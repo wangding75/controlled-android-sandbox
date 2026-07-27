@@ -46,7 +46,7 @@ final class LegacyPackageLayoutMigrator {
         if (!layout.isInsidePackagesRoot(sourceApk) || !sourceApk.isFile()) {
             throw new SecurityException("LEGACY_PACKAGE_PATH_INVALID: " + record.packageName);
         }
-        if (!record.sha256.equalsIgnoreCase(ApkImportManager.sha256(sourceApk))) {
+        if (!record.baseApkSha256.equalsIgnoreCase(ApkImportManager.sha256(sourceApk))) {
             throw new SecurityException("LEGACY_PACKAGE_DIGEST_MISMATCH: " + record.packageName);
         }
 
@@ -102,7 +102,7 @@ final class LegacyPackageLayoutMigrator {
 
     private static void requirePublishedRevision(SandboxRecord record, File apk,
                                                  File nativeDirectory) throws Exception {
-        if (!apk.isFile() || !record.sha256.equalsIgnoreCase(ApkImportManager.sha256(apk))) {
+        if (!apk.isFile() || !record.baseApkSha256.equalsIgnoreCase(ApkImportManager.sha256(apk))) {
             throw new SecurityException("MIGRATED_REVISION_DIGEST_MISMATCH: " + record.packageName);
         }
         if (!record.nativeLibraryDir.trim().isEmpty() && !nativeDirectory.isDirectory()) {

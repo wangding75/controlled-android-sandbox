@@ -73,6 +73,31 @@ public final class PackageManagementService extends Service {
                             lifecycle.importApkFile(new File(required(sourcePath, "sourcePath"))))));
         }
 
+        @Override public PackageServiceResult createInstallSession(String expectedPackageName) {
+            return execute("createInstallSession", () -> PackageServiceResult.successInt(
+                    "createInstallSession", lifecycle.createInstallSession(
+                            expectedPackageName == null ? "" : expectedPackageName.trim())));
+        }
+
+        @Override public PackageServiceResult addInstallArtifact(int sessionId, String sourceUri) {
+            return execute("addInstallArtifact", () -> PackageServiceResult.successText(
+                    "addInstallArtifact", lifecycle.addInstallArtifact(sessionId,
+                            Uri.parse(required(sourceUri, "sourceUri")))));
+        }
+
+        @Override public PackageServiceResult commitInstallSession(int sessionId) {
+            return execute("commitInstallSession", () -> PackageServiceResult.successRecord(
+                    "commitInstallSession", PackageServiceMapper.toSnapshot(
+                            lifecycle.commitInstallSession(sessionId))));
+        }
+
+        @Override public PackageServiceResult abandonInstallSession(int sessionId) {
+            return execute("abandonInstallSession", () -> {
+                lifecycle.abandonInstallSession(sessionId);
+                return PackageServiceResult.success("abandonInstallSession");
+            });
+        }
+
         @Override public PackageServiceResult findRecord(String packageName) {
             return execute("findRecord", () -> PackageServiceResult.successRecord(
                     "findRecord", PackageServiceMapper.toSnapshot(

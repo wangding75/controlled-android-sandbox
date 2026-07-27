@@ -17,17 +17,26 @@ final class SandboxPackageLifecycle {
     private final Context context;
     private final SandboxCatalogRepository catalogRepository;
     private final ApkImportManager importer;
+    private final PackageInstallSessionStore installSessions;
     private String maintenanceWarning = "";
 
     SandboxPackageLifecycle(Context context) {
         this.context = context.getApplicationContext();
         catalogRepository = new SandboxCatalogRepository(this.context);
         importer = new ApkImportManager(this.context);
+        installSessions = new PackageInstallSessionStore(this.context.getFilesDir());
     }
 
     synchronized SandboxCatalogState load() throws Exception {
         SandboxCatalogState state = catalogRepository.load();
-        sweepUnreferencedFiles(state);
+        List<String> cleanupFailures = new ArrayList<>();
+        try {
+            installSessions.sweepStale(24L * 60 * 60 * 1000);
+        } catch (Exception cleanupFailure) {
+            cleanupFailures.add("Install-session maintenance failed: " + cleanupFailure.getMessage());
+        }
+        sweepUnreferencedFiles(state, cleanupFailures);
+        maintenanceWarning = formatMaintenanceWarning(cleanupFailures);
         return state;
     }
 
@@ -39,6 +48,46 @@ final class SandboxPackageLifecycle {
     synchronized SandboxRecord importApkFile(File source) throws Exception {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current, importer.importApkFile(source, current.records()));
+    }
+
+    synchronized int createInstallSession(String expectedPackageName) throws Exception {
+        return installSessions.create(expectedPackageName);
+    }
+
+    synchronized String addInstallArtifact(int sessionId, Uri source) throws Exception {
+        if (source == null) throw new IllegalArgumentException("source URI is required");
+        return installSessions.addArtifact(sessionId,
+                context.getContentResolver().openInputStream(source));
+    }
+
+    synchronized SandboxRecord commitInstallSession(int sessionId) throws Exception {
+        PackageInstallSessionStore.PreparedSession prepared = installSessions.seal(sessionId);
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxRecord committed;
+        try {
+            SandboxRecord imported = importer.importApkFiles(prepared.artifacts, current.records());
+            if (!prepared.expectedPackageName.isEmpty()
+                    && !prepared.expectedPackageName.equals(imported.packageName)) {
+                deletePublishedRevisionIfUnreferenced(current, imported);
+                throw new SecurityException("INSTALL_SESSION_PACKAGE_MISMATCH");
+            }
+            committed = commitImported(current, imported);
+        } catch (Exception error) {
+            try { installSessions.reopenAfterFailure(sessionId); }
+            catch (Exception reopenFailure) { error.addSuppressed(reopenFailure); }
+            throw error;
+        }
+        try {
+            installSessions.complete(sessionId);
+        } catch (Exception cleanupFailure) {
+            maintenanceWarning = "Committed install session cleanup failed: "
+                    + cleanupFailure.getMessage();
+        }
+        return committed;
+    }
+
+    synchronized void abandonInstallSession(int sessionId) throws Exception {
+        installSessions.abandon(sessionId);
     }
 
     synchronized SandboxRecord findRecord(String packageName) throws Exception {

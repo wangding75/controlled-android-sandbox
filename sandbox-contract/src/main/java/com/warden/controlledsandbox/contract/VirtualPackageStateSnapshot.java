@@ -18,6 +18,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private final String launchActivity;
     private final String applicationClass;
     private final boolean enabled;
+    private final ArrayList<String> splitNames;
+    private final ArrayList<String> sharedLibraries;
     private final ArrayList<VirtualComponentSnapshot> components;
     private final ArrayList<VirtualPermissionSnapshot> permissions;
     private final ArrayList<PackageAppOpSnapshot> appOps;
@@ -30,6 +32,20 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<VirtualComponentSnapshot> components,
                                        List<VirtualPermissionSnapshot> permissions,
                                        List<PackageAppOpSnapshot> appOps) {
+        this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
+                apkSha256, launchActivity, applicationClass, enabled, List.of(), List.of(),
+                components, permissions, appOps);
+    }
+
+    public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
+                                       String versionName, long versionCode,
+                                       String signatureSha256, String apkSha256,
+                                       String launchActivity, String applicationClass,
+                                       boolean enabled, List<String> splitNames,
+                                       List<String> sharedLibraries,
+                                       List<VirtualComponentSnapshot> components,
+                                       List<VirtualPermissionSnapshot> permissions,
+                                       List<PackageAppOpSnapshot> appOps) {
         this.packageName = required(packageName, "packageName");
         if (virtualUserId < 0 || virtualUserId > 999) {
             throw new IllegalArgumentException("virtualUserId out of range");
@@ -39,10 +55,12 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         this.versionName = value(versionName);
         this.versionCode = versionCode;
         this.signatureSha256 = required(signatureSha256, "signatureSha256");
-        this.apkSha256 = required(apkSha256, "apkSha256");
+        this.apkSha256 = digest(apkSha256, "apkSha256");
         this.launchActivity = value(launchActivity);
         this.applicationClass = value(applicationClass);
         this.enabled = enabled;
+        this.splitNames = validatedNames(splitNames, "splitName", 255);
+        this.sharedLibraries = validatedNames(sharedLibraries, "sharedLibrary", 1024);
         this.components = new ArrayList<>(components == null ? List.of() : components);
         this.permissions = new ArrayList<>(permissions == null ? List.of() : permissions);
         this.appOps = new ArrayList<>(appOps == null ? List.of() : appOps);
@@ -51,7 +69,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private VirtualPackageStateSnapshot(Parcel in) {
         this(in.readString(), in.readInt(), in.readString(), in.readString(), in.readLong(),
                 in.readString(), in.readString(), in.readString(), in.readString(),
-                in.readInt() != 0,
+                in.readInt() != 0, in.createStringArrayList(), in.createStringArrayList(),
                 in.createTypedArrayList(VirtualComponentSnapshot.CREATOR),
                 in.createTypedArrayList(VirtualPermissionSnapshot.CREATOR),
                 in.createTypedArrayList(PackageAppOpSnapshot.CREATOR));
@@ -67,6 +85,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     public String launchActivity() { return launchActivity; }
     public String applicationClass() { return applicationClass; }
     public boolean enabled() { return enabled; }
+    public List<String> splitNames() { return Collections.unmodifiableList(splitNames); }
+    public List<String> sharedLibraries() { return Collections.unmodifiableList(sharedLibraries); }
     public List<VirtualComponentSnapshot> components() { return Collections.unmodifiableList(components); }
     public List<VirtualPermissionSnapshot> permissions() { return Collections.unmodifiableList(permissions); }
     public List<PackageAppOpSnapshot> appOps() { return Collections.unmodifiableList(appOps); }
@@ -75,8 +95,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         out.writeString(packageName); out.writeInt(virtualUserId); out.writeString(label);
         out.writeString(versionName); out.writeLong(versionCode); out.writeString(signatureSha256);
         out.writeString(apkSha256); out.writeString(launchActivity); out.writeString(applicationClass);
-        out.writeInt(enabled ? 1 : 0); out.writeTypedList(components); out.writeTypedList(permissions);
-        out.writeTypedList(appOps);
+        out.writeInt(enabled ? 1 : 0); out.writeStringList(splitNames); out.writeStringList(sharedLibraries);
+        out.writeTypedList(components); out.writeTypedList(permissions); out.writeTypedList(appOps);
     }
     @Override public int describeContents() { return 0; }
 
@@ -89,9 +109,28 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         }
     };
 
+    private static ArrayList<String> validatedNames(List<String> input, String name, int maximum) {
+        ArrayList<String> output = new ArrayList<>();
+        java.util.Set<String> unique = new java.util.HashSet<>();
+        if (input == null) return output;
+        if (input.size() > maximum) throw new IllegalArgumentException(name + " list is too large");
+        for (String value : input) {
+            String normalized = required(value, name);
+            if (!unique.add(normalized)) throw new IllegalArgumentException("Duplicate " + name + ": " + normalized);
+            output.add(normalized);
+        }
+        return output;
+    }
+    private static String digest(String value, String name) {
+        String normalized = required(value, name).toLowerCase(java.util.Locale.ROOT);
+        if (!normalized.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(name + " must contain 64 hexadecimal characters");
+        }
+        return normalized;
+    }
     private static String required(String value, String name) {
         if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " is required");
-        return value;
+        return value.trim();
     }
     private static String value(String value) { return value == null ? "" : value; }
 }

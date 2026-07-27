@@ -1,6 +1,9 @@
 package com.warden.controlledsandbox;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Canonical app-private location policy for immutable package revisions. */
 final class PackageStorageLayout {
@@ -12,26 +15,32 @@ final class PackageStorageLayout {
     }
 
     File packagesRoot() { return packagesRoot; }
+    File packageDirectory(String packageName) { return new File(packagesRoot, safeSegment(packageName)); }
+    File revisionsDirectory(String packageName) { return new File(packageDirectory(packageName), "revisions"); }
 
-    File packageDirectory(String packageName) {
-        return new File(packagesRoot, safeSegment(packageName));
+    File revisionDirectory(String packageName, String revisionSha256) {
+        requireDigest(revisionSha256);
+        return new File(revisionsDirectory(packageName), revisionSha256.toLowerCase(java.util.Locale.ROOT));
     }
 
-    File revisionsDirectory(String packageName) {
-        return new File(packageDirectory(packageName), "revisions");
+    File apkFile(String packageName, String revisionSha256) {
+        return new File(revisionDirectory(packageName, revisionSha256), "base.apk");
     }
 
-    File revisionDirectory(String packageName, String sha256) {
-        requireDigest(sha256);
-        return new File(revisionsDirectory(packageName), sha256.toLowerCase(java.util.Locale.ROOT));
+    File splitDirectory(String packageName, String revisionSha256) {
+        return new File(revisionDirectory(packageName, revisionSha256), "splits");
     }
 
-    File apkFile(String packageName, String sha256) {
-        return new File(revisionDirectory(packageName, sha256), "base.apk");
+    File splitApkFile(String packageName, String revisionSha256, String splitName) {
+        if (splitName == null || splitName.trim().isEmpty()) {
+            throw new IllegalArgumentException("splitName is required");
+        }
+        return new File(splitDirectory(packageName, revisionSha256),
+                "split_" + PackageArtifactRecord.safe(splitName) + ".apk");
     }
 
-    File nativeLibraryDirectory(String packageName, String sha256) {
-        return new File(revisionDirectory(packageName, sha256), "lib");
+    File nativeLibraryDirectory(String packageName, String revisionSha256) {
+        return new File(revisionDirectory(packageName, revisionSha256), "lib");
     }
 
     void requireCatalogLayout(SandboxCatalogState state) throws Exception {
@@ -45,7 +54,7 @@ final class PackageStorageLayout {
         requireInsidePackagesRoot(expectedApk);
         File configuredApk = new File(record.apkPath);
         requireNoManagedSymlinks(configuredApk);
-        if (java.nio.file.Files.isSymbolicLink(configuredApk.toPath())) {
+        if (Files.isSymbolicLink(configuredApk.toPath())) {
             throw new SecurityException("PACKAGE_APK_PATH_IS_SYMBOLIC_LINK: " + record.packageName);
         }
         File actualApk = configuredApk.getCanonicalFile();
@@ -55,6 +64,41 @@ final class PackageStorageLayout {
         if (!actualApk.isFile()) {
             throw new SecurityException("PACKAGE_REVISION_APK_MISSING: " + record.packageName);
         }
+
+        int baseCount = 0;
+        Set<String> splitNames = new HashSet<>();
+        for (PackageArtifactRecord artifact : record.artifacts) {
+            File expected = artifact.base()
+                    ? expectedApk
+                    : splitApkFile(record.packageName, record.sha256, artifact.splitName).getCanonicalFile();
+            requireInsidePackagesRoot(expected);
+            File configured = new File(artifact.path);
+            requireNoManagedSymlinks(configured);
+            if (Files.isSymbolicLink(configured.toPath()) || !configured.isFile()) {
+                throw new SecurityException("PACKAGE_ARTIFACT_MISSING: " + artifact.splitName);
+            }
+            if (!expected.equals(configured.getCanonicalFile())) {
+                throw new SecurityException("PACKAGE_ARTIFACT_PATH_MISMATCH: " + artifact.splitName);
+            }
+            String actualDigest = ApkImportManager.sha256(configured);
+            if (!artifact.sha256.equals(actualDigest)) {
+                throw new SecurityException("PACKAGE_ARTIFACT_DIGEST_MISMATCH: " + artifact.splitName);
+            }
+            if (artifact.base()) {
+                baseCount++;
+                if (!artifact.sha256.equals(record.baseApkSha256)) {
+                    throw new SecurityException("PACKAGE_BASE_DIGEST_MISMATCH: " + record.packageName);
+                }
+            } else if (!splitNames.add(artifact.splitName)) {
+                throw new SecurityException("PACKAGE_DUPLICATE_SPLIT: " + artifact.splitName);
+            }
+        }
+        if (baseCount != 1) throw new SecurityException("PACKAGE_BASE_ARTIFACT_COUNT_INVALID");
+        String computedRevision = ApkImportManager.revisionDigestRecords(record.artifacts);
+        if (!record.sha256.equals(computedRevision)) {
+            throw new SecurityException("PACKAGE_REVISION_DIGEST_MISMATCH: " + record.packageName);
+        }
+
         if (!record.nativeLibraryDir.trim().isEmpty()) {
             File configuredExpectedNative = nativeLibraryDirectory(record.packageName, record.sha256);
             requireNoManagedSymlinks(configuredExpectedNative);
@@ -62,7 +106,7 @@ final class PackageStorageLayout {
             requireInsidePackagesRoot(expectedNative);
             File configuredNative = new File(record.nativeLibraryDir);
             requireNoManagedSymlinks(configuredNative);
-            if (java.nio.file.Files.isSymbolicLink(configuredNative.toPath())) {
+            if (Files.isSymbolicLink(configuredNative.toPath())) {
                 throw new SecurityException("PACKAGE_NATIVE_PATH_IS_SYMBOLIC_LINK: " + record.packageName);
             }
             File actualNative = configuredNative.getCanonicalFile();
@@ -94,13 +138,13 @@ final class PackageStorageLayout {
             throw new SecurityException("PACKAGE_PATH_OUTSIDE_MANAGED_ROOT: " + file);
         }
         java.nio.file.Path current = root;
-        if (java.nio.file.Files.isSymbolicLink(current)) {
+        if (Files.isSymbolicLink(current)) {
             throw new SecurityException("PACKAGE_PATH_CONTAINS_SYMBOLIC_LINK: " + current);
         }
         java.nio.file.Path relative = root.relativize(candidate);
         for (java.nio.file.Path part : relative) {
             current = current.resolve(part);
-            if (java.nio.file.Files.isSymbolicLink(current)) {
+            if (Files.isSymbolicLink(current)) {
                 throw new SecurityException("PACKAGE_PATH_CONTAINS_SYMBOLIC_LINK: " + current);
             }
         }
@@ -108,7 +152,7 @@ final class PackageStorageLayout {
 
     private static void requireDigest(String value) {
         if (value == null || !value.matches("[0-9a-fA-F]{64}")) {
-            throw new IllegalArgumentException("APK SHA-256 must contain 64 hexadecimal characters");
+            throw new IllegalArgumentException("Revision SHA-256 must contain 64 hexadecimal characters");
         }
     }
 

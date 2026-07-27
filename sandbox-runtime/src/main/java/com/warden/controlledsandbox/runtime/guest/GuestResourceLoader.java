@@ -8,17 +8,25 @@ import java.lang.reflect.Method;
 public final class GuestResourceLoader {
     private GuestResourceLoader() { }
 
-    static LoadedResources load(Context host, String apkPath) throws Exception {
+    static LoadedResources load(Context host, String apkPath, String[] splitPaths) throws Exception {
         AssetManager assets = AssetManager.class.getDeclaredConstructor().newInstance();
         Method addAssetPath = AssetManager.class.getDeclaredMethod("addAssetPath", String.class);
         addAssetPath.setAccessible(true);
-        Object cookie = addAssetPath.invoke(assets, apkPath);
-        if (!(cookie instanceof Integer) || ((Integer) cookie) == 0) {
-            throw new IllegalStateException("AssetManager rejected Guest APK");
+        addRequiredAssetPath(addAssetPath, assets, apkPath, "base");
+        if (splitPaths != null) {
+            for (String splitPath : splitPaths) addRequiredAssetPath(addAssetPath, assets, splitPath, "split");
         }
         Resources hostResources = host.getResources();
         Resources resources = new Resources(assets, hostResources.getDisplayMetrics(), hostResources.getConfiguration());
         return new LoadedResources(assets, resources);
+    }
+
+    private static void addRequiredAssetPath(Method addAssetPath, AssetManager assets,
+                                             String path, String kind) throws Exception {
+        Object cookie = addAssetPath.invoke(assets, path);
+        if (!(cookie instanceof Integer) || ((Integer) cookie) == 0) {
+            throw new IllegalStateException("AssetManager rejected Guest " + kind + " APK: " + path);
+        }
     }
 
     static final class LoadedResources {

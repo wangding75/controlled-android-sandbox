@@ -86,6 +86,26 @@ final class RuntimeClient implements AutoCloseable {
                 ? record.packageName : processName);
         request.putString(RuntimeKeys.APK_PATH, record.apkPath);
         request.putString(RuntimeKeys.APK_SHA256, record.sha256);
+        request.putString(RuntimeKeys.BASE_APK_SHA256, record.baseApkSha256);
+        ArrayList<String> splitNames = new ArrayList<>();
+        ArrayList<String> splitTypes = new ArrayList<>();
+        ArrayList<String> splitConfigFor = new ArrayList<>();
+        ArrayList<String> splitUses = new ArrayList<>();
+        ArrayList<String> splitPaths = new ArrayList<>();
+        ArrayList<String> splitSha256s = new ArrayList<>();
+        for (PackageArtifactRecord artifact : record.artifacts) {
+            if (artifact.base()) continue;
+            splitNames.add(artifact.splitName); splitTypes.add(artifact.type);
+            splitConfigFor.add(artifact.configForSplit); splitUses.add(artifact.usesSplit);
+            splitPaths.add(artifact.path); splitSha256s.add(artifact.sha256);
+        }
+        request.putStringArrayList(RuntimeKeys.SPLIT_NAMES, splitNames);
+        request.putStringArrayList(RuntimeKeys.SPLIT_TYPES, splitTypes);
+        request.putStringArrayList(RuntimeKeys.SPLIT_CONFIG_FOR, splitConfigFor);
+        request.putStringArrayList(RuntimeKeys.SPLIT_USES, splitUses);
+        request.putStringArrayList(RuntimeKeys.SPLIT_PATHS, splitPaths);
+        request.putStringArrayList(RuntimeKeys.SPLIT_SHA256S, splitSha256s);
+        request.putString(RuntimeKeys.SHARED_LIBRARIES, record.sharedLibraries);
         request.putLong(RuntimeKeys.APK_VERSION_CODE, record.versionCode);
         request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, record.nativeLibraryDir);
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);

@@ -13,8 +13,8 @@ import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
-import java.io.File;
 import java.util.concurrent.CountDownLatch;
+import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 /** Main-process client for the Binder-owned package authority. */
@@ -59,6 +59,24 @@ final class PackageServiceClient implements AutoCloseable {
 
     SandboxRecord importApkFile(File source) throws Exception {
         return record(requireSession().importApkFile(source == null ? "" : source.getAbsolutePath()));
+    }
+
+    int createInstallSession(String expectedPackageName) throws Exception {
+        return requireSuccess(requireSession().createInstallSession(
+                expectedPackageName == null ? "" : expectedPackageName)).intValue();
+    }
+
+    String addInstallArtifact(int sessionId, Uri source) throws Exception {
+        return requireSuccess(requireSession().addInstallArtifact(sessionId,
+                source == null ? "" : source.toString())).textValue();
+    }
+
+    SandboxRecord commitInstallSession(int sessionId) throws Exception {
+        return record(requireSession().commitInstallSession(sessionId));
+    }
+
+    void abandonInstallSession(int sessionId) throws Exception {
+        requireSuccess(requireSession().abandonInstallSession(sessionId));
     }
 
     SandboxRecord findRecord(String packageName) throws Exception {

@@ -51,6 +51,8 @@ public final class GuestContext extends ContextWrapper {
         applicationInfo.packageName = spec.packageName;
         applicationInfo.sourceDir = spec.apkPath;
         applicationInfo.publicSourceDir = spec.apkPath;
+        applicationInfo.splitSourceDirs = spec.splitPathArray();
+        applicationInfo.splitPublicSourceDirs = spec.splitPathArray();
         applicationInfo.nativeLibraryDir = spec.nativeLibraryDir;
         applicationInfo.dataDir = dataRoot.getAbsolutePath();
         applicationInfo.uid = spec.virtualUid;
@@ -167,7 +169,7 @@ public final class GuestContext extends ContextWrapper {
 
     @Override public Context createContextForSplit(String splitName)
             throws PackageManager.NameNotFoundException {
-        if (splitName == null || splitName.trim().isEmpty()) return this;
+        if (splitName != null && !splitName.trim().isEmpty() && spec.hasSplit(splitName)) return this;
         throw new PackageManager.NameNotFoundException("Guest split is not installed: " + splitName);
     }
 

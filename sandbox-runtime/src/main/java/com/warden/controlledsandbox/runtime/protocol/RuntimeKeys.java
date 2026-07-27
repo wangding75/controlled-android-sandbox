@@ -13,6 +13,14 @@ public final class RuntimeKeys {
     public static final String PROCESS_NAME = "processName";
     public static final String APK_PATH = "apkPath";
     public static final String APK_SHA256 = "apkSha256";
+    public static final String BASE_APK_SHA256 = "baseApkSha256";
+    public static final String SPLIT_NAMES = "splitNames";
+    public static final String SPLIT_TYPES = "splitTypes";
+    public static final String SPLIT_CONFIG_FOR = "splitConfigFor";
+    public static final String SPLIT_USES = "splitUses";
+    public static final String SPLIT_PATHS = "splitPaths";
+    public static final String SPLIT_SHA256S = "splitSha256s";
+    public static final String SHARED_LIBRARIES = "sharedLibraries";
     public static final String APK_VERSION_CODE = "apkVersionCode";
     public static final String PACKAGE_REVISION = "packageRevision";
     public static final String NATIVE_LIBRARY_DIR = "nativeLibraryDir";

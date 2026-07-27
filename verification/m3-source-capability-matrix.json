@@ -629,6 +629,81 @@
       "sourceStatus": "complete",
       "productionStatus": "not-applicable",
       "deviceStatus": "not-applicable"
+    },
+    {
+      "id": "package.install-session",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",
+        "app/src/main/java/com/warden/controlledsandbox/MainActivity.java",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageInstallSessionStoreSelfTest.java",
+        "scripts/check-split-install-sessions.py"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Persisted Binder-owned staged sessions support multi-select import, seal/retry/abandon, bounded artifact copying and stale cleanup. Android document-provider grants and process-death behavior remain untested."
+    },
+    {
+      "id": "package.split-manifest-model",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/ManifestModel.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
+        "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageArtifactRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageArtifactOrder.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageArtifactOrderSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Base, feature and configuration split metadata is validated and dependency ordered. Full Android PackageInstaller parity and every manifest edge case are not claimed."
+    },
+    {
+      "id": "package.multi-artifact-revision",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageStorageLayout.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/PackageRevisionSetVerifier.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/PackageRevisionSetVerifierSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Every APK artifact has an immutable digest and the package revision is a deterministic set digest; Binder and Guest verify the complete set before use."
+    },
+    {
+      "id": "runtime.split-class-resource-loading",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestResourceLoader.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Dependency-ordered split APK paths feed class loading, resources, ApplicationInfo and createContextForSplit. ART and AssetManager behavior still requires Android validation."
+    },
+    {
+      "id": "package.shared-library-declarations",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "uses-library names are retained in package and runtime metadata. Library resolution, required/optional semantics, native shared-library namespaces and device availability checks are not implemented."
     }
   ],
   "statusDimensions": {

@@ -70,10 +70,10 @@ if not errors:
 
     required_importer = [
         'storageLayout.revisionsDirectory(packageName)',
-        'storageLayout.revisionDirectory(packageName, sha)',
+        'storageLayout.revisionDirectory(packageName, revisionSha256)',
         'storageLayout.requireNoManagedSymlinks(revisionDir)',
         'IMMUTABLE_REVISION_DIRECTORY_MISMATCH',
-        'IMMUTABLE_REVISION_NATIVE_MISMATCH',
+        'IMMUTABLE_REVISION_CONTENT_MISMATCH',
         'publishDirectory(transactionDir, revisionDir);',
         'Files.isSymbolicLink(path)',
         'StandardCopyOption.ATOMIC_MOVE',
@@ -121,7 +121,7 @@ if not errors:
     for fragment in forbidden_activity:
         if fragment in text['activity']:
             errors.append(f'MainActivity bypasses lifecycle authority: {fragment}')
-    for required in ['packageService.importApk(uri)', 'packageService.createClone(',
+    for required in ['packageService.importApk(selected.get(0))', 'packageService.createClone(',
                      'packageService.deleteInstance(', 'packageService.updateInstanceStatus(']:
         if required not in text['activity']:
             errors.append(f'MainActivity lifecycle wiring missing: {required}')

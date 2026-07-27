@@ -11,7 +11,8 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - DONE — ABI-native extraction protections.
 - DONE — one validated atomic package/virtual-instance catalog with legacy migration and post-commit orphan cleanup.
 - DONE — package lifecycle mutations are serialized by a dedicated Binder-owned package service with a PID/UID-bound management capability.
-- PARTIAL — split APK/install sessions, shared-library state and dex/cache rollback remain open.
+- DONE — staged Binder-owned install sessions, Base/Feature/Configuration Split validation, immutable multi-artifact revisions and dependency-ordered product import/runtime paths.
+- PARTIAL — shared-library resolution, dex/oat cache ownership, install rollback history and PackageInstaller parity remain open.
 
 ## Runtime control plane
 

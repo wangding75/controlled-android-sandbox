@@ -2,7 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
-import com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifier;
+import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Application;
@@ -42,7 +42,8 @@ public final class GuestRuntimeEnvironment {
             boolean nativeCrashRecorderInstalled = RuntimeDiagnostics.nativeCrashFile() != null
                     && NativePolicy.installCrashRecorder(RuntimeDiagnostics.nativeCrashFile().getAbsolutePath());
             com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
-                    ApkRevisionVerifier.verify(spec.apkFile(), spec.apkVersionCode, spec.apkSha256);
+                    PackageRevisionSetVerifier.verify(spec.apkFile(), spec.baseApkSha256,
+                            spec.splitArtifacts(), spec.apkVersionCode, spec.apkSha256);
             if (!verifiedRevision.canonical().equals(spec.packageRevision)) {
                 throw new SecurityException("PACKAGE_REVISION_MISMATCH");
             }
@@ -58,9 +59,10 @@ public final class GuestRuntimeEnvironment {
             File optimized = new File(host.getCodeCacheDir(), "guest/" + safe(spec.packageName)
                     + "/" + safe(spec.packageRevision) + "/" + spec.generation);
             ensureDirectory(optimized);
-            GuestClassLoader loader = new GuestClassLoader(spec.apkPath, optimized.getAbsolutePath(),
+            GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader());
-            GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(host, spec.apkPath);
+            GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
+                    host, spec.apkPath, spec.splitPathArray());
             GuestContext guestContext = new GuestContext(host, spec, loader, loadedResources.resources, loadedResources.assets);
             boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
                     spec.packageName, spec.virtualUserId, spec.dataRoot, spec.apkPath,

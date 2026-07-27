@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import android.os.Parcel;
+import com.warden.controlledsandbox.contract.PackageArtifactSnapshot;
 import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageInstanceSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
@@ -23,7 +24,15 @@ public final class PackageServiceContractSelfTest {
                 "com.example.fixture", ".FixtureReceiver", "com.example.fixture",
                 "com.example.ACTION", ".FixtureProvider", "com.example.fixture",
                 "com.example.fixture.provider", "android.permission.INTERNET",
+                "org.apache.http.legacy",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                List.of(new PackageArtifactSnapshot("", "BASE", "", "",
+                                "/files/packages/com.example.fixture/revisions/abc/base.apk",
+                                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                        new PackageArtifactSnapshot("payments", "FEATURE", "", "",
+                                "/files/packages/com.example.fixture/revisions/abc/splits/split_payments.apk",
+                                "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")),
                 10, "NOT_TESTED", 0);
         PackageInstanceSnapshot instance = new PackageInstanceSnapshot(
                 "com.example.fixture", 3, "Clone 3", 11, "READY", 12);
@@ -48,11 +57,18 @@ public final class PackageServiceContractSelfTest {
                 "virtual user identity lost");
         require("cleanup pending".equals(restored.catalog().maintenanceWarning()),
                 "maintenance warning lost");
+        require(restored.catalog().packages().get(0).artifacts().size() == 2,
+                "artifact list lost");
+        require("payments".equals(restored.catalog().packages().get(0).artifacts().get(1).splitName()),
+                "split identity lost");
+        require("org.apache.http.legacy".equals(restored.catalog().packages().get(0).sharedLibraries()),
+                "shared library metadata lost");
 
         VirtualPackageStateSnapshot packageState = new VirtualPackageStateSnapshot(
                 "com.example.fixture", 3, "Fixture", "1.0", 1L, "signer",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "com.example.fixture.MainActivity", "com.example.fixture.FixtureApplication", true,
+                List.of("payments"), List.of("org.apache.http.legacy"),
                 List.of(new VirtualComponentSnapshot("ACTIVITY",
                         "com.example.fixture.MainActivity", "com.example.fixture", true, true,
                         false, "", "", List.of("android.intent.action.MAIN"))),
@@ -70,6 +86,10 @@ public final class PackageServiceContractSelfTest {
                 "permission decision lost");
         require("IGNORED".equals(restoredState.packageState().appOps().get(0).mode()),
                 "AppOps mode lost");
+        require(restoredState.packageState().splitNames().equals(List.of("payments")),
+                "virtual split names lost");
+        require(restoredState.packageState().sharedLibraries().equals(List.of("org.apache.http.legacy")),
+                "virtual shared libraries lost");
         boolean contradictionRejected = false;
         try { new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", true); }
         catch (IllegalArgumentException expected) { contradictionRejected = true; }

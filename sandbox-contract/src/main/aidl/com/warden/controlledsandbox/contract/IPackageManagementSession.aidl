@@ -6,6 +6,10 @@ interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
     PackageServiceResult importApk(String uri);
     PackageServiceResult importApkFile(String sourcePath);
+    PackageServiceResult createInstallSession(String expectedPackageName);
+    PackageServiceResult addInstallArtifact(int sessionId, String sourceUri);
+    PackageServiceResult commitInstallSession(int sessionId);
+    PackageServiceResult abandonInstallSession(int sessionId);
     PackageServiceResult findRecord(String packageName);
     PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);
     PackageServiceResult setPermissionDecision(String packageName, int virtualUserId, String permission, String decision);

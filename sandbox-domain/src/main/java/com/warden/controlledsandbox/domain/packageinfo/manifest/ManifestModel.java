@@ -10,6 +10,10 @@ public final class ManifestModel {
     private String packageName = "";
     private String applicationClass = "";
     private String applicationPermission = "";
+    private String splitName = "";
+    private String configForSplit = "";
+    private String usesSplit = "";
+    private boolean featureSplit;
     private int minSdk;
     private int targetSdk;
     private final List<Component> activities = new ArrayList<>();
@@ -17,12 +21,21 @@ public final class ManifestModel {
     private final List<Component> receivers = new ArrayList<>();
     private final List<Component> providers = new ArrayList<>();
     private final List<String> permissions = new ArrayList<>();
+    private final List<String> sharedLibraries = new ArrayList<>();
 
     public String packageName() { return packageName; }
     public void packageName(String value) { packageName = value == null ? "" : value; }
     public String applicationClass() { return applicationClass; }
     public void applicationClass(String value) { applicationClass = resolveClassName(value); }
     public String applicationPermission() { return applicationPermission; }
+    public String splitName() { return splitName; }
+    public void splitName(String value) { splitName = normalize(value); }
+    public String configForSplit() { return configForSplit; }
+    public void configForSplit(String value) { configForSplit = normalize(value); }
+    public String usesSplit() { return usesSplit; }
+    public void usesSplit(String value) { usesSplit = normalize(value); }
+    public boolean featureSplit() { return featureSplit; }
+    public void featureSplit(boolean value) { featureSplit = value; }
     public void applicationPermission(String value) { applicationPermission = value == null ? "" : value.trim(); }
     public int minSdk() { return minSdk; }
     public void minSdk(int value) { minSdk = value; }
@@ -33,11 +46,16 @@ public final class ManifestModel {
     public List<Component> receivers() { return Collections.unmodifiableList(receivers); }
     public List<Component> providers() { return Collections.unmodifiableList(providers); }
     public List<String> permissions() { return Collections.unmodifiableList(permissions); }
+    public List<String> sharedLibraries() { return Collections.unmodifiableList(sharedLibraries); }
 
     public void addActivity(Component component) { activities.add(component); }
     public void addService(Component component) { services.add(component); }
     public void addReceiver(Component component) { receivers.add(component); }
     public void addProvider(Component component) { providers.add(component); }
+    public void addSharedLibrary(String library) {
+        if (library != null && !library.trim().isEmpty() && !sharedLibraries.contains(library.trim())) sharedLibraries.add(library.trim());
+    }
+
     public void addPermission(String permission) {
         if (permission != null && !permission.trim().isEmpty() && !permissions.contains(permission)) permissions.add(permission);
     }

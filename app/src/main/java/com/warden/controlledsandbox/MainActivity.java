@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import android.app.Activity;
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -12,7 +13,9 @@ import android.widget.Toast;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.domain.persistence.PersistentStateException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -67,27 +70,68 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/vnd.android.package-archive");
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         startActivityForResult(intent, REQUEST_APK);
     }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_APK || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        Uri uri = data.getData();
-        runtimeStatus.setText("Importing APK…");
-        worker.execute(() -> {
-            try {
-                SandboxRecord imported = packageService.importApk(uri);
-                runOnUiThread(() -> {
-                    runtimeStatus.setText(operationMessage("Imported " + imported.packageName));
-                    refresh();
-                });
-            } catch (Exception error) {
-                runOnUiThread(() -> {
-                    runtimeStatus.setText("Import failed");
-                    Toast.makeText(this, error.getClass().getSimpleName() + ": " + error.getMessage(), Toast.LENGTH_LONG).show();
-                });
+        if (requestCode != REQUEST_APK || resultCode != RESULT_OK || data == null) return;
+        List<Uri> selected = selectedUris(data);
+        if (selected.isEmpty()) return;
+        runtimeStatus.setText(selected.size() == 1 ? "Importing APK…"
+                : "Importing " + selected.size() + " APK artifacts…");
+        worker.execute(() -> importSelection(selected));
+    }
+
+
+    private void importSelection(List<Uri> selected) {
+        int sessionId = -1;
+        try {
+            SandboxRecord imported;
+            if (selected.size() == 1) {
+                imported = packageService.importApk(selected.get(0));
+            } else {
+                sessionId = packageService.createInstallSession("");
+                for (Uri uri : selected) packageService.addInstallArtifact(sessionId, uri);
+                imported = packageService.commitInstallSession(sessionId);
+                sessionId = -1;
             }
+            SandboxRecord completed = imported;
+            runOnUiThread(() -> {
+                runtimeStatus.setText(operationMessage("Imported " + completed.packageName
+                        + " · artifacts=" + completed.artifacts.size()));
+                refresh();
+            });
+        } catch (Exception error) {
+            if (sessionId > 0) {
+                try { packageService.abandonInstallSession(sessionId); }
+                catch (Exception cleanupFailure) { error.addSuppressed(cleanupFailure); }
+            }
+            showImportFailure(error);
+        }
+    }
+
+    private static List<Uri> selectedUris(Intent data) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<Uri> result = new ArrayList<>();
+        Uri direct = data.getData();
+        if (direct != null && seen.add(direct.toString())) result.add(direct);
+        ClipData clip = data.getClipData();
+        if (clip != null) {
+            for (int index = 0; index < clip.getItemCount(); index++) {
+                Uri uri = clip.getItemAt(index).getUri();
+                if (uri != null && seen.add(uri.toString())) result.add(uri);
+            }
+        }
+        return result;
+    }
+
+    private void showImportFailure(Exception error) {
+        runOnUiThread(() -> {
+            runtimeStatus.setText("Import failed");
+            Toast.makeText(this, error.getClass().getSimpleName() + ": " + error.getMessage(),
+                    Toast.LENGTH_LONG).show();
         });
     }
 

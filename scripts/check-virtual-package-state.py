@@ -57,9 +57,9 @@ require(
 
 repository = require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java',
-    'SCHEMA_VERSION = 2',
+    'SCHEMA_VERSION = 3',
     'root.put("policies", policies)',
-    'version != 1 && version != SCHEMA_VERSION',
+    'version != 1 && version != 2 && version != SCHEMA_VERSION',
     'new SandboxCatalogState(packages, instances, policies)',
 )
 state = require(

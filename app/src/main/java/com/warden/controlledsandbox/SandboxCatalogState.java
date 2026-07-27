@@ -209,8 +209,21 @@ final class SandboxCatalogState {
             }
             if (record.packageName.trim().isEmpty() || record.versionCode < 0
                     || record.signatureSha256.trim().isEmpty() || record.apkPath.trim().isEmpty()
-                    || !record.sha256.matches("[0-9a-fA-F]{64}")) {
+                    || !record.sha256.matches("[0-9a-fA-F]{64}")
+                    || !record.baseApkSha256.matches("[0-9a-fA-F]{64}")
+                    || record.artifacts.isEmpty()) {
                 throw new PersistentStateException("Incomplete trusted package metadata: " + record.packageName);
+            }
+            int baseArtifacts = 0;
+            Set<String> splitNames = new HashSet<>();
+            for (PackageArtifactRecord artifact : record.artifacts) {
+                if (artifact.base()) baseArtifacts++;
+                else if (!splitNames.add(artifact.splitName)) {
+                    throw new PersistentStateException("Duplicate split metadata: " + artifact.splitName);
+                }
+            }
+            if (baseArtifacts != 1) {
+                throw new PersistentStateException("Package must contain exactly one base artifact: " + record.packageName);
             }
         }
         Set<String> instanceKeys = new HashSet<>();

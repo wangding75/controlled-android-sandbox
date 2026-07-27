@@ -72,12 +72,19 @@ public final class BinaryXmlManifestParser {
 
     private static void onStart(ManifestModel model, Deque<ElementContext> stack, Element element) {
         switch (element.name) {
-            case "manifest" -> model.packageName(element.stringAttr("package"));
+            case "manifest" -> {
+                model.packageName(element.stringAttr("package"));
+                model.splitName(element.stringAttr("split"));
+                model.configForSplit(element.stringAttr("configForSplit"));
+                model.usesSplit(element.stringAttr("usesSplit"));
+                model.featureSplit(element.boolAttr("isFeatureSplit", false));
+            }
             case "uses-sdk" -> {
                 model.minSdk(element.intAttr("minSdkVersion", 0));
                 model.targetSdk(element.intAttr("targetSdkVersion", 0));
             }
             case "uses-permission", "uses-permission-sdk-23" -> model.addPermission(element.stringAttr("name"));
+            case "uses-library" -> model.addSharedLibrary(element.stringAttr("name"));
             case "application" -> {
                 model.applicationClass(element.stringAttr("name"));
                 model.applicationPermission(element.stringAttr("permission"));
