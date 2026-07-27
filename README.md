@@ -1,4 +1,4 @@
-# Controlled Sandbox — Clean-room Development 0.2
+# Controlled Sandbox — Clean-room Development 0.3
 
 A from-scratch Android application-virtualization research project. Production source is intentionally separated into domain, Binder contract, framework adapter, native policy, runtime, product app and test-fixture modules. No code from VirtualApp, NewBlackbox, Twoyi or their forks is included.
 
@@ -6,12 +6,12 @@ A from-scratch Android application-virtualization research project. Production s
 
 - Defensive APK import into app-private storage with SHA-256, signer continuity and downgrade checks.
 - Bounds-checked binary `AndroidManifest.xml` parsing for application, activities, services, receivers, providers, intent-filter priority/categories/data/MIME, authorities, permissions, process names and isolated services.
-- One Binder-owned package authority in a dedicated process, with a typed PID/UID-bound management capability, atomic package/virtual-instance catalog, legacy migration, immutable SHA-256 APK/native revision publication and orphan cleanup reporting.
+- One Binder-owned package authority in a dedicated process, with a typed PID/UID-bound management capability, atomic package/virtual-instance/policy catalog, legacy migration, immutable SHA-256 APK/native revision publication and orphan cleanup reporting.
 - Multiple virtual users/instances with independent data roots and deterministic virtual UIDs.
 - Versioned AIDL protocol, SHA-256-bound immutable APK revisions, explicit session state machine, eight process slots, retained Binder connections, death detection, generation recovery and one-time Activity route tokens.
 - Guest `DexClassLoader` with host-internal deny rules, APK resource set, instance-scoped `Context` with principal storage redirection and host-unwrapping denial, `Application` bootstrap and custom atomic `SharedPreferences`.
 - Broker-authoritative Activity, started/bound Service, dynamic Receiver, explicit/implicit manifest Receiver and Provider authority/CRUD/Call/Batch/Cursor/FileDescriptor routing, ordered-broadcast source policy, broker-owned ContentObserver callbacks, Session-bound TTL/one-time URI Grants and unified Provider resource lifecycle cleanup with Guest component bridges.
-- Process-local PackageManager identity hook with explicit installation reporting and rollback.
+- Binder-issued, APK-revision-bound virtual package/component snapshot plus per-virtual-user permission and AppOps policy consumed by PackageManager, PermissionManager and bounded AppOps hooks.
 - WebView data-directory suffix per virtual user/process slot.
 - Native C++ path/network policy engine with ARM64/x86_64 Android build definitions and a host-side self-test.
 - Structured JSONL runtime diagnostics, uncaught-exception capture and main-thread liveness watchdog.

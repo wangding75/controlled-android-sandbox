@@ -9,6 +9,7 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
@@ -23,6 +24,7 @@ final class RuntimeClient implements AutoCloseable {
     private final Context context;
     private final CountDownLatch connected = new CountDownLatch(1);
     private volatile IRuntimeBroker broker;
+    private final PackageServiceClient packageService;
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) { broker = IRuntimeBroker.Stub.asInterface(service); connected.countDown(); }
         @Override public void onServiceDisconnected(ComponentName name) { broker = null; }
@@ -30,6 +32,7 @@ final class RuntimeClient implements AutoCloseable {
 
     RuntimeClient(Context context) {
         this.context = context.getApplicationContext();
+        this.packageService = new PackageServiceClient(this.context);
         if (!this.context.bindService(new Intent(this.context, RuntimeBrokerService.class), connection, Context.BIND_AUTO_CREATE)) connected.countDown();
     }
 
@@ -69,7 +72,12 @@ final class RuntimeClient implements AutoCloseable {
         return requireBroker().invokeComponent(request);
     }
 
-    private Bundle request(SandboxRecord record, int virtualUserId, String processName) {
+    private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {
+        VirtualPackageStateSnapshot packageState = packageService.virtualPackageState(
+                record.packageName, virtualUserId);
+        if (!record.sha256.equals(packageState.apkSha256())) {
+            throw new SecurityException("PACKAGE_STATE_REVISION_MISMATCH");
+        }
         Bundle request = new Bundle();
         request.putInt(RuntimeKeys.PROTOCOL, RuntimeProtocol.CURRENT);
         request.putString(RuntimeKeys.PACKAGE_NAME, record.packageName);
@@ -85,6 +93,7 @@ final class RuntimeClient implements AutoCloseable {
         ArrayList<String> permissions = new ArrayList<>();
         if (record.permissions != null && !record.permissions.trim().isEmpty()) permissions.addAll(Arrays.asList(record.permissions.split(",")));
         request.putStringArrayList(RuntimeKeys.PERMISSIONS, permissions);
+        request.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
         return request;
     }
 
@@ -95,6 +104,7 @@ final class RuntimeClient implements AutoCloseable {
 
     @Override public void close() {
         try { context.unbindService(connection); } catch (Exception ignored) { }
+        packageService.close();
         broker = null;
     }
 }

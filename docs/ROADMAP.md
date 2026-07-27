@@ -10,7 +10,8 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - DONE — signer continuity and downgrade rejection.
 - DONE — ABI-native extraction protections.
 - DONE — one validated atomic package/virtual-instance catalog with legacy migration and post-commit orphan cleanup.
-- PARTIAL — package lifecycle is in-process; Binder-owned cross-process serialization, split APK/install sessions and dex/cache rollback remain open.
+- DONE — package lifecycle mutations are serialized by a dedicated Binder-owned package service with a PID/UID-bound management capability.
+- PARTIAL — split APK/install sessions, shared-library state and dex/cache rollback remain open.
 
 ## Runtime control plane
 
@@ -45,8 +46,11 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 
 ## Framework policy
 
-- DONE — virtual PackageManager application/package/component/query matrix.
-- DONE — reversible AppOps, notification, JobScheduler, storage and permission identity proxies with per-service diagnostics.
+- DONE — Binder-issued, revision-bound virtual PackageManager application/package/component/query snapshot.
+- DONE — per-package/per-virtual-user permission and bounded AppOps decisions persist atomically and are consumed by PackageManager/PermissionManager/AppOps proxies.
+- PARTIAL — permission semantics still lack host-capability checks, runtime-consent flow, roles/special access and signature/privileged handling.
+- PARTIAL — AppOps coverage is limited to bounded integer/boolean check/note/start-style calls.
+- DONE — reversible notification, JobScheduler and storage identity proxies with per-service diagnostics.
 - DONE — ActivityManager/ActivityTaskManager source mediation uses an atomic proxy pair, exact API-signature policies, callback/result task models and reversible rollback.
 - DEVICE — hidden API and Binder signature matrix on Android 12–16 and OEM variants.
 

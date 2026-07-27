@@ -33,7 +33,23 @@ public final class SandboxCatalogStateSelfTest {
         require("NOT_TESTED".equals(clone.state.instances().get(1).lastRuntimeStatus),
                 "prior aggregate remains immutable");
 
-        SandboxCatalogState defaultOnly = status.withoutInstance("com.example.alpha", 1);
+        SandboxCatalogState permissionDenied = status.withPermissionDecision(
+                "com.example.alpha", 1, "android.permission.CAMERA", "DENIED");
+        require("DENIED".equals(permissionDenied.policy("com.example.alpha", 1)
+                .permissionDecision("android.permission.CAMERA")), "permission decision persisted");
+        SandboxCatalogState appOpIgnored = permissionDenied.withAppOpMode(
+                "com.example.alpha", 1, "android:camera", "IGNORED");
+        require("IGNORED".equals(appOpIgnored.policy("com.example.alpha", 1)
+                .appOpMode("android:camera")), "AppOps mode persisted");
+        require(appOpIgnored.policy("com.example.alpha", 0).permissionDecisions().isEmpty(),
+                "policy is isolated by virtual user");
+        SandboxCatalogState resetPolicy = appOpIgnored.withoutPolicy("com.example.alpha", 1);
+        require(resetPolicy.policy("com.example.alpha", 1).permissionDecisions().isEmpty()
+                && resetPolicy.policy("com.example.alpha", 1).appOpModes().isEmpty(),
+                "policy reset removes overrides");
+
+        SandboxCatalogState defaultOnly = appOpIgnored.withoutInstance("com.example.alpha", 1);
+        require(defaultOnly.policies().isEmpty(), "instance deletion removes policy atomically");
         require(defaultOnly.records().size() == 1, "package retained while default exists");
         SandboxCatalogState empty = defaultOnly.withoutInstance("com.example.alpha", 0);
         require(empty.records().isEmpty() && empty.instances().isEmpty(),
@@ -65,6 +81,16 @@ public final class SandboxCatalogStateSelfTest {
             duplicateRejected = true;
         }
         require(duplicateRejected, "duplicate package rejected");
+
+        boolean orphanPolicyRejected = false;
+        try {
+            new SandboxCatalogState(List.of(alphaV1),
+                    List.of(new SandboxInstance("com.example.alpha", 0, "Default", 1L, "N", 0L)),
+                    List.of(SandboxPolicyState.empty("com.example.alpha", 1)));
+        } catch (PersistentStateException expected) {
+            orphanPolicyRejected = true;
+        }
+        require(orphanPolicyRejected, "orphan policy rejected");
 
         testLegacyPackageLayoutMigration();
         System.out.println("PASS atomic sandbox catalog aggregate self-test");

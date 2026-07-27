@@ -25,7 +25,7 @@ public final class ReflectiveServiceHook implements AutoCloseable {
                                               GuestIdentity identity) throws Exception {
         Object manager = context.getSystemService(serviceName);
         if (manager == null) throw new IllegalStateException("System service unavailable: " + serviceName);
-        return replaceField(manager, fieldName, identity);
+        return replaceField(manager, fieldName, identity, serviceName);
     }
 
     public static ReflectiveServiceHook staticField(String ownerClassName, String fieldName,
@@ -39,7 +39,7 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             initializer.setAccessible(true);
             original = initializer.invoke(null);
         }
-        return replace(null, field, original, identity);
+        return replace(null, field, original, identity, "");
     }
 
     public static ReflectiveServiceHook singleton(String ownerClassName, String singletonFieldName,
@@ -57,16 +57,25 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             get.setAccessible(true);
             original = get.invoke(singleton);
         }
-        return replace(singleton, instance, original, identity);
+        return replace(singleton, instance, original, identity, "");
     }
 
     static ReflectiveServiceHook replaceField(Object owner, String fieldName, GuestIdentity identity) throws Exception {
+        return replaceField(owner, fieldName, identity, "");
+    }
+
+    static ReflectiveServiceHook replaceField(Object owner, String fieldName, GuestIdentity identity,
+                                              String serviceName) throws Exception {
         Field field = findField(owner.getClass(), fieldName);
         field.setAccessible(true);
-        return replace(owner, field, field.get(owner), identity);
+        return replace(owner, field, field.get(owner), identity, serviceName);
     }
 
     static Object createProxy(Object original, GuestIdentity identity) {
+        return createProxy(original, identity, "");
+    }
+
+    static Object createProxy(Object original, GuestIdentity identity, String serviceName) {
         if (original == null) throw new IllegalStateException("Framework service is null");
         Set<Class<?>> interfaces = new LinkedHashSet<>();
         Class<?> cursor = original.getClass();
@@ -78,12 +87,12 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         ClassLoader loader = original.getClass().getClassLoader();
         if (loader == null) loader = ReflectiveServiceHook.class.getClassLoader();
         return Proxy.newProxyInstance(loader, interfaces.toArray(new Class<?>[0]),
-                new SystemServiceInvocationHandler(original, identity));
+                new SystemServiceInvocationHandler(original, identity, serviceName));
     }
 
     private static ReflectiveServiceHook replace(Object owner, Field field, Object original,
-                                                 GuestIdentity identity) throws Exception {
-        Object proxy = createProxy(original, identity);
+                                                 GuestIdentity identity, String serviceName) throws Exception {
+        Object proxy = createProxy(original, identity, serviceName);
         field.set(owner, proxy);
         return new ReflectiveServiceHook(owner, field, original);
     }

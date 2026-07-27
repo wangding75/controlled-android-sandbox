@@ -5,6 +5,10 @@ import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageInstanceSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import java.util.List;
 
 public final class PackageServiceContractSelfTest {
@@ -44,6 +48,36 @@ public final class PackageServiceContractSelfTest {
                 "virtual user identity lost");
         require("cleanup pending".equals(restored.catalog().maintenanceWarning()),
                 "maintenance warning lost");
+
+        VirtualPackageStateSnapshot packageState = new VirtualPackageStateSnapshot(
+                "com.example.fixture", 3, "Fixture", "1.0", 1L, "signer",
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "com.example.fixture.MainActivity", "com.example.fixture.FixtureApplication", true,
+                List.of(new VirtualComponentSnapshot("ACTIVITY",
+                        "com.example.fixture.MainActivity", "com.example.fixture", true, true,
+                        false, "", "", List.of("android.intent.action.MAIN"))),
+                List.of(new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", false)),
+                List.of(new PackageAppOpSnapshot("android:camera", "IGNORED")));
+        Parcel stateParcel = Parcel.obtain();
+        PackageServiceResult.successPackageState("getVirtualPackageState", packageState)
+                .writeToParcel(stateParcel, 0);
+        stateParcel.setDataPosition(0);
+        PackageServiceResult restoredState = PackageServiceResult.CREATOR.createFromParcel(stateParcel);
+        stateParcel.recycle();
+        require(restoredState.packageState() != null, "virtual package state lost");
+        require(restoredState.packageState().components().size() == 1, "component state lost");
+        require(!restoredState.packageState().permissions().get(0).effectiveGranted(),
+                "permission decision lost");
+        require("IGNORED".equals(restoredState.packageState().appOps().get(0).mode()),
+                "AppOps mode lost");
+        boolean contradictionRejected = false;
+        try { new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", true); }
+        catch (IllegalArgumentException expected) { contradictionRejected = true; }
+        require(contradictionRejected, "permission decision contradiction rejected");
+        boolean invalidAppOpRejected = false;
+        try { new PackageAppOpSnapshot("android:camera", "UNSUPPORTED"); }
+        catch (IllegalArgumentException expected) { invalidAppOpRejected = true; }
+        require(invalidAppOpRejected, "invalid AppOps mode rejected");
         System.out.println("PASS package service typed contract self-test");
     }
 

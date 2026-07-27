@@ -45,6 +45,42 @@ final class SandboxPackageLifecycle {
         return catalogRepository.load().findRecord(packageName);
     }
 
+    synchronized SandboxPackagePolicyView packagePolicy(String packageName, int virtualUserId)
+            throws Exception {
+        SandboxCatalogState state = catalogRepository.load();
+        return new SandboxPackagePolicyView(state.findRecord(packageName),
+                state.policy(packageName, virtualUserId));
+    }
+
+    synchronized SandboxPackagePolicyView setPermissionDecision(String packageName, int virtualUserId,
+                                                                 String permission, String decision)
+            throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withPermissionDecision(
+                packageName, virtualUserId, permission, decision);
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId));
+    }
+
+    synchronized SandboxPackagePolicyView setAppOpMode(String packageName, int virtualUserId,
+                                                        String opName, String mode) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withAppOpMode(packageName, virtualUserId, opName, mode);
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId));
+    }
+
+    synchronized SandboxPackagePolicyView resetPolicy(String packageName, int virtualUserId)
+            throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withoutPolicy(packageName, virtualUserId);
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId));
+    }
+
     synchronized void ensureInstance(String packageName, int virtualUserId) throws Exception {
         SandboxCatalogState current = catalogRepository.load();
         SandboxCatalogState next = current.withEnsuredInstance(

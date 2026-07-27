@@ -11,18 +11,21 @@ public final class PackageServiceResult implements Parcelable {
     private final String errorMessage;
     private final PackageCatalogSnapshot catalog;
     private final PackageRecordSnapshot record;
+    private final VirtualPackageStateSnapshot packageState;
     private final int intValue;
     private final String textValue;
 
     private PackageServiceResult(boolean successful, String operation, String errorCode,
                                  String errorMessage, PackageCatalogSnapshot catalog,
-                                 PackageRecordSnapshot record, int intValue, String textValue) {
+                                 PackageRecordSnapshot record, VirtualPackageStateSnapshot packageState,
+                                 int intValue, String textValue) {
         this.successful = successful;
         this.operation = value(operation);
         this.errorCode = value(errorCode);
         this.errorMessage = value(errorMessage);
         this.catalog = catalog;
         this.record = record;
+        this.packageState = packageState;
         this.intValue = intValue;
         this.textValue = value(textValue);
     }
@@ -31,26 +34,31 @@ public final class PackageServiceResult implements Parcelable {
         this(in.readInt() != 0, in.readString(), in.readString(), in.readString(),
                 in.readParcelable(PackageCatalogSnapshot.class.getClassLoader()),
                 in.readParcelable(PackageRecordSnapshot.class.getClassLoader()),
+                in.readParcelable(VirtualPackageStateSnapshot.class.getClassLoader()),
                 in.readInt(), in.readString());
     }
 
     public static PackageServiceResult successCatalog(String operation, PackageCatalogSnapshot catalog) {
-        return new PackageServiceResult(true, operation, "", "", catalog, null, 0, "");
+        return new PackageServiceResult(true, operation, "", "", catalog, null, null, 0, "");
     }
     public static PackageServiceResult successRecord(String operation, PackageRecordSnapshot record) {
-        return new PackageServiceResult(true, operation, "", "", null, record, 0, "");
+        return new PackageServiceResult(true, operation, "", "", null, record, null, 0, "");
+    }
+    public static PackageServiceResult successPackageState(String operation,
+                                                           VirtualPackageStateSnapshot packageState) {
+        return new PackageServiceResult(true, operation, "", "", null, null, packageState, 0, "");
     }
     public static PackageServiceResult successInt(String operation, int value) {
-        return new PackageServiceResult(true, operation, "", "", null, null, value, "");
+        return new PackageServiceResult(true, operation, "", "", null, null, null, value, "");
     }
     public static PackageServiceResult successText(String operation, String value) {
-        return new PackageServiceResult(true, operation, "", "", null, null, 0, value);
+        return new PackageServiceResult(true, operation, "", "", null, null, null, 0, value);
     }
     public static PackageServiceResult success(String operation) {
-        return new PackageServiceResult(true, operation, "", "", null, null, 0, "");
+        return new PackageServiceResult(true, operation, "", "", null, null, null, 0, "");
     }
     public static PackageServiceResult failure(String operation, String errorCode, String errorMessage) {
-        return new PackageServiceResult(false, operation, errorCode, errorMessage, null, null, 0, "");
+        return new PackageServiceResult(false, operation, errorCode, errorMessage, null, null, null, 0, "");
     }
 
     public boolean successful() { return successful; }
@@ -59,13 +67,15 @@ public final class PackageServiceResult implements Parcelable {
     public String errorMessage() { return errorMessage; }
     public PackageCatalogSnapshot catalog() { return catalog; }
     public PackageRecordSnapshot record() { return record; }
+    public VirtualPackageStateSnapshot packageState() { return packageState; }
     public int intValue() { return intValue; }
     public String textValue() { return textValue; }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeInt(successful ? 1 : 0); out.writeString(operation); out.writeString(errorCode);
         out.writeString(errorMessage); out.writeParcelable(catalog, flags);
-        out.writeParcelable(record, flags); out.writeInt(intValue); out.writeString(textValue);
+        out.writeParcelable(record, flags); out.writeParcelable(packageState, flags);
+        out.writeInt(intValue); out.writeString(textValue);
     }
     @Override public int describeContents() { return 0; }
 

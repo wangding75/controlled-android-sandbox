@@ -8,6 +8,7 @@ public final class RuntimeKeys {
     public static final String VIRTUAL_USER_ID = "virtualUserId";
     public static final String VIRTUAL_UID = "virtualUid";
     public static final String PERMISSIONS = "permissions";
+    public static final String PACKAGE_STATE = "packageState";
     public static final String PROCESS_SLOT = "processSlot";
     public static final String PROCESS_NAME = "processName";
     public static final String APK_PATH = "apkPath";

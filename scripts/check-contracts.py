@@ -23,6 +23,33 @@ for name in ['RuntimeStatusRequest', 'RuntimeStatusResult', 'RuntimeStatusSnapsh
     if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
     elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
 
+
+package_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl').read_text()
+package_signatures = [
+    'PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);',
+    'PackageServiceResult setPermissionDecision(String packageName, int virtualUserId, String permission, String decision);',
+    'PackageServiceResult setAppOpMode(String packageName, int virtualUserId, String opName, String mode);',
+    'PackageServiceResult resetVirtualPolicy(String packageName, int virtualUserId);',
+]
+for signature in package_signatures:
+    if signature not in package_aidl:
+        errors.append(f'IPackageManagementSession is missing {signature}')
+if 'Bundle' in package_aidl:
+    errors.append('IPackageManagementSession must not use Bundle')
+
+for name in ['VirtualComponentSnapshot', 'VirtualPermissionSnapshot',
+             'PackageAppOpSnapshot', 'VirtualPackageStateSnapshot']:
+    declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
+    source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
+    if not declaration.is_file(): errors.append(f'missing AIDL parcelable declaration for {name}')
+    if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
+    elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
+
+package_result = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java').read_text()
+for evidence in ['VirtualPackageStateSnapshot packageState', 'successPackageState(', 'packageState()']:
+    if evidence not in package_result:
+        errors.append(f'PackageServiceResult is missing typed package-state evidence: {evidence}')
+
 client = (ROOT / 'app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java').read_text()
 if '.runtimeStatusV2(' not in client:
     errors.append('RuntimeClient must use typed runtimeStatusV2')

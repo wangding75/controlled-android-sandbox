@@ -12,16 +12,26 @@ import java.util.Set;
 final class SandboxCatalogState {
     private final List<SandboxRecord> records;
     private final List<SandboxInstance> instances;
+    private final List<SandboxPolicyState> policies;
 
     SandboxCatalogState(List<SandboxRecord> records, List<SandboxInstance> instances) {
+        this(records, instances, List.of());
+    }
+
+    SandboxCatalogState(List<SandboxRecord> records, List<SandboxInstance> instances,
+                        List<SandboxPolicyState> policies) {
         List<SandboxRecord> recordCopy = new ArrayList<>(required(records, "records"));
         recordCopy.sort(Comparator.comparing(record -> record.packageName));
         List<SandboxInstance> instanceCopy = new ArrayList<>(required(instances, "instances"));
         instanceCopy.sort(Comparator.comparing((SandboxInstance instance) -> instance.packageName)
                 .thenComparingInt(instance -> instance.virtualUserId));
-        validate(recordCopy, instanceCopy);
+        List<SandboxPolicyState> policyCopy = new ArrayList<>(required(policies, "policies"));
+        policyCopy.sort(Comparator.comparing((SandboxPolicyState policy) -> policy.packageName)
+                .thenComparingInt(policy -> policy.virtualUserId));
+        validate(recordCopy, instanceCopy, policyCopy);
         this.records = Collections.unmodifiableList(recordCopy);
         this.instances = Collections.unmodifiableList(instanceCopy);
+        this.policies = Collections.unmodifiableList(policyCopy);
     }
 
     static SandboxCatalogState empty() { return new SandboxCatalogState(List.of(), List.of()); }
@@ -48,6 +58,17 @@ final class SandboxCatalogState {
 
     List<SandboxRecord> records() { return new ArrayList<>(records); }
     List<SandboxInstance> instances() { return new ArrayList<>(instances); }
+    List<SandboxPolicyState> policies() { return new ArrayList<>(policies); }
+
+    SandboxPolicyState policy(String packageName, int virtualUserId) {
+        requireInstance(packageName, virtualUserId);
+        for (SandboxPolicyState policy : policies) {
+            if (policy.packageName.equals(packageName) && policy.virtualUserId == virtualUserId) {
+                return policy;
+            }
+        }
+        return SandboxPolicyState.empty(packageName, virtualUserId);
+    }
 
     SandboxRecord findRecord(String packageName) {
         for (SandboxRecord record : records) if (record.packageName.equals(packageName)) return record;
@@ -65,7 +86,7 @@ final class SandboxCatalogState {
             if (instance.packageName.equals(imported.packageName)) { found = true; break; }
         }
         if (!found) nextInstances.add(defaultInstance(imported.packageName, nowMs));
-        return new SandboxCatalogState(nextRecords, nextInstances);
+        return new SandboxCatalogState(nextRecords, nextInstances, policies);
     }
 
     SandboxCatalogState withEnsuredInstance(String packageName, int virtualUserId, long nowMs) {
@@ -84,7 +105,7 @@ final class SandboxCatalogState {
         String displayName = virtualUserId == 0 ? "Default" : "Clone " + virtualUserId;
         next.add(new SandboxInstance(packageName, virtualUserId, displayName,
                 nowMs, "NOT_TESTED", 0));
-        return new SandboxCatalogState(records, next);
+        return new SandboxCatalogState(records, next, policies);
     }
 
     CloneResult withClone(String packageName, long nowMs) {
@@ -93,7 +114,7 @@ final class SandboxCatalogState {
         int userId = SandboxInstanceRepository.nextUserId(next, packageName);
         next.add(new SandboxInstance(packageName, userId, "Clone " + userId,
                 nowMs, "NOT_TESTED", 0));
-        return new CloneResult(new SandboxCatalogState(records, next), userId);
+        return new CloneResult(new SandboxCatalogState(records, next, policies), userId);
     }
 
     SandboxCatalogState withoutInstance(String packageName, int virtualUserId) {
@@ -107,7 +128,10 @@ final class SandboxCatalogState {
         }
         List<SandboxRecord> nextRecords = records();
         if (!packageStillUsed) nextRecords.removeIf(record -> record.packageName.equals(packageName));
-        return new SandboxCatalogState(nextRecords, nextInstances);
+        List<SandboxPolicyState> nextPolicies = policies();
+        nextPolicies.removeIf(policy -> policy.packageName.equals(packageName)
+                && policy.virtualUserId == virtualUserId);
+        return new SandboxCatalogState(nextRecords, nextInstances, nextPolicies);
     }
 
     SandboxCatalogState withInstanceStatus(String packageName, int virtualUserId,
@@ -123,7 +147,47 @@ final class SandboxCatalogState {
             }
         }
         if (!updated) throw new IllegalArgumentException("Sandbox instance does not exist");
-        return new SandboxCatalogState(records, next);
+        return new SandboxCatalogState(records, next, policies);
+    }
+
+    SandboxCatalogState withPermissionDecision(String packageName, int virtualUserId,
+                                               String permission, String decision) {
+        SandboxPolicyState current = policy(packageName, virtualUserId);
+        SandboxPolicyState updated = current.withPermissionDecision(permission, decision);
+        return withPolicy(updated);
+    }
+
+    SandboxCatalogState withAppOpMode(String packageName, int virtualUserId,
+                                      String opName, String mode) {
+        SandboxPolicyState current = policy(packageName, virtualUserId);
+        SandboxPolicyState updated = current.withAppOpMode(opName, mode);
+        return withPolicy(updated);
+    }
+
+    SandboxCatalogState withoutPolicy(String packageName, int virtualUserId) {
+        requireInstance(packageName, virtualUserId);
+        List<SandboxPolicyState> next = policies();
+        next.removeIf(policy -> policy.packageName.equals(packageName)
+                && policy.virtualUserId == virtualUserId);
+        return new SandboxCatalogState(records, instances, next);
+    }
+
+    private SandboxCatalogState withPolicy(SandboxPolicyState updated) {
+        List<SandboxPolicyState> next = policies();
+        next.removeIf(policy -> policy.packageName.equals(updated.packageName)
+                && policy.virtualUserId == updated.virtualUserId);
+        if (!updated.permissionDecisions().isEmpty() || !updated.appOpModes().isEmpty()) {
+            next.add(updated);
+        }
+        return new SandboxCatalogState(records, instances, next);
+    }
+
+    private void requireInstance(String packageName, int virtualUserId) {
+        for (SandboxInstance instance : instances) {
+            if (instance.packageName.equals(packageName) && instance.virtualUserId == virtualUserId) return;
+        }
+        throw new IllegalArgumentException("Sandbox instance does not exist: "
+                + packageName + " user=" + virtualUserId);
     }
 
     private static SandboxInstance defaultInstance(String packageName, long nowMs) {
@@ -135,7 +199,8 @@ final class SandboxCatalogState {
         return values;
     }
 
-    private static void validate(List<SandboxRecord> records, List<SandboxInstance> instances) {
+    private static void validate(List<SandboxRecord> records, List<SandboxInstance> instances,
+                                 List<SandboxPolicyState> policies) {
         Set<String> packages = new HashSet<>();
         for (SandboxRecord record : records) {
             if (record == null) throw new PersistentStateException("Catalog contains a null package");
@@ -158,6 +223,17 @@ final class SandboxCatalogState {
             if (!instanceKeys.add(key)) throw new PersistentStateException("Duplicate sandbox instance: " + key);
             if (instance.virtualUserId < 0 || instance.virtualUserId > 999) {
                 throw new PersistentStateException("Virtual user id out of range: " + key);
+            }
+        }
+        Set<String> policyKeys = new HashSet<>();
+        for (SandboxPolicyState policy : policies) {
+            if (policy == null) throw new PersistentStateException("Catalog contains a null policy");
+            String key = policy.packageName + "#" + policy.virtualUserId;
+            if (!instanceKeys.contains(key)) {
+                throw new PersistentStateException("Policy references missing instance: " + key);
+            }
+            if (!policyKeys.add(key)) {
+                throw new PersistentStateException("Duplicate sandbox policy: " + key);
             }
         }
     }

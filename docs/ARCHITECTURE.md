@@ -32,9 +32,9 @@ Only canonical paths under the host application's private `files` directory may 
 
 ## Package lifecycle authority
 
-`SandboxPackageLifecycle` is the product-side authority for import, clone, instance status and deletion. `SandboxCatalogState` validates package/instance referential integrity and `SandboxCatalogRepository` persists the aggregate in one recoverable catalog. APK and extracted native payloads are addressed by SHA-256 under `files/packages/<package>/revisions/<digest>/`; legacy mutable payloads are copied forward before the first catalog commit. Catalog paths reject outside-root locations and managed symbolic-link traversal.
+`PackageManagementService` in the dedicated `:sandbox_package` process owns the production `SandboxPackageLifecycle`. `SandboxCatalogState` validates package/instance/policy referential integrity and `SandboxCatalogRepository` persists the aggregate in one recoverable schema-v2 catalog. APK and extracted native payloads are addressed by SHA-256 under `files/packages/<package>/revisions/<digest>/`; legacy mutable payloads are copied forward before the first catalog commit. Catalog paths reject outside-root locations and managed symbolic-link traversal.
 
-The current authority is serialized in-process. A later iteration must move package lifecycle ownership behind a Binder service before independent installer or management processes are introduced.
+Product callers use a typed, death-linked `IPackageManagementSession` capability that is bound to the verified main-process PID and application UID. Package metadata, component metadata, permission decisions and bounded AppOps modes are issued as a revision-bound `VirtualPackageStateSnapshot` for each package and virtual user.
 
 ## Runtime authority
 
@@ -130,9 +130,9 @@ These are development implementations, not yet proof of complete Android compati
 
 ## Framework adapters
 
-`sandbox-framework` currently installs a process-local PackageManager proxy and synthesizes package/application/UID/permission identity for the active Guest. Hook status and failures are reported; teardown restores the original object.
+`sandbox-framework` installs process-local PackageManager and selected system-service proxies. Package/application/component identity, virtual UID, per-user permission decisions and bounded AppOps modes originate from the package-service snapshot. Direct host-package PackageManager queries are hidden. Hook status and failures are reported; teardown restores original objects.
 
-Activity/task, AppOps, notification, job and storage service adapters are not yet complete and are not represented as passed capabilities.
+Activity/task, notification, job and storage adapters remain bounded source implementations. Permission and AppOps proxies cover explicit check-style surfaces but do not yet reproduce every Android API-level signature, attribution model or host-capability rule.
 
 ## Native boundary
 

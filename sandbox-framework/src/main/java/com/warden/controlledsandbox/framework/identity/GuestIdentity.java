@@ -16,6 +16,8 @@ public final class GuestIdentity {
     private final String processName;
     private final int virtualUserId;
     private final long generation;
+    private final VirtualPermissionPolicy permissionPolicy;
+    private final SandboxAppOpsPolicy appOpsPolicy;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
                          Set<String> requestedPermissions) {
@@ -42,6 +44,18 @@ public final class GuestIdentity {
                          Set<String> requestedPermissions, String hostPackageName, int hostUid,
                          VirtualPackageMetadata packageMetadata, String processName,
                          int virtualUserId, long generation) {
+        this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName, hostUid,
+                packageMetadata, processName, virtualUserId, generation,
+                new VirtualPermissionPolicy(requestedPermissions, java.util.Map.of()),
+                new SandboxAppOpsPolicy(java.util.Map.of()));
+    }
+
+    public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
+                         Set<String> requestedPermissions, String hostPackageName, int hostUid,
+                         VirtualPackageMetadata packageMetadata, String processName,
+                         int virtualUserId, long generation,
+                         VirtualPermissionPolicy permissionPolicy,
+                         SandboxAppOpsPolicy appOpsPolicy) {
         if (packageName == null || packageName.trim().isEmpty()) {
             throw new IllegalArgumentException("packageName is required");
         }
@@ -67,6 +81,8 @@ public final class GuestIdentity {
         this.processName = processName;
         this.virtualUserId = virtualUserId;
         this.generation = generation;
+        this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
+        this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
     }
 
     public String packageName() { return packageName; }
@@ -79,4 +95,6 @@ public final class GuestIdentity {
     public String processName() { return processName; }
     public int virtualUserId() { return virtualUserId; }
     public long generation() { return generation; }
+    public VirtualPermissionPolicy permissionPolicy() { return permissionPolicy; }
+    public SandboxAppOpsPolicy appOpsPolicy() { return appOpsPolicy; }
 }

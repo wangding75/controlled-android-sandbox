@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +67,28 @@ final class PackageServiceClient implements AutoCloseable {
         return record == null ? null : PackageServiceMapper.fromSnapshot(record);
     }
 
+    VirtualPackageStateSnapshot virtualPackageState(String packageName, int virtualUserId)
+            throws Exception {
+        return packageState(requireSession().getVirtualPackageState(packageName, virtualUserId));
+    }
+
+    VirtualPackageStateSnapshot setPermissionDecision(String packageName, int virtualUserId,
+                                                        String permission, String decision)
+            throws Exception {
+        return packageState(requireSession().setPermissionDecision(
+                packageName, virtualUserId, permission, decision));
+    }
+
+    VirtualPackageStateSnapshot setAppOpMode(String packageName, int virtualUserId,
+                                              String opName, String mode) throws Exception {
+        return packageState(requireSession().setAppOpMode(packageName, virtualUserId, opName, mode));
+    }
+
+    VirtualPackageStateSnapshot resetVirtualPolicy(String packageName, int virtualUserId)
+            throws Exception {
+        return packageState(requireSession().resetVirtualPolicy(packageName, virtualUserId));
+    }
+
     void ensureInstance(String packageName, int virtualUserId) throws Exception {
         requireSuccess(requireSession().ensureInstance(packageName, virtualUserId));
     }
@@ -87,6 +110,12 @@ final class PackageServiceClient implements AutoCloseable {
 
     String maintenanceWarning() throws Exception {
         return requireSuccess(requireSession().maintenanceStatus()).textValue();
+    }
+
+    private VirtualPackageStateSnapshot packageState(PackageServiceResult raw) {
+        VirtualPackageStateSnapshot state = requireSuccess(raw).packageState();
+        if (state == null) throw new IllegalStateException("Package service returned no virtual package state");
+        return state;
     }
 
     private SandboxRecord record(PackageServiceResult raw) throws Exception {

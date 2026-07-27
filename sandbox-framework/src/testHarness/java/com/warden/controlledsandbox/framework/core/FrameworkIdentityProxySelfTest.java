@@ -2,6 +2,8 @@ package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
+import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.framework.packagemanager.PackageManagerInvocationHandlerTestAccess;
 
 import android.content.ComponentName;
@@ -35,10 +37,16 @@ public final class FrameworkIdentityProxySelfTest {
                         new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.PROVIDER,
                                 "guest.pkg.DataProvider", "guest.pkg:provider", false, true, false,
                                 Set.of(), "guest.pkg.data")));
-        GuestIdentity identity = new GuestIdentity("guest.pkg", 12001, info, Set.of("camera"),
-                "host.pkg", 10001, metadata);
+        GuestIdentity identity = new GuestIdentity("guest.pkg", 12001, info,
+                Set.of("android.permission.CAMERA", "android.permission.INTERNET"),
+                "host.pkg", 10001, metadata, "guest.pkg", 0, 1L,
+                new VirtualPermissionPolicy(
+                        Set.of("android.permission.CAMERA", "android.permission.INTERNET"),
+                        java.util.Map.of("android.permission.CAMERA", "DENIED")),
+                new SandboxAppOpsPolicy(java.util.Map.of("android:camera", "IGNORED")));
         testIdentityRewriting(identity);
         testPackageQueries(identity);
+        testPermissionAndAppOps(identity);
         testHookReadinessPolicy();
         System.out.println("PASS framework identity and package-manager proxy self-test");
     }
@@ -83,9 +91,49 @@ public final class FrameworkIdentityProxySelfTest {
                 "query service");
         require(proxy.getPackagesForUid(12001)[0].equals("guest.pkg"), "virtual UID query");
         require(proxy.getInstalledApplications(0, 0).size() == 1, "installed applications isolated");
+        require(proxy.checkPermission("android.permission.CAMERA", "guest.pkg", 0) == -1,
+                "explicit virtual permission denial");
+        require(proxy.checkPermission("android.permission.INTERNET", "guest.pkg", 0) == 0,
+                "default declared permission grant");
+        boolean hostHidden = false;
+        try { proxy.getApplicationInfo("host.pkg", 0); }
+        catch (IllegalArgumentException expected) { hostHidden = expected.getMessage().contains("HOST_PACKAGE_HIDDEN"); }
+        require(hostHidden, "host package identity hidden");
         require(delegate.calls == 0, "virtual queries avoid host delegate");
         require("host-result".equals(proxy.unhandled("guest.pkg")), "fallback delegates with host identity");
         require("host.pkg".equals(delegate.lastPackage), "fallback package rewritten");
+    }
+
+    private static void testPermissionAndAppOps(GuestIdentity identity) {
+        FakePermissionService permissionDelegate = new FakePermissionService();
+        FakePermissionApi permission = (FakePermissionApi) Proxy.newProxyInstance(
+                FrameworkIdentityProxySelfTest.class.getClassLoader(),
+                new Class<?>[]{FakePermissionApi.class},
+                new SystemServiceInvocationHandler(permissionDelegate, identity, "permission"));
+        require(permission.checkPermission("android.permission.CAMERA", "guest.pkg", 12001) == -1,
+                "PermissionManager denial uses virtual policy");
+        require(permission.checkPermission("android.permission.INTERNET", "guest.pkg", 12001) == 0,
+                "PermissionManager grant uses virtual policy");
+        boolean mutationBlocked = false;
+        try { permission.grantRuntimePermission("guest.pkg", "android.permission.CAMERA", 0); }
+        catch (SecurityException expected) {
+            mutationBlocked = expected.getMessage().contains("VIRTUAL_PERMISSION_MUTATION_REQUIRES_PACKAGE_SERVICE");
+        }
+        require(mutationBlocked, "PermissionManager mutation is fail-closed");
+        require(permissionDelegate.calls == 0, "PermissionManager virtual decision avoids host delegate");
+
+        FakeAppOpsService appOpsDelegate = new FakeAppOpsService();
+        FakeAppOpsApi appOps = (FakeAppOpsApi) Proxy.newProxyInstance(
+                FrameworkIdentityProxySelfTest.class.getClassLoader(),
+                new Class<?>[]{FakeAppOpsApi.class},
+                new SystemServiceInvocationHandler(appOpsDelegate, identity, "appops"));
+        require(appOps.checkOperation("android:camera", 12001, "guest.pkg") == 1,
+                "AppOps override maps to MODE_IGNORED");
+        require(appOps.checkOperation("android:record_audio", 12001, "guest.pkg") == 3,
+                "AppOps default maps to MODE_DEFAULT");
+        require(appOps.checkOperation(26, 12001, "guest.pkg") == 3,
+                "integer AppOps code fails closed to MODE_DEFAULT without host delegation");
+        require(appOpsDelegate.calls == 0, "AppOps virtual decision avoids host delegate");
     }
 
     private static void testHookReadinessPolicy() {
@@ -148,6 +196,7 @@ public final class FrameworkIdentityProxySelfTest {
         List<ResolveInfo> queryIntentServices(Intent intent, String resolvedType, long flags, int userId);
         String[] getPackagesForUid(int uid);
         List<ApplicationInfo> getInstalledApplications(long flags, int userId);
+        int checkPermission(String permission, String packageName, int userId);
         String unhandled(String packageName);
     }
 
@@ -162,7 +211,38 @@ public final class FrameworkIdentityProxySelfTest {
         @Override public List<ResolveInfo> queryIntentServices(Intent intent, String resolvedType, long flags, int userId) { return called(List.of()); }
         @Override public String[] getPackagesForUid(int uid) { return called(new String[]{"host.pkg"}); }
         @Override public List<ApplicationInfo> getInstalledApplications(long flags, int userId) { return called(List.of()); }
+        @Override public int checkPermission(String permission, String packageName, int userId) { return called(-99); }
         @Override public String unhandled(String packageName) { lastPackage = packageName; return called("host-result"); }
+    }
+
+    interface FakePermissionApi {
+        int checkPermission(String permission, String packageName, int uid);
+        void grantRuntimePermission(String packageName, String permission, int userId);
+    }
+
+    static final class FakePermissionService implements FakePermissionApi {
+        int calls;
+        @Override public int checkPermission(String permission, String packageName, int uid) {
+            calls++; return -99;
+        }
+        @Override public void grantRuntimePermission(String packageName, String permission, int userId) {
+            calls++;
+        }
+    }
+
+    interface FakeAppOpsApi {
+        int checkOperation(String opName, int uid, String packageName);
+        int checkOperation(int opCode, int uid, String packageName);
+    }
+
+    static final class FakeAppOpsService implements FakeAppOpsApi {
+        int calls;
+        @Override public int checkOperation(String opName, int uid, String packageName) {
+            calls++; return -99;
+        }
+        @Override public int checkOperation(int opCode, int uid, String packageName) {
+            calls++; return -99;
+        }
     }
 
     static final class FakeAttribution {

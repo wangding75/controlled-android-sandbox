@@ -16,6 +16,7 @@ public final class PackageManagementService extends Service {
     private final Object operationLock = new Object();
     private SandboxPackageLifecycle lifecycle;
     private PackageCallerVerifier callerVerifier;
+    private VirtualPackageStateBuilder packageStateBuilder;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -39,6 +40,7 @@ public final class PackageManagementService extends Service {
         super.onCreate();
         lifecycle = new SandboxPackageLifecycle(this);
         callerVerifier = new PackageCallerVerifier(this);
+        packageStateBuilder = new VirtualPackageStateBuilder();
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
@@ -75,6 +77,48 @@ public final class PackageManagementService extends Service {
             return execute("findRecord", () -> PackageServiceResult.successRecord(
                     "findRecord", PackageServiceMapper.toSnapshot(
                             lifecycle.findRecord(required(packageName, "packageName")))));
+        }
+
+        @Override public PackageServiceResult getVirtualPackageState(String packageName,
+                                                                      int virtualUserId) {
+            return execute("getVirtualPackageState", () -> packageStateResult(
+                    "getVirtualPackageState", lifecycle.packagePolicy(
+                            required(packageName, "packageName"), virtualUserId), virtualUserId));
+        }
+
+        @Override public PackageServiceResult setPermissionDecision(String packageName,
+                                                                     int virtualUserId,
+                                                                     String permission,
+                                                                     String decision) {
+            return execute("setPermissionDecision", () -> {
+                String normalizedPackage = required(packageName, "packageName");
+                String normalizedPermission = required(permission, "permission");
+                SandboxPackagePolicyView current = lifecycle.packagePolicy(
+                        normalizedPackage, virtualUserId);
+                if (!packageStateBuilder.declaresPermission(current.record, normalizedPermission)) {
+                    throw new IllegalArgumentException(
+                            "Permission is not declared by package: " + normalizedPermission);
+                }
+                SandboxPackagePolicyView updated = lifecycle.setPermissionDecision(
+                        normalizedPackage, virtualUserId, normalizedPermission,
+                        SandboxPolicyState.permissionDecisionValue(decision));
+                return packageStateResult("setPermissionDecision", updated, virtualUserId);
+            });
+        }
+
+        @Override public PackageServiceResult setAppOpMode(String packageName, int virtualUserId,
+                                                            String opName, String mode) {
+            return execute("setAppOpMode", () -> packageStateResult("setAppOpMode",
+                    lifecycle.setAppOpMode(required(packageName, "packageName"), virtualUserId,
+                            required(opName, "opName"), SandboxPolicyState.appOpModeValue(mode)),
+                    virtualUserId));
+        }
+
+        @Override public PackageServiceResult resetVirtualPolicy(String packageName,
+                                                                  int virtualUserId) {
+            return execute("resetVirtualPolicy", () -> packageStateResult("resetVirtualPolicy",
+                    lifecycle.resetPolicy(required(packageName, "packageName"), virtualUserId),
+                    virtualUserId));
         }
 
         @Override public PackageServiceResult ensureInstance(String packageName, int virtualUserId) {
@@ -117,6 +161,13 @@ public final class PackageManagementService extends Service {
         }
 
         @Override public void binderDied() { closeInternal(); }
+
+        private PackageServiceResult packageStateResult(String operation,
+                                                        SandboxPackagePolicyView view,
+                                                        int virtualUserId) throws Exception {
+            return PackageServiceResult.successPackageState(operation,
+                    packageStateBuilder.build(view.record, virtualUserId, view.policy));
+        }
 
         private PackageServiceResult execute(String operation, Operation action) {
             requireOwner();

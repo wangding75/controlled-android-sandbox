@@ -60,6 +60,54 @@
       "notes": "Package and instance mutations are serialized in a dedicated :sandbox_package service. Only the AMS-recorded host main process can mint a PID/UID-bound Binder capability; client death and per-call caller checks revoke or reject reuse. Real Binder/AMS behavior remains device-deferred, and shared-UID containment is not a malicious-code security boundary."
     },
     {
+      "id": "package.virtual-state-authority",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java",
+        "scripts/check-virtual-package-state.py"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Package metadata and virtual policy are issued by the Binder-owned package authority and revision-bound into runtime requests; Android Binder behavior remains not-tested."
+    },
+    {
+      "id": "package.permission-state",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPolicyState.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPermissionPolicy.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/SandboxCatalogStateSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Permission overrides are isolated by package and virtual user and are atomically persisted; host manifest/runtime permission enforcement and device behavior remain outside current evidence."
+    },
+    {
+      "id": "package.appops-state",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPolicyState.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SandboxAppOpsPolicy.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/SandboxCatalogStateSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Simple AppOps integer and boolean decisions are supplied from the virtual package snapshot; complex return surfaces and Android service behavior remain not-tested."
+    },
+    {
       "id": "identity.virtual-user-uid",
       "evidence": [
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/identity/VirtualUidRegistry.java",
@@ -403,7 +451,10 @@
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerHook.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java"
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
@@ -443,7 +494,10 @@
       "id": "framework.app-ops",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/permission/AppOpsManagerHook.java",
-        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPolicyState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SandboxAppOpsPolicy.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
@@ -483,7 +537,10 @@
       "id": "framework.permission",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/permission/PermissionManagerHook.java",
-        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPolicyState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPermissionPolicy.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",

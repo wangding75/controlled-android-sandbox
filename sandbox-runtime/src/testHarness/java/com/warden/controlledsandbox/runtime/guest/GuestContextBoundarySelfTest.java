@@ -8,6 +8,7 @@ import android.content.res.Resources;
 import android.os.Bundle;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.io.File;
 import java.nio.file.Files;
 
@@ -30,6 +31,10 @@ public final class GuestContextBoundarySelfTest {
             request.putString(RuntimeKeys.PACKAGE_REVISION, "v1:sha256:" + "a".repeat(64));
             request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, new File(root, "lib").getAbsolutePath());
             request.putString(RuntimeKeys.DATA_ROOT, new File(root, "instance").getAbsolutePath());
+            request.putParcelable(RuntimeKeys.PACKAGE_STATE, new VirtualPackageStateSnapshot(
+                    "com.example.guest", 3, "Guest", "1", 1L, "b".repeat(64),
+                    "a".repeat(64), "com.example.guest.MainActivity", "", true,
+                    java.util.List.of(), java.util.List.of(), java.util.List.of()));
             GuestPackageSpec spec = new GuestPackageSpec(request);
             Context host = new Context();
             Resources resources = new Resources(new AssetManager(),

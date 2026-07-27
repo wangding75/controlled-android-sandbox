@@ -48,6 +48,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
 
     private Object virtualResult(String methodName, Class<?> returnType, Object[] args) {
         boolean guestTarget = containsGuestPackage(args);
+        boolean hostTarget = containsHostPackage(args);
+        if (hostTarget && !guestTarget) return hiddenHostResult(methodName, returnType);
         switch (methodName) {
             case "getApplicationInfo":
                 return guestTarget ? metadata.applicationInfo() : NoResult.VALUE;
@@ -65,7 +67,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "checkPermission":
                 if (!guestTarget) return NoResult.VALUE;
                 String permission = firstString(args);
-                return identity.requestedPermissions().contains(permission)
+                return identity.permissionPolicy().isGranted(permission)
                         ? PackageManager.PERMISSION_GRANTED : PackageManager.PERMISSION_DENIED;
             case "getPackagesForUid":
                 return firstInt(args, -1) == identity.virtualUid()
@@ -130,6 +132,38 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         Intent intent = firstIntent(args);
         List<ResolveInfo> matches = metadata.query(intent, type);
         return matches.isEmpty() ? NoResult.VALUE : metadata.adaptCollection(matches, returnType);
+    }
+
+    private Object hiddenHostResult(String methodName, Class<?> returnType) {
+        switch (methodName) {
+            case "getApplicationInfo":
+            case "getPackageInfo":
+            case "getPackageInfoVersioned":
+            case "getPackageUid":
+            case "getPackageUidAsUser":
+            case "getActivityInfo":
+            case "getReceiverInfo":
+            case "getServiceInfo":
+            case "getProviderInfo":
+                throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
+            case "isPackageAvailable": return false;
+            case "checkPermission": return PackageManager.PERMISSION_DENIED;
+            case "getInstallerPackageName":
+            case "getInstallSourceInfo": return null;
+            default:
+                if (returnType == boolean.class || returnType == Boolean.class) return false;
+                return NoResult.VALUE;
+        }
+    }
+
+    private boolean containsHostPackage(Object[] args) {
+        if (args == null) return false;
+        for (Object arg : args) {
+            if (identity.hostPackageName().equals(arg)) return true;
+            if (arg instanceof ComponentName
+                    && identity.hostPackageName().equals(((ComponentName) arg).getPackageName())) return true;
+        }
+        return false;
     }
 
     private boolean containsGuestPackage(Object[] args) {

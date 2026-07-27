@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.os.Bundle;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +28,7 @@ public final class GuestPackageSpec {
     public final String componentClass;
     final String dataRoot;
     final List<String> permissions;
+    final VirtualPackageStateSnapshot packageState;
 
     public GuestPackageSpec(Bundle bundle) {
         if (bundle == null) throw new IllegalArgumentException("request is required");
@@ -55,6 +57,14 @@ public final class GuestPackageSpec {
         dataRoot = required(bundle, RuntimeKeys.DATA_ROOT);
         ArrayList<String> requested = bundle.getStringArrayList(RuntimeKeys.PERMISSIONS);
         permissions = requested == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(requested));
+        packageState = bundle.getParcelable(RuntimeKeys.PACKAGE_STATE);
+        if (packageState == null) throw new IllegalArgumentException("virtual package state is required");
+        if (!packageName.equals(packageState.packageName()) || virtualUserId != packageState.virtualUserId()) {
+            throw new SecurityException("VIRTUAL_PACKAGE_STATE_IDENTITY_MISMATCH");
+        }
+        if (!apkSha256.equals(packageState.apkSha256())) {
+            throw new SecurityException("VIRTUAL_PACKAGE_STATE_REVISION_MISMATCH");
+        }
     }
 
     Bundle toBundle() {
@@ -76,6 +86,7 @@ public final class GuestPackageSpec {
         out.putString(RuntimeKeys.COMPONENT_CLASS, componentClass);
         out.putString(RuntimeKeys.DATA_ROOT, dataRoot);
         out.putStringArrayList(RuntimeKeys.PERMISSIONS, new ArrayList<>(permissions));
+        out.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
         return out;
     }
 

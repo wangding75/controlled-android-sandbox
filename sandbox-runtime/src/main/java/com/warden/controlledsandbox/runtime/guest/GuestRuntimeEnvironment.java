@@ -14,10 +14,16 @@ import android.os.Process;
 import com.warden.controlledsandbox.framework.core.FrameworkHooks;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
+import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
+import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Process-local runtime. One Android guest process hosts exactly one generation at a time. */
 public final class GuestRuntimeEnvironment {
@@ -68,15 +74,16 @@ public final class GuestRuntimeEnvironment {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(spec);
-            VirtualPackageMetadata packageMetadata = GuestManifestMetadataLoader.load(
-                    spec.apkFile(), guestContext.getApplicationInfo());
+            VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
+                    spec.packageState, guestContext.getApplicationInfo());
             OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor =
                     new OrderedReceiverFinishInterceptor();
             stagedOrderedReceiverInterceptor = orderedReceiverFinishInterceptor;
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
-                            packageMetadata, spec.processName, spec.virtualUserId, spec.generation),
+                            packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
+                            permissionPolicy(spec), appOpsPolicy(spec)),
                     orderedReceiverFinishInterceptor);
             stagedHooks = frameworkHooks;
             frameworkHooks.report().requireMandatoryReady();
@@ -145,6 +152,24 @@ public final class GuestRuntimeEnvironment {
         Session session = require(sessionId, generation);
         session.shutdown();
         current = null;
+    }
+
+    private static VirtualPermissionPolicy permissionPolicy(GuestPackageSpec spec) {
+        Map<String, String> decisions = new LinkedHashMap<>();
+        java.util.Set<String> declared = new java.util.LinkedHashSet<>();
+        for (VirtualPermissionSnapshot permission : spec.packageState.permissions()) {
+            declared.add(permission.name());
+            decisions.put(permission.name(), permission.decision());
+        }
+        return new VirtualPermissionPolicy(declared, decisions);
+    }
+
+    private static SandboxAppOpsPolicy appOpsPolicy(GuestPackageSpec spec) {
+        Map<String, String> modes = new LinkedHashMap<>();
+        for (PackageAppOpSnapshot appOp : spec.packageState.appOps()) {
+            modes.put(appOp.opName(), appOp.mode());
+        }
+        return new SandboxAppOpsPolicy(modes);
     }
 
     private static Application createApplication(GuestPackageSpec spec, ClassLoader loader,
