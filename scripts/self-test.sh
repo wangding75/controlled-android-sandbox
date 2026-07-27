@@ -19,7 +19,7 @@ import sys, xml.etree.ElementTree as ET
 root=Path(sys.argv[1])
 for p in root.rglob('*.xml'):
     if 'build/' not in str(p): ET.parse(p)
-required=['settings.gradle','app/build.gradle','sandbox-runtime/src/main/AndroidManifest.xml','docs/CLEAN_ROOM_POLICY.md']
+required=['settings.gradle','app/build.gradle','sandbox-runtime/src/main/AndroidManifest.xml','docs/CLEAN_ROOM_POLICY.md','docs/BASELINE.md','build-environment.lock.json','.gitattributes']
 for rel in required:
     if not (root/rel).is_file(): raise SystemExit('missing '+rel)
 debug_manifest=ET.parse(root/'app/src/debug/AndroidManifest.xml').getroot()

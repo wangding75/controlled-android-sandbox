@@ -67,3 +67,27 @@ The script builds and installs the host and Fixture APKs, runs two virtual insta
 ## License
 
 Original project code is released under Apache License 2.0. Imported APKs retain their own licenses and distribution restrictions. See `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES.md` and `docs/CLEAN_ROOM_POLICY.md`.
+
+## Frozen baseline and reproducible build
+
+The uploaded B3-T5A source is frozen by the `baseline-b3-t5a-upload` tag. Toolchain values and the uploaded archive identity are recorded in `build-environment.lock.json` and `docs/BASELINE.md`.
+
+Host-only gates:
+
+```bash
+./scripts/verify-all.sh
+```
+
+Locked Android cache bootstrap on Windows:
+
+```powershell
+.\scripts\bootstrap-build-cache.ps1
+```
+
+Offline two-pass reproducibility check:
+
+```powershell
+.\scripts\reproducible-build.ps1 -VerifyTwice
+```
+
+The two-pass command builds unsigned release APKs twice with a clean task graph, no Gradle build cache and no parallel execution, then compares their bytes. It intentionally does not run an Emulator or physical-device test.

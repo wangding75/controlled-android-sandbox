@@ -4,6 +4,10 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
 ./scripts/self-test.sh
+python3 scripts/check-build-environment.py
+python3 tools/baseline_manifest.py
+./scripts/check-wrapper-bootstrap.sh
+./scripts/test-wrapper-bootstrap.sh
 python3 scripts/check-architecture.py
 python3 scripts/check-contracts.py
 python3 scripts/check-ports-dispatchers.py
@@ -15,7 +19,13 @@ python3 scripts/check-m3-source-progress.py
 python3 tools/static_android_compile.py
 ./scripts/test-native.sh
 ./scripts/test-m3-gate.sh
-bash -n scripts/self-test.sh scripts/verify-all.sh scripts/test-m3-gate.sh scripts/check-m3-release-gate.sh
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  ./scripts/test-reproducible-source-package.sh
+else
+  echo 'SKIP reproducible source package comparison: Git metadata unavailable in source archive'
+fi
+bash -n scripts/*.sh
+PYTHONPYCACHEPREFIX="$ROOT/build/pycache" python3 -m py_compile scripts/*.py tools/*.py
 
 python3 - <<'PY'
 from pathlib import Path
@@ -36,17 +46,5 @@ for p in Path('scripts').glob('*.ps1'):
     if stack: raise SystemExit(f'{p}: unclosed delimiter')
     print('PASS structural PowerShell check', p)
 PY
-
-FAKE="$ROOT/build/fake-wrapper-home"
-rm -rf "$FAKE"
-mkdir -p "$FAKE/.gradle/wrapper/dists/controlled-sandbox/gradle-8.13-bin/gradle-8.13/bin"
-cat > "$FAKE/.gradle/wrapper/dists/controlled-sandbox/gradle-8.13-bin/gradle-8.13/bin/gradle" <<'SH'
-#!/usr/bin/env sh
-[ "$1" = "help" ] || exit 9
-printf 'PASS custom Gradle bootstrap delegation\n'
-SH
-chmod +x "$FAKE/.gradle/wrapper/dists/controlled-sandbox/gradle-8.13-bin/gradle-8.13/bin/gradle"
-java -Duser.home="$FAKE" -Dcontrolled.wrapper.projectDir="$ROOT" \
-  -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain help --offline
 
 echo 'PASS all locally executable verification gates'

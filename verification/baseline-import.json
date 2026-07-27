@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "uploadedArchive": "controlled-sandbox-main-b3t5a-4bb36b4e2797-full-source(1).zip",
+  "uploadedArchiveSha256": "b48dc213732ef980fa2241d6d5a6f6933e32a2b0f54e25ea9fae829a09812e32",
+  "upstreamDeclaredSourceRevision": "4bb36b4e279759bba06a2beb0d79946a6d757c12",
+  "frozenBaselineCommit": "7edf76364cf464cc43f91aaec5b0dee4d38abea3",
+  "frozenBaselineBranch": "baseline/b3-t5a-upload",
+  "frozenBaselineTag": "baseline-b3-t5a-upload",
+  "fileCount": 387,
+  "contentComparison": "exact-path-and-sha256-match"
+}

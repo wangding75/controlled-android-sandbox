@@ -6,5 +6,5 @@ if defined JAVA_HOME (
 ) else (
   set JAVA_EXE=java.exe
 )
-"%JAVA_EXE%" -Dcontrolled.wrapper.projectDir="%APP_HOME%" -cp "%APP_HOME%gradle\wrapper\gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain %*
+"%JAVA_EXE%" -Dcontrolled.wrapper.projectDir="%APP_HOME%" "%APP_HOME%tools\wrapper-src\org\gradle\wrapper\GradleWrapperMain.java" %*
 endlocal

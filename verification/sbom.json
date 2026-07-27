@@ -16,7 +16,7 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "0f691594c24b2915ea8e548f970de088180f9e92bcce5871152def94482cad30"
+      "sourceDigestSha256": "4746a9190310ea06dd64477d3d027f1a355df51de0f4f8d66dceec006a562c63"
     },
     {
       "type": "library",
@@ -42,7 +42,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "613f108a79a33e4fd9de78fe822a2f4efae873d5c9c963e10a5206410cb78919"
+      "sourceDigestSha256": "ec31f19b3f5d381ed9729f059ef9baaf6b4df0031c472aa9065b6d6532467e41"
     },
     {
       "type": "library",
@@ -55,7 +55,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "6b889b244349c42aaa50cd0369f4d5eb0189949a55608622fa77dd70013a5aa8"
+      "sourceDigestSha256": "d751874ab3eae48e3ae6636af9ce4d3cc94e2d5b33033037427e4b9c3ca5ca32"
     },
     {
       "type": "library",
@@ -70,7 +70,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "793952ad0001e4ed5d2b459c82b453e34de6a0e015a39c8f0c662ccf6092ba2a"
+      "sourceDigestSha256": "54867680def82b402daab3dd36004c456e4c381adb1b8e522ce240ca3305c0ab"
     },
     {
       "type": "library",
@@ -83,7 +83,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "6cb5e648129aa922db249faae50abe7b035b432636be1d19cd97f7ddccb77d96"
+      "sourceDigestSha256": "c04606898391a0c7026a160755424f558a6d47e4ff0ae82930d4fdbf26f8a242"
     },
     {
       "type": "application",
@@ -98,7 +98,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "07412a72db7bb0c8d157717cffdcc87c9df2790b9ef8296e0b2aeb1961966c08"
+      "sourceDigestSha256": "73350e1c54916e8fdbeffb7341be26cf2f34896be628b14346290ee373b16631"
     }
   ],
   "externalRuntimeDependencies": [

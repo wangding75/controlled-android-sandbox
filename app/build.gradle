@@ -2,12 +2,13 @@ plugins { id 'com.android.application' }
 
 android {
     namespace 'com.warden.controlledsandbox'
-    compileSdk 36
+    compileSdk rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
 
     defaultConfig {
         applicationId 'com.warden.controlledsandbox'
-        minSdk 26
-        targetSdk 35
+        minSdk rootProject.ext.controlledMinSdk
+        targetSdk rootProject.ext.controlledTargetSdk
         versionCode 2
         versionName '0.2.0-development'
     }

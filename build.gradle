@@ -2,3 +2,12 @@ plugins {
     id 'com.android.application' version '8.11.1' apply false
     id 'com.android.library' version '8.11.1' apply false
 }
+
+ext {
+    controlledCompileSdk = 36
+    controlledTargetSdk = 35
+    controlledMinSdk = 26
+    controlledBuildTools = '35.0.0'
+    controlledNdkVersion = '27.2.12479018'
+    controlledCmakeVersion = '3.22.1'
+}

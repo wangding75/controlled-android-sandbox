@@ -20,6 +20,5 @@ include ':sandbox-domain'
 include ':sandbox-contract'
 include ':sandbox-runtime'
 include ':sandbox-framework'
-
 include ':fixture-basic'
 include ':sandbox-native'
