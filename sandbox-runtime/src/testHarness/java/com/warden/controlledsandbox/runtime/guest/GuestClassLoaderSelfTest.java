@@ -6,9 +6,21 @@ public final class GuestClassLoaderSelfTest {
         require(GuestClassLoader.isParentFirst("android.app.Activity"), "Android parent first");
         require(GuestClassLoader.isParentFirst("com.warden.controlledsandbox.contract.IRuntimeBroker"),
                 "sandbox contract parent first");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment"),
+                "runtime implementation denied");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.framework.core.FrameworkHooks"),
+                "framework implementation denied");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.nativebridge.NativePolicy"),
+                "native management implementation denied");
+        require(!GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.contract.IRuntimeBroker"),
+                "contract remains available");
         require(!GuestClassLoader.isParentFirst("com.example.guest.MainActivity"), "Guest child first");
         require(!GuestClassLoader.isParentFirst("org.example.library.Client"), "Guest libraries child first");
-        System.out.println("PASS Guest class-loader policy self-test");
+        System.out.println("PASS Guest class-loader host-boundary policy self-test");
     }
 
     private static void require(boolean condition, String label) {

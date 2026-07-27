@@ -267,11 +267,15 @@
       "evidence": [
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java",
-        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestManifestMetadataLoader.java"
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestManifestMetadataLoader.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoaderSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Guest application bootstrap is source-wired with host-internal class denial and principal Context storage redirection. Same-UID hostile-code isolation and Android framework behavior remain outside this evidence level."
     },
     {
       "id": "runtime.activity-adapter",

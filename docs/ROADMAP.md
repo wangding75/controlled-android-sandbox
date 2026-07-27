@@ -23,8 +23,8 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 
 ## Guest application and Activity
 
-- DONE — child-first Guest class loader with parent-first platform namespaces.
-- DONE — Guest resources, Context and Application construction/bootstrap.
+- DONE — child-first Guest class loader with parent-first platform/contract namespaces and explicit denial of host implementation classes.
+- PARTIAL — Guest resources, Application bootstrap and principal Context storage redirection; device-protected storage and broader system-service identity remain open.
 - DONE — Stub Activity route consumption and lifecycle forwarding.
 - DONE — explicit Activity task/token/state model used by the runtime controller.
 - PARTIAL — AMS/ATMS mediation currently performs reversible identity proxying but does not yet virtualize every start/result/task callback signature.

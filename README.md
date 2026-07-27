@@ -9,7 +9,7 @@ A from-scratch Android application-virtualization research project. Production s
 - Atomic package and virtual-instance metadata storage.
 - Multiple virtual users/instances with independent data roots and deterministic virtual UIDs.
 - Versioned AIDL protocol, explicit session state machine, eight process slots, retained Binder connections, death detection, generation recovery and one-time Activity route tokens.
-- Guest `DexClassLoader`, APK resource set, instance-scoped `Context`, `Application` bootstrap and custom atomic `SharedPreferences`.
+- Guest `DexClassLoader` with host-internal deny rules, APK resource set, instance-scoped `Context` with principal storage redirection and host-unwrapping denial, `Application` bootstrap and custom atomic `SharedPreferences`.
 - Broker-authoritative Activity, started/bound Service, dynamic Receiver, explicit/implicit manifest Receiver and Provider authority/CRUD/Call/Batch/Cursor/FileDescriptor routing, ordered-broadcast source policy, broker-owned ContentObserver callbacks, Session-bound TTL/one-time URI Grants and unified Provider resource lifecycle cleanup with Guest component bridges.
 - Process-local PackageManager identity hook with explicit installation reporting and rollback.
 - WebView data-directory suffix per virtual user/process slot.
