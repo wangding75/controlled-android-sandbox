@@ -1,0 +1,25 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'ControlledSandbox'
+include ':app'
+include ':sandbox-domain'
+include ':sandbox-contract'
+include ':sandbox-runtime'
+include ':sandbox-framework'
+
+include ':fixture-basic'
+include ':sandbox-native'

@@ -1,0 +1,45 @@
+PASS sandbox-domain self-test
+PASS XML and structure checks
+PASS repository self-test
+PASS architecture boundary checks
+PASS generated SBOM with 7 components
+PASS M3 capability evidence matrix: source complete=31 partial=4 missing=0 weighted=94.3%; production wired=29 partial=4 blocked=1 n/a=1 weighted=91.2%; device verified=0 partial=0 not-tested=33 blocked=1 n/a=1 weighted=0.0%
+PASS static Android-source compilation with local API stubs
+PASS sandbox SharedPreferences self-test
+PASS Provider cursor transport self-test
+PASS broker cursor lease runtime self-test
+PASS Guest Provider file transport self-test
+PASS broker Provider file lease runtime self-test
+PASS WebView profile isolation self-test
+PASS Guest class-loader policy self-test
+PASS runtime diagnostics evidence self-test
+PASS broker concurrent state self-test
+PASS broker Service production registry self-test
+PASS broker Receiver production registry self-test
+PASS broker manifest Receiver runtime self-test
+PASS BrokerObserverRuntimeSelfTest
+PASS ProviderBatchRuntimeSelfTest
+PASS URI grant lifecycle integration self-test
+PASS ProviderLifecycleCoordinatorSelfTest
+PASS broker Provider authority lifecycle self-test
+PASS isolatedProcess fail-closed policy self-test
+PASS audited Activity field bridge self-test
+PASS broker Activity production adapter self-test
+PASS framework identity proxy self-test
+PASS FrameworkProxySelfTest
+PASS DefaultControllerSelfTest
+PASS ActivityTaskLedgerSelfTest
+PASS ActivityTaskLedgerConcurrencySelfTest
+PASS ActivityLaunchCoordinatorSelfTest
+PASS OneTimeRouteStoreSelfTest
+PASS sandbox-native policy self-test
+PASS sandbox-native PLT hook self-test
+PASS sandbox-native crash recorder self-test
+PASS sandbox-native JNI boundary compile
+PASS strict M3 evidence gate self-test
+PASS structural PowerShell check scripts/run-emulator-m3.ps1
+PASS structural PowerShell check scripts/self-test.ps1
+PASS structural PowerShell check scripts/build-debug.ps1
+PASS structural PowerShell check scripts/emulator-smoke.ps1
+PASS custom Gradle bootstrap delegation
+PASS all locally executable verification gates

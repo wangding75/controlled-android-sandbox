@@ -1,0 +1,547 @@
+{
+  "schemaVersion": 2,
+  "scope": "multi-dimensional-source-production-device-evidence",
+  "capabilities": [
+    {
+      "id": "package.manifest",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "package.upgrade-policy",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/PackageUpgradePolicy.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "identity.virtual-user-uid",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/identity/VirtualUidRegistry.java",
+        "sandbox-domain/src/testHarness/java/com/warden/controlledsandbox/domain/SelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "storage.virtual-path",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/identity/VirtualPathPolicy.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "session.generation-recovery",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "route.one-time-token",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/OneTimeRouteStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntimeSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "activity.task-lifecycle-model",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "service.started-bound-model",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/service/BrokerServiceRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/service/BrokerServiceRuntimeSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "receiver.dynamic-registry",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/DynamicReceiverRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerReceiverRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerReceiverRuntimeSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "receiver.manifest-explicit-activation",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerManifestReceiverRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerManifestReceiverRuntimeSelfTest.java",
+        "docs/fixes/b3-t4a-manifest-receiver-runtime.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Explicit manifest Receiver routing and deterministic on-demand Guest process activation are wired; implicit resolution is tracked separately, while platform background/protected-broadcast behavior remains device-deferred."
+    },
+    {
+      "id": "receiver.manifest-implicit-resolution",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/BroadcastIntent.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerManifestReceiverRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerManifestReceiverRuntimeSelfTest.java",
+        "docs/fixes/b3-t4b-implicit-ordered-broadcast.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Broker action index, action/category/data/MIME matching, stable priority ordering, dual permission checks and on-demand process delivery are locally wired; Android platform implicit-broadcast restrictions remain device-deferred."
+    },
+    {
+      "id": "receiver.ordered-source-model",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/OrderedBroadcastState.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/ManifestBroadcastDispatcher.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BroadcastPayloadEstimator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/ManifestBroadcastDispatcherSelfTest.java",
+        "docs/fixes/b3-t4b-implicit-ordered-broadcast.md",
+        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Priority-ordered result propagation, abort/clear-abort, failure policy and payload limits are wired at Broker/Guest source level. Ordinary Receiver PendingResult bridging is tracked separately and remains device-deferred."
+    },
+    {
+      "id": "receiver.ordered-pending-result-bridge",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IOrderedReceiverCompletion.aidl",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerOrderedReceiverRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridge.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverFinishInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkCallInterceptor.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistrySelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridgeSelfTest.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkCallInterceptorSelfTest.java",
+        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Broker one-shot token authority, sync/async PendingResult capture, finishReceiver interception, deadline cleanup, Session/Binder cancellation, replay and late-token rejection are source-wired. Hidden-API constructor access, real Binder/AMS interception and API/OEM compatibility remain unverified."
+    },
+    {
+      "id": "receiver.lifecycle-consistency",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/DynamicReceiverRegistry.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/ReceiverLifecycleCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/status/BrokerRuntimeStatusSource.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/RuntimeStatusSnapshot.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/ReceiverLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t4d-receiver-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Dynamic registrations, Manifest indexes/bindings, Action Index/start templates and Ordered completion tokens share one lifecycle coordinator and one runtime-status snapshot. Session recovery, disconnect, stop, instance invalidation, Broker destroy and token expiry are source-wired; real Android broadcast lifecycle remains device-deferred."
+    },
+    {
+      "id": "provider.authority-registry",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/ProviderAuthorityRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntimeSelfTest.java",
+        "docs/fixes/b3-t3a-provider-authority-lifecycle.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/ComponentOperations.java",
+        "docs/fixes/b3-t3b-provider-operation-routing.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t3e4-provider-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "provider.uri-grants",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/UriGrantRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntimeSelfTest.java",
+        "docs/fixes/b3-t3b-provider-operation-routing.md",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/UriGrantLifecycleSelfTest.java",
+        "docs/fixes/b3-t3e3-uri-grant-lifecycle.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t3e4-provider-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Session/generation-bound TTL, one-time atomic consumption, revoke and lifecycle cleanup are locally verified; Android platform URI-permission behavior remains device-deferred."
+    },
+    {
+      "id": "provider.content-observers",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IProviderObserver.aidl",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/ProviderObserverRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntimeSelfTest.java",
+        "docs/fixes/b3-t3e1-provider-observer-registry.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t3e4-provider-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Broker-owned callback registration and URI matching are locally verified; Android ContentResolver/IContentObserver behavior remains device-deferred."
+    },
+    {
+      "id": "provider.batch-operations",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderBatchRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/AtomicProviderBatch.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderBatchRuntimeSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntimeSelfTest.java",
+        "docs/fixes/b3-t3e2-provider-batch-operations.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t3e4-provider-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Bounded Broker/Guest batch routing is locally verified; Android ContentResolver, Binder and third-party Provider transaction behavior remain device-deferred."
+    },
+    {
+      "id": "process.declared-isolated-planning",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/process/ComponentProcessPlanner.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "blocked",
+      "deviceStatus": "blocked",
+      "notes": "Manifest planning exists; runtime rejects isolated components until real Android isolated UID slots are implemented and verified."
+    },
+    {
+      "id": "runtime.application",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestManifestMetadataLoader.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.activity-adapter",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/GuestActivityController.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.service-adapter",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/service/BrokerServiceRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.receiver-adapter",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerReceiverRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.provider-transport",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderCursorTransport.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/CursorLeaseRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntimeSelfTest.java",
+        "docs/fixes/b3-t3b-provider-operation-routing.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerCursorRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderTransportSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerCursorRuntimeSelfTest.java",
+        "docs/fixes/b3-t3c-cursor-leases.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderFileModes.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/GuestProviderFileTransport.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerFileRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/GuestProviderFileTransportSelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerFileRuntimeSelfTest.java",
+        "docs/fixes/b3-t3d-provider-file-descriptors.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinatorSelfTest.java",
+        "docs/fixes/b3-t3e4-provider-consistency-review.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.multi-process-binding",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.package-manager",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.activity-task-manager",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkProxyController.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkProxyInstaller.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkServiceSpec.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkSignatureAudit.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkProxySelfTest.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DefaultControllerSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.activity-manager",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkProxyController.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkProxyInstaller.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkServiceSpec.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkSignatureAudit.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkProxySelfTest.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DefaultControllerSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.app-ops",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/permission/AppOpsManagerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.notification",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/NotificationManagerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.job-scheduler",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/JobSchedulerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.storage",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/StorageManagerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.permission",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/permission/PermissionManagerHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "native.file-hook",
+      "evidence": [
+        "sandbox-native/src/main/cpp/include/controlled_sandbox/native_file_system.h",
+        "sandbox-native/src/main/cpp/native_file_system.cpp",
+        "sandbox-native/src/main/cpp/native_hook.cpp",
+        "sandbox-native/src/main/cpp/native_policy.cpp",
+        "sandbox-native/src/main/cpp/native_policy_jni.cpp",
+        "sandbox-native/src/main/java/com/warden/controlledsandbox/nativebridge/NativePolicy.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-native/src/test/cpp/native_policy_self_test.cpp",
+        "sandbox-native/src/test/cpp/native_file_system_self_test.cpp",
+        "sandbox-native/src/test/cpp/native_file_hook_fixture.cpp",
+        "sandbox-native/src/test/cpp/native_hook_self_test.cpp",
+        "docs/fixes/b3-t5a-native-file-system-hooks.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest native-library PLT/GOT file calls are policy-bound and fail-closed; Android linker, SELinux, kernel race behavior, simulator and device execution remain not-tested."
+    },
+    {
+      "id": "native.network-hook",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_hook.cpp",
+        "sandbox-native/src/main/cpp/native_policy.cpp",
+        "sandbox-native/src/test/cpp/native_hook_self_test.cpp"
+      ],
+      "sourceStatus": "partial",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+    },
+    {
+      "id": "native.dynamic-loader-hook",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_hook.cpp",
+        "sandbox-native/src/test/cpp/native_hook_self_test.cpp"
+      ],
+      "sourceStatus": "partial",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+    },
+    {
+      "id": "webview.profile-isolation",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/WebViewProfileManager.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/WebViewProfileSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "diagnostics.crash-anr-events",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/diagnostics/RuntimeDiagnostics.java",
+        "sandbox-native/src/main/cpp/native_crash.cpp",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/diagnostics/RuntimeDiagnosticsSelfTest.java",
+        "sandbox-native/src/test/cpp/native_crash_self_test.cpp"
+      ],
+      "sourceStatus": "partial",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+    },
+    {
+      "id": "fixtures.component-matrix",
+      "evidence": [
+        "fixture-basic/src/main/AndroidManifest.xml",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/MainActivity.java",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/DetailActivity.java",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/RemoteActivity.java",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureService.java",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/DynamicFixtureReceiver.java",
+        "fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureProvider.java",
+        "fixture-basic/src/main/cpp/fixture_native.cpp"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "not-applicable",
+      "deviceStatus": "not-applicable"
+    }
+  ],
+  "statusDimensions": {
+    "sourceStatus": [
+      "complete",
+      "partial",
+      "missing"
+    ],
+    "productionStatus": [
+      "wired",
+      "partial",
+      "blocked",
+      "not-applicable"
+    ],
+    "deviceStatus": [
+      "verified",
+      "partial",
+      "not-tested",
+      "blocked",
+      "not-applicable"
+    ]
+  }
+}

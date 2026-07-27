@@ -1,0 +1,110 @@
+package com.warden.controlledsandbox.domain.persistence;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Objects;
+
+/**
+ * UTF-8 file store with an independently written last-known-good copy.
+ * Corruption is never converted into an empty state.
+ */
+public final class RecoverableFileStore {
+    private final Path primary;
+    private final Path backup;
+
+    public RecoverableFileStore(Path primary) {
+        this.primary = Objects.requireNonNull(primary, "primary").toAbsolutePath().normalize();
+        this.backup = this.primary.resolveSibling(this.primary.getFileName() + ".lastgood");
+    }
+
+    public synchronized <T> T read(Decoder<T> decoder, T emptyValue) {
+        Objects.requireNonNull(decoder, "decoder");
+        boolean primaryExists = Files.isRegularFile(primary);
+        boolean backupExists = Files.isRegularFile(backup);
+        if (!primaryExists && !backupExists) return emptyValue;
+
+        Throwable primaryFailure = null;
+        if (primaryExists) {
+            String trusted = null;
+            T decoded = null;
+            try {
+                trusted = readUtf8(primary);
+                decoded = decoder.decode(trusted);
+            } catch (Throwable error) {
+                primaryFailure = error;
+            }
+            if (primaryFailure == null) {
+                try {
+                    writePath(backup, trusted);
+                } catch (IOException error) {
+                    throw new PersistentStateException("Cannot refresh last-known-good backup: " + backup, error);
+                }
+                return decoded;
+            }
+        }
+
+        if (backupExists) {
+            try {
+                String recovered = readUtf8(backup);
+                T decoded = decoder.decode(recovered);
+                writePath(primary, recovered);
+                return decoded;
+            } catch (Throwable backupFailure) {
+                PersistentStateException failure = new PersistentStateException(
+                        "Persisted state is corrupt and no trusted backup can be recovered: " + primary,
+                        primaryFailure == null ? backupFailure : primaryFailure);
+                if (primaryFailure != null) failure.addSuppressed(backupFailure);
+                throw failure;
+            }
+        }
+
+        throw new PersistentStateException("Persisted state is corrupt and no backup exists: " + primary,
+                primaryFailure);
+    }
+
+    public synchronized void write(String content) throws IOException {
+        Objects.requireNonNull(content, "content");
+        writePath(primary, content);
+        writePath(backup, content);
+    }
+
+    public Path primary() { return primary; }
+    public Path backup() { return backup; }
+
+    private static String readUtf8(Path path) throws IOException {
+        return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+    }
+
+    private static void writePath(Path destination, String content) throws IOException {
+        Path parent = destination.getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Path temporary = destination.resolveSibling(destination.getFileName() + ".tmp");
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            ByteBuffer buffer = ByteBuffer.wrap(bytes);
+            while (buffer.hasRemaining()) channel.write(buffer);
+            channel.force(true);
+        }
+        try {
+            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException unsupported) {
+            Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
+    }
+
+    @FunctionalInterface
+    public interface Decoder<T> {
+        T decode(String content) throws Exception;
+    }
+}

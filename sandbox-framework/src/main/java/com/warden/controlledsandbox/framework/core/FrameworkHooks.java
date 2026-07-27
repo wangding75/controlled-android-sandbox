@@ -1,0 +1,153 @@
+package com.warden.controlledsandbox.framework.core;
+
+import com.warden.controlledsandbox.framework.identity.GuestIdentity;
+import com.warden.controlledsandbox.framework.packagemanager.PackageManagerHook;
+import com.warden.controlledsandbox.framework.permission.AppOpsManagerHook;
+import com.warden.controlledsandbox.framework.permission.PermissionManagerHook;
+import com.warden.controlledsandbox.framework.service.JobSchedulerHook;
+import com.warden.controlledsandbox.framework.service.NotificationManagerHook;
+import com.warden.controlledsandbox.framework.service.StorageManagerHook;
+
+import android.content.Context;
+import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
+import com.warden.controlledsandbox.framework.identity.IdentityContext;
+import com.warden.controlledsandbox.framework.core.ProxyInstallReport;
+import com.warden.controlledsandbox.framework.core.ProxyTelemetry;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/** Installs framework proxies independently and keeps reversible handles for process shutdown. */
+public final class FrameworkHooks implements AutoCloseable {
+    private final List<AutoCloseable> hooks;
+    private final FrameworkHookReport report;
+
+    private FrameworkHooks(List<AutoCloseable> hooks, FrameworkHookReport report) {
+        this.hooks = hooks;
+        this.report = report;
+    }
+
+    public static FrameworkHooks install(Context context, GuestIdentity identity) {
+        return install(context, identity, FrameworkCallInterceptor.NO_OP);
+    }
+
+    public static FrameworkHooks install(
+            Context context, GuestIdentity identity, FrameworkCallInterceptor callInterceptor) {
+        List<AutoCloseable> hooks = new ArrayList<>();
+        Map<String, Boolean> installed = new LinkedHashMap<>();
+        Map<String, String> failures = new LinkedHashMap<>();
+        attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(context, identity));
+        installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);
+        attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(context, identity));
+        attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(context, identity));
+        FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
+        if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
+            rollbackInstalled(hooks, installed, failures);
+            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
+        }
+        attempt("notification", installed, failures, hooks, () -> NotificationManagerHook.install(identity));
+        attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(context, identity));
+        attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(context, identity));
+        return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
+    }
+
+    public FrameworkHookReport report() { return report; }
+
+    @Override public void close() {
+        for (int index = hooks.size() - 1; index >= 0; index--) {
+            try { hooks.get(index).close(); } catch (Exception ignored) { }
+        }
+        hooks.clear();
+    }
+
+    private static void installActivityFrameworkPair(
+            GuestIdentity identity,
+            FrameworkCallInterceptor callInterceptor,
+            Map<String, Boolean> installed,
+            Map<String, String> failures,
+            List<AutoCloseable> hooks) {
+        final String activityManager = "activityManager";
+        final String activityTaskManager = "activityTaskManager";
+        try {
+            IdentityContext context = new IdentityContext(
+                    identity.packageName(),
+                    identity.virtualUid(),
+                    identity.hostPackageName(),
+                    identity.hostUid(),
+                    identity.processName(),
+                    identity.virtualUserId(),
+                    identity.generation());
+            FrameworkProxyController controller = FrameworkProxyController.installDefault(
+                    context, ProxyTelemetry.NO_OP, callInterceptor);
+            if (!controller.passed()) {
+                installed.put(activityManager, false);
+                installed.put(activityTaskManager, false);
+                for (ProxyInstallReport item : controller.reports()) {
+                    String key = serviceKey(item.service());
+                    failures.put(key, failureDetail(item));
+                }
+                failures.putIfAbsent(activityManager, "java.lang.IllegalStateException:atomic proxy pair failed");
+                failures.putIfAbsent(activityTaskManager, "java.lang.IllegalStateException:atomic proxy pair failed");
+                return;
+            }
+            installed.put(activityManager, true);
+            installed.put(activityTaskManager, true);
+            hooks.add(() -> { controller.rollbackAll(); });
+        } catch (Throwable error) {
+            String failure = error.getClass().getName() + ":" + String.valueOf(error.getMessage());
+            installed.put(activityManager, false);
+            installed.put(activityTaskManager, false);
+            failures.put(activityManager, failure);
+            failures.put(activityTaskManager, failure);
+        }
+    }
+
+    private static String serviceKey(String service) {
+        return switch (service) {
+            case "activity-manager" -> "activityManager";
+            case "activity-task-manager" -> "activityTaskManager";
+            default -> service;
+        };
+    }
+
+    private static String failureDetail(ProxyInstallReport report) {
+        String message = report.failure();
+        if (message.isEmpty() && !report.unsupportedProtectedSignatures().isEmpty()) {
+            message = "unsupported signatures=" + String.join(",", report.unsupportedProtectedSignatures());
+        }
+        if (message.isEmpty()) message = "proxy installation did not pass";
+        return "java.lang.IllegalStateException:" + message;
+    }
+
+    private static void rollbackInstalled(List<AutoCloseable> hooks, Map<String, Boolean> installed,
+                                          Map<String, String> failures) {
+        for (int index = hooks.size() - 1; index >= 0; index--) {
+            try { hooks.get(index).close(); }
+            catch (Exception error) {
+                failures.put("rollback-" + index, error.getClass().getName() + ":" + String.valueOf(error.getMessage()));
+            }
+        }
+        hooks.clear();
+        for (Map.Entry<String, Boolean> item : installed.entrySet()) {
+            if (Boolean.TRUE.equals(item.getValue())) {
+                item.setValue(false);
+                failures.putIfAbsent(item.getKey(), "java.lang.IllegalStateException:rolled back after mandatory hook failure");
+            }
+        }
+    }
+
+    private static void attempt(String name, Map<String, Boolean> installed, Map<String, String> failures,
+                                List<AutoCloseable> hooks, Installer installer) {
+        try {
+            AutoCloseable hook = installer.install();
+            hooks.add(hook);
+            installed.put(name, true);
+        } catch (Throwable error) {
+            installed.put(name, false);
+            failures.put(name, error.getClass().getName() + ":" + String.valueOf(error.getMessage()));
+        }
+    }
+
+    private interface Installer { AutoCloseable install() throws Exception; }
+}

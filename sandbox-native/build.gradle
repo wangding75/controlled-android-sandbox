@@ -1,0 +1,20 @@
+plugins { id 'com.android.library' }
+
+android {
+    namespace 'com.warden.controlledsandbox.nativebridge'
+    compileSdk 36
+    defaultConfig {
+        minSdk 26
+        externalNativeBuild {
+            cmake { cppFlags '-std=c++20 -Wall -Wextra -Werror' }
+        }
+        ndk { abiFilters 'arm64-v8a', 'x86_64' }
+    }
+    externalNativeBuild {
+        cmake { path 'src/main/cpp/CMakeLists.txt' version '3.22.1' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

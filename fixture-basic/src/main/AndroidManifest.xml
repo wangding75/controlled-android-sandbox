@@ -1,0 +1,29 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application
+        android:name=".FixtureApplication"
+        android:allowBackup="false"
+        android:label="Controlled Sandbox Fixture"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="false">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".DetailActivity" android:exported="false" />
+        <activity android:name=".RemoteActivity" android:exported="false" android:process=":remote" />
+        <service android:name=".FixtureService" android:exported="false" />
+        <service android:name=".RemoteFixtureService" android:exported="false" android:process=":remote" />
+        <service android:name=".IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
+        <receiver android:name=".FixtureReceiver" android:exported="true">
+            <intent-filter><action android:name="com.warden.controlledsandbox.fixture.PING" /></intent-filter>
+        </receiver>
+        <provider
+            android:name=".FixtureProvider"
+            android:authorities="com.warden.controlledsandbox.fixture.provider"
+            android:exported="false"
+            android:process=":provider" />
+    </application>
+</manifest>

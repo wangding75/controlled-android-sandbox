@@ -1,0 +1,2 @@
+-keep class com.warden.controlledsandbox.runtime.** { *; }
+-keep class com.warden.controlledsandbox.contract.** { *; }

@@ -1,0 +1,120 @@
+{
+  "bomFormat": "ControlledSandbox-SBOM",
+  "specVersion": "1.0",
+  "project": "controlled-sandbox-cleanroom",
+  "version": "0.2.0-development",
+  "components": [
+    {
+      "type": "application",
+      "name": "app",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 18,
+      "languages": [
+        "Gradle",
+        "Java",
+        "XML",
+        "pro"
+      ],
+      "sourceDigestSha256": "0f691594c24b2915ea8e548f970de088180f9e92bcce5871152def94482cad30"
+    },
+    {
+      "type": "library",
+      "name": "sandbox-domain",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 50,
+      "languages": [
+        "Gradle",
+        "Java"
+      ],
+      "sourceDigestSha256": "fb9eefea3cb39aaf00aab5d5c740506decb4cbd7fc3b6d2f1d8cb077d5ce520a"
+    },
+    {
+      "type": "library",
+      "name": "sandbox-contract",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 15,
+      "languages": [
+        "AIDL",
+        "Gradle",
+        "Java",
+        "XML"
+      ],
+      "sourceDigestSha256": "613f108a79a33e4fd9de78fe822a2f4efae873d5c9c963e10a5206410cb78919"
+    },
+    {
+      "type": "library",
+      "name": "sandbox-framework",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 83,
+      "languages": [
+        "Gradle",
+        "Java",
+        "XML"
+      ],
+      "sourceDigestSha256": "6b889b244349c42aaa50cd0369f4d5eb0189949a55608622fa77dd70013a5aa8"
+    },
+    {
+      "type": "library",
+      "name": "sandbox-native",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 18,
+      "languages": [
+        "C++",
+        "Gradle",
+        "Java",
+        "XML",
+        "txt"
+      ],
+      "sourceDigestSha256": "793952ad0001e4ed5d2b459c82b453e34de6a0e015a39c8f0c662ccf6092ba2a"
+    },
+    {
+      "type": "library",
+      "name": "sandbox-runtime",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 110,
+      "languages": [
+        "Gradle",
+        "Java",
+        "XML"
+      ],
+      "sourceDigestSha256": "6cb5e648129aa922db249faae50abe7b035b432636be1d19cd97f7ddccb77d96"
+    },
+    {
+      "type": "application",
+      "name": "fixture-basic",
+      "version": "0.2.0-development",
+      "license": "Apache-2.0",
+      "fileCount": 15,
+      "languages": [
+        "C++",
+        "Gradle",
+        "Java",
+        "XML",
+        "txt"
+      ],
+      "sourceDigestSha256": "07412a72db7bb0c8d157717cffdcc87c9df2790b9ef8296e0b2aeb1961966c08"
+    }
+  ],
+  "externalRuntimeDependencies": [
+    {
+      "name": "Android platform APIs",
+      "scope": "provided"
+    },
+    {
+      "name": "Android Gradle Plugin",
+      "version": "8.11.1",
+      "scope": "build"
+    },
+    {
+      "name": "Gradle",
+      "version": "8.13",
+      "scope": "build"
+    }
+  ]
+}

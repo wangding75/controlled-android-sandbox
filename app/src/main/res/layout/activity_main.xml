@@ -1,0 +1,21 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Controlled Sandbox" android:textSize="24sp" android:textStyle="bold" />
+    <TextView android:id="@+id/runtimeStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="6dp" android:text="Runtime: connecting…" android:textSize="14sp" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:text="M3 development build: virtual instances, Guest Application/component bridges, native policy and diagnostics are implemented. A real Emulator gate is still required before release." android:textSize="13sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:orientation="horizontal">
+        <Button android:id="@+id/importButton" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Import APK" />
+        <Button android:id="@+id/refreshButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:text="Refresh" />
+    </LinearLayout>
+    <TextView android:id="@+id/emptyText" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:gravity="center" android:text="No APK imported" />
+    <ListView android:id="@+id/packageList" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:layout_marginTop="8dp" android:dividerHeight="8dp" />
+</LinearLayout>

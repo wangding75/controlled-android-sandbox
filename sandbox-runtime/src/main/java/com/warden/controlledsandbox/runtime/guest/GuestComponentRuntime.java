@@ -1,0 +1,658 @@
+package com.warden.controlledsandbox.runtime.guest;
+
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransport;
+import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
+import com.warden.controlledsandbox.runtime.provider.ProviderCursorTransport;
+
+import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.ContentProvider;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.ContextWrapper;
+import android.content.Intent;
+import android.content.pm.ProviderInfo;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.IBinder;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Process-local lifecycle owner for non-Activity Guest components. */
+public final class GuestComponentRuntime {
+    private final GuestRuntimeEnvironment.Session session;
+    private final Map<String, ServiceRecord> services = new LinkedHashMap<>();
+    private final Map<String, ReceiverRecord> receivers = new LinkedHashMap<>();
+    private final Map<String, ProviderRecord> providersByClass = new LinkedHashMap<>();
+    private final Map<String, ProviderRecord> providersByAuthority = new LinkedHashMap<>();
+    private final ProviderCursorTransport cursorTransport = new ProviderCursorTransport();
+    private final GuestProviderFileTransport fileTransport = new GuestProviderFileTransport();
+    private int nextStartId = 1;
+
+    GuestComponentRuntime(GuestRuntimeEnvironment.Session session) { this.session = session; }
+
+    synchronized Bundle invoke(Bundle request) {
+        try {
+            String operation = required(request, ComponentOperations.OPERATION);
+            String componentClass = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+            IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass);
+            switch (operation) {
+                case ComponentOperations.START_SERVICE:
+                    return startService(componentClass, request.getString(ComponentOperations.ACTION, ""));
+                case ComponentOperations.STOP_SERVICE:
+                    return stopService(componentClass);
+                case ComponentOperations.BIND_SERVICE:
+                    return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID),
+                            request.getString(ComponentOperations.ACTION, ""));
+                case ComponentOperations.UNBIND_SERVICE:
+                    return unbindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID));
+                case ComponentOperations.REGISTER_RECEIVER:
+                    return registerReceiver(componentClass, request);
+                case ComponentOperations.UNREGISTER_RECEIVER:
+                    return unregisterReceiver(required(request, RuntimeKeys.RECEIVER_ID));
+                case ComponentOperations.SEND_BROADCAST:
+                    return sendBroadcast(componentClass, request);
+                case ComponentOperations.PREPARE_PROVIDER:
+                    return prepareProvider(componentClass, required(request, ComponentOperations.AUTHORITY));
+                case ComponentOperations.PROVIDER_QUERY:
+                    return queryProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_CURSOR_PAGE:
+                    return cursorTransport.page(required(request, RuntimeKeys.CURSOR_TOKEN),
+                            session.spec.sessionId, session.spec.generation,
+                            request.getInt(RuntimeKeys.CURSOR_OFFSET, 0),
+                            request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
+                            request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64));
+                case ComponentOperations.PROVIDER_CURSOR_CLOSE:
+                    return cursorTransport.close(required(request, RuntimeKeys.CURSOR_TOKEN),
+                            session.spec.sessionId, session.spec.generation);
+                case ComponentOperations.PROVIDER_CURSOR_CANCEL:
+                    return cursorTransport.cancel(required(request, RuntimeKeys.CURSOR_TOKEN),
+                            session.spec.sessionId, session.spec.generation);
+                case ComponentOperations.PROVIDER_GET_TYPE:
+                    return getProviderType(componentClass, request);
+                case ComponentOperations.PROVIDER_INSERT:
+                    return insertProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_UPDATE:
+                    return updateProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_DELETE:
+                    return deleteProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_CALL:
+                    return callProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_APPLY_BATCH:
+                    return applyBatchProvider(componentClass, request);
+                case ComponentOperations.PROVIDER_OPEN_FILE:
+                    return openProviderFile(componentClass, request);
+                case ComponentOperations.PROVIDER_OPEN_ASSET_FILE:
+                    return openProviderAssetFile(componentClass, request);
+                case ComponentOperations.PROVIDER_OPEN_TYPED_ASSET_FILE:
+                    return openProviderTypedAssetFile(componentClass, request);
+                case ComponentOperations.PROVIDER_FILE_CLOSE:
+                    return fileTransport.close(required(request, RuntimeKeys.FILE_TOKEN),
+                            session.spec.sessionId, session.spec.generation);
+                default:
+                    throw new IllegalArgumentException("Unknown component operation: " + operation);
+            }
+        } catch (Throwable error) {
+            return failure(error);
+        }
+    }
+
+    synchronized void shutdown() {
+        cursorTransport.closeAll();
+        fileTransport.closeAll();
+        for (ServiceRecord record : services.values()) destroyService(record);
+        services.clear();
+        receivers.clear();
+        for (ProviderRecord record : providersByClass.values()) {
+            try { record.provider.shutdown(); } catch (Throwable ignored) { }
+        }
+        providersByClass.clear();
+        providersByAuthority.clear();
+    }
+
+    private Bundle startService(String className, String action) throws Exception {
+        ServiceRecord record = getOrCreateService(className);
+        Intent intent = intent(action);
+        int startId = nextStartId++;
+        int resultCode = record.service.onStartCommand(intent, 0, startId);
+        record.startCount++;
+        Bundle out = success("SERVICE_STARTED", className);
+        out.putBoolean("created", record.createdNow);
+        record.createdNow = false;
+        out.putInt("startId", startId);
+        out.putInt("startCount", record.startCount);
+        out.putInt("connectionCount", record.connections.size());
+        out.putInt("onStartCommandResult", resultCode);
+        RuntimeEventLog.event("GUEST_SERVICE_START", out);
+        return out;
+    }
+
+    private Bundle stopService(String className) {
+        ServiceRecord record = services.get(className);
+        if (record == null) return success("SERVICE_NOT_RUNNING", className);
+        record.startCount = 0;
+        boolean destroyed = settleService(className, record);
+        Bundle out = success(destroyed ? "SERVICE_STOPPED" : "SERVICE_STOP_REQUESTED", className);
+        out.putInt("connectionCount", record.connections.size());
+        out.putBoolean("destroyed", destroyed);
+        RuntimeEventLog.event("GUEST_SERVICE_STOP", out);
+        return out;
+    }
+
+    private Bundle bindService(String className, String connectionId, String action) throws Exception {
+        ServiceRecord record = getOrCreateService(className);
+        if (record.connections.containsKey(connectionId)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
+        Intent intent = intent(action);
+        IBinder binder;
+        boolean rebound = false;
+        if (record.connections.isEmpty() && record.rebindRequested && record.lastBinder != null) {
+            record.service.onRebind(intent);
+            binder = record.lastBinder;
+            record.rebindRequested = false;
+            rebound = true;
+        } else {
+            binder = record.service.onBind(intent);
+            record.lastBinder = binder;
+        }
+        record.connections.put(connectionId, new BoundConnection(connectionId, intent));
+        Bundle out = success(binder == null ? "SERVICE_NULL_BINDING" : "SERVICE_BOUND", className);
+        out.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+        out.putInt("connectionCount", record.connections.size());
+        out.putBoolean("created", record.createdNow);
+        record.createdNow = false;
+        out.putBoolean("rebound", rebound);
+        if (binder != null) out.putBinder(RuntimeKeys.BINDER, binder);
+        RuntimeEventLog.event("GUEST_SERVICE_BIND", out);
+        return out;
+    }
+
+    private Bundle unbindService(String className, String connectionId) {
+        ServiceRecord record = services.get(className);
+        if (record == null) throw new IllegalArgumentException("SERVICE_NOT_RUNNING");
+        BoundConnection removed = record.connections.remove(connectionId);
+        if (removed == null) throw new IllegalArgumentException("UNKNOWN_SERVICE_CONNECTION");
+        if (record.connections.isEmpty()) record.rebindRequested = record.service.onUnbind(removed.intent);
+        boolean destroyed = settleService(className, record);
+        Bundle out = success(destroyed ? "SERVICE_UNBOUND_DESTROYED" : "SERVICE_UNBOUND", className);
+        out.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+        out.putInt("connectionCount", record.connections.size());
+        out.putBoolean("rebindRequested", record.rebindRequested);
+        out.putBoolean("destroyed", destroyed);
+        RuntimeEventLog.event("GUEST_SERVICE_UNBIND", out);
+        return out;
+    }
+
+    private ServiceRecord getOrCreateService(String className) throws Exception {
+        if (className == null || className.trim().isEmpty()) throw new IllegalArgumentException("Service class is required");
+        ServiceRecord record = services.get(className);
+        if (record != null) return record;
+        Class<?> type = session.classLoader.loadClass(className);
+        if (!Service.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not a Service: " + className);
+        Service service = (Service) type.getDeclaredConstructor().newInstance();
+        attachBaseContext(service, session.context);
+        setOptionalField(service, "mApplication", session.application);
+        setOptionalField(service, "mClassName", className);
+        service.onCreate();
+        requireNativeHookRefresh("SERVICE_CREATE");
+        record = new ServiceRecord(service);
+        record.createdNow = true;
+        services.put(className, record);
+        return record;
+    }
+
+    private void requireNativeHookRefresh(String stage) {
+        if (session.nativeHooksInstalled && !NativePolicy.refreshHooks()) {
+            throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_" + stage + ":"
+                    + NativePolicy.hookStatus());
+        }
+    }
+
+    private boolean settleService(String className, ServiceRecord record) {
+        if (record.startCount > 0 || !record.connections.isEmpty()) return false;
+        services.remove(className);
+        destroyService(record);
+        return true;
+    }
+
+    private static void destroyService(ServiceRecord record) {
+        try { record.service.onDestroy(); } catch (Throwable ignored) { }
+        record.connections.clear();
+        record.lastBinder = null;
+    }
+
+    private Bundle registerReceiver(String className, Bundle request) throws Exception {
+        if (className.trim().isEmpty()) throw new IllegalArgumentException("Receiver class is required");
+        String receiverId = request.getString(RuntimeKeys.RECEIVER_ID, "");
+        if (receiverId.trim().isEmpty()) throw new IllegalArgumentException("receiverId is required");
+        if (receivers.containsKey(receiverId)) throw new IllegalStateException("DUPLICATE_RECEIVER_ID");
+        ArrayList<String> actions = request.getStringArrayList(RuntimeKeys.RECEIVER_ACTIONS);
+        if (actions == null || actions.isEmpty()) throw new IllegalArgumentException("receiverActions is required");
+        BroadcastReceiver receiver = newReceiver(className);
+        ReceiverRecord record = new ReceiverRecord(receiverId, className, receiver,
+                new ArrayList<>(actions), request.getBoolean(RuntimeKeys.RECEIVER_EXPORTED, false));
+        receivers.put(receiverId, record);
+        Bundle out = success("RECEIVER_REGISTERED", className);
+        out.putString(RuntimeKeys.RECEIVER_ID, receiverId);
+        out.putInt("receiverCount", receivers.size());
+        RuntimeEventLog.event("GUEST_RECEIVER_REGISTER", out);
+        return out;
+    }
+
+    private Bundle unregisterReceiver(String receiverId) {
+        ReceiverRecord removed = receivers.remove(receiverId);
+        if (removed == null) throw new IllegalArgumentException("UNKNOWN_RECEIVER_ID");
+        Bundle out = success("RECEIVER_UNREGISTERED", removed.className);
+        out.putString(RuntimeKeys.RECEIVER_ID, receiverId);
+        out.putInt("receiverCount", receivers.size());
+        RuntimeEventLog.event("GUEST_RECEIVER_UNREGISTER", out);
+        return out;
+    }
+
+    private Bundle sendBroadcast(String className, Bundle request) throws Exception {
+        String action = request.getString(ComponentOperations.ACTION, "");
+        Intent intent = broadcastIntent(request);
+        String receiverId = request.getString(RuntimeKeys.RECEIVER_ID, "");
+        boolean ordered = request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false);
+        if (ordered) {
+            if (!receiverId.trim().isEmpty()) {
+                ReceiverRecord record = receivers.get(receiverId);
+                if (record == null) throw new IllegalArgumentException("UNKNOWN_RECEIVER_ID");
+                return deliverOrderedReceiver(record.receiver, record.className, intent, request, action);
+            }
+            if (className == null || className.trim().isEmpty()) {
+                throw new IllegalArgumentException("ORDERED_RECEIVER_CLASS_REQUIRED");
+            }
+            BroadcastReceiver receiver = newReceiver(className);
+            return deliverOrderedReceiver(receiver, className, intent, request, action);
+        }
+
+        int delivered = 0;
+        if (!receiverId.trim().isEmpty()) {
+            ReceiverRecord record = receivers.get(receiverId);
+            if (record == null) throw new IllegalArgumentException("UNKNOWN_RECEIVER_ID");
+            record.receiver.onReceive(session.context, intent);
+            delivered = 1;
+            className = record.className;
+        } else if (className != null && !className.trim().isEmpty()) {
+            newReceiver(className).onReceive(session.context, intent);
+            delivered = 1;
+        } else {
+            for (ReceiverRecord record : receivers.values()) {
+                if (record.actions.contains(action)) {
+                    record.receiver.onReceive(session.context, intent);
+                    delivered++;
+                }
+            }
+        }
+        Bundle out = success(delivered == 0 ? "BROADCAST_NO_RECEIVERS" : "BROADCAST_DELIVERED",
+                className == null ? "" : className);
+        out.putString(ComponentOperations.ACTION, action);
+        out.putInt("deliveredCount", delivered);
+        RuntimeEventLog.event("GUEST_BROADCAST", out);
+        return out;
+    }
+
+    private Bundle deliverOrderedReceiver(BroadcastReceiver receiver, String className, Intent intent,
+                                          Bundle request, String action) throws Exception {
+        OrderedReceiverPendingResultBridge bridge = OrderedReceiverPendingResultBridge.install(
+                receiver, request, session.orderedReceiverFinishInterceptor);
+        try {
+            receiver.onReceive(session.context, intent);
+            Bundle out = bridge.afterOnReceive();
+            out.putString(ComponentOperations.ACTION, action);
+            out.putString(RuntimeKeys.COMPONENT_CLASS, className);
+            out.putInt("deliveredCount", 1);
+            RuntimeEventLog.event("GUEST_ORDERED_BROADCAST", out);
+            return out;
+        } catch (Throwable error) {
+            bridge.cancelLocal();
+            throw error;
+        }
+    }
+
+    private BroadcastReceiver newReceiver(String className) throws Exception {
+        Class<?> type = session.classLoader.loadClass(className);
+        if (!BroadcastReceiver.class.isAssignableFrom(type)) {
+            throw new IllegalArgumentException("Component is not a BroadcastReceiver: " + className);
+        }
+        return (BroadcastReceiver) type.getDeclaredConstructor().newInstance();
+    }
+
+    private Bundle prepareProvider(String className, String authority) throws Exception {
+        ProviderRecord existing = providersByAuthority.get(authority);
+        if (existing != null) {
+            if (!existing.className.equals(className)) throw new IllegalStateException("PROVIDER_AUTHORITY_COLLISION");
+            return providerResult("PROVIDER_ALREADY_READY", existing);
+        }
+        ProviderRecord byClass = providersByClass.get(className);
+        if (byClass != null) {
+            providersByAuthority.put(authority, byClass);
+            return providerResult("PROVIDER_AUTHORITY_ATTACHED", byClass);
+        }
+        Class<?> type = session.classLoader.loadClass(className);
+        if (!ContentProvider.class.isAssignableFrom(type)) {
+            throw new IllegalArgumentException("Component is not a ContentProvider: " + className);
+        }
+        ContentProvider provider = (ContentProvider) type.getDeclaredConstructor().newInstance();
+        requireNativeHookRefresh("PROVIDER_CREATE");
+        ProviderInfo info = new ProviderInfo();
+        info.name = className;
+        info.packageName = session.spec.packageName;
+        info.authority = authority;
+        info.exported = false;
+        info.applicationInfo = session.context.getApplicationInfo();
+        provider.attachInfo(session.context, info);
+        ProviderRecord record = new ProviderRecord(className, authority, provider);
+        providersByClass.put(className, record);
+        providersByAuthority.put(authority, record);
+        Bundle out = providerResult("PROVIDER_READY", record);
+        RuntimeEventLog.event("GUEST_PROVIDER_PREPARE", out);
+        return out;
+    }
+
+    private Bundle queryProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        String[] projection = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_PROJECTION));
+        String[] selectionArgs = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS));
+        android.database.Cursor cursor = record.provider.query(uri, projection,
+                request.getString(RuntimeKeys.PROVIDER_SELECTION, ""), selectionArgs,
+                request.getString(RuntimeKeys.PROVIDER_SORT_ORDER, ""));
+        Bundle out = cursorTransport.open(cursor, required(request, RuntimeKeys.CURSOR_TOKEN),
+                session.spec.sessionId, providerInstance(record), session.spec.generation,
+                request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64),
+                request.getLong(RuntimeKeys.CURSOR_TTL_MS, ProviderCursorTransport.DEFAULT_LEASE_TTL_MS));
+        out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
+        out.putString(ComponentOperations.AUTHORITY, record.authority);
+        out.putString(RuntimeKeys.URI, uri.toString());
+        RuntimeEventLog.event("GUEST_PROVIDER_QUERY", out);
+        return out;
+    }
+
+    private Bundle getProviderType(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Bundle out = providerResult("PROVIDER_TYPE", record);
+        out.putString("mimeType", record.provider.getType(uri));
+        out.putString(RuntimeKeys.URI, uri.toString());
+        return out;
+    }
+
+    private Bundle insertProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Uri inserted = record.provider.insert(uri, contentValues(request.getBundle(RuntimeKeys.PROVIDER_VALUES)));
+        Bundle out = providerResult("PROVIDER_INSERTED", record);
+        out.putString(RuntimeKeys.URI, inserted == null ? "" : inserted.toString());
+        RuntimeEventLog.event("GUEST_PROVIDER_INSERT", out);
+        return out;
+    }
+
+    private Bundle updateProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        int count = record.provider.update(uri, contentValues(request.getBundle(RuntimeKeys.PROVIDER_VALUES)),
+                request.getString(RuntimeKeys.PROVIDER_SELECTION, ""),
+                toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS)));
+        Bundle out = providerResult("PROVIDER_UPDATED", record);
+        out.putInt("affectedRows", count);
+        RuntimeEventLog.event("GUEST_PROVIDER_UPDATE", out);
+        return out;
+    }
+
+    private Bundle deleteProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        int count = record.provider.delete(uri, request.getString(RuntimeKeys.PROVIDER_SELECTION, ""),
+                toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS)));
+        Bundle out = providerResult("PROVIDER_DELETED", record);
+        out.putInt("affectedRows", count);
+        RuntimeEventLog.event("GUEST_PROVIDER_DELETE", out);
+        return out;
+    }
+
+    private Bundle callProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        String method = required(request, RuntimeKeys.PROVIDER_METHOD);
+        String argument = request.getString(RuntimeKeys.PROVIDER_ARGUMENT, "");
+        Bundle extras = request.getBundle(RuntimeKeys.PROVIDER_EXTRAS);
+        Bundle returned = record.provider.call(method, argument, extras == null ? null : new Bundle(extras));
+        Bundle out = providerResult("PROVIDER_CALLED", record);
+        out.putString(RuntimeKeys.PROVIDER_METHOD, method);
+        out.putBundle(RuntimeKeys.PROVIDER_RESULT, returned == null ? new Bundle() : new Bundle(returned));
+        RuntimeEventLog.event("GUEST_PROVIDER_CALL", out);
+        return out;
+    }
+
+    private Bundle applyBatchProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        try {
+            ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, record.authority);
+            Bundle out = ProviderBatchRuntime.execute(record.provider, batch);
+            out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
+            out.putString(ComponentOperations.AUTHORITY, record.authority);
+            RuntimeEventLog.event("GUEST_PROVIDER_APPLY_BATCH", out);
+            return out;
+        } catch (ProviderBatchRuntime.BatchException error) {
+            Bundle out = failure(error);
+            out.putInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, error.operationIndex());
+            RuntimeEventLog.event("GUEST_PROVIDER_APPLY_BATCH_FAILED", out);
+            return out;
+        }
+    }
+
+    private Bundle openProviderFile(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Bundle out = fileTransport.openFile(record.provider, uri,
+                required(request, RuntimeKeys.PROVIDER_FILE_MODE),
+                required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
+                android.os.SystemClock.elapsedRealtime(),
+                request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        attachProviderFileResult(out, record, uri);
+        RuntimeEventLog.event("GUEST_PROVIDER_OPEN_FILE", out);
+        return out;
+    }
+
+    private Bundle openProviderAssetFile(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Bundle out = fileTransport.openAssetFile(record.provider, uri,
+                required(request, RuntimeKeys.PROVIDER_FILE_MODE),
+                required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
+                android.os.SystemClock.elapsedRealtime(),
+                request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        attachProviderFileResult(out, record, uri);
+        RuntimeEventLog.event("GUEST_PROVIDER_OPEN_ASSET_FILE", out);
+        return out;
+    }
+
+    private Bundle openProviderTypedAssetFile(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Bundle out = fileTransport.openTypedAssetFile(record.provider, uri,
+                required(request, RuntimeKeys.PROVIDER_MIME_TYPE),
+                request.getBundle(RuntimeKeys.PROVIDER_FILE_OPTIONS),
+                required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
+                android.os.SystemClock.elapsedRealtime(),
+                request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        attachProviderFileResult(out, record, uri);
+        RuntimeEventLog.event("GUEST_PROVIDER_OPEN_TYPED_ASSET_FILE", out);
+        return out;
+    }
+
+    private static void attachProviderFileResult(Bundle out, ProviderRecord record, Uri uri) {
+        out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
+        out.putString(ComponentOperations.AUTHORITY, record.authority);
+        out.putString(RuntimeKeys.URI, uri.toString());
+    }
+
+    private ProviderRecord requireProvider(String className, Bundle request) throws Exception {
+        String authority = request.getString(ComponentOperations.AUTHORITY, "");
+        ProviderRecord record = authority.trim().isEmpty() ? null : providersByAuthority.get(authority);
+        if (record == null && className != null && !className.trim().isEmpty()) record = providersByClass.get(className);
+        if (record == null) {
+            if (className == null || className.trim().isEmpty()) throw new IllegalArgumentException("Provider class is required");
+            if (authority.trim().isEmpty()) throw new IllegalArgumentException("providerAuthority is required");
+            prepareProvider(className, authority);
+            record = providersByAuthority.get(authority);
+        }
+        return record;
+    }
+
+    private String providerInstance(ProviderRecord record) {
+        return session.spec.virtualUserId + ":" + session.spec.packageName + ":" + record.authority;
+    }
+
+    private static Bundle providerResult(String status, ProviderRecord record) {
+        Bundle out = success(status, record.className);
+        out.putString(ComponentOperations.AUTHORITY, record.authority);
+        return out;
+    }
+
+    private static ContentValues contentValues(Bundle values) {
+        ContentValues out = new ContentValues();
+        if (values == null) return out;
+        for (String key : values.keySet()) {
+            Object value = values.get(key);
+            if (value == null) out.putNull(key);
+            else if (value instanceof String) out.put(key, (String) value);
+            else if (value instanceof Integer) out.put(key, (Integer) value);
+            else if (value instanceof Long) out.put(key, (Long) value);
+            else if (value instanceof Boolean) out.put(key, (Boolean) value);
+            else if (value instanceof Float) out.put(key, (Float) value);
+            else if (value instanceof Double) out.put(key, (Double) value);
+            else if (value instanceof byte[]) out.put(key, (byte[]) value);
+            else throw new IllegalArgumentException("Unsupported ContentValues type for " + key);
+        }
+        return out;
+    }
+
+    private static String[] toArray(ArrayList<String> values) {
+        return values == null ? null : values.toArray(new String[0]);
+    }
+
+    private static Intent intent(String action) {
+        Intent intent = new Intent();
+        if (action != null && !action.trim().isEmpty()) intent.setAction(action);
+        return intent;
+    }
+
+    private static Intent broadcastIntent(Bundle request) {
+        Intent intent = intent(request.getString(ComponentOperations.ACTION, ""));
+        ArrayList<String> categories = request.getStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES);
+        if (categories != null) for (String category : categories) {
+            if (category != null && !category.trim().isEmpty()) intent.addCategory(category.trim());
+        }
+        String mimeType = request.getString(RuntimeKeys.BROADCAST_MIME_TYPE, "").trim();
+        String scheme = request.getString(RuntimeKeys.BROADCAST_SCHEME, "").trim();
+        android.net.Uri data = null;
+        if (!scheme.isEmpty()) {
+            String host = request.getString(RuntimeKeys.BROADCAST_HOST, "").trim();
+            String path = request.getString(RuntimeKeys.BROADCAST_PATH, "").trim();
+            StringBuilder uri = new StringBuilder(scheme).append(host.isEmpty() ? ":" : "://");
+            if (!host.isEmpty()) uri.append(host);
+            if (!path.isEmpty()) uri.append(path.startsWith("/") ? path : "/" + path);
+            data = android.net.Uri.parse(uri.toString());
+        }
+        if (data != null && !mimeType.isEmpty()) intent.setDataAndType(data, mimeType);
+        else if (data != null) intent.setData(data);
+        else if (!mimeType.isEmpty()) intent.setType(mimeType);
+        return intent;
+    }
+
+    private static void attachBaseContext(ContextWrapper wrapper, Context context) throws Exception {
+        Method method = ContextWrapper.class.getDeclaredMethod("attachBaseContext", Context.class);
+        method.setAccessible(true);
+        method.invoke(wrapper, context);
+    }
+
+    private static void setOptionalField(Object target, String name, Object value) {
+        Class<?> cursor = target.getClass();
+        while (cursor != null) {
+            try {
+                Field field = cursor.getDeclaredField(name);
+                field.setAccessible(true);
+                field.set(target, value);
+                return;
+            } catch (NoSuchFieldException ignored) {
+                cursor = cursor.getSuperclass();
+            } catch (Throwable ignored) {
+                return;
+            }
+        }
+    }
+
+    private static Bundle success(String status, String component) {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, status);
+        out.putString(RuntimeKeys.COMPONENT_CLASS, component);
+        return out;
+    }
+
+    private static Bundle failure(Throwable error) {
+        Throwable root = error;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, "FAILED");
+        out.putString(RuntimeKeys.ERROR_TYPE, root.getClass().getName());
+        out.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(root.getMessage()));
+        return out;
+    }
+
+    private static String required(Bundle bundle, String key) {
+        String value = bundle.getString(key, "");
+        if (value.trim().isEmpty()) throw new IllegalArgumentException(key + " is required");
+        return value;
+    }
+
+    private static final class ServiceRecord {
+        final Service service;
+        final Map<String, BoundConnection> connections = new LinkedHashMap<>();
+        int startCount;
+        IBinder lastBinder;
+        boolean rebindRequested;
+        boolean createdNow;
+        ServiceRecord(Service service) { this.service = service; }
+    }
+
+    private static final class BoundConnection {
+        final String id;
+        final Intent intent;
+        BoundConnection(String id, Intent intent) { this.id = id; this.intent = intent; }
+    }
+
+    private static final class ReceiverRecord {
+        final String id;
+        final String className;
+        final BroadcastReceiver receiver;
+        final ArrayList<String> actions;
+        final boolean exported;
+        ReceiverRecord(String id, String className, BroadcastReceiver receiver,
+                       ArrayList<String> actions, boolean exported) {
+            this.id = id;
+            this.className = className;
+            this.receiver = receiver;
+            this.actions = actions;
+            this.exported = exported;
+        }
+    }
+
+    private static final class ProviderRecord {
+        final String className;
+        final String authority;
+        final ContentProvider provider;
+        ProviderRecord(String className, String authority, ContentProvider provider) {
+            this.className = className;
+            this.authority = authority;
+            this.provider = provider;
+        }
+    }
+}

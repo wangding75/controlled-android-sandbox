@@ -1,0 +1,10 @@
+Date: 2026-07-25
+Java:
+openjdk version "21.0.10" 2026-01-20
+OpenJDK Runtime Environment (build 21.0.10+7-Debian-1deb13u1)
+OpenJDK 64-Bit Server VM (build 21.0.10+7-Debian-1deb13u1, mixed mode, sharing)
+Platform:
+Linux b5d4d85ec866 6.12.13 #1 SMP Wed Jul 22 00:33:13 UTC 2026 x86_64 GNU/Linux
+Android SDK: not present in current execution container
+KVM: absent
+Network dependency resolution: unavailable in current execution container
