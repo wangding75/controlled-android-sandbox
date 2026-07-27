@@ -17,6 +17,7 @@ import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import java.io.File;
@@ -81,11 +82,13 @@ public final class GuestRuntimeEnvironment {
             OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor =
                     new OrderedReceiverFinishInterceptor();
             stagedOrderedReceiverInterceptor = orderedReceiverFinishInterceptor;
+            VirtualPermissionPolicy permissionPolicy = permissionPolicy(spec.packageState);
+            SandboxAppOpsPolicy appOpsPolicy = appOpsPolicy(spec.packageState);
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
-                            permissionPolicy(spec), appOpsPolicy(spec)),
+                            permissionPolicy, appOpsPolicy),
                     orderedReceiverFinishInterceptor);
             stagedHooks = frameworkHooks;
             frameworkHooks.report().requireMandatoryReady();
@@ -96,8 +99,8 @@ public final class GuestRuntimeEnvironment {
             }
             guestContext.application(application);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
-                    orderedReceiverFinishInterceptor, packageMetadata, nativePolicyConfigured, nativeHooksInstalled,
-                    nativeCrashRecorderInstalled, webViewProfile);
+                    orderedReceiverFinishInterceptor, packageMetadata, permissionPolicy, appOpsPolicy,
+                    nativePolicyConfigured, nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
             stagedSession = session;
             session.components = new GuestComponentRuntime(session);
             current = session;
@@ -156,19 +159,27 @@ public final class GuestRuntimeEnvironment {
         current = null;
     }
 
-    private static VirtualPermissionPolicy permissionPolicy(GuestPackageSpec spec) {
-        Map<String, String> decisions = new LinkedHashMap<>();
-        java.util.Set<String> declared = new java.util.LinkedHashSet<>();
-        for (VirtualPermissionSnapshot permission : spec.packageState.permissions()) {
-            declared.add(permission.name());
-            decisions.put(permission.name(), permission.decision());
-        }
-        return new VirtualPermissionPolicy(declared, decisions);
+    public static synchronized void updatePermissionState(String sessionId, long generation,
+                                                          VirtualPackageStateSnapshot packageState) {
+        Session session = require(sessionId, generation);
+        session.updatePermissionState(packageState);
     }
 
-    private static SandboxAppOpsPolicy appOpsPolicy(GuestPackageSpec spec) {
+    private static VirtualPermissionPolicy permissionPolicy(VirtualPackageStateSnapshot state) {
+        Map<String, String> decisions = new LinkedHashMap<>();
+        java.util.Set<String> declared = new java.util.LinkedHashSet<>();
+        java.util.Set<String> effective = new java.util.LinkedHashSet<>();
+        for (VirtualPermissionSnapshot permission : state.permissions()) {
+            declared.add(permission.name());
+            decisions.put(permission.name(), permission.decision());
+            if (permission.effectiveGranted()) effective.add(permission.name());
+        }
+        return new VirtualPermissionPolicy(declared, decisions, effective);
+    }
+
+    private static SandboxAppOpsPolicy appOpsPolicy(VirtualPackageStateSnapshot state) {
         Map<String, String> modes = new LinkedHashMap<>();
-        for (PackageAppOpSnapshot appOp : spec.packageState.appOps()) {
+        for (PackageAppOpSnapshot appOp : state.appOps()) {
             modes.put(appOp.opName(), appOp.mode());
         }
         return new SandboxAppOpsPolicy(modes);
@@ -208,6 +219,9 @@ public final class GuestRuntimeEnvironment {
         final FrameworkHooks frameworkHooks;
         final OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor;
         final VirtualPackageMetadata packageMetadata;
+        final VirtualPermissionPolicy permissionPolicy;
+        final SandboxAppOpsPolicy appOpsPolicy;
+        volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
         final boolean nativeCrashRecorderInstalled;
@@ -217,7 +231,8 @@ public final class GuestRuntimeEnvironment {
         Session(GuestPackageSpec spec, GuestClassLoader classLoader, GuestContext context,
                 Application application, GuestResourceLoader.LoadedResources resources, FrameworkHooks frameworkHooks,
                 OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor,
-                VirtualPackageMetadata packageMetadata, boolean nativePolicyConfigured, boolean nativeHooksInstalled,
+                VirtualPackageMetadata packageMetadata, VirtualPermissionPolicy permissionPolicy,
+                SandboxAppOpsPolicy appOpsPolicy, boolean nativePolicyConfigured, boolean nativeHooksInstalled,
                 boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile) {
             this.spec = spec;
             this.classLoader = classLoader;
@@ -228,6 +243,9 @@ public final class GuestRuntimeEnvironment {
             this.orderedReceiverFinishInterceptor = java.util.Objects.requireNonNull(
                     orderedReceiverFinishInterceptor, "orderedReceiverFinishInterceptor");
             this.packageMetadata = java.util.Objects.requireNonNull(packageMetadata, "packageMetadata");
+            this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
+            this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
+            this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
             this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
@@ -238,6 +256,23 @@ public final class GuestRuntimeEnvironment {
         public GuestClassLoader classLoader() { return classLoader; }
         public GuestContext context() { return context; }
         public Application application() { return application; }
+
+        synchronized void updatePermissionState(VirtualPackageStateSnapshot updated) {
+            if (updated == null || !spec.packageName.equals(updated.packageName())
+                    || spec.virtualUserId != updated.virtualUserId()) {
+                throw new SecurityException("RUNTIME_PERMISSION_STATE_IDENTITY_MISMATCH");
+            }
+            if (!spec.apkSha256.equals(updated.apkSha256())) {
+                throw new SecurityException("RUNTIME_PERMISSION_STATE_REVISION_MISMATCH");
+            }
+            VirtualPermissionPolicy nextPermissions = permissionPolicy(updated);
+            SandboxAppOpsPolicy nextAppOps = appOpsPolicy(updated);
+            permissionPolicy.replace(nextPermissions.declaredPermissions(), nextPermissions.decisions(),
+                    nextPermissions.effectiveGrants());
+            appOpsPolicy.replace(nextAppOps.modes());
+            context.updatePermissionState(updated.permissions());
+            packageState = updated;
+        }
 
         Bundle status(String status, long started) {
             Bundle out = spec.toBundle();

@@ -98,7 +98,7 @@ final class SandboxPackageLifecycle {
             throws Exception {
         SandboxCatalogState state = catalogRepository.load();
         return new SandboxPackagePolicyView(state.findRecord(packageName),
-                state.policy(packageName, virtualUserId));
+                state.policy(packageName, virtualUserId), state);
     }
 
     synchronized SandboxPackagePolicyView setPermissionDecision(String packageName, int virtualUserId,
@@ -109,7 +109,7 @@ final class SandboxPackageLifecycle {
                 packageName, virtualUserId, permission, decision);
         catalogRepository.save(next);
         return new SandboxPackagePolicyView(next.findRecord(packageName),
-                next.policy(packageName, virtualUserId));
+                next.policy(packageName, virtualUserId), next);
     }
 
     synchronized SandboxPackagePolicyView setAppOpMode(String packageName, int virtualUserId,
@@ -118,16 +118,71 @@ final class SandboxPackageLifecycle {
         SandboxCatalogState next = current.withAppOpMode(packageName, virtualUserId, opName, mode);
         catalogRepository.save(next);
         return new SandboxPackagePolicyView(next.findRecord(packageName),
-                next.policy(packageName, virtualUserId));
+                next.policy(packageName, virtualUserId), next);
     }
 
     synchronized SandboxPackagePolicyView resetPolicy(String packageName, int virtualUserId)
             throws Exception {
         SandboxCatalogState current = catalogRepository.load();
-        SandboxCatalogState next = current.withoutPolicy(packageName, virtualUserId);
+        SandboxCatalogState next = current.withPolicyReset(packageName, virtualUserId,
+                "management policy reset", "HOST_MAIN", System.currentTimeMillis());
         catalogRepository.save(next);
         return new SandboxPackagePolicyView(next.findRecord(packageName),
-                next.policy(packageName, virtualUserId));
+                next.policy(packageName, virtualUserId), next);
+    }
+
+    synchronized SandboxCatalogState.PermissionRequestResult requestRuntimePermission(
+            String packageName, int virtualUserId, String permission, String appOpName,
+            boolean hostGranted, int requestCode, String sessionId, long generation,
+            String actor) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState.PermissionRequestResult result = current.withPermissionRequest(
+                packageName, virtualUserId, permission, appOpName, hostGranted, requestCode,
+                sessionId, generation, System.currentTimeMillis(), actor);
+        if (result.state != current) catalogRepository.save(result.state);
+        return result;
+    }
+
+    synchronized SandboxCatalogState.PermissionRequestResult resolveRuntimePermission(
+            long requestId, String outcome, boolean hostGranted, String reason, String actor)
+            throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState.PermissionRequestResult result = current.withPermissionResolution(
+                requestId, outcome, hostGranted, reason, actor, System.currentTimeMillis());
+        catalogRepository.save(result.state);
+        return result;
+    }
+
+    synchronized SandboxPackagePolicyView revokeRuntimePermission(
+            String packageName, int virtualUserId, String permission, String appOpName,
+            String reason, String actor) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withPermissionRevocation(packageName, virtualUserId,
+                permission, appOpName, reason, actor, System.currentTimeMillis());
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId), next);
+    }
+
+    synchronized RuntimePermissionRequestRecord permissionRequest(long requestId) throws Exception {
+        return catalogRepository.load().permissionRequest(requestId);
+    }
+
+    synchronized RuntimePermissionRequestRecord pendingPermissionRequest(
+            String packageName, int virtualUserId, String permission, int requestCode,
+            String sessionId, long generation) throws Exception {
+        return catalogRepository.load().pendingPermissionRequest(packageName, virtualUserId,
+                permission, requestCode, sessionId, generation);
+    }
+
+    synchronized List<RuntimePermissionRequestRecord> pendingPermissionRequests(
+            String packageName, int virtualUserId) throws Exception {
+        return catalogRepository.load().pendingPermissionRequests(packageName, virtualUserId);
+    }
+
+    synchronized List<PermissionAuditRecord> permissionAudit(
+            String packageName, int virtualUserId, int limit) throws Exception {
+        return catalogRepository.load().permissionAudit(packageName, virtualUserId, limit);
     }
 
     synchronized void ensureInstance(String packageName, int virtualUserId) throws Exception {

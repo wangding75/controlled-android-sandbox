@@ -120,6 +120,12 @@ public final class GuestActivityController {
                 new Object[]{requestCode, resultCode, data});
     }
 
+    void permissionResult(int requestCode, String[] permissions, int[] grantResults) {
+        invokeIfCreated("onRequestPermissionsResult",
+                new Class<?>[]{int.class, String[].class, int[].class},
+                new Object[]{requestCode, permissions, grantResults});
+    }
+
     void saveInstanceState(Bundle state) {
         invokeIfCreated("onSaveInstanceState", new Class<?>[]{Bundle.class}, new Object[]{state});
         Bundle details = new Bundle();

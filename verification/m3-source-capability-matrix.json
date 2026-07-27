@@ -704,6 +704,78 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "uses-library names are retained in package and runtime metadata. Library resolution, required/optional semantics, native shared-library namespaces and device availability checks are not implemented."
+    },
+    {
+      "id": "package.runtime-permission-catalog",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimePermissionRequestRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/PermissionAuditRecord.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/RuntimePermissionWorkflowSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Catalog schema v4 atomically stores bounded per-instance runtime-permission requests, resolutions, revocations and audit records. Android process-death and filesystem behavior remain untested."
+    },
+    {
+      "id": "package.runtime-permission-binder-capability",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimePermissionSession.aidl",
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimePermissionSessionGuard.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "A typed PID/UID-bound capability is issued only to the recorded Runtime Broker process and is closed on client Binder death. Shared-UID hostile-code resistance is not claimed."
+    },
+    {
+      "id": "runtime.permission-result-bridge",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/GuestActivityController.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/RouteBrokerClient.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Host Activity permission callbacks are resolved through Runtime Broker and Package Service before an effective result is delivered to the Guest Activity. Real Android callback/token behavior is untested."
+    },
+    {
+      "id": "runtime.host-backed-effective-permission",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/HostPermissionStateResolver.java",
+        "app/src/main/java/com/warden/controlledsandbox/PermissionCapabilityRegistry.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPermissionSnapshot.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/RuntimePermissionWorkflowSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Dangerous permissions are effective only when both the virtual decision and the system-owned host package capability allow them. Runtime permission groups, one-time grants and OEM policy behavior remain untested."
+    },
+    {
+      "id": "runtime.dynamic-access-policy-refresh",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestCapabilityGate.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPermissionPolicy.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SandboxAppOpsPolicy.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DynamicAccessPolicySelfTest.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestCapabilityGateSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "The active Guest generation replaces permission, AppOps and bounded camera/location service-acquisition policy without restart. Already-acquired service handles and deep native/static APIs are not revoked by this gate."
     }
   ],
   "statusDimensions": {

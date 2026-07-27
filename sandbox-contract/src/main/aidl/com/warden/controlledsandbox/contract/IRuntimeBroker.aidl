@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.contract;
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 interface IRuntimeBroker {
@@ -11,6 +12,10 @@ interface IRuntimeBroker {
     Bundle consumeRoute(String token, String sessionId, long generation);
     Bundle activityEvent(in Bundle request);
     Bundle sessionStatus(String packageName, int virtualUserId);
+    PackageServiceResult requestRuntimePermission(String sessionId, long generation,
+        String permission, int requestCode);
+    PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
+        String permission, int requestCode, boolean hostGranted, String reason);
     RuntimeStatusResult runtimeStatusV2(in RuntimeStatusRequest request);
     // Legacy compatibility only. New callers must use runtimeStatusV2.
     Bundle runtimeStatus();

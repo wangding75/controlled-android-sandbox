@@ -10,7 +10,8 @@ public final class PackageManagementAuthorizationSelfTest {
         List<ManagementCallerPolicy.ProcessIdentity> processes = List.of(
                 new ManagementCallerPolicy.ProcessIdentity(100, 2000, host),
                 new ManagementCallerPolicy.ProcessIdentity(101, 2000, host + ":guest0"),
-                new ManagementCallerPolicy.ProcessIdentity(102, 2000, host + ":sandbox_package"));
+                new ManagementCallerPolicy.ProcessIdentity(102, 2000, host + ":sandbox_package"),
+                new ManagementCallerPolicy.ProcessIdentity(103, 2000, host + ":sandbox_server"));
         require(ManagementCallerPolicy.isAuthorized(2000, 100, 2000, host, processes),
                 "main process should be authorized");
         require(!ManagementCallerPolicy.isAuthorized(2000, 101, 2000, host, processes),
@@ -21,6 +22,12 @@ public final class PackageManagementAuthorizationSelfTest {
                 "foreign uid must be rejected");
         require(!ManagementCallerPolicy.isAuthorized(2000, 999, 2000, host, processes),
                 "unknown pid must be rejected");
+        require(ManagementCallerPolicy.isAuthorized(2000, 103, 2000,
+                        host + ":sandbox_server", processes),
+                "runtime broker process should mint only the runtime permission capability");
+        require(!ManagementCallerPolicy.isAuthorized(2000, 101, 2000,
+                        host + ":sandbox_server", processes),
+                "Guest process must not mint the runtime permission capability");
 
         ManagementSessionGuard guard = new ManagementSessionGuard(2000, 100);
         guard.requireOwner(2000, 100);
@@ -31,6 +38,14 @@ public final class PackageManagementAuthorizationSelfTest {
         guard.close();
         expectSecurity(() -> guard.requireOwner(2000, 100),
                 "closed capability must remain closed");
+
+        RuntimePermissionSessionGuard runtimeGuard = new RuntimePermissionSessionGuard(2000, 103);
+        runtimeGuard.requireOwner(2000, 103);
+        expectSecurity(() -> runtimeGuard.requireOwner(2000, 101),
+                "Guest process must not reuse the Runtime Broker capability");
+        runtimeGuard.close();
+        expectSecurity(() -> runtimeGuard.requireOwner(2000, 103),
+                "closed Runtime Broker capability must remain closed");
         System.out.println("PASS package management authorization self-test");
     }
 

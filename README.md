@@ -12,6 +12,7 @@ A from-scratch Android application-virtualization research project. Production s
 - Guest `DexClassLoader` with host-internal deny rules, dependency-ordered Base/Split class and resource paths, split-aware `ApplicationInfo`/`Context`, instance-scoped storage redirection and host-unwrapping denial, `Application` bootstrap and custom atomic `SharedPreferences`.
 - Broker-authoritative Activity, started/bound Service, dynamic Receiver, explicit/implicit manifest Receiver and Provider authority/CRUD/Call/Batch/Cursor/FileDescriptor routing, ordered-broadcast source policy, broker-owned ContentObserver callbacks, Session-bound TTL/one-time URI Grants and unified Provider resource lifecycle cleanup with Guest component bridges.
 - Binder-issued, APK-revision-bound virtual package/component snapshot plus per-virtual-user permission and AppOps policy consumed by PackageManager, PermissionManager and bounded AppOps hooks.
+- Catalog-v4 runtime-permission requests and audit, a Runtime-Broker-only typed Binder capability, host-capability-backed effective grants, Activity callback bridging and same-generation permission/AppOps/camera-location service-gate refresh.
 - WebView data-directory suffix per virtual user/process slot.
 - Native C++ path/network policy engine with ARM64/x86_64 Android build definitions and a host-side self-test.
 - Structured JSONL runtime diagnostics, uncaught-exception capture and main-thread liveness watchdog.

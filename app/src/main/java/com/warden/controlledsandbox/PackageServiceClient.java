@@ -13,6 +13,9 @@ import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
+import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
@@ -105,6 +108,34 @@ final class PackageServiceClient implements AutoCloseable {
     VirtualPackageStateSnapshot resetVirtualPolicy(String packageName, int virtualUserId)
             throws Exception {
         return packageState(requireSession().resetVirtualPolicy(packageName, virtualUserId));
+    }
+
+    RuntimePermissionRequestSnapshot resolveRuntimePermission(long requestId, String outcome,
+                                                                 String reason) throws Exception {
+        PackageServiceResult result = requireSuccess(requireSession().resolveRuntimePermission(
+                requestId, outcome, reason));
+        RuntimePermissionRequestSnapshot request = result.permissionRequest();
+        if (request == null) throw new IllegalStateException("Package service returned no permission request");
+        return request;
+    }
+
+    VirtualPackageStateSnapshot revokeRuntimePermission(String packageName, int virtualUserId,
+                                                         String permission, String reason)
+            throws Exception {
+        return packageState(requireSession().revokeRuntimePermission(
+                packageName, virtualUserId, permission, reason));
+    }
+
+    List<RuntimePermissionRequestSnapshot> pendingPermissionRequests(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSuccess(requireSession().listPendingPermissionRequests(
+                packageName, virtualUserId)).permissionRequests();
+    }
+
+    List<PermissionAuditSnapshot> permissionAudit(String packageName, int virtualUserId,
+                                                   int limit) throws Exception {
+        return requireSuccess(requireSession().listPermissionAudit(
+                packageName, virtualUserId, limit)).permissionAudit();
     }
 
     void ensureInstance(String packageName, int virtualUserId) throws Exception {

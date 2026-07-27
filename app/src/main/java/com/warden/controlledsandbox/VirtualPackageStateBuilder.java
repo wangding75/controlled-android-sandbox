@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import android.content.Context;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
 import java.io.File;
@@ -20,9 +21,15 @@ import java.util.zip.ZipFile;
 /** Builds immutable Binder package state from every artifact in the trusted revision. */
 final class VirtualPackageStateBuilder {
     private final Map<String, ManifestSet> manifestsByRevision = new ConcurrentHashMap<>();
+    private final HostPermissionStateResolver hostPermissions;
+
+    VirtualPackageStateBuilder(Context context) {
+        hostPermissions = new HostPermissionStateResolver(context);
+    }
 
     VirtualPackageStateSnapshot build(SandboxRecord record, int virtualUserId,
-                                      SandboxPolicyState policy) throws Exception {
+                                      SandboxPolicyState policy,
+                                      SandboxCatalogState catalog) throws Exception {
         if (record == null) throw new IllegalArgumentException("Package is not installed");
         if (policy == null) throw new IllegalArgumentException("policy is required");
         ManifestSet set = manifestsByRevision.get(record.sha256);
@@ -40,13 +47,29 @@ final class VirtualPackageStateBuilder {
         append(components, record.packageName, set.providers, "PROVIDER");
 
         List<VirtualPermissionSnapshot> permissions = new ArrayList<>();
+        Map<String, String> effectiveAppOps = new java.util.TreeMap<>(policy.appOpModes());
         for (String permission : set.permissions) {
             String decision = policy.permissionDecision(permission);
-            boolean granted = !SandboxPolicyState.PERMISSION_DENIED.equals(decision);
-            permissions.add(new VirtualPermissionSnapshot(permission, decision, granted));
+            PermissionCapabilityRegistry.Capability capability =
+                    PermissionCapabilityRegistry.resolve(permission);
+            HostPermissionStateResolver.HostState host = hostPermissions.resolve(permission);
+            boolean granted = !SandboxPolicyState.PERMISSION_DENIED.equals(decision)
+                    && host.grantedToHost
+                    && (!capability.runtimeControlled
+                    || SandboxPolicyState.PERMISSION_GRANTED.equals(decision));
+            String requestState = catalog.latestPermissionRequestState(
+                    record.packageName, virtualUserId, permission);
+            permissions.add(new VirtualPermissionSnapshot(permission, decision, granted,
+                    host.declaredByHost, host.grantedToHost, host.runtimeRequestable,
+                    capability.appOpName, requestState));
+            if (!capability.appOpName.isEmpty()) {
+                String configuredMode = effectiveAppOps.get(capability.appOpName);
+                effectiveAppOps.put(capability.appOpName,
+                        effectiveAppOpMode(granted, configuredMode));
+            }
         }
         List<PackageAppOpSnapshot> appOps = new ArrayList<>();
-        for (Map.Entry<String, String> item : policy.appOpModes().entrySet()) {
+        for (Map.Entry<String, String> item : effectiveAppOps.entrySet()) {
             appOps.add(new PackageAppOpSnapshot(item.getKey(), item.getValue()));
         }
         return new VirtualPackageStateSnapshot(record.packageName, virtualUserId,
@@ -54,6 +77,19 @@ final class VirtualPackageStateBuilder {
                 record.signatureSha256, record.sha256, set.launcherActivity,
                 set.applicationClass, true, record.splitNames(),
                 new ArrayList<>(set.sharedLibraries), components, permissions, appOps);
+    }
+
+    static String effectiveAppOpMode(boolean permissionGranted, String configuredMode) {
+        String configured = configuredMode == null
+                ? SandboxPolicyState.APP_OP_DEFAULT
+                : SandboxPolicyState.appOpModeValue(configuredMode);
+        if (!permissionGranted) {
+            return SandboxPolicyState.APP_OP_ERRORED.equals(configured)
+                    ? SandboxPolicyState.APP_OP_ERRORED
+                    : SandboxPolicyState.APP_OP_IGNORED;
+        }
+        return SandboxPolicyState.APP_OP_DEFAULT.equals(configured)
+                ? SandboxPolicyState.APP_OP_ALLOWED : configured;
     }
 
     boolean declaresPermission(SandboxRecord record, String permission) throws Exception {

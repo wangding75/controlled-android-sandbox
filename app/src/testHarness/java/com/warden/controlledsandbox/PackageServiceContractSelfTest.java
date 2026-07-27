@@ -10,6 +10,8 @@ import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
+import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import java.util.List;
 
 public final class PackageServiceContractSelfTest {
@@ -98,6 +100,41 @@ public final class PackageServiceContractSelfTest {
         try { new PackageAppOpSnapshot("android:camera", "UNSUPPORTED"); }
         catch (IllegalArgumentException expected) { invalidAppOpRejected = true; }
         require(invalidAppOpRejected, "invalid AppOps mode rejected");
+
+        RuntimePermissionRequestSnapshot permissionRequest = new RuntimePermissionRequestSnapshot(
+                7L, "com.example.fixture", 3, "android.permission.CAMERA", "android:camera",
+                "GRANTED", true, 19, "session-7", 4L, 100L, 120L, "user granted");
+        PermissionAuditSnapshot audit = new PermissionAuditSnapshot(
+                9L, 120L, "com.example.fixture", 3, "android.permission.CAMERA",
+                "RESOLVE", "GRANTED", "ANDROID_PERMISSION_RESULT", "user granted", 7L);
+        Parcel permissionParcel = Parcel.obtain();
+        PackageServiceResult.successPermissionRequest("resolveRuntimePermission",
+                permissionRequest, packageState).writeToParcel(permissionParcel, 0);
+        permissionParcel.setDataPosition(0);
+        PackageServiceResult restoredPermission = PackageServiceResult.CREATOR
+                .createFromParcel(permissionParcel);
+        permissionParcel.recycle();
+        require(restoredPermission.permissionRequest() != null
+                        && restoredPermission.permissionRequest().requestId() == 7L,
+                "runtime permission request lost");
+        Parcel auditParcel = Parcel.obtain();
+        PackageServiceResult.successPermissionAudit("listPermissionAudit", List.of(audit))
+                .writeToParcel(auditParcel, 0);
+        auditParcel.setDataPosition(0);
+        PackageServiceResult restoredAudit = PackageServiceResult.CREATOR.createFromParcel(auditParcel);
+        auditParcel.recycle();
+        require(restoredAudit.permissionAudit().size() == 1
+                        && "RESOLVE".equals(restoredAudit.permissionAudit().get(0).action()),
+                "permission audit lost");
+        boolean hostlessGrantRejected = false;
+        try {
+            new RuntimePermissionRequestSnapshot(8L, "com.example.fixture", 3,
+                    "android.permission.CAMERA", "android:camera", "GRANTED", false,
+                    20, "session-8", 5L, 200L, 220L, "invalid");
+        } catch (IllegalArgumentException expected) {
+            hostlessGrantRejected = true;
+        }
+        require(hostlessGrantRejected, "hostless runtime grant rejected");
         System.out.println("PASS package service typed contract self-test");
     }
 

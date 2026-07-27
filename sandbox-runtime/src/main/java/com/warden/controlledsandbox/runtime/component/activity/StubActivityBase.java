@@ -8,6 +8,9 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -113,6 +116,63 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (controller != null) controller.activityResult(requestCode, resultCode, data);
+    }
+
+    @Override public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                                     int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (controller == null || permissions == null || grantResults == null
+                || permissions.length != grantResults.length) return;
+        int[] effective = new int[permissions.length];
+        java.util.Arrays.fill(effective, PackageManager.PERMISSION_DENIED);
+        reportPermissionResult(0, requestCode, permissions, grantResults, effective);
+    }
+
+    private void reportPermissionResult(int index, int requestCode, String[] permissions,
+                                        int[] hostResults, int[] effective) {
+        if (index >= permissions.length) {
+            if (controller != null) controller.permissionResult(requestCode, permissions, effective);
+            return;
+        }
+        String permission = permissions[index] == null ? "" : permissions[index].trim();
+        if (permission.isEmpty()) {
+            reportPermissionResult(index + 1, requestCode, permissions, hostResults, effective);
+            return;
+        }
+        boolean hostGranted = hostResults[index] == PackageManager.PERMISSION_GRANTED;
+        RouteBrokerClient.requestPermission(this, sessionId, generation, permission, requestCode,
+                requested -> {
+                    if (requested == null || !requested.successful()) {
+                        reportPermissionResult(index + 1, requestCode, permissions, hostResults, effective);
+                        return;
+                    }
+                    RouteBrokerClient.reportPermissionResult(this, sessionId, generation, permission,
+                            requestCode, hostGranted, "host-permission-callback", result -> {
+                                boolean granted = refreshPermissionState(result, permission);
+                                effective[index] = granted ? PackageManager.PERMISSION_GRANTED
+                                        : PackageManager.PERMISSION_DENIED;
+                                reportPermissionResult(index + 1, requestCode, permissions,
+                                        hostResults, effective);
+                            });
+                });
+    }
+
+    private boolean refreshPermissionState(PackageServiceResult result, String permission) {
+        if (result == null || !result.successful() || result.packageState() == null) return false;
+        try {
+            GuestRuntimeEnvironment.updatePermissionState(sessionId, generation, result.packageState());
+        } catch (RuntimeException error) {
+            return false;
+        }
+        return effectiveGrant(result, permission);
+    }
+
+    private static boolean effectiveGrant(PackageServiceResult result, String permission) {
+        if (result == null || !result.successful() || result.packageState() == null) return false;
+        for (VirtualPermissionSnapshot snapshot : result.packageState().permissions()) {
+            if (permission.equals(snapshot.name())) return snapshot.effectiveGranted();
+        }
+        return false;
     }
 
     @Override protected void onSaveInstanceState(Bundle state) {

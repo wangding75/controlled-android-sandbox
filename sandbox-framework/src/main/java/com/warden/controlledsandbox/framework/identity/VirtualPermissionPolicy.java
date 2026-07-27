@@ -6,38 +6,73 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** Immutable permission decisions carried with one Guest runtime generation. */
+/** Thread-safe permission decisions and effective host-backed grants for one Guest generation. */
 public final class VirtualPermissionPolicy {
     public static final String DEFAULT = "DEFAULT";
     public static final String GRANTED = "GRANTED";
     public static final String DENIED = "DENIED";
 
-    private final Set<String> declaredPermissions;
-    private final Map<String, String> decisions;
+    private volatile State state = new State(Set.of(), Map.of(), Set.of());
 
+    /** Compatibility constructor: DEFAULT/GRANTED are treated as effective grants. */
     public VirtualPermissionPolicy(Set<String> declaredPermissions, Map<String, String> decisions) {
-        this.declaredPermissions = Collections.unmodifiableSet(new LinkedHashSet<>(
+        replace(declaredPermissions, decisions, legacyEffective(declaredPermissions, decisions));
+    }
+
+    public VirtualPermissionPolicy(Set<String> declaredPermissions, Map<String, String> decisions,
+                                   Set<String> effectiveGrants) {
+        replace(declaredPermissions, decisions, effectiveGrants);
+    }
+
+    public void replace(Set<String> declaredPermissions, Map<String, String> decisions,
+                        Set<String> effectiveGrants) {
+        Set<String> declared = Collections.unmodifiableSet(new LinkedHashSet<>(
                 declaredPermissions == null ? Set.of() : declaredPermissions));
         Map<String, String> normalized = new LinkedHashMap<>();
         if (decisions != null) {
             for (Map.Entry<String, String> item : decisions.entrySet()) {
-                if (!this.declaredPermissions.contains(item.getKey())) continue;
+                if (!declared.contains(item.getKey())) continue;
                 String value = normalize(item.getValue());
                 if (!DEFAULT.equals(value)) normalized.put(item.getKey(), value);
             }
         }
-        this.decisions = Collections.unmodifiableMap(normalized);
+        LinkedHashSet<String> grants = new LinkedHashSet<>();
+        if (effectiveGrants != null) {
+            for (String permission : effectiveGrants) {
+                if (declared.contains(permission)
+                        && !DENIED.equals(normalized.getOrDefault(permission, DEFAULT))) {
+                    grants.add(permission);
+                }
+            }
+        }
+        state = new State(declared, Collections.unmodifiableMap(normalized),
+                Collections.unmodifiableSet(grants));
     }
 
-    public Set<String> declaredPermissions() { return declaredPermissions; }
-    public Map<String, String> decisions() { return decisions; }
+    public Set<String> declaredPermissions() { return state.declaredPermissions; }
+    public Map<String, String> decisions() { return state.decisions; }
+    public Set<String> effectiveGrants() { return state.effectiveGrants; }
+
     public String decision(String permission) {
-        if (!declaredPermissions.contains(permission)) return DENIED;
-        return decisions.getOrDefault(permission, DEFAULT);
+        State current = state;
+        if (!current.declaredPermissions.contains(permission)) return DENIED;
+        return current.decisions.getOrDefault(permission, DEFAULT);
     }
+
     public boolean isGranted(String permission) {
-        String decision = decision(permission);
-        return GRANTED.equals(decision) || DEFAULT.equals(decision);
+        State current = state;
+        return current.declaredPermissions.contains(permission)
+                && current.effectiveGrants.contains(permission);
+    }
+
+    private static Set<String> legacyEffective(Set<String> declared, Map<String, String> decisions) {
+        LinkedHashSet<String> output = new LinkedHashSet<>();
+        if (declared == null) return output;
+        for (String permission : declared) {
+            String decision = decisions == null ? DEFAULT : normalize(decisions.get(permission));
+            if (!DENIED.equals(decision)) output.add(permission);
+        }
+        return output;
     }
 
     private static String normalize(String value) {
@@ -47,4 +82,7 @@ public final class VirtualPermissionPolicy {
         }
         return normalized;
     }
+
+    private record State(Set<String> declaredPermissions, Map<String, String> decisions,
+                         Set<String> effectiveGrants) { }
 }

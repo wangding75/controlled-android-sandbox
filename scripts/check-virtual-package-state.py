@@ -57,10 +57,10 @@ require(
 
 repository = require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java',
-    'SCHEMA_VERSION = 3',
+    'SCHEMA_VERSION = 4',
     'root.put("policies", policies)',
-    'version != 1 && version != 2 && version != SCHEMA_VERSION',
-    'new SandboxCatalogState(packages, instances, policies)',
+    'version != 1 && version != 2 && version != 3 && version != SCHEMA_VERSION',
+    'new SandboxCatalogState(packages, instances, policies,',
 )
 state = require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java',
@@ -96,8 +96,8 @@ require(
 require(
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java',
     'GuestPackageMetadataMapper.fromSnapshot(',
-    'permissionPolicy(spec)',
-    'appOpsPolicy(spec)',
+    'permissionPolicy(spec.packageState)',
+    'appOpsPolicy(spec.packageState)',
 )
 require(
     'sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java',

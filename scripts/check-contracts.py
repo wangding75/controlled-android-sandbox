@@ -9,6 +9,8 @@ aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/cont
 required = [
     'RuntimeStatusResult runtimeStatusV2(in RuntimeStatusRequest request);',
     'Bundle runtimeStatus();',
+    'PackageServiceResult requestRuntimePermission(String sessionId, long generation,',
+    'PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,',
 ]
 for signature in required:
     if signature not in aidl:
@@ -30,6 +32,10 @@ package_signatures = [
     'PackageServiceResult setPermissionDecision(String packageName, int virtualUserId, String permission, String decision);',
     'PackageServiceResult setAppOpMode(String packageName, int virtualUserId, String opName, String mode);',
     'PackageServiceResult resetVirtualPolicy(String packageName, int virtualUserId);',
+    'PackageServiceResult resolveRuntimePermission(long requestId, String outcome, String reason);',
+    'PackageServiceResult revokeRuntimePermission(String packageName, int virtualUserId, String permission, String reason);',
+    'PackageServiceResult listPendingPermissionRequests(String packageName, int virtualUserId);',
+    'PackageServiceResult listPermissionAudit(String packageName, int virtualUserId, int limit);',
 ]
 for signature in package_signatures:
     if signature not in package_aidl:
@@ -38,7 +44,8 @@ if 'Bundle' in package_aidl:
     errors.append('IPackageManagementSession must not use Bundle')
 
 for name in ['VirtualComponentSnapshot', 'VirtualPermissionSnapshot',
-             'PackageAppOpSnapshot', 'VirtualPackageStateSnapshot']:
+             'PackageAppOpSnapshot', 'VirtualPackageStateSnapshot',
+             'RuntimePermissionRequestSnapshot', 'PermissionAuditSnapshot']:
     declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
     source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
     if not declaration.is_file(): errors.append(f'missing AIDL parcelable declaration for {name}')
@@ -46,7 +53,9 @@ for name in ['VirtualComponentSnapshot', 'VirtualPermissionSnapshot',
     elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
 
 package_result = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java').read_text()
-for evidence in ['VirtualPackageStateSnapshot packageState', 'successPackageState(', 'packageState()']:
+for evidence in ['VirtualPackageStateSnapshot packageState', 'successPackageState(', 'packageState()',
+                 'RuntimePermissionRequestSnapshot permissionRequest', 'successPermissionRequest(',
+                 'successPermissionAudit(']:
     if evidence not in package_result:
         errors.append(f'PackageServiceResult is missing typed package-state evidence: {evidence}')
 

@@ -34,6 +34,7 @@ public final class GuestContext extends ContextWrapper {
     private final File dataRoot;
     private final File externalRoot;
     private final ApplicationInfo applicationInfo;
+    private final GuestCapabilityGate capabilityGate;
     private volatile Application application;
     private final Map<String, SharedPreferences> preferences = new HashMap<>();
 
@@ -48,6 +49,7 @@ public final class GuestContext extends ContextWrapper {
         this.dataRoot = ensureDirectory(new File(instanceRoot, "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.applicationInfo = new ApplicationInfo(host.getApplicationInfo());
+        this.capabilityGate = new GuestCapabilityGate(spec.packageState.permissions());
         applicationInfo.packageName = spec.packageName;
         applicationInfo.sourceDir = spec.apkPath;
         applicationInfo.publicSourceDir = spec.apkPath;
@@ -70,6 +72,9 @@ public final class GuestContext extends ContextWrapper {
     }
 
     void application(Application value) { application = value; }
+    void updatePermissionState(java.util.List<com.warden.controlledsandbox.contract.VirtualPermissionSnapshot> permissions) {
+        capabilityGate.replace(permissions);
+    }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     @Override public Context getBaseContext() { return this; }
@@ -79,6 +84,10 @@ public final class GuestContext extends ContextWrapper {
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
+    @Override public Object getSystemService(String name) {
+        capabilityGate.requireService(name);
+        return super.getSystemService(name);
+    }
     @Override public File getDataDir() { return dataRoot; }
     @Override public File getFilesDir() { return ensureDirectory(new File(dataRoot, "files")); }
     @Override public File getCacheDir() { return ensureDirectory(new File(dataRoot, "cache")); }

@@ -5,26 +5,28 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-/** Immutable AppOps mode overrides carried with one Guest runtime generation. */
+/** Thread-safe AppOps mode overrides carried by one Guest runtime generation. */
 public final class SandboxAppOpsPolicy {
     public static final String DEFAULT = "DEFAULT";
     public static final String ALLOWED = "ALLOWED";
     public static final String IGNORED = "IGNORED";
     public static final String ERRORED = "ERRORED";
 
-    private final Map<String, String> modes;
+    private volatile Map<String, String> modes = Map.of();
 
-    public SandboxAppOpsPolicy(Map<String, String> modes) {
+    public SandboxAppOpsPolicy(Map<String, String> modes) { replace(modes); }
+
+    public synchronized void replace(Map<String, String> values) {
         Map<String, String> normalized = new LinkedHashMap<>();
-        if (modes != null) {
-            for (Map.Entry<String, String> item : modes.entrySet()) {
+        if (values != null) {
+            for (Map.Entry<String, String> item : values.entrySet()) {
                 String name = item.getKey() == null ? "" : item.getKey().trim();
                 if (name.isEmpty()) continue;
                 String value = normalize(item.getValue());
                 if (!DEFAULT.equals(value)) normalized.put(name, value);
             }
         }
-        this.modes = Collections.unmodifiableMap(normalized);
+        modes = Collections.unmodifiableMap(normalized);
     }
 
     public Map<String, String> modes() { return modes; }

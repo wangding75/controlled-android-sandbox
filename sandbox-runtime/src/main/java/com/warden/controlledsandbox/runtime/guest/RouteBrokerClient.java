@@ -11,9 +11,11 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.PackageServiceResult;
 
 public final class RouteBrokerClient {
     public interface Callback { void complete(Bundle route); }
+    public interface PermissionCallback { void complete(PackageServiceResult result); }
 
     private RouteBrokerClient() { }
 
@@ -23,6 +25,42 @@ public final class RouteBrokerClient {
 
     public static void event(Activity activity, Bundle request, Callback callback) {
         call(activity, broker -> broker.activityEvent(request), callback);
+    }
+
+    public static void requestPermission(Activity activity, String sessionId, long generation,
+                                         String permission, int requestCode,
+                                         PermissionCallback callback) {
+        permissionCall(activity, broker -> broker.requestRuntimePermission(
+                sessionId, generation, permission, requestCode), callback);
+    }
+
+    public static void reportPermissionResult(Activity activity, String sessionId, long generation,
+                                               String permission, int requestCode,
+                                               boolean hostGranted, String reason,
+                                               PermissionCallback callback) {
+        permissionCall(activity, broker -> broker.reportRuntimePermissionResult(
+                sessionId, generation, permission, requestCode, hostGranted, reason), callback);
+    }
+
+    private static void permissionCall(Activity activity, PermissionRemoteCall call,
+                                       PermissionCallback callback) {
+        Intent service = new Intent(activity, RuntimeBrokerService.class);
+        ServiceConnection connection = new ServiceConnection() {
+            @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+                PackageServiceResult result;
+                try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
+                catch (Exception error) { result = PackageServiceResult.failure(
+                        "runtimePermission", error.getClass().getSimpleName(),
+                        String.valueOf(error.getMessage())); }
+                try { activity.unbindService(this); } catch (Exception ignored) { }
+                callback.complete(result);
+            }
+            @Override public void onServiceDisconnected(ComponentName name) { }
+        };
+        if (!activity.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+            callback.complete(PackageServiceResult.failure("runtimePermission",
+                    "BIND_FAILED", "Cannot bind RuntimeBrokerService"));
+        }
     }
 
     private static void call(Activity activity, RemoteCall call, Callback callback) {
@@ -55,4 +93,7 @@ public final class RouteBrokerClient {
     }
 
     private interface RemoteCall { Bundle invoke(IRuntimeBroker broker) throws Exception; }
+    private interface PermissionRemoteCall {
+        PackageServiceResult invoke(IRuntimeBroker broker) throws Exception;
+    }
 }
