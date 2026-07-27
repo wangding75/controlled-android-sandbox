@@ -8,6 +8,7 @@ public final class GuestSession {
     private final String packageName;
     private final int virtualUserId;
     private final String processName;
+    private final String packageRevision;
     private final int processSlot;
     private final long generation;
     private final SessionState state;
@@ -16,16 +17,24 @@ public final class GuestSession {
 
     public GuestSession(String sessionId, String packageName, int virtualUserId, int processSlot,
                         long generation, SessionState state, long updatedAtMs, String failure) {
-        this(sessionId, packageName, virtualUserId, packageName, processSlot,
+        this(sessionId, packageName, virtualUserId, packageName, "legacy", processSlot,
                 generation, state, updatedAtMs, failure);
     }
 
     public GuestSession(String sessionId, String packageName, int virtualUserId, String processName,
                         int processSlot, long generation, SessionState state,
                         long updatedAtMs, String failure) {
+        this(sessionId, packageName, virtualUserId, processName, "legacy", processSlot,
+                generation, state, updatedAtMs, failure);
+    }
+
+    public GuestSession(String sessionId, String packageName, int virtualUserId, String processName,
+                        String packageRevision, int processSlot, long generation, SessionState state,
+                        long updatedAtMs, String failure) {
         this.sessionId = requireText(sessionId, "sessionId");
         this.packageName = requireText(packageName, "packageName");
         this.processName = requireText(processName, "processName");
+        this.packageRevision = requireText(packageRevision, "packageRevision");
         if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
         if (processSlot < 0) throw new IllegalArgumentException("processSlot must be non-negative");
         if (generation < 1) throw new IllegalArgumentException("generation must be positive");
@@ -41,6 +50,7 @@ public final class GuestSession {
     public String packageName() { return packageName; }
     public int virtualUserId() { return virtualUserId; }
     public String processName() { return processName; }
+    public String packageRevision() { return packageRevision; }
     public int processSlot() { return processSlot; }
     public long generation() { return generation; }
     public SessionState state() { return state; }
@@ -51,16 +61,16 @@ public final class GuestSession {
         if (!state.canTransitionTo(next)) {
             throw new IllegalStateException("Invalid session transition " + state + " -> " + next);
         }
-        return new GuestSession(sessionId, packageName, virtualUserId, processName, processSlot,
-                generation, next, nowMs, failureReason);
+        return new GuestSession(sessionId, packageName, virtualUserId, processName, packageRevision,
+                processSlot, generation, next, nowMs, failureReason);
     }
 
     public GuestSession nextGeneration(long nowMs) {
         if (state != SessionState.RECOVERING) {
             throw new IllegalStateException("Generation may advance only while recovering");
         }
-        return new GuestSession(sessionId, packageName, virtualUserId, processName, processSlot,
-                generation + 1, SessionState.PREPARING, nowMs, "");
+        return new GuestSession(sessionId, packageName, virtualUserId, processName, packageRevision,
+                processSlot, generation + 1, SessionState.PREPARING, nowMs, "");
     }
 
     private static String requireText(String value, String name) {

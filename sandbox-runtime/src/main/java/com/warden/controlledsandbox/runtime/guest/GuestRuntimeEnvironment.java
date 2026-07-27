@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Application;
@@ -34,15 +35,22 @@ public final class GuestRuntimeEnvironment {
             RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot);
             boolean nativeCrashRecorderInstalled = RuntimeDiagnostics.nativeCrashFile() != null
                     && NativePolicy.installCrashRecorder(RuntimeDiagnostics.nativeCrashFile().getAbsolutePath());
-            if (!spec.apkFile().isFile()) throw new IllegalArgumentException("APK file is missing");
+            com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
+                    ApkRevisionVerifier.verify(spec.apkFile(), spec.apkVersionCode, spec.apkSha256);
+            if (!verifiedRevision.canonical().equals(spec.packageRevision)) {
+                throw new SecurityException("PACKAGE_REVISION_MISMATCH");
+            }
             if (current != null) {
-                if (current.spec.sessionId.equals(spec.sessionId) && current.spec.generation == spec.generation) {
+                if (current.spec.sessionId.equals(spec.sessionId)
+                        && current.spec.generation == spec.generation
+                        && current.spec.packageRevision.equals(spec.packageRevision)) {
                     return current.status("ALREADY_READY", started);
                 }
                 if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
                 current.shutdown();
             }
-            File optimized = new File(host.getCodeCacheDir(), "guest/" + safe(spec.packageName) + "/" + spec.generation);
+            File optimized = new File(host.getCodeCacheDir(), "guest/" + safe(spec.packageName)
+                    + "/" + safe(spec.packageRevision) + "/" + spec.generation);
             ensureDirectory(optimized);
             GuestClassLoader loader = new GuestClassLoader(spec.apkPath, optimized.getAbsolutePath(),
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader());

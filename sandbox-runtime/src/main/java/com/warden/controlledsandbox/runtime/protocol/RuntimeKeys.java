@@ -11,6 +11,9 @@ public final class RuntimeKeys {
     public static final String PROCESS_SLOT = "processSlot";
     public static final String PROCESS_NAME = "processName";
     public static final String APK_PATH = "apkPath";
+    public static final String APK_SHA256 = "apkSha256";
+    public static final String APK_VERSION_CODE = "apkVersionCode";
+    public static final String PACKAGE_REVISION = "packageRevision";
     public static final String NATIVE_LIBRARY_DIR = "nativeLibraryDir";
     public static final String APPLICATION_CLASS = "applicationClass";
     public static final String COMPONENT_CLASS = "componentClass";

@@ -26,6 +26,7 @@ import com.warden.controlledsandbox.runtime.guest.GuestProcessService4;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService5;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService6;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService7;
+import com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifier;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntime;
@@ -55,11 +56,13 @@ import com.warden.controlledsandbox.domain.port.AuditSink;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.domain.session.PackageRevision;
 import com.warden.controlledsandbox.domain.component.receiver.DynamicReceiverRegistry;
 import com.warden.controlledsandbox.domain.component.provider.ProviderAuthorityRegistry;
 import com.warden.controlledsandbox.domain.component.provider.ProviderObserverRegistry;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.domain.session.SessionRegistry;
+import com.warden.controlledsandbox.domain.session.SessionRevisionPolicy;
 import com.warden.controlledsandbox.domain.session.SessionState;
 import com.warden.controlledsandbox.domain.identity.VirtualUidRegistry;
 import com.warden.controlledsandbox.domain.component.provider.UriGrantRegistry;
@@ -605,17 +608,24 @@ public final class RuntimeBrokerService extends Service {
         try {
             Bundle input = request == null ? new Bundle() : new Bundle(request);
             validateInput(input);
-            manifestReceiverRuntime.indexPackage(input);
             String packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
             int userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
             String processName = processName(input, packageName);
+            String packageRevision = required(input, RuntimeKeys.PACKAGE_REVISION);
             input.putString(RuntimeKeys.PROCESS_NAME, processName);
-            GuestSession session = sessions.allocate(packageName, userId, processName, now());
+            stopMismatchedRevisionSessions(packageName, userId, packageRevision);
+            manifestReceiverRuntime.indexPackage(input);
+            GuestSession session = sessions.allocate(
+                    packageName, userId, processName, packageRevision, now());
             GuestSession staleRecovery = null;
             String key = processKey(packageName, userId, processName);
             if (session.state() == SessionState.READY || session.state() == SessionState.ACTIVE) {
                 Bundle cached = brokerState.prepared(key);
                 if (cached == null) throw new IllegalStateException("PREPARED_SPEC_MISSING");
+                if (!session.packageRevision().equals(
+                        cached.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
+                    throw new IllegalStateException("PREPARED_SPEC_REVISION_MISMATCH");
+                }
                 receiverLifecycle.bindSession(session);
                 Bundle out = new Bundle(cached);
                 out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
@@ -686,6 +696,15 @@ public final class RuntimeBrokerService extends Service {
         }
     }
 
+    private void stopMismatchedRevisionSessions(String packageName, int userId,
+                                                String requestedRevision) {
+        java.util.List<GuestSession> existing = sessions.getAll(packageName, userId);
+        for (GuestSession session : SessionRevisionPolicy.mismatchedLiveSessions(
+                existing, requestedRevision)) {
+            stopSession(session);
+        }
+    }
+
     private synchronized void stopGuestInternal(String packageName, int userId) {
         java.util.List<GuestSession> active = new ArrayList<>(sessions.getAll(packageName, userId));
         for (GuestSession session : active) stopSession(session);
@@ -736,6 +755,7 @@ public final class RuntimeBrokerService extends Service {
         spec.putLong(RuntimeKeys.GENERATION, session.generation());
         spec.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
         spec.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+        spec.putString(RuntimeKeys.PACKAGE_REVISION, session.packageRevision());
         spec.putInt(RuntimeKeys.VIRTUAL_UID, uidRegistry().uidFor(session.packageName(), session.virtualUserId()));
         File dataRoot = new File(getFilesDir(), "instances/u" + session.virtualUserId() + "/" + safe(session.packageName()));
         if (!dataRoot.isDirectory() && !dataRoot.mkdirs() && !dataRoot.isDirectory()) throw new IllegalStateException("Cannot create Guest instance root");
@@ -759,6 +779,13 @@ public final class RuntimeBrokerService extends Service {
         File privateRoot = getFilesDir().getCanonicalFile();
         if (!apk.isFile()) throw new IllegalArgumentException("APK file is missing");
         if (!apk.toPath().startsWith(privateRoot.toPath())) throw new SecurityException("APK path is outside app-private storage");
+        long apkVersionCode = input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
+        String apkSha256 = required(input, RuntimeKeys.APK_SHA256);
+        PackageRevision revision = ApkRevisionVerifier.verify(apk, apkVersionCode, apkSha256);
+        input.putString(RuntimeKeys.APK_PATH, apk.getCanonicalPath());
+        input.putString(RuntimeKeys.APK_SHA256, revision.apkSha256());
+        input.putLong(RuntimeKeys.APK_VERSION_CODE, revision.versionCode());
+        input.putString(RuntimeKeys.PACKAGE_REVISION, revision.canonical());
         String nativeDir = input.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
         if (!nativeDir.trim().isEmpty()) {
             File nativeFile = new File(nativeDir).getCanonicalFile();
@@ -1415,6 +1442,7 @@ public final class RuntimeBrokerService extends Service {
         out.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
         out.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
         out.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+        out.putString(RuntimeKeys.PACKAGE_REVISION, session.packageRevision());
         out.putInt(RuntimeKeys.VIRTUAL_UID, uidRegistry().uidFor(session.packageName(), session.virtualUserId()));
         out.putLong(RuntimeKeys.GENERATION, session.generation());
         out.putString("sessionState", session.state().name());

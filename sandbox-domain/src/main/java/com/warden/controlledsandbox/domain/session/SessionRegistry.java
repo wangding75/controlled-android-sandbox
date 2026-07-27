@@ -23,21 +23,30 @@ public final class SessionRegistry implements SessionMetricsRepository {
     }
 
     public synchronized GuestSession allocate(String packageName, int virtualUserId, long nowMs) {
-        return allocate(packageName, virtualUserId, packageName, nowMs);
+        return allocate(packageName, virtualUserId, packageName, "legacy", nowMs);
     }
 
     public synchronized GuestSession allocate(String packageName, int virtualUserId,
                                               String processName, long nowMs) {
+        return allocate(packageName, virtualUserId, processName, "legacy", nowMs);
+    }
+
+    public synchronized GuestSession allocate(String packageName, int virtualUserId,
+                                              String processName, String packageRevision, long nowMs) {
         String key = key(packageName, virtualUserId, processName);
         GuestSession existing = sessions.get(key);
         if (existing != null && existing.state() != SessionState.STOPPED && existing.state() != SessionState.FAILED) {
+            if (!existing.packageRevision().equals(packageRevision)) {
+                throw new IllegalStateException("SESSION_REVISION_MISMATCH expected="
+                        + existing.packageRevision() + " actual=" + packageRevision);
+            }
             return existing;
         }
         int slot = slots.reserve(slotOwner(packageName, processName), virtualUserId);
         if (slot < 0) throw new IllegalStateException("NO_PROCESS_SLOT");
         String sessionId = nextUniqueSessionId();
         GuestSession created = new GuestSession(sessionId, packageName, virtualUserId,
-                processName, slot, 1, SessionState.ALLOCATED, nowMs, "");
+                processName, packageRevision, slot, 1, SessionState.ALLOCATED, nowMs, "");
         sessions.put(key, created);
         return created;
     }

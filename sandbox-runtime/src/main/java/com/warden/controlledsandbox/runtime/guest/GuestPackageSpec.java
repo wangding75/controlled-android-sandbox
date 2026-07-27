@@ -19,6 +19,9 @@ public final class GuestPackageSpec {
     final int processSlot;
     final String processName;
     final String apkPath;
+    final String apkSha256;
+    final long apkVersionCode;
+    final String packageRevision;
     final String nativeLibraryDir;
     final String applicationClass;
     public final String componentClass;
@@ -42,6 +45,10 @@ public final class GuestPackageSpec {
         processName = bundle.getString(RuntimeKeys.PROCESS_NAME, packageName);
         if (processName == null || processName.trim().isEmpty()) throw new IllegalArgumentException("processName is required");
         apkPath = required(bundle, RuntimeKeys.APK_PATH);
+        apkSha256 = required(bundle, RuntimeKeys.APK_SHA256);
+        apkVersionCode = bundle.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
+        if (apkVersionCode < 0) throw new IllegalArgumentException("apkVersionCode must be non-negative");
+        packageRevision = required(bundle, RuntimeKeys.PACKAGE_REVISION);
         nativeLibraryDir = bundle.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
         applicationClass = bundle.getString(RuntimeKeys.APPLICATION_CLASS, "");
         componentClass = bundle.getString(RuntimeKeys.COMPONENT_CLASS, "");
@@ -61,6 +68,9 @@ public final class GuestPackageSpec {
         out.putInt(RuntimeKeys.PROCESS_SLOT, processSlot);
         out.putString(RuntimeKeys.PROCESS_NAME, processName);
         out.putString(RuntimeKeys.APK_PATH, apkPath);
+        out.putString(RuntimeKeys.APK_SHA256, apkSha256);
+        out.putLong(RuntimeKeys.APK_VERSION_CODE, apkVersionCode);
+        out.putString(RuntimeKeys.PACKAGE_REVISION, packageRevision);
         out.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, nativeLibraryDir);
         out.putString(RuntimeKeys.APPLICATION_CLASS, applicationClass);
         out.putString(RuntimeKeys.COMPONENT_CLASS, componentClass);

@@ -42,11 +42,18 @@
     {
       "id": "session.generation-recovery",
       "evidence": [
-        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java"
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/PackageRevision.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRevisionPolicy.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/ApkRevisionVerifier.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/ApkRevisionVerifierSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Generation recovery and same-revision reuse are source-wired. APK SHA-256 is verified in Broker and Guest; a different revision invalidates all live processes for the virtual instance. Android process/cache behavior remains device-deferred."
     },
     {
       "id": "route.one-time-token",

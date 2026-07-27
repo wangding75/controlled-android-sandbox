@@ -77,6 +77,8 @@ final class RuntimeClient implements AutoCloseable {
         request.putString(RuntimeKeys.PROCESS_NAME, processName == null || processName.trim().isEmpty()
                 ? record.packageName : processName);
         request.putString(RuntimeKeys.APK_PATH, record.apkPath);
+        request.putString(RuntimeKeys.APK_SHA256, record.sha256);
+        request.putLong(RuntimeKeys.APK_VERSION_CODE, record.versionCode);
         request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, record.nativeLibraryDir);
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.launchActivity);

@@ -13,6 +13,7 @@ python3 scripts/check-contracts.py
 python3 scripts/check-ports-dispatchers.py
 python3 scripts/check-package-boundaries.py
 python3 scripts/check-guest-boundary.py
+python3 scripts/check-apk-revision-binding.py
 python3 scripts/check-broadcast-model.py
 python3 scripts/check-native-file-hooks.py
 python3 scripts/generate-sbom.py

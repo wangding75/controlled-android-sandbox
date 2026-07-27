@@ -26,7 +26,9 @@ import com.warden.controlledsandbox.domain.process.SlotPool;
 import com.warden.controlledsandbox.domain.routing.RouteTable;
 import com.warden.controlledsandbox.domain.routing.RouteTicket;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.domain.session.PackageRevision;
 import com.warden.controlledsandbox.domain.session.SessionRegistry;
+import com.warden.controlledsandbox.domain.session.SessionRevisionPolicy;
 import com.warden.controlledsandbox.domain.session.SessionState;
 
 public final class SelfTest {
@@ -150,6 +152,30 @@ public final class SelfTest {
         try { registry.transition(session.packageName(), 0, 1, SessionState.READY, 7, ""); }
         catch (IllegalStateException expected) { stale = expected.getMessage().startsWith("STALE_GENERATION"); }
         require(stale, "stale generation rejected");
+
+        String firstRevision = PackageRevision.of(1L, "a".repeat(64)).canonical();
+        String secondRevision = PackageRevision.of(2L, "b".repeat(64)).canonical();
+        SessionRegistry revisionRegistry = new SessionRegistry(1, testTokens());
+        GuestSession revisionBound = revisionRegistry.allocate(
+                "com.example.revision", 0, "com.example.revision", firstRevision, 1);
+        require(firstRevision.equals(revisionBound.packageRevision()), "session retains package revision");
+        require(revisionRegistry.allocate("com.example.revision", 0,
+                "com.example.revision", firstRevision, 2) == revisionBound,
+                "same revision reuses active session");
+        boolean revisionMismatch = false;
+        try {
+            revisionRegistry.allocate("com.example.revision", 0,
+                    "com.example.revision", secondRevision, 3);
+        } catch (IllegalStateException expected) {
+            revisionMismatch = expected.getMessage().startsWith("SESSION_REVISION_MISMATCH");
+        }
+        require(revisionMismatch, "different APK revision cannot reuse active session");
+        require(SessionRevisionPolicy.mismatchedLiveSessions(
+                java.util.List.of(revisionBound), secondRevision).size() == 1,
+                "revision policy selects live mismatched session");
+        require(SessionRevisionPolicy.mismatchedLiveSessions(
+                java.util.List.of(revisionBound), firstRevision).isEmpty(),
+                "revision policy retains matching live session");
 
         SessionRegistry disconnectRegistry = new SessionRegistry(1, testTokens());
         GuestSession disconnected = disconnectRegistry.allocate("com.example.disconnect", 0, 1);

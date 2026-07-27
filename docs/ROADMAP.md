@@ -14,7 +14,7 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 ## Runtime control plane
 
 - DONE — versioned Binder protocol.
-- DONE — explicit session lifecycle and generation checks.
+- DONE — explicit session lifecycle, generation checks and immutable APK-revision binding with stale-Session replacement.
 - DONE — eight retained Guest process bindings and Binder-death handling.
 - DONE — one-time expiring Activity route authority.
 - DONE — separate virtual-user roots and virtual UIDs.
