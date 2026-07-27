@@ -280,6 +280,28 @@ public final class SelfTest {
                 }, "empty");
             } catch (PersistentStateException expected) { blocked = true; }
             require(blocked, "recoverable store fails closed");
+
+            java.nio.file.Path firstWriteDirectory = directory.resolve("first-write-target");
+            java.nio.file.Files.createDirectory(firstWriteDirectory);
+            RecoverableFileStore firstWriteFailure = new RecoverableFileStore(firstWriteDirectory);
+            boolean firstWriteBlocked = false;
+            try { firstWriteFailure.write("must-not-survive"); }
+            catch (java.io.IOException expected) { firstWriteBlocked = true; }
+            require(firstWriteBlocked, "recoverable store reports first primary failure");
+            require(!java.nio.file.Files.exists(firstWriteFailure.backup()),
+                    "failed first write removes uncommitted backup");
+
+            java.nio.file.Path rollbackPrimary = directory.resolve("rollback-state.txt");
+            RecoverableFileStore rollbackStore = new RecoverableFileStore(rollbackPrimary);
+            rollbackStore.write("old-state");
+            java.nio.file.Files.delete(rollbackPrimary);
+            java.nio.file.Files.createDirectory(rollbackPrimary);
+            boolean updateBlocked = false;
+            try { rollbackStore.write("new-state"); }
+            catch (java.io.IOException expected) { updateBlocked = true; }
+            require(updateBlocked, "recoverable store reports update primary failure");
+            require("old-state".equals(java.nio.file.Files.readString(rollbackStore.backup())),
+                    "failed update restores previous backup");
         } finally {
             try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(directory)) {
                 paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {

@@ -6,7 +6,7 @@ A from-scratch Android application-virtualization research project. Production s
 
 - Defensive APK import into app-private storage with SHA-256, signer continuity and downgrade checks.
 - Bounds-checked binary `AndroidManifest.xml` parsing for application, activities, services, receivers, providers, intent-filter priority/categories/data/MIME, authorities, permissions, process names and isolated services.
-- Atomic package and virtual-instance metadata storage.
+- One atomic package/virtual-instance catalog with legacy migration, immutable SHA-256 APK/native revision publication and orphan cleanup reporting.
 - Multiple virtual users/instances with independent data roots and deterministic virtual UIDs.
 - Versioned AIDL protocol, SHA-256-bound immutable APK revisions, explicit session state machine, eight process slots, retained Binder connections, death detection, generation recovery and one-time Activity route tokens.
 - Guest `DexClassLoader` with host-internal deny rules, APK resource set, instance-scoped `Context` with principal storage redirection and host-unwrapping denial, `Application` bootstrap and custom atomic `SharedPreferences`.

@@ -11,7 +11,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.domain.persistence.PersistentStateException;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,9 +21,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final List<SandboxRecord> records = new ArrayList<>();
     private final List<SandboxInstance> instances = new ArrayList<>();
-    private SandboxRepository repository;
-    private SandboxInstanceRepository instanceRepository;
-    private ApkImportManager importer;
+    private SandboxPackageLifecycle packageLifecycle;
     private RuntimeClient runtime;
     private PackageAdapter adapter;
     private TextView runtimeStatus;
@@ -35,9 +32,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        repository = new SandboxRepository(this);
-        instanceRepository = new SandboxInstanceRepository(this);
-        importer = new ApkImportManager(this);
+        packageLifecycle = new SandboxPackageLifecycle(this);
         runtime = new RuntimeClient(this);
         runtimeStatus = findViewById(R.id.runtimeStatus);
         emptyText = findViewById(R.id.emptyText);
@@ -82,17 +77,16 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         runtimeStatus.setText("Importing APK…");
         worker.execute(() -> {
             try {
-                SandboxRecord imported = importer.importApk(uri);
-                synchronized (records) {
-                    records.removeIf(item -> item.packageName.equals(imported.packageName));
-                    records.add(imported);
-                    repository.save(records);
-                    ensureDefaultInstance(imported.packageName);
-                    instanceRepository.save(instances);
-                }
-                runOnUiThread(() -> { runtimeStatus.setText("Imported " + imported.packageName); refresh(); });
+                SandboxRecord imported = packageLifecycle.importApk(uri);
+                runOnUiThread(() -> {
+                    runtimeStatus.setText(operationMessage("Imported " + imported.packageName));
+                    refresh();
+                });
             } catch (Exception error) {
-                runOnUiThread(() -> { runtimeStatus.setText("Import failed"); Toast.makeText(this, error.getClass().getSimpleName() + ": " + error.getMessage(), Toast.LENGTH_LONG).show(); });
+                runOnUiThread(() -> {
+                    runtimeStatus.setText("Import failed");
+                    Toast.makeText(this, error.getClass().getSimpleName() + ": " + error.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
         });
     }
@@ -100,13 +94,11 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private void refresh() {
         synchronized (records) {
             try {
-                List<SandboxRecord> loadedRecords = repository.load();
-                List<SandboxInstance> loadedInstances = instanceRepository.load();
-                records.clear(); records.addAll(loadedRecords);
-                instances.clear(); instances.addAll(loadedInstances);
-                boolean changed = instances.removeIf(instance -> findRecord(instance.packageName) == null);
-                for (SandboxRecord record : records) changed |= ensureDefaultInstance(record.packageName);
-                if (changed) instanceRepository.save(instances);
+                SandboxCatalogState state = packageLifecycle.load();
+                records.clear();
+                records.addAll(state.records());
+                instances.clear();
+                instances.addAll(state.instances());
                 List<SandboxItem> items = new ArrayList<>();
                 for (SandboxInstance instance : instances) {
                     SandboxRecord record = findRecord(instance.packageName);
@@ -119,7 +111,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
             } catch (PersistentStateException error) {
                 failClosedMetadata(error);
             } catch (Exception error) {
-                failClosedMetadata(new PersistentStateException("Cannot persist repaired instance metadata", error));
+                failClosedMetadata(new PersistentStateException("Cannot load package catalog", error));
             }
         }
     }
@@ -132,12 +124,6 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         adapter.replace(List.of());
         emptyText.setVisibility(View.VISIBLE);
         runtimeStatus.setText("Metadata blocked: " + error.getMessage());
-    }
-
-    private boolean ensureDefaultInstance(String packageName) {
-        for (SandboxInstance instance : instances) if (instance.packageName.equals(packageName)) return false;
-        instances.add(new SandboxInstance(packageName, 0, "Default", System.currentTimeMillis(), "NOT_TESTED", 0));
-        return true;
     }
 
     private SandboxRecord findRecord(String packageName) {
@@ -169,40 +155,43 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
                         + " · Provider=" + provider.getString("status", "")
                         + " · Stop=" + stop.getString("status", "");
                 saveInstanceStatus(item.instance, summary);
-                runOnUiThread(() -> { runtimeStatus.setText(summary); refresh(); });
-            } catch (Exception error) { showFailure("Component test failed", error); }
+                runOnUiThread(() -> {
+                    runtimeStatus.setText(summary);
+                    refresh();
+                });
+            } catch (Exception error) {
+                showFailure("Component test failed", error);
+            }
         });
     }
 
     @Override public void onClone(SandboxItem item) {
         worker.execute(() -> {
             try {
-                final int userId;
-                synchronized (records) {
-                    userId = SandboxInstanceRepository.nextUserId(instances, item.record.packageName);
-                    instances.add(new SandboxInstance(item.record.packageName, userId, "Clone " + userId,
-                            System.currentTimeMillis(), "NOT_TESTED", 0));
-                    instanceRepository.save(instances);
-                }
-                runOnUiThread(() -> { runtimeStatus.setText("Created clone user=" + userId); refresh(); });
-            } catch (Exception error) { showFailure("Clone failed", error); }
+                int userId = packageLifecycle.createClone(item.record.packageName);
+                runOnUiThread(() -> {
+                    runtimeStatus.setText("Created clone user=" + userId);
+                    refresh();
+                });
+            } catch (Exception error) {
+                showFailure("Clone failed", error);
+            }
         });
     }
 
     @Override public void onDelete(SandboxItem item) {
         worker.execute(() -> {
-            try { runtime.stop(item.record, item.instance.virtualUserId); } catch (Exception ignored) { }
-            synchronized (records) {
-                instances.removeIf(instance -> instance.packageName.equals(item.record.packageName)
-                        && instance.virtualUserId == item.instance.virtualUserId);
-                boolean packageStillUsed = false;
-                for (SandboxInstance instance : instances) if (instance.packageName.equals(item.record.packageName)) packageStillUsed = true;
-                if (!packageStillUsed) records.removeIf(record -> record.packageName.equals(item.record.packageName));
-                try { instanceRepository.save(instances); repository.save(records); } catch (Exception ignored) { }
-                ApkImportManager.deleteTree(new File(getFilesDir(), "instances/u" + item.instance.virtualUserId + "/" + item.record.packageName));
-                if (!packageStillUsed) ApkImportManager.deleteTree(new File(item.record.apkPath).getParentFile());
+            try {
+                runtime.stop(item.record, item.instance.virtualUserId);
+                packageLifecycle.deleteInstance(item.record.packageName, item.instance.virtualUserId);
+                runOnUiThread(() -> {
+                    runtimeStatus.setText(operationMessage("Deleted " + item.record.packageName
+                            + " user=" + item.instance.virtualUserId));
+                    refresh();
+                });
+            } catch (Exception error) {
+                showFailure("Delete failed", error);
             }
-            runOnUiThread(this::refresh);
         });
     }
 
@@ -210,32 +199,48 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         try {
             Bundle result = operation.run();
             String status = result.getString("status", "UNKNOWN");
-            if ("FAILED".equals(status)) status += " / " + result.getString("errorType", "") + ": " + result.getString("errorMessage", "");
+            if ("FAILED".equals(status)) {
+                status += " / " + result.getString("errorType", "") + ": "
+                        + result.getString("errorMessage", "");
+            }
             saveInstanceStatus(item.instance, status);
-            String display = status + " · user=" + item.instance.virtualUserId + " · pid=" + result.getInt("pid", -1)
+            String display = status + " · user=" + item.instance.virtualUserId
+                    + " · pid=" + result.getInt("pid", -1)
                     + " · " + result.getLong("durationMs", -1) + "ms";
-            runOnUiThread(() -> { runtimeStatus.setText(display); refresh(); });
-        } catch (Exception error) { showFailure("Runtime operation failed", error); }
-    }
-
-    private void saveInstanceStatus(SandboxInstance instance, String status) throws Exception {
-        synchronized (records) {
-            instance.lastRuntimeStatus = status;
-            instance.lastRuntimeAt = System.currentTimeMillis();
-            instanceRepository.save(instances);
+            runOnUiThread(() -> {
+                runtimeStatus.setText(display);
+                refresh();
+            });
+        } catch (Exception error) {
+            showFailure("Runtime operation failed", error);
         }
     }
 
+    private void saveInstanceStatus(SandboxInstance instance, String status) throws Exception {
+        packageLifecycle.updateInstanceStatus(instance.packageName, instance.virtualUserId, status);
+    }
+
+    private String operationMessage(String success) {
+        String warning = packageLifecycle.maintenanceWarning();
+        return warning.isEmpty() ? success : success + " · Cleanup pending: " + warning;
+    }
+
     private void setBusy(String action, SandboxItem item) {
-        runtimeStatus.setText(action + " " + item.record.packageName + " user=" + item.instance.virtualUserId + "…");
+        runtimeStatus.setText(action + " " + item.record.packageName
+                + " user=" + item.instance.virtualUserId + "…");
     }
 
     private void showFailure(String prefix, Exception error) {
-        runOnUiThread(() -> { runtimeStatus.setText(prefix); Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show(); });
+        runOnUiThread(() -> {
+            runtimeStatus.setText(prefix);
+            Toast.makeText(this, error.getMessage(), Toast.LENGTH_LONG).show();
+        });
     }
 
     @Override protected void onDestroy() {
-        runtime.close(); worker.shutdownNow(); super.onDestroy();
+        runtime.close();
+        worker.shutdownNow();
+        super.onDestroy();
     }
 
     private interface BundleOperation { Bundle run() throws Exception; }

@@ -71,8 +71,23 @@ public final class RecoverableFileStore {
 
     public synchronized void write(String content) throws IOException {
         Objects.requireNonNull(content, "content");
-        writePath(primary, content);
+        // Publish the recoverable copy first. If the primary write then fails in the
+        // same process, restore the previous backup (or remove the first-write backup)
+        // so callers may safely roll back files associated with the failed metadata switch.
+        boolean previousBackupExists = Files.isRegularFile(backup);
+        String previousBackup = previousBackupExists ? readUtf8(backup) : null;
         writePath(backup, content);
+        try {
+            writePath(primary, content);
+        } catch (IOException primaryFailure) {
+            try {
+                if (previousBackupExists) writePath(backup, previousBackup);
+                else Files.deleteIfExists(backup);
+            } catch (IOException rollbackFailure) {
+                primaryFailure.addSuppressed(rollbackFailure);
+            }
+            throw primaryFailure;
+        }
     }
 
     public Path primary() { return primary; }

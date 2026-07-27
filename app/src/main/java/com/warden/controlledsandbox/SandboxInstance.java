@@ -23,6 +23,11 @@ final class SandboxInstance {
         this.lastRuntimeAt = lastRuntimeAt;
     }
 
+    SandboxInstance withStatus(String status, long atMs) {
+        return new SandboxInstance(packageName, virtualUserId, displayName, createdAt,
+                status, atMs);
+    }
+
     JSONObject toJson() throws JSONException {
         return new JSONObject().put("packageName", packageName).put("virtualUserId", virtualUserId)
                 .put("displayName", displayName).put("createdAt", createdAt)

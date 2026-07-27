@@ -24,10 +24,17 @@ Imported APKs are untrusted input. Import performs:
 2. bounded binary-manifest parsing;
 3. PackageManager package-name cross-check;
 4. signing-certificate continuity and version-code downgrade policy;
-5. transaction-directory installation with previous-version rollback;
-6. bounded ABI-specific native-library extraction with duplicate/path checks.
+5. transaction-directory staging and immutable SHA-256 revision publication;
+6. one atomic package/virtual-instance catalog switch with failed-switch rollback;
+7. bounded ABI-specific native-library extraction with duplicate/path checks.
 
 Only canonical paths under the host application's private `files` directory may enter the runtime broker.
+
+## Package lifecycle authority
+
+`SandboxPackageLifecycle` is the product-side authority for import, clone, instance status and deletion. `SandboxCatalogState` validates package/instance referential integrity and `SandboxCatalogRepository` persists the aggregate in one recoverable catalog. APK and extracted native payloads are addressed by SHA-256 under `files/packages/<package>/revisions/<digest>/`; legacy mutable payloads are copied forward before the first catalog commit. Catalog paths reject outside-root locations and managed symbolic-link traversal.
+
+The current authority is serialized in-process. A later iteration must move package lifecycle ownership behind a Binder service before independent installer or management processes are introduced.
 
 ## Runtime authority
 

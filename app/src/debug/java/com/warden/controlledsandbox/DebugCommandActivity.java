@@ -8,8 +8,6 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
@@ -33,19 +31,15 @@ public final class DebugCommandActivity extends Activity {
         try {
             result.put("command", command).put("package", packageName).put("virtualUserId", virtualUserId).put("startedAt", System.currentTimeMillis());
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
-            SandboxRepository repository = new SandboxRepository(this);
-            List<SandboxRecord> records = new ArrayList<>(repository.load());
-            SandboxRecord record = null;
-            for (SandboxRecord item : records) if (item.packageName.equals(packageName)) { record = item; break; }
-            boolean importRequested = "import-launch".equals(command) || "import-prepare".equals(command) || record == null;
+            SandboxPackageLifecycle lifecycle = new SandboxPackageLifecycle(this);
+            SandboxRecord record = lifecycle.findRecord(packageName);
+            boolean importRequested = "import-launch".equals(command)
+                    || "import-prepare".equals(command) || record == null;
             if (importRequested) {
                 ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
-                record = new ApkImportManager(this).importApkFile(new File(installed.sourceDir));
-                final SandboxRecord imported = record;
-                records.removeIf(item -> item.packageName.equals(imported.packageName));
-                records.add(record);
-                repository.save(records);
+                record = lifecycle.importApkFile(new File(installed.sourceDir));
             }
+            lifecycle.ensureInstance(packageName, virtualUserId);
             runtime = new RuntimeClient(this);
             Bundle operation;
             if ("import-launch".equals(command) || "launch".equals(command)) {

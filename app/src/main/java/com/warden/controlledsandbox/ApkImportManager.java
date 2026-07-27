@@ -17,11 +17,17 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.security.MessageDigest;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -30,21 +36,25 @@ final class ApkImportManager {
     private static final long MAX_NATIVE_BYTES = 1024L * 1024 * 1024;
     private static final int MAX_ZIP_ENTRIES = 20_000;
     private final Context context;
+    private final PackageStorageLayout storageLayout;
 
-    ApkImportManager(Context context) { this.context = context.getApplicationContext(); }
+    ApkImportManager(Context context) {
+        this.context = context.getApplicationContext();
+        storageLayout = new PackageStorageLayout(this.context.getFilesDir());
+    }
 
-    SandboxRecord importApk(Uri uri) throws Exception {
+    SandboxRecord importApk(Uri uri, List<SandboxRecord> trustedRecords) throws Exception {
         File temporary = createStagingFile();
         try {
             String sha = copyAndHash(uri, temporary);
-            return finishImport(temporary, sha);
+            return finishImport(temporary, sha, trustedRecords);
         } catch (Exception error) {
-            temporary.delete();
+            deleteTemporaryFile(temporary, error);
             throw error;
         }
     }
 
-    SandboxRecord importApkFile(File source) throws Exception {
+    SandboxRecord importApkFile(File source, List<SandboxRecord> trustedRecords) throws Exception {
         if (source == null || !source.isFile()) throw new IllegalArgumentException("Source APK does not exist");
         File temporary = createStagingFile();
         try {
@@ -61,9 +71,9 @@ final class ApkImportManager {
                     output.write(buffer, 0, count);
                 }
             }
-            return finishImport(temporary, toHex(digest.digest()));
+            return finishImport(temporary, toHex(digest.digest()), trustedRecords);
         } catch (Exception error) {
-            temporary.delete();
+            deleteTemporaryFile(temporary, error);
             throw error;
         }
     }
@@ -74,7 +84,7 @@ final class ApkImportManager {
         return File.createTempFile("import-", ".apk", stagingRoot);
     }
 
-    private SandboxRecord finishImport(File temporary, String sha) throws Exception {
+    private SandboxRecord finishImport(File temporary, String sha, List<SandboxRecord> trustedRecords) throws Exception {
         File transactionDir = null;
         try {
             ManifestModel manifest;
@@ -93,11 +103,11 @@ final class ApkImportManager {
             if (!packageName.equals(info.packageName)) throw new IllegalArgumentException("Manifest and PackageManager package names differ");
             long versionCode = Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
             String signatureSha256 = signingDigest(info);
-            SandboxRecord previousRecord = existingRecord(packageName);
+            SandboxRecord previousRecord = existingRecord(packageName, trustedRecords);
             new PackageUpgradePolicy().validate(previousRecord == null ? 0 : previousRecord.versionCode,
                     previousRecord == null ? "" : previousRecord.signatureSha256, versionCode, signatureSha256);
 
-            File packagesRoot = new File(context.getFilesDir(), "packages");
+            File packagesRoot = storageLayout.packagesRoot();
             if (!packagesRoot.isDirectory() && !packagesRoot.mkdirs() && !packagesRoot.isDirectory()) {
                 throw new IllegalStateException("Cannot create package root");
             }
@@ -119,21 +129,29 @@ final class ApkImportManager {
             ManifestModel.Component receiver = firstEnabled(manifest.receivers());
             ManifestModel.Component provider = firstEnabled(manifest.providers());
 
-            File packageDir = new File(packagesRoot, safeSegment(packageName));
-            verifyExistingPackageState(packageDir, previousRecord);
-            File backupDir = new File(packagesRoot, ".backup-" + safeSegment(packageName) + "-" + System.nanoTime());
-            boolean hadPrevious = packageDir.exists();
-            if (hadPrevious && !packageDir.renameTo(backupDir)) throw new IllegalStateException("Cannot stage previous package version");
-            boolean committed = transactionDir.renameTo(packageDir);
-            if (!committed) {
-                if (hadPrevious) backupDir.renameTo(packageDir);
-                throw new IllegalStateException("Cannot commit package installation");
+            verifyExistingPackageState(packagesRoot, previousRecord);
+            File packageDir = storageLayout.packageDirectory(packageName);
+            File revisionsRoot = storageLayout.revisionsDirectory(packageName);
+            if (!revisionsRoot.isDirectory() && !revisionsRoot.mkdirs() && !revisionsRoot.isDirectory()) {
+                throw new IllegalStateException("Cannot create package revision root");
             }
-            transactionDir = null;
-            deleteTree(backupDir);
+            File revisionDir = storageLayout.revisionDirectory(packageName, sha);
+            storageLayout.requireInsidePackagesRoot(revisionDir);
+            storageLayout.requireNoManagedSymlinks(revisionDir);
+            if (revisionDir.exists()) {
+                requireMatchingPublishedRevision(transactionDir, revisionDir, sha);
+                deleteTreeOrThrow(transactionDir);
+                transactionDir = null;
+            } else {
+                publishDirectory(transactionDir, revisionDir);
+                transactionDir = null;
+            }
 
-            File apk = new File(packageDir, "base.apk");
-            File nativeDir = new File(packageDir, "lib");
+            File apk = new File(revisionDir, "base.apk");
+            File nativeDir = new File(revisionDir, "lib");
+            apk.setReadable(true, true);
+            apk.setWritable(false, false);
+            apk.setExecutable(false, false);
             return new SandboxRecord(packageName, label, version, versionCode, signatureSha256, apk.getAbsolutePath(),
                     selectedAbi.isEmpty() ? "" : nativeDir.getAbsolutePath(), manifest.launcherActivity(),
                     processName(packageName, activity), manifest.applicationClass(),
@@ -144,8 +162,12 @@ final class ApkImportManager {
                     String.join(",", manifest.permissions()), sha,
                     System.currentTimeMillis(), "NOT_TESTED", 0);
         } catch (Exception error) {
-            temporary.delete();
-            deleteTree(transactionDir);
+            deleteTemporaryFile(temporary, error);
+            try {
+                deleteTreeOrThrow(transactionDir);
+            } catch (Exception cleanupFailure) {
+                error.addSuppressed(cleanupFailure);
+            }
             throw error;
         }
     }
@@ -217,20 +239,15 @@ final class ApkImportManager {
     }
 
 
-    private void verifyExistingPackageState(File packageDir, SandboxRecord previousRecord) throws Exception {
-        if (!packageDir.exists()) {
-            if (previousRecord != null) {
-                throw new SecurityException("TRUSTED_PACKAGE_DIRECTORY_MISSING");
-            }
-            return;
+    private void verifyExistingPackageState(File packagesRoot, SandboxRecord previousRecord) throws Exception {
+        if (previousRecord == null) return;
+        storageLayout.requireRecordLayout(previousRecord);
+        File existingApk = new File(previousRecord.apkPath).getCanonicalFile();
+        File trustedRoot = packagesRoot.getCanonicalFile();
+        if (!existingApk.toPath().startsWith(trustedRoot.toPath())) {
+            throw new SecurityException("PACKAGE_METADATA_PATH_OUTSIDE_TRUSTED_ROOT");
         }
-        if (!packageDir.isDirectory()) throw new SecurityException("PACKAGE_PATH_NOT_DIRECTORY");
-        if (previousRecord == null) throw new SecurityException("PACKAGE_METADATA_MISSING_FOR_EXISTING_INSTALL");
-        File existingApk = new File(packageDir, "base.apk");
         if (!existingApk.isFile()) throw new SecurityException("EXISTING_BASE_APK_MISSING");
-        if (!existingApk.getCanonicalFile().equals(new File(previousRecord.apkPath).getCanonicalFile())) {
-            throw new SecurityException("PACKAGE_METADATA_PATH_MISMATCH");
-        }
         int flags = PackageManager.GET_META_DATA | (Build.VERSION.SDK_INT >= 28
                 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
         PackageInfo existingInfo = context.getPackageManager().getPackageArchiveInfo(existingApk.getAbsolutePath(), flags);
@@ -251,7 +268,55 @@ final class ApkImportManager {
         }
     }
 
-    private static String sha256(File file) throws Exception {
+    private static void requireMatchingPublishedRevision(File stagedRevision,
+                                                         File publishedRevision,
+                                                         String expectedSha256) throws Exception {
+        if (Files.isSymbolicLink(publishedRevision.toPath()) || !publishedRevision.isDirectory()) {
+            throw new SecurityException("IMMUTABLE_REVISION_DIRECTORY_MISMATCH");
+        }
+        File publishedApk = new File(publishedRevision, "base.apk");
+        if (Files.isSymbolicLink(publishedApk.toPath()) || !publishedApk.isFile()
+                || !expectedSha256.equals(sha256(publishedApk))) {
+            throw new SecurityException("IMMUTABLE_REVISION_DIRECTORY_MISMATCH");
+        }
+        Map<String, String> stagedNative = nativeTreeDigests(new File(stagedRevision, "lib"));
+        Map<String, String> publishedNative = nativeTreeDigests(new File(publishedRevision, "lib"));
+        if (!stagedNative.equals(publishedNative)) {
+            throw new SecurityException("IMMUTABLE_REVISION_NATIVE_MISMATCH");
+        }
+    }
+
+    private static Map<String, String> nativeTreeDigests(File root) throws Exception {
+        Map<String, String> digests = new TreeMap<>();
+        if (!Files.exists(root.toPath(), LinkOption.NOFOLLOW_LINKS)) return digests;
+        if (Files.isSymbolicLink(root.toPath()) || !root.isDirectory()) {
+            throw new SecurityException("IMMUTABLE_REVISION_NATIVE_MISMATCH");
+        }
+        collectNativeDigests(root, root, digests);
+        return digests;
+    }
+
+    private static void collectNativeDigests(File root, File directory,
+                                             Map<String, String> digests) throws Exception {
+        File[] children = directory.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list native revision " + directory);
+        for (File child : children) {
+            java.nio.file.Path path = child.toPath();
+            if (Files.isSymbolicLink(path)) {
+                throw new SecurityException("IMMUTABLE_REVISION_NATIVE_MISMATCH");
+            }
+            if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+                collectNativeDigests(root, child, digests);
+            } else if (Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+                String relative = root.toPath().relativize(path).toString().replace(File.separatorChar, '/');
+                digests.put(relative, sha256(child));
+            } else {
+                throw new SecurityException("IMMUTABLE_REVISION_NATIVE_MISMATCH");
+            }
+        }
+    }
+
+    static String sha256(File file) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         try (BufferedInputStream input = new BufferedInputStream(new FileInputStream(file))) {
             byte[] buffer = new byte[64 * 1024];
@@ -261,9 +326,11 @@ final class ApkImportManager {
         return toHex(digest.digest());
     }
 
-    private SandboxRecord existingRecord(String packageName) {
-        for (SandboxRecord record : new SandboxRepository(context).load()) {
-            if (record.packageName.equals(packageName)) return record;
+    private static SandboxRecord existingRecord(String packageName,
+                                                  List<SandboxRecord> trustedRecords) {
+        if (trustedRecords == null) throw new IllegalArgumentException("trustedRecords are required");
+        for (SandboxRecord record : trustedRecords) {
+            if (record != null && record.packageName.equals(packageName)) return record;
         }
         return null;
     }
@@ -340,14 +407,67 @@ final class ApkImportManager {
     }
 
     static void deleteTree(File file) {
-        if (file == null || !file.exists()) return;
-        if (file.isDirectory()) { File[] children = file.listFiles(); if (children != null) for (File child : children) deleteTree(child); }
-        file.delete();
+        try {
+            deleteTreeOrThrow(file);
+        } catch (Exception ignored) {
+            // Legacy best-effort helper. Transactional lifecycle code uses deleteTreeOrThrow.
+        }
     }
-    private static String safeSegment(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
+
+    static void deleteTreeOrThrow(File file) throws Exception {
+        if (file == null) return;
+        java.nio.file.Path path = file.toPath();
+        if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return;
+        if (Files.isSymbolicLink(path)) {
+            Files.delete(path);
+            return;
+        }
+        if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+            File[] children = file.listFiles();
+            if (children == null) throw new IllegalStateException("Cannot list directory " + file);
+            for (File child : children) deleteTreeOrThrow(child);
+        }
+        Files.delete(path);
+    }
+
+    static void publishDirectory(File source, File destination) throws Exception {
+        try {
+            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException unsupported) {
+            Files.move(source.toPath(), destination.toPath());
+        }
+    }
+
+    private static void deleteTemporaryFile(File file, Exception owner) {
+        if (file == null || !file.exists()) return;
+        if (!file.delete() && file.exists()) {
+            owner.addSuppressed(new IllegalStateException("Cannot delete staging file " + file));
+        }
+    }
+
     private static void moveFile(File source, File destination) throws Exception {
-        if (source.renameTo(destination)) return;
-        try (InputStream in = new FileInputStream(source); FileOutputStream out = new FileOutputStream(destination)) { copy(in, out); }
-        if (!source.delete()) source.deleteOnExit();
+        try {
+            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE);
+            return;
+        } catch (AtomicMoveNotSupportedException unsupported) {
+            try {
+                Files.move(source.toPath(), destination.toPath());
+                return;
+            } catch (Exception moveFailure) {
+                // Fall through to a synced copy when the provider/filesystem cannot rename.
+            }
+        } catch (Exception moveFailure) {
+            // Fall through to a synced copy when the provider/filesystem cannot rename.
+        }
+        try (BufferedInputStream in = new BufferedInputStream(new FileInputStream(source));
+             FileOutputStream file = new FileOutputStream(destination);
+             BufferedOutputStream out = new BufferedOutputStream(file)) {
+            copy(in, out);
+            out.flush();
+            file.getFD().sync();
+        }
+        if (!source.delete() && source.exists()) {
+            throw new IllegalStateException("Cannot remove copied staging file " + source);
+        }
     }
 }

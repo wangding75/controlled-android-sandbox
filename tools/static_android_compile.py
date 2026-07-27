@@ -85,7 +85,7 @@ w('android/widget/Toast.java','''package android.widget; import android.content.
 w('dalvik/system/DexClassLoader.java','''package dalvik.system; public class DexClassLoader extends ClassLoader { public DexClassLoader(String a,String b,String c,ClassLoader d){super(d);} }''')
 
 w('org/json/JSONException.java','''package org.json; public class JSONException extends Exception { private static final long serialVersionUID=1L; public JSONException(){} public JSONException(String s){super(s);} }''')
-w('org/json/JSONObject.java','''package org.json; public class JSONObject { public JSONObject(){} public JSONObject put(String k,Object v)throws JSONException{return this;} public String toString(int n){return "{}";} public String getString(String k)throws JSONException{return "";} public String optString(String k){return "";} public String optString(String k,String d){return d;} public int optInt(String k,int d){return d;} public long optLong(String k){return 0;} public long optLong(String k,long d){return d;} }''')
+w('org/json/JSONObject.java','''package org.json; public class JSONObject { public JSONObject(){} public JSONObject(String s)throws JSONException{} public JSONObject put(String k,Object v)throws JSONException{return this;} public String toString(int n){return "{}";} public String getString(String k)throws JSONException{return "";} public JSONArray getJSONArray(String k)throws JSONException{return new JSONArray();} public String optString(String k){return "";} public String optString(String k,String d){return d;} public int optInt(String k,int d){return d;} public long optLong(String k){return 0;} public long optLong(String k,long d){return d;} }''')
 w('org/json/JSONArray.java','''package org.json; public class JSONArray { public JSONArray(){} public JSONArray(String s){} public int length(){return 0;} public JSONObject getJSONObject(int i)throws JSONException{return new JSONObject();} public JSONArray put(Object o){return this;} public String toString(int n){return "[]";} }''')
 
 w('com/warden/controlledsandbox/R.java','''package com.warden.controlledsandbox; public final class R { public static final class layout {public static final int activity_main=1,row_package=2;} public static final class id {public static final int runtimeStatus=1,emptyText=2,packageList=3,importButton=4,refreshButton=5,title=6,summary=7,status=8,probe=9,delete=10,launch=11,components=12,clone=13;} }''')
@@ -95,7 +95,7 @@ w('com/warden/controlledsandbox/contract/IGuestProcess.java','''package com.ward
 w('com/warden/controlledsandbox/contract/IRuntimeBroker.java','''package com.warden.controlledsandbox.contract; import android.os.*; public interface IRuntimeBroker extends IInterface { Bundle prepareGuest(Bundle r)throws RemoteException; Bundle launchActivity(Bundle r)throws RemoteException; Bundle invokeComponent(Bundle r)throws RemoteException; Bundle grantUriPermission(Bundle r)throws RemoteException; Bundle revokeUriPermission(Bundle r)throws RemoteException; Bundle consumeRoute(String t,String s,long g)throws RemoteException; Bundle activityEvent(Bundle r)throws RemoteException; Bundle sessionStatus(String p,int u)throws RemoteException; RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest r)throws RemoteException; Bundle runtimeStatus()throws RemoteException; void stopGuest(String p,int u)throws RemoteException; abstract class Stub extends Binder implements IRuntimeBroker { public static IRuntimeBroker asInterface(IBinder b){return null;} } }''')
 
 sources=[]
-for base in ['sandbox-domain/src/main/java','sandbox-contract/src/main/java','sandbox-framework/src/main/java','sandbox-framework/src/testHarness/java','sandbox-native/src/main/java','sandbox-runtime/src/main/java','sandbox-runtime/src/testHarness/java','app/src/main/java','app/src/debug/java','fixture-basic/src/main/java']:
+for base in ['sandbox-domain/src/main/java','sandbox-contract/src/main/java','sandbox-framework/src/main/java','sandbox-framework/src/testHarness/java','sandbox-native/src/main/java','sandbox-runtime/src/main/java','sandbox-runtime/src/testHarness/java','app/src/main/java','app/src/debug/java','app/src/testHarness/java','fixture-basic/src/main/java']:
     sources += sorted((root/base).rglob('*.java'))
 sources += sorted(stubs.rglob('*.java'))
 cmd=['javac','--release','17','-Xlint:all','-d',str(classes)]+[str(x) for x in sources]
@@ -104,6 +104,9 @@ print(result.stdout, end='')
 if result.returncode:
     sys.exit(result.returncode)
 print('PASS static Android-source compilation with local API stubs')
+run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.SandboxCatalogStateSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+print(run.stdout, end='')
+if run.returncode: sys.exit(run.returncode)
 run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifierSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 print(run.stdout, end='')
 if run.returncode: sys.exit(run.returncode)

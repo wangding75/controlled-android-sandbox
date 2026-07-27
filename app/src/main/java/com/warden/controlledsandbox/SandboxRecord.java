@@ -60,6 +60,15 @@ final class SandboxRecord {
         this.lastProbeAt = lastProbeAt;
     }
 
+    SandboxRecord withStoragePaths(String newApkPath, String newNativeLibraryDir) {
+        return new SandboxRecord(packageName, label, versionName, versionCode,
+                signatureSha256, newApkPath, newNativeLibraryDir, launchActivity,
+                launchProcess, applicationClass, serviceClass, serviceProcess,
+                receiverClass, receiverProcess, receiverAction, providerClass,
+                providerProcess, providerAuthority, permissions, sha256, importedAt,
+                lastProbeStatus, lastProbeAt);
+    }
+
     JSONObject toJson() throws JSONException {
         return new JSONObject().put("packageName", packageName).put("label", label).put("versionName", versionName)
                 .put("versionCode", versionCode).put("signatureSha256", signatureSha256)

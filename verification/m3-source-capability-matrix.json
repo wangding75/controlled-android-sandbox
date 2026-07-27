@@ -21,6 +21,25 @@
       "deviceStatus": "not-tested"
     },
     {
+      "id": "package.lifecycle-transaction",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageStorageLayout.java",
+        "app/src/main/java/com/warden/controlledsandbox/LegacyPackageLayoutMigrator.java",
+        "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/SandboxCatalogStateSelfTest.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java",
+        "scripts/check-package-lifecycle-transaction.py",
+        "docs/fixes/m4-t3-transactional-package-lifecycle.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Packages and instances are persisted as one atomic catalog; legacy mutable package payloads are copied into canonical SHA-256 revision paths, APK/native paths reject managed symlink traversal, stale revisions and orphan instance directories are swept, and post-commit cleanup failures are surfaced as maintenance warnings. Filesystem crash durability remains device-deferred."
+    },
+    {
       "id": "identity.virtual-user-uid",
       "evidence": [
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/identity/VirtualUidRegistry.java",

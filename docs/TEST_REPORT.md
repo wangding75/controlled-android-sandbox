@@ -1,44 +1,53 @@
-# Development B3-T4B local test report
+# M4-T3 local test report
 
 Date: **2026-07-27**
 
-Status: **LOCAL PASS / SOURCE 94.6% / PRODUCTION WIRING 90.3% / DEVICE EVIDENCE 0.0%**
+Status: **LOCAL PASS / SOURCE 96.2% / PRODUCTION WIRING 91.0% / DEVICE EVIDENCE 0.0%**
 
 ## Evidence dimensions
 
-The capability matrix contains 37 tracked capabilities and reports three independent dimensions:
+The capability matrix contains 40 tracked capabilities and reports three independent dimensions:
 
-- Source: 33 complete, 4 partial, 0 missing; weighted 94.6%.
-- Production wiring: 30 wired, 5 partial, 1 blocked, 1 not applicable; weighted 90.3%.
-- Device verification: 0 verified, 0 partial, 35 not tested, 1 blocked, 1 not applicable; weighted 0.0%.
+- Source: 37 complete, 3 partial, 0 missing; weighted 96.2%.
+- Production wiring: 33 wired, 5 partial, 1 blocked, 1 not applicable; weighted 91.0%.
+- Device verification: 0 verified, 0 partial, 38 not tested, 1 blocked, 1 not applicable; weighted 0.0%.
 
-The production percentage decreases slightly because Ordered Broadcast is now tracked as a real capability with
-partial production wiring instead of being omitted from the denominator. The blocked production capability
-remains real Android `isolatedProcess` execution.
+These percentages describe repository evidence and must not be interpreted as third-party APK compatibility rates.
 
-## Passed locally
+## M4-T3 additions verified locally
 
-- Domain, architecture, repository and deterministic SBOM checks.
-- Static compilation of all Java production/test sources with local Android/AIDL stubs.
-- Persistent package/instance metadata recovery and collision-free virtual UID tests.
-- Mandatory Framework Hook fail-closed and atomic rollback tests.
-- Broker-owned Activity, Service, dynamic Receiver and Provider lifecycle tests.
-- Explicit manifest Receiver indexing, exported/permission checks, deterministic on-demand process request,
-  Session/generation rebinding and concurrent resolution tests.
-- Implicit manifest Receiver action index and package-replacement/removal consistency tests.
-- Action, category, scheme, host, path, MIME and target-package matching tests.
-- Priority ordering, Receiver permission and sender-required Receiver permission tests.
-- Cross-user rejection and 128-match fail-closed tests.
-- Ordered result code/data/extras propagation, abort, clear-abort and failure-policy tests.
-- Broadcast payload size and unsupported payload-type admission tests.
-- Parser tests for intent-filter priority, categories and data/MIME metadata.
-- Cursor, FileDescriptor, ContentObserver, Batch and URI Grant tests.
-- Native policy, PLT hook, crash recorder and JNI boundary tests.
-- Strict device-gate self-tests, PowerShell structure checks and Gradle bootstrap delegation.
+- Package records and virtual instances are validated and persisted as one atomic catalog.
+- Legacy independent metadata is normalized only when no catalog exists.
+- Legacy mutable APK/native payloads are copied and verified into canonical SHA-256 revision directories.
+- Existing revision reuse requires matching APK and native-file digest maps.
+- Catalog paths reject outside-root locations, missing payloads and managed symbolic-link traversal.
+- Import/upgrade publishes an immutable revision before switching the catalog and rolls back an unreferenced revision when the catalog switch fails.
+- Delete switches the catalog before instance/package cleanup.
+- Stale revisions, interrupted install/migration directories, legacy payloads and orphan instance directories are swept.
+- Post-commit cleanup failures are retained as maintenance warnings rather than being reported as metadata transaction failures.
+- `RecoverableFileStore` writes backup before primary and restores/removes the backup when synchronous primary publication fails.
+- Product and debug command paths both use `SandboxPackageLifecycle` instead of writing legacy repositories directly.
+
+## Other gates passed locally
+
+- Domain, architecture, contract, package-boundary and deterministic SBOM checks.
+- Static compilation of Java production/test sources with local Android/AIDL stubs.
+- Guest Context and class-loader boundary tests.
+- Immutable APK revision and stale-Session replacement tests.
+- Activity, Service, Receiver and Provider source/runtime model tests.
+- Framework identity/proxy and rollback tests.
+- Native policy, filesystem/network hook and crash-recorder host tests.
+- Reproducible source ZIP two-run byte comparison.
+- Wrapper checksum and fail-closed bootstrap tests.
 
 ## Not executed
 
-Per the current development instruction, simulator, physical-device, ADB, real AGP/SDK/NDK build and
-third-party application tests are skipped. No platform `BroadcastReceiver.PendingResult`, sticky/protected
-broadcast, background-execution restriction, real Binder parcel limit, framework-originated broadcast or OEM
-Receiver behavior has been verified. Device evidence therefore remains 0.0%.
+Per the current development instruction, Emulator, physical-device, ADB, real third-party APK and device behavior tests are skipped. The current host has JDK 21 while the locked Android build requires JDK 17, and no Android SDK/NDK build is claimed in this iteration.
+
+The following remain unverified:
+
+- Android filesystem rename and sudden-power-loss behavior.
+- Binder/process coordination under real Android scheduling.
+- Package migration from an actually installed older application build.
+- Runtime behavior of split APKs, native libraries and dex caches.
+- Compatibility with real third-party applications.

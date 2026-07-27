@@ -6,10 +6,11 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 
 - DONE — clean-room repository and license policy.
 - DONE — bounded binary Android manifest parser.
-- DONE — private transactional APK import and digest.
+- DONE — private transactional APK import, digest and immutable SHA-256 revision publication.
 - DONE — signer continuity and downgrade rejection.
 - DONE — ABI-native extraction protections.
-- DONE — package and virtual-instance registries.
+- DONE — one validated atomic package/virtual-instance catalog with legacy migration and post-commit orphan cleanup.
+- PARTIAL — package lifecycle is in-process; Binder-owned cross-process serialization, split APK/install sessions and dex/cache rollback remain open.
 
 ## Runtime control plane
 
