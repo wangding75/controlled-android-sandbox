@@ -121,16 +121,16 @@ if not errors:
     for fragment in forbidden_activity:
         if fragment in text['activity']:
             errors.append(f'MainActivity bypasses lifecycle authority: {fragment}')
-    for required in ['packageLifecycle.importApk(uri)', 'packageLifecycle.createClone(',
-                     'packageLifecycle.deleteInstance(', 'packageLifecycle.updateInstanceStatus(']:
+    for required in ['packageService.importApk(uri)', 'packageService.createClone(',
+                     'packageService.deleteInstance(', 'packageService.updateInstanceStatus(']:
         if required not in text['activity']:
             errors.append(f'MainActivity lifecycle wiring missing: {required}')
 
     for forbidden in ['new SandboxRepository(', 'new ApkImportManager(', 'repository.save(']:
         if forbidden in text['debug_activity']:
             errors.append(f'DebugCommandActivity bypasses lifecycle authority: {forbidden}')
-    for required in ['lifecycle.importApkFile(', 'lifecycle.ensureInstance(',
-                     'lifecycle.findRecord(']:
+    for required in ['packages.importApkFile(', 'packages.ensureInstance(',
+                     'packages.findRecord(']:
         if required not in text['debug_activity']:
             errors.append(f'DebugCommandActivity lifecycle wiring missing: {required}')
 

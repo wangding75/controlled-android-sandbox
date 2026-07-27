@@ -21,7 +21,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final List<SandboxRecord> records = new ArrayList<>();
     private final List<SandboxInstance> instances = new ArrayList<>();
-    private SandboxPackageLifecycle packageLifecycle;
+    private PackageServiceClient packageService;
     private RuntimeClient runtime;
     private PackageAdapter adapter;
     private TextView runtimeStatus;
@@ -32,7 +32,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        packageLifecycle = new SandboxPackageLifecycle(this);
+        packageService = new PackageServiceClient(this);
         runtime = new RuntimeClient(this);
         runtimeStatus = findViewById(R.id.runtimeStatus);
         emptyText = findViewById(R.id.emptyText);
@@ -77,7 +77,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         runtimeStatus.setText("Importing APK…");
         worker.execute(() -> {
             try {
-                SandboxRecord imported = packageLifecycle.importApk(uri);
+                SandboxRecord imported = packageService.importApk(uri);
                 runOnUiThread(() -> {
                     runtimeStatus.setText(operationMessage("Imported " + imported.packageName));
                     refresh();
@@ -92,28 +92,33 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     private void refresh() {
-        synchronized (records) {
+        worker.execute(() -> {
             try {
-                SandboxCatalogState state = packageLifecycle.load();
-                records.clear();
-                records.addAll(state.records());
-                instances.clear();
-                instances.addAll(state.instances());
-                List<SandboxItem> items = new ArrayList<>();
-                for (SandboxInstance instance : instances) {
-                    SandboxRecord record = findRecord(instance.packageName);
-                    if (record != null) items.add(new SandboxItem(record, instance));
-                }
-                metadataHealthy = true;
-                importButton.setEnabled(true);
-                adapter.replace(items);
-                emptyText.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
+                SandboxCatalogState state = packageService.load();
+                runOnUiThread(() -> applyCatalog(state));
             } catch (PersistentStateException error) {
-                failClosedMetadata(error);
+                runOnUiThread(() -> failClosedMetadata(error));
             } catch (Exception error) {
-                failClosedMetadata(new PersistentStateException("Cannot load package catalog", error));
+                runOnUiThread(() -> failClosedMetadata(
+                        new PersistentStateException("Cannot load package catalog", error)));
             }
+        });
+    }
+
+    private void applyCatalog(SandboxCatalogState state) {
+        records.clear();
+        records.addAll(state.records());
+        instances.clear();
+        instances.addAll(state.instances());
+        List<SandboxItem> items = new ArrayList<>();
+        for (SandboxInstance instance : instances) {
+            SandboxRecord record = findRecord(instance.packageName);
+            if (record != null) items.add(new SandboxItem(record, instance));
         }
+        metadataHealthy = true;
+        importButton.setEnabled(true);
+        adapter.replace(items);
+        emptyText.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
     private void failClosedMetadata(PersistentStateException error) {
@@ -168,7 +173,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override public void onClone(SandboxItem item) {
         worker.execute(() -> {
             try {
-                int userId = packageLifecycle.createClone(item.record.packageName);
+                int userId = packageService.createClone(item.record.packageName);
                 runOnUiThread(() -> {
                     runtimeStatus.setText("Created clone user=" + userId);
                     refresh();
@@ -183,7 +188,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         worker.execute(() -> {
             try {
                 runtime.stop(item.record, item.instance.virtualUserId);
-                packageLifecycle.deleteInstance(item.record.packageName, item.instance.virtualUserId);
+                packageService.deleteInstance(item.record.packageName, item.instance.virtualUserId);
                 runOnUiThread(() -> {
                     runtimeStatus.setText(operationMessage("Deleted " + item.record.packageName
                             + " user=" + item.instance.virtualUserId));
@@ -217,12 +222,16 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     private void saveInstanceStatus(SandboxInstance instance, String status) throws Exception {
-        packageLifecycle.updateInstanceStatus(instance.packageName, instance.virtualUserId, status);
+        packageService.updateInstanceStatus(instance.packageName, instance.virtualUserId, status);
     }
 
     private String operationMessage(String success) {
-        String warning = packageLifecycle.maintenanceWarning();
-        return warning.isEmpty() ? success : success + " · Cleanup pending: " + warning;
+        try {
+            String warning = packageService.maintenanceWarning();
+            return warning.isEmpty() ? success : success + " · Cleanup pending: " + warning;
+        } catch (Exception error) {
+            return success + " · Cleanup status unavailable: " + error.getMessage();
+        }
     }
 
     private void setBusy(String action, SandboxItem item) {
@@ -238,6 +247,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     @Override protected void onDestroy() {
+        packageService.close();
         runtime.close();
         worker.shutdownNow();
         super.onDestroy();

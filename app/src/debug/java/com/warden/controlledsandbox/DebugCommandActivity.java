@@ -28,18 +28,19 @@ public final class DebugCommandActivity extends Activity {
     private void execute(String command, String packageName, int virtualUserId) {
         JSONObject result = new JSONObject();
         RuntimeClient runtime = null;
+        PackageServiceClient packages = null;
         try {
             result.put("command", command).put("package", packageName).put("virtualUserId", virtualUserId).put("startedAt", System.currentTimeMillis());
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
-            SandboxPackageLifecycle lifecycle = new SandboxPackageLifecycle(this);
-            SandboxRecord record = lifecycle.findRecord(packageName);
+            packages = new PackageServiceClient(this);
+            SandboxRecord record = packages.findRecord(packageName);
             boolean importRequested = "import-launch".equals(command)
                     || "import-prepare".equals(command) || record == null;
             if (importRequested) {
                 ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
-                record = lifecycle.importApkFile(new File(installed.sourceDir));
+                record = packages.importApkFile(new File(installed.sourceDir));
             }
-            lifecycle.ensureInstance(packageName, virtualUserId);
+            packages.ensureInstance(packageName, virtualUserId);
             runtime = new RuntimeClient(this);
             Bundle operation;
             if ("import-launch".equals(command) || "launch".equals(command)) {
@@ -77,6 +78,7 @@ public final class DebugCommandActivity extends Activity {
             Log.e(TAG, "FAIL " + command + " " + packageName + " " + error);
         } finally {
             if (runtime != null) runtime.close();
+            if (packages != null) packages.close();
             writeResult(result);
             runOnUiThread(() -> { finish(); worker.shutdown(); });
         }

@@ -40,6 +40,26 @@
       "notes": "Packages and instances are persisted as one atomic catalog; legacy mutable package payloads are copied into canonical SHA-256 revision paths, APK/native paths reject managed symlink traversal, stale revisions and orphan instance directories are swept, and post-commit cleanup failures are surfaced as maintenance warnings. Filesystem crash durability remains device-deferred."
     },
     {
+      "id": "package.binder-management-authority",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java",
+        "app/src/main/java/com/warden/controlledsandbox/ManagementSessionGuard.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java",
+        "scripts/check-package-service-boundary.py",
+        "docs/fixes/m4-t4-binder-package-authority.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Package and instance mutations are serialized in a dedicated :sandbox_package service. Only the AMS-recorded host main process can mint a PID/UID-bound Binder capability; client death and per-call caller checks revoke or reject reuse. Real Binder/AMS behavior remains device-deferred, and shared-UID containment is not a malicious-code security boundary."
+    },
+    {
       "id": "identity.virtual-user-uid",
       "evidence": [
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/identity/VirtualUidRegistry.java",

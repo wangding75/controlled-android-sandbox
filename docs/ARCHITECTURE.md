@@ -156,3 +156,8 @@ Every host/runtime/Guest process writes bounded JSONL evidence under `files/runt
 - Bypassing authentication, integrity checks, anti-cheat, financial controls or enterprise policy.
 - Reading another application's credentials or private data without authorization.
 - Claiming compatibility without versioned, reproducible device evidence.
+## Package management authority
+
+Package and virtual-instance mutations are owned by `PackageManagementService` in the dedicated `:sandbox_package` process. Product callers bind through `PackageServiceClient` and receive a death-linked `IPackageManagementSession` capability only after the Android process registry identifies the caller as the host main process. The capability is bound to the caller PID and UID and is revalidated on each call. Guest and runtime processes may reach the non-exported same-UID service Binder, but cannot mint or reuse a management session.
+
+This boundary serializes package writes and reduces privileged API exposure. It does not remove the shared Linux UID between host and Guest processes and is not a hostile-code security boundary.
