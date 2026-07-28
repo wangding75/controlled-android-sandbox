@@ -35,6 +35,7 @@ public final class ActivityTaskLedger {
 
     public synchronized LaunchDecision launch(LaunchRequest request) {
         Objects.requireNonNull(request, "request");
+        validateLaunchFlagCombinations(request);
         validateCallerTask(request);
         String callerActivityToken = resolveCallerActivityToken(request);
         String resultCallerToken = resolveResultCallerToken(request, callerActivityToken);
@@ -45,8 +46,26 @@ public final class ActivityTaskLedger {
             throw new IllegalArgumentException("CLEAR_TASK requires NEW_TASK");
         }
 
+        if (!clearTask && request.documentLaunchMode() == DocumentLaunchMode.INTO_EXISTING) {
+            Match document = findDocumentTask(request);
+            if (document != null) {
+                MutableActivity root = document.task.activities.get(0);
+                int removed = clearAbove(document.task, 0);
+                enqueueNewIntent(root, request);
+                registerResultLink(root, resultCallerToken, callerActivityToken, request);
+                return completeDecision(
+                        LaunchAction.CLEARED_TOP,
+                        document.task,
+                        root,
+                        removed,
+                        false,
+                        request.routeToken(),
+                        callerActivityToken);
+            }
+        }
+
         if (!clearTask && request.launchMode() == LaunchMode.SINGLE_INSTANCE) {
-            Match global = findAcrossTasks(request.identity());
+            Match global = findAcrossTasks(request.identity(), request.packageRevision());
             if (global != null) {
                 MutableActivity activity = global.task.activities.get(global.index);
                 int removed = retainOnly(global.task, activity);
@@ -64,7 +83,7 @@ public final class ActivityTaskLedger {
         }
 
         if (!clearTask && request.launchMode() == LaunchMode.SINGLE_TASK) {
-            Match global = findAcrossTasks(request.identity());
+            Match global = findAcrossTasks(request.identity(), request.packageRevision());
             if (global != null) {
                 int removed = clearAbove(global.task, global.index);
                 MutableActivity activity = global.task.activities.get(global.index);
@@ -385,13 +404,24 @@ public final class ActivityTaskLedger {
             int virtualUserId,
             String packageName,
             int maxCount) {
+        return runningTasks(virtualUserId, packageName, "", maxCount);
+    }
+
+    public synchronized List<TaskQuerySnapshot> runningTasks(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int maxCount) {
         String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = normalizeOptional(packageRevision);
         validateTaskQuery(virtualUserId, maxCount);
         List<TaskQuerySnapshot> result = new ArrayList<>();
         List<MutableTask> ordered = new ArrayList<>(tasks.values());
         for (int index = ordered.size() - 1; index >= 0 && result.size() < maxCount; index--) {
             MutableTask task = ordered.get(index);
-            if (task.virtualUserId == virtualUserId && task.packageName.equals(normalizedPackageName)) {
+            if (task.virtualUserId == virtualUserId
+                    && task.packageName.equals(normalizedPackageName)
+                    && revisionMatches(task.packageRevision, normalizedRevision)) {
                 result.add(querySnapshot(task, true));
             }
         }
@@ -402,7 +432,16 @@ public final class ActivityTaskLedger {
             int virtualUserId,
             String packageName,
             int maxCount) {
+        return recentTasks(virtualUserId, packageName, "", maxCount);
+    }
+
+    public synchronized List<TaskQuerySnapshot> recentTasks(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int maxCount) {
         String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = normalizeOptional(packageRevision);
         validateTaskQuery(virtualUserId, maxCount);
         List<TaskQuerySnapshot> result = new ArrayList<>();
         java.util.Set<Integer> seen = new java.util.LinkedHashSet<>();
@@ -411,6 +450,7 @@ public final class ActivityTaskLedger {
             MutableTask task = active.get(index);
             if (task.virtualUserId != virtualUserId
                     || !task.packageName.equals(normalizedPackageName)
+                    || !revisionMatches(task.packageRevision, normalizedRevision)
                     || task.excludedFromRecents) {
                 continue;
             }
@@ -423,6 +463,7 @@ public final class ActivityTaskLedger {
             TaskQuerySnapshot snapshot = archived.get(index);
             if (snapshot.virtualUserId() == virtualUserId
                     && snapshot.packageName().equals(normalizedPackageName)
+                    && revisionMatches(snapshot.packageRevision(), normalizedRevision)
                     && !snapshot.excludedFromRecents()
                     && seen.add(snapshot.taskId())) {
                 result.add(snapshot);
@@ -435,7 +476,15 @@ public final class ActivityTaskLedger {
             int virtualUserId,
             String packageName,
             int taskId) {
-        MutableTask task = requireOwnedTask(virtualUserId, packageName, taskId);
+        return moveTaskToFront(virtualUserId, packageName, "", taskId);
+    }
+
+    public synchronized boolean moveTaskToFront(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int taskId) {
+        MutableTask task = requireOwnedTask(virtualUserId, packageName, packageRevision, taskId);
         MutableTask currentFront = tasks.isEmpty() ? null
                 : new ArrayList<>(tasks.values()).get(tasks.size() - 1);
         if (currentFront != null && currentFront.taskId == task.taskId) return false;
@@ -447,7 +496,15 @@ public final class ActivityTaskLedger {
             int virtualUserId,
             String packageName,
             int taskId) {
-        MutableTask task = requireOwnedTask(virtualUserId, packageName, taskId);
+        return removeTask(virtualUserId, packageName, "", taskId);
+    }
+
+    public synchronized boolean removeTask(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int taskId) {
+        MutableTask task = requireOwnedTask(virtualUserId, packageName, packageRevision, taskId);
         tasks.remove(task.taskId);
         recentTasks.remove(task.taskId);
         for (MutableActivity activity : new ArrayList<>(task.activities)) {
@@ -455,6 +512,89 @@ public final class ActivityTaskLedger {
         }
         task.activities.clear();
         return true;
+    }
+
+    public synchronized boolean moveTaskToBack(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int taskId) {
+        MutableTask task = requireOwnedTask(virtualUserId, packageName, packageRevision, taskId);
+        if (tasks.size() < 2 || tasks.keySet().iterator().next() == task.taskId) return false;
+        LinkedHashMap<Integer, MutableTask> reordered = new LinkedHashMap<>();
+        reordered.put(task.taskId, task);
+        for (Map.Entry<Integer, MutableTask> entry : tasks.entrySet()) {
+            if (entry.getKey() != task.taskId) reordered.put(entry.getKey(), entry.getValue());
+        }
+        tasks.clear();
+        tasks.putAll(reordered);
+        return true;
+    }
+
+    public synchronized int finishAffinity(String activityToken) {
+        MutableActivity activity = requireActivity(activityToken);
+        MutableTask task = taskContaining(activity.token);
+        int index = indexOfToken(task, activity.token);
+        int removed = 0;
+        for (int removeIndex = index; removeIndex >= 0; removeIndex--) {
+            removeActivityAt(task, removeIndex, false, RESULT_CANCELED, "");
+            removed++;
+        }
+        if (task.activities.isEmpty()) {
+            archiveTask(task);
+            tasks.remove(task.taskId);
+        }
+        return removed;
+    }
+
+    public synchronized boolean finishAndRemoveTask(String activityToken) {
+        MutableActivity activity = requireActivity(activityToken);
+        MutableTask task = taskContaining(activity.token);
+        return removeTask(task.virtualUserId, task.packageName, task.packageRevision, task.taskId);
+    }
+
+    public synchronized int clearPackageRevision(
+            int virtualUserId,
+            String packageName,
+            String retainedRevision) {
+        if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+        String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = requireText(retainedRevision, "retainedRevision");
+        int removed = 0;
+        for (MutableTask task : new ArrayList<>(tasks.values())) {
+            if (task.virtualUserId == virtualUserId
+                    && task.packageName.equals(normalizedPackageName)
+                    && !task.packageRevision.equals(normalizedRevision)) {
+                removeTask(task.virtualUserId, task.packageName, task.packageRevision, task.taskId);
+                removed++;
+            }
+        }
+        recentTasks.entrySet().removeIf(entry -> {
+            TaskQuerySnapshot task = entry.getValue();
+            return task.virtualUserId() == virtualUserId
+                    && task.packageName().equals(normalizedPackageName)
+                    && !task.packageRevision().equals(normalizedRevision);
+        });
+        return removed;
+    }
+
+    public synchronized int clearPackageInstance(int virtualUserId, String packageName) {
+        if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+        String normalizedPackageName = requireText(packageName, "packageName");
+        int removed = 0;
+        for (MutableTask task : new ArrayList<>(tasks.values())) {
+            if (task.virtualUserId == virtualUserId
+                    && task.packageName.equals(normalizedPackageName)) {
+                removeTask(task.virtualUserId, task.packageName, task.packageRevision, task.taskId);
+                removed++;
+            }
+        }
+        recentTasks.entrySet().removeIf(entry -> {
+            TaskQuerySnapshot task = entry.getValue();
+            return task.virtualUserId() == virtualUserId
+                    && task.packageName().equals(normalizedPackageName);
+        });
+        return removed;
     }
 
     public synchronized ActivityTaskCheckpoint checkpoint() {
@@ -486,8 +626,11 @@ public final class ActivityTaskLedger {
                     task.taskId,
                     task.virtualUserId,
                     task.packageName,
+                    task.packageRevision,
                     task.affinity,
                     task.documentTask,
+                    task.documentLaunchMode,
+                    task.documentKey,
                     task.rootIntentFlags,
                     task.excludedFromRecents,
                     task.retainInRecents,
@@ -522,8 +665,11 @@ public final class ActivityTaskLedger {
                     snapshot.taskId(),
                     snapshot.virtualUserId(),
                     snapshot.packageName(),
+                    snapshot.packageRevision(),
                     snapshot.affinity(),
                     snapshot.documentTask(),
+                    snapshot.documentLaunchMode(),
+                    snapshot.documentKey(),
                     snapshot.rootIntentFlags(),
                     snapshot.excludedFromRecents(),
                     snapshot.retainInRecents(),
@@ -582,7 +728,18 @@ public final class ActivityTaskLedger {
             String packageName,
             String processName,
             long processGeneration) {
+        return adoptRestoredProcessGeneration(
+                virtualUserId, packageName, "", processName, processGeneration);
+    }
+
+    public synchronized int adoptRestoredProcessGeneration(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String processName,
+            long processGeneration) {
         String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = normalizeOptional(packageRevision);
         String normalizedProcessName = requireText(processName, "processName");
         if (virtualUserId < 0 || processGeneration < 1) {
             throw new IllegalArgumentException("invalid restored process identity");
@@ -593,7 +750,9 @@ public final class ActivityTaskLedger {
             if (activity.restoredFromCheckpoint
                     && activity.identity.virtualUserId() == virtualUserId
                     && activity.identity.packageName().equals(normalizedPackageName)
-                    && activity.processName.equals(normalizedProcessName)) {
+                    && activity.processName.equals(normalizedProcessName)
+                    && revisionMatches(taskContaining(activity.token).packageRevision,
+                            normalizedRevision)) {
                 rotateActivityToken(activity, processGeneration, RecreationReason.PROCESS_RESTART);
                 activity.restoredFromCheckpoint = false;
                 adopted++;
@@ -635,13 +794,21 @@ public final class ActivityTaskLedger {
         }
     }
 
-    private MutableTask requireOwnedTask(int virtualUserId, String packageName, int taskId) {
+    private MutableTask requireOwnedTask(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            int taskId) {
         if (virtualUserId < 0 || taskId < 1) throw new IllegalArgumentException("invalid task identity");
         String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = normalizeOptional(packageRevision);
         MutableTask task = tasks.get(taskId);
         if (task == null) throw new IllegalArgumentException("Unknown taskId: " + taskId);
         if (task.virtualUserId != virtualUserId || !task.packageName.equals(normalizedPackageName)) {
             throw new SecurityException("TASK_OWNER_MISMATCH");
+        }
+        if (!revisionMatches(task.packageRevision, normalizedRevision)) {
+            throw new SecurityException("TASK_REVISION_MISMATCH");
         }
         return task;
     }
@@ -653,8 +820,11 @@ public final class ActivityTaskLedger {
                 task.taskId,
                 task.virtualUserId,
                 task.packageName,
+                task.packageRevision,
                 task.affinity,
                 task.documentTask,
+                task.documentLaunchMode,
+                task.documentKey,
                 active,
                 task.excludedFromRecents,
                 task.retainInRecents,
@@ -677,8 +847,11 @@ public final class ActivityTaskLedger {
                 task.taskId,
                 task.virtualUserId,
                 task.packageName,
+                task.packageRevision,
                 task.affinity,
                 task.documentTask,
+                task.documentLaunchMode,
+                task.documentKey,
                 false,
                 task.excludedFromRecents,
                 task.retainInRecents,
@@ -727,6 +900,12 @@ public final class ActivityTaskLedger {
         if (caller.virtualUserId != request.identity().virtualUserId()) {
             throw new SecurityException("Cross-virtual-user caller task is forbidden");
         }
+        if (!caller.packageName.equals(request.identity().packageName())) {
+            throw new SecurityException("Cross-package caller task is forbidden");
+        }
+        if (!caller.packageRevision.equals(request.packageRevision())) {
+            throw new SecurityException("Cross-revision caller task is forbidden");
+        }
     }
 
     private String resolveCallerActivityToken(LaunchRequest request) {
@@ -760,10 +939,41 @@ public final class ActivityTaskLedger {
         }
     }
 
+    private static void validateLaunchFlagCombinations(LaunchRequest request) {
+        boolean newTask = LaunchFlags.has(request.flags(), LaunchFlags.NEW_TASK);
+        boolean newDocument = LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT);
+        boolean multipleTask = LaunchFlags.has(request.flags(), LaunchFlags.MULTIPLE_TASK);
+        boolean clearTask = LaunchFlags.has(request.flags(), LaunchFlags.CLEAR_TASK);
+        if (multipleTask && !newTask && !newDocument) {
+            throw new IllegalArgumentException("MULTIPLE_TASK requires NEW_TASK or NEW_DOCUMENT");
+        }
+        if (clearTask && !newTask) {
+            throw new IllegalArgumentException("CLEAR_TASK requires NEW_TASK");
+        }
+        if (request.documentLaunchMode() == DocumentLaunchMode.NEVER && newDocument) {
+            throw new IllegalArgumentException("documentLaunchMode NEVER forbids NEW_DOCUMENT");
+        }
+        if (request.documentLaunchMode() == DocumentLaunchMode.INTO_EXISTING
+                && request.documentKey().isEmpty()) {
+            throw new IllegalArgumentException("INTO_EXISTING requires a stable documentKey");
+        }
+        if (request.documentLaunchMode() == DocumentLaunchMode.ALWAYS
+                && !newTask && request.callerTaskId() != null) {
+            // ALWAYS is modeled as a new document task even when the caller omitted NEW_TASK.
+            return;
+        }
+        if (request.launchMode() == LaunchMode.SINGLE_INSTANCE
+                && request.documentLaunchMode() == DocumentLaunchMode.INTO_EXISTING) {
+            throw new IllegalArgumentException(
+                    "singleInstance cannot use INTO_EXISTING document mode");
+        }
+    }
+
     private MutableTask selectTargetTask(LaunchRequest request) {
         boolean forceNew = request.launchMode() == LaunchMode.SINGLE_INSTANCE
                 || LaunchFlags.has(request.flags(), LaunchFlags.MULTIPLE_TASK)
-                || LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT);
+                || LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT)
+                || request.documentLaunchMode() == DocumentLaunchMode.ALWAYS;
         if (forceNew) {
             return null;
         }
@@ -773,13 +983,15 @@ public final class ActivityTaskLedger {
             candidate = findByAffinity(
                     request.identity().virtualUserId(),
                     request.identity().packageName(),
+                    request.packageRevision(),
                     request.taskAffinity());
         } else if (request.callerTaskId() != null) {
             candidate = tasks.get(request.callerTaskId());
         } else {
             candidate = findFrontTaskForPackage(
                     request.identity().virtualUserId(),
-                    request.identity().packageName());
+                    request.identity().packageName(),
+                    request.packageRevision());
         }
 
         if (candidate != null && !canAcceptActivity(candidate, request.identity())) {
@@ -790,12 +1002,19 @@ public final class ActivityTaskLedger {
 
     private MutableTask createTask(LaunchRequest request) {
         int id = nextTaskId.getAndIncrement();
+        boolean documentTask = request.documentRequested()
+                && request.documentLaunchMode() != DocumentLaunchMode.NEVER;
+        DocumentLaunchMode documentMode = documentTask
+                ? effectiveDocumentMode(request) : DocumentLaunchMode.NONE;
         MutableTask task = new MutableTask(
                 id,
                 request.identity().virtualUserId(),
                 request.identity().packageName(),
+                request.packageRevision(),
                 request.taskAffinity(),
-                LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT),
+                documentTask,
+                documentMode,
+                documentTask ? request.documentKey() : "",
                 request.flags(),
                 LaunchFlags.has(request.flags(), LaunchFlags.EXCLUDE_FROM_RECENTS),
                 LaunchFlags.has(request.flags(), LaunchFlags.RETAIN_IN_RECENTS),
@@ -820,11 +1039,16 @@ public final class ActivityTaskLedger {
         return activity;
     }
 
-    private MutableTask findByAffinity(int virtualUserId, String packageName, String affinity) {
+    private MutableTask findByAffinity(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String affinity) {
         MutableTask found = null;
         for (MutableTask task : tasks.values()) {
             if (task.virtualUserId == virtualUserId
                     && task.packageName.equals(packageName)
+                    && task.packageRevision.equals(packageRevision)
                     && task.affinity.equals(affinity)
                     && !task.documentTask) {
                 found = task;
@@ -833,21 +1057,52 @@ public final class ActivityTaskLedger {
         return found;
     }
 
-    private MutableTask findFrontTaskForPackage(int virtualUserId, String packageName) {
+    private Match findDocumentTask(LaunchRequest request) {
+        Match found = null;
+        for (MutableTask task : tasks.values()) {
+            if (!task.documentTask
+                    || task.virtualUserId != request.identity().virtualUserId()
+                    || !task.packageName.equals(request.identity().packageName())
+                    || !task.packageRevision.equals(request.packageRevision())
+                    || !task.documentKey.equals(request.documentKey())
+                    || task.activities.isEmpty()) {
+                continue;
+            }
+            MutableActivity root = task.activities.get(0);
+            if (root.identity.equals(request.identity())) found = new Match(task, 0);
+        }
+        return found;
+    }
+
+    private static DocumentLaunchMode effectiveDocumentMode(LaunchRequest request) {
+        if (request.documentLaunchMode() != DocumentLaunchMode.NONE) {
+            return request.documentLaunchMode();
+        }
+        return LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT)
+                ? DocumentLaunchMode.ALWAYS : DocumentLaunchMode.NONE;
+    }
+
+    private MutableTask findFrontTaskForPackage(
+            int virtualUserId,
+            String packageName,
+            String packageRevision) {
         MutableTask found = null;
         for (MutableTask task : tasks.values()) {
-            if (task.virtualUserId == virtualUserId && task.packageName.equals(packageName)) {
+            if (task.virtualUserId == virtualUserId
+                    && task.packageName.equals(packageName)
+                    && task.packageRevision.equals(packageRevision)) {
                 found = task;
             }
         }
         return found;
     }
 
-    private Match findAcrossTasks(ActivityIdentity identity) {
+    private Match findAcrossTasks(ActivityIdentity identity, String packageRevision) {
         Match found = null;
         for (MutableTask task : tasks.values()) {
             if (task.virtualUserId != identity.virtualUserId()
-                    || !task.packageName.equals(identity.packageName())) {
+                    || !task.packageName.equals(identity.packageName())
+                    || !task.packageRevision.equals(packageRevision)) {
                 continue;
             }
             int index = findIndex(task, identity);
@@ -1121,6 +1376,20 @@ public final class ActivityTaskLedger {
         return activity;
     }
 
+    private MutableTask taskContaining(String activityToken) {
+        for (MutableTask task : tasks.values()) {
+            if (indexOfToken(task, activityToken) >= 0) return task;
+        }
+        throw new IllegalArgumentException("Activity token has no live task: " + activityToken);
+    }
+
+    private static int indexOfToken(MutableTask task, String activityToken) {
+        for (int index = 0; index < task.activities.size(); index++) {
+            if (task.activities.get(index).token.equals(activityToken)) return index;
+        }
+        return -1;
+    }
+
     private void ensureTaskRegistered(MutableTask task) {
         tasks.putIfAbsent(task.taskId, task);
     }
@@ -1186,6 +1455,14 @@ public final class ActivityTaskLedger {
         return normalized;
     }
 
+    private static String normalizeOptional(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static boolean revisionMatches(String taskRevision, String requestedRevision) {
+        return requestedRevision.isEmpty() || taskRevision.equals(requestedRevision);
+    }
+
     private record Match(MutableTask task, int index) {
     }
 
@@ -1199,8 +1476,11 @@ public final class ActivityTaskLedger {
         private final int taskId;
         private final int virtualUserId;
         private final String packageName;
+        private final String packageRevision;
         private final String affinity;
         private final boolean documentTask;
+        private final DocumentLaunchMode documentLaunchMode;
+        private final String documentKey;
         private final int rootIntentFlags;
         private final boolean excludedFromRecents;
         private final boolean retainInRecents;
@@ -1212,8 +1492,11 @@ public final class ActivityTaskLedger {
                 int taskId,
                 int virtualUserId,
                 String packageName,
+                String packageRevision,
                 String affinity,
                 boolean documentTask,
+                DocumentLaunchMode documentLaunchMode,
+                String documentKey,
                 int rootIntentFlags,
                 boolean excludedFromRecents,
                 boolean retainInRecents,
@@ -1221,8 +1504,11 @@ public final class ActivityTaskLedger {
             this.taskId = taskId;
             this.virtualUserId = virtualUserId;
             this.packageName = packageName;
+            this.packageRevision = packageRevision;
             this.affinity = affinity;
             this.documentTask = documentTask;
+            this.documentLaunchMode = documentLaunchMode;
+            this.documentKey = documentKey;
             this.rootIntentFlags = rootIntentFlags;
             this.excludedFromRecents = excludedFromRecents;
             this.retainInRecents = retainInRecents;

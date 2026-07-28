@@ -37,6 +37,8 @@ public final class RuntimeKeys {
     public static final String ACTIVITY_LAUNCH_MODE = "activityLaunchMode";
     public static final String ACTIVITY_FLAGS = "activityFlags";
     public static final String TASK_AFFINITY = "taskAffinity";
+    public static final String DOCUMENT_LAUNCH_MODE = "documentLaunchMode";
+    public static final String DOCUMENT_KEY = "documentKey";
     public static final String CALLER_TASK_ID = "callerTaskId";
     public static final String RESULT_WHO = "resultWho";
     public static final String REQUEST_CODE = "requestCode";

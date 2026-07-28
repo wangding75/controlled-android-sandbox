@@ -6,21 +6,15 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.ActivityTaskRequest;
 import com.warden.controlledsandbox.contract.ActivityTaskResult;
-import com.warden.controlledsandbox.contract.ActivityTaskSnapshot;
-import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.domain.session.GuestSession;
-import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchCoordinator;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchSpec;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchTransaction;
 import com.warden.controlledsandbox.framework.activity.ActivityProcessIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskLedger;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskRestoreOutcome;
-import com.warden.controlledsandbox.framework.activity.TaskQuerySnapshot;
 import com.warden.controlledsandbox.framework.activity.ConfigurationDecision;
 import com.warden.controlledsandbox.framework.activity.LaunchAction;
-import com.warden.controlledsandbox.framework.activity.LaunchFlags;
-import com.warden.controlledsandbox.framework.activity.LaunchMode;
 import com.warden.controlledsandbox.framework.activity.LifecycleState;
 import com.warden.controlledsandbox.framework.activity.SavedActivityState;
 import com.warden.controlledsandbox.framework.routing.OneTimeRouteStore;
@@ -30,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +35,7 @@ public final class BrokerActivityRuntime {
     private final ActivityTaskLedger ledger;
     private final OneTimeRouteStore routeStore;
     private final ActivityLaunchCoordinator coordinator;
+    private final ActivityTaskOperationDispatcher taskOperations;
     private final BrokerStateStore transport;
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
     private ActivityTaskCheckpointStore checkpointStore;
@@ -57,6 +51,8 @@ public final class BrokerActivityRuntime {
         this.routeStore = java.util.Objects.requireNonNull(routeStore, "routeStore");
         this.transport = java.util.Objects.requireNonNull(transport, "transport");
         this.coordinator = new ActivityLaunchCoordinator(ledger, routeStore);
+        this.taskOperations = new ActivityTaskOperationDispatcher(
+                ledger, this::persistCheckpoint, () -> checkpointStatus, () -> restoreOutcome);
     }
 
     public synchronized ActivityTaskRestoreOutcome configureCheckpointStore(Path file) {
@@ -88,8 +84,9 @@ public final class BrokerActivityRuntime {
 
     public synchronized Bundle launch(GuestSession session, String component, Bundle prepared, Bundle request) {
         int adopted = ledger.adoptRestoredProcessGeneration(
-                session.virtualUserId(), session.packageName(), session.processName(), session.generation());
-        ActivityLaunchSpec spec = launchSpec(session, component, request);
+                session.virtualUserId(), session.packageName(), session.packageRevision(),
+                session.processName(), session.generation());
+        ActivityLaunchSpec spec = ActivityLaunchSpecFactory.create(session, component, request);
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
         metadata.put(RuntimeKeys.COMPONENT_CLASS, component);
@@ -102,6 +99,9 @@ public final class BrokerActivityRuntime {
         String token = transaction.routeToken().value();
         Bundle envelope = new Bundle(prepared);
         if (request != null) envelope.putAll(request);
+        envelope.putInt(RuntimeKeys.ACTIVITY_FLAGS, spec.flags());
+        envelope.putString(RuntimeKeys.DOCUMENT_LAUNCH_MODE, spec.documentLaunchMode().name());
+        envelope.putString(RuntimeKeys.DOCUMENT_KEY, spec.documentKey());
         envelope.putString(RuntimeKeys.COMPONENT_CLASS, component);
         envelope.putString(RuntimeKeys.ROUTE_TOKEN, token);
         addDecision(envelope, transaction);
@@ -205,80 +205,33 @@ public final class BrokerActivityRuntime {
     public synchronized ActivityTaskResult taskOperation(
             GuestSession session,
             ActivityTaskRequest request) {
-        java.util.Objects.requireNonNull(request, "request");
-        verifySession(request, session);
-        boolean changed = false;
-        List<ActivityTaskSnapshot> tasks = List.of();
-        switch (request.operation()) {
-            case ActivityTaskRequest.QUERY_RUNNING -> tasks = projectTasks(ledger.runningTasks(
-                    session.virtualUserId(), session.packageName(), request.maxCount()));
-            case ActivityTaskRequest.QUERY_RECENT -> tasks = projectTasks(ledger.recentTasks(
-                    session.virtualUserId(), session.packageName(), request.maxCount()));
-            case ActivityTaskRequest.MOVE_TO_FRONT -> {
-                changed = ledger.moveTaskToFront(
-                        session.virtualUserId(), session.packageName(), request.taskId());
-                persistCheckpoint();
-            }
-            case ActivityTaskRequest.REMOVE_TASK -> {
-                changed = ledger.removeTask(
-                        session.virtualUserId(), session.packageName(), request.taskId());
-                persistCheckpoint();
-            }
-            case ActivityTaskRequest.CHECKPOINT_STATUS -> { }
-            default -> throw new IllegalArgumentException(
-                    "Unknown Activity task operation: " + request.operation());
-        }
-        return ActivityTaskResult.success(
-                RuntimeProtocol.CURRENT,
-                request.requestId(),
-                request.operation(),
-                changed,
-                checkpointStatus,
-                ledger.taskCount(),
-                ledger.activityCount(),
-                restoreOutcome.restoredTaskCount(),
-                restoreOutcome.restoredActivityCount(),
-                restoreOutcome.droppedTransportDeliveryCount(),
-                tasks);
+        return taskOperations.dispatch(session, request);
     }
 
     public synchronized int pendingRouteCount() { return pending.size(); }
     public synchronized int taskCount() { return ledger.taskCount(); }
     public synchronized int activityCount() { return ledger.activityCount(); }
 
+    public synchronized int clearMismatchedRevision(
+            int virtualUserId,
+            String packageName,
+            String retainedRevision) {
+        int removed = ledger.clearPackageRevision(
+                virtualUserId, packageName, retainedRevision);
+        if (removed > 0) persistCheckpoint();
+        return removed;
+    }
+
+    public synchronized int clearPackageInstance(int virtualUserId, String packageName) {
+        int removed = ledger.clearPackageInstance(virtualUserId, packageName);
+        if (removed > 0) persistCheckpoint();
+        return removed;
+    }
+
     private void persistCheckpoint() {
         if (checkpointStore == null) return;
         checkpointStore.save(ledger.checkpoint());
         checkpointStatus = "PERSISTED";
-    }
-
-    private static List<ActivityTaskSnapshot> projectTasks(List<TaskQuerySnapshot> snapshots) {
-        return snapshots.stream().map(snapshot -> new ActivityTaskSnapshot(
-                snapshot.taskId(),
-                snapshot.virtualUserId(),
-                snapshot.packageName(),
-                snapshot.affinity(),
-                snapshot.documentTask(),
-                snapshot.active(),
-                snapshot.excludedFromRecents(),
-                snapshot.retainInRecents(),
-                snapshot.activityCount(),
-                snapshot.baseComponentName(),
-                snapshot.topComponentName(),
-                snapshot.lastActiveSequence(),
-                snapshot.moveToFrontCount())).toList();
-    }
-
-    private static void verifySession(ActivityTaskRequest request, GuestSession session) {
-        if (!RuntimeProtocol.isCompatible(request.protocolVersion())) {
-            throw new IllegalArgumentException("ACTIVITY_TASK_PROTOCOL_MISMATCH");
-        }
-        if (!session.sessionId().equals(request.sessionId())
-                || session.generation() != request.generation()
-                || session.virtualUserId() != request.virtualUserId()
-                || !session.packageName().equals(request.packageName())) {
-            throw new SecurityException("ACTIVITY_TASK_SESSION_MISMATCH");
-        }
     }
 
     private void purgePending(GuestSession stale) {
@@ -288,28 +241,6 @@ public final class BrokerActivityRuntime {
                 routeStore.revoke(entry.getKey());
             }
         }
-    }
-
-    private static ActivityLaunchSpec launchSpec(GuestSession session, String component, Bundle request) {
-        Bundle input = request == null ? new Bundle() : request;
-        int flags = input.getInt(RuntimeKeys.ACTIVITY_FLAGS, LaunchFlags.NEW_TASK);
-        Integer callerTaskId = input.getInt(RuntimeKeys.CALLER_TASK_ID, 0) > 0
-                ? input.getInt(RuntimeKeys.CALLER_TASK_ID, 0) : null;
-        return new ActivityLaunchSpec(
-                new ActivityIdentity(session.virtualUserId(), session.packageName(), component),
-                input.getString(RuntimeKeys.TASK_AFFINITY, session.packageName()),
-                parseLaunchMode(input.getString(RuntimeKeys.ACTIVITY_LAUNCH_MODE, "STANDARD")),
-                flags,
-                callerTaskId,
-                session.processName(),
-                session.generation(),
-                input.getString(RuntimeKeys.RESULT_WHO, ""),
-                input.getInt(RuntimeKeys.REQUEST_CODE, -1));
-    }
-
-    private static LaunchMode parseLaunchMode(String value) {
-        try { return LaunchMode.valueOf(value == null ? "STANDARD" : value.trim().toUpperCase(java.util.Locale.ROOT)); }
-        catch (IllegalArgumentException error) { throw new IllegalArgumentException("Unknown launch mode: " + value, error); }
     }
 
     private static void addDecision(Bundle out, ActivityLaunchTransaction transaction) {

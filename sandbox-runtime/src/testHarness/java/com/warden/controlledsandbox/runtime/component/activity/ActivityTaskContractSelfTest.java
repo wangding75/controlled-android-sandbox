@@ -21,13 +21,18 @@ public final class ActivityTaskContractSelfTest {
         check(request.maxCount() == 25, "request query bound changed");
 
         ActivityTaskSnapshot task = new ActivityTaskSnapshot(
-                7, 2, "com.example", "com.example.task", true, false,
+                7, 2, "com.example", "revision-7", "com.example.task", true,
+                "INTO_EXISTING", "content://item/7", false,
                 false, true, 1, "com.example.Root", "com.example.Top", 12, 3);
         ActivityTaskResult result = roundTripResult(ActivityTaskResult.success(
                 RuntimeProtocol.CURRENT, "req-1", ActivityTaskRequest.QUERY_RECENT,
                 false, "RESTORED", 1, 1, 1, 1, 2, List.of(task)));
         check(result.successful() && result.tasks().size() == 1, "typed task result lost payload");
         check(result.tasks().get(0).taskId() == 7, "typed task projection changed identity");
+        check(result.tasks().get(0).packageRevision().equals("revision-7"),
+                "typed task projection lost package revision");
+        check(result.tasks().get(0).documentKey().equals("content://item/7"),
+                "typed task projection lost document identity");
         check(result.droppedDeliveryCount() == 2, "restore metadata changed");
 
         ActivityTaskResult failure = roundTripResult(ActivityTaskResult.failure(
@@ -40,6 +45,10 @@ public final class ActivityTaskContractSelfTest {
                 RuntimeProtocol.CURRENT, "bad", "session-1", 4, 2, "com.example",
                 ActivityTaskRequest.MOVE_TO_FRONT, 0, 0),
                 "task mutation without taskId must fail");
+        expectFailure(() -> new ActivityTaskRequest(
+                RuntimeProtocol.CURRENT, "bad-finish", "session-1", 4, 2, "com.example",
+                ActivityTaskRequest.FINISH_AFFINITY, 0, 0, ""),
+                "finish operation without Activity token must fail");
         System.out.println("PASS typed Activity task Binder contract self-test");
     }
 

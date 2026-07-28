@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.component.activity;
 import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityRestoreSnapshot;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint;
+import com.warden.controlledsandbox.framework.activity.DocumentLaunchMode;
 import com.warden.controlledsandbox.framework.activity.LaunchMode;
 import com.warden.controlledsandbox.framework.activity.SavedActivityState;
 import com.warden.controlledsandbox.framework.activity.TaskQuerySnapshot;
@@ -128,9 +129,13 @@ public final class ActivityTaskCheckpointStore {
                 output.writeLong(checkpoint.nextActivationSequence());
                 output.writeInt(checkpoint.transportDeliveryCount());
                 output.writeInt(checkpoint.tasks().size());
-                for (TaskRestoreSnapshot task : checkpoint.tasks()) writeTask(output, task);
+                for (TaskRestoreSnapshot task : checkpoint.tasks()) {
+                    writeTask(output, task, checkpoint.schemaVersion());
+                }
                 output.writeInt(checkpoint.recentTasks().size());
-                for (TaskQuerySnapshot recent : checkpoint.recentTasks()) writeRecent(output, recent);
+                for (TaskQuerySnapshot recent : checkpoint.recentTasks()) {
+                    writeRecent(output, recent, checkpoint.schemaVersion());
+                }
             }
             return bytes.toByteArray();
         } catch (IOException impossible) {
@@ -141,6 +146,11 @@ public final class ActivityTaskCheckpointStore {
     private static ActivityTaskCheckpoint decode(byte[] payload) {
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload))) {
             int schemaVersion = input.readInt();
+            if (schemaVersion != ActivityTaskCheckpoint.LEGACY_SCHEMA
+                    && schemaVersion != ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+                throw new IllegalStateException(
+                        "ACTIVITY_TASK_CHECKPOINT_SCHEMA_UNSUPPORTED:" + schemaVersion);
+            }
             int nextTaskId = input.readInt();
             long nextNewIntent = input.readLong();
             long nextConfiguration = input.readLong();
@@ -150,7 +160,7 @@ public final class ActivityTaskCheckpointStore {
             List<TaskRestoreSnapshot> tasks = new ArrayList<>(taskCount);
             int activityCount = 0;
             for (int index = 0; index < taskCount; index++) {
-                TaskRestoreSnapshot task = readTask(input);
+                TaskRestoreSnapshot task = readTask(input, schemaVersion);
                 activityCount = Math.addExact(activityCount, task.activities().size());
                 if (activityCount > MAX_ACTIVITIES) {
                     throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_ACTIVITY_LIMIT");
@@ -159,7 +169,9 @@ public final class ActivityTaskCheckpointStore {
             }
             int recentCount = boundedCount(input.readInt(), MAX_RECENTS, "recent task");
             List<TaskQuerySnapshot> recents = new ArrayList<>(recentCount);
-            for (int index = 0; index < recentCount; index++) recents.add(readRecent(input));
+            for (int index = 0; index < recentCount; index++) {
+                recents.add(readRecent(input, schemaVersion));
+            }
             if (input.available() != 0) {
                 throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_TRAILING_DATA");
             }
@@ -177,12 +189,22 @@ public final class ActivityTaskCheckpointStore {
         }
     }
 
-    private static void writeTask(DataOutputStream output, TaskRestoreSnapshot task) throws IOException {
+    private static void writeTask(
+            DataOutputStream output,
+            TaskRestoreSnapshot task,
+            int schemaVersion) throws IOException {
         output.writeInt(task.taskId());
         output.writeInt(task.virtualUserId());
         output.writeUTF(task.packageName());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeUTF(task.packageRevision());
+        }
         output.writeUTF(task.affinity());
         output.writeBoolean(task.documentTask());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeUTF(task.documentLaunchMode().name());
+            output.writeUTF(task.documentKey());
+        }
         output.writeInt(task.rootIntentFlags());
         output.writeBoolean(task.excludedFromRecents());
         output.writeBoolean(task.retainInRecents());
@@ -192,12 +214,26 @@ public final class ActivityTaskCheckpointStore {
         for (ActivityRestoreSnapshot activity : task.activities()) writeActivity(output, activity);
     }
 
-    private static TaskRestoreSnapshot readTask(DataInputStream input) throws IOException {
+    private static TaskRestoreSnapshot readTask(DataInputStream input, int schemaVersion) throws IOException {
         int taskId = input.readInt();
         int virtualUserId = input.readInt();
         String packageName = input.readUTF();
+        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA
+                ? input.readUTF() : "legacy";
         String affinity = input.readUTF();
         boolean documentTask = input.readBoolean();
+        DocumentLaunchMode documentLaunchMode = documentTask
+                ? DocumentLaunchMode.ALWAYS : DocumentLaunchMode.NONE;
+        String documentKey = "";
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            try {
+                documentLaunchMode = DocumentLaunchMode.valueOf(input.readUTF());
+            } catch (IllegalArgumentException error) {
+                throw new IllegalStateException(
+                        "ACTIVITY_TASK_CHECKPOINT_DOCUMENT_MODE_INVALID", error);
+            }
+            documentKey = input.readUTF();
+        }
         int rootIntentFlags = input.readInt();
         boolean excluded = input.readBoolean();
         boolean retain = input.readBoolean();
@@ -206,8 +242,9 @@ public final class ActivityTaskCheckpointStore {
         int activityCount = boundedCount(input.readInt(), MAX_ACTIVITIES, "Activity");
         List<ActivityRestoreSnapshot> activities = new ArrayList<>(activityCount);
         for (int index = 0; index < activityCount; index++) activities.add(readActivity(input));
-        return new TaskRestoreSnapshot(taskId, virtualUserId, packageName, affinity, documentTask,
-                rootIntentFlags, excluded, retain, lastActive, moveCount, activities);
+        return new TaskRestoreSnapshot(taskId, virtualUserId, packageName, packageRevision,
+                affinity, documentTask, documentLaunchMode, documentKey, rootIntentFlags,
+                excluded, retain, lastActive, moveCount, activities);
     }
 
     private static void writeActivity(DataOutputStream output, ActivityRestoreSnapshot activity)
@@ -268,12 +305,22 @@ public final class ActivityTaskCheckpointStore {
                 savedState, configurationCount, lastConfigurationToken);
     }
 
-    private static void writeRecent(DataOutputStream output, TaskQuerySnapshot task) throws IOException {
+    private static void writeRecent(
+            DataOutputStream output,
+            TaskQuerySnapshot task,
+            int schemaVersion) throws IOException {
         output.writeInt(task.taskId());
         output.writeInt(task.virtualUserId());
         output.writeUTF(task.packageName());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeUTF(task.packageRevision());
+        }
         output.writeUTF(task.affinity());
         output.writeBoolean(task.documentTask());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeUTF(task.documentLaunchMode().name());
+            output.writeUTF(task.documentKey());
+        }
         output.writeBoolean(task.active());
         output.writeBoolean(task.excludedFromRecents());
         output.writeBoolean(task.retainInRecents());
@@ -284,10 +331,31 @@ public final class ActivityTaskCheckpointStore {
         output.writeLong(task.moveToFrontCount());
     }
 
-    private static TaskQuerySnapshot readRecent(DataInputStream input) throws IOException {
+    private static TaskQuerySnapshot readRecent(DataInputStream input, int schemaVersion)
+            throws IOException {
+        int taskId = input.readInt();
+        int virtualUserId = input.readInt();
+        String packageName = input.readUTF();
+        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA
+                ? input.readUTF() : "legacy";
+        String affinity = input.readUTF();
+        boolean documentTask = input.readBoolean();
+        DocumentLaunchMode documentLaunchMode = documentTask
+                ? DocumentLaunchMode.ALWAYS : DocumentLaunchMode.NONE;
+        String documentKey = "";
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            try {
+                documentLaunchMode = DocumentLaunchMode.valueOf(input.readUTF());
+            } catch (IllegalArgumentException error) {
+                throw new IllegalStateException(
+                        "ACTIVITY_TASK_CHECKPOINT_DOCUMENT_MODE_INVALID", error);
+            }
+            documentKey = input.readUTF();
+        }
         return new TaskQuerySnapshot(
-                input.readInt(), input.readInt(), input.readUTF(), input.readUTF(),
-                input.readBoolean(), input.readBoolean(), input.readBoolean(), input.readBoolean(),
+                taskId, virtualUserId, packageName, packageRevision, affinity,
+                documentTask, documentLaunchMode, documentKey,
+                input.readBoolean(), input.readBoolean(), input.readBoolean(),
                 input.readInt(), input.readUTF(), input.readUTF(), input.readLong(), input.readLong());
     }
 

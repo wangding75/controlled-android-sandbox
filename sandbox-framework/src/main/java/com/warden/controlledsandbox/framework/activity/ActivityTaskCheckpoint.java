@@ -14,10 +14,11 @@ public record ActivityTaskCheckpoint(
         List<TaskRestoreSnapshot> tasks,
         List<TaskQuerySnapshot> recentTasks) {
 
-    public static final int CURRENT_SCHEMA = 1;
+    public static final int LEGACY_SCHEMA = 1;
+    public static final int CURRENT_SCHEMA = 2;
 
     public ActivityTaskCheckpoint {
-        if (schemaVersion != CURRENT_SCHEMA) {
+        if (schemaVersion != LEGACY_SCHEMA && schemaVersion != CURRENT_SCHEMA) {
             throw new IllegalArgumentException("unsupported Activity task checkpoint schema: " + schemaVersion);
         }
         if (nextTaskId < 1 || nextNewIntentSequence < 1 || nextConfigurationSequence < 1

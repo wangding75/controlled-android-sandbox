@@ -28,6 +28,9 @@ public final class ActivityTaskLedgerSelfTest {
         testForwardResultChain();
         testNoHistoryAndRecentTaskPolicy();
         testRunningRecentMoveAndRemoveQueries();
+        testLaunchFlagValidationMatrix();
+        testDocumentLaunchModes();
+        testFinishMoveBackAndRevisionCleanup();
         testCheckpointRestoreDropsTransportAndPreservesState();
         testFiveHundredLaunchesWithoutLedgerLeak();
         System.out.println("PASS ActivityTaskLedgerSelfTest");
@@ -468,6 +471,104 @@ public final class ActivityTaskLedgerSelfTest {
                 "explicit remove must remove task from recents");
     }
 
+    private static void testLaunchFlagValidationMatrix() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        expectLaunchFailure(ledger, advancedRequest(
+                0, "InvalidMultiple", LaunchMode.STANDARD, LaunchFlags.MULTIPLE_TASK,
+                null, 1, "rev-a", DocumentLaunchMode.NONE, ""),
+                "MULTIPLE_TASK requires");
+        expectLaunchFailure(ledger, advancedRequest(
+                0, "InvalidClear", LaunchMode.STANDARD, LaunchFlags.CLEAR_TASK,
+                null, 1, "rev-a", DocumentLaunchMode.NONE, ""),
+                "CLEAR_TASK requires");
+        expectLaunchFailure(ledger, advancedRequest(
+                0, "NeverDocument", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.NEW_DOCUMENT,
+                null, 1, "rev-a", DocumentLaunchMode.NEVER, "doc-never"),
+                "NEVER forbids");
+        expectLaunchFailure(ledger, advancedRequest(
+                0, "MissingDocumentKey", LaunchMode.STANDARD, LaunchFlags.NEW_TASK,
+                null, 1, "rev-a", DocumentLaunchMode.INTO_EXISTING, ""),
+                "requires a stable documentKey");
+    }
+
+    private static void testDocumentLaunchModes() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision first = ledger.launch(advancedRequest(
+                0, "Document", LaunchMode.STANDARD, LaunchFlags.NEW_TASK,
+                null, 1, "rev-doc", DocumentLaunchMode.INTO_EXISTING, "content://item/7"));
+        ledger.launch(advancedRequest(
+                0, "Detail", LaunchMode.STANDARD, 0,
+                first.taskId(), 1, "rev-doc", DocumentLaunchMode.NONE, ""));
+        LaunchDecision reused = ledger.launch(advancedRequest(
+                0, "Document", LaunchMode.STANDARD, LaunchFlags.NEW_TASK,
+                null, 1, "rev-doc", DocumentLaunchMode.INTO_EXISTING, "content://item/7"));
+        check(reused.taskId() == first.taskId(), "INTO_EXISTING should reuse matching document task");
+        check(reused.removedActivityCount() == 1, "INTO_EXISTING should clear document task to root");
+        TaskQuerySnapshot reusedSnapshot = ledger.runningTasks(
+                0, "guest.example", "rev-doc", 10).get(0);
+        check(reusedSnapshot.documentTask(), "document task marker should be retained");
+        check(reusedSnapshot.documentLaunchMode() == DocumentLaunchMode.INTO_EXISTING,
+                "document launch mode should be queryable");
+        check(reusedSnapshot.documentKey().equals("content://item/7"),
+                "document identity should be queryable");
+
+        LaunchDecision alwaysOne = ledger.launch(advancedRequest(
+                0, "Always", LaunchMode.STANDARD, 0,
+                null, 1, "rev-doc", DocumentLaunchMode.ALWAYS, "content://item/8"));
+        LaunchDecision alwaysTwo = ledger.launch(advancedRequest(
+                0, "Always", LaunchMode.STANDARD, 0,
+                null, 1, "rev-doc", DocumentLaunchMode.ALWAYS, "content://item/8"));
+        check(alwaysOne.taskId() != alwaysTwo.taskId(),
+                "ALWAYS document mode should create a distinct task");
+    }
+
+    private static void testFinishMoveBackAndRevisionCleanup() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(advancedRequest(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK,
+                null, 2, "rev-current", DocumentLaunchMode.NONE, ""));
+        LaunchDecision middle = ledger.launch(advancedRequest(
+                0, "Middle", LaunchMode.STANDARD, 0,
+                root.taskId(), 2, "rev-current", DocumentLaunchMode.NONE, ""));
+        ledger.launch(advancedRequest(
+                0, "Top", LaunchMode.STANDARD, 0,
+                root.taskId(), 2, "rev-current", DocumentLaunchMode.NONE, ""));
+        check(ledger.finishAffinity(middle.activityToken()) == 2,
+                "finishAffinity should remove the selected Activity and all above it");
+        check(ledger.snapshot().get(0).activities().size() == 1,
+                "finishAffinity should retain the lower affinity stack");
+
+        LaunchDecision other = ledger.launch(advancedRequest(
+                0, "Other", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.MULTIPLE_TASK,
+                null, 2, "rev-current", DocumentLaunchMode.NONE, ""));
+        check(ledger.moveTaskToBack(0, "guest.example", "rev-current", other.taskId()),
+                "foreground task should move behind another task");
+        List<TaskQuerySnapshot> running = ledger.runningTasks(
+                0, "guest.example", "rev-current", 10);
+        check(running.get(running.size() - 1).taskId() == other.taskId(),
+                "moved-back task should be last in front-first query order");
+        check(ledger.finishAndRemoveTask(other.activityToken()),
+                "finishAndRemoveTask should delete the whole task");
+
+        LaunchDecision stale = ledger.launch(advancedRequest(
+                0, "Stale", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.MULTIPLE_TASK,
+                null, 2, "rev-old", DocumentLaunchMode.NONE, ""));
+        try {
+            ledger.moveTaskToFront(0, "guest.example", "rev-current", stale.taskId());
+            throw new AssertionError("revision mismatch should reject task mutation");
+        } catch (SecurityException expected) {
+            check(expected.getMessage().contains("TASK_REVISION_MISMATCH"),
+                    "revision ownership rejection should be explicit");
+        }
+        check(ledger.clearPackageRevision(0, "guest.example", "rev-current") == 1,
+                "old package revision task should be removed");
+        check(ledger.runningTasks(0, "guest.example", "rev-old", 10).isEmpty(),
+                "old revision query should have no live tasks after cleanup");
+    }
+
     private static void testCheckpointRestoreDropsTransportAndPreservesState() {
         ActivityTaskLedger source = new ActivityTaskLedger();
         LaunchDecision root = source.launch(request(
@@ -584,6 +685,45 @@ public final class ActivityTaskLedgerSelfTest {
                 "route-result-" + user + "-" + component + "-" + generation,
                 resultWho,
                 requestCode);
+    }
+
+    private static LaunchRequest advancedRequest(
+            int user,
+            String component,
+            LaunchMode mode,
+            int flags,
+            Integer callerTask,
+            long generation,
+            String packageRevision,
+            DocumentLaunchMode documentMode,
+            String documentKey) {
+        return new LaunchRequest(
+                new ActivityIdentity(user, "guest.example", component),
+                "guest.example",
+                mode,
+                flags,
+                callerTask,
+                "guest.example:main",
+                generation,
+                "route-advanced-" + user + "-" + component + "-" + generation,
+                "",
+                -1,
+                packageRevision,
+                documentMode,
+                documentKey);
+    }
+
+    private static void expectLaunchFailure(
+            ActivityTaskLedger ledger,
+            LaunchRequest request,
+            String expectedMessage) {
+        try {
+            ledger.launch(request);
+            throw new AssertionError("invalid launch combination should fail");
+        } catch (IllegalArgumentException expected) {
+            check(expected.getMessage().contains(expectedMessage),
+                    "launch validation failure should contain: " + expectedMessage);
+        }
     }
 
     private static void expectUnknownToken(ActivityTaskLedger ledger, String staleToken) {

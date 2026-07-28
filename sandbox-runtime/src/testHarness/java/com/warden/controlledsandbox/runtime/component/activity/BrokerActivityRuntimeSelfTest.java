@@ -39,6 +39,8 @@ public final class BrokerActivityRuntimeSelfTest {
                 "running-task query should expose owned task");
         check(running.tasks().get(0).taskId() == launch.getInt(RuntimeKeys.TASK_ID, 0),
                 "running-task query should preserve task identity");
+        check(running.tasks().get(0).packageRevision().equals(session.packageRevision()),
+                "running-task query should bind task to APK revision");
         ActivityTaskResult checkpointStatus = runtime.taskOperation(
                 session, taskRequest(session, ActivityTaskRequest.CHECKPOINT_STATUS));
         check("PERSISTED".equals(checkpointStatus.checkpointStatus()),
@@ -61,6 +63,24 @@ public final class BrokerActivityRuntimeSelfTest {
         event(runtime, session, activity, "RESUMED");
         event(runtime, session, activity, "PAUSED");
         event(runtime, session, activity, "STOPPED");
+
+        Bundle secondRequest = new Bundle(prepared);
+        secondRequest.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.SecondActivity");
+        secondRequest.putInt(RuntimeKeys.ACTIVITY_FLAGS,
+                com.warden.controlledsandbox.framework.activity.LaunchFlags.NEW_TASK
+                        | com.warden.controlledsandbox.framework.activity.LaunchFlags.MULTIPLE_TASK);
+        Bundle secondLaunch = runtime.launch(
+                session, "com.example.SecondActivity", prepared, secondRequest);
+        int secondTaskId = secondLaunch.getInt(RuntimeKeys.TASK_ID, 0);
+        ActivityTaskResult movedBack = runtime.taskOperation(session, taskMutation(
+                session, ActivityTaskRequest.MOVE_TO_BACK, secondTaskId, ""));
+        check(movedBack.successful() && movedBack.changed(),
+                "MOVE_TO_BACK should reorder an owned foreground task");
+        ActivityTaskResult removedSecond = runtime.taskOperation(session, taskMutation(
+                session, ActivityTaskRequest.FINISH_AND_REMOVE_TASK, 0,
+                secondLaunch.getString(RuntimeKeys.ACTIVITY_TOKEN, "")));
+        check(removedSecond.successful() && removedSecond.changed(),
+                "finishAndRemoveTask should remove an owned task");
 
         Bundle stateEvent = baseEvent(session, activity, "SAVE_STATE");
         stateEvent.putLong(RuntimeKeys.SAVED_STATE_VERSION, 1);
@@ -97,6 +117,24 @@ public final class BrokerActivityRuntimeSelfTest {
                 operation,
                 0,
                 maxCount);
+    }
+
+    private static ActivityTaskRequest taskMutation(
+            GuestSession session,
+            String operation,
+            int taskId,
+            String activityToken) {
+        return new ActivityTaskRequest(
+                RuntimeProtocol.CURRENT,
+                "task-mutation-" + operation,
+                session.sessionId(),
+                session.generation(),
+                session.virtualUserId(),
+                session.packageName(),
+                operation,
+                taskId,
+                0,
+                activityToken);
     }
 
     private static Bundle prepared(GuestSession session) {

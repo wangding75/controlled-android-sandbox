@@ -13,7 +13,10 @@ public record ActivityLaunchSpec(
         String processName,
         long processGeneration,
         String resultWho,
-        int requestCode) {
+        int requestCode,
+        String packageRevision,
+        DocumentLaunchMode documentLaunchMode,
+        String documentKey) {
 
     public ActivityLaunchSpec {
         identity = Objects.requireNonNull(identity, "identity");
@@ -21,12 +24,32 @@ public record ActivityLaunchSpec(
         launchMode = Objects.requireNonNull(launchMode, "launchMode");
         processName = normalize(processName, identity.packageName());
         resultWho = resultWho == null ? "" : resultWho;
+        packageRevision = normalize(packageRevision, "legacy");
+        documentLaunchMode = documentLaunchMode == null
+                ? DocumentLaunchMode.NONE : documentLaunchMode;
+        documentKey = documentKey == null ? "" : documentKey.trim();
         if (callerTaskId != null && callerTaskId < 1) {
             throw new IllegalArgumentException("callerTaskId must be positive");
         }
         if (processGeneration < 1) {
             throw new IllegalArgumentException("processGeneration must be positive");
         }
+    }
+
+    /** Compatibility constructor for the M4-T14/M4-T15 stage-1 call shape. */
+    public ActivityLaunchSpec(
+            ActivityIdentity identity,
+            String taskAffinity,
+            LaunchMode launchMode,
+            int flags,
+            Integer callerTaskId,
+            String processName,
+            long processGeneration,
+            String resultWho,
+            int requestCode) {
+        this(identity, taskAffinity, launchMode, flags, callerTaskId, processName,
+                processGeneration, resultWho, requestCode, "legacy",
+                DocumentLaunchMode.NONE, "");
     }
 
     public RouteOwner routeOwner() {
@@ -48,7 +71,10 @@ public record ActivityLaunchSpec(
                 processGeneration,
                 routeToken,
                 resultWho,
-                requestCode);
+                requestCode,
+                packageRevision,
+                documentLaunchMode,
+                documentKey);
     }
 
     private static String normalize(String value, String fallback) {

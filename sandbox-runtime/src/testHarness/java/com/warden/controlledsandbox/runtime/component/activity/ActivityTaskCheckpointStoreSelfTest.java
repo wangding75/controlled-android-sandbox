@@ -39,6 +39,21 @@ public final class ActivityTaskCheckpointStoreSelfTest {
         ActivityTaskCheckpoint loaded = store.load().orElseThrow();
         check(loaded.equals(expected), "checkpoint codec round trip changed state");
 
+        ActivityTaskCheckpoint legacy = new ActivityTaskCheckpoint(
+                ActivityTaskCheckpoint.LEGACY_SCHEMA,
+                expected.nextTaskId(),
+                expected.nextNewIntentSequence(),
+                expected.nextConfigurationSequence(),
+                expected.nextActivationSequence(),
+                expected.transportDeliveryCount(),
+                expected.tasks(),
+                expected.recentTasks());
+        store.save(legacy);
+        ActivityTaskCheckpoint loadedLegacy = store.load().orElseThrow();
+        check(loadedLegacy.equals(legacy), "schema-1 checkpoint must remain readable");
+
+        store.save(expected);
+
         byte[] corrupt = Files.readAllBytes(file);
         corrupt[corrupt.length / 2] ^= 0x01;
         Files.write(file, corrupt);

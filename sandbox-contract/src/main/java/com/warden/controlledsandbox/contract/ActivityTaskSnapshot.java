@@ -9,8 +9,9 @@ public final class ActivityTaskSnapshot implements Parcelable {
         @Override public ActivityTaskSnapshot createFromParcel(Parcel source) {
             return new ActivityTaskSnapshot(
                     source.readInt(), source.readInt(), source.readString(), source.readString(),
+                    source.readString(), source.readInt() != 0, source.readString(), source.readString(),
                     source.readInt() != 0, source.readInt() != 0, source.readInt() != 0,
-                    source.readInt() != 0, source.readInt(), source.readString(), source.readString(),
+                    source.readInt(), source.readString(), source.readString(),
                     source.readLong(), source.readLong());
         }
 
@@ -22,8 +23,11 @@ public final class ActivityTaskSnapshot implements Parcelable {
     private final int taskId;
     private final int virtualUserId;
     private final String packageName;
+    private final String packageRevision;
     private final String affinity;
     private final boolean documentTask;
+    private final String documentLaunchMode;
+    private final String documentKey;
     private final boolean active;
     private final boolean excludedFromRecents;
     private final boolean retainInRecents;
@@ -37,8 +41,11 @@ public final class ActivityTaskSnapshot implements Parcelable {
             int taskId,
             int virtualUserId,
             String packageName,
+            String packageRevision,
             String affinity,
             boolean documentTask,
+            String documentLaunchMode,
+            String documentKey,
             boolean active,
             boolean excludedFromRecents,
             boolean retainInRecents,
@@ -57,8 +64,13 @@ public final class ActivityTaskSnapshot implements Parcelable {
         this.taskId = taskId;
         this.virtualUserId = virtualUserId;
         this.packageName = ContractChecks.requiredText(packageName, "packageName", 255);
+        this.packageRevision = ContractChecks.requiredText(
+                packageRevision, "packageRevision", 1024);
         this.affinity = ContractChecks.optionalText(affinity, "affinity", 255);
         this.documentTask = documentTask;
+        this.documentLaunchMode = ContractChecks.optionalText(
+                documentLaunchMode, "documentLaunchMode", 64);
+        this.documentKey = ContractChecks.optionalText(documentKey, "documentKey", 2048);
         this.active = active;
         this.excludedFromRecents = excludedFromRecents;
         this.retainInRecents = retainInRecents;
@@ -67,13 +79,41 @@ public final class ActivityTaskSnapshot implements Parcelable {
         this.topComponentName = ContractChecks.optionalText(topComponentName, "topComponentName", 512);
         this.lastActiveSequence = lastActiveSequence;
         this.moveToFrontCount = moveToFrontCount;
+        if (!documentTask && (!this.documentKey.isEmpty()
+                || !"NONE".equals(this.documentLaunchMode))) {
+            throw new IllegalArgumentException("non-document task cannot expose document metadata");
+        }
+    }
+
+    /** Compatibility constructor for schema-1 task projections. */
+    public ActivityTaskSnapshot(
+            int taskId,
+            int virtualUserId,
+            String packageName,
+            String affinity,
+            boolean documentTask,
+            boolean active,
+            boolean excludedFromRecents,
+            boolean retainInRecents,
+            int activityCount,
+            String baseComponentName,
+            String topComponentName,
+            long lastActiveSequence,
+            long moveToFrontCount) {
+        this(taskId, virtualUserId, packageName, "legacy", affinity, documentTask,
+                documentTask ? "ALWAYS" : "NONE", "", active, excludedFromRecents,
+                retainInRecents, activityCount, baseComponentName, topComponentName,
+                lastActiveSequence, moveToFrontCount);
     }
 
     public int taskId() { return taskId; }
     public int virtualUserId() { return virtualUserId; }
     public String packageName() { return packageName; }
+    public String packageRevision() { return packageRevision; }
     public String affinity() { return affinity; }
     public boolean documentTask() { return documentTask; }
+    public String documentLaunchMode() { return documentLaunchMode; }
+    public String documentKey() { return documentKey; }
     public boolean active() { return active; }
     public boolean excludedFromRecents() { return excludedFromRecents; }
     public boolean retainInRecents() { return retainInRecents; }
@@ -89,8 +129,11 @@ public final class ActivityTaskSnapshot implements Parcelable {
         dest.writeInt(taskId);
         dest.writeInt(virtualUserId);
         dest.writeString(packageName);
+        dest.writeString(packageRevision);
         dest.writeString(affinity);
         dest.writeInt(documentTask ? 1 : 0);
+        dest.writeString(documentLaunchMode);
+        dest.writeString(documentKey);
         dest.writeInt(active ? 1 : 0);
         dest.writeInt(excludedFromRecents ? 1 : 0);
         dest.writeInt(retainInRecents ? 1 : 0);

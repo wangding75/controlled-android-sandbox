@@ -125,7 +125,6 @@ public final class RuntimeBrokerService extends Service {
                 sessions, clock, activityRuntime, serviceCoordinator, receiverCoordinator,
                 providerResources, systemServiceCoordinator);
     }
-
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
         @Override public Bundle prepareGuest(Bundle request) {
             CallerGuard.requireSameApplication();
@@ -631,7 +630,6 @@ public final class RuntimeBrokerService extends Service {
     };
 
     @Override public IBinder onBind(Intent intent) { return binder; }
-
     private synchronized Bundle prepareGuestInternal(Bundle request) {
         try {
             Bundle input = request == null ? new Bundle() : new Bundle(request);
@@ -726,6 +724,7 @@ public final class RuntimeBrokerService extends Service {
                 existing, requestedRevision)) {
             stopSession(session);
         }
+        activityRuntime.clearMismatchedRevision(userId, packageName, requestedRevision);
     }
 
     private synchronized void stopGuestInternal(String packageName, int userId) {
@@ -734,6 +733,7 @@ public final class RuntimeBrokerService extends Service {
         receiverCoordinator.invalidateInstance(packageName, userId,
                 "ORDERED_RECEIVER_INSTANCE_STOPPED");
         providerResources.invalidateInstance(packageName, userId);
+        activityRuntime.clearPackageInstance(userId, packageName);
     }
 
     private void stopSession(GuestSession original) {
