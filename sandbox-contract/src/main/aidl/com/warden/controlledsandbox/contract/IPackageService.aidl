@@ -9,4 +9,5 @@ interface IPackageService {
     IPackageManagementSession openManagementSession(in IBinder clientToken);
     IRuntimePermissionSession openRuntimePermissionSession(in IBinder clientToken);
     IVirtualSystemServiceSession openVirtualSystemServiceSession(in IBinder clientToken, String packageName, int virtualUserId, String processName, long generation);
+    boolean dispatchVirtualJob(int hostJobId);
 }

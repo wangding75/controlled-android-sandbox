@@ -13,6 +13,9 @@ import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import java.io.File;
 
@@ -91,6 +94,12 @@ public final class PackageManagementService extends Service {
             }
             systemServices.register(session);
             return session;
+        }
+
+        @Override public boolean dispatchVirtualJob(int hostJobId) {
+            callerVerifier.requireRuntimeBrokerCaller();
+            if (hostJobId < 0) throw new IllegalArgumentException("hostJobId must be non-negative");
+            return systemServices.dispatchJob(hostJobId);
         }
     };
 
@@ -536,6 +545,38 @@ public final class PackageManagementService extends Service {
         }
         @Override public java.util.List<VirtualAlarmSnapshot> listAlarms() {
             requireCapability(); return systemServices.alarms(scope, processName, generation);
+        }
+        @Override public VirtualNotificationSnapshot reserveNotification(int guestId, String guestTag, String channelId) {
+            requireCapability(); return systemServices.reserveNotification(scope, generation, guestId, guestTag, channelId);
+        }
+        @Override public void commitNotification(int guestId, String guestTag, String channelId, byte[] payload) {
+            requireCapability(); systemServices.commitNotification(scope, guestId, guestTag, channelId, payload);
+        }
+        @Override public boolean removeNotification(int guestId, String guestTag) {
+            requireCapability(); return systemServices.removeNotification(scope, guestId, guestTag);
+        }
+        @Override public java.util.List<VirtualNotificationSnapshot> listNotifications() {
+            requireCapability(); return systemServices.notifications(scope);
+        }
+        @Override public void upsertNotificationChannel(String kind, String id, String groupId, byte[] payload) {
+            requireCapability(); systemServices.upsertNotificationChannel(scope, kind, id, groupId, payload);
+        }
+        @Override public boolean removeNotificationChannel(String kind, String id) {
+            requireCapability(); return systemServices.removeNotificationChannel(scope, kind, id);
+        }
+        @Override public java.util.List<VirtualNotificationChannelSnapshot> listNotificationChannels() {
+            requireCapability(); return systemServices.notificationChannels(scope);
+        }
+        @Override public VirtualJobSnapshot reserveJob(int guestId, byte[] payload) {
+            requireCapability(); return systemServices.reserveJob(scope, processName, generation, guestId, payload);
+        }
+        @Override public void commitJob(int guestId) { requireCapability(); systemServices.commitJob(scope, guestId); }
+        @Override public boolean removeJob(int guestId) { requireCapability(); return systemServices.removeJob(scope, guestId); }
+        @Override public java.util.List<VirtualJobSnapshot> listJobs() {
+            requireCapability(); return systemServices.jobs(scope, processName, generation);
+        }
+        @Override public void finishJob(int guestId, boolean needsReschedule) {
+            requireCapability(); systemServices.finishJob(scope, guestId, needsReschedule);
         }
         @Override public int ensureNamespace(String namespace, int guestId) {
             requireCapability(); return systemServices.ensureNamespace(scope, namespace, guestId);

@@ -26,8 +26,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     private final ClipboardState clipboard;
     private final AccountState accounts;
     private final AlarmState alarms;
-    private final IntNamespace notifications;
-    private final IntNamespace jobs;
+    private final NotificationState notifications;
+    private final JobState jobs;
 
     public VirtualSystemServiceState() { this(null); }
 
@@ -36,15 +36,15 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
         alarms = new AlarmState(authority);
-        notifications = new IntNamespace("notification", 0x51000000, authority);
-        jobs = new IntNamespace("job", 0x52000000, authority);
+        notifications = new NotificationState(authority);
+        jobs = new JobState(authority);
     }
 
     public ClipboardState clipboard() { return clipboard; }
     public AccountState accounts() { return accounts; }
     public AlarmState alarms() { return alarms; }
-    public IntNamespace notifications() { return notifications; }
-    public IntNamespace jobs() { return jobs; }
+    public NotificationState notifications() { return notifications; }
+    public JobState jobs() { return jobs; }
     public boolean binderOwned() { return authority != null; }
 
     @Override public void close() {
@@ -246,6 +246,188 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         private static void dispatch(Object token) {
             if (invokeNoArg(token, "send", "doAlarm", "onAlarm", "run")) return;
             throw new IllegalStateException("VIRTUAL_ALARM_TARGET_UNDELIVERABLE:" + token.getClass().getName());
+        }
+    }
+
+    public static final class NotificationState {
+        public record Mapping(int hostId, boolean created) { }
+        private record Key(int guestId, String guestTag) { }
+        private static final class Entry {
+            final int guestId; final int hostId; final String guestTag; final String hostTag;
+            String channelId; String state; Object payload; long updatedAtMs;
+            Entry(int guestId, int hostId, String guestTag, String hostTag, String channelId,
+                  String state, Object payload, long updatedAtMs) {
+                this.guestId = guestId; this.hostId = hostId; this.guestTag = guestTag;
+                this.hostTag = hostTag; this.channelId = channelId; this.state = state;
+                this.payload = payload; this.updatedAtMs = updatedAtMs;
+            }
+        }
+        private final VirtualSystemServiceAuthority authority;
+        private final AtomicInteger next = new AtomicInteger(0x51000000);
+        private final Map<Key, Entry> entries = new LinkedHashMap<>();
+        private final Map<String, VirtualSystemServiceAuthority.NotificationChannelRecord> channels = new LinkedHashMap<>();
+        NotificationState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
+
+        public synchronized VirtualSystemServiceAuthority.NotificationRecord reserve(int guestId, String tag, String channelId) {
+            String guestTag = normalize(tag); String channel = normalize(channelId);
+            if (authority != null) return authority.reserveNotification(guestId, guestTag, channel);
+            Key key = new Key(guestId, guestTag); Entry current = entries.get(key);
+            if (current == null) {
+                int host = next.getAndIncrement();
+                current = new Entry(guestId, host, guestTag, "cs:" + host + ":" + guestTag,
+                        channel, "RESERVED", null, System.currentTimeMillis());
+                entries.put(key, current);
+            } else {
+                current.channelId = channel; current.state = "RESERVED"; current.updatedAtMs = System.currentTimeMillis();
+            }
+            return record(current);
+        }
+        public synchronized void commit(int guestId, String tag, String channelId, Object payload) {
+            String guestTag = normalize(tag); String channel = normalize(channelId);
+            if (authority != null) { authority.commitNotification(guestId, guestTag, channel, payload); return; }
+            Entry entry = entries.get(new Key(guestId, guestTag));
+            if (entry == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
+            entry.channelId = channel; entry.payload = payload; entry.state = "ACTIVE";
+            entry.updatedAtMs = System.currentTimeMillis();
+        }
+        public synchronized boolean remove(int guestId, String tag) {
+            String guestTag = normalize(tag);
+            return authority != null ? authority.removeNotification(guestId, guestTag)
+                    : entries.remove(new Key(guestId, guestTag)) != null;
+        }
+        public synchronized List<VirtualSystemServiceAuthority.NotificationRecord> records() {
+            if (authority != null) return Collections.unmodifiableList(new ArrayList<>(authority.notifications()));
+            List<VirtualSystemServiceAuthority.NotificationRecord> out = new ArrayList<>();
+            for (Entry entry : entries.values()) out.add(record(entry));
+            return Collections.unmodifiableList(out);
+        }
+        public synchronized Mapping ensure(int guestId) {
+            VirtualSystemServiceAuthority.NotificationRecord before = find(guestId, "");
+            VirtualSystemServiceAuthority.NotificationRecord value = reserve(guestId, "", "");
+            return new Mapping(value.hostId(), before == null);
+        }
+        public synchronized Integer hostIdIfPresent(int guestId) {
+            VirtualSystemServiceAuthority.NotificationRecord value = find(guestId, "");
+            return value == null ? null : value.hostId();
+        }
+        public synchronized Integer guestId(int hostId) {
+            for (VirtualSystemServiceAuthority.NotificationRecord value : records()) if (value.hostId() == hostId) return value.guestId();
+            return null;
+        }
+        public synchronized Integer removeGuest(int guestId) {
+            VirtualSystemServiceAuthority.NotificationRecord value = find(guestId, "");
+            if (value == null) return null; remove(guestId, ""); return value.hostId();
+        }
+        public synchronized List<Integer> guestIds() {
+            java.util.LinkedHashSet<Integer> out = new java.util.LinkedHashSet<>();
+            for (VirtualSystemServiceAuthority.NotificationRecord value : records()) out.add(value.guestId());
+            return Collections.unmodifiableList(new ArrayList<>(out));
+        }
+        public synchronized int size() { return records().size(); }
+        public synchronized void upsertChannel(String kind, String id, String groupId, Object payload) {
+            if (authority != null) { authority.upsertNotificationChannel(kind, id, groupId, payload); return; }
+            channels.put(kind + "#" + id, new VirtualSystemServiceAuthority.NotificationChannelRecord(
+                    kind, id, normalize(groupId), payload, System.currentTimeMillis()));
+        }
+        public synchronized boolean removeChannel(String kind, String id) {
+            return authority != null ? authority.removeNotificationChannel(kind, id)
+                    : channels.remove(kind + "#" + id) != null;
+        }
+        public synchronized List<VirtualSystemServiceAuthority.NotificationChannelRecord> channels() {
+            return authority != null ? Collections.unmodifiableList(new ArrayList<>(authority.notificationChannels()))
+                    : Collections.unmodifiableList(new ArrayList<>(channels.values()));
+        }
+        public synchronized void clear() { if (authority == null) { entries.clear(); channels.clear(); } }
+        private VirtualSystemServiceAuthority.NotificationRecord find(int guestId, String tag) {
+            String normalized = normalize(tag);
+            for (VirtualSystemServiceAuthority.NotificationRecord value : records()) {
+                if (value.guestId() == guestId && value.guestTag().equals(normalized)) return value;
+            }
+            return null;
+        }
+        private static VirtualSystemServiceAuthority.NotificationRecord record(Entry entry) {
+            return new VirtualSystemServiceAuthority.NotificationRecord(entry.guestId, entry.hostId,
+                    entry.guestTag, entry.hostTag, entry.channelId, entry.state, entry.payload, entry.updatedAtMs);
+        }
+    }
+
+    public static final class JobState {
+        public record Mapping(int hostId, boolean created) { }
+        private static final class Entry {
+            final int guestId; final int hostId; String state; Object payload; long updatedAtMs;
+            Entry(int guestId, int hostId, String state, Object payload, long updatedAtMs) {
+                this.guestId = guestId; this.hostId = hostId; this.state = state;
+                this.payload = payload; this.updatedAtMs = updatedAtMs;
+            }
+        }
+        private final VirtualSystemServiceAuthority authority;
+        private final AtomicInteger next = new AtomicInteger(0x52000000);
+        private final Map<Integer, Entry> entries = new LinkedHashMap<>();
+        JobState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
+        public synchronized VirtualSystemServiceAuthority.JobRecord reserve(int guestId, Object payload) {
+            if (authority != null) return authority.reserveJob(guestId, payload);
+            Entry entry = entries.get(guestId);
+            if (entry == null) {
+                entry = new Entry(guestId, next.getAndIncrement(), "RESERVED", payload, System.currentTimeMillis());
+                entries.put(guestId, entry);
+            } else { entry.state = "RESERVED"; entry.payload = payload; entry.updatedAtMs = System.currentTimeMillis(); }
+            return record(entry);
+        }
+        public synchronized void commit(int guestId) {
+            if (authority != null) { authority.commitJob(guestId); return; }
+            Entry entry = entries.get(guestId);
+            if (entry == null) throw new IllegalStateException("VIRTUAL_JOB_RESERVATION_REQUIRED");
+            entry.state = "SCHEDULED"; entry.updatedAtMs = System.currentTimeMillis();
+        }
+        public synchronized boolean remove(int guestId) {
+            return authority != null ? authority.removeJob(guestId) : entries.remove(guestId) != null;
+        }
+        public synchronized List<VirtualSystemServiceAuthority.JobRecord> records() {
+            if (authority != null) return Collections.unmodifiableList(new ArrayList<>(authority.jobs()));
+            List<VirtualSystemServiceAuthority.JobRecord> out = new ArrayList<>();
+            for (Entry entry : entries.values()) out.add(record(entry));
+            return Collections.unmodifiableList(out);
+        }
+        public synchronized Mapping ensure(int guestId) {
+            VirtualSystemServiceAuthority.JobRecord before = findGuest(guestId);
+            VirtualSystemServiceAuthority.JobRecord value = reserve(guestId, before == null ? null : before.payload());
+            return new Mapping(value.hostId(), before == null);
+        }
+        public synchronized Integer hostIdIfPresent(int guestId) {
+            VirtualSystemServiceAuthority.JobRecord value = findGuest(guestId); return value == null ? null : value.hostId();
+        }
+        public synchronized Integer guestId(int hostId) {
+            for (VirtualSystemServiceAuthority.JobRecord value : records()) if (value.hostId() == hostId) return value.guestId();
+            return null;
+        }
+        public synchronized Integer removeGuest(int guestId) {
+            VirtualSystemServiceAuthority.JobRecord value = findGuest(guestId);
+            if (value == null) return null; remove(guestId); return value.hostId();
+        }
+        public synchronized List<Integer> guestIds() {
+            List<Integer> out = new ArrayList<>();
+            for (VirtualSystemServiceAuthority.JobRecord value : records()) out.add(value.guestId());
+            return Collections.unmodifiableList(out);
+        }
+        public synchronized int size() { return records().size(); }
+        public synchronized void setReadyListener(java.util.function.BiFunction<Integer, Object, Boolean> listener) {
+            if (authority != null) authority.setJobReadyListener(listener);
+        }
+        public synchronized void finish(int guestId, boolean needsReschedule) {
+            if (authority != null) { authority.finishJob(guestId, needsReschedule); return; }
+            Entry entry = entries.get(guestId);
+            if (entry == null) return;
+            if (needsReschedule) { entry.state = "SCHEDULED"; entry.updatedAtMs = System.currentTimeMillis(); }
+            else entries.remove(guestId);
+        }
+        public synchronized void clear() { if (authority == null) entries.clear(); }
+        private VirtualSystemServiceAuthority.JobRecord findGuest(int guestId) {
+            for (VirtualSystemServiceAuthority.JobRecord value : records()) if (value.guestId() == guestId) return value;
+            return null;
+        }
+        private static VirtualSystemServiceAuthority.JobRecord record(Entry entry) {
+            return new VirtualSystemServiceAuthority.JobRecord(entry.guestId, entry.hostId, entry.state,
+                    "local", 0L, entry.payload, entry.updatedAtMs);
         }
     }
 

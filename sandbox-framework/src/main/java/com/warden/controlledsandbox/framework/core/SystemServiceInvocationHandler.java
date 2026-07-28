@@ -45,6 +45,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 ? VirtualSystemServiceInterceptor.Call.passThrough()
                 : virtualServiceInterceptor.before(method, rewritten);
         if (virtualCall.handled()) return virtualCall.result();
+        if (virtualCall.direct()) {
+            try { return virtualCall.invokeDirect(delegate, method); }
+            finally { virtualCall.close(); }
+        }
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
         try {
             try {

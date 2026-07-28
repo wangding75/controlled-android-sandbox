@@ -163,3 +163,19 @@ Package and virtual-instance mutations are owned by `PackageManagementService` i
 This boundary serializes package writes and reduces privileged API exposure. It does not remove the shared Linux UID between host and Guest processes and is not a hostile-code security boundary.
 
 Package Service also owns a separate Runtime-Broker-only `IVirtualSystemServiceSession` capability. The capability is fixed to package, virtual user, virtual process and Runtime generation and exposes only bounded Clipboard, Account, Alarm and Notification/Job namespace operations. Guest code receives the scoped session Binder through its Runtime specification, never the Package Service root Binder.
+
+## M4-T12 lifecycle ownership
+
+Notification, Notification Channel/Group and Job ownership are persisted by the scoped Package Service
+`VirtualSystemServiceStore`. Framework proxies reserve state before host delegation and commit only
+after success. Notification and Job `cancelAll` enumerate owned host identifiers and never invoke a
+host-global cancel-all operation.
+
+Android JobScheduler callbacks terminate at the non-exported `VirtualJobService` in the trusted
+`:sandbox_server` process. Package Service forwards the callback only to the matching package/user/
+process/generation capability. The observer returns an explicit acknowledgement; without a complete
+Guest `JobParameters` bridge the host requests rescheduling.
+
+Provider cursor/file cleanup delivery is owned by `RuntimeProviderResourceCoordinator`, not by
+`RuntimeBrokerService`. The central Broker retains orchestration and Session ownership while Provider
+resource invalidation and best-effort physical close delivery are delegated.

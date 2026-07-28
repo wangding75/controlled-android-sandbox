@@ -119,10 +119,11 @@ public final class GuestRuntimeEnvironment {
             guestContext.application(application);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
-                    capabilityPolicy, capabilityAudit, capabilityLeases, nativePolicyConfigured,
+                    capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
                     nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
             stagedSession = session;
             session.components = new GuestComponentRuntime(session);
+            virtualServices.jobs().setReadyListener(session::onVirtualJobReady);
             current = session;
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
@@ -245,6 +246,7 @@ public final class GuestRuntimeEnvironment {
         final CapabilityAccessPolicy capabilityPolicy;
         final GuestCapabilityAuditLog capabilityAudit;
         final CapabilityLeaseRegistry capabilityLeases;
+        final VirtualSystemServiceState virtualServices;
         volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
@@ -258,6 +260,7 @@ public final class GuestRuntimeEnvironment {
                 VirtualPackageMetadata packageMetadata, VirtualPermissionPolicy permissionPolicy,
                 SandboxAppOpsPolicy appOpsPolicy, CapabilityAccessPolicy capabilityPolicy,
                 GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
+                VirtualSystemServiceState virtualServices,
                 boolean nativePolicyConfigured, boolean nativeHooksInstalled,
                 boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile) {
             this.spec = spec;
@@ -275,6 +278,7 @@ public final class GuestRuntimeEnvironment {
             this.capabilityPolicy = java.util.Objects.requireNonNull(capabilityPolicy, "capabilityPolicy");
             this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
             this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
+            this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
             this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
@@ -304,6 +308,20 @@ public final class GuestRuntimeEnvironment {
             context.updatePermissionState(updated.permissions());
             capabilityLeases.revokeDenied(capabilityPolicy, capabilityAudit);
             packageState = updated;
+        }
+
+        private synchronized boolean onVirtualJobReady(Integer guestJobId, Object jobPayload) {
+            Bundle event = new Bundle();
+            event.putInt("guestJobId", guestJobId == null ? -1 : guestJobId);
+            event.putString("packageName", spec.packageName);
+            event.putInt("virtualUserId", spec.virtualUserId);
+            event.putLong("generation", spec.generation);
+            event.putString("jobPayloadType", jobPayload == null ? "" : jobPayload.getClass().getName());
+            event.putString("status", "JOB_PARAMETERS_BRIDGE_PENDING");
+            RuntimeEventLog.event("GUEST_JOB_CALLBACK_DEFERRED", event);
+            // Binder delivery is acknowledged only after a real JobParameters/JobService bridge exists.
+            // Returning false makes the trusted host JobService request rescheduling instead of losing work.
+            return false;
         }
 
         Bundle status(String status, long started) {
@@ -355,6 +373,7 @@ public final class GuestRuntimeEnvironment {
         void shutdown() {
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
+            virtualServices.close();
             frameworkCallRouter.close();
             frameworkHooks.close();
             NativePolicy.resetHooks();

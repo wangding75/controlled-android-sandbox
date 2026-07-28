@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.contract;
 
-oneway interface IVirtualSystemServiceObserver {
+interface IVirtualSystemServiceObserver {
     void onClipboardChanged();
     void onAlarm(String alarmId);
+    boolean onJobReady(int guestJobId, in byte[] jobPayload);
 }

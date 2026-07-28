@@ -1080,6 +1080,69 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Notification and Job guest-to-host ID mappings persist by package and virtual user across Guest process restarts. Full notification/job object lifecycle remains separately partial."
+    },
+    {
+      "id": "contract.notification-job-lifecycle",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualNotificationSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualJobSnapshot.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Typed Notification/Channel/Job lifecycle records and synchronous Job callback acknowledgement are exposed through the scoped virtual system-service capability."
+    },
+    {
+      "id": "package.notification-owned-resource-lifecycle",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Active Notification records and Channel/Group metadata persist by package/user; cancelAll enumerates and cancels only owned host IDs without invoking host-global cancelAll."
+    },
+    {
+      "id": "package.job-durable-spec-state",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Marshalled Guest JobInfo ownership, stable host ID, process/generation owner and SCHEDULED/RUNNING state survive Package Service recreation; host JobService dispatch is wired."
+    },
+    {
+      "id": "runtime.job-callback-acknowledgement",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java"
+      ],
+      "sourceStatus": "partial",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Host callback reaches the owning Guest capability and requires explicit execution acknowledgement. Until a version-safe JobParameters bridge is implemented, Guest returns false and host requests rescheduling instead of silently losing the job."
+    },
+    {
+      "id": "runtime.provider-resource-coordinator-split",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/RuntimeProviderResourceCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/RuntimeProviderResourceCoordinatorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Provider cursor/file close delivery and cross-registry cleanup orchestration are extracted from RuntimeBrokerService into a dedicated coordinator."
     }
   ],
   "statusDimensions": {

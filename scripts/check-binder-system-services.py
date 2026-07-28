@@ -31,14 +31,14 @@ root_aidl = require(
 session_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
     "byte[] getClipboard()", "List<VirtualAccountSnapshot> listAccounts",
-    "void scheduleAlarm", "int ensureNamespace", "void close()")
+    "void scheduleAlarm", "int ensureNamespace", "reserveNotification", "reserveJob", "void close()")
 observer_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
-    "oneway interface", "onClipboardChanged", "onAlarm")
+    "interface IVirtualSystemServiceObserver", "onClipboardChanged", "onAlarm", "boolean onJobReady")
 for aidl in [root_aidl, session_aidl, observer_aidl]:
     if "Bundle" in aidl:
         errors.append("M4-T11 virtual system-service AIDL must not use Bundle")
-for name in ["VirtualAccountSnapshot", "VirtualAlarmSnapshot"]:
+for name in ["VirtualAccountSnapshot", "VirtualAlarmSnapshot", "VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot", "VirtualJobSnapshot"]:
     require(f"sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl",
             f"parcelable {name}")
     source = require(f"sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java",
@@ -51,7 +51,7 @@ store = require(
     '"sandbox-system-services.json"', "class VirtualSystemServiceStore",
     "ownerProcessName", "ownerGeneration", "deleteScopeBestEffort",
     "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_ALARMS_PER_SCOPE",
-    "MAX_NAMESPACE_MAPPINGS", "ensureNamespace", "notifyClipboard", "RETRY_WITHOUT_CLIENT_MS")
+    "MAX_NAMESPACE_MAPPINGS", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE", "ensureNamespace", "notifyClipboard", "RETRY_WITHOUT_CLIENT_MS")
 if "client.processName().equals(alarm.ownerProcessName)" not in store:
     errors.append("alarm delivery must be bound to the owning virtual process")
 if "client.generation() == alarm.ownerGeneration" not in store:
@@ -76,8 +76,9 @@ require(
 interceptor = require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
     '"mChannelId"', '"mShortcutId"', '"mGroup"', "passThroughLifecycle")
-if "VIRTUAL_NOTIFICATION_CANCEL_ALL_UNSUPPORTED" not in interceptor:
-    errors.append("notification cancelAll must remain fail-closed until bounded cleanup exists")
+for token in ["cancelAllNotifications", "cancelAllJobs"]:
+    if token not in interceptor:
+        errors.append(f"bounded owned-resource cleanup missing: {token}")
 
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeSystemServiceCoordinator.java",
@@ -89,7 +90,7 @@ require(
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
     "class RemoteVirtualSystemServiceAuthority", "Parcel.obtain()", "session.registerObserver",
-    "alarmDeliveries", "alarmDeliveries.remove(alarmId)", "session.ensureNamespace")
+    "alarmDeliveries", "alarmDeliveries.remove(alarmId)", "session.ensureNamespace", "session.reserveNotification", "session.reserveJob")
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
     "spec.virtualSystemServiceBinder", "RemoteVirtualSystemServiceAuthority",
@@ -110,6 +111,8 @@ require(
     "clipboard must be shared", "accounts must be isolated by virtual user",
     "other guest processes must not receive owner alarms",
     "oversized clipboard payload must fail closed",
+    "active notification lifecycle must survive Package Service recreation",
+    "scheduled job lifecycle must survive Package Service recreation",
     "instance deletion must clear shared system-service state")
 contract_test = require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java",

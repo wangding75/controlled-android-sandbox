@@ -8,6 +8,12 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
                          java.util.Map<String, String> tokens) { }
     record AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, Object token) { }
     record NamespaceMapping(int hostId, boolean created) { }
+    record NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
+                              String channelId, String state, Object payload, long updatedAtMs) { }
+    record NotificationChannelRecord(String kind, String id, String groupId,
+                                     Object payload, long updatedAtMs) { }
+    record JobRecord(int guestId, int hostId, String state, String ownerProcessName,
+                     long ownerGeneration, Object payload, long updatedAtMs) { }
 
     Object clipboard();
     void setClipboard(Object value);
@@ -26,6 +32,21 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, Object token, Runnable delivery);
     boolean cancelAlarm(String alarmId);
     List<AlarmRecord> alarms();
+
+    default NotificationRecord reserveNotification(int guestId, String guestTag, String channelId) { throw new UnsupportedOperationException("notification authority"); }
+    default void commitNotification(int guestId, String guestTag, String channelId, Object payload) { throw new UnsupportedOperationException("notification authority"); }
+    default boolean removeNotification(int guestId, String guestTag) { return false; }
+    default List<NotificationRecord> notifications() { return List.of(); }
+    default void upsertNotificationChannel(String kind, String id, String groupId, Object payload) { throw new UnsupportedOperationException("notification channel authority"); }
+    default boolean removeNotificationChannel(String kind, String id) { return false; }
+    default List<NotificationChannelRecord> notificationChannels() { return List.of(); }
+
+    default JobRecord reserveJob(int guestId, Object payload) { throw new UnsupportedOperationException("job authority"); }
+    default void commitJob(int guestId) { throw new UnsupportedOperationException("job authority"); }
+    default boolean removeJob(int guestId) { return false; }
+    default List<JobRecord> jobs() { return List.of(); }
+    default void finishJob(int guestId, boolean needsReschedule) { }
+    default void setJobReadyListener(java.util.function.BiFunction<Integer, Object, Boolean> listener) { }
 
     NamespaceMapping ensureNamespace(String namespace, int guestId);
     Integer hostIdIfPresent(String namespace, int guestId);

@@ -30,7 +30,7 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
         'case "clipboard"', 'case "account"', 'case "alarm"',
         'case "notification"', 'case "jobscheduler"',
-        "VIRTUAL_JOB_CANCEL_ALL_UNSUPPORTED", "VIRTUAL_NOTIFICATION_CANCEL_ALL_UNSUPPORTED")
+        "cancelAllJobs", "cancelAllNotifications")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
         "AlarmManagerHook.install(hostServiceContext, identity)",
         "ClipboardManagerHook.install(hostServiceContext, identity)",
@@ -71,7 +71,7 @@ if len(coordinator.splitlines()) < 250:
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java",
         "clipboard isolated by Guest identity", "host accounts remain hidden",
         "virtual alarm delivered in process", "failed notification does not leak namespace mapping",
-        "job cancelAll fails closed")
+        "virtual cancelAll cancels only owned host job IDs")
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistrySelfTest.java",
         "equivalent sender reuses stable token", "one-shot sender cancelled after send")
 require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptorSelfTest.java",

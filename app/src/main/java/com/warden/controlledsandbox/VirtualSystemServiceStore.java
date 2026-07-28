@@ -3,6 +3,9 @@ package com.warden.controlledsandbox;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -67,6 +70,37 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             this.ownerGeneration = ownerGeneration;
         }
     }
+    private record NotificationKey(int guestId, String guestTag) { }
+    private static final class NotificationRecord {
+        final int guestId; final int hostId; final String guestTag; final String hostTag;
+        String channelId; String state; byte[] payload; long updatedAtMs;
+        NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
+                           String channelId, String state, byte[] payload, long updatedAtMs) {
+            if (guestId < 0 || hostId < 0) throw new IllegalArgumentException("notification ids must be non-negative");
+            this.guestId = guestId; this.hostId = hostId; this.guestTag = normalizeTag(guestTag);
+            this.hostTag = required(hostTag, "hostTag"); this.channelId = normalize(channelId);
+            this.state = notificationState(state); this.payload = boundedPayload(payload, "notificationPayload");
+            this.updatedAtMs = Math.max(0L, updatedAtMs);
+        }
+    }
+    private static final class NotificationChannelRecord {
+        final String kind; final String id; String groupId; byte[] payload; long updatedAtMs;
+        NotificationChannelRecord(String kind, String id, String groupId, byte[] payload, long updatedAtMs) {
+            this.kind = channelKind(kind); this.id = required(id, "channelId"); this.groupId = normalize(groupId);
+            this.payload = boundedPayload(payload, "notificationChannelPayload"); this.updatedAtMs = Math.max(0L, updatedAtMs);
+        }
+    }
+    private static final class JobRecord {
+        final int guestId; final int hostId; String state; final String ownerProcessName;
+        long ownerGeneration; byte[] payload; long updatedAtMs;
+        JobRecord(int guestId, int hostId, String state, String ownerProcessName,
+                  long ownerGeneration, byte[] payload, long updatedAtMs) {
+            if (guestId < 0 || hostId < 0 || ownerGeneration < 0L) throw new IllegalArgumentException("invalid job identity");
+            this.guestId = guestId; this.hostId = hostId; this.state = jobState(state);
+            this.ownerProcessName = required(ownerProcessName, "ownerProcessName"); this.ownerGeneration = ownerGeneration;
+            this.payload = boundedPayload(payload, "jobPayload"); this.updatedAtMs = Math.max(0L, updatedAtMs);
+        }
+    }
     private static final class NamespaceState {
         int next;
         final Map<Integer, Integer> guestToHost = new LinkedHashMap<>();
@@ -78,14 +112,20 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<AccountKey, AccountRecord> accounts = new LinkedHashMap<>();
         final Map<String, AlarmRecord> alarms = new LinkedHashMap<>();
         final Map<String, NamespaceState> namespaces = new LinkedHashMap<>();
+        final Map<NotificationKey, NotificationRecord> notifications = new LinkedHashMap<>();
+        final Map<String, NotificationChannelRecord> notificationChannels = new LinkedHashMap<>();
+        final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    private static final int SCHEMA = 1;
+    private static final int SCHEMA = 2;
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     private static final int MAX_ACCOUNTS_PER_SCOPE = 64;
     private static final int MAX_TOKENS_PER_ACCOUNT = 32;
     private static final int MAX_ALARMS_PER_SCOPE = 256;
     private static final int MAX_NAMESPACE_MAPPINGS = 4096;
+    private static final int MAX_NOTIFICATIONS_PER_SCOPE = 1024;
+    private static final int MAX_NOTIFICATION_CHANNELS_PER_SCOPE = 512;
+    private static final int MAX_JOBS_PER_SCOPE = 512;
     private static final int MAX_KEY_CHARS = 512;
     private static final int MAX_SECRET_CHARS = 16 * 1024;
     private static final long RETRY_WITHOUT_CLIENT_MS = 30_000L;
@@ -93,6 +133,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private volatile String maintenanceWarning = "";
     private final Map<Scope, ScopeState> states = new LinkedHashMap<>();
     private final Set<Client> clients = new LinkedHashSet<>();
+    private int nextNotificationHostId = 0x51000000;
+    private int nextJobHostId = 0x52000000;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
         Thread thread = new Thread(runnable, "sandbox-system-service-authority");
         thread.setDaemon(true); return thread;
@@ -109,6 +151,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     synchronized void register(Client client) {
+        clients.removeIf(existing -> existing != client
+                && existing.scope().equals(client.scope())
+                && existing.processName().equals(client.processName())
+                && existing.generation() == client.generation());
         clients.add(client);
         for (AlarmRecord alarm : state(client.scope()).alarms.values()) {
             if (alarm.future == null || alarm.future.isCancelled() || alarm.future.isDone()) {
@@ -238,6 +284,155 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return Collections.unmodifiableList(out);
     }
 
+    synchronized VirtualNotificationSnapshot reserveNotification(Scope scope, long generation, int guestId,
+                                                                  String guestTag, String channelId) {
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        NotificationKey key = notificationKey(guestId, guestTag);
+        NotificationRecord current = state.notifications.get(key);
+        if (current == null) {
+            if (state.notifications.size() >= MAX_NOTIFICATIONS_PER_SCOPE) {
+                throw new IllegalStateException("VIRTUAL_NOTIFICATION_LIMIT_EXCEEDED");
+            }
+            int hostId = allocateHostId("notification");
+            current = new NotificationRecord(guestId, hostId, key.guestTag(),
+                    hostNotificationTag(scope, key.guestTag(), generation), channelId,
+                    VirtualNotificationSnapshot.RESERVED, new byte[0], System.currentTimeMillis());
+            state.notifications.put(key, current);
+        } else {
+            current.channelId = normalize(channelId);
+            current.state = VirtualNotificationSnapshot.RESERVED;
+            current.updatedAtMs = System.currentTimeMillis();
+        }
+        persistOrRestore(scope, before); return notificationSnapshot(current);
+    }
+    synchronized void commitNotification(Scope scope, int guestId, String guestTag,
+                                         String channelId, byte[] payload) {
+        ScopeState before = snapshot(scope);
+        NotificationRecord record = state(scope).notifications.get(notificationKey(guestId, guestTag));
+        if (record == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
+        record.channelId = normalize(channelId); record.payload = boundedPayload(payload, "notificationPayload");
+        record.state = VirtualNotificationSnapshot.ACTIVE; record.updatedAtMs = System.currentTimeMillis();
+        persistOrRestore(scope, before);
+    }
+    synchronized boolean removeNotification(Scope scope, int guestId, String guestTag) {
+        ScopeState before = snapshot(scope);
+        boolean removed = state(scope).notifications.remove(notificationKey(guestId, guestTag)) != null;
+        if (removed) persistOrRestore(scope, before); return removed;
+    }
+    synchronized List<VirtualNotificationSnapshot> notifications(Scope scope) {
+        List<VirtualNotificationSnapshot> out = new ArrayList<>();
+        for (NotificationRecord record : state(scope).notifications.values()) out.add(notificationSnapshot(record));
+        out.sort(Comparator.comparingInt(VirtualNotificationSnapshot::guestId)
+                .thenComparing(VirtualNotificationSnapshot::guestTag));
+        return Collections.unmodifiableList(out);
+    }
+    synchronized void upsertNotificationChannel(Scope scope, String kind, String id,
+                                                String groupId, byte[] payload) {
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        String key = channelKey(kind, id);
+        if (!state.notificationChannels.containsKey(key)
+                && state.notificationChannels.size() >= MAX_NOTIFICATION_CHANNELS_PER_SCOPE) {
+            throw new IllegalStateException("VIRTUAL_NOTIFICATION_CHANNEL_LIMIT_EXCEEDED");
+        }
+        state.notificationChannels.put(key, new NotificationChannelRecord(kind, id, groupId,
+                payload, System.currentTimeMillis()));
+        persistOrRestore(scope, before);
+    }
+    synchronized boolean removeNotificationChannel(Scope scope, String kind, String id) {
+        ScopeState before = snapshot(scope);
+        boolean removed = state(scope).notificationChannels.remove(channelKey(kind, id)) != null;
+        if (removed) persistOrRestore(scope, before); return removed;
+    }
+    synchronized List<VirtualNotificationChannelSnapshot> notificationChannels(Scope scope) {
+        List<VirtualNotificationChannelSnapshot> out = new ArrayList<>();
+        for (NotificationChannelRecord record : state(scope).notificationChannels.values()) {
+            out.add(new VirtualNotificationChannelSnapshot(record.kind, record.id, record.groupId,
+                    record.payload, record.updatedAtMs));
+        }
+        out.sort(Comparator.comparing(VirtualNotificationChannelSnapshot::kind)
+                .thenComparing(VirtualNotificationChannelSnapshot::id));
+        return Collections.unmodifiableList(out);
+    }
+
+    synchronized VirtualJobSnapshot reserveJob(Scope scope, String processName, long generation,
+                                               int guestId, byte[] payload) {
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        JobRecord current = state.jobs.get(guestId);
+        if (current == null) {
+            if (state.jobs.size() >= MAX_JOBS_PER_SCOPE) throw new IllegalStateException("VIRTUAL_JOB_LIMIT_EXCEEDED");
+            current = new JobRecord(guestId, allocateHostId("job"), VirtualJobSnapshot.RESERVED,
+                    processName, generation, payload, System.currentTimeMillis());
+            state.jobs.put(guestId, current);
+        } else {
+            current.state = VirtualJobSnapshot.RESERVED; current.ownerGeneration = generation;
+            current.payload = boundedPayload(payload, "jobPayload"); current.updatedAtMs = System.currentTimeMillis();
+        }
+        persistOrRestore(scope, before); return jobSnapshot(current);
+    }
+    synchronized void commitJob(Scope scope, int guestId) {
+        ScopeState before = snapshot(scope); JobRecord record = state(scope).jobs.get(guestId);
+        if (record == null) throw new IllegalStateException("VIRTUAL_JOB_RESERVATION_REQUIRED");
+        record.state = VirtualJobSnapshot.SCHEDULED; record.updatedAtMs = System.currentTimeMillis();
+        persistOrRestore(scope, before);
+    }
+    synchronized boolean removeJob(Scope scope, int guestId) {
+        ScopeState before = snapshot(scope); boolean removed = state(scope).jobs.remove(guestId) != null;
+        if (removed) persistOrRestore(scope, before); return removed;
+    }
+    synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation) {
+        ScopeState before = snapshot(scope); boolean changed = false; List<VirtualJobSnapshot> out = new ArrayList<>();
+        for (JobRecord record : state(scope).jobs.values()) {
+            if (record.ownerProcessName.equals(processName) && record.ownerGeneration != generation) {
+                record.ownerGeneration = generation; changed = true;
+            }
+            out.add(jobSnapshot(record));
+        }
+        if (changed) persistOrRestore(scope, before);
+        out.sort(Comparator.comparingInt(VirtualJobSnapshot::guestId));
+        return Collections.unmodifiableList(out);
+    }
+    synchronized void finishJob(Scope scope, int guestId, boolean needsReschedule) {
+        ScopeState before = snapshot(scope); JobRecord record = state(scope).jobs.get(guestId);
+        if (record == null) return;
+        if (needsReschedule) { record.state = VirtualJobSnapshot.SCHEDULED; record.updatedAtMs = System.currentTimeMillis(); }
+        else state(scope).jobs.remove(guestId);
+        persistOrRestore(scope, before);
+    }
+    boolean dispatchJob(int hostJobId) {
+        List<JobDispatch> deliveries = new ArrayList<>();
+        synchronized (this) {
+            for (Map.Entry<Scope, ScopeState> item : states.entrySet()) {
+                for (JobRecord job : item.getValue().jobs.values()) {
+                    if (job.hostId != hostJobId || !VirtualJobSnapshot.SCHEDULED.equals(job.state)) continue;
+                    for (Client client : new ArrayList<>(clients)) {
+                        if (client.active() && client.scope().equals(item.getKey())
+                                && client.processName().equals(job.ownerProcessName)
+                                && client.generation() == job.ownerGeneration && client.observer() != null) {
+                            deliveries.add(new JobDispatch(item.getKey(), job, client.observer()));
+                        }
+                    }
+                }
+            }
+        }
+        boolean delivered = false;
+        for (JobDispatch delivery : deliveries) {
+            try {
+                if (delivery.observer.onJobReady(delivery.job.guestId, delivery.job.payload.clone())) delivered = true;
+            } catch (Exception ignored) { }
+        }
+        if (delivered) synchronized (this) {
+            for (JobDispatch delivery : deliveries) {
+                JobRecord current = state(delivery.scope).jobs.get(delivery.job.guestId);
+                if (current != delivery.job) continue;
+                ScopeState before = snapshot(delivery.scope);
+                current.state = VirtualJobSnapshot.RUNNING; current.updatedAtMs = System.currentTimeMillis();
+                persistOrRestore(delivery.scope, before);
+            }
+        }
+        return delivered;
+    }
+    private record JobDispatch(Scope scope, JobRecord job, IVirtualSystemServiceObserver observer) { }
+
     synchronized String maintenanceWarning() { return maintenanceWarning; }
 
     synchronized void deleteScopeBestEffort(Scope scope) {
@@ -261,7 +456,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         if (state.guestToHost.size() >= MAX_NAMESPACE_MAPPINGS) {
             throw new IllegalStateException("VIRTUAL_NAMESPACE_LIMIT_EXCEEDED");
         }
-        int candidate; do { candidate = state.next++; } while (state.hostToGuest.containsKey(candidate));
+        int candidate = allocateHostId(normalizeRequired(namespace, "namespace"));
+        state.next = Math.max(state.next, candidate + 1);
         state.guestToHost.put(guestId, candidate); state.hostToGuest.put(candidate, guestId);
         persistOrRestore(scope, before); return candidate;
     }
@@ -376,6 +572,21 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             namespace.hostToGuest.putAll(item.getValue().hostToGuest);
             copy.namespaces.put(item.getKey(), namespace);
         }
+        for (Map.Entry<NotificationKey, NotificationRecord> item : current.notifications.entrySet()) {
+            NotificationRecord value = item.getValue();
+            copy.notifications.put(item.getKey(), new NotificationRecord(value.guestId, value.hostId,
+                    value.guestTag, value.hostTag, value.channelId, value.state, value.payload, value.updatedAtMs));
+        }
+        for (Map.Entry<String, NotificationChannelRecord> item : current.notificationChannels.entrySet()) {
+            NotificationChannelRecord value = item.getValue();
+            copy.notificationChannels.put(item.getKey(), new NotificationChannelRecord(value.kind, value.id,
+                    value.groupId, value.payload, value.updatedAtMs));
+        }
+        for (Map.Entry<Integer, JobRecord> item : current.jobs.entrySet()) {
+            JobRecord value = item.getValue();
+            copy.jobs.put(item.getKey(), new JobRecord(value.guestId, value.hostId, value.state,
+                    value.ownerProcessName, value.ownerGeneration, value.payload, value.updatedAtMs));
+        }
         return copy;
     }
     private void persistOrRestore(Scope scope, ScopeState before) {
@@ -404,7 +615,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         if (!file.isFile()) return;
         try {
             JSONObject root = new JSONObject(Files.readString(file.toPath(), StandardCharsets.UTF_8));
-            if (root.optInt("schemaVersion", -1) != SCHEMA) throw new IllegalStateException("Unsupported virtual service schema");
+            int schema = root.optInt("schemaVersion", -1);
+            if (schema < 1 || schema > SCHEMA) throw new IllegalStateException("Unsupported virtual service schema");
+            nextNotificationHostId = root.optInt("nextNotificationHostId", 0x51000000);
+            nextJobHostId = root.optInt("nextJobHostId", 0x52000000);
             JSONArray scopes = root.optJSONArray("scopes");
             if (scopes == null) return;
             for (int i = 0; i < scopes.length(); i++) {
@@ -438,18 +652,52 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     if (mappings != null) for (int j = 0; j < mappings.length(); j++) {
                         JSONObject mapping = mappings.getJSONObject(j); int guest = mapping.getInt("guest"); int host = mapping.getInt("host");
                         value.guestToHost.put(guest, host); value.hostToGuest.put(host, guest);
+                        if ("notification".equals(name)) nextNotificationHostId = Math.max(nextNotificationHostId, host + 1);
+                        if ("job".equals(name)) nextJobHostId = Math.max(nextJobHostId, host + 1);
                     }
                     state.namespaces.put(name, value);
                 }
+                if (schema >= 2) {
+                    JSONArray notifications = item.optJSONArray("notifications");
+                    if (notifications != null) for (int j = 0; j < notifications.length(); j++) {
+                        JSONObject value = notifications.getJSONObject(j);
+                        NotificationRecord record = new NotificationRecord(value.getInt("guestId"), value.getInt("hostId"),
+                                value.optString("guestTag", ""), value.getString("hostTag"), value.optString("channelId", ""),
+                                value.optString("state", VirtualNotificationSnapshot.ACTIVE), decode(value.optString("payload", "")),
+                                value.optLong("updatedAtMs", 0L));
+                        state.notifications.put(new NotificationKey(record.guestId, record.guestTag), record);
+                        nextNotificationHostId = Math.max(nextNotificationHostId, record.hostId + 1);
+                    }
+                    JSONArray channels = item.optJSONArray("notificationChannels");
+                    if (channels != null) for (int j = 0; j < channels.length(); j++) {
+                        JSONObject value = channels.getJSONObject(j);
+                        NotificationChannelRecord record = new NotificationChannelRecord(value.getString("kind"),
+                                value.getString("id"), value.optString("groupId", ""),
+                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
+                        state.notificationChannels.put(channelKey(record.kind, record.id), record);
+                    }
+                    JSONArray jobs = item.optJSONArray("jobs");
+                    if (jobs != null) for (int j = 0; j < jobs.length(); j++) {
+                        JSONObject value = jobs.getJSONObject(j);
+                        JobRecord record = new JobRecord(value.getInt("guestId"), value.getInt("hostId"),
+                                value.optString("state", VirtualJobSnapshot.SCHEDULED),
+                                value.optString("ownerProcessName", scope.packageName()), value.optLong("ownerGeneration", 0L),
+                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
+                        state.jobs.put(record.guestId, record); nextJobHostId = Math.max(nextJobHostId, record.hostId + 1);
+                    }
+                }
                 states.put(scope, state);
             }
+            removeStaleReservations();
         } catch (Exception error) {
             throw new IllegalStateException("Cannot load virtual system-service store", error);
         }
     }
     private synchronized void persist() {
         try {
-            JSONObject root = new JSONObject().put("schemaVersion", SCHEMA);
+            JSONObject root = new JSONObject().put("schemaVersion", SCHEMA)
+                    .put("nextNotificationHostId", nextNotificationHostId)
+                    .put("nextJobHostId", nextJobHostId);
             JSONArray scopes = new JSONArray();
             List<Scope> keys = new ArrayList<>(states.keySet());
             keys.sort(Comparator.comparing(Scope::packageName).thenComparingInt(Scope::virtualUserId));
@@ -468,8 +716,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 JSONArray alarms = new JSONArray();
                 for (AlarmRecord alarm : state.alarms.values()) alarms.put(new JSONObject().put("id", alarm.id)
                         .put("triggerAtMs", alarm.triggerAtMs).put("intervalMs", alarm.intervalMs)
-                        .put("token", encode(alarm.tokenPayload))
-                        .put("ownerProcessName", alarm.ownerProcessName)
+                        .put("token", encode(alarm.tokenPayload)).put("ownerProcessName", alarm.ownerProcessName)
                         .put("ownerGeneration", alarm.ownerGeneration));
                 item.put("alarms", alarms);
                 JSONObject namespaces = new JSONObject();
@@ -480,7 +727,24 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     }
                     namespaces.put(namespace.getKey(), new JSONObject().put("next", namespace.getValue().next).put("mappings", mappings));
                 }
-                item.put("namespaces", namespaces); scopes.put(item);
+                item.put("namespaces", namespaces);
+                JSONArray notifications = new JSONArray();
+                for (NotificationRecord value : state.notifications.values()) notifications.put(new JSONObject()
+                        .put("guestId", value.guestId).put("hostId", value.hostId).put("guestTag", value.guestTag)
+                        .put("hostTag", value.hostTag).put("channelId", value.channelId).put("state", value.state)
+                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
+                item.put("notifications", notifications);
+                JSONArray channels = new JSONArray();
+                for (NotificationChannelRecord value : state.notificationChannels.values()) channels.put(new JSONObject()
+                        .put("kind", value.kind).put("id", value.id).put("groupId", value.groupId)
+                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
+                item.put("notificationChannels", channels);
+                JSONArray jobs = new JSONArray();
+                for (JobRecord value : state.jobs.values()) jobs.put(new JSONObject()
+                        .put("guestId", value.guestId).put("hostId", value.hostId).put("state", value.state)
+                        .put("ownerProcessName", value.ownerProcessName).put("ownerGeneration", value.ownerGeneration)
+                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
+                item.put("jobs", jobs); scopes.put(item);
             }
             root.put("scopes", scopes);
             File parent = file.getParentFile();
@@ -488,19 +752,94 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             File temp = new File(parent, file.getName() + ".tmp");
             byte[] bytes = root.toString().getBytes(StandardCharsets.UTF_8);
             try {
-                try (FileOutputStream out = new FileOutputStream(temp)) {
-                    out.write(bytes); out.flush(); out.getFD().sync();
-                }
+                try (FileOutputStream out = new FileOutputStream(temp)) { out.write(bytes); out.flush(); out.getFD().sync(); }
                 try { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
-                catch (AtomicMoveNotSupportedException error) {
-                    Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                }
-            } finally {
-                if (temp.exists()) temp.delete();
-            }
+                catch (AtomicMoveNotSupportedException error) { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING); }
+            } finally { if (temp.exists()) temp.delete(); }
         } catch (Exception error) {
             throw new IllegalStateException("Cannot persist virtual system-service store", error);
         }
+    }
+
+
+    private synchronized int allocateHostId(String namespace) {
+        int candidate;
+        if ("notification".equals(namespace)) {
+            do { candidate = nextNotificationHostId++; } while (hostIdInUse(namespace, candidate));
+            return candidate;
+        }
+        if ("job".equals(namespace)) {
+            do { candidate = nextJobHostId++; } while (hostIdInUse(namespace, candidate));
+            return candidate;
+        }
+        int next = 0x53000000;
+        do { candidate = next++; } while (hostIdInUse(namespace, candidate));
+        return candidate;
+    }
+    private boolean hostIdInUse(String namespace, int hostId) {
+        for (ScopeState state : states.values()) {
+            NamespaceState value = state.namespaces.get(namespace);
+            if (value != null && value.hostToGuest.containsKey(hostId)) return true;
+            if ("notification".equals(namespace)) {
+                for (NotificationRecord record : state.notifications.values()) if (record.hostId == hostId) return true;
+            }
+            if ("job".equals(namespace)) {
+                for (JobRecord record : state.jobs.values()) if (record.hostId == hostId) return true;
+            }
+        }
+        return false;
+    }
+    private void removeStaleReservations() {
+        long cutoff = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(24);
+        for (ScopeState state : states.values()) {
+            state.notifications.values().removeIf(value -> VirtualNotificationSnapshot.RESERVED.equals(value.state)
+                    && value.updatedAtMs < cutoff);
+            state.jobs.values().removeIf(value -> VirtualJobSnapshot.RESERVED.equals(value.state)
+                    && value.updatedAtMs < cutoff);
+        }
+    }
+    private static NotificationKey notificationKey(int guestId, String guestTag) {
+        if (guestId < 0) throw new IllegalArgumentException("guestId must be non-negative");
+        return new NotificationKey(guestId, normalizeTag(guestTag));
+    }
+    private static String normalizeTag(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.length() > MAX_KEY_CHARS) throw new IllegalArgumentException("notification tag too long");
+        return normalized;
+    }
+    private static String hostNotificationTag(Scope scope, String guestTag, long generation) {
+        return "cs:u" + scope.virtualUserId() + ":g" + generation + ":" + guestTag;
+    }
+    private static String channelKey(String kind, String id) { return channelKind(kind) + "#" + required(id, "channelId"); }
+    private static String channelKind(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!VirtualNotificationChannelSnapshot.CHANNEL.equals(normalized)
+                && !VirtualNotificationChannelSnapshot.GROUP.equals(normalized)) {
+            throw new IllegalArgumentException("invalid notification channel kind");
+        }
+        return normalized;
+    }
+    private static String notificationState(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!VirtualNotificationSnapshot.RESERVED.equals(normalized)
+                && !VirtualNotificationSnapshot.ACTIVE.equals(normalized)) {
+            throw new IllegalArgumentException("invalid notification state");
+        }
+        return normalized;
+    }
+    private static String jobState(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!VirtualJobSnapshot.RESERVED.equals(normalized) && !VirtualJobSnapshot.SCHEDULED.equals(normalized)
+                && !VirtualJobSnapshot.RUNNING.equals(normalized)) throw new IllegalArgumentException("invalid job state");
+        return normalized;
+    }
+    private static VirtualNotificationSnapshot notificationSnapshot(NotificationRecord value) {
+        return new VirtualNotificationSnapshot(value.guestId, value.hostId, value.guestTag, value.hostTag,
+                value.channelId, value.state, value.payload, value.updatedAtMs);
+    }
+    private static VirtualJobSnapshot jobSnapshot(JobRecord value) {
+        return new VirtualJobSnapshot(value.guestId, value.hostId, value.state, value.ownerProcessName,
+                value.ownerGeneration, value.payload, value.updatedAtMs);
     }
 
     @Override public synchronized void close() {

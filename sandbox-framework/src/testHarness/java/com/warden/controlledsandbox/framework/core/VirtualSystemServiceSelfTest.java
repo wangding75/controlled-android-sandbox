@@ -22,8 +22,9 @@ public final class VirtualSystemServiceSelfTest {
         testNotificationNamespace();
         testNotificationChannelObjects();
         testNotificationFailureRollback();
+        testNotificationOwnedCancelAll();
         testJobNamespace();
-        testJobFailureRollbackAndCancelAllBoundary();
+        testJobFailureRollbackAndOwnedCancelAll();
         System.out.println("PASS virtual Alarm/Clipboard/Account/Notification/Job self-test");
     }
 
@@ -93,6 +94,8 @@ public final class VirtualSystemServiceSelfTest {
                 new FakeNotification(), 7);
         require(delegate.lastId != 42, "notification ID namespaced");
         require(delegate.lastTag.startsWith("cs:u7:g9:"), "notification tag namespaced");
+        require(identity.virtualServices().notifications().records().get(0).payload() != null,
+                "notification payload committed to virtual lifecycle state");
         int hostId = delegate.lastId;
         notifications.cancelNotificationWithTag("guest.notify", "guest.notify", "updates", 42, 7);
         require(delegate.lastId == hostId, "notification cancellation reuses host namespace ID");
@@ -109,9 +112,18 @@ public final class VirtualSystemServiceSelfTest {
                 "Guest channel object restored after host call");
         require(delegate.hostId.startsWith("cs.u6.guest.channels."),
                 "channel object ID namespaced for host call");
+        require(identity.virtualServices().notifications().channels().get(0).payload() != null,
+                "channel payload committed to virtual lifecycle state");
         List<FakeNotificationChannel> returned = api.getNotificationChannels();
         require(returned.size() == 1 && "updates".equals(returned.get(0).mId),
-                "host channel result restored to Guest namespace");
+                "only owned host channel result restored to Guest namespace");
+        require(api.getNotificationChannel("updates") != null,
+                "owned single channel restored to Guest namespace");
+        require(api.getNotificationChannel("host-only") == null,
+                "unrelated host single channel hidden from Guest");
+        FakeChannelSlice slice = api.getNotificationChannelSlice();
+        require(slice.mList.size() == 1 && "updates".equals(slice.mList.get(0).mId),
+                "wrapped host channel list filtered to owned Guest channels");
     }
 
 
@@ -132,6 +144,23 @@ public final class VirtualSystemServiceSelfTest {
         require(delegate.cancelCalls == 0, "unknown notification cancel stays virtual");
     }
 
+    private static void testNotificationOwnedCancelAll() {
+        GuestIdentity identity = identity("guest.notify.all", 3, 11L);
+        FakeNotificationDelegate delegate = new FakeNotificationDelegate();
+        NotificationApi notifications = proxy(NotificationApi.class, delegate, identity, "notification");
+        notifications.enqueueNotificationWithTag("guest.notify.all", "guest.notify.all", "first", 1,
+                new FakeNotification(), 3);
+        notifications.enqueueNotificationWithTag("guest.notify.all", "guest.notify.all", "second", 2,
+                new FakeNotification(), 3);
+        require(identity.virtualServices().notifications().size() == 2,
+                "two owned notifications must be tracked before cancelAll");
+        notifications.cancelAllNotifications("guest.notify.all", 3);
+        require(delegate.cancelAllCalls == 0 && delegate.cancelCalls == 2,
+                "virtual notification cancelAll must cancel only owned host IDs");
+        require(identity.virtualServices().notifications().size() == 0,
+                "notification lifecycle must be empty after owned cancelAll");
+    }
+
     private static void testJobNamespace() {
         GuestIdentity identity = identity("guest.jobs", 1, 5L);
         FakeJobDelegate delegate = new FakeJobDelegate();
@@ -147,19 +176,29 @@ public final class VirtualSystemServiceSelfTest {
     }
 
 
-    private static void testJobFailureRollbackAndCancelAllBoundary() {
-        GuestIdentity identity = identity("guest.jobs.failure", 4, 6L);
-        FailingJobDelegate delegate = new FailingJobDelegate();
-        JobApi jobs = proxy(JobApi.class, delegate, identity, "jobscheduler");
+    private static void testJobFailureRollbackAndOwnedCancelAll() {
+        GuestIdentity failedIdentity = identity("guest.jobs.failure", 4, 6L);
+        FailingJobDelegate failing = new FailingJobDelegate();
+        JobApi failedJobs = proxy(JobApi.class, failing, failedIdentity, "jobscheduler");
         boolean failed = false;
-        try { jobs.schedule(new Job(23)); } catch (IllegalStateException expected) { failed = true; }
+        try { failedJobs.schedule(new Job(23)); } catch (IllegalStateException expected) { failed = true; }
         require(failed, "job delegate failure surfaced");
-        require(identity.virtualServices().jobs().size() == 0,
+        require(failedIdentity.virtualServices().jobs().size() == 0,
                 "failed job schedule does not leak namespace mapping");
-        boolean blocked = false;
-        try { jobs.cancelAll(); } catch (SecurityException expected) { blocked = true; }
-        require(blocked && delegate.cancelAllCalls == 0,
-                "job cancelAll fails closed instead of touching host namespace");
+        failedJobs.cancelAll();
+        require(failing.cancelAllCalls == 0 && failing.cancelledId == 0,
+                "empty virtual cancelAll never touches host global namespace");
+
+        GuestIdentity ownedIdentity = identity("guest.jobs.owned", 4, 7L);
+        FakeJobDelegate owned = new FakeJobDelegate();
+        JobApi ownedJobs = proxy(JobApi.class, owned, ownedIdentity, "jobscheduler");
+        require(ownedJobs.schedule(new Job(31)) == 1, "owned job scheduled");
+        int hostId = owned.observedId;
+        ownedJobs.cancelAll();
+        require(owned.cancelAllCalls == 0 && owned.cancelledId == hostId,
+                "virtual cancelAll cancels only owned host job IDs");
+        require(ownedIdentity.virtualServices().jobs().size() == 0,
+                "owned job state removed after cancelAll");
     }
 
     @SuppressWarnings("unchecked")
@@ -232,9 +271,10 @@ public final class VirtualSystemServiceSelfTest {
         void enqueueNotificationWithTag(String pkg, String opPkg, String tag, int id,
                                         FakeNotification notification, int userId);
         void cancelNotificationWithTag(String pkg, String opPkg, String tag, int id, int userId);
+        void cancelAllNotifications(String pkg, int userId);
     }
     static class FakeNotificationDelegate implements NotificationApi {
-        int lastId; String lastTag; int cancelCalls;
+        int lastId; String lastTag; int cancelCalls; int cancelAllCalls;
         public void enqueueNotificationWithTag(String pkg, String opPkg, String tag, int id,
                                                FakeNotification notification, int userId) {
             lastTag = tag; lastId = id;
@@ -242,6 +282,7 @@ public final class VirtualSystemServiceSelfTest {
         public void cancelNotificationWithTag(String pkg, String opPkg, String tag, int id, int userId) {
             cancelCalls++; lastTag = tag; lastId = id;
         }
+        public void cancelAllNotifications(String pkg, int userId) { cancelAllCalls++; }
     }
     static final class FailingNotificationDelegate extends FakeNotificationDelegate {
         @Override public void enqueueNotificationWithTag(String pkg, String opPkg, String tag, int id,
@@ -254,11 +295,30 @@ public final class VirtualSystemServiceSelfTest {
     interface ChannelApi {
         void createNotificationChannels(List<FakeNotificationChannel> channels);
         List<FakeNotificationChannel> getNotificationChannels();
+        FakeNotificationChannel getNotificationChannel(String id);
+        FakeChannelSlice getNotificationChannelSlice();
     }
     static final class ChannelDelegate implements ChannelApi {
         String hostId = "";
         public void createNotificationChannels(List<FakeNotificationChannel> channels) { hostId = channels.get(0).mId; }
-        public List<FakeNotificationChannel> getNotificationChannels() { return List.of(new FakeNotificationChannel(hostId, "cs.u6.guest.channels.group")); }
+        public List<FakeNotificationChannel> getNotificationChannels() {
+            return List.of(
+                    new FakeNotificationChannel(hostId, "cs.u6.guest.channels.group"),
+                    new FakeNotificationChannel("host-only", "host-group"));
+        }
+        public FakeNotificationChannel getNotificationChannel(String id) {
+            if (id.endsWith("host-only")) return new FakeNotificationChannel("host-only", "host-group");
+            return new FakeNotificationChannel(hostId, "cs.u6.guest.channels.group");
+        }
+        public FakeChannelSlice getNotificationChannelSlice() {
+            return new FakeChannelSlice(new ArrayList<>(List.of(
+                    new FakeNotificationChannel(hostId, "cs.u6.guest.channels.group"),
+                    new FakeNotificationChannel("host-only", "host-group"))));
+        }
+    }
+    static final class FakeChannelSlice {
+        private List<FakeNotificationChannel> mList;
+        FakeChannelSlice(List<FakeNotificationChannel> values) { mList = values; }
     }
     static final class FakeNotificationChannel {
         private String mId;

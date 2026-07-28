@@ -6,6 +6,9 @@ import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.BiFunction;
 
 /** Guest-side adapter for a scoped Binder-owned virtual system-service capability. */
 public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemServiceAuthority {
@@ -22,12 +26,16 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private final ClassLoader classLoader;
     private final ConcurrentMap<String, Runnable> alarmDeliveries = new ConcurrentHashMap<>();
     private volatile Runnable clipboardListener = () -> { };
+    private volatile BiFunction<Integer, Object, Boolean> jobReadyListener = (id, payload) -> false;
     private volatile boolean closed;
     private final IVirtualSystemServiceObserver observer = new IVirtualSystemServiceObserver.Stub() {
         @Override public void onClipboardChanged() { clipboardListener.run(); }
         @Override public void onAlarm(String alarmId) {
             Runnable delivery = alarmDeliveries.get(alarmId);
             if (delivery != null) delivery.run();
+        }
+        @Override public boolean onJobReady(int guestJobId, byte[] jobPayload) {
+            return Boolean.TRUE.equals(jobReadyListener.apply(guestJobId, unmarshal(jobPayload)));
         }
     };
 
@@ -102,6 +110,55 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return Collections.unmodifiableList(result);
     }
 
+    @Override public NotificationRecord reserveNotification(int guestId, String guestTag, String channelId) {
+        return notification(call(() -> session.reserveNotification(guestId, safe(guestTag), safe(channelId))));
+    }
+    @Override public void commitNotification(int guestId, String guestTag, String channelId, Object payload) {
+        call(() -> { session.commitNotification(guestId, safe(guestTag), safe(channelId), marshal(payload)); return null; });
+    }
+    @Override public boolean removeNotification(int guestId, String guestTag) {
+        return call(() -> session.removeNotification(guestId, safe(guestTag)));
+    }
+    @Override public List<NotificationRecord> notifications() {
+        List<VirtualNotificationSnapshot> values = call(session::listNotifications);
+        List<NotificationRecord> out = new ArrayList<>();
+        if (values != null) for (VirtualNotificationSnapshot value : values) out.add(notification(value));
+        return Collections.unmodifiableList(out);
+    }
+    @Override public void upsertNotificationChannel(String kind, String id, String groupId, Object payload) {
+        call(() -> { session.upsertNotificationChannel(kind, id, safe(groupId), marshal(payload)); return null; });
+    }
+    @Override public boolean removeNotificationChannel(String kind, String id) {
+        return call(() -> session.removeNotificationChannel(kind, id));
+    }
+    @Override public List<NotificationChannelRecord> notificationChannels() {
+        List<VirtualNotificationChannelSnapshot> values = call(session::listNotificationChannels);
+        List<NotificationChannelRecord> out = new ArrayList<>();
+        if (values != null) for (VirtualNotificationChannelSnapshot value : values) {
+            out.add(new NotificationChannelRecord(value.kind(), value.id(), value.groupId(),
+                    unmarshal(value.payload()), value.updatedAtMs()));
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    @Override public JobRecord reserveJob(int guestId, Object payload) {
+        return job(call(() -> session.reserveJob(guestId, marshal(payload))));
+    }
+    @Override public void commitJob(int guestId) { call(() -> { session.commitJob(guestId); return null; }); }
+    @Override public boolean removeJob(int guestId) { return call(() -> session.removeJob(guestId)); }
+    @Override public List<JobRecord> jobs() {
+        List<VirtualJobSnapshot> values = call(session::listJobs);
+        List<JobRecord> out = new ArrayList<>();
+        if (values != null) for (VirtualJobSnapshot value : values) out.add(job(value));
+        return Collections.unmodifiableList(out);
+    }
+    @Override public void finishJob(int guestId, boolean needsReschedule) {
+        call(() -> { session.finishJob(guestId, needsReschedule); return null; });
+    }
+    @Override public void setJobReadyListener(BiFunction<Integer, Object, Boolean> listener) {
+        jobReadyListener = listener == null ? (id, payload) -> false : listener;
+    }
+
     @Override public NamespaceMapping ensureNamespace(String namespace, int guestId) {
         int before = call(() -> session.hostIdIfPresent(namespace, guestId));
         int host = call(() -> session.ensureNamespace(namespace, guestId));
@@ -126,9 +183,18 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
 
     @Override public void close() {
         if (closed) return; closed = true; alarmDeliveries.clear(); clipboardListener = () -> { };
+        jobReadyListener = (id, payload) -> false;
         try { session.close(); } catch (Exception ignored) { }
     }
 
+    private NotificationRecord notification(VirtualNotificationSnapshot value) {
+        return new NotificationRecord(value.guestId(), value.hostId(), value.guestTag(), value.hostTag(),
+                value.channelId(), value.state(), unmarshal(value.payload()), value.updatedAtMs());
+    }
+    private JobRecord job(VirtualJobSnapshot value) {
+        return new JobRecord(value.guestId(), value.hostId(), value.state(), value.ownerProcessName(),
+                value.ownerGeneration(), unmarshal(value.payload()), value.updatedAtMs());
+    }
     private byte[] marshal(Object value) {
         if (value == null) return new byte[0];
         if (!(value instanceof Parcelable)) {
@@ -158,5 +224,6 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_REMOTE_FAILURE", error); }
     }
+    private static String safe(String value) { return value == null ? "" : value.trim(); }
     @FunctionalInterface private interface RemoteCall<T> { T run() throws Exception; }
 }

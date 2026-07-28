@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -145,29 +146,61 @@ public final class VirtualSystemServiceInterceptor {
         String name = normalize(method.getName());
         List<Restore> restores = new ArrayList<>();
         if (name.contains("cancelall")) {
-            throw new SecurityException("VIRTUAL_NOTIFICATION_CANCEL_ALL_UNSUPPORTED");
+            return Call.direct((delegate, intercepted) -> cancelAllNotifications(delegate, intercepted));
         }
         if (name.contains("enqueue") || name.contains("notify")) {
-            rewriteNotificationTag(arguments, restores);
-            NamespaceRewrite rewrite = rewriteNotificationId(arguments, restores, true);
+            int guestId = notificationGuestId(arguments);
+            String guestTag = notificationGuestTag(arguments);
+            String channelId = notificationChannelId(arguments);
+            boolean created = findNotification(guestId, guestTag) == null;
+            VirtualSystemServiceAuthority.NotificationRecord reservation =
+                    state.notifications().reserve(guestId, guestTag, channelId);
+            rewriteNotificationTag(arguments, restores, notificationHostTag(guestTag));
+            rewriteNotificationId(arguments, restores, reservation.hostId());
             rewriteChannelStrings(arguments, restores, name);
             rewriteNotificationChannelFields(arguments, restores);
-            return Call.passThroughLifecycle(restores, result -> result,
-                    () -> { if (rewrite.created) state.notifications().removeGuest(rewrite.guestId); });
+            Object notificationPayload = notificationPayload(arguments);
+            return Call.passThroughLifecycle(restores, result -> {
+                state.notifications().commit(guestId, guestTag, channelId, notificationPayload);
+                return result;
+            }, () -> { if (created) state.notifications().remove(guestId, guestTag); });
         }
         if (name.contains("cancel")) {
-            rewriteNotificationTag(arguments, restores);
-            NamespaceRewrite rewrite = rewriteNotificationId(arguments, restores, false);
-            if (!rewrite.present) return Call.handled(defaultValue(method.getReturnType()));
+            int guestId = notificationGuestId(arguments);
+            String guestTag = notificationGuestTag(arguments);
+            VirtualSystemServiceAuthority.NotificationRecord record = findNotification(guestId, guestTag);
+            if (record == null) return Call.handled(defaultValue(method.getReturnType()));
+            rewriteNotificationTag(arguments, restores, notificationHostTag(guestTag));
+            rewriteNotificationId(arguments, restores, record.hostId());
             return Call.passThroughLifecycle(restores, result -> {
-                state.notifications().removeGuest(rewrite.guestId);
+                state.notifications().remove(guestId, guestTag);
+                return result;
+            }, () -> { });
+        }
+        if (isChannelCreate(name)) {
+            List<ChannelDraft> drafts = notificationChannelDrafts(arguments, name);
+            rewriteChannelStrings(arguments, restores, name);
+            rewriteChannelObjects(arguments, restores);
+            return Call.passThroughLifecycle(restores, result -> {
+                for (ChannelDraft draft : drafts) {
+                    state.notifications().upsertChannel(draft.kind, draft.id, draft.groupId, draft.payload);
+                }
+                return filterAndRestoreChannelResult(result);
+            }, () -> { });
+        }
+        if (isChannelDelete(name)) {
+            String kind = name.contains("group") ? "GROUP" : "CHANNEL";
+            String guestId = firstChannelString(arguments);
+            rewriteChannelStrings(arguments, restores, name);
+            return Call.passThroughLifecycle(restores, result -> {
+                if (!guestId.isEmpty()) state.notifications().removeChannel(kind, guestId);
                 return result;
             }, () -> { });
         }
         if (name.contains("channel") || name.contains("group")) {
             rewriteChannelStrings(arguments, restores, name);
             rewriteChannelObjects(arguments, restores);
-            return Call.passThroughLifecycle(restores, this::restoreChannelResult, () -> { });
+            return Call.passThroughLifecycle(restores, this::filterAndRestoreChannelResult, () -> { });
         }
         if (name.startsWith("arenotificationsenabled")) return Call.handled(Boolean.TRUE);
         return Call.passThrough();
@@ -180,21 +213,27 @@ public final class VirtualSystemServiceInterceptor {
             Object job = firstObjectWithMethod(arguments, "getId");
             if (job == null) throw new SecurityException("VIRTUAL_JOB_OBJECT_REQUIRED");
             int virtualId = intResult(job, "getId");
-            VirtualSystemServiceState.IntNamespace.Mapping mapping = state.jobs().ensure(virtualId);
+            boolean created = state.jobs().hostIdIfPresent(virtualId) == null;
+            VirtualSystemServiceAuthority.JobRecord reservation = state.jobs().reserve(virtualId, job);
             Field field = findField(job.getClass(), "jobId", "mJobId");
-            if (field == null) throw new SecurityException("VIRTUAL_JOB_ID_FIELD_UNSUPPORTED");
+            if (field == null) {
+                if (created) state.jobs().remove(virtualId);
+                throw new SecurityException("VIRTUAL_JOB_ID_FIELD_UNSUPPORTED");
+            }
             try {
-                field.setAccessible(true); Object original = field.get(job); field.set(job, mapping.hostId());
+                field.setAccessible(true); Object original = field.get(job); field.set(job, reservation.hostId());
                 restores.add(() -> field.set(job, original));
             } catch (ReflectiveOperationException error) {
-                if (mapping.created()) state.jobs().removeGuest(virtualId);
+                if (created) state.jobs().remove(virtualId);
                 throw new SecurityException("VIRTUAL_JOB_ID_REWRITE_FAILED", error);
             }
-            return Call.passThroughLifecycle(restores, result -> result,
-                    () -> { if (mapping.created()) state.jobs().removeGuest(virtualId); });
+            rewriteJobService(job, restores);
+            return Call.passThroughLifecycle(restores, result -> {
+                state.jobs().commit(virtualId); return result;
+            }, () -> { if (created) state.jobs().remove(virtualId); });
         }
         if (name.startsWith("cancelall")) {
-            throw new SecurityException("VIRTUAL_JOB_CANCEL_ALL_UNSUPPORTED");
+            return Call.direct((delegate, intercepted) -> cancelAllJobs(delegate, intercepted));
         }
         if (name.startsWith("cancel") || name.startsWith("getpendingjob")) {
             int index = firstIntIndex(arguments);
@@ -206,8 +245,7 @@ public final class VirtualSystemServiceInterceptor {
             restores.add(() -> arguments[index] = original);
             if (name.startsWith("cancel")) {
                 return Call.passThroughLifecycle(restores, result -> {
-                    state.jobs().removeGuest(virtualId);
-                    return result;
+                    state.jobs().remove(virtualId); return result;
                 }, () -> { });
             }
             return Call.passThrough(restores);
@@ -232,17 +270,174 @@ public final class VirtualSystemServiceInterceptor {
         return filtered;
     }
 
+    private VirtualSystemServiceAuthority.NotificationRecord findNotification(int guestId, String guestTag) {
+        String normalizedTag = guestTag == null ? "" : guestTag.trim();
+        for (VirtualSystemServiceAuthority.NotificationRecord record : state.notifications().records()) {
+            if (record.guestId() == guestId && record.guestTag().equals(normalizedTag)) return record;
+        }
+        return null;
+    }
+    private int notificationGuestId(Object[] arguments) {
+        int index = notificationIdIndex(arguments);
+        if (index < 0) throw new SecurityException("VIRTUAL_NOTIFICATION_ID_REQUIRED");
+        return ((Number) arguments[index]).intValue();
+    }
+    private String notificationGuestTag(Object[] arguments) {
+        if (arguments == null) return "";
+        for (String value : stringArguments(arguments)) {
+            if (value.equals(identity.packageName()) || value.equals(identity.hostPackageName())) continue;
+            if (value.startsWith("android:") || value.contains("permission")) continue;
+            return value;
+        }
+        return "";
+    }
+    private String notificationHostTag(String guestTag) {
+        return "cs:u" + identity.virtualUserId() + ":g" + identity.generation() + ":"
+                + (guestTag == null ? "" : guestTag.trim());
+    }
+    private String notificationChannelId(Object[] arguments) {
+        if (arguments == null) return "";
+        for (Object value : arguments) {
+            if (value == null || !value.getClass().getName().contains("Notification")) continue;
+            String id = VirtualSystemServiceState.stringMember(value, "mChannelId", "channelId", "getChannelId");
+            if (!id.isEmpty()) return id;
+        }
+        return "";
+    }
+    private void rewriteNotificationId(Object[] arguments, List<Restore> restores, int hostId) {
+        int index = notificationIdIndex(arguments);
+        if (index < 0) throw new SecurityException("VIRTUAL_NOTIFICATION_ID_REQUIRED");
+        Object original = arguments[index]; arguments[index] = hostId;
+        restores.add(() -> arguments[index] = original);
+    }
+    private void rewriteNotificationTag(Object[] arguments, List<Restore> restores, String hostTag) {
+        if (arguments == null) return;
+        for (int index = 0; index < arguments.length; index++) {
+            Object value = arguments[index];
+            if (!(value instanceof String string)) continue;
+            if (string.equals(identity.packageName()) || string.equals(identity.hostPackageName())) continue;
+            if (string.contains("permission") || string.startsWith("android:")) continue;
+            arguments[index] = hostTag;
+            int restoreIndex = index;
+            restores.add(() -> arguments[restoreIndex] = value);
+            return;
+        }
+    }
+    private Object cancelAllNotifications(Object delegate, Method intercepted) throws Throwable {
+        List<VirtualSystemServiceAuthority.NotificationRecord> records = new ArrayList<>();
+        for (VirtualSystemServiceAuthority.NotificationRecord record : state.notifications().records()) {
+            if ("ACTIVE".equals(record.state())) records.add(record);
+        }
+        for (VirtualSystemServiceAuthority.NotificationRecord record : records) {
+            invokeNotificationCancel(delegate, record);
+            state.notifications().remove(record.guestId(), record.guestTag());
+        }
+        return defaultValue(intercepted.getReturnType());
+    }
+    private void invokeNotificationCancel(Object delegate,
+                                          VirtualSystemServiceAuthority.NotificationRecord record) throws Throwable {
+        Method selected = null;
+        for (Method candidate : delegate.getClass().getMethods()) {
+            String name = normalize(candidate.getName());
+            if (!name.contains("cancel") || name.contains("all")) continue;
+            boolean hasInt = false;
+            for (Class<?> type : candidate.getParameterTypes()) if (type == int.class || type == Integer.class) hasInt = true;
+            if (hasInt) { selected = candidate; break; }
+        }
+        if (selected == null) throw new SecurityException("VIRTUAL_NOTIFICATION_CANCEL_METHOD_UNAVAILABLE");
+        selected.setAccessible(true);
+        Object[] values = notificationCancelArguments(selected.getParameterTypes(), record);
+        try { selected.invoke(delegate, values); }
+        catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+    }
+    private Object[] notificationCancelArguments(Class<?>[] types,
+                                                  VirtualSystemServiceAuthority.NotificationRecord record) {
+        Object[] values = new Object[types.length]; int stringIndex = 0; boolean idWritten = false;
+        for (int index = 0; index < types.length; index++) {
+            Class<?> type = types[index];
+            if (type == String.class) {
+                values[index] = stringIndex++ < 2 ? identity.hostPackageName() : record.hostTag();
+            } else if ((type == int.class || type == Integer.class) && !idWritten) {
+                values[index] = record.hostId(); idWritten = true;
+            } else values[index] = defaultValue(type);
+        }
+        return values;
+    }
+    private Object cancelAllJobs(Object delegate, Method intercepted) throws Throwable {
+        Method cancel = null;
+        for (Method candidate : delegate.getClass().getMethods()) {
+            if (normalize(candidate.getName()).equals("cancel") && candidate.getParameterCount() == 1
+                    && (candidate.getParameterTypes()[0] == int.class || candidate.getParameterTypes()[0] == Integer.class)) {
+                cancel = candidate; break;
+            }
+        }
+        if (cancel == null) throw new SecurityException("VIRTUAL_JOB_CANCEL_METHOD_UNAVAILABLE");
+        cancel.setAccessible(true);
+        for (VirtualSystemServiceAuthority.JobRecord record : new ArrayList<>(state.jobs().records())) {
+            try { cancel.invoke(delegate, record.hostId()); }
+            catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+            state.jobs().remove(record.guestId());
+        }
+        return defaultValue(intercepted.getReturnType());
+    }
+    private void rewriteJobService(Object job, List<Restore> restores) {
+        Field field = findField(job.getClass(), "service", "mService");
+        if (field == null) return;
+        try {
+            field.setAccessible(true); Object original = field.get(job);
+            Class<?> componentType = Class.forName("android.content.ComponentName");
+            Object replacement = componentType.getConstructor(String.class, String.class)
+                    .newInstance(identity.hostPackageName(), "com.warden.controlledsandbox.VirtualJobService");
+            field.set(job, replacement); restores.add(() -> field.set(job, original));
+        } catch (Throwable error) {
+            throw new SecurityException("VIRTUAL_JOB_SERVICE_REWRITE_FAILED", error);
+        }
+    }
+    private static boolean isChannelCreate(String name) {
+        return (name.contains("create") || name.contains("update")) && (name.contains("channel") || name.contains("group"));
+    }
+    private static boolean isChannelDelete(String name) {
+        return (name.contains("delete") || name.contains("remove")) && (name.contains("channel") || name.contains("group"));
+    }
+    private List<ChannelDraft> notificationChannelDrafts(Object[] arguments, String methodName) {
+        List<ChannelDraft> out = new ArrayList<>();
+        if (arguments == null) return out;
+        java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (Object value : arguments) collectChannelDrafts(value, out, visited, methodName);
+        return out;
+    }
+    private void collectChannelDrafts(Object value, List<ChannelDraft> out, java.util.Set<Object> visited,
+                                      String methodName) {
+        if (value == null || !visited.add(value)) return;
+        if (value instanceof Iterable<?> iterable) { for (Object item : iterable) collectChannelDrafts(item, out, visited, methodName); return; }
+        if (value.getClass().isArray()) { int size = Array.getLength(value); for (int i=0;i<size;i++) collectChannelDrafts(Array.get(value,i), out, visited, methodName); return; }
+        String className = value.getClass().getName();
+        if (!className.contains("NotificationChannel") && !className.contains("NotificationChannelGroup")) return;
+        String id = VirtualSystemServiceState.stringMember(value, "mId", "id", "getId");
+        if (id.isEmpty()) return;
+        String kind = className.contains("Group") || methodName.contains("group") ? "GROUP" : "CHANNEL";
+        String group = "CHANNEL".equals(kind)
+                ? VirtualSystemServiceState.stringMember(value, "mGroup", "group", "getGroup") : "";
+        out.add(new ChannelDraft(kind, id, group, value));
+    }
+    private static String firstChannelString(Object[] arguments) {
+        if (arguments == null) return "";
+        for (Object value : arguments) if (value instanceof String string && !string.trim().isEmpty()) return string.trim();
+        return "";
+    }
+    private record ChannelDraft(String kind, String id, String groupId, Object payload) { }
+
     private NamespaceRewrite rewriteNotificationId(Object[] arguments, List<Restore> restores,
                                                    boolean create) {
         int index = notificationIdIndex(arguments);
         if (index < 0) return NamespaceRewrite.absent();
         int guestId = ((Number) arguments[index]).intValue();
-        VirtualSystemServiceState.IntNamespace.Mapping mapping;
+        VirtualSystemServiceState.NotificationState.Mapping mapping;
         if (create) mapping = state.notifications().ensure(guestId);
         else {
             Integer host = state.notifications().hostIdIfPresent(guestId);
             if (host == null) return new NamespaceRewrite(guestId, 0, false, false);
-            mapping = new VirtualSystemServiceState.IntNamespace.Mapping(host, false);
+            mapping = new VirtualSystemServiceState.NotificationState.Mapping(host, false);
         }
         Object original = arguments[index]; arguments[index] = mapping.hostId();
         restores.add(() -> arguments[index] = original);
@@ -279,10 +474,65 @@ public final class VirtualSystemServiceInterceptor {
         for (Object value : arguments) rewriteChannelObject(value, restores, visited, true);
     }
 
-    private Object restoreChannelResult(Object result) {
+    private Object filterAndRestoreChannelResult(Object result) {
+        if (result == null) return null;
+        if (result instanceof Iterable<?> iterable) {
+            List<Object> owned = new ArrayList<>();
+            for (Object item : iterable) {
+                Object restored = filterAndRestoreChannelResult(item);
+                if (restored != null) owned.add(restored);
+            }
+            return owned;
+        }
+        if (result.getClass().isArray()) {
+            Class<?> component = result.getClass().getComponentType();
+            List<Object> owned = new ArrayList<>();
+            int length = java.lang.reflect.Array.getLength(result);
+            for (int index = 0; index < length; index++) {
+                Object restored = filterAndRestoreChannelResult(java.lang.reflect.Array.get(result, index));
+                if (restored != null) owned.add(restored);
+            }
+            Object filtered = java.lang.reflect.Array.newInstance(component, owned.size());
+            for (int index = 0; index < owned.size(); index++) {
+                java.lang.reflect.Array.set(filtered, index, owned.get(index));
+            }
+            return filtered;
+        }
+        if (!isChannelObject(result)) {
+            Field listField = findField(result.getClass(), "mList", "list");
+            if (listField == null) return null;
+            try {
+                listField.setAccessible(true);
+                Object raw = listField.get(result);
+                Object filtered = filterAndRestoreChannelResult(raw);
+                listField.set(result, filtered == null ? new ArrayList<>() : filtered);
+                return result;
+            } catch (ReflectiveOperationException error) {
+                throw new SecurityException("VIRTUAL_NOTIFICATION_CHANNEL_LIST_RESULT_UNSUPPORTED", error);
+            }
+        }
+        if (!isOwnedChannelObject(result)) return null;
         java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
         rewriteChannelObject(result, new ArrayList<>(), visited, false);
         return result;
+    }
+
+    private static boolean isChannelObject(Object value) {
+        String className = value.getClass().getName();
+        return className.contains("NotificationChannel") || className.contains("NotificationChannelGroup");
+    }
+
+    private boolean isOwnedChannelObject(Object value) {
+        if (!isChannelObject(value)) return false;
+        Field idField = findField(value.getClass(), "mId", "id");
+        if (idField == null) return false;
+        try {
+            idField.setAccessible(true);
+            Object raw = idField.get(value);
+            return raw instanceof String string && string.startsWith(channelNamespace(""));
+        } catch (ReflectiveOperationException error) {
+            throw new SecurityException("VIRTUAL_NOTIFICATION_CHANNEL_RESULT_UNSUPPORTED", error);
+        }
     }
 
     private void rewriteChannelObject(Object value, List<Restore> restores, java.util.Set<Object> visited,
@@ -346,6 +596,18 @@ public final class VirtualSystemServiceInterceptor {
             int restoreIndex = index;
             restores.add(() -> arguments[restoreIndex] = value);
         }
+    }
+
+
+    private static Object notificationPayload(Object[] arguments) {
+        if (arguments == null) return null;
+        for (Object value : arguments) {
+            if (value == null) continue;
+            String type = value.getClass().getName();
+            if (type.contains("Notification") && !type.contains("NotificationChannel")
+                    && !type.contains("NotificationChannelGroup")) return value;
+        }
+        return null;
     }
 
     private static int notificationIdIndex(Object[] arguments) {
@@ -486,36 +748,45 @@ public final class VirtualSystemServiceInterceptor {
 
     @FunctionalInterface private interface Restore { void restore() throws Exception; }
     @FunctionalInterface public interface ResultRewrite { Object rewrite(Object result); }
+    @FunctionalInterface public interface DirectInvocation { Object invoke(Object delegate, Method interceptedMethod) throws Throwable; }
 
     public static final class Call implements AutoCloseable {
-        private static final Call PASS = new Call(false, null, List.of(), result -> result, () -> { });
+        private static final Call PASS = new Call(false, null, List.of(), result -> result, () -> { }, null);
         private final boolean handled;
         private final Object result;
         private final List<Restore> restores;
         private final ResultRewrite resultRewrite;
         private final Runnable failureAction;
+        private final DirectInvocation directInvocation;
 
         private Call(boolean handled, Object result, List<Restore> restores,
-                     ResultRewrite resultRewrite, Runnable failureAction) {
+                     ResultRewrite resultRewrite, Runnable failureAction, DirectInvocation directInvocation) {
             this.handled = handled; this.result = result;
             this.restores = restores == null ? List.of() : List.copyOf(restores);
             this.resultRewrite = resultRewrite == null ? value -> value : resultRewrite;
             this.failureAction = failureAction == null ? () -> { } : failureAction;
+            this.directInvocation = directInvocation;
         }
         public static Call passThrough() { return PASS; }
         static Call passThrough(List<Restore> restores) {
-            return new Call(false, null, restores, result -> result, () -> { });
+            return new Call(false, null, restores, result -> result, () -> { }, null);
         }
         static Call passThroughWithResult(ResultRewrite rewrite) {
-            return new Call(false, null, List.of(), rewrite, () -> { });
+            return new Call(false, null, List.of(), rewrite, () -> { }, null);
         }
         static Call passThroughLifecycle(List<Restore> restores, ResultRewrite rewrite, Runnable failure) {
-            return new Call(false, null, restores, rewrite, failure);
+            return new Call(false, null, restores, rewrite, failure, null);
         }
         static Call handled(Object value) {
-            return new Call(true, value, List.of(), result -> result, () -> { });
+            return new Call(true, value, List.of(), result -> result, () -> { }, null);
+        }
+        static Call direct(DirectInvocation invocation) {
+            return new Call(false, null, List.of(), result -> result, () -> { },
+                    java.util.Objects.requireNonNull(invocation, "invocation"));
         }
         public boolean handled() { return handled; }
+        public boolean direct() { return directInvocation != null; }
+        public Object invokeDirect(Object delegate, Method method) throws Throwable { return directInvocation.invoke(delegate, method); }
         public Object result() { return result; }
         public Object rewriteResult(Object value) { return resultRewrite.rewrite(value); }
         public void onFailure() { failureAction.run(); }

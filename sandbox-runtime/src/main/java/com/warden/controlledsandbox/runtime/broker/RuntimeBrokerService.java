@@ -31,6 +31,7 @@ import com.warden.controlledsandbox.runtime.provider.BrokerObserverRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerProviderRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinator;
+import com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinator;
 import com.warden.controlledsandbox.runtime.status.BrokerRuntimeStatusSource;
 
 
@@ -92,6 +93,12 @@ public final class RuntimeBrokerService extends Service {
     private final BrokerObserverRuntime observerRuntime = new BrokerObserverRuntime();
     private final ProviderLifecycleCoordinator providerLifecycle = new ProviderLifecycleCoordinator(
             providerRuntime, cursorRuntime, fileRuntime, observerRuntime, uriGrants);
+    private final RuntimeProviderResourceCoordinator providerResources =
+            new RuntimeProviderResourceCoordinator(providerLifecycle,
+                    this::sessionById,
+                    session -> brokerState.prepared(processKey(session.packageName(),
+                            session.virtualUserId(), session.processName())),
+                    (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
     private final RuntimeStatusDispatcher runtimeStatusDispatcher = new RuntimeStatusDispatcher(
             clock,
             new BrokerRuntimeStatusSource(sessions, activityRuntime, serviceRuntime, providerLifecycle,
@@ -367,13 +374,13 @@ public final class RuntimeBrokerService extends Service {
                         cursorRuntime.rollbackQuery(cursorQueryReservation);
                         if (cursorPageReservation != null) {
                             cursorRuntime.abort(cursorPageReservation.token());
-                            closeGuestCursorBestEffort(activeSession, cursorPageReservation.token());
+                            providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
                         }
                         if (cursorTerminalReservation != null) cursorRuntime.completeTerminal(cursorTerminalReservation);
                         fileRuntime.rollbackOpen(fileOpenReservation);
                         if (fileCloseReservation != null) {
                             fileRuntime.abort(fileCloseReservation.token());
-                            closeGuestFileBestEffort(activeSession, fileCloseReservation.token());
+                            providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
                         }
                         if (providerRoute != null) {
                             providerRuntime.completeOperation(providerRoute, result, now());
@@ -421,21 +428,21 @@ public final class RuntimeBrokerService extends Service {
                     cursorRuntime.rollbackQuery(cursorQueryReservation);
                     if (cursorPageReservation != null) {
                         cursorRuntime.abort(cursorPageReservation.token());
-                        closeGuestCursorBestEffort(activeSession, cursorPageReservation.token());
+                        providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
                     }
                     if (cursorTerminalReservation != null) {
                         try { cursorRuntime.completeTerminal(cursorTerminalReservation); } catch (RuntimeException ignored) { }
                     }
                     if (cursorQueryReservation != null && cursorTargetSession != null) {
-                        closeGuestCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
+                        providerResources.closeCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
                     }
                     fileRuntime.rollbackOpen(fileOpenReservation);
                     if (fileOpenReservation != null && fileTargetSession != null) {
-                        closeGuestFileBestEffort(fileTargetSession, fileOpenReservation.token());
+                        providerResources.closeFileBestEffort(fileTargetSession, fileOpenReservation.token());
                     }
                     if (fileCloseReservation != null) {
                         fileRuntime.abort(fileCloseReservation.token());
-                        closeGuestFileBestEffort(activeSession, fileCloseReservation.token());
+                        providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
                     }
                     if (providerRoute != null) {
                         providerRuntime.failOperation(providerRoute, error, now());
@@ -652,8 +659,7 @@ public final class RuntimeBrokerService extends Service {
                     serviceRuntime.invalidate(staleRecovery);
                     receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
-                    applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
-                            staleRecovery.sessionId(), staleRecovery.generation());
+                    providerResources.stopSession(staleRecovery);
                 }
                 systemServiceCoordinator.stop(session);
                 throw error;
@@ -668,8 +674,7 @@ public final class RuntimeBrokerService extends Service {
                     serviceRuntime.invalidate(staleRecovery);
                     receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
-                    applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
-                            staleRecovery.sessionId(), staleRecovery.generation());
+                    providerResources.stopSession(staleRecovery);
                 }
                 systemServiceCoordinator.stop(session);
                 return guestResult;
@@ -678,10 +683,7 @@ public final class RuntimeBrokerService extends Service {
                 activityRuntime.recreate(staleRecovery, session);
                 serviceRuntime.processRecovered(staleRecovery, session);
                 receiverCoordinator.recoverSession(staleRecovery, session);
-                ProviderLifecycleCoordinator.RecoveryResult recovery =
-                        providerLifecycle.recoverSession(staleRecovery, session);
-                applyProviderCleanup(recovery.staleResources(),
-                        staleRecovery.sessionId(), staleRecovery.generation());
+                providerResources.recoverSession(staleRecovery, session);
                 systemServiceCoordinator.stop(staleRecovery);
             }
             GuestSession ready = sessions.transition(packageName, userId, processName, session.generation(),
@@ -714,7 +716,7 @@ public final class RuntimeBrokerService extends Service {
         for (GuestSession session : active) stopSession(session);
         receiverCoordinator.invalidateInstance(packageName, userId,
                 "ORDERED_RECEIVER_INSTANCE_STOPPED");
-        applyProviderCleanup(providerLifecycle.invalidateInstance(packageName, userId), "", -1);
+        providerResources.invalidateInstance(packageName, userId);
     }
 
     private void stopSession(GuestSession original) {
@@ -746,8 +748,7 @@ public final class RuntimeBrokerService extends Service {
             receiverCoordinator.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
             activityRuntime.invalidate(original);
             serviceRuntime.invalidate(original);
-            applyProviderCleanup(providerLifecycle.stopSession(original),
-                    original.sessionId(), original.generation());
+            providerResources.stopSession(original);
             if (systemServiceCoordinator != null) systemServiceCoordinator.stop(original);
             releaseGuestConnection(original.processSlot());
         }
@@ -1065,61 +1066,8 @@ public final class RuntimeBrokerService extends Service {
     }
 
     private void purgeExpiredResources(long nowMs) {
-        applyProviderCleanup(providerLifecycle.purgeExpired(nowMs), "", -1);
+        providerResources.purgeExpired(nowMs);
         receiverCoordinator.purgeExpired();
-    }
-
-    private void applyProviderCleanup(ProviderLifecycleCoordinator.CleanupResult cleanup,
-                                      String unavailableSessionId, long unavailableGeneration) {
-        if (cleanup == null) return;
-        closeCursorLeasesBestEffort(cleanup.cursors(), unavailableSessionId, unavailableGeneration);
-        closeFileLeasesBestEffort(cleanup.files(), unavailableSessionId, unavailableGeneration);
-    }
-
-    private void closeGuestCursorBestEffort(GuestSession target, String token) {
-        if (target == null || token == null || token.trim().isEmpty()) return;
-        Bundle base = brokerState.prepared(processKey(target.packageName(), target.virtualUserId(), target.processName()));
-        if (base == null) return;
-        Bundle close = new Bundle(base);
-        close.putString(ComponentOperations.OPERATION, ComponentOperations.PROVIDER_CURSOR_CANCEL);
-        close.putString(RuntimeKeys.CURSOR_TOKEN, token);
-        try { callGuest(target.processSlot(), guest -> guest.invokeComponent(close)); }
-        catch (Throwable ignored) { }
-    }
-
-    private void closeCursorLeasesBestEffort(java.util.List<BrokerCursorRuntime.Lease> leases,
-                                             String unavailableSessionId, long unavailableGeneration) {
-        for (BrokerCursorRuntime.Lease lease : leases) {
-            if (lease.targetSessionId().equals(unavailableSessionId)
-                    && lease.targetGeneration() == unavailableGeneration) continue;
-            GuestSession target = sessionById(lease.targetSessionId(), lease.targetGeneration());
-            if (target != null && (target.state() == SessionState.READY || target.state() == SessionState.ACTIVE)) {
-                closeGuestCursorBestEffort(target, lease.token());
-            }
-        }
-    }
-
-    private void closeGuestFileBestEffort(GuestSession target, String token) {
-        if (target == null || token == null || token.trim().isEmpty()) return;
-        Bundle base = brokerState.prepared(processKey(target.packageName(), target.virtualUserId(), target.processName()));
-        if (base == null) return;
-        Bundle close = new Bundle(base);
-        close.putString(ComponentOperations.OPERATION, ComponentOperations.PROVIDER_FILE_CLOSE);
-        close.putString(RuntimeKeys.FILE_TOKEN, token);
-        try { callGuest(target.processSlot(), guest -> guest.invokeComponent(close)); }
-        catch (Throwable ignored) { }
-    }
-
-    private void closeFileLeasesBestEffort(java.util.List<BrokerFileRuntime.Lease> leases,
-                                           String unavailableSessionId, long unavailableGeneration) {
-        for (BrokerFileRuntime.Lease lease : leases) {
-            if (lease.targetSessionId().equals(unavailableSessionId)
-                    && lease.targetGeneration() == unavailableGeneration) continue;
-            GuestSession target = sessionById(lease.targetSessionId(), lease.targetGeneration());
-            if (target != null && (target.state() == SessionState.READY || target.state() == SessionState.ACTIVE)) {
-                closeGuestFileBestEffort(target, lease.token());
-            }
-        }
     }
 
     private Bundle callGuest(int slot, GuestCall call) throws Exception {
@@ -1182,8 +1130,7 @@ public final class RuntimeBrokerService extends Service {
             }
         }
         if (affected != null) {
-            applyProviderCleanup(providerLifecycle.disconnectSession(affected),
-                    affected.sessionId(), affected.generation());
+            providerResources.disconnectSession(affected);
         }
         source.unlinkDeath();
         try { unbindService(source); } catch (Exception ignored) { }
@@ -1205,8 +1152,7 @@ public final class RuntimeBrokerService extends Service {
     @Override public void onDestroy() {
         for (GuestSession session : sessions.snapshot()) {
             receiverCoordinator.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
-            applyProviderCleanup(providerLifecycle.stopSession(session),
-                    session.sessionId(), session.generation());
+            providerResources.stopSession(session);
         }
         Integer[] slots;
         synchronized (this) { slots = guestConnections.keySet().toArray(new Integer[0]); }

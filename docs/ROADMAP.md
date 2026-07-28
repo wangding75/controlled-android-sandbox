@@ -78,3 +78,11 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - LOCAL — evidence matrix is generated from `verification/m3-source-capability-matrix.json`; source, production wiring and device evidence are reported independently.
 - DONE — ActivityManager and ActivityTaskManager source and production wiring gate; Android Binder/device execution remains pending.
 - DEVICE — real AGP/NDK build, two isolated virtual instances, full component evidence and 20-minute stability run.
+
+## M4-T12 source baseline
+
+Completed in source/host evidence: persistent owned Notification/Channel lifecycle, durable Job spec
+state, safe scoped Notification/Job `cancelAll`, trusted host Job callback routing with explicit Guest
+acknowledgement, and Provider resource cleanup extraction. Remaining priority: version-safe Guest
+`JobParameters` execution, Notification/Job Android-version adapters and continued Broker
+decomposition. Device validation remains intentionally deferred.

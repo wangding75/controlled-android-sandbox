@@ -3,6 +3,9 @@ package com.warden.controlledsandbox.contract;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 
 interface IVirtualSystemServiceSession {
     byte[] getClipboard();
@@ -22,6 +25,20 @@ interface IVirtualSystemServiceSession {
     void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);
     boolean cancelAlarm(String alarmId);
     List<VirtualAlarmSnapshot> listAlarms();
+
+    VirtualNotificationSnapshot reserveNotification(int guestId, String guestTag, String channelId);
+    void commitNotification(int guestId, String guestTag, String channelId, in byte[] payload);
+    boolean removeNotification(int guestId, String guestTag);
+    List<VirtualNotificationSnapshot> listNotifications();
+    void upsertNotificationChannel(String kind, String id, String groupId, in byte[] payload);
+    boolean removeNotificationChannel(String kind, String id);
+    List<VirtualNotificationChannelSnapshot> listNotificationChannels();
+
+    VirtualJobSnapshot reserveJob(int guestId, in byte[] payload);
+    void commitJob(int guestId);
+    boolean removeJob(int guestId);
+    List<VirtualJobSnapshot> listJobs();
+    void finishJob(int guestId, boolean needsReschedule);
 
     int ensureNamespace(String namespace, int guestId);
     int hostIdIfPresent(String namespace, int guestId);

@@ -14,6 +14,9 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
 import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import java.util.List;
@@ -175,6 +178,41 @@ public final class PackageServiceContractSelfTest {
         require("a7".equals(restoredAlarm.alarmId()) && restoredAlarm.intervalMs() == 456L
                         && java.util.Arrays.equals(new byte[]{1, 2, 3}, restoredAlarm.tokenPayload()),
                 "virtual alarm snapshot lost");
+
+        VirtualNotificationSnapshot notification = new VirtualNotificationSnapshot(
+                7, 0x51000007, "updates", "cs:u3:g9:updates", "general",
+                VirtualNotificationSnapshot.ACTIVE, new byte[]{4, 2}, 77L);
+        Parcel notificationParcel = Parcel.obtain();
+        notification.writeToParcel(notificationParcel, 0); notificationParcel.setDataPosition(0);
+        VirtualNotificationSnapshot restoredNotification = VirtualNotificationSnapshot.CREATOR
+                .createFromParcel(notificationParcel);
+        notificationParcel.recycle();
+        require(restoredNotification.hostId() == 0x51000007
+                        && VirtualNotificationSnapshot.ACTIVE.equals(restoredNotification.state())
+                        && java.util.Arrays.equals(new byte[]{4, 2}, restoredNotification.payload()),
+                "virtual notification snapshot lost");
+
+        VirtualNotificationChannelSnapshot channel = new VirtualNotificationChannelSnapshot(
+                VirtualNotificationChannelSnapshot.CHANNEL, "general", "group", new byte[]{8}, 88L);
+        Parcel channelParcel = Parcel.obtain();
+        channel.writeToParcel(channelParcel, 0); channelParcel.setDataPosition(0);
+        VirtualNotificationChannelSnapshot restoredChannel = VirtualNotificationChannelSnapshot.CREATOR
+                .createFromParcel(channelParcel);
+        channelParcel.recycle();
+        require("general".equals(restoredChannel.id()) && "group".equals(restoredChannel.groupId()),
+                "virtual notification channel snapshot lost");
+
+        VirtualJobSnapshot job = new VirtualJobSnapshot(17, 0x52000011,
+                VirtualJobSnapshot.SCHEDULED, "com.example.fixture:worker", 6L,
+                new byte[]{1, 7}, 99L);
+        Parcel jobParcel = Parcel.obtain();
+        job.writeToParcel(jobParcel, 0); jobParcel.setDataPosition(0);
+        VirtualJobSnapshot restoredJob = VirtualJobSnapshot.CREATOR.createFromParcel(jobParcel);
+        jobParcel.recycle();
+        require(restoredJob.guestId() == 17 && restoredJob.hostId() == 0x52000011
+                        && VirtualJobSnapshot.SCHEDULED.equals(restoredJob.state())
+                        && java.util.Arrays.equals(new byte[]{1, 7}, restoredJob.payload()),
+                "virtual job snapshot lost");
         System.out.println("PASS package service typed contract self-test");
     }
 
