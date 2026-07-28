@@ -56,7 +56,7 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - DONE — reversible notification, JobScheduler and storage identity proxies with per-service diagnostics.
 - DONE — ActivityManager/ActivityTaskManager source mediation uses an atomic proxy pair, exact API-signature policies, callback/result task models and reversible rollback.
 - DONE — Package-Service-owned typed Binder authority shares Clipboard, basic Account and persistent Notification/Job namespaces per package/virtual user; Alarm ownership is bound to virtual process and Runtime generation with bounded recovery.
-- PARTIAL — AlarmManager power/reboot semantics, Account authenticators, Notification callbacks/channels and JobService constraints/callbacks remain open.
+- PARTIAL — AlarmManager power/reboot semantics, Account authenticators, Notification callbacks/channels, Job work-item APIs and Android-version Job constraints remain open.
 - DEVICE — hidden API and Binder signature matrix on Android 12–16 and OEM variants.
 
 ## Native and WebView
@@ -86,3 +86,7 @@ state, safe scoped Notification/Job `cancelAll`, trusted host Job callback routi
 acknowledgement, and Provider resource cleanup extraction. Remaining priority: version-safe Guest
 `JobParameters` execution, Notification/Job Android-version adapters and continued Broker
 decomposition. Device validation remains intentionally deferred.
+
+## M4-T13 source baseline
+
+Completed in source/host evidence: typed JobParameters transport, trusted Host JobService dispatch, owning Guest JobService `onStartJob`/`onStopJob`, one-shot scoped `jobFinished`, timeout and Binder-death rescheduling, and stale-generation rejection. Remaining priority: Android-version validation, Job work-item APIs, Service coordinator extraction and complete Service lifecycle semantics. Device validation remains intentionally deferred.

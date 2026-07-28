@@ -34,7 +34,7 @@ session_aidl = require(
     "void scheduleAlarm", "int ensureNamespace", "reserveNotification", "reserveJob", "void close()")
 observer_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
-    "interface IVirtualSystemServiceObserver", "onClipboardChanged", "onAlarm", "boolean onJobReady")
+    "interface IVirtualSystemServiceObserver", "onClipboardChanged", "onAlarm", "boolean onJobStart", "boolean onJobStop")
 for aidl in [root_aidl, session_aidl, observer_aidl]:
     if "Bundle" in aidl:
         errors.append("M4-T11 virtual system-service AIDL must not use Bundle")

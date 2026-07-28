@@ -179,3 +179,9 @@ Guest `JobParameters` bridge the host requests rescheduling.
 Provider cursor/file cleanup delivery is owned by `RuntimeProviderResourceCoordinator`, not by
 `RuntimeBrokerService`. The central Broker retains orchestration and Session ownership while Provider
 resource invalidation and best-effort physical close delivery are delegated.
+
+## M4-T13 Guest Job execution ownership
+
+Android `JobParameters` and its host callback never cross directly into Guest code. The trusted `VirtualJobService` extracts a bounded `VirtualJobParametersSnapshot` and calls Package Service. Package Service validates the persisted Job owner and current Runtime observer, transitions the record through `DISPATCHING` and `RUNNING`, and creates an `IVirtualJobExecution` capability bound to Guest ID, process, generation and dispatch token.
+
+The Guest runtime reconstructs version-adapted `JobParameters`, invokes the declared Guest `JobService` on its main thread and exposes only a restricted raw `IJobCallback` implementation for `jobFinished`. Completion returns through the scoped execution Binder to the trusted Host callback. Runtime death, callback death, replacement, timeout and stop invalidate the capability and apply an explicit reschedule decision.

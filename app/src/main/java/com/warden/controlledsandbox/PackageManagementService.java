@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Process;
+import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
@@ -13,6 +14,7 @@ import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
@@ -96,10 +98,21 @@ public final class PackageManagementService extends Service {
             return session;
         }
 
-        @Override public boolean dispatchVirtualJob(int hostJobId) {
+        @Override public boolean startVirtualJob(VirtualJobParametersSnapshot parameters,
+                IHostJobCallback callback) {
+            callerVerifier.requireRuntimeBrokerCaller();
+            if (parameters == null || callback == null || callback.asBinder() == null
+                    || !callback.asBinder().isBinderAlive()) {
+                throw new IllegalArgumentException("virtual job parameters and callback are required");
+            }
+            return systemServices.startJob(parameters, callback, Binder.getCallingUid());
+        }
+
+        @Override public boolean stopVirtualJob(int hostJobId, int stopReason,
+                int internalStopReason, String debugStopReason) {
             callerVerifier.requireRuntimeBrokerCaller();
             if (hostJobId < 0) throw new IllegalArgumentException("hostJobId must be non-negative");
-            return systemServices.dispatchJob(hostJobId);
+            return systemServices.stopJob(hostJobId, stopReason, internalStopReason, debugStopReason);
         }
     };
 
@@ -574,9 +587,6 @@ public final class PackageManagementService extends Service {
         @Override public boolean removeJob(int guestId) { requireCapability(); return systemServices.removeJob(scope, guestId); }
         @Override public java.util.List<VirtualJobSnapshot> listJobs() {
             requireCapability(); return systemServices.jobs(scope, processName, generation);
-        }
-        @Override public void finishJob(int guestId, boolean needsReschedule) {
-            requireCapability(); systemServices.finishJob(scope, guestId, needsReschedule);
         }
         @Override public int ensureNamespace(String namespace, int guestId) {
             requireCapability(); return systemServices.ensureNamespace(scope, namespace, guestId);

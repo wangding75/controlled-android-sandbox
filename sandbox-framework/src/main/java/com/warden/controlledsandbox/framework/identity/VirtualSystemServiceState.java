@@ -410,15 +410,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             return Collections.unmodifiableList(out);
         }
         public synchronized int size() { return records().size(); }
-        public synchronized void setReadyListener(java.util.function.BiFunction<Integer, Object, Boolean> listener) {
-            if (authority != null) authority.setJobReadyListener(listener);
-        }
-        public synchronized void finish(int guestId, boolean needsReschedule) {
-            if (authority != null) { authority.finishJob(guestId, needsReschedule); return; }
-            Entry entry = entries.get(guestId);
-            if (entry == null) return;
-            if (needsReschedule) { entry.state = "SCHEDULED"; entry.updatedAtMs = System.currentTimeMillis(); }
-            else entries.remove(guestId);
+        public synchronized void setExecutionListener(VirtualSystemServiceAuthority.JobExecutionListener listener) {
+            if (authority != null) authority.setJobExecutionListener(listener);
         }
         public synchronized void clear() { if (authority == null) entries.clear(); }
         private VirtualSystemServiceAuthority.JobRecord findGuest(int guestId) {

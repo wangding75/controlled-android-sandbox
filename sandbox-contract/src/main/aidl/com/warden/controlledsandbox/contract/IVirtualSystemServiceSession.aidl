@@ -38,7 +38,6 @@ interface IVirtualSystemServiceSession {
     void commitJob(int guestId);
     boolean removeJob(int guestId);
     List<VirtualJobSnapshot> listJobs();
-    void finishJob(int guestId, boolean needsReschedule);
 
     int ensureNamespace(String namespace, int guestId);
     int hostIdIfPresent(String namespace, int guestId);

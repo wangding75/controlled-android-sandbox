@@ -123,7 +123,18 @@ public final class GuestRuntimeEnvironment {
                     nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
             stagedSession = session;
             session.components = new GuestComponentRuntime(session);
-            virtualServices.jobs().setReadyListener(session::onVirtualJobReady);
+            session.jobServices = new GuestJobServiceBridge(session);
+            virtualServices.jobs().setExecutionListener(new com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecutionListener() {
+                @Override public boolean onStart(int guestJobId, Object jobPayload,
+                        com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters,
+                        com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecution execution) {
+                    return session.onVirtualJobStart(guestJobId, jobPayload, parameters, execution);
+                }
+                @Override public boolean onStop(int guestJobId,
+                        com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters) {
+                    return session.onVirtualJobStop(guestJobId, parameters);
+                }
+            });
             current = session;
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
@@ -253,6 +264,7 @@ public final class GuestRuntimeEnvironment {
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
         GuestComponentRuntime components;
+        GuestJobServiceBridge jobServices;
 
         Session(GuestPackageSpec spec, GuestClassLoader classLoader, GuestContext context,
                 Application application, GuestResourceLoader.LoadedResources resources, FrameworkHooks frameworkHooks,
@@ -310,18 +322,16 @@ public final class GuestRuntimeEnvironment {
             packageState = updated;
         }
 
-        private synchronized boolean onVirtualJobReady(Integer guestJobId, Object jobPayload) {
-            Bundle event = new Bundle();
-            event.putInt("guestJobId", guestJobId == null ? -1 : guestJobId);
-            event.putString("packageName", spec.packageName);
-            event.putInt("virtualUserId", spec.virtualUserId);
-            event.putLong("generation", spec.generation);
-            event.putString("jobPayloadType", jobPayload == null ? "" : jobPayload.getClass().getName());
-            event.putString("status", "JOB_PARAMETERS_BRIDGE_PENDING");
-            RuntimeEventLog.event("GUEST_JOB_CALLBACK_DEFERRED", event);
-            // Binder delivery is acknowledged only after a real JobParameters/JobService bridge exists.
-            // Returning false makes the trusted host JobService request rescheduling instead of losing work.
-            return false;
+        private synchronized boolean onVirtualJobStart(int guestJobId, Object jobPayload,
+                com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters,
+                com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecution execution) {
+            if (jobServices == null) return false;
+            return jobServices.start(guestJobId, jobPayload, parameters, execution);
+        }
+
+        private synchronized boolean onVirtualJobStop(int guestJobId,
+                com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters) {
+            return jobServices == null || jobServices.stop(guestJobId, parameters);
         }
 
         Bundle status(String status, long started) {
@@ -371,6 +381,7 @@ public final class GuestRuntimeEnvironment {
         }
 
         void shutdown() {
+            if (jobServices != null) jobServices.close();
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
             virtualServices.close();

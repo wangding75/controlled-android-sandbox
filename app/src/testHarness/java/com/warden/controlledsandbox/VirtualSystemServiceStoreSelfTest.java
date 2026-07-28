@@ -1,13 +1,18 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.contract.IHostJobCallback;
+import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class VirtualSystemServiceStoreSelfTest {
     public static void main(String[] args) throws Exception {
@@ -96,19 +101,63 @@ public final class VirtualSystemServiceStoreSelfTest {
                         && reloaded.jobs(owner, "guest.pkg", 1L).get(0).hostId() == reservedJob.hostId(),
                 "scheduled job lifecycle must survive Package Service recreation");
         reloaded.register(first);
-        require(reloaded.dispatchJob(reservedJob.hostId()), "owned scheduled job must dispatch");
+        AtomicBoolean hostFinished = new AtomicBoolean();
+        AtomicBoolean hostReschedule = new AtomicBoolean(true);
+        IHostJobCallback hostCallback = new IHostJobCallback.Stub() {
+            @Override public void finishHostJob(int hostJobId, boolean needsReschedule) {
+                require(hostJobId == reservedJob.hostId(), "host callback must retain host job identity");
+                hostFinished.set(true); hostReschedule.set(needsReschedule);
+            }
+        };
+        require(reloaded.startJob(parameters(reservedJob.hostId()), hostCallback, 0),
+                "owned scheduled job must dispatch");
         require(jobEvents.get() == 1 && deliveredJobId.get() == 51,
                 "job callback must use Guest job ID and owning Generation");
         require(VirtualJobSnapshot.RUNNING.equals(reloaded.jobs(owner, "guest.pkg", 1L).get(0).state()),
-                "dispatched job must transition to RUNNING");
-        reloaded.finishJob(owner, 51, false);
+                "accepted job must transition to RUNNING");
+        first.execution.get().finish(false);
+        require(hostFinished.get() && !hostReschedule.get(),
+                "Guest jobFinished must complete the trusted host callback");
         require(reloaded.jobs(owner, "guest.pkg", 1L).isEmpty(),
                 "finished job must be removed when reschedule is false");
+        VirtualJobSnapshot stoppableJob = reloaded.reserveJob(owner, "guest.pkg", 1L,
+                53, new byte[]{5, 3});
+        reloaded.commitJob(owner, 53);
+        first.execution.set(null);
+        require(reloaded.startJob(parameters(stoppableJob.hostId()), new IHostJobCallback.Stub() {
+                    @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                }, 0), "second owned job must start");
+        IVirtualJobExecution staleExecution = first.execution.get();
+        require(reloaded.stopJob(stoppableJob.hostId(), 3, 7, "constraint"),
+                "Guest onStopJob reschedule decision must reach Host JobService");
+        require(first.stopEvents.get() == 1, "Guest onStopJob must run exactly once");
+        staleExecution.finish(false);
+        require(VirtualJobSnapshot.SCHEDULED.equals(reloaded.jobs(owner, "guest.pkg", 1L).stream()
+                        .filter(value -> value.guestId() == 53).findFirst().orElseThrow().state()),
+                "stale execution capability must not finish a rescheduled job");
+        reloaded.removeJob(owner, 53);
+        VirtualJobSnapshot recoveryJob = reloaded.reserveJob(owner, "guest.pkg", 1L,
+                54, new byte[]{5, 4});
+        reloaded.commitJob(owner, 54);
+        first.execution.set(null);
+        require(reloaded.startJob(parameters(recoveryJob.hostId()), new IHostJobCallback.Stub() {
+                    @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                }, 0), "recovery job must enter RUNNING");
+        VirtualSystemServiceStore recoveredWhileRunning = new VirtualSystemServiceStore(root);
+        require(VirtualJobSnapshot.SCHEDULED.equals(recoveredWhileRunning
+                        .jobs(owner, "guest.pkg", 1L).stream()
+                        .filter(value -> value.guestId() == 54).findFirst().orElseThrow().state()),
+                "Package Service recreation must recover stale RUNNING jobs to SCHEDULED");
+        recoveredWhileRunning.close();
+        reloaded.stopJob(recoveryJob.hostId(), 0, -1, "cleanup");
+        reloaded.removeJob(owner, 54);
         VirtualJobSnapshot deferredJob = reloaded.reserveJob(owner, "guest.pkg:remote", 2L,
                 52, new byte[]{5, 2});
         reloaded.commitJob(owner, 52);
         reloaded.register(second);
-        require(!reloaded.dispatchJob(deferredJob.hostId()),
+        require(!reloaded.startJob(parameters(deferredJob.hostId()), new IHostJobCallback.Stub() {
+                    @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                }, 0),
                 "job callback without Guest execution acknowledgement must request host reschedule");
         require(VirtualJobSnapshot.SCHEDULED.equals(
                         reloaded.jobs(owner, "guest.pkg:remote", 2L).stream()
@@ -132,6 +181,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         final String processName;
         final long generation;
         final IVirtualSystemServiceObserver observer;
+        final AtomicReference<IVirtualJobExecution> execution = new AtomicReference<>();
+        final AtomicInteger stopEvents = new AtomicInteger();
         volatile boolean closed;
         TestClient(VirtualSystemServiceStore.Scope scope, String processName, long generation,
                    AtomicInteger clipboardEvents, AtomicInteger alarmEvents,
@@ -140,8 +191,15 @@ public final class VirtualSystemServiceStoreSelfTest {
             observer = new IVirtualSystemServiceObserver.Stub() {
                 @Override public void onClipboardChanged() { clipboardEvents.incrementAndGet(); }
                 @Override public void onAlarm(String alarmId) { alarmEvents.incrementAndGet(); }
-                @Override public boolean onJobReady(int guestJobId, byte[] payload) {
-                    deliveredJobId.set(guestJobId); jobEvents.incrementAndGet(); return acceptJobs;
+                @Override public boolean onJobStart(int guestJobId, byte[] payload,
+                                                    VirtualJobParametersSnapshot parameters,
+                                                    IVirtualJobExecution jobExecution) {
+                    deliveredJobId.set(guestJobId); jobEvents.incrementAndGet();
+                    execution.set(jobExecution); return acceptJobs;
+                }
+                @Override public boolean onJobStop(int guestJobId,
+                                                   VirtualJobParametersSnapshot parameters) {
+                    stopEvents.incrementAndGet(); return true;
                 }
             };
         }
@@ -150,6 +208,11 @@ public final class VirtualSystemServiceStoreSelfTest {
         @Override public long generation() { return generation; }
         @Override public IVirtualSystemServiceObserver observer() { return observer; }
         @Override public boolean active() { return !closed; }
+    }
+    private static VirtualJobParametersSnapshot parameters(int hostJobId) {
+        return new VirtualJobParametersSnapshot(hostJobId, -1, "", new byte[0], new byte[0],
+                new byte[0], 0, false, false, false, List.of(), List.of(), new byte[0],
+                0, -1, "", 0L);
     }
     private static void require(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);

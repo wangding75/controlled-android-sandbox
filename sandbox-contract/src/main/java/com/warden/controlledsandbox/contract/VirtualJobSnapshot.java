@@ -7,6 +7,7 @@ import android.os.Parcelable;
 public final class VirtualJobSnapshot implements Parcelable {
     public static final String RESERVED = "RESERVED";
     public static final String SCHEDULED = "SCHEDULED";
+    public static final String DISPATCHING = "DISPATCHING";
     public static final String RUNNING = "RUNNING";
     private final int guestId;
     private final int hostId;
@@ -51,7 +52,8 @@ public final class VirtualJobSnapshot implements Parcelable {
     };
     private static String requireState(String value) {
         String normalized = value == null ? "" : value.trim();
-        if (!RESERVED.equals(normalized) && !SCHEDULED.equals(normalized) && !RUNNING.equals(normalized)) {
+        if (!RESERVED.equals(normalized) && !SCHEDULED.equals(normalized)
+                && !DISPATCHING.equals(normalized) && !RUNNING.equals(normalized)) {
             throw new IllegalArgumentException("invalid job state: " + value);
         }
         return normalized;

@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.systemservice;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
@@ -9,6 +10,7 @@ import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.BiFunction;
 
 /** Guest-side adapter for a scoped Binder-owned virtual system-service capability. */
 public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemServiceAuthority {
@@ -26,7 +27,11 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private final ClassLoader classLoader;
     private final ConcurrentMap<String, Runnable> alarmDeliveries = new ConcurrentHashMap<>();
     private volatile Runnable clipboardListener = () -> { };
-    private volatile BiFunction<Integer, Object, Boolean> jobReadyListener = (id, payload) -> false;
+    private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
+        @Override public boolean onStart(int guestJobId, Object jobPayload,
+                JobParametersRecord parameters, JobExecution execution) { return false; }
+        @Override public boolean onStop(int guestJobId, JobParametersRecord parameters) { return true; }
+    };
     private volatile boolean closed;
     private final IVirtualSystemServiceObserver observer = new IVirtualSystemServiceObserver.Stub() {
         @Override public void onClipboardChanged() { clipboardListener.run(); }
@@ -34,8 +39,14 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
             Runnable delivery = alarmDeliveries.get(alarmId);
             if (delivery != null) delivery.run();
         }
-        @Override public boolean onJobReady(int guestJobId, byte[] jobPayload) {
-            return Boolean.TRUE.equals(jobReadyListener.apply(guestJobId, unmarshal(jobPayload)));
+        @Override public boolean onJobStart(int guestJobId, byte[] jobPayload,
+                VirtualJobParametersSnapshot parameters, IVirtualJobExecution execution) {
+            if (parameters == null || execution == null) return false;
+            return jobExecutionListener.onStart(guestJobId, unmarshal(jobPayload),
+                    parameters(parameters), execution(execution));
+        }
+        @Override public boolean onJobStop(int guestJobId, VirtualJobParametersSnapshot parameters) {
+            return parameters != null && jobExecutionListener.onStop(guestJobId, parameters(parameters));
         }
     };
 
@@ -152,11 +163,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (values != null) for (VirtualJobSnapshot value : values) out.add(job(value));
         return Collections.unmodifiableList(out);
     }
-    @Override public void finishJob(int guestId, boolean needsReschedule) {
-        call(() -> { session.finishJob(guestId, needsReschedule); return null; });
-    }
-    @Override public void setJobReadyListener(BiFunction<Integer, Object, Boolean> listener) {
-        jobReadyListener = listener == null ? (id, payload) -> false : listener;
+    @Override public void setJobExecutionListener(JobExecutionListener listener) {
+        jobExecutionListener = listener == null ? new JobExecutionListener() {
+            @Override public boolean onStart(int guestJobId, Object payload,
+                    JobParametersRecord parameters, JobExecution execution) { return false; }
+            @Override public boolean onStop(int guestJobId, JobParametersRecord parameters) { return true; }
+        } : listener;
     }
 
     @Override public NamespaceMapping ensureNamespace(String namespace, int guestId) {
@@ -183,8 +195,38 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
 
     @Override public void close() {
         if (closed) return; closed = true; alarmDeliveries.clear(); clipboardListener = () -> { };
-        jobReadyListener = (id, payload) -> false;
+        jobExecutionListener = new JobExecutionListener() {
+            @Override public boolean onStart(int guestJobId, Object payload,
+                    JobParametersRecord parameters, JobExecution execution) { return false; }
+            @Override public boolean onStop(int guestJobId, JobParametersRecord parameters) { return true; }
+        };
         try { session.close(); } catch (Exception ignored) { }
+    }
+
+
+    private JobParametersRecord parameters(VirtualJobParametersSnapshot value) {
+        return new JobParametersRecord(value.hostJobId(), value.guestJobId(), value.namespace(),
+                unmarshal(value.extras()), unmarshal(value.transientExtras()), unmarshal(value.clipData()),
+                value.clipGrantFlags(), value.overrideDeadlineExpired(), value.expedited(),
+                value.userInitiated(), value.triggeredUris(), value.triggeredAuthorities(),
+                unmarshal(value.network()), value.stopReason(), value.internalStopReason(),
+                value.debugStopReason(), value.dispatchToken());
+    }
+    private static JobExecution execution(IVirtualJobExecution remote) {
+        return new JobExecution() {
+            @Override public int guestJobId() { return callRemote(remote::guestJobId); }
+            @Override public long generation() { return callRemote(remote::generation); }
+            @Override public long dispatchToken() { return callRemote(remote::dispatchToken); }
+            @Override public boolean active() { return callRemote(remote::isActive); }
+            @Override public void finish(boolean needsReschedule) {
+                callRemote(() -> { remote.finish(needsReschedule); return null; });
+            }
+        };
+    }
+    private static <T> T callRemote(RemoteCall<T> operation) {
+        try { return operation.run(); }
+        catch (RuntimeException error) { throw error; }
+        catch (Exception error) { throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_REMOTE_FAILURE", error); }
     }
 
     private NotificationRecord notification(VirtualNotificationSnapshot value) {

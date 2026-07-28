@@ -100,10 +100,10 @@
     },
     {
       "id": "job-scheduler",
-      "hook": "binder-owned-persistent-spec-host-bridge",
+      "hook": "binder-owned-persistent-spec-host-guest-jobservice-execution-bridge",
       "isolation": "package-user",
       "production": "partial",
-      "hostFallback": "delegated-after-rewrite-reschedule-without-guest-ack",
+      "hostFallback": "delegated-after-rewrite-with-typed-jobparameters-and-scoped-callback",
       "device": "not-tested"
     },
     {

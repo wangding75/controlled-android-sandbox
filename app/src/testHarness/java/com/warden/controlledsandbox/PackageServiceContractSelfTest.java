@@ -15,6 +15,7 @@ import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
@@ -213,6 +214,20 @@ public final class PackageServiceContractSelfTest {
                         && VirtualJobSnapshot.SCHEDULED.equals(restoredJob.state())
                         && java.util.Arrays.equals(new byte[]{1, 7}, restoredJob.payload()),
                 "virtual job snapshot lost");
+        VirtualJobParametersSnapshot jobParameters = new VirtualJobParametersSnapshot(
+                0x52000011, 17, "guest", new byte[]{1}, new byte[]{2}, new byte[]{3}, 4,
+                true, true, false, List.of("content://guest/jobs/17"), List.of("guest.jobs"),
+                new byte[]{5}, 6, 7, "constraint", 8L);
+        Parcel jobParametersParcel = Parcel.obtain();
+        jobParameters.writeToParcel(jobParametersParcel, 0); jobParametersParcel.setDataPosition(0);
+        VirtualJobParametersSnapshot restoredJobParameters = VirtualJobParametersSnapshot.CREATOR
+                .createFromParcel(jobParametersParcel);
+        jobParametersParcel.recycle();
+        require(restoredJobParameters.hostJobId() == 0x52000011
+                        && restoredJobParameters.guestJobId() == 17
+                        && restoredJobParameters.dispatchToken() == 8L
+                        && restoredJobParameters.triggeredUris().size() == 1,
+                "virtual JobParameters snapshot lost");
         System.out.println("PASS package service typed contract self-test");
     }
 

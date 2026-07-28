@@ -54,7 +54,9 @@ for name in ['VirtualComponentSnapshot', 'VirtualPermissionSnapshot',
 
 package_root_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl').read_text()
 virtual_service_signatures = [
-    'IVirtualSystemServiceSession openVirtualSystemServiceSession(in IBinder clientToken, String packageName, int virtualUserId, String processName, long generation);',
+    'IVirtualSystemServiceSession openVirtualSystemServiceSession(',
+    'boolean startVirtualJob(',
+    'boolean stopVirtualJob(',
 ]
 for signature in virtual_service_signatures:
     if signature not in package_root_aidl:
@@ -74,12 +76,21 @@ for signature in [
 if 'Bundle' in virtual_service_aidl or 'Bundle' in package_root_aidl:
     errors.append('virtual system-service contracts must not use Bundle')
 for name in ['VirtualAccountSnapshot', 'VirtualAlarmSnapshot', 'VirtualNotificationSnapshot',
-             'VirtualNotificationChannelSnapshot', 'VirtualJobSnapshot']:
+             'VirtualNotificationChannelSnapshot', 'VirtualJobSnapshot', 'VirtualJobParametersSnapshot']:
     declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
     source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
     if not declaration.is_file(): errors.append(f'missing AIDL parcelable declaration for {name}')
     if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
     elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
+
+
+for name in ['IHostJobCallback', 'IVirtualJobExecution']:
+    declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
+    if not declaration.is_file(): errors.append(f'missing typed Job execution AIDL for {name}')
+job_observer = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl').read_text()
+for signature in ['boolean onJobStart(', 'boolean onJobStop(']:
+    if signature not in job_observer: errors.append(f'Job observer is missing {signature}')
+if 'onJobReady' in job_observer: errors.append('obsolete onJobReady acknowledgement remains')
 
 package_result = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java').read_text()
 for evidence in ['VirtualPackageStateSnapshot packageState', 'successPackageState(', 'packageState()',

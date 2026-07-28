@@ -1125,12 +1125,12 @@
         "app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java",
         "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
-        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java"
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestJobServiceBridge.java"
       ],
-      "sourceStatus": "partial",
-      "productionStatus": "partial",
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Host callback reaches the owning Guest capability and requires explicit execution acknowledgement. Until a version-safe JobParameters bridge is implemented, Guest returns false and host requests rescheduling instead of silently losing the job."
+      "notes": "Trusted Host JobService dispatches to the owning Guest JobService; synchronous acceptance, scoped asynchronous jobFinished, stop and reschedule decisions are wired through typed capabilities."
     },
     {
       "id": "runtime.provider-resource-coordinator-split",
@@ -1143,6 +1143,55 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Provider cursor/file close delivery and cross-registry cleanup orchestration are extracted from RuntimeBrokerService into a dedicated coordinator."
+    },
+    {
+      "id": "contract.typed-job-execution-capability",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/VirtualJobParametersSnapshot.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualJobParametersSnapshot.java",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualJobExecution.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IHostJobCallback.aidl"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Version-neutral bounded JobParameters data and one-shot execution/host callback capabilities replace direct host callback exposure and Bundle transport."
+    },
+    {
+      "id": "package.job-execution-state-machine",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Persistent Job state now transitions SCHEDULED\u2192DISPATCHING\u2192RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
+    },
+    {
+      "id": "runtime.guest-jobservice-execution-bridge",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestJobServiceBridge.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestJobServiceBridgeSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest runtime resolves and creates the declared JobService, reconstructs bounded JobParameters and invokes onStartJob/onStopJob on the Guest main thread."
+    },
+    {
+      "id": "runtime.job-finished-callback",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestJobServiceBridge.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "A scoped one-shot execution Binder maps Guest JobService.jobFinished to the trusted Host JobService callback; old generations, completed capabilities and mismatched job IDs cannot finish current work."
     }
   ],
   "statusDimensions": {

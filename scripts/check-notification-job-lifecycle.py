@@ -26,13 +26,13 @@ def require(relative: str, *tokens: str) -> str:
 
 observer = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
-    "interface IVirtualSystemServiceObserver", "boolean onJobReady")
+    "interface IVirtualSystemServiceObserver", "boolean onJobStart", "boolean onJobStop")
 if "oneway interface" in observer:
     errors.append("Job acknowledgement observer cannot remain oneway")
 session = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
     "reserveNotification", "commitNotification", "listNotifications",
-    "upsertNotificationChannel", "reserveJob", "commitJob", "listJobs", "finishJob")
+    "upsertNotificationChannel", "reserveJob", "commitJob", "listJobs")
 if "Bundle" in session:
     errors.append("M4-T12 system-service lifecycle AIDL must remain typed")
 for name in ["VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot", "VirtualJobSnapshot"]:
@@ -47,15 +47,15 @@ store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
     "private static final int SCHEMA = 2", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE",
     "reserveNotification", "commitNotification", "notificationChannels", "reserveJob",
-    "commitJob", "dispatchJob", "observer.onJobReady", "VirtualJobSnapshot.SCHEDULED")
-if "if (delivery.observer.onJobReady" not in store:
-    errors.append("Job must become RUNNING only after explicit Guest callback acknowledgement")
+    "commitJob", "startJob", "observer().onJobStart", "VirtualJobSnapshot.SCHEDULED")
+if "VirtualJobSnapshot.DISPATCHING" not in store or "VirtualJobSnapshot.RUNNING" not in store:
+    errors.append("Job must transition through DISPATCHING and RUNNING only after Guest acceptance")
 service = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java",
-    "extends JobService", "dispatchVirtualJob", "jobFinished", "needsReschedule")
+    "extends JobService", "startVirtualJob", "stopVirtualJob", "jobFinished", "needsReschedule")
 manifest = require("app/src/main/AndroidManifest.xml", ".VirtualJobService", "android.permission.BIND_JOB_SERVICE")
 root_aidl = require("sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
-                    "boolean dispatchVirtualJob(int hostJobId)")
+                    "boolean startVirtualJob", "boolean stopVirtualJob")
 
 interceptor = require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
@@ -67,12 +67,12 @@ for forbidden in ["VIRTUAL_NOTIFICATION_CANCEL_ALL_UNSUPPORTED", "VIRTUAL_JOB_CA
 
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
-    "BiFunction<Integer, Object, Boolean>", "session.reserveNotification", "session.reserveJob",
-    "onJobReady", "jobReadyListener.apply")
+    "JobExecutionListener", "session.reserveNotification", "session.reserveJob",
+    "onJobStart", "onJobStop")
 guest = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
-    "virtualServices.jobs().setReadyListener", "JOB_PARAMETERS_BRIDGE_PENDING",
-    "return false", "virtualServices.close()")
+    "virtualServices.jobs().setExecutionListener", "GuestJobServiceBridge",
+    "onVirtualJobStart", "onVirtualJobStop", "virtualServices.close()")
 provider_coordinator = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/RuntimeProviderResourceCoordinator.java",
     "class RuntimeProviderResourceCoordinator", "closeCursorBestEffort", "closeFileBestEffort",
@@ -92,7 +92,7 @@ require(
     "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
     "active notification lifecycle must survive Package Service recreation",
     "scheduled job lifecycle must survive Package Service recreation",
-    "unacknowledged job must remain SCHEDULED")
+    "job callback without Guest execution acknowledgement must request host reschedule")
 require(
     "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java",
     "virtual notification cancelAll must cancel only owned host IDs",
@@ -124,7 +124,7 @@ if service_matrix.is_file():
     job = services.get("job-scheduler", {})
     if notification.get("production") != "wired" or "owned-resource" not in notification.get("hook", ""):
         errors.append("notification service matrix must disclose wired owned-resource lifecycle")
-    if job.get("production") != "partial" or "host-bridge" not in job.get("hook", ""):
+    if job.get("production") != "partial" or ("host-bridge" not in job.get("hook", "") and "execution-bridge" not in job.get("hook", "")):
         errors.append("job service matrix must disclose partial host bridge")
 else:
     errors.append("missing system service coverage matrix")

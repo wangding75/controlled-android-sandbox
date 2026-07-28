@@ -1,11 +1,17 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.contract.IHostJobCallback;
+import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import android.os.Binder;
+import android.os.IBinder;
+import android.os.RemoteException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -129,10 +136,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private static final int MAX_KEY_CHARS = 512;
     private static final int MAX_SECRET_CHARS = 16 * 1024;
     private static final long RETRY_WITHOUT_CLIENT_MS = 30_000L;
+    private static final long JOB_EXECUTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
     private final File file;
     private volatile String maintenanceWarning = "";
     private final Map<Scope, ScopeState> states = new LinkedHashMap<>();
     private final Set<Client> clients = new LinkedHashSet<>();
+    private final Map<Integer, JobExecution> activeJobExecutions = new LinkedHashMap<>();
+    private final AtomicLong nextJobDispatchToken = new AtomicLong(1L);
     private int nextNotificationHostId = 0x51000000;
     private int nextJobHostId = 0x52000000;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -150,19 +160,41 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
     }
 
-    synchronized void register(Client client) {
-        clients.removeIf(existing -> existing != client
-                && existing.scope().equals(client.scope())
-                && existing.processName().equals(client.processName())
-                && existing.generation() == client.generation());
-        clients.add(client);
-        for (AlarmRecord alarm : state(client.scope()).alarms.values()) {
-            if (alarm.future == null || alarm.future.isCancelled() || alarm.future.isDone()) {
-                scheduleFuture(client.scope(), alarm);
+    void register(Client client) {
+        List<JobExecution> stale = new ArrayList<>();
+        synchronized (this) {
+            clients.removeIf(existing -> {
+                boolean replace = existing != client && existing.scope().equals(client.scope())
+                        && existing.processName().equals(client.processName())
+                        && existing.generation() == client.generation();
+                if (replace) collectExecutions(existing, stale);
+                return replace;
+            });
+            clients.add(client);
+            for (AlarmRecord alarm : state(client.scope()).alarms.values()) {
+                if (alarm.future == null || alarm.future.isCancelled() || alarm.future.isDone()) {
+                    scheduleFuture(client.scope(), alarm);
+                }
             }
         }
+        for (JobExecution execution : stale) rescheduleExecution(execution);
     }
-    synchronized void unregister(Client client) { clients.remove(client); }
+    void unregister(Client client) {
+        List<JobExecution> stale = new ArrayList<>();
+        synchronized (this) {
+            clients.remove(client); collectExecutions(client, stale);
+        }
+        for (JobExecution execution : stale) rescheduleExecution(execution);
+    }
+    private void rescheduleExecution(JobExecution execution) {
+        try { scheduler.execute(() -> execution.complete(true, true)); }
+        catch (RuntimeException rejected) { execution.complete(true, true); }
+    }
+    private void collectExecutions(Client client, List<JobExecution> out) {
+        for (JobExecution execution : activeJobExecutions.values()) {
+            if (execution.client == client && execution.active) out.add(execution);
+        }
+    }
 
     synchronized byte[] clipboard(Scope scope) { return state(scope).clipboard.clone(); }
     synchronized void setClipboard(Scope scope, byte[] payload) {
@@ -364,6 +396,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     processName, generation, payload, System.currentTimeMillis());
             state.jobs.put(guestId, current);
         } else {
+            JobExecution active = activeJobExecutions.get(current.hostId);
+            if (active != null && active.active()) {
+                throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_ACTIVE");
+            }
             current.state = VirtualJobSnapshot.RESERVED; current.ownerGeneration = generation;
             current.payload = boundedPayload(payload, "jobPayload"); current.updatedAtMs = System.currentTimeMillis();
         }
@@ -375,15 +411,33 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         record.state = VirtualJobSnapshot.SCHEDULED; record.updatedAtMs = System.currentTimeMillis();
         persistOrRestore(scope, before);
     }
-    synchronized boolean removeJob(Scope scope, int guestId) {
-        ScopeState before = snapshot(scope); boolean removed = state(scope).jobs.remove(guestId) != null;
-        if (removed) persistOrRestore(scope, before); return removed;
+    boolean removeJob(Scope scope, int guestId) {
+        JobExecution execution;
+        synchronized (this) {
+            JobRecord record = state(scope).jobs.get(guestId);
+            execution = record == null ? null : activeJobExecutions.get(record.hostId);
+        }
+        if (execution != null) {
+            execution.cancelWithoutHost(false);
+            return true;
+        }
+        synchronized (this) {
+            ScopeState before = snapshot(scope); boolean removed = state(scope).jobs.remove(guestId) != null;
+            if (removed) persistOrRestore(scope, before); return removed;
+        }
     }
     synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation) {
         ScopeState before = snapshot(scope); boolean changed = false; List<VirtualJobSnapshot> out = new ArrayList<>();
         for (JobRecord record : state(scope).jobs.values()) {
             if (record.ownerProcessName.equals(processName) && record.ownerGeneration != generation) {
-                record.ownerGeneration = generation; changed = true;
+                JobExecution active = activeJobExecutions.get(record.hostId);
+                if (active != null && active.active()) continue;
+                record.ownerGeneration = generation;
+                if (VirtualJobSnapshot.DISPATCHING.equals(record.state)
+                        || VirtualJobSnapshot.RUNNING.equals(record.state)) {
+                    record.state = VirtualJobSnapshot.SCHEDULED;
+                }
+                record.updatedAtMs = System.currentTimeMillis(); changed = true;
             }
             out.add(jobSnapshot(record));
         }
@@ -391,61 +445,191 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         out.sort(Comparator.comparingInt(VirtualJobSnapshot::guestId));
         return Collections.unmodifiableList(out);
     }
-    synchronized void finishJob(Scope scope, int guestId, boolean needsReschedule) {
-        ScopeState before = snapshot(scope); JobRecord record = state(scope).jobs.get(guestId);
-        if (record == null) return;
-        if (needsReschedule) { record.state = VirtualJobSnapshot.SCHEDULED; record.updatedAtMs = System.currentTimeMillis(); }
-        else state(scope).jobs.remove(guestId);
-        persistOrRestore(scope, before);
-    }
-    boolean dispatchJob(int hostJobId) {
-        List<JobDispatch> deliveries = new ArrayList<>();
+
+    boolean startJob(VirtualJobParametersSnapshot parameters, IHostJobCallback hostCallback,
+                     int ownerUid) {
+        if (parameters == null || hostCallback == null || hostCallback.asBinder() == null
+                || !hostCallback.asBinder().isBinderAlive()) return false;
+        JobExecution execution;
         synchronized (this) {
-            for (Map.Entry<Scope, ScopeState> item : states.entrySet()) {
-                for (JobRecord job : item.getValue().jobs.values()) {
-                    if (job.hostId != hostJobId || !VirtualJobSnapshot.SCHEDULED.equals(job.state)) continue;
-                    for (Client client : new ArrayList<>(clients)) {
-                        if (client.active() && client.scope().equals(item.getKey())
-                                && client.processName().equals(job.ownerProcessName)
-                                && client.generation() == job.ownerGeneration && client.observer() != null) {
-                            deliveries.add(new JobDispatch(item.getKey(), job, client.observer()));
-                        }
-                    }
-                }
+            LocatedJob located = findJobByHost(parameters.hostJobId());
+            if (located == null || !VirtualJobSnapshot.SCHEDULED.equals(located.job.state)
+                    || activeJobExecutions.containsKey(parameters.hostJobId())) return false;
+            Client client = matchingClient(located.scope, located.job);
+            if (client == null) return false;
+            ScopeState before = snapshot(located.scope);
+            located.job.state = VirtualJobSnapshot.DISPATCHING;
+            located.job.updatedAtMs = System.currentTimeMillis();
+            persistOrRestore(located.scope, before);
+            long token = positiveToken();
+            execution = new JobExecution(located.scope, located.job, client, ownerUid,
+                    parameters.forGuest(located.job.guestId, token), hostCallback, token);
+            try { hostCallback.asBinder().linkToDeath(execution, 0); }
+            catch (RemoteException error) {
+                located.job.state = VirtualJobSnapshot.SCHEDULED;
+                located.job.updatedAtMs = System.currentTimeMillis();
+                persist();
+                return false;
             }
+            activeJobExecutions.put(located.job.hostId, execution);
         }
-        boolean delivered = false;
-        for (JobDispatch delivery : deliveries) {
-            try {
-                if (delivery.observer.onJobReady(delivery.job.guestId, delivery.job.payload.clone())) delivered = true;
-            } catch (Exception ignored) { }
+        boolean accepted;
+        try {
+            accepted = execution.client.observer().onJobStart(execution.job.guestId,
+                    execution.job.payload.clone(), execution.parameters, execution);
+        } catch (Exception error) { accepted = false; }
+        if (!accepted) {
+            execution.rejectStart();
+            return false;
         }
-        if (delivered) synchronized (this) {
-            for (JobDispatch delivery : deliveries) {
-                JobRecord current = state(delivery.scope).jobs.get(delivery.job.guestId);
-                if (current != delivery.job) continue;
-                ScopeState before = snapshot(delivery.scope);
-                current.state = VirtualJobSnapshot.RUNNING; current.updatedAtMs = System.currentTimeMillis();
-                persistOrRestore(delivery.scope, before);
+        synchronized (this) {
+            if (!execution.active) return true;
+            LocatedJob current = findJobByHost(execution.job.hostId);
+            if (current == null || current.job != execution.job) {
+                execution.invalidateLocked(); return false;
             }
+            ScopeState before = snapshot(current.scope);
+            current.job.state = VirtualJobSnapshot.RUNNING;
+            current.job.updatedAtMs = System.currentTimeMillis();
+            try { persistOrRestore(current.scope, before); }
+            catch (RuntimeException error) {
+                current.job.state = VirtualJobSnapshot.SCHEDULED;
+                current.job.updatedAtMs = System.currentTimeMillis();
+                execution.invalidateLocked();
+                try { persist(); } catch (RuntimeException ignored) { }
+                throw error;
+            }
+            execution.timeout = scheduler.schedule(execution::timeout,
+                    JOB_EXECUTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         }
-        return delivered;
+        return true;
     }
-    private record JobDispatch(Scope scope, JobRecord job, IVirtualSystemServiceObserver observer) { }
+
+    boolean stopJob(int hostJobId, int stopReason, int internalStopReason,
+                    String debugStopReason) {
+        JobExecution execution;
+        synchronized (this) { execution = activeJobExecutions.get(hostJobId); }
+        if (execution == null || !execution.active()) return true;
+        boolean reschedule = true;
+        try {
+            reschedule = execution.client.observer().onJobStop(execution.job.guestId,
+                    execution.parameters.withStopReason(stopReason, internalStopReason, debugStopReason));
+        } catch (Exception ignored) { reschedule = true; }
+        execution.complete(reschedule, false);
+        return reschedule;
+    }
+
+    private synchronized LocatedJob findJobByHost(int hostId) {
+        for (Map.Entry<Scope, ScopeState> item : states.entrySet()) {
+            for (JobRecord job : item.getValue().jobs.values()) {
+                if (job.hostId == hostId) return new LocatedJob(item.getKey(), job);
+            }
+        }
+        return null;
+    }
+    private synchronized Client matchingClient(Scope scope, JobRecord job) {
+        Client match = null;
+        for (Client client : new ArrayList<>(clients)) {
+            if (!client.active() || client.observer() == null || !client.scope().equals(scope)
+                    || !client.processName().equals(job.ownerProcessName)
+                    || client.generation() != job.ownerGeneration) continue;
+            if (match != null) return null;
+            match = client;
+        }
+        return match;
+    }
+    private long positiveToken() {
+        long value = nextJobDispatchToken.getAndIncrement();
+        if (value > 0L) return value;
+        synchronized (nextJobDispatchToken) {
+            nextJobDispatchToken.set(2L); return 1L;
+        }
+    }
+    private record LocatedJob(Scope scope, JobRecord job) { }
+
+    private final class JobExecution extends IVirtualJobExecution.Stub implements IBinder.DeathRecipient {
+        final Scope scope; final JobRecord job; final Client client; final int ownerUid;
+        final VirtualJobParametersSnapshot parameters; final IHostJobCallback hostCallback;
+        final long token; volatile boolean active = true; volatile ScheduledFuture<?> timeout;
+        JobExecution(Scope scope, JobRecord job, Client client, int ownerUid,
+                     VirtualJobParametersSnapshot parameters, IHostJobCallback hostCallback,
+                     long token) {
+            this.scope = scope; this.job = job; this.client = client; this.ownerUid = ownerUid;
+            this.parameters = parameters; this.hostCallback = hostCallback; this.token = token;
+        }
+        @Override public int guestJobId() { return job.guestId; }
+        @Override public long generation() { return job.ownerGeneration; }
+        @Override public long dispatchToken() { return token; }
+        @Override public boolean isActive() { return active(); }
+        @Override public void finish(boolean needsReschedule) {
+            if (Binder.getCallingUid() != ownerUid) throw new SecurityException("JOB_EXECUTION_UID_MISMATCH");
+            complete(needsReschedule, true);
+        }
+        @Override public void binderDied() { cancelWithoutHost(true); }
+        boolean active() {
+            synchronized (VirtualSystemServiceStore.this) {
+                return active && activeJobExecutions.get(job.hostId) == this;
+            }
+        }
+        void rejectStart() { complete(true, false); }
+        void timeout() { complete(true, true); }
+        void cancelWithoutHost(boolean reschedule) { complete(reschedule, false); }
+        void complete(boolean needsReschedule, boolean notifyHost) {
+            boolean callHost = false;
+            synchronized (VirtualSystemServiceStore.this) {
+                if (!active()) return;
+                ScopeState before = snapshot(scope);
+                if (needsReschedule) {
+                    job.state = VirtualJobSnapshot.SCHEDULED;
+                    job.updatedAtMs = System.currentTimeMillis();
+                } else {
+                    state(scope).jobs.remove(job.guestId);
+                }
+                persistOrRestore(scope, before);
+                invalidateLocked(); callHost = notifyHost;
+            }
+            if (callHost) {
+                try { hostCallback.finishHostJob(job.hostId, needsReschedule); }
+                catch (Exception ignored) { }
+            }
+        }
+        void invalidateLocked() {
+            if (!active) return; active = false;
+            activeJobExecutions.remove(job.hostId, this);
+            ScheduledFuture<?> value = timeout; if (value != null) value.cancel(false);
+            try { hostCallback.asBinder().unlinkToDeath(this, 0); } catch (RuntimeException ignored) { }
+        }
+    }
 
     synchronized String maintenanceWarning() { return maintenanceWarning; }
 
-    synchronized void deleteScopeBestEffort(Scope scope) {
-        ScopeState removed = states.remove(scope);
-        if (removed == null) return;
-        for (AlarmRecord alarm : removed.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
-        try {
-            persist();
-            maintenanceWarning = "";
-        } catch (RuntimeException error) {
-            states.put(scope, removed);
-            for (AlarmRecord alarm : removed.alarms.values()) scheduleFuture(scope, alarm);
-            maintenanceWarning = "VIRTUAL_SYSTEM_SERVICE_SCOPE_CLEANUP_FAILED:" + error.getClass().getSimpleName();
+    void deleteScopeBestEffort(Scope scope) {
+        List<JobExecution> active = new ArrayList<>();
+        synchronized (this) {
+            for (JobExecution execution : activeJobExecutions.values()) {
+                if (execution.scope.equals(scope)) active.add(execution);
+            }
+        }
+        String executionWarning = "";
+        for (JobExecution execution : active) {
+            try { execution.complete(false, true); }
+            catch (RuntimeException error) {
+                synchronized (this) { execution.invalidateLocked(); }
+                executionWarning = "VIRTUAL_JOB_SCOPE_CANCEL_FAILED:" + error.getClass().getSimpleName();
+            }
+        }
+        synchronized (this) {
+            ScopeState removed = states.remove(scope);
+            if (removed == null) return;
+            for (AlarmRecord alarm : removed.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
+            try {
+                persist();
+                maintenanceWarning = executionWarning;
+            } catch (RuntimeException error) {
+                states.put(scope, removed);
+                for (AlarmRecord alarm : removed.alarms.values()) scheduleFuture(scope, alarm);
+                maintenanceWarning = "VIRTUAL_SYSTEM_SERVICE_SCOPE_CLEANUP_FAILED:" + error.getClass().getSimpleName();
+            }
         }
     }
 
@@ -796,6 +980,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     && value.updatedAtMs < cutoff);
             state.jobs.values().removeIf(value -> VirtualJobSnapshot.RESERVED.equals(value.state)
                     && value.updatedAtMs < cutoff);
+            for (JobRecord value : state.jobs.values()) {
+                if (VirtualJobSnapshot.DISPATCHING.equals(value.state)
+                        || VirtualJobSnapshot.RUNNING.equals(value.state)) {
+                    value.state = VirtualJobSnapshot.SCHEDULED;
+                    value.updatedAtMs = System.currentTimeMillis();
+                }
+            }
         }
     }
     private static NotificationKey notificationKey(int guestId, String guestTag) {
@@ -830,6 +1021,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private static String jobState(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
         if (!VirtualJobSnapshot.RESERVED.equals(normalized) && !VirtualJobSnapshot.SCHEDULED.equals(normalized)
+                && !VirtualJobSnapshot.DISPATCHING.equals(normalized)
                 && !VirtualJobSnapshot.RUNNING.equals(normalized)) throw new IllegalArgumentException("invalid job state");
         return normalized;
     }
@@ -844,6 +1036,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
 
     @Override public synchronized void close() {
         for (ScopeState state : states.values()) for (AlarmRecord alarm : state.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
+        for (JobExecution execution : new ArrayList<>(activeJobExecutions.values())) execution.invalidateLocked();
         clients.clear(); scheduler.shutdownNow();
     }
     private static byte[] boundedPayload(byte[] value, String name) {

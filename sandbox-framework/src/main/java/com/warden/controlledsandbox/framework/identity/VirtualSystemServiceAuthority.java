@@ -14,6 +14,26 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
                                      Object payload, long updatedAtMs) { }
     record JobRecord(int guestId, int hostId, String state, String ownerProcessName,
                      long ownerGeneration, Object payload, long updatedAtMs) { }
+    record JobParametersRecord(int hostJobId, int guestJobId, String namespace,
+                               Object extras, Object transientExtras, Object clipData,
+                               int clipGrantFlags, boolean overrideDeadlineExpired,
+                               boolean expedited, boolean userInitiated,
+                               java.util.List<String> triggeredUris,
+                               java.util.List<String> triggeredAuthorities,
+                               Object network, int stopReason, int internalStopReason,
+                               String debugStopReason, long dispatchToken) { }
+    interface JobExecution {
+        int guestJobId();
+        long generation();
+        long dispatchToken();
+        boolean active();
+        void finish(boolean needsReschedule);
+    }
+    interface JobExecutionListener {
+        boolean onStart(int guestJobId, Object jobPayload, JobParametersRecord parameters,
+                        JobExecution execution);
+        boolean onStop(int guestJobId, JobParametersRecord parameters);
+    }
 
     Object clipboard();
     void setClipboard(Object value);
@@ -45,8 +65,7 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     default void commitJob(int guestId) { throw new UnsupportedOperationException("job authority"); }
     default boolean removeJob(int guestId) { return false; }
     default List<JobRecord> jobs() { return List.of(); }
-    default void finishJob(int guestId, boolean needsReschedule) { }
-    default void setJobReadyListener(java.util.function.BiFunction<Integer, Object, Boolean> listener) { }
+    default void setJobExecutionListener(JobExecutionListener listener) { }
 
     NamespaceMapping ensureNamespace(String namespace, int guestId);
     Integer hostIdIfPresent(String namespace, int guestId);

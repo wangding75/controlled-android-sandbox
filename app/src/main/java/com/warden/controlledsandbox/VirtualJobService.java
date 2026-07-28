@@ -7,35 +7,27 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
+import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageService;
+import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** Host JobScheduler callback bridge. Runs in the trusted Runtime Broker process. */
+/** Trusted Host JobScheduler callback bridge running in the Runtime Broker process. */
 public final class VirtualJobService extends JobService {
-    private final ConcurrentMap<Integer, ServiceConnection> connections = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, JobConnection> connections = new ConcurrentHashMap<>();
 
     @Override public boolean onStartJob(JobParameters params) {
         if (params == null) return false;
         int hostJobId = params.getJobId();
-        Intent intent = new Intent(this, PackageManagementService.class);
-        ServiceConnection value = new ServiceConnection() {
-            @Override public void onServiceConnected(ComponentName name, IBinder binder) {
-                boolean delivered = false;
-                try {
-                    IPackageService service = IPackageService.Stub.asInterface(binder);
-                    delivered = service != null && service.dispatchVirtualJob(hostJobId);
-                } catch (Exception ignored) { }
-                finally { complete(hostJobId, params, !delivered, this); }
-            }
-            @Override public void onServiceDisconnected(ComponentName name) {
-                complete(hostJobId, params, true, this);
-            }
-        };
+        JobConnection value = new JobConnection(hostJobId, params,
+                HostJobParametersSnapshotFactory.from(params));
         if (connections.putIfAbsent(hostJobId, value) != null) return true;
         boolean bound;
-        try { bound = bindService(intent, value, Context.BIND_AUTO_CREATE); }
-        catch (RuntimeException error) { bound = false; }
+        try {
+            bound = bindService(new Intent(this, PackageManagementService.class), value,
+                    Context.BIND_AUTO_CREATE);
+        } catch (RuntimeException error) { bound = false; }
         if (!bound) {
             connections.remove(hostJobId, value);
             return false;
@@ -45,19 +37,88 @@ public final class VirtualJobService extends JobService {
 
     @Override public boolean onStopJob(JobParameters params) {
         if (params == null) return true;
-        ServiceConnection value = connections.remove(params.getJobId());
-        if (value != null) unbind(value);
-        return true;
+        int hostJobId = params.getJobId();
+        JobConnection value = connections.remove(hostJobId);
+        if (value == null) return true;
+        value.stopped = true;
+        boolean reschedule = true;
+        IPackageService service = value.service;
+        if (service != null) {
+            try {
+                reschedule = service.stopVirtualJob(hostJobId,
+                        HostJobParametersSnapshotFactory.stopReason(params),
+                        HostJobParametersSnapshotFactory.internalStopReason(params),
+                        HostJobParametersSnapshotFactory.debugStopReason(params));
+            } catch (Exception ignored) { reschedule = true; }
+        }
+        unbind(value);
+        return reschedule;
     }
 
-    private void complete(int hostJobId, JobParameters params, boolean needsReschedule,
-                          ServiceConnection value) {
-        if (!connections.remove(hostJobId, value)) return;
-        try { jobFinished(params, needsReschedule); } catch (RuntimeException ignored) { }
+    @Override public void onDestroy() {
+        for (JobConnection value : connections.values()) {
+            if (connections.remove(value.hostJobId, value)) {
+                value.stopped = true;
+                IPackageService service = value.service;
+                if (service != null) {
+                    try { service.stopVirtualJob(value.hostJobId, 0, -1, "host JobService destroyed"); }
+                    catch (Exception ignored) { }
+                }
+                unbind(value);
+            }
+        }
+        super.onDestroy();
+    }
+
+    private void complete(JobConnection value, boolean needsReschedule) {
+        if (value.stopped || !connections.remove(value.hostJobId, value)) return;
+        value.stopped = true;
+        try { jobFinished(value.parameters, needsReschedule); }
+        catch (RuntimeException ignored) { }
         unbind(value);
     }
 
     private void unbind(ServiceConnection value) {
         try { unbindService(value); } catch (RuntimeException ignored) { }
+    }
+
+    private final class JobConnection implements ServiceConnection {
+        final int hostJobId;
+        final JobParameters parameters;
+        final VirtualJobParametersSnapshot snapshot;
+        final IHostJobCallback callback;
+        volatile IPackageService service;
+        volatile boolean stopped;
+
+        JobConnection(int hostJobId, JobParameters parameters,
+                      VirtualJobParametersSnapshot snapshot) {
+            this.hostJobId = hostJobId; this.parameters = parameters; this.snapshot = snapshot;
+            callback = new IHostJobCallback.Stub() {
+                @Override public void finishHostJob(int reportedHostJobId, boolean needsReschedule) {
+                    if (reportedHostJobId != JobConnection.this.hostJobId) {
+                        throw new SecurityException("HOST_JOB_CALLBACK_ID_MISMATCH");
+                    }
+                    complete(JobConnection.this, needsReschedule);
+                }
+            };
+        }
+
+        @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+            if (stopped) { unbind(this); return; }
+            service = IPackageService.Stub.asInterface(binder);
+            boolean accepted = false;
+            try { accepted = service != null && service.startVirtualJob(snapshot, callback); }
+            catch (Exception ignored) { accepted = false; }
+            if (!accepted) complete(this, true);
+        }
+        @Override public void onServiceDisconnected(ComponentName name) {
+            service = null; complete(this, true);
+        }
+        @Override public void onBindingDied(ComponentName name) {
+            service = null; complete(this, true);
+        }
+        @Override public void onNullBinding(ComponentName name) {
+            service = null; complete(this, true);
+        }
     }
 }
