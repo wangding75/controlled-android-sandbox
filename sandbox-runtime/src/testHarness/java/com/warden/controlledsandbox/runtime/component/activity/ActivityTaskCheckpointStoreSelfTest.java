@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.component.activity;
 import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskLedger;
+import com.warden.controlledsandbox.framework.activity.DocumentLaunchMode;
 import com.warden.controlledsandbox.framework.activity.LaunchFlags;
 import com.warden.controlledsandbox.framework.activity.LaunchMode;
 import com.warden.controlledsandbox.framework.activity.LaunchRequest;
@@ -29,7 +30,10 @@ public final class ActivityTaskCheckpointStoreSelfTest {
                 3,
                 "route-1",
                 "",
-                -1));
+                -1,
+                "rev-3",
+                DocumentLaunchMode.ALWAYS,
+                "content://example/document/1"));
         ledger.saveInstanceState(launch.activityToken(),
                 new SavedActivityState(2, Map.of("screen", "home")));
         ActivityTaskCheckpoint expected = ledger.checkpoint();
@@ -50,7 +54,30 @@ public final class ActivityTaskCheckpointStoreSelfTest {
                 expected.recentTasks());
         store.save(legacy);
         ActivityTaskCheckpoint loadedLegacy = store.load().orElseThrow();
-        check(loadedLegacy.equals(legacy), "schema-1 checkpoint must remain readable");
+        check(loadedLegacy.schemaVersion() == ActivityTaskCheckpoint.LEGACY_SCHEMA
+                        && loadedLegacy.tasks().size() == legacy.tasks().size()
+                        && loadedLegacy.tasks().get(0).activities().size()
+                        == legacy.tasks().get(0).activities().size(),
+                "schema-1 checkpoint must remain readable");
+
+        ActivityTaskCheckpoint previous = new ActivityTaskCheckpoint(
+                ActivityTaskCheckpoint.PREVIOUS_SCHEMA,
+                expected.nextTaskId(),
+                expected.nextNewIntentSequence(),
+                expected.nextConfigurationSequence(),
+                expected.nextActivationSequence(),
+                expected.transportDeliveryCount(),
+                expected.tasks(),
+                expected.recentTasks());
+        store.save(previous);
+        ActivityTaskCheckpoint loadedPrevious = store.load().orElseThrow();
+        check(loadedPrevious.schemaVersion() == ActivityTaskCheckpoint.PREVIOUS_SCHEMA
+                        && loadedPrevious.tasks().get(0).packageRevision().equals("rev-3")
+                        && loadedPrevious.tasks().get(0).documentLaunchMode()
+                        == previous.tasks().get(0).documentLaunchMode()
+                        && loadedPrevious.tasks().get(0).documentKey()
+                        .equals(previous.tasks().get(0).documentKey()),
+                "schema-2 checkpoint must preserve revision and document task state");
 
         store.save(expected);
 

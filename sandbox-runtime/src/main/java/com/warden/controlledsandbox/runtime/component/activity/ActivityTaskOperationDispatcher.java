@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.framework.activity.TaskQuerySnapshot;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 
 /** Narrow dispatcher for typed Guest task queries and mutations. */
 final class ActivityTaskOperationDispatcher {
@@ -44,32 +45,27 @@ final class ActivityTaskOperationDispatcher {
                     session.virtualUserId(), session.packageName(), session.packageRevision(),
                     request.maxCount()));
             case ActivityTaskRequest.MOVE_TO_FRONT -> {
-                changed = ledger.moveTaskToFront(
+                changed = mutate(() -> ledger.moveTaskToFront(
                         session.virtualUserId(), session.packageName(), session.packageRevision(),
-                        request.taskId());
-                persistCheckpoint.run();
+                        request.taskId()));
             }
             case ActivityTaskRequest.MOVE_TO_BACK -> {
-                changed = ledger.moveTaskToBack(
+                changed = mutate(() -> ledger.moveTaskToBack(
                         session.virtualUserId(), session.packageName(), session.packageRevision(),
-                        request.taskId());
-                persistCheckpoint.run();
+                        request.taskId()));
             }
             case ActivityTaskRequest.REMOVE_TASK -> {
-                changed = ledger.removeTask(
+                changed = mutate(() -> ledger.removeTask(
                         session.virtualUserId(), session.packageName(), session.packageRevision(),
-                        request.taskId());
-                persistCheckpoint.run();
+                        request.taskId()));
             }
             case ActivityTaskRequest.FINISH_AFFINITY -> {
                 verifyOwner(request.activityToken(), session);
-                changed = ledger.finishAffinity(request.activityToken()) > 0;
-                persistCheckpoint.run();
+                changed = mutate(() -> ledger.finishAffinity(request.activityToken()) > 0);
             }
             case ActivityTaskRequest.FINISH_AND_REMOVE_TASK -> {
                 verifyOwner(request.activityToken(), session);
-                changed = ledger.finishAndRemoveTask(request.activityToken());
-                persistCheckpoint.run();
+                changed = mutate(() -> ledger.finishAndRemoveTask(request.activityToken()));
             }
             case ActivityTaskRequest.CHECKPOINT_STATUS -> { }
             default -> throw new IllegalArgumentException(
@@ -88,6 +84,18 @@ final class ActivityTaskOperationDispatcher {
                 restored.restoredActivityCount(),
                 restored.droppedTransportDeliveryCount(),
                 tasks);
+    }
+
+    private boolean mutate(BooleanSupplier operation) {
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
+        try {
+            boolean changed = operation.getAsBoolean();
+            if (changed) persistCheckpoint.run();
+            return changed;
+        } catch (RuntimeException failure) {
+            ledger.restoreRollbackState(before);
+            throw failure;
+        }
     }
 
     private void verifyOwner(String activityToken, GuestSession session) {

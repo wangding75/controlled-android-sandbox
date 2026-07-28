@@ -2,6 +2,8 @@ package com.warden.controlledsandbox.contract;
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.ActivityTaskRequest;
 import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
@@ -14,6 +16,7 @@ interface IRuntimeBroker {
     Bundle consumeRoute(String token, String sessionId, long generation);
     Bundle activityEvent(in Bundle request);
     ActivityTaskResult activityTaskOperation(in ActivityTaskRequest request);
+    ActivityResultResult activityResultOperation(in ActivityResultRequest request);
     Bundle sessionStatus(String packageName, int virtualUserId);
     PackageServiceResult requestRuntimePermission(String sessionId, long generation,
         String permission, int requestCode);

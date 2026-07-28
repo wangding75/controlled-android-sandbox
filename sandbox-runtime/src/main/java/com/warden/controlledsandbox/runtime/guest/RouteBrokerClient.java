@@ -11,11 +11,14 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 
 public final class RouteBrokerClient {
     public interface Callback { void complete(Bundle route); }
     public interface PermissionCallback { void complete(PackageServiceResult result); }
+    public interface ActivityResultCallback { void complete(ActivityResultResult result); }
 
     private RouteBrokerClient() { }
 
@@ -35,6 +38,13 @@ public final class RouteBrokerClient {
         call(context, broker -> broker.invokeComponent(request), callback);
     }
 
+    public static void activityResultOperation(
+            Context context,
+            ActivityResultRequest request,
+            ActivityResultCallback callback) {
+        activityResultCall(context, broker -> broker.activityResultOperation(request), callback);
+    }
+
     public static void requestPermission(Activity activity, String sessionId, long generation,
                                          String permission, int requestCode,
                                          PermissionCallback callback) {
@@ -48,6 +58,38 @@ public final class RouteBrokerClient {
                                                PermissionCallback callback) {
         permissionCall(activity, broker -> broker.reportRuntimePermissionResult(
                 sessionId, generation, permission, requestCode, hostGranted, reason), callback);
+    }
+
+    private static void activityResultCall(
+            Context context,
+            ActivityResultRemoteCall call,
+            ActivityResultCallback callback) {
+        Intent service = new Intent(context, RuntimeBrokerService.class);
+        ServiceConnection connection = new ServiceConnection() {
+            @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+                ActivityResultResult result;
+                try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
+                catch (Exception error) {
+                    result = com.warden.controlledsandbox.contract.ActivityResultResult.failure(
+                            com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT,
+                            "activity-result-bind-failure",
+                            new com.warden.controlledsandbox.contract.SandboxError(
+                                    "ACTIVITY_RESULT_BINDER_FAILURE",
+                                    error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()),
+                                    true));
+                }
+                try { context.unbindService(this); } catch (Exception ignored) { }
+                callback.complete(result);
+            }
+            @Override public void onServiceDisconnected(ComponentName name) { }
+        };
+        if (!context.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+            callback.complete(com.warden.controlledsandbox.contract.ActivityResultResult.failure(
+                    com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT,
+                    "activity-result-bind-failure",
+                    new com.warden.controlledsandbox.contract.SandboxError(
+                            "BIND_FAILED", "Cannot bind RuntimeBrokerService", true)));
+        }
     }
 
     private static void permissionCall(Activity activity, PermissionRemoteCall call,
@@ -103,5 +145,8 @@ public final class RouteBrokerClient {
     private interface RemoteCall { Bundle invoke(IRuntimeBroker broker) throws Exception; }
     private interface PermissionRemoteCall {
         PackageServiceResult invoke(IRuntimeBroker broker) throws Exception;
+    }
+    private interface ActivityResultRemoteCall {
+        ActivityResultResult invoke(IRuntimeBroker broker) throws Exception;
     }
 }

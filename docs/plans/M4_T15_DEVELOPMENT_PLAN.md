@@ -53,7 +53,7 @@
 
 ### B1：LaunchMode、Intent Flag 与 Task 核心策略
 
-状态：**PASS，已通过批次门禁，待合并 `main` 和生成备份。**
+状态：**PASS，提交 `44cb141` 已合入 `main`，备份已生成。**
 
 交付：
 
@@ -67,6 +67,8 @@
 退出条件：专项矩阵测试、checkpoint 兼容测试和全仓门禁通过。
 
 ### B2：Result、Activity 重建与恢复
+
+状态：**PASS；本批次提交将快进合入 `main`，并标记 `m4-t15-b2-source-pass`。**
 
 交付：
 

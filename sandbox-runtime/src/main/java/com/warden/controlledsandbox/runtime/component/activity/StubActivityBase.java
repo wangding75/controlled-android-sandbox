@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.component.activity;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.guest.GuestPackageSpec;
 import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
+import com.warden.controlledsandbox.runtime.guest.GuestActivityResultBridge;
 import com.warden.controlledsandbox.runtime.guest.RouteBrokerClient;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
@@ -20,6 +21,7 @@ import java.util.Deque;
 
 public abstract class StubActivityBase extends Activity {
     private GuestActivityController controller;
+    private GuestActivityResultBridge activityResults;
     private TextView diagnostic;
     private int hostStage = 1;
     private String sessionId = "";
@@ -59,6 +61,8 @@ public abstract class StubActivityBase extends Activity {
                 int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
                 controller = new GuestActivityController(this, session, activityToken, taskId,
                         this::enqueueActivityEvent);
+                activityResults = new GuestActivityResultBridge(
+                        this, session, activityToken, taskId);
                 Bundle result = controller.create(spec.componentClass, state);
                 RuntimeEventLog.event("GUEST_ACTIVITY_CREATE", result);
                 if ("ACTIVITY_CREATED".equals(result.getString(RuntimeKeys.STATUS))) {
@@ -75,7 +79,14 @@ public abstract class StubActivityBase extends Activity {
     }
 
     @Override protected void onStart() { super.onStart(); hostStage = 2; if (controller != null) controller.start(); }
-    @Override protected void onResume() { super.onResume(); hostStage = 3; if (controller != null) controller.resume(); }
+    @Override protected void onResume() {
+        super.onResume();
+        hostStage = 3;
+        if (controller != null) controller.resume();
+        if (controller != null && activityResults != null) {
+            activityResults.drain(controller::activityResult);
+        }
+    }
     @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
     @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
     @Override protected void onDestroy() { if (controller != null) controller.destroy(); super.onDestroy(); }
@@ -203,7 +214,11 @@ public abstract class StubActivityBase extends Activity {
                 if ("ACTIVITY_EVENT_APPLIED".equals(result.getString(RuntimeKeys.STATUS))) {
                     activityEvents.removeFirst();
                     String currentToken = result.getString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
-                    if (!currentToken.isEmpty()) activityToken = currentToken;
+                    if (!currentToken.isEmpty()) {
+                        activityToken = currentToken;
+                        if (controller != null) controller.updateActivityToken(currentToken);
+                        if (activityResults != null) activityResults.updateActivityToken(currentToken);
+                    }
                 } else {
                     activityEvents.clear();
                     showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_EVENT_FAILED"),

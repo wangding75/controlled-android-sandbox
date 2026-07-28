@@ -1,10 +1,11 @@
 package com.warden.controlledsandbox.runtime.broker;
-
 import com.warden.controlledsandbox.contract.ActivityTaskRequest;
 import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
-
 import com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractFailure;
+import com.warden.controlledsandbox.runtime.component.activity.ActivityResultContractFailure;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity0;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity1;
@@ -35,8 +36,6 @@ import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinator;
 import com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinator;
 import com.warden.controlledsandbox.runtime.status.BrokerRuntimeStatusSource;
-
-
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
@@ -69,7 +68,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service {
     private static final int SLOT_COUNT = 8;
@@ -110,7 +108,6 @@ public final class RuntimeBrokerService extends Service {
             this::purgeExpiredResources,
             auditSink);
     private final ConcurrentMap<Integer, GuestConnection> guestConnections = new ConcurrentHashMap<>();
-
     @Override public void onCreate() {
         super.onCreate();
         activityRuntime.configureCheckpointStore(
@@ -130,7 +127,6 @@ public final class RuntimeBrokerService extends Service {
             CallerGuard.requireSameApplication();
             return RuntimeBrokerService.this.prepareGuestInternal(request);
         }
-
         @Override public Bundle launchActivity(Bundle request) {
             CallerGuard.requireSameApplication();
             Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
@@ -145,7 +141,6 @@ public final class RuntimeBrokerService extends Service {
                 String component = request == null ? "" : request.getString(RuntimeKeys.COMPONENT_CLASS, "");
                 if (component.trim().isEmpty()) component = prepared.getString(RuntimeKeys.COMPONENT_CLASS, "");
                 if (component.trim().isEmpty()) return failure("COMPONENT_MISSING", "No Guest Activity class supplied");
-
                 Bundle transaction = activityRuntime.launch(session, component, prepared, request);
                 issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
                 Intent launch = new Intent(RuntimeBrokerService.this, activityClassFor(session.processSlot()));
@@ -156,7 +151,6 @@ public final class RuntimeBrokerService extends Service {
                 launch.putExtra(RuntimeKeys.ACTIVITY_TOKEN,
                         transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
                 startActivity(launch);
-
                 Bundle out = sessionBundle(session, "LAUNCH_REQUESTED");
                 out.putAll(transaction);
                 return out;
@@ -165,7 +159,6 @@ public final class RuntimeBrokerService extends Service {
                 return failure(error);
             }
         }
-
         @Override public Bundle invokeComponent(Bundle request) {
             CallerGuard.requireSameApplication();
             BrokerProviderRuntime.OperationRoute providerRoute = null;
@@ -194,7 +187,6 @@ public final class RuntimeBrokerService extends Service {
                 if (ComponentOperations.PROVIDER_NOTIFY_CHANGE.equals(operation)) {
                     return notifyProviderObservers(request, requestedPackage, requestedUser);
                 }
-
                 GuestSession session;
                 BrokerCursorRuntime.Lease cursorLease = null;
                 BrokerFileRuntime.Lease fileLease = null;
@@ -233,7 +225,6 @@ public final class RuntimeBrokerService extends Service {
                         session = sessions.get(requestedPackage, requestedUser, processName);
                     }
                 }
-
                 if (ComponentOperations.SEND_BROADCAST.equals(operation)
                         && !request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
                         && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
@@ -248,7 +239,6 @@ public final class RuntimeBrokerService extends Service {
                             ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
                                     || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false));
                 }
-
                 String packageName = session.packageName();
                 int userId = session.virtualUserId();
                 String processName = session.processName();
@@ -269,7 +259,6 @@ public final class RuntimeBrokerService extends Service {
                 fileTargetSession = activeSession;
                 ProviderAccess providerAccess = providerRoute != null
                         ? providerAccess(providerRoute, request, activeSession) : null;
-
                 if (ComponentOperations.PROVIDER_OBSERVER_REGISTER.equals(operation)) {
                     if (providerAccess == null) throw new IllegalStateException("PROVIDER_OBSERVER_ACCESS_MISSING");
                     BrokerObserverRuntime.RegisterResult registration = observerRuntime.register(request,
@@ -588,6 +577,17 @@ public final class RuntimeBrokerService extends Service {
                 return activityRuntime.taskOperation(current, request);
             } catch (Throwable error) {
                 return ActivityTaskContractFailure.from(request, error);
+            }
+        }
+
+        @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request) {
+            CallerGuard.requireSameApplication();
+            try {
+                if (request == null) throw new IllegalArgumentException("request is required");
+                GuestSession current = findSession(request.sessionId(), request.generation());
+                return activityRuntime.resultOperation(current, request);
+            } catch (Throwable error) {
+                return ActivityResultContractFailure.from(request, error);
             }
         }
 

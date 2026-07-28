@@ -2,6 +2,9 @@ package com.warden.controlledsandbox.runtime.component.activity;
 
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
+import com.warden.controlledsandbox.runtime.guest.GuestActivityResultBridge;
+import com.warden.controlledsandbox.contract.ActivityResultSnapshot;
+import com.warden.controlledsandbox.contract.ActivityResultIntentSnapshot;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Activity;
@@ -16,7 +19,7 @@ public final class GuestActivityController {
 
     private final Activity host;
     private final GuestRuntimeEnvironment.Session session;
-    private final String activityToken;
+    private String activityToken;
     private final int taskId;
     private final EventSink eventSink;
     private Activity guest;
@@ -99,8 +102,16 @@ public final class GuestActivityController {
     void destroy() {
         if (!created || destroyed) return;
         if (started) stop();
+        ActivityResultFieldBridge.Captured result = ActivityResultFieldBridge.capture(guest);
         invokeIfCreated("onDestroy", new Class<?>[0], new Object[0]);
-        emitBestEffort("DESTROYED", new Bundle());
+        if (result.explicit()) {
+            Bundle details = new Bundle();
+            details.putInt(RuntimeKeys.RESULT_CODE, result.resultCode());
+            putResultIntent(details, GuestActivityResultBridge.snapshot(result.data()));
+            emitBestEffort("FINISH_RESULT", details);
+        } else {
+            emitBestEffort("DESTROYED", new Bundle());
+        }
         destroyed = true;
         guest = null;
     }
@@ -120,6 +131,18 @@ public final class GuestActivityController {
                 new Object[]{requestCode, resultCode, data});
     }
 
+    void activityResult(ActivityResultSnapshot result) {
+        activityResult(result.requestCode(), result.resultCode(),
+                GuestActivityResultBridge.toIntent(result.resultIntent()));
+    }
+
+    synchronized void updateActivityToken(String currentToken) {
+        if (currentToken == null || currentToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("currentToken is required");
+        }
+        activityToken = currentToken.trim();
+    }
+
     void permissionResult(int requestCode, String[] permissions, int[] grantResults) {
         invokeIfCreated("onRequestPermissionsResult",
                 new Class<?>[]{int.class, String[].class, int[].class},
@@ -135,6 +158,18 @@ public final class GuestActivityController {
             if (value != null) details.putString(RuntimeKeys.SAVED_STATE_PREFIX + key, String.valueOf(value));
         }
         emit("SAVE_STATE", details);
+    }
+
+    private static void putResultIntent(Bundle details, ActivityResultIntentSnapshot intent) {
+        details.putString(RuntimeKeys.RESULT_INTENT_ACTION, intent.action());
+        details.putString(RuntimeKeys.RESULT_INTENT_DATA, intent.dataUri());
+        details.putString(RuntimeKeys.RESULT_INTENT_TYPE, intent.mimeType());
+        details.putString(RuntimeKeys.RESULT_INTENT_COMPONENT, intent.componentName());
+        details.putInt(RuntimeKeys.RESULT_INTENT_FLAGS, intent.flags());
+        details.putString(RuntimeKeys.RESULT_INTENT_CLIP, intent.clipDescription());
+        for (java.util.Map.Entry<String, String> entry : intent.extras().entrySet()) {
+            details.putString(RuntimeKeys.RESULT_INTENT_EXTRA_PREFIX + entry.getKey(), entry.getValue());
+        }
     }
 
     private void emit(String event, Bundle details) {

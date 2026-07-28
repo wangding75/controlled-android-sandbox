@@ -33,7 +33,9 @@ final class ActivityLaunchSpecFactory {
                 input.getInt(RuntimeKeys.REQUEST_CODE, -1),
                 session.packageRevision(),
                 documentMode,
-                input.getString(RuntimeKeys.DOCUMENT_KEY, ""));
+                input.getString(RuntimeKeys.DOCUMENT_KEY, ""),
+                input.getString(RuntimeKeys.ACTIVITY_RESULT_KEY, ""),
+                input.getString(RuntimeKeys.INTENT_SENDER_TOKEN, ""));
     }
 
     private static LaunchMode parseLaunchMode(String value) {

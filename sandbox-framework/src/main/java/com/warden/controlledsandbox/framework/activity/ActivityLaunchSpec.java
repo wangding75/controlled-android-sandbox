@@ -16,7 +16,9 @@ public record ActivityLaunchSpec(
         int requestCode,
         String packageRevision,
         DocumentLaunchMode documentLaunchMode,
-        String documentKey) {
+        String documentKey,
+        String activityResultKey,
+        String intentSenderToken) {
 
     public ActivityLaunchSpec {
         identity = Objects.requireNonNull(identity, "identity");
@@ -28,12 +30,34 @@ public record ActivityLaunchSpec(
         documentLaunchMode = documentLaunchMode == null
                 ? DocumentLaunchMode.NONE : documentLaunchMode;
         documentKey = documentKey == null ? "" : documentKey.trim();
+        activityResultKey = optional(activityResultKey, 256, "activityResultKey");
+        intentSenderToken = optional(intentSenderToken, 512, "intentSenderToken");
         if (callerTaskId != null && callerTaskId < 1) {
             throw new IllegalArgumentException("callerTaskId must be positive");
         }
         if (processGeneration < 1) {
             throw new IllegalArgumentException("processGeneration must be positive");
         }
+    }
+
+
+    /** Compatibility constructor for the M4-T15 B1 typed task shape. */
+    public ActivityLaunchSpec(
+            ActivityIdentity identity,
+            String taskAffinity,
+            LaunchMode launchMode,
+            int flags,
+            Integer callerTaskId,
+            String processName,
+            long processGeneration,
+            String resultWho,
+            int requestCode,
+            String packageRevision,
+            DocumentLaunchMode documentLaunchMode,
+            String documentKey) {
+        this(identity, taskAffinity, launchMode, flags, callerTaskId, processName,
+                processGeneration, resultWho, requestCode, packageRevision,
+                documentLaunchMode, documentKey, "", "");
     }
 
     /** Compatibility constructor for the M4-T14/M4-T15 stage-1 call shape. */
@@ -49,7 +73,7 @@ public record ActivityLaunchSpec(
             int requestCode) {
         this(identity, taskAffinity, launchMode, flags, callerTaskId, processName,
                 processGeneration, resultWho, requestCode, "legacy",
-                DocumentLaunchMode.NONE, "");
+                DocumentLaunchMode.NONE, "", "", "");
     }
 
     public RouteOwner routeOwner() {
@@ -74,7 +98,17 @@ public record ActivityLaunchSpec(
                 requestCode,
                 packageRevision,
                 documentLaunchMode,
-                documentKey);
+                documentKey,
+                activityResultKey,
+                intentSenderToken);
+    }
+
+    private static String optional(String value, int maximum, String name) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.length() > maximum) {
+            throw new IllegalArgumentException(name + " exceeds " + maximum + " characters");
+        }
+        return normalized;
     }
 
     private static String normalize(String value, String fallback) {

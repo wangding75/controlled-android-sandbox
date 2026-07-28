@@ -6,6 +6,9 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.ActivityTaskRequest;
 import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.contract.ActivityResultIntentSnapshot;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +67,38 @@ public final class BrokerActivityRuntimeSelfTest {
         event(runtime, session, activity, "PAUSED");
         event(runtime, session, activity, "STOPPED");
 
+        ActivityResultResult registration = runtime.resultOperation(session, resultRequest(
+                session, ActivityResultRequest.REGISTER, activity, "broker-registry", 0,
+                ActivityResultIntentSnapshot.empty()));
+        check(registration.successful() && registration.assignedRequestCode() == 0,
+                "Broker should allocate registry-backed request code");
+        Bundle resultLaunchRequest = new Bundle(prepared);
+        resultLaunchRequest.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.ResultActivity");
+        resultLaunchRequest.putInt(RuntimeKeys.CALLER_TASK_ID, launch.getInt(RuntimeKeys.TASK_ID, 0));
+        resultLaunchRequest.putInt(RuntimeKeys.REQUEST_CODE, registration.assignedRequestCode());
+        resultLaunchRequest.putString(RuntimeKeys.RESULT_WHO, "fragment:broker");
+        resultLaunchRequest.putString(RuntimeKeys.ACTIVITY_RESULT_KEY, "broker-registry");
+        resultLaunchRequest.putString(RuntimeKeys.INTENT_SENDER_TOKEN, "broker-intent-sender");
+        Bundle resultLaunch = runtime.launch(
+                session, "com.example.ResultActivity", prepared, resultLaunchRequest);
+        String resultActivity = resultLaunch.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+        ActivityResultResult finished = runtime.resultOperation(session, resultRequest(
+                session, ActivityResultRequest.FINISH, resultActivity, "", -1,
+                ActivityResultIntentSnapshot.fromMap(
+                        "broker.RESULT", "content://broker/result", "text/plain", "",
+                        1, "", java.util.Map.of("payload", "ok"))));
+        check(finished.successful() && finished.changed(),
+                "Broker should finish virtual callee with typed Result Intent");
+        ActivityResultResult drained = runtime.resultOperation(session, resultRequest(
+                session, ActivityResultRequest.DRAIN, activity, "", 0,
+                ActivityResultIntentSnapshot.empty()));
+        check(drained.successful() && drained.results().size() == 1,
+                "Broker should drain one virtual Activity result");
+        check(drained.results().get(0).registryKey().equals("broker-registry")
+                        && drained.results().get(0).intentSenderToken().equals("broker-intent-sender")
+                        && drained.results().get(0).resultIntent().extras().get("payload").equals("ok"),
+                "Broker result metadata or typed Intent payload changed");
+
         Bundle secondRequest = new Bundle(prepared);
         secondRequest.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.SecondActivity");
         secondRequest.putInt(RuntimeKeys.ACTIVITY_FLAGS,
@@ -101,7 +136,88 @@ public final class BrokerActivityRuntimeSelfTest {
         check(runtime.activityCount() == 0, "invalidation leaked activity");
         check(runtime.pendingRouteCount() == 0, "invalidation leaked route");
 
+        Path blockedParent = Files.createTempDirectory("broker-activity-rollback-")
+                .resolve("not-a-directory");
+        Files.writeString(blockedParent, "blocked");
+        BrokerActivityRuntime rollbackRuntime = new BrokerActivityRuntime(new BrokerStateStore());
+        rollbackRuntime.configureCheckpointStore(blockedParent.resolve("tasks.bin"));
+        GuestSession rollbackSession = session("rollback-session", 1, SessionState.READY);
+        Bundle rollbackPrepared = prepared(rollbackSession);
+        Bundle rollbackLaunch = new Bundle(rollbackPrepared);
+        rollbackLaunch.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.RollbackActivity");
+        expectFailure(() -> rollbackRuntime.launch(
+                rollbackSession, "com.example.RollbackActivity", rollbackPrepared, rollbackLaunch),
+                "checkpoint write failure must reject Activity launch");
+        check(rollbackRuntime.taskCount() == 0 && rollbackRuntime.activityCount() == 0
+                        && rollbackRuntime.pendingRouteCount() == 0,
+                "failed checkpoint write must roll back ledger and route state exactly");
+
+        Path malformedFile = Files.createTempDirectory("broker-activity-malformed-")
+                .resolve("tasks.bin");
+        com.warden.controlledsandbox.framework.activity.ActivityTaskLedger malformedSource =
+                new com.warden.controlledsandbox.framework.activity.ActivityTaskLedger();
+        malformedSource.launch(new com.warden.controlledsandbox.framework.activity.LaunchRequest(
+                new com.warden.controlledsandbox.framework.activity.ActivityIdentity(
+                        0, "com.example", "com.example.MalformedActivity"),
+                "com.example",
+                com.warden.controlledsandbox.framework.activity.LaunchMode.STANDARD,
+                com.warden.controlledsandbox.framework.activity.LaunchFlags.NEW_TASK,
+                null, "com.example", 1, "malformed-route", "", -1));
+        var validCheckpoint = malformedSource.checkpoint();
+        var duplicatedTask = validCheckpoint.tasks().get(0);
+        var malformedCheckpoint = new com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint(
+                validCheckpoint.schemaVersion(), validCheckpoint.nextTaskId(),
+                validCheckpoint.nextNewIntentSequence(), validCheckpoint.nextConfigurationSequence(),
+                validCheckpoint.nextActivationSequence(), validCheckpoint.transportDeliveryCount(),
+                java.util.List.of(duplicatedTask, duplicatedTask), validCheckpoint.recentTasks());
+        new ActivityTaskCheckpointStore(malformedFile).save(malformedCheckpoint);
+        BrokerActivityRuntime malformedRuntime = new BrokerActivityRuntime(new BrokerStateStore());
+        malformedRuntime.configureCheckpointStore(malformedFile);
+        check(malformedRuntime.taskCount() == 0 && malformedRuntime.activityCount() == 0
+                        && malformedRuntime.checkpointStatus().startsWith("QUARANTINED:")
+                        && Files.isRegularFile(malformedFile.resolveSibling("tasks.bin.corrupt")),
+                "failed restore must roll back partial ledger state and quarantine checkpoint");
+
+        Path cleanupDirectory = Files.createTempDirectory("broker-activity-cleanup-rollback-");
+        Path cleanupCheckpoint = cleanupDirectory.resolve("tasks.bin");
+        BrokerActivityRuntime cleanupRuntime = new BrokerActivityRuntime(new BrokerStateStore());
+        cleanupRuntime.configureCheckpointStore(cleanupCheckpoint);
+        GuestSession cleanupSession = session("cleanup-session", 1, SessionState.READY);
+        Bundle cleanupPrepared = prepared(cleanupSession);
+        Bundle cleanupRequest = new Bundle(cleanupPrepared);
+        cleanupRequest.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.CleanupActivity");
+        cleanupRuntime.launch(
+                cleanupSession, "com.example.CleanupActivity", cleanupPrepared, cleanupRequest);
+        Files.delete(cleanupCheckpoint);
+        Files.delete(cleanupDirectory);
+        Files.writeString(cleanupDirectory, "blocked");
+        expectFailure(() -> cleanupRuntime.clearPackageInstance(1, "com.example"),
+                "checkpoint failure must reject package-instance cleanup");
+        check(cleanupRuntime.taskCount() == 1 && cleanupRuntime.activityCount() == 1,
+                "failed cleanup checkpoint must restore the previous ledger state");
+
         System.out.println("PASS broker Activity production adapter self-test");
+    }
+
+    private static ActivityResultRequest resultRequest(
+            GuestSession session,
+            String operation,
+            String activityToken,
+            String registryKey,
+            int resultCode,
+            ActivityResultIntentSnapshot resultIntent) {
+        return new ActivityResultRequest(
+                RuntimeProtocol.CURRENT,
+                "result-request-" + operation + "-" + activityToken,
+                session.sessionId(),
+                session.generation(),
+                session.virtualUserId(),
+                session.packageName(),
+                operation,
+                activityToken,
+                registryKey,
+                resultCode,
+                resultIntent);
     }
 
     private static ActivityTaskRequest taskRequest(GuestSession session, String operation) {

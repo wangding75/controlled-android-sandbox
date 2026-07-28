@@ -15,7 +15,9 @@ public record LaunchRequest(
         int requestCode,
         String packageRevision,
         DocumentLaunchMode documentLaunchMode,
-        String documentKey) {
+        String documentKey,
+        String activityResultKey,
+        String intentSenderToken) {
 
     public LaunchRequest {
         identity = Objects.requireNonNull(identity, "identity");
@@ -28,6 +30,8 @@ public record LaunchRequest(
         documentLaunchMode = documentLaunchMode == null
                 ? DocumentLaunchMode.NONE : documentLaunchMode;
         documentKey = documentKey == null ? "" : documentKey.trim();
+        activityResultKey = optional(activityResultKey, 256, "activityResultKey");
+        intentSenderToken = optional(intentSenderToken, 512, "intentSenderToken");
         if (callerTaskId != null && callerTaskId < 1) {
             throw new IllegalArgumentException("callerTaskId must be positive");
         }
@@ -37,6 +41,27 @@ public record LaunchRequest(
         if (documentKey.length() > 2048) {
             throw new IllegalArgumentException("documentKey exceeds 2048 characters");
         }
+    }
+
+
+    /** Compatibility constructor for the M4-T15 B1 typed task shape. */
+    public LaunchRequest(
+            ActivityIdentity identity,
+            String taskAffinity,
+            LaunchMode launchMode,
+            int flags,
+            Integer callerTaskId,
+            String processName,
+            long processGeneration,
+            String routeToken,
+            String resultWho,
+            int requestCode,
+            String packageRevision,
+            DocumentLaunchMode documentLaunchMode,
+            String documentKey) {
+        this(identity, taskAffinity, launchMode, flags, callerTaskId, processName,
+                processGeneration, routeToken, resultWho, requestCode, packageRevision,
+                documentLaunchMode, documentKey, "", "");
     }
 
     /** Backward-compatible constructor for existing source tests and legacy callers. */
@@ -53,13 +78,13 @@ public record LaunchRequest(
             int requestCode) {
         this(identity, taskAffinity, launchMode, flags, callerTaskId, processName,
                 processGeneration, routeToken, resultWho, requestCode,
-                "legacy", DocumentLaunchMode.NONE, "");
+                "legacy", DocumentLaunchMode.NONE, "", "", "");
     }
 
     public LaunchRequest withFlags(int newFlags) {
         return new LaunchRequest(identity, taskAffinity, launchMode, newFlags, callerTaskId,
                 processName, processGeneration, routeToken, resultWho, requestCode,
-                packageRevision, documentLaunchMode, documentKey);
+                packageRevision, documentLaunchMode, documentKey, activityResultKey, intentSenderToken);
     }
 
     public boolean documentRequested() {
@@ -72,6 +97,14 @@ public record LaunchRequest(
         String normalized = Objects.requireNonNull(value, name).trim();
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return normalized;
+    }
+
+    private static String optional(String value, int maximum, String name) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.length() > maximum) {
+            throw new IllegalArgumentException(name + " exceeds " + maximum + " characters");
         }
         return normalized;
     }

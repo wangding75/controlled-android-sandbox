@@ -23,13 +23,14 @@ require('sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 ledger=require('sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java',
  'validateLaunchFlagCombinations','findDocumentTask','finishAffinity(','finishAndRemoveTask(',
  'moveTaskToBack(','clearPackageRevision(','TASK_REVISION_MISMATCH','checkpoint()',
- 'restore(ActivityTaskCheckpoint','adoptRestoredProcessGeneration')
+ 'restore(ActivityTaskCheckpoint','adoptRestoredProcessGeneration',
+ 'registerActivityResult','captureRollbackState','restoreRollbackState')
 store=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStore.java',
  'LEGACY_SCHEMA','CURRENT_SCHEMA','CRC32','ATOMIC_MOVE','quarantineCorrupt','MAX_FILE_BYTES',
- 'ACTIVITY_TASK_CHECKPOINT_SCHEMA_UNSUPPORTED')
+ 'ACTIVITY_TASK_CHECKPOINT_SCHEMA_UNSUPPORTED','PREVIOUS_SCHEMA')
 runtime=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java',
  'ActivityLaunchSpecFactory.create','ActivityTaskOperationDispatcher','clearMismatchedRevision',
- 'clearPackageInstance','persistCheckpoint')
+ 'clearPackageInstance','persistCheckpoint','ActivityResultOperationDispatcher')
 dispatcher=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskOperationDispatcher.java',
  'QUERY_RUNNING','QUERY_RECENT','MOVE_TO_FRONT','MOVE_TO_BACK','REMOVE_TASK',
  'FINISH_AFFINITY','FINISH_AND_REMOVE_TASK','packageRevision()')
@@ -38,35 +39,56 @@ factory=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runt
  'LaunchFlags.MULTIPLE_TASK')
 broker=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
  'activityRuntime.clearMismatchedRevision','activityRuntime.clearPackageInstance',
- 'activityTaskOperation(ActivityTaskRequest request)')
+ 'activityTaskOperation(ActivityTaskRequest request)',
+ 'activityResultOperation(ActivityResultRequest request)')
 require('sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl',
- 'ActivityTaskResult activityTaskOperation(in ActivityTaskRequest request);')
+ 'ActivityTaskResult activityTaskOperation(in ActivityTaskRequest request);',
+ 'ActivityResultResult activityResultOperation(in ActivityResultRequest request);')
 require('sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ActivityTaskRequest.java',
  'implements Parcelable','MOVE_TO_BACK','FINISH_AFFINITY','FINISH_AND_REMOVE_TASK',
  'activityToken','protocolVersion')
 require('sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ActivityTaskSnapshot.java',
  'implements Parcelable','packageRevision','documentLaunchMode','documentKey')
+require('sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ResultIntentSnapshot.java',
+ 'MAX_EXTRAS','clipDescription','extras')
+require('sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ActivityResultRequest.java',
+ 'implements Parcelable','REGISTER','FINISH','DRAIN','registryKey')
+result_dispatcher=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityResultOperationDispatcher.java',
+ 'registerActivityResult','finishWithResult','drainActivityResults','captureRollbackState')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityCheckpointTransaction.java',
+ 'captureRollbackState','restoreRollbackState','persistCheckpoint')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityResultBridge.java',
+ 'launchForResult','intentSenderToken','ActivityResultRequest.DRAIN','toIntent')
 require('sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java',
  'testLaunchFlagValidationMatrix','testDocumentLaunchModes','testFinishMoveBackAndRevisionCleanup',
- 'testForwardResultChain','testCheckpointRestoreDropsTransportAndPreservesState')
+ 'testForwardResultChain','testCheckpointRestoreDropsTransportAndPreservesState',
+ 'testRegistryResultIntentAndIntentSender','testCheckpointRestoresPendingResultOwnership',
+ 'testExactRollbackState')
 require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStoreSelfTest.java',
- 'schema-1 checkpoint must remain readable','corrupt checkpoint should fail closed')
+ 'schema-1 checkpoint must remain readable','schema-2 checkpoint must preserve revision',
+ 'corrupt checkpoint should fail closed')
 require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskContractSelfTest.java',
  'finish operation without Activity token must fail','typed task projection lost package revision')
 require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntimeSelfTest.java',
- 'MOVE_TO_BACK should reorder','finishAndRemoveTask should remove')
+ 'MOVE_TO_BACK should reorder','finishAndRemoveTask should remove',
+ 'failed restore must roll back partial ledger state','failed cleanup checkpoint must restore')
 require('docs/plans/M4_T15_DEVELOPMENT_PLAN.md',
  'B1：LaunchMode','B2：Result','B3：Framework')
 require('docs/M4_T15_B1_DEVELOPMENT_REPORT.md',
- 'SOURCE/HOST PASS CANDIDATE','schema 1','设备证据仍为 0')
+ 'PASS — SOURCE/HOST VERIFIED','schema 1','设备证据仍为 0')
+require('docs/M4_T15_B2_DEVELOPMENT_REPORT.md',
+ 'PASS — SOURCE/HOST VERIFIED','ActivityResultIntentSnapshot','事务回滚','设备证据仍为 0')
 runner=text('tools/static_android_compile.py')
 for test in ['ActivityTaskLedgerSelfTest','ActivityTaskCheckpointStoreSelfTest',
-             'ActivityTaskContractSelfTest','BrokerActivityRuntimeSelfTest']:
+             'ActivityTaskContractSelfTest','ActivityResultContractSelfTest',
+             'BrokerActivityRuntimeSelfTest']:
  if runner.count(test)<1: errors.append(f'static compiler does not execute {test}')
 if len(broker.splitlines()) > 1375:
  errors.append(f'RuntimeBrokerService exceeded bounded M4-T15 growth: {len(broker.splitlines())} lines')
 if len(runtime.splitlines()) > 330:
  errors.append(f'BrokerActivityRuntime should remain extracted: {len(runtime.splitlines())} lines')
+if len(result_dispatcher.splitlines()) > 180:
+ errors.append(f'ActivityResultOperationDispatcher unexpectedly large: {len(result_dispatcher.splitlines())} lines')
 if len(dispatcher.splitlines()) > 180:
  errors.append(f'ActivityTaskOperationDispatcher unexpectedly large: {len(dispatcher.splitlines())} lines')
 matrix=ROOT/'verification/m3-source-capability-matrix.json'

@@ -41,6 +41,16 @@ public final class RuntimeKeys {
     public static final String DOCUMENT_KEY = "documentKey";
     public static final String CALLER_TASK_ID = "callerTaskId";
     public static final String RESULT_WHO = "resultWho";
+    public static final String ACTIVITY_RESULT_KEY = "activityResultKey";
+    public static final String INTENT_SENDER_TOKEN = "intentSenderToken";
+    public static final String RESULT_CODE = "activityResultCode";
+    public static final String RESULT_INTENT_ACTION = "activityResultIntent.action";
+    public static final String RESULT_INTENT_DATA = "activityResultIntent.data";
+    public static final String RESULT_INTENT_TYPE = "activityResultIntent.type";
+    public static final String RESULT_INTENT_COMPONENT = "activityResultIntent.component";
+    public static final String RESULT_INTENT_FLAGS = "activityResultIntent.flags";
+    public static final String RESULT_INTENT_CLIP = "activityResultIntent.clip";
+    public static final String RESULT_INTENT_EXTRA_PREFIX = "activityResultIntent.extra.";
     public static final String REQUEST_CODE = "requestCode";
     public static final String SAVED_STATE_VERSION = "savedStateVersion";
     public static final String SAVED_STATE_PREFIX = "savedState.";

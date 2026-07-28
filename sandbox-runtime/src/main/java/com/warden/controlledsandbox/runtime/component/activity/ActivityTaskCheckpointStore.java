@@ -2,6 +2,8 @@ package com.warden.controlledsandbox.runtime.component.activity;
 
 import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityRestoreSnapshot;
+import com.warden.controlledsandbox.framework.activity.ActivityResultRegistration;
+import com.warden.controlledsandbox.framework.activity.PendingActivityResultSnapshot;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint;
 import com.warden.controlledsandbox.framework.activity.DocumentLaunchMode;
 import com.warden.controlledsandbox.framework.activity.LaunchMode;
@@ -34,6 +36,8 @@ public final class ActivityTaskCheckpointStore {
     private static final int MAX_ACTIVITIES = 2048;
     private static final int MAX_RECENTS = 256;
     private static final int MAX_SAVED_STATE_ENTRIES = 128;
+    private static final int MAX_RESULT_REGISTRATIONS = 128;
+    private static final int MAX_PENDING_RESULT_LINKS = 128;
 
     private final Path file;
 
@@ -147,6 +151,7 @@ public final class ActivityTaskCheckpointStore {
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload))) {
             int schemaVersion = input.readInt();
             if (schemaVersion != ActivityTaskCheckpoint.LEGACY_SCHEMA
+                    && schemaVersion != ActivityTaskCheckpoint.PREVIOUS_SCHEMA
                     && schemaVersion != ActivityTaskCheckpoint.CURRENT_SCHEMA) {
                 throw new IllegalStateException(
                         "ACTIVITY_TASK_CHECKPOINT_SCHEMA_UNSUPPORTED:" + schemaVersion);
@@ -196,12 +201,12 @@ public final class ActivityTaskCheckpointStore {
         output.writeInt(task.taskId());
         output.writeInt(task.virtualUserId());
         output.writeUTF(task.packageName());
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             output.writeUTF(task.packageRevision());
         }
         output.writeUTF(task.affinity());
         output.writeBoolean(task.documentTask());
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             output.writeUTF(task.documentLaunchMode().name());
             output.writeUTF(task.documentKey());
         }
@@ -211,21 +216,23 @@ public final class ActivityTaskCheckpointStore {
         output.writeLong(task.lastActiveSequence());
         output.writeLong(task.moveToFrontCount());
         output.writeInt(task.activities().size());
-        for (ActivityRestoreSnapshot activity : task.activities()) writeActivity(output, activity);
+        for (ActivityRestoreSnapshot activity : task.activities()) {
+            writeActivity(output, activity, schemaVersion);
+        }
     }
 
     private static TaskRestoreSnapshot readTask(DataInputStream input, int schemaVersion) throws IOException {
         int taskId = input.readInt();
         int virtualUserId = input.readInt();
         String packageName = input.readUTF();
-        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA
+        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA
                 ? input.readUTF() : "legacy";
         String affinity = input.readUTF();
         boolean documentTask = input.readBoolean();
         DocumentLaunchMode documentLaunchMode = documentTask
                 ? DocumentLaunchMode.ALWAYS : DocumentLaunchMode.NONE;
         String documentKey = "";
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             try {
                 documentLaunchMode = DocumentLaunchMode.valueOf(input.readUTF());
             } catch (IllegalArgumentException error) {
@@ -241,17 +248,24 @@ public final class ActivityTaskCheckpointStore {
         long moveCount = input.readLong();
         int activityCount = boundedCount(input.readInt(), MAX_ACTIVITIES, "Activity");
         List<ActivityRestoreSnapshot> activities = new ArrayList<>(activityCount);
-        for (int index = 0; index < activityCount; index++) activities.add(readActivity(input));
+        for (int index = 0; index < activityCount; index++) {
+            activities.add(readActivity(input, schemaVersion));
+        }
         return new TaskRestoreSnapshot(taskId, virtualUserId, packageName, packageRevision,
                 affinity, documentTask, documentLaunchMode, documentKey, rootIntentFlags,
                 excluded, retain, lastActive, moveCount, activities);
     }
 
-    private static void writeActivity(DataOutputStream output, ActivityRestoreSnapshot activity)
-            throws IOException {
+    private static void writeActivity(
+            DataOutputStream output,
+            ActivityRestoreSnapshot activity,
+            int schemaVersion) throws IOException {
         output.writeInt(activity.identity().virtualUserId());
         output.writeUTF(activity.identity().packageName());
         output.writeUTF(activity.identity().componentName());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeUTF(activity.stableId());
+        }
         output.writeUTF(activity.launchMode().name());
         output.writeUTF(activity.processName());
         output.writeLong(activity.processGeneration());
@@ -272,10 +286,29 @@ public final class ActivityTaskCheckpointStore {
         }
         output.writeLong(activity.configurationCount());
         output.writeUTF(activity.lastConfigurationToken());
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            output.writeInt(activity.resultRegistrations().size());
+            for (ActivityResultRegistration registration : activity.resultRegistrations()) {
+                output.writeUTF(registration.key());
+                output.writeInt(registration.requestCode());
+            }
+            output.writeInt(activity.pendingResultLinks().size());
+            for (PendingActivityResultSnapshot link : activity.pendingResultLinks()) {
+                output.writeUTF(link.callerStableId());
+                output.writeUTF(link.resultWho());
+                output.writeUTF(link.registryKey());
+                output.writeInt(link.requestCode());
+                output.writeUTF(link.intentSenderToken());
+            }
+        }
     }
 
-    private static ActivityRestoreSnapshot readActivity(DataInputStream input) throws IOException {
+    private static ActivityRestoreSnapshot readActivity(
+            DataInputStream input,
+            int schemaVersion) throws IOException {
         ActivityIdentity identity = new ActivityIdentity(input.readInt(), input.readUTF(), input.readUTF());
+        String stableId = schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA
+                ? input.readUTF() : "";
         LaunchMode launchMode;
         try {
             launchMode = LaunchMode.valueOf(input.readUTF());
@@ -300,9 +333,25 @@ public final class ActivityTaskCheckpointStore {
         }
         long configurationCount = input.readLong();
         String lastConfigurationToken = input.readUTF();
-        return new ActivityRestoreSnapshot(identity, launchMode, processName, processGeneration,
-                resultWho, requestCode, launchFlags, noHistory, newIntentCount, recreationCount,
-                savedState, configurationCount, lastConfigurationToken);
+        List<ActivityResultRegistration> registrations = new ArrayList<>();
+        List<PendingActivityResultSnapshot> pendingLinks = new ArrayList<>();
+        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+            int registrationCount = boundedCount(
+                    input.readInt(), MAX_RESULT_REGISTRATIONS, "result registration");
+            for (int index = 0; index < registrationCount; index++) {
+                registrations.add(new ActivityResultRegistration(input.readUTF(), input.readInt()));
+            }
+            int pendingCount = boundedCount(
+                    input.readInt(), MAX_PENDING_RESULT_LINKS, "pending result link");
+            for (int index = 0; index < pendingCount; index++) {
+                pendingLinks.add(new PendingActivityResultSnapshot(
+                        input.readUTF(), input.readUTF(), input.readUTF(), input.readInt(), input.readUTF()));
+            }
+        }
+        return new ActivityRestoreSnapshot(identity, stableId, launchMode, processName,
+                processGeneration, resultWho, requestCode, launchFlags, noHistory,
+                newIntentCount, recreationCount, savedState, configurationCount,
+                lastConfigurationToken, registrations, pendingLinks);
     }
 
     private static void writeRecent(
@@ -312,12 +361,12 @@ public final class ActivityTaskCheckpointStore {
         output.writeInt(task.taskId());
         output.writeInt(task.virtualUserId());
         output.writeUTF(task.packageName());
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             output.writeUTF(task.packageRevision());
         }
         output.writeUTF(task.affinity());
         output.writeBoolean(task.documentTask());
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             output.writeUTF(task.documentLaunchMode().name());
             output.writeUTF(task.documentKey());
         }
@@ -336,14 +385,14 @@ public final class ActivityTaskCheckpointStore {
         int taskId = input.readInt();
         int virtualUserId = input.readInt();
         String packageName = input.readUTF();
-        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA
+        String packageRevision = schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA
                 ? input.readUTF() : "legacy";
         String affinity = input.readUTF();
         boolean documentTask = input.readBoolean();
         DocumentLaunchMode documentLaunchMode = documentTask
                 ? DocumentLaunchMode.ALWAYS : DocumentLaunchMode.NONE;
         String documentKey = "";
-        if (schemaVersion >= ActivityTaskCheckpoint.CURRENT_SCHEMA) {
+        if (schemaVersion >= ActivityTaskCheckpoint.PREVIOUS_SCHEMA) {
             try {
                 documentLaunchMode = DocumentLaunchMode.valueOf(input.readUTF());
             } catch (IllegalArgumentException error) {

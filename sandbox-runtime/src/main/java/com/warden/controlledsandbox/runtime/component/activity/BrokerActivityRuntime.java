@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.ActivityTaskRequest;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.ActivityTaskResult;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchCoordinator;
@@ -36,6 +38,8 @@ public final class BrokerActivityRuntime {
     private final OneTimeRouteStore routeStore;
     private final ActivityLaunchCoordinator coordinator;
     private final ActivityTaskOperationDispatcher taskOperations;
+    private final ActivityResultOperationDispatcher resultOperations;
+    private final ActivityCheckpointTransaction checkpointTransactions;
     private final BrokerStateStore transport;
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
     private ActivityTaskCheckpointStore checkpointStore;
@@ -53,6 +57,8 @@ public final class BrokerActivityRuntime {
         this.coordinator = new ActivityLaunchCoordinator(ledger, routeStore);
         this.taskOperations = new ActivityTaskOperationDispatcher(
                 ledger, this::persistCheckpoint, () -> checkpointStatus, () -> restoreOutcome);
+        this.resultOperations = new ActivityResultOperationDispatcher(ledger, this::persistCheckpoint);
+        this.checkpointTransactions = new ActivityCheckpointTransaction(ledger, this::persistCheckpoint);
     }
 
     public synchronized ActivityTaskRestoreOutcome configureCheckpointStore(Path file) {
@@ -61,6 +67,7 @@ public final class BrokerActivityRuntime {
             throw new IllegalStateException("Activity runtime must be idle before checkpoint restore");
         }
         checkpointStore = new ActivityTaskCheckpointStore(file);
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
         try {
             Optional<com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint> checkpoint =
                     checkpointStore.load();
@@ -72,6 +79,7 @@ public final class BrokerActivityRuntime {
             checkpointStatus = "RESTORED";
             return restoreOutcome;
         } catch (RuntimeException corruption) {
+            ledger.restoreRollbackState(before);
             checkpointStore.quarantineCorrupt();
             checkpointStatus = "QUARANTINED:" + corruption.getMessage();
             restoreOutcome = new ActivityTaskRestoreOutcome(0, 0, 0, 0);
@@ -83,37 +91,49 @@ public final class BrokerActivityRuntime {
     public synchronized ActivityTaskRestoreOutcome restoreOutcome() { return restoreOutcome; }
 
     public synchronized Bundle launch(GuestSession session, String component, Bundle prepared, Bundle request) {
-        int adopted = ledger.adoptRestoredProcessGeneration(
-                session.virtualUserId(), session.packageName(), session.packageRevision(),
-                session.processName(), session.generation());
-        ActivityLaunchSpec spec = ActivityLaunchSpecFactory.create(session, component, request);
-        Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
-        metadata.put(RuntimeKeys.COMPONENT_CLASS, component);
-        metadata.put(RuntimeKeys.PROCESS_NAME, session.processName());
-        ActivityLaunchTransaction transaction = coordinator.launch(
-                spec,
-                component.getBytes(StandardCharsets.UTF_8),
-                metadata,
-                ROUTE_TTL);
-        String token = transaction.routeToken().value();
-        Bundle envelope = new Bundle(prepared);
-        if (request != null) envelope.putAll(request);
-        envelope.putInt(RuntimeKeys.ACTIVITY_FLAGS, spec.flags());
-        envelope.putString(RuntimeKeys.DOCUMENT_LAUNCH_MODE, spec.documentLaunchMode().name());
-        envelope.putString(RuntimeKeys.DOCUMENT_KEY, spec.documentKey());
-        envelope.putString(RuntimeKeys.COMPONENT_CLASS, component);
-        envelope.putString(RuntimeKeys.ROUTE_TOKEN, token);
-        addDecision(envelope, transaction);
-        transport.putRoute(token, envelope);
-        if (pending.putIfAbsent(token, transaction) != null) {
-            transport.removeRoute(token);
-            routeStore.revoke(token);
-            throw new IllegalStateException("DUPLICATE_ACTIVITY_TRANSACTION");
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
+        String token = "";
+        try {
+            int adopted = ledger.adoptRestoredProcessGeneration(
+                    session.virtualUserId(), session.packageName(), session.packageRevision(),
+                    session.processName(), session.generation());
+            ActivityLaunchSpec spec = ActivityLaunchSpecFactory.create(session, component, request);
+            Map<String, String> metadata = new LinkedHashMap<>();
+            metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
+            metadata.put(RuntimeKeys.COMPONENT_CLASS, component);
+            metadata.put(RuntimeKeys.PROCESS_NAME, session.processName());
+            ActivityLaunchTransaction transaction = coordinator.launch(
+                    spec,
+                    component.getBytes(StandardCharsets.UTF_8),
+                    metadata,
+                    ROUTE_TTL);
+            token = transaction.routeToken().value();
+            Bundle envelope = new Bundle(prepared);
+            if (request != null) envelope.putAll(request);
+            envelope.putInt(RuntimeKeys.ACTIVITY_FLAGS, spec.flags());
+            envelope.putString(RuntimeKeys.DOCUMENT_LAUNCH_MODE, spec.documentLaunchMode().name());
+            envelope.putString(RuntimeKeys.DOCUMENT_KEY, spec.documentKey());
+            envelope.putString(RuntimeKeys.ACTIVITY_RESULT_KEY, spec.activityResultKey());
+            envelope.putString(RuntimeKeys.INTENT_SENDER_TOKEN, spec.intentSenderToken());
+            envelope.putString(RuntimeKeys.COMPONENT_CLASS, component);
+            envelope.putString(RuntimeKeys.ROUTE_TOKEN, token);
+            addDecision(envelope, transaction);
+            transport.putRoute(token, envelope);
+            if (pending.putIfAbsent(token, transaction) != null) {
+                throw new IllegalStateException("DUPLICATE_ACTIVITY_TRANSACTION");
+            }
+            if (adopted > 0) envelope.putInt(RuntimeKeys.RESTORED_ACTIVITY_COUNT, adopted);
+            persistCheckpoint();
+            return new Bundle(envelope);
+        } catch (RuntimeException failure) {
+            if (!token.isEmpty()) {
+                pending.remove(token);
+                transport.removeRoute(token);
+                routeStore.revoke(token);
+            }
+            ledger.restoreRollbackState(before);
+            throw failure;
         }
-        if (adopted > 0) envelope.putInt(RuntimeKeys.RESTORED_ACTIVITY_COUNT, adopted);
-        persistCheckpoint();
-        return new Bundle(envelope);
     }
 
     public synchronized Bundle consume(String token, GuestSession session) {
@@ -136,57 +156,69 @@ public final class BrokerActivityRuntime {
     }
 
     public synchronized void launchFailed(String token) {
-        ActivityLaunchTransaction transaction = pending.remove(token);
+        ActivityLaunchTransaction transaction = pending.get(token);
+        if (transaction != null) {
+            LaunchAction action = transaction.decision().action();
+            if (action == LaunchAction.CREATED_ACTIVITY || action == LaunchAction.CREATED_TASK) {
+                checkpointTransactions.mutate(
+                        () -> ledger.finish(transaction.decision().activityToken()));
+            }
+            pending.remove(token, transaction);
+        }
         transport.removeRoute(token);
         routeStore.revoke(token);
-        if (transaction == null) return;
-        LaunchAction action = transaction.decision().action();
-        if (action == LaunchAction.CREATED_ACTIVITY || action == LaunchAction.CREATED_TASK) {
-            ledger.finish(transaction.decision().activityToken());
-            persistCheckpoint();
-        }
     }
 
     public synchronized Bundle event(GuestSession session, Bundle request) {
         if (request == null) throw new IllegalArgumentException("activity event request is required");
-        String activityToken = required(request, RuntimeKeys.ACTIVITY_TOKEN);
-        verifyOwner(activityToken, session);
-        String event = required(request, RuntimeKeys.ACTIVITY_EVENT);
-        Bundle out = new Bundle();
-        out.putString(RuntimeKeys.STATUS, "ACTIVITY_EVENT_APPLIED");
-        out.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
-        switch (event) {
-            case "CREATED" -> ledger.transition(activityToken, LifecycleState.CREATED);
-            case "STARTED" -> ledger.transition(activityToken, LifecycleState.STARTED);
-            case "RESUMED" -> ledger.transition(activityToken, LifecycleState.RESUMED);
-            case "PAUSED" -> ledger.transition(activityToken, LifecycleState.PAUSED);
-            case "STOPPED" -> ledger.transition(activityToken, LifecycleState.STOPPED);
-            case "DESTROYED" -> ledger.transition(activityToken, LifecycleState.DESTROYED);
-            case "SAVE_STATE" -> {
-                long version = request.getLong(RuntimeKeys.SAVED_STATE_VERSION, 1L);
-                ledger.saveInstanceState(activityToken, new SavedActivityState(version, savedState(request)));
-            }
-            case "CONFIGURATION" -> {
-                ConfigurationDecision decision = ledger.handleConfigurationChange(
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
+        try {
+            String activityToken = required(request, RuntimeKeys.ACTIVITY_TOKEN);
+            verifyOwner(activityToken, session);
+            String event = required(request, RuntimeKeys.ACTIVITY_EVENT);
+            Bundle out = new Bundle();
+            out.putString(RuntimeKeys.STATUS, "ACTIVITY_EVENT_APPLIED");
+            out.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+            switch (event) {
+                case "CREATED" -> ledger.transition(activityToken, LifecycleState.CREATED);
+                case "STARTED" -> ledger.transition(activityToken, LifecycleState.STARTED);
+                case "RESUMED" -> ledger.transition(activityToken, LifecycleState.RESUMED);
+                case "PAUSED" -> ledger.transition(activityToken, LifecycleState.PAUSED);
+                case "STOPPED" -> ledger.transition(activityToken, LifecycleState.STOPPED);
+                case "DESTROYED" -> ledger.transition(activityToken, LifecycleState.DESTROYED);
+                case "SAVE_STATE" -> {
+                    long version = request.getLong(RuntimeKeys.SAVED_STATE_VERSION, 1L);
+                    ledger.saveInstanceState(activityToken, new SavedActivityState(version, savedState(request)));
+                }
+                case "CONFIGURATION" -> {
+                    ConfigurationDecision decision = ledger.handleConfigurationChange(
+                            activityToken,
+                            required(request, RuntimeKeys.CONFIGURATION_TOKEN),
+                            request.getBoolean(RuntimeKeys.HANDLES_CONFIGURATION, true));
+                    out.putString(RuntimeKeys.ACTIVITY_TOKEN, decision.currentActivityToken());
+                    out.putString(RuntimeKeys.ACTIVITY_ACTION, decision.action().name());
+                }
+                case "FINISH_RESULT" -> ledger.finishWithResult(
                         activityToken,
-                        required(request, RuntimeKeys.CONFIGURATION_TOKEN),
-                        request.getBoolean(RuntimeKeys.HANDLES_CONFIGURATION, true));
-                out.putString(RuntimeKeys.ACTIVITY_TOKEN, decision.currentActivityToken());
-                out.putString(RuntimeKeys.ACTIVITY_ACTION, decision.action().name());
+                        request.getInt(RuntimeKeys.RESULT_CODE, ActivityTaskLedger.RESULT_CANCELED),
+                        ActivityResultBundleCodec.decode(request));
+                default -> throw new IllegalArgumentException("Unknown activity event: " + event);
             }
-            default -> throw new IllegalArgumentException("Unknown activity event: " + event);
+            out.putInt(RuntimeKeys.ACTIVITY_COUNT, ledger.activityCount());
+            out.putInt(RuntimeKeys.TASK_COUNT, ledger.taskCount());
+            persistCheckpoint();
+            return out;
+        } catch (RuntimeException failure) {
+            ledger.restoreRollbackState(before);
+            throw failure;
         }
-        out.putInt(RuntimeKeys.ACTIVITY_COUNT, ledger.activityCount());
-        out.putInt(RuntimeKeys.TASK_COUNT, ledger.taskCount());
-        persistCheckpoint();
-        return out;
     }
 
     public synchronized void recreate(GuestSession stale, GuestSession current) {
-        coordinator.recreateProcessGeneration(stale.virtualUserId(), stale.packageName(), stale.processName(),
-                stale.generation(), current.generation());
+        checkpointTransactions.mutate(() -> coordinator.recreateProcessGeneration(
+                stale.virtualUserId(), stale.packageName(), stale.processName(),
+                stale.generation(), current.generation()));
         purgePending(stale);
-        persistCheckpoint();
     }
 
     public synchronized void processDisconnected(GuestSession stale) {
@@ -196,16 +228,21 @@ public final class BrokerActivityRuntime {
     }
 
     public synchronized void invalidate(GuestSession stale) {
-        coordinator.invalidateProcessGeneration(stale.virtualUserId(), stale.packageName(), stale.processName(),
-                stale.generation());
+        checkpointTransactions.mutate(() -> coordinator.invalidateProcessGeneration(
+                stale.virtualUserId(), stale.packageName(), stale.processName(), stale.generation()));
         purgePending(stale);
-        persistCheckpoint();
     }
 
     public synchronized ActivityTaskResult taskOperation(
             GuestSession session,
             ActivityTaskRequest request) {
         return taskOperations.dispatch(session, request);
+    }
+
+    public synchronized ActivityResultResult resultOperation(
+            GuestSession session,
+            ActivityResultRequest request) {
+        return resultOperations.dispatch(session, request);
     }
 
     public synchronized int pendingRouteCount() { return pending.size(); }
@@ -216,16 +253,13 @@ public final class BrokerActivityRuntime {
             int virtualUserId,
             String packageName,
             String retainedRevision) {
-        int removed = ledger.clearPackageRevision(
-                virtualUserId, packageName, retainedRevision);
-        if (removed > 0) persistCheckpoint();
-        return removed;
+        return checkpointTransactions.mutate(() -> ledger.clearPackageRevision(
+                virtualUserId, packageName, retainedRevision));
     }
 
     public synchronized int clearPackageInstance(int virtualUserId, String packageName) {
-        int removed = ledger.clearPackageInstance(virtualUserId, packageName);
-        if (removed > 0) persistCheckpoint();
-        return removed;
+        return checkpointTransactions.mutate(
+                () -> ledger.clearPackageInstance(virtualUserId, packageName));
     }
 
     private void persistCheckpoint() {

@@ -32,6 +32,9 @@ public final class ActivityTaskLedgerSelfTest {
         testDocumentLaunchModes();
         testFinishMoveBackAndRevisionCleanup();
         testCheckpointRestoreDropsTransportAndPreservesState();
+        testRegistryResultIntentAndIntentSender();
+        testCheckpointRestoresPendingResultOwnership();
+        testExactRollbackState();
         testFiveHundredLaunchesWithoutLedgerLeak();
         System.out.println("PASS ActivityTaskLedgerSelfTest");
     }
@@ -606,6 +609,94 @@ public final class ActivityTaskLedgerSelfTest {
         check(restored.adoptRestoredProcessGeneration(
                 0, "guest.example", "guest.example:main", 10) == 0,
                 "restored generation adoption must be one-shot");
+    }
+
+    private static void testRegistryResultIntentAndIntentSender() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision caller = ledger.launch(request(
+                0, "RegistryCaller", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 7));
+        ActivityResultRegistration registration = ledger.registerActivityResult(
+                caller.activityToken(), "profile-editor");
+        check(registration.requestCode() == 0, "first registry key should receive request code 0");
+        check(ledger.registerActivityResult(caller.activityToken(), "profile-editor").equals(registration),
+                "registry key allocation must be idempotent");
+        LaunchDecision callee = ledger.launch(new LaunchRequest(
+                new ActivityIdentity(0, "guest.example", "RegistryCallee"),
+                "guest.example", LaunchMode.STANDARD, 0, caller.taskId(),
+                "guest.example:main", 7, "route-registry-result", "fragment:profile",
+                registration.requestCode(), "legacy", DocumentLaunchMode.NONE, "",
+                registration.key(), "intent-sender-42"));
+        ResultIntentSnapshot resultIntent = new ResultIntentSnapshot(
+                "guest.RESULT", "content://guest/result/1", "text/plain",
+                "guest.example/RegistryCaller", 3, "result clip",
+                Map.of("name", "Ada", "count", "2"));
+        check(ledger.finishWithResult(callee.activityToken(), -1, resultIntent),
+                "typed result should finish callee");
+        ActivityResultDelivery delivery = ledger.drainActivityResults(
+                caller.activityToken()).get(0);
+        check(delivery.registryKey().equals("profile-editor"),
+                "Activity Result registry key should be preserved");
+        check(delivery.intentSenderToken().equals("intent-sender-42"),
+                "Intent Sender ownership token should be preserved");
+        check(delivery.resultWho().equals("fragment:profile"),
+                "Result Who should be preserved");
+        check(delivery.resultIntent().equals(resultIntent),
+                "typed Result Intent should survive delivery");
+        check(ledger.unregisterActivityResult(caller.activityToken(), "profile-editor"),
+                "registry key should unregister");
+    }
+
+    private static void testCheckpointRestoresPendingResultOwnership() {
+        ActivityTaskLedger source = new ActivityTaskLedger();
+        LaunchDecision caller = source.launch(request(
+                0, "RestoreCaller", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 11));
+        ActivityResultRegistration registration = source.registerActivityResult(
+                caller.activityToken(), "restore-key");
+        source.launch(new LaunchRequest(
+                new ActivityIdentity(0, "guest.example", "RestoreCallee"),
+                "guest.example", LaunchMode.STANDARD, 0, caller.taskId(),
+                "guest.example:main", 11, "route-restore-result", "fragment:restore",
+                registration.requestCode(), "legacy", DocumentLaunchMode.NONE, "",
+                registration.key(), "sender-restore"));
+        ActivityTaskCheckpoint checkpoint = source.checkpoint();
+        check(checkpoint.transportDeliveryCount() == 0,
+                "durable pending result ownership is not a dropped transport delivery");
+
+        ActivityTaskLedger restored = new ActivityTaskLedger();
+        restored.restore(checkpoint);
+        List<ActivitySnapshot> activities = restored.snapshot().get(0).activities();
+        String restoredCaller = activities.stream()
+                .filter(value -> value.identity().componentName().equals("RestoreCaller"))
+                .findFirst().orElseThrow().token();
+        String restoredCallee = activities.stream()
+                .filter(value -> value.identity().componentName().equals("RestoreCallee"))
+                .findFirst().orElseThrow().token();
+        check(restored.activityResultRegistration(restoredCaller, "restore-key")
+                        .orElseThrow().requestCode() == registration.requestCode(),
+                "registry mapping should survive Broker checkpoint restore");
+        check(restored.finishWithResult(restoredCallee, -1,
+                        new ResultIntentSnapshot("restore", "", "", "", 0, "", Map.of())),
+                "restored callee should finish");
+        ActivityResultDelivery delivery = restored.drainActivityResults(restoredCaller).get(0);
+        check(delivery.registryKey().equals("restore-key")
+                        && delivery.intentSenderToken().equals("sender-restore"),
+                "restored result ownership metadata should be delivered");
+    }
+
+    private static void testExactRollbackState() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision initial = ledger.launch(request(
+                0, "RollbackRoot", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 2));
+        ledger.registerActivityResult(initial.activityToken(), "rollback-key");
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
+        ledger.launch(request(
+                0, "RollbackChild", LaunchMode.STANDARD, 0, initial.taskId(), 2));
+        ledger.finish(initial.activityToken());
+        ledger.restoreRollbackState(before);
+        check(ledger.activityCount() == 1 && ledger.taskCount() == 1,
+                "rollback should restore exact task and Activity counts");
+        check(ledger.activityResultRegistration(initial.activityToken(), "rollback-key").isPresent(),
+                "rollback should preserve registration and original Activity token");
     }
 
     private static void testFiveHundredLaunchesWithoutLedgerLeak() {

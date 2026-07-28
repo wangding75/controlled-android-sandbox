@@ -24,6 +24,7 @@ public final class ActivityTaskLedger {
     private final AtomicInteger nextTaskId = new AtomicInteger(1);
     private final AtomicLong nextNewIntentSequence = new AtomicLong(1);
     private static final int MAX_RECENT_TASKS = 64;
+    private static final int MAX_RESULT_REGISTRATIONS = 128;
 
     private final AtomicLong nextConfigurationSequence = new AtomicLong(1);
     private final AtomicLong nextActivationSequence = new AtomicLong(1);
@@ -244,7 +245,49 @@ public final class ActivityTaskLedger {
 
     public synchronized boolean finishWithResult(String token, int resultCode, String dataToken) {
         String normalizedDataToken = dataToken == null ? "" : dataToken;
-        return removeActivityByToken(token, resultCode, normalizedDataToken);
+        return removeActivityByToken(token, resultCode, normalizedDataToken, ResultIntentSnapshot.EMPTY);
+    }
+
+    public synchronized boolean finishWithResult(
+            String token,
+            int resultCode,
+            ResultIntentSnapshot resultIntent) {
+        return removeActivityByToken(token, resultCode, "", Objects.requireNonNull(resultIntent, "resultIntent"));
+    }
+
+    public synchronized ActivityResultRegistration registerActivityResult(
+            String activityToken,
+            String registrationKey) {
+        MutableActivity activity = requireActivity(activityToken);
+        String key = requireBoundedText(registrationKey, "registrationKey", 256);
+        Integer existing = activity.resultRegistrations.get(key);
+        if (existing != null) return new ActivityResultRegistration(key, existing);
+        if (activity.resultRegistrations.size() >= MAX_RESULT_REGISTRATIONS) {
+            throw new IllegalStateException("ACTIVITY_RESULT_REGISTRATION_LIMIT");
+        }
+        boolean[] used = new boolean[0x10000];
+        for (Integer value : activity.resultRegistrations.values()) used[value] = true;
+        int requestCode = 0;
+        while (requestCode < used.length && used[requestCode]) requestCode++;
+        if (requestCode == used.length) throw new IllegalStateException("ACTIVITY_RESULT_REQUEST_CODE_EXHAUSTED");
+        activity.resultRegistrations.put(key, requestCode);
+        return new ActivityResultRegistration(key, requestCode);
+    }
+
+    public synchronized boolean unregisterActivityResult(String activityToken, String registrationKey) {
+        MutableActivity activity = requireActivity(activityToken);
+        return activity.resultRegistrations.remove(requireBoundedText(
+                registrationKey, "registrationKey", 256)) != null;
+    }
+
+    public synchronized Optional<ActivityResultRegistration> activityResultRegistration(
+            String activityToken,
+            String registrationKey) {
+        MutableActivity activity = requireActivity(activityToken);
+        String key = requireBoundedText(registrationKey, "registrationKey", 256);
+        Integer requestCode = activity.resultRegistrations.get(key);
+        return requestCode == null ? Optional.empty()
+                : Optional.of(new ActivityResultRegistration(key, requestCode));
     }
 
     public synchronized List<ActivityResultDelivery> drainActivityResults(String callerActivityToken) {
@@ -597,6 +640,46 @@ public final class ActivityTaskLedger {
         return removed;
     }
 
+    /** Exact in-memory snapshot used to roll back a mutation when durable persistence fails. */
+    public synchronized RollbackState captureRollbackState() {
+        LinkedHashMap<Integer, MutableTask> taskCopies = new LinkedHashMap<>();
+        LinkedHashMap<String, MutableActivity> activityCopies = new LinkedHashMap<>();
+        for (MutableTask task : tasks.values()) {
+            MutableTask taskCopy = copyTask(task, activityCopies);
+            taskCopies.put(taskCopy.taskId, taskCopy);
+        }
+        LinkedHashMap<String, List<ActivityResultDelivery>> deliveryCopies = new LinkedHashMap<>();
+        for (Map.Entry<String, List<ActivityResultDelivery>> entry : resultDeliveriesByCaller.entrySet()) {
+            deliveryCopies.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return new RollbackState(
+                nextTaskId.get(),
+                nextNewIntentSequence.get(),
+                nextConfigurationSequence.get(),
+                nextActivationSequence.get(),
+                taskCopies,
+                new LinkedHashMap<>(recentTasks),
+                activityCopies,
+                deliveryCopies);
+    }
+
+    /** Restores an exact in-memory state captured before a failed durable mutation. */
+    public synchronized void restoreRollbackState(RollbackState state) {
+        Objects.requireNonNull(state, "state");
+        tasks.clear();
+        recentTasks.clear();
+        activitiesByToken.clear();
+        resultDeliveriesByCaller.clear();
+        nextTaskId.set(state.nextTaskId);
+        nextNewIntentSequence.set(state.nextNewIntentSequence);
+        nextConfigurationSequence.set(state.nextConfigurationSequence);
+        nextActivationSequence.set(state.nextActivationSequence);
+        tasks.putAll(state.tasks);
+        recentTasks.putAll(state.recentTasks);
+        activitiesByToken.putAll(state.activitiesByToken);
+        resultDeliveriesByCaller.putAll(state.resultDeliveriesByCaller);
+    }
+
     public synchronized ActivityTaskCheckpoint checkpoint() {
         List<TaskRestoreSnapshot> taskSnapshots = new ArrayList<>();
         int transportDeliveries = resultDeliveriesByCaller.values().stream()
@@ -606,9 +689,20 @@ public final class ActivityTaskLedger {
             List<ActivityRestoreSnapshot> activities = new ArrayList<>();
             for (MutableActivity activity : task.activities) {
                 transportDeliveries += activity.pendingNewIntents.size();
-                transportDeliveries += activity.pendingResultLinks.size();
+                List<ActivityResultRegistration> registrations = activity.resultRegistrations.entrySet().stream()
+                        .map(entry -> new ActivityResultRegistration(entry.getKey(), entry.getValue()))
+                        .toList();
+                List<PendingActivityResultSnapshot> pendingLinks = activity.pendingResultLinks.stream()
+                        .map(link -> new PendingActivityResultSnapshot(
+                                requireActivity(link.callerActivityToken).stableId,
+                                link.resultWho,
+                                link.registryKey,
+                                link.requestCode,
+                                link.intentSenderToken))
+                        .toList();
                 activities.add(new ActivityRestoreSnapshot(
                         activity.identity,
+                        activity.stableId,
                         activity.launchMode,
                         activity.processName,
                         activity.processGeneration,
@@ -620,7 +714,9 @@ public final class ActivityTaskLedger {
                         activity.recreationCount,
                         activity.savedState,
                         activity.configurationCount,
-                        activity.lastConfigurationToken));
+                        activity.lastConfigurationToken,
+                        registrations,
+                        pendingLinks));
             }
             taskSnapshots.add(new TaskRestoreSnapshot(
                     task.taskId,
@@ -656,6 +752,8 @@ public final class ActivityTaskLedger {
             throw new IllegalStateException("Activity task ledger must be empty before restore");
         }
         java.util.Set<Integer> taskIds = new java.util.LinkedHashSet<>();
+        Map<String, MutableActivity> restoredByStableId = new LinkedHashMap<>();
+        List<Runnable> pendingLinkRestorations = new ArrayList<>();
         int restoredActivities = 0;
         for (TaskRestoreSnapshot snapshot : checkpoint.tasks()) {
             if (!taskIds.add(snapshot.taskId())) {
@@ -677,8 +775,14 @@ public final class ActivityTaskLedger {
             task.moveToFrontCount = snapshot.moveToFrontCount();
             for (ActivityRestoreSnapshot activitySnapshot : snapshot.activities()) {
                 String token = UUID.randomUUID().toString();
+                String stableId = activitySnapshot.stableId().isEmpty()
+                        ? UUID.randomUUID().toString() : activitySnapshot.stableId();
+                if (restoredByStableId.containsKey(stableId)) {
+                    throw new IllegalArgumentException("duplicate restored Activity stableId: " + stableId);
+                }
                 MutableActivity activity = new MutableActivity(
                         activitySnapshot.identity(),
+                        stableId,
                         token,
                         activitySnapshot.launchMode(),
                         activitySnapshot.processName(),
@@ -694,12 +798,31 @@ public final class ActivityTaskLedger {
                 activity.savedState = activitySnapshot.savedState();
                 activity.configurationCount = activitySnapshot.configurationCount();
                 activity.lastConfigurationToken = activitySnapshot.lastConfigurationToken();
+                for (ActivityResultRegistration registration : activitySnapshot.resultRegistrations()) {
+                    if (activity.resultRegistrations.putIfAbsent(
+                            registration.key(), registration.requestCode()) != null) {
+                        throw new IllegalArgumentException("duplicate restored Activity result key");
+                    }
+                }
                 task.activities.add(activity);
                 activitiesByToken.put(token, activity);
+                restoredByStableId.put(stableId, activity);
+                pendingLinkRestorations.add(() -> {
+                    for (PendingActivityResultSnapshot link : activitySnapshot.pendingResultLinks()) {
+                        MutableActivity caller = restoredByStableId.get(link.callerStableId());
+                        if (caller == null) {
+                            throw new IllegalArgumentException("restored result caller is missing");
+                        }
+                        activity.pendingResultLinks.add(new PendingResultLink(
+                                caller.token, link.resultWho(), link.registryKey(),
+                                link.requestCode(), link.intentSenderToken()));
+                    }
+                });
                 restoredActivities++;
             }
             tasks.put(task.taskId, task);
         }
+        for (Runnable restoration : pendingLinkRestorations) restoration.run();
         java.util.Set<Integer> recentTaskIds = new java.util.LinkedHashSet<>();
         for (TaskQuerySnapshot recent : checkpoint.recentTasks()) {
             if (recent.active()) throw new IllegalArgumentException("checkpoint recent task must be inactive");
@@ -1027,6 +1150,7 @@ public final class ActivityTaskLedger {
         String token = UUID.randomUUID().toString();
         MutableActivity activity = new MutableActivity(
                 request.identity(),
+                UUID.randomUUID().toString(),
                 token,
                 request.launchMode(),
                 request.processName(),
@@ -1176,16 +1300,34 @@ public final class ActivityTaskLedger {
             boolean removeEmptyTask,
             int resultCode,
             String dataToken) {
+        removeActivityAt(task, index, removeEmptyTask, resultCode, dataToken, ResultIntentSnapshot.EMPTY);
+    }
+
+    private void removeActivityAt(
+            MutableTask task,
+            int index,
+            boolean removeEmptyTask,
+            int resultCode,
+            String dataToken,
+            ResultIntentSnapshot resultIntent) {
         boolean archiveWhenEmpty = removeEmptyTask && task.activities.size() == 1;
         if (archiveWhenEmpty) archiveTask(task);
         MutableActivity removed = task.activities.remove(index);
-        finalizeActivity(removed, resultCode, dataToken);
+        finalizeActivity(removed, resultCode, dataToken, resultIntent);
         if (removeEmptyTask && task.activities.isEmpty()) {
             tasks.remove(task.taskId);
         }
     }
 
     private boolean removeActivityByToken(String token, int resultCode, String dataToken) {
+        return removeActivityByToken(token, resultCode, dataToken, ResultIntentSnapshot.EMPTY);
+    }
+
+    private boolean removeActivityByToken(
+            String token,
+            int resultCode,
+            String dataToken,
+            ResultIntentSnapshot resultIntent) {
         MutableActivity activity = activitiesByToken.get(Objects.requireNonNull(token, "token"));
         if (activity == null) {
             return false;
@@ -1193,17 +1335,28 @@ public final class ActivityTaskLedger {
         for (MutableTask task : new ArrayList<>(tasks.values())) {
             for (int index = 0; index < task.activities.size(); index++) {
                 if (task.activities.get(index).token.equals(token)) {
-                    removeActivityAt(task, index, true, resultCode, dataToken);
+                    removeActivityAt(task, index, true, resultCode, dataToken, resultIntent);
                     return true;
                 }
             }
         }
-        finalizeActivity(activity, resultCode, dataToken);
+        finalizeActivity(activity, resultCode, dataToken, resultIntent);
         return false;
     }
 
-    private void finalizeActivity(MutableActivity activity, int resultCode, String dataToken) {
-        deliverPendingResults(activity, resultCode, dataToken);
+    private void finalizeActivity(
+            MutableActivity activity,
+            int resultCode,
+            String dataToken) {
+        finalizeActivity(activity, resultCode, dataToken, ResultIntentSnapshot.EMPTY);
+    }
+
+    private void finalizeActivity(
+            MutableActivity activity,
+            int resultCode,
+            String dataToken,
+            ResultIntentSnapshot resultIntent) {
+        deliverPendingResults(activity, resultCode, dataToken, resultIntent);
         activity.lifecycleState = LifecycleState.DESTROYED;
         activitiesByToken.remove(activity.token);
         resultDeliveriesByCaller.remove(activity.token);
@@ -1213,7 +1366,11 @@ public final class ActivityTaskLedger {
         activity.pendingNewIntents.clear();
     }
 
-    private void deliverPendingResults(MutableActivity callee, int resultCode, String dataToken) {
+    private void deliverPendingResults(
+            MutableActivity callee,
+            int resultCode,
+            String dataToken,
+            ResultIntentSnapshot resultIntent) {
         for (PendingResultLink link : callee.pendingResultLinks) {
             if (!activitiesByToken.containsKey(link.callerActivityToken)) {
                 continue;
@@ -1222,9 +1379,12 @@ public final class ActivityTaskLedger {
                     link.callerActivityToken,
                     callee.token,
                     link.resultWho,
+                    link.registryKey,
                     link.requestCode,
                     resultCode,
-                    dataToken);
+                    link.intentSenderToken,
+                    dataToken,
+                    resultIntent);
             resultDeliveriesByCaller
                     .computeIfAbsent(link.callerActivityToken, ignored -> new ArrayList<>())
                     .add(delivery);
@@ -1244,10 +1404,19 @@ public final class ActivityTaskLedger {
             return;
         }
         if (callerActivityToken == null || request.requestCode() < 0) return;
+        if (!request.activityResultKey().isEmpty()) {
+            MutableActivity caller = requireActivity(callerActivityToken);
+            Integer registeredCode = caller.resultRegistrations.get(request.activityResultKey());
+            if (registeredCode == null || registeredCode != request.requestCode()) {
+                throw new SecurityException("ACTIVITY_RESULT_REGISTRATION_MISMATCH");
+            }
+        }
         callee.pendingResultLinks.add(new PendingResultLink(
                 callerActivityToken,
                 request.resultWho(),
-                request.requestCode()));
+                request.activityResultKey(),
+                request.requestCode(),
+                request.intentSenderToken()));
     }
 
     private void enqueueNewIntent(MutableActivity activity, LaunchRequest request) {
@@ -1318,7 +1487,9 @@ public final class ActivityTaskLedger {
                     activity.pendingResultLinks.set(index, new PendingResultLink(
                             currentToken,
                             link.resultWho,
-                            link.requestCode));
+                            link.registryKey,
+                            link.requestCode,
+                            link.intentSenderToken));
                 }
             }
         }
@@ -1363,9 +1534,12 @@ public final class ActivityTaskLedger {
                 callerToken,
                 calleeToken,
                 delivery.resultWho(),
+                delivery.registryKey(),
                 delivery.requestCode(),
                 delivery.resultCode(),
-                delivery.dataToken());
+                delivery.intentSenderToken(),
+                delivery.dataToken(),
+                delivery.resultIntent());
     }
 
     private MutableActivity requireActivity(String token) {
@@ -1447,10 +1621,68 @@ public final class ActivityTaskLedger {
                 createdNewTask);
     }
 
+    private static MutableTask copyTask(
+            MutableTask source,
+            Map<String, MutableActivity> activityCopies) {
+        MutableTask copy = new MutableTask(
+                source.taskId,
+                source.virtualUserId,
+                source.packageName,
+                source.packageRevision,
+                source.affinity,
+                source.documentTask,
+                source.documentLaunchMode,
+                source.documentKey,
+                source.rootIntentFlags,
+                source.excludedFromRecents,
+                source.retainInRecents,
+                source.lastActiveSequence);
+        copy.moveToFrontCount = source.moveToFrontCount;
+        for (MutableActivity activity : source.activities) {
+            MutableActivity activityCopy = copyActivity(activity);
+            copy.activities.add(activityCopy);
+            activityCopies.put(activityCopy.token, activityCopy);
+        }
+        return copy;
+    }
+
+    private static MutableActivity copyActivity(MutableActivity source) {
+        MutableActivity copy = new MutableActivity(
+                source.identity,
+                source.stableId,
+                source.token,
+                source.launchMode,
+                source.processName,
+                source.processGeneration,
+                source.resultWho,
+                source.requestCode,
+                source.launchFlags,
+                source.noHistory);
+        copy.restoredFromCheckpoint = source.restoredFromCheckpoint;
+        copy.lifecycleState = source.lifecycleState;
+        copy.newIntentCount = source.newIntentCount;
+        copy.pendingNewIntents.addAll(source.pendingNewIntents);
+        copy.pendingResultLinks.addAll(source.pendingResultLinks);
+        copy.resultRegistrations.putAll(source.resultRegistrations);
+        copy.recreationCount = source.recreationCount;
+        copy.savedState = source.savedState;
+        copy.configurationCount = source.configurationCount;
+        copy.lastConfigurationToken = source.lastConfigurationToken;
+        return copy;
+    }
+
     private static String requireText(String value, String name) {
         String normalized = Objects.requireNonNull(value, name).trim();
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(name + " must not be blank");
+        }
+        return normalized;
+    }
+
+    private static String requireBoundedText(String value, String name, int maximum) {
+        String normalized = requireText(value, name);
+        if (normalized.length() > maximum) {
+            throw new IllegalArgumentException(name + " exceeds " + maximum + " characters");
         }
         return normalized;
     }
@@ -1463,13 +1695,45 @@ public final class ActivityTaskLedger {
         return requestedRevision.isEmpty() || taskRevision.equals(requestedRevision);
     }
 
+    public static final class RollbackState {
+        private final int nextTaskId;
+        private final long nextNewIntentSequence;
+        private final long nextConfigurationSequence;
+        private final long nextActivationSequence;
+        private final LinkedHashMap<Integer, MutableTask> tasks;
+        private final LinkedHashMap<Integer, TaskQuerySnapshot> recentTasks;
+        private final LinkedHashMap<String, MutableActivity> activitiesByToken;
+        private final LinkedHashMap<String, List<ActivityResultDelivery>> resultDeliveriesByCaller;
+
+        private RollbackState(
+                int nextTaskId,
+                long nextNewIntentSequence,
+                long nextConfigurationSequence,
+                long nextActivationSequence,
+                LinkedHashMap<Integer, MutableTask> tasks,
+                LinkedHashMap<Integer, TaskQuerySnapshot> recentTasks,
+                LinkedHashMap<String, MutableActivity> activitiesByToken,
+                LinkedHashMap<String, List<ActivityResultDelivery>> resultDeliveriesByCaller) {
+            this.nextTaskId = nextTaskId;
+            this.nextNewIntentSequence = nextNewIntentSequence;
+            this.nextConfigurationSequence = nextConfigurationSequence;
+            this.nextActivationSequence = nextActivationSequence;
+            this.tasks = tasks;
+            this.recentTasks = recentTasks;
+            this.activitiesByToken = activitiesByToken;
+            this.resultDeliveriesByCaller = resultDeliveriesByCaller;
+        }
+    }
+
     private record Match(MutableTask task, int index) {
     }
 
     private record PendingResultLink(
             String callerActivityToken,
             String resultWho,
-            int requestCode) {
+            String registryKey,
+            int requestCode,
+            String intentSenderToken) {
     }
 
     private static final class MutableTask {
@@ -1528,6 +1792,7 @@ public final class ActivityTaskLedger {
 
     private static final class MutableActivity {
         private final ActivityIdentity identity;
+        private final String stableId;
         private String token;
         private final LaunchMode launchMode;
         private final String processName;
@@ -1541,6 +1806,7 @@ public final class ActivityTaskLedger {
         private long newIntentCount;
         private final List<NewIntentDelivery> pendingNewIntents = new ArrayList<>();
         private final List<PendingResultLink> pendingResultLinks = new ArrayList<>();
+        private final LinkedHashMap<String, Integer> resultRegistrations = new LinkedHashMap<>();
         private long recreationCount;
         private SavedActivityState savedState;
         private long configurationCount;
@@ -1548,6 +1814,7 @@ public final class ActivityTaskLedger {
 
         private MutableActivity(
                 ActivityIdentity identity,
+                String stableId,
                 String token,
                 LaunchMode launchMode,
                 String processName,
@@ -1557,6 +1824,7 @@ public final class ActivityTaskLedger {
                 int launchFlags,
                 boolean noHistory) {
             this.identity = identity;
+            this.stableId = requireBoundedText(stableId, "stableId", 128);
             this.token = token;
             this.launchMode = launchMode;
             this.processName = processName;
