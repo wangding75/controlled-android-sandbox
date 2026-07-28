@@ -384,14 +384,25 @@ public final class SelfTest {
     private static void testServiceRuntimeRegistry() {
         ServiceRuntimeRegistry registry = new ServiceRuntimeRegistry();
         ServiceRuntimeRegistry.Snapshot service = registry.start("instance-a", "pkg.SyncService", "pkg:remote",
-                ServiceRuntimeRegistry.RestartMode.STICKY, 1);
-        require(service.started() && service.lastStartId() == 1, "started service");
+                ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT, 1, "ACTION_SYNC", true);
+        require(service.started() && service.lastStartId() == 1 && service.foreground(), "started foreground service");
+        service = registry.start("instance-a", "pkg.SyncService", "pkg:remote",
+                ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT, 1, "ACTION_SYNC_2", false);
+        require(service.lastStartId() == 2 && "ACTION_SYNC_2".equals(service.lastStartAction()), "latest start metadata");
+        service = registry.stopStartId("instance-a", "pkg.SyncService", 1, 1);
+        require(service.started(), "stale start id must not stop service");
+        service = registry.stopStartId("instance-a", "pkg.SyncService", 99, 1);
+        require(service.started(), "future start id must not stop service");
         service = registry.bind("instance-a", "pkg.SyncService", "pkg:remote", "connection-1", 1);
         require(service.bound(), "bound service");
         service = registry.unbind("instance-a", "pkg.SyncService", "connection-1", 1);
         require(service.started() && !service.bound(), "unbind keeps started service");
-        require(registry.markProcessDied("instance-a", "pkg:remote", 1).get(0).state() == ServiceRuntimeRegistry.State.RECOVERING,
-                "sticky service recovery");
+        ServiceRuntimeRegistry.Snapshot recovering = registry.markProcessDied(
+                "instance-a", "pkg:remote", 1).get(0);
+        require(recovering.state() == ServiceRuntimeRegistry.State.RECOVERING
+                        && !recovering.foreground()
+                        && "ACTION_SYNC_2".equals(recovering.lastStartAction()),
+                "redeliver service recovery");
         service = registry.completeRecovery("instance-a", "pkg.SyncService", 1, 2);
         require(service.generation() == 2 && service.state() == ServiceRuntimeRegistry.State.ACTIVE,
                 "service recovery generation");

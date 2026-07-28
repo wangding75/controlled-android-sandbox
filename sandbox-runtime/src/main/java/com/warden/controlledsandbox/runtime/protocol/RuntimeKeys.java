@@ -53,6 +53,14 @@ public final class RuntimeKeys {
     public static final String SERVICE_CONNECTION_COUNT = "serviceConnectionCount";
     public static final String SERVICE_LAST_START_ID = "serviceLastStartId";
     public static final String SERVICE_RECORD_COUNT = "serviceRecordCount";
+    public static final String SERVICE_FOREGROUND = "serviceForeground";
+    public static final String SERVICE_FOREGROUND_REQUESTED = "serviceForegroundRequested";
+    public static final String SERVICE_RECOVERY = "serviceRecovery";
+    public static final String SERVICE_REDELIVERED = "serviceRedelivered";
+    public static final String SERVICE_START_ID = "serviceStartId";
+    public static final String SERVICE_STOPPED_BY_START_ID = "serviceStoppedByStartId";
+    public static final String SERVICE_CONNECTION_BINDER = "serviceConnectionBinder";
+    public static final String SERVICE_CONNECTION_DEATH_TRACKED = "serviceConnectionDeathTracked";
     public static final String STATUS = "status";
     public static final String ERROR_TYPE = "errorType";
     public static final String ERROR_MESSAGE = "errorMessage";

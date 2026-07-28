@@ -99,3 +99,7 @@ The two-pass command builds unsigned release APKs twice with a clean task graph,
 ## M4-T13 source baseline
 
 M4-T13 adds a typed Guest JobService execution bridge. Trusted Host Job callbacks are reduced to bounded `VirtualJobParametersSnapshot` data, Package Service owns the `SCHEDULED → DISPATCHING → RUNNING` state machine, and Guest `jobFinished` is a one-shot package/user/process/generation/dispatch-token capability. This is source/host evidence only; Android-version and OEM JobScheduler behavior remains device-gated.
+
+## M4-T14 source baseline
+
+M4-T14 moves Service ownership behind `RuntimeServiceCoordinator`. Started, bound and foreground state is generation-aware; bound clients may provide death-linked Binder tokens; stale start IDs cannot stop newer work; and sticky/redeliver Services are recreated after Guest process recovery. Foreground notification/type enforcement and Android/OEM lifecycle behavior remain device-gated.

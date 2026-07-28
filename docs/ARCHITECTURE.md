@@ -185,3 +185,9 @@ resource invalidation and best-effort physical close delivery are delegated.
 Android `JobParameters` and its host callback never cross directly into Guest code. The trusted `VirtualJobService` extracts a bounded `VirtualJobParametersSnapshot` and calls Package Service. Package Service validates the persisted Job owner and current Runtime observer, transitions the record through `DISPATCHING` and `RUNNING`, and creates an `IVirtualJobExecution` capability bound to Guest ID, process, generation and dispatch token.
 
 The Guest runtime reconstructs version-adapted `JobParameters`, invokes the declared Guest `JobService` on its main thread and exposes only a restricted raw `IJobCallback` implementation for `jobFinished`. Completion returns through the scoped execution Binder to the trusted Host callback. Runtime death, callback death, replacement, timeout and stop invalidate the capability and apply an explicit reschedule decision.
+
+## M4-T14 Service lifecycle ownership
+
+`RuntimeServiceCoordinator` owns Broker-side started, bound, foreground and recovery state. `RuntimeBrokerService` supplies only the generic component route and Guest Binder invocation. Bound clients may attach a Binder token; the coordinator links it to death, performs best-effort Guest unbind and removes authoritative connection ownership.
+
+Guest process death clears connection and foreground state. `START_NOT_STICKY` records are destroyed, while sticky and redeliver records enter `RECOVERING`. The new Guest generation must successfully recreate every recoverable Service before ownership moves to that generation. Redelivery carries only the bounded latest action, not an unrestricted host Intent object.

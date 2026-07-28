@@ -1166,7 +1166,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Persistent Job state now transitions SCHEDULED\u2192DISPATCHING\u2192RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
+      "notes": "Persistent Job state now transitions SCHEDULED→DISPATCHING→RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
     },
     {
       "id": "runtime.guest-jobservice-execution-bridge",
@@ -1192,6 +1192,55 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "A scoped one-shot execution Binder maps Guest JobService.jobFinished to the trusted Host JobService callback; old generations, completed capabilities and mismatched job IDs cannot finish current work."
+    },
+    {
+      "id": "runtime.service-coordinator-split",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinatorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Started, bound, foreground, recovery and connection-lease orchestration are extracted from RuntimeBrokerService into a dedicated Service coordinator."
+    },
+    {
+      "id": "runtime.service-connection-death-cleanup",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinator.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinatorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Bound-service client tokens are linked to Binder death; dead clients are removed from Broker ownership and receive best-effort Guest onUnbind delivery."
+    },
+    {
+      "id": "runtime.service-sticky-redelivery-recovery",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentRecoveryCoordinator.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "START_STICKY and START_REDELIVER_INTENT ownership survives Guest process death; recovery recreates the Service in the new Generation and redelivers the latest bounded action when required."
+    },
+    {
+      "id": "runtime.foreground-service-state-model",
+      "evidence": [
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java"
+      ],
+      "sourceStatus": "partial",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Foreground ownership, promotion/demotion and stop semantics are modeled and routed, but Android foreground notification deadlines, service types and OEM enforcement remain unimplemented."
     }
   ],
   "statusDimensions": {

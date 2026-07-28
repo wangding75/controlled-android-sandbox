@@ -2,7 +2,6 @@ package com.warden.controlledsandbox.runtime.status;
 
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.runtime.component.receiver.ReceiverLifecycleCoordinator;
-import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerProviderRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinator;
 
@@ -13,14 +12,14 @@ import com.warden.controlledsandbox.domain.port.SessionMetricsRepository;
 public final class BrokerRuntimeStatusSource implements RuntimeStatusSource {
     private final SessionMetricsRepository sessions;
     private final BrokerActivityRuntime activity;
-    private final BrokerServiceRuntime services;
+    private final ServiceMetricsSource services;
     private final ProviderLifecycleCoordinator providers;
     private final BrokerProviderRuntime providerAudit;
     private final ReceiverLifecycleCoordinator receivers;
 
     public BrokerRuntimeStatusSource(SessionMetricsRepository sessions,
                                      BrokerActivityRuntime activity,
-                                     BrokerServiceRuntime services,
+                                     ServiceMetricsSource services,
                                      ProviderLifecycleCoordinator providers,
                                      BrokerProviderRuntime providerAudit,
                                      ReceiverLifecycleCoordinator receivers) {

@@ -5,7 +5,6 @@ import com.warden.controlledsandbox.runtime.component.receiver.BrokerManifestRec
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerOrderedReceiverRuntime;
 import com.warden.controlledsandbox.runtime.component.receiver.ReceiverLifecycleCoordinator;
-import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics;
 import com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerFileRuntime;
@@ -33,7 +32,7 @@ public final class BrokerArchitecturePortsSelfTest {
         sessions.allocate("com.example.guest", 0, 10);
         BrokerStateStore state = new BrokerStateStore();
         BrokerActivityRuntime activity = new BrokerActivityRuntime(state);
-        BrokerServiceRuntime services = new BrokerServiceRuntime();
+        RuntimeServiceCoordinator services = new RuntimeServiceCoordinator(state, (slot, request) -> new Bundle());
         BrokerProviderRuntime provider = new BrokerProviderRuntime();
         BrokerCursorRuntime cursors = new BrokerCursorRuntime();
         BrokerFileRuntime files = new BrokerFileRuntime();

@@ -80,7 +80,10 @@ provider_coordinator = require(
 broker = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
     "RuntimeProviderResourceCoordinator providerResources", "providerResources.stopSession",
-    "providerResources.recoverSession", "providerResources.invalidateInstance")
+    "componentRecoveryCoordinator.recover", "providerResources.invalidateInstance")
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentRecoveryCoordinator.java",
+    "providers.recoverSession", "providers.stopSession")
 for forbidden in ["closeGuestCursorBestEffort", "closeGuestFileBestEffort", "applyProviderCleanup"]:
     if forbidden in broker:
         errors.append(f"RuntimeBrokerService still owns extracted Provider cleanup: {forbidden}")

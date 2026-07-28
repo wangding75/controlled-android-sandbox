@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
@@ -50,6 +51,35 @@ final class RuntimeClient implements AutoCloseable {
     Bundle startService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.START_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
     Bundle stopService(SandboxRecord record) throws Exception { return stopService(record, 0); }
     Bundle stopService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.STOP_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
+    Bundle startForegroundService(SandboxRecord record, int virtualUserId) throws Exception {
+        return component(record, virtualUserId, ComponentOperations.START_FOREGROUND_SERVICE,
+                record.serviceClass, record.serviceProcess, "", "");
+    }
+    Bundle stopServiceStartId(SandboxRecord record, int virtualUserId, int startId) throws Exception {
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.STOP_SERVICE_START_ID,
+                record.serviceClass, record.serviceProcess, "", "");
+        request.putInt(RuntimeKeys.SERVICE_START_ID, startId);
+        return requireBroker().invokeComponent(request);
+    }
+    Bundle setServiceForeground(SandboxRecord record, int virtualUserId, boolean foreground) throws Exception {
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.SET_SERVICE_FOREGROUND,
+                record.serviceClass, record.serviceProcess, "", "");
+        request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, foreground);
+        return requireBroker().invokeComponent(request);
+    }
+    BoundServiceLease bindService(SandboxRecord record, int virtualUserId, String connectionId) throws Exception {
+        Binder clientToken = new Binder();
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.BIND_SERVICE,
+                record.serviceClass, record.serviceProcess, "", "");
+        request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+        request.putBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER, clientToken);
+        Bundle result = requireBroker().invokeComponent(request);
+        if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+            throw new IllegalStateException(result.getString(RuntimeKeys.ERROR_TYPE, "SERVICE_BIND_FAILED"));
+        }
+        return new BoundServiceLease(record, virtualUserId, connectionId, clientToken,
+                result.getBinder(RuntimeKeys.BINDER));
+    }
     Bundle sendBroadcast(SandboxRecord record) throws Exception { return sendBroadcast(record, 0); }
     Bundle sendBroadcast(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.SEND_BROADCAST, record.receiverClass, record.receiverProcess, record.receiverAction, ""); }
     Bundle prepareProvider(SandboxRecord record) throws Exception { return prepareProvider(record, 0); }
@@ -64,12 +94,19 @@ final class RuntimeClient implements AutoCloseable {
             out.putString(RuntimeKeys.STATUS, "SKIPPED_NO_COMPONENT");
             return out;
         }
+        return requireBroker().invokeComponent(componentRequest(record, virtualUserId, operation,
+                component, processName, action, authority));
+    }
+
+    private Bundle componentRequest(SandboxRecord record, int virtualUserId, String operation, String component,
+                                    String processName, String action, String authority) throws Exception {
+        if (component == null || component.trim().isEmpty()) throw new IllegalArgumentException("component is required");
         Bundle request = request(record, virtualUserId, processName);
         request.putString(ComponentOperations.OPERATION, operation);
         request.putString(RuntimeKeys.COMPONENT_CLASS, component);
         request.putString(ComponentOperations.ACTION, action == null ? "" : action);
         request.putString(ComponentOperations.AUTHORITY, authority == null ? "" : authority);
-        return requireBroker().invokeComponent(request);
+        return request;
     }
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {
@@ -115,6 +152,39 @@ final class RuntimeClient implements AutoCloseable {
         request.putStringArrayList(RuntimeKeys.PERMISSIONS, permissions);
         request.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
         return request;
+    }
+
+    final class BoundServiceLease implements AutoCloseable {
+        private final SandboxRecord record;
+        private final int virtualUserId;
+        private final String connectionId;
+        @SuppressWarnings("unused") private final IBinder clientToken;
+        private final IBinder serviceBinder;
+        private boolean closed;
+
+        BoundServiceLease(SandboxRecord record, int virtualUserId, String connectionId,
+                          IBinder clientToken, IBinder serviceBinder) {
+            this.record = record;
+            this.virtualUserId = virtualUserId;
+            this.connectionId = connectionId;
+            this.clientToken = clientToken;
+            this.serviceBinder = serviceBinder;
+        }
+
+        IBinder binder() { return serviceBinder; }
+
+        @Override public void close() {
+            if (closed) return;
+            closed = true;
+            try {
+                Bundle request = componentRequest(record, virtualUserId, ComponentOperations.UNBIND_SERVICE,
+                        record.serviceClass, record.serviceProcess, "", "");
+                request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
+                requireBroker().invokeComponent(request);
+            } catch (Exception error) {
+                throw new IllegalStateException("SERVICE_UNBIND_FAILED", error);
+            }
+        }
     }
 
     private IRuntimeBroker requireBroker() throws Exception {

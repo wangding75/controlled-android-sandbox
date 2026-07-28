@@ -5,7 +5,10 @@ public final class ComponentOperations {
     public static final String ACTION = "intentAction";
     public static final String AUTHORITY = "providerAuthority";
     public static final String START_SERVICE = "START_SERVICE";
+    public static final String START_FOREGROUND_SERVICE = "START_FOREGROUND_SERVICE";
     public static final String STOP_SERVICE = "STOP_SERVICE";
+    public static final String STOP_SERVICE_START_ID = "STOP_SERVICE_START_ID";
+    public static final String SET_SERVICE_FOREGROUND = "SET_SERVICE_FOREGROUND";
     public static final String BIND_SERVICE = "BIND_SERVICE";
     public static final String UNBIND_SERVICE = "UNBIND_SERVICE";
     public static final String REGISTER_RECEIVER = "REGISTER_RECEIVER";
@@ -33,6 +36,22 @@ public final class ComponentOperations {
     public static final String PROVIDER_NOTIFY_CHANGE = "PROVIDER_NOTIFY_CHANGE";
 
     private ComponentOperations() { }
+
+    public static boolean isServiceOperation(String operation) {
+        return START_SERVICE.equals(operation)
+                || START_FOREGROUND_SERVICE.equals(operation)
+                || STOP_SERVICE.equals(operation)
+                || STOP_SERVICE_START_ID.equals(operation)
+                || SET_SERVICE_FOREGROUND.equals(operation)
+                || BIND_SERVICE.equals(operation)
+                || UNBIND_SERVICE.equals(operation);
+    }
+
+    public static void requireKnownServiceOperation(String operation) {
+        if (operation != null && operation.contains("SERVICE") && !isServiceOperation(operation)) {
+            throw new IllegalArgumentException("Unknown Service operation: " + operation);
+        }
+    }
 
     public static boolean isProviderOperation(String operation) {
         return PREPARE_PROVIDER.equals(operation)

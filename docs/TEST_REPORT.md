@@ -52,3 +52,10 @@ The following remain unverified:
 - Complex AppOps return types, attribution chains and callbacks.
 - Package Service restart and policy-snapshot refresh behavior under Android scheduling.
 - Compatibility with real third-party applications.
+
+
+# M4-T14 local test report
+
+Status: **LOCAL PASS CANDIDATE / SOURCE 97.8% / PRODUCTION WIRING 95.5% / DEVICE EVIDENCE 0.0%**
+
+The capability matrix contains 90 tracked entries. M4-T14 adds dedicated Service coordination, Binder-death cleanup, sticky/redeliver recovery and a partial foreground-service state model. Static Android compilation and Service-specific domain/Broker/coordinator regression tests pass. Emulator, physical-device, real APK and Android foreground-service policy tests remain intentionally deferred.

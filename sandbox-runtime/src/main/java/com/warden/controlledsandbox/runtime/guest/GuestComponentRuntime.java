@@ -45,9 +45,17 @@ public final class GuestComponentRuntime {
             IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass);
             switch (operation) {
                 case ComponentOperations.START_SERVICE:
-                    return startService(componentClass, request.getString(ComponentOperations.ACTION, ""));
+                    return startService(componentClass, request, false);
+                case ComponentOperations.START_FOREGROUND_SERVICE:
+                    return startService(componentClass, request, true);
                 case ComponentOperations.STOP_SERVICE:
                     return stopService(componentClass);
+                case ComponentOperations.STOP_SERVICE_START_ID:
+                    return stopServiceStartId(componentClass,
+                            request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
+                case ComponentOperations.SET_SERVICE_FOREGROUND:
+                    return setServiceForeground(componentClass,
+                            request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false));
                 case ComponentOperations.BIND_SERVICE:
                     return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID),
                             request.getString(ComponentOperations.ACTION, ""));
@@ -117,19 +125,33 @@ public final class GuestComponentRuntime {
         providersByAuthority.clear();
     }
 
-    private Bundle startService(String className, String action) throws Exception {
+    private Bundle startService(String className, Bundle request, boolean foregroundRequested) throws Exception {
         ServiceRecord record = getOrCreateService(className);
+        String action = request.getString(ComponentOperations.ACTION, "");
         Intent intent = intent(action);
-        int startId = nextStartId++;
-        int resultCode = record.service.onStartCommand(intent, 0, startId);
+        boolean recovery = request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
+        int recoveredStartId = request.getInt(RuntimeKeys.SERVICE_START_ID, -1);
+        int startId = recovery && recoveredStartId > 0 ? recoveredStartId : nextStartId++;
+        if (recovery) nextStartId = Math.max(nextStartId, startId + 1);
+        int flags = request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false)
+                ? Service.START_FLAG_REDELIVERY : 0;
+        int resultCode = record.service.onStartCommand(intent, flags, startId);
         record.startCount++;
-        Bundle out = success("SERVICE_STARTED", className);
+        record.lastStartId = startId;
+        record.lastStartIntent = intent;
+        record.foreground = record.foreground || foregroundRequested
+                || request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false);
+        Bundle out = success(recovery ? "SERVICE_RECOVERED" : "SERVICE_STARTED", className);
         out.putBoolean("created", record.createdNow);
         record.createdNow = false;
         out.putInt("startId", startId);
+        out.putInt(RuntimeKeys.SERVICE_START_ID, startId);
         out.putInt("startCount", record.startCount);
         out.putInt("connectionCount", record.connections.size());
         out.putInt("onStartCommandResult", resultCode);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
+        out.putBoolean(RuntimeKeys.SERVICE_REDELIVERED,
+                request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false));
         RuntimeEventLog.event("GUEST_SERVICE_START", out);
         return out;
     }
@@ -138,11 +160,46 @@ public final class GuestComponentRuntime {
         ServiceRecord record = services.get(className);
         if (record == null) return success("SERVICE_NOT_RUNNING", className);
         record.startCount = 0;
+        record.foreground = false;
         boolean destroyed = settleService(className, record);
         Bundle out = success(destroyed ? "SERVICE_STOPPED" : "SERVICE_STOP_REQUESTED", className);
         out.putInt("connectionCount", record.connections.size());
         out.putBoolean("destroyed", destroyed);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
         RuntimeEventLog.event("GUEST_SERVICE_STOP", out);
+        return out;
+    }
+
+    private Bundle stopServiceStartId(String className, int startId) {
+        if (startId < 1) throw new IllegalArgumentException("serviceStartId must be positive");
+        ServiceRecord record = services.get(className);
+        if (record == null) return success("SERVICE_NOT_RUNNING", className);
+        boolean stopped = startId == record.lastStartId;
+        if (stopped) {
+            record.startCount = 0;
+            record.foreground = false;
+        }
+        boolean destroyed = stopped && settleService(className, record);
+        Bundle out = success(destroyed ? "SERVICE_STOPPED_BY_START_ID"
+                : stopped ? "SERVICE_STOP_REQUESTED_BY_START_ID" : "SERVICE_START_ID_STALE", className);
+        out.putInt(RuntimeKeys.SERVICE_START_ID, startId);
+        out.putBoolean(RuntimeKeys.SERVICE_STOPPED_BY_START_ID, stopped);
+        out.putBoolean("destroyed", destroyed);
+        out.putInt("connectionCount", record.connections.size());
+        RuntimeEventLog.event("GUEST_SERVICE_STOP_START_ID", out);
+        return out;
+    }
+
+    private Bundle setServiceForeground(String className, boolean foreground) {
+        ServiceRecord record = services.get(className);
+        if (record == null) throw new IllegalArgumentException("SERVICE_NOT_RUNNING");
+        if (foreground && record.startCount == 0) throw new IllegalStateException("FOREGROUND_SERVICE_NOT_STARTED");
+        record.foreground = foreground;
+        Bundle out = success(foreground ? "SERVICE_FOREGROUND" : "SERVICE_BACKGROUND", className);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, foreground);
+        out.putInt("startCount", record.startCount);
+        out.putInt("connectionCount", record.connections.size());
+        RuntimeEventLog.event("GUEST_SERVICE_FOREGROUND", out);
         return out;
     }
 
@@ -168,6 +225,7 @@ public final class GuestComponentRuntime {
         out.putBoolean("created", record.createdNow);
         record.createdNow = false;
         out.putBoolean("rebound", rebound);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
         if (binder != null) out.putBinder(RuntimeKeys.BINDER, binder);
         RuntimeEventLog.event("GUEST_SERVICE_BIND", out);
         return out;
@@ -185,6 +243,7 @@ public final class GuestComponentRuntime {
         out.putInt("connectionCount", record.connections.size());
         out.putBoolean("rebindRequested", record.rebindRequested);
         out.putBoolean("destroyed", destroyed);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
         RuntimeEventLog.event("GUEST_SERVICE_UNBIND", out);
         return out;
     }
@@ -225,6 +284,8 @@ public final class GuestComponentRuntime {
         try { record.service.onDestroy(); } catch (Throwable ignored) { }
         record.connections.clear();
         record.lastBinder = null;
+        record.lastStartIntent = null;
+        record.foreground = false;
     }
 
     private Bundle registerReceiver(String className, Bundle request) throws Exception {
@@ -617,6 +678,9 @@ public final class GuestComponentRuntime {
         final Service service;
         final Map<String, BoundConnection> connections = new LinkedHashMap<>();
         int startCount;
+        int lastStartId;
+        Intent lastStartIntent;
+        boolean foreground;
         IBinder lastBinder;
         boolean rebindRequested;
         boolean createdNow;

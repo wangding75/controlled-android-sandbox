@@ -18,12 +18,28 @@ public final class BrokerServiceRuntimeSelfTest {
         Bundle otherStartResult = success("SERVICE_STARTED");
         otherStartResult.putInt("onStartCommandResult", Service.START_STICKY);
         runtime.applySuccessfulOperation(otherUser, request(ComponentOperations.START_SERVICE), otherStartResult);
-        Bundle start = request(ComponentOperations.START_SERVICE);
+
+        Bundle start = request(ComponentOperations.START_FOREGROUND_SERVICE);
+        start.putString(ComponentOperations.ACTION, "ACTION_SYNC");
         Bundle startResult = success("SERVICE_STARTED");
-        startResult.putInt("onStartCommandResult", Service.START_STICKY);
+        startResult.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
         runtime.applySuccessfulOperation(first, start, startResult);
         check("ACTIVE".equals(startResult.getString(RuntimeKeys.SERVICE_STATE)), "started service not active");
-        check("STICKY".equals(startResult.getString(RuntimeKeys.SERVICE_RESTART_MODE)), "restart mode missing");
+        check("REDELIVER_INTENT".equals(startResult.getString(RuntimeKeys.SERVICE_RESTART_MODE)), "restart mode missing");
+        check(startResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false), "foreground state missing");
+
+        Bundle secondStart = request(ComponentOperations.START_SERVICE);
+        secondStart.putString(ComponentOperations.ACTION, "ACTION_LATEST");
+        Bundle secondStartResult = success("SERVICE_STARTED");
+        secondStartResult.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
+        runtime.applySuccessfulOperation(first, secondStart, secondStartResult);
+        check(secondStartResult.getInt(RuntimeKeys.SERVICE_LAST_START_ID, 0) == 2, "start id did not advance");
+
+        Bundle staleStop = request(ComponentOperations.STOP_SERVICE_START_ID);
+        staleStop.putInt(RuntimeKeys.SERVICE_START_ID, 1);
+        Bundle staleStopResult = success("SERVICE_START_ID_STALE");
+        runtime.applySuccessfulOperation(first, staleStop, staleStopResult);
+        check(staleStopResult.getInt(RuntimeKeys.SERVICE_START_COUNT, 0) == 2, "stale start id stopped service");
 
         Bundle bind = request(ComponentOperations.BIND_SERVICE);
         bind.putString(RuntimeKeys.CONNECTION_ID, "connection-1");
@@ -32,11 +48,12 @@ public final class BrokerServiceRuntimeSelfTest {
         check(bindResult.getInt(RuntimeKeys.SERVICE_CONNECTION_COUNT, 0) == 1, "connection not registered");
 
         check(runtime.processDisconnected(first).size() == 1, "disconnect did not affect service");
-        check("ACTIVE".equals(otherStartResult.getString(RuntimeKeys.SERVICE_STATE)),
-                "second virtual user initial state missing");
+        check(runtime.recovering(first).size() == 1, "redeliver service not marked for recovery");
+        check("ACTION_LATEST".equals(runtime.recovering(first).get(0).lastStartAction()), "redelivery action lost");
         check(runtime.recordCount() == 2, "second virtual user service was cross-contaminated");
         GuestSession second = session(1, 2);
-        check(runtime.processRecovered(first, second).size() == 1, "sticky service not recovered");
+        check(runtime.processRecovered(first, second).size() == 1, "service not recovered");
+
         Bundle rebound = request(ComponentOperations.BIND_SERVICE);
         rebound.putString(RuntimeKeys.CONNECTION_ID, "connection-2");
         runtime.applySuccessfulOperation(second, rebound, success("SERVICE_BOUND"));
@@ -46,6 +63,7 @@ public final class BrokerServiceRuntimeSelfTest {
         runtime.applySuccessfulOperation(second, stop, stopResult);
         check("ACTIVE".equals(stopResult.getString(RuntimeKeys.SERVICE_STATE)),
                 "bound service should remain active after stop");
+        check(!stopResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, true), "foreground state survived stop");
 
         Bundle unbind = request(ComponentOperations.UNBIND_SERVICE);
         unbind.putString(RuntimeKeys.CONNECTION_ID, "connection-2");
@@ -56,7 +74,7 @@ public final class BrokerServiceRuntimeSelfTest {
 
         Bundle restartResult = success("SERVICE_STARTED");
         restartResult.putInt("onStartCommandResult", Service.START_NOT_STICKY);
-        runtime.applySuccessfulOperation(second, start, restartResult);
+        runtime.applySuccessfulOperation(second, request(ComponentOperations.START_SERVICE), restartResult);
         check("ACTIVE".equals(restartResult.getString(RuntimeKeys.SERVICE_STATE)),
                 "destroyed service must be restartable");
         check(runtime.invalidate(second) == 1 && runtime.recordCount() == 1,
@@ -67,8 +85,8 @@ public final class BrokerServiceRuntimeSelfTest {
     }
 
     private static GuestSession session(int userId, long generation) {
-        return new GuestSession("s-" + userId, "com.example", userId, "com.example:remote", 0,
-                generation, SessionState.READY, 0, "");
+        return new GuestSession("s-" + userId + "-" + generation, "com.example", userId,
+                "com.example:remote", 0, generation, SessionState.READY, 0, "");
     }
 
     private static Bundle request(String operation) {

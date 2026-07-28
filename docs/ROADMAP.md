@@ -90,3 +90,7 @@ decomposition. Device validation remains intentionally deferred.
 ## M4-T13 source baseline
 
 Completed in source/host evidence: typed JobParameters transport, trusted Host JobService dispatch, owning Guest JobService `onStartJob`/`onStopJob`, one-shot scoped `jobFinished`, timeout and Binder-death rescheduling, and stale-generation rejection. Remaining priority: Android-version validation, Job work-item APIs, Service coordinator extraction and complete Service lifecycle semantics. Device validation remains intentionally deferred.
+
+## M4-T14 source baseline
+
+Completed in source/host evidence: dedicated Service coordinator ownership, started/bound multi-client state, Binder-death cleanup, latest-start-ID stop semantics, foreground state, and sticky/redeliver Guest-generation recovery. Remaining priority: complete Android IServiceConnection/foreground enforcement, Broker-process persistence, Activity/Task launch modes and device validation.

@@ -55,7 +55,7 @@ for token in [
     'receiverCoordinator.dispatchImplicitManifestBroadcast(',
     'receiverCoordinator.dispatchDynamicBroadcast(',
     'receiverCoordinator.disconnectSession(',
-    'receiverCoordinator.recoverSession(',
+    'componentRecoveryCoordinator.recover(',
     'receiverCoordinator.stopSession(',
     'receiverCoordinator.invalidateInstance(',
     'receiverCoordinator.invalidateAll(',
@@ -63,6 +63,10 @@ for token in [
 ]:
     if token not in broker:
         errors.append(f'RuntimeBrokerService missing Receiver coordinator delegation: {token}')
+recovery = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentRecoveryCoordinator.java').read_text()
+if 'receivers.recoverSession(' not in recovery:
+    errors.append('RuntimeComponentRecoveryCoordinator missing Receiver recovery delegation')
+
 for token in [
     'ManifestBroadcastDispatcher', 'dispatchImplicitManifestBroadcast(', 'BroadcastPayloadEstimator',
     'BrokerOrderedReceiverRuntime', 'completion = new IOrderedReceiverCompletion.Stub()',

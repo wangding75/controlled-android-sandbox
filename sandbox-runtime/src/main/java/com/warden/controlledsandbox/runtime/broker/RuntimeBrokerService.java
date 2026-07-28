@@ -12,7 +12,6 @@ import com.warden.controlledsandbox.runtime.component.activity.StubActivity5;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity6;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity7;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
-import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService0;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService1;
@@ -78,6 +77,7 @@ public final class RuntimeBrokerService extends Service {
     private VirtualUidRegistry virtualUids;
     private RuntimePermissionCoordinator runtimePermissionCoordinator;
     private RuntimeSystemServiceCoordinator systemServiceCoordinator;
+    private RuntimeComponentRecoveryCoordinator componentRecoveryCoordinator;
     private final UriGrantRegistry uriGrants = new UriGrantRegistry();
     private final BrokerStateStore brokerState = new BrokerStateStore();
     private final RuntimeReceiverCoordinator receiverCoordinator = new RuntimeReceiverCoordinator(
@@ -86,7 +86,8 @@ public final class RuntimeBrokerService extends Service {
             this::sessionById,
             (processSlot, request) -> callGuest(processSlot, guest -> guest.invokeComponent(request)));
     private final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
-    private final BrokerServiceRuntime serviceRuntime = new BrokerServiceRuntime();
+    private final RuntimeServiceCoordinator serviceCoordinator = new RuntimeServiceCoordinator(
+            brokerState, (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
     private final BrokerProviderRuntime providerRuntime = new BrokerProviderRuntime();
     private final BrokerCursorRuntime cursorRuntime = new BrokerCursorRuntime();
     private final BrokerFileRuntime fileRuntime = new BrokerFileRuntime();
@@ -101,7 +102,7 @@ public final class RuntimeBrokerService extends Service {
                     (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
     private final RuntimeStatusDispatcher runtimeStatusDispatcher = new RuntimeStatusDispatcher(
             clock,
-            new BrokerRuntimeStatusSource(sessions, activityRuntime, serviceRuntime, providerLifecycle,
+            new BrokerRuntimeStatusSource(sessions, activityRuntime, serviceCoordinator, providerLifecycle,
                     providerRuntime, receiverCoordinator.lifecycle()),
             this::purgeExpiredResources,
             auditSink);
@@ -115,6 +116,9 @@ public final class RuntimeBrokerService extends Service {
                 new RuntimePermissionPackageClient(this), this::permissionSession);
         systemServiceCoordinator = new RuntimeSystemServiceCoordinator(
                 new RuntimeVirtualSystemServicePackageClient(this));
+        componentRecoveryCoordinator = new RuntimeComponentRecoveryCoordinator(
+                sessions, clock, activityRuntime, serviceCoordinator, receiverCoordinator,
+                providerResources, systemServiceCoordinator);
     }
 
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
@@ -176,6 +180,7 @@ public final class RuntimeBrokerService extends Service {
                 purgeExpiredResources();
                 String operation = request.getString(ComponentOperations.OPERATION, "");
                 ComponentOperations.requireKnownProviderOperation(operation);
+                ComponentOperations.requireKnownServiceOperation(operation);
                 String requestedPackage = required(request, RuntimeKeys.PACKAGE_NAME);
                 int requestedUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
                 if (requestedUser < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
@@ -389,7 +394,7 @@ public final class RuntimeBrokerService extends Service {
                         receiverCoordinator.rollbackRegistration(receiverReservation);
                         providerRuntime.rollbackPrepare(providerReservation);
                     } else {
-                        serviceRuntime.applySuccessfulOperation(activeSession, request, result);
+                        serviceCoordinator.applySuccessfulOperation(activeSession, request, result);
                         if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
                             receiverCoordinator.commitUnregister(request, activeSession);
                         }
@@ -656,7 +661,7 @@ public final class RuntimeBrokerService extends Service {
             } catch (Throwable error) {
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
-                    serviceRuntime.invalidate(staleRecovery);
+                    serviceCoordinator.invalidate(staleRecovery);
                     receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
                     providerResources.stopSession(staleRecovery);
@@ -671,7 +676,7 @@ public final class RuntimeBrokerService extends Service {
                         now(), guestResult.getString(RuntimeKeys.ERROR_TYPE, "GUEST_PREPARE_FAILED"));
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
-                    serviceRuntime.invalidate(staleRecovery);
+                    serviceCoordinator.invalidate(staleRecovery);
                     receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
                     providerResources.stopSession(staleRecovery);
@@ -680,11 +685,7 @@ public final class RuntimeBrokerService extends Service {
                 return guestResult;
             }
             if (staleRecovery != null) {
-                activityRuntime.recreate(staleRecovery, session);
-                serviceRuntime.processRecovered(staleRecovery, session);
-                receiverCoordinator.recoverSession(staleRecovery, session);
-                providerResources.recoverSession(staleRecovery, session);
-                systemServiceCoordinator.stop(staleRecovery);
+                componentRecoveryCoordinator.recover(staleRecovery, session, spec);
             }
             GuestSession ready = sessions.transition(packageName, userId, processName, session.generation(),
                     SessionState.READY, now(), "");
@@ -747,7 +748,7 @@ public final class RuntimeBrokerService extends Service {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(), original.processName()));
             receiverCoordinator.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
             activityRuntime.invalidate(original);
-            serviceRuntime.invalidate(original);
+            serviceCoordinator.stopSession(original);
             providerResources.stopSession(original);
             if (systemServiceCoordinator != null) systemServiceCoordinator.stop(original);
             releaseGuestConnection(original.processSlot());
@@ -1121,7 +1122,7 @@ public final class RuntimeBrokerService extends Service {
                 affected = sessions.markSlotDisconnected(slot, now(), reason);
                 if (affected != null) {
                     activityRuntime.processDisconnected(affected);
-                    serviceRuntime.processDisconnected(affected);
+                    serviceCoordinator.disconnectSession(affected);
                     receiverCoordinator.disconnectSession(affected,
                             "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + reason);
                     RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
@@ -1152,6 +1153,7 @@ public final class RuntimeBrokerService extends Service {
     @Override public void onDestroy() {
         for (GuestSession session : sessions.snapshot()) {
             receiverCoordinator.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
+            serviceCoordinator.stopSession(session);
             providerResources.stopSession(session);
         }
         Integer[] slots;
@@ -1160,6 +1162,7 @@ public final class RuntimeBrokerService extends Service {
         receiverCoordinator.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
         if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
         if (systemServiceCoordinator != null) systemServiceCoordinator.close();
+        serviceCoordinator.close();
         super.onDestroy();
     }
 

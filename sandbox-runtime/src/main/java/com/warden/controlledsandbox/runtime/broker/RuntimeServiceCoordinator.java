@@ -1,0 +1,222 @@
+package com.warden.controlledsandbox.runtime.broker;
+
+import android.os.Bundle;
+import android.os.IBinder;
+import android.os.RemoteException;
+
+import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
+import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
+import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Broker-owned Service authority.
+ *
+ * <p>Owns started/bound/foreground state, client Binder-death cleanup, and sticky/redelivery
+ * recovery. RuntimeBrokerService only supplies Guest process allocation and Binder invocation.</p>
+ */
+public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
+    @FunctionalInterface public interface GuestInvoker {
+        Bundle invoke(int processSlot, Bundle request) throws Exception;
+    }
+
+    private final BrokerStateStore brokerState;
+    private final GuestInvoker guestInvoker;
+    private final BrokerServiceRuntime runtime = new BrokerServiceRuntime();
+    private final Map<String, ConnectionLease> connections = new LinkedHashMap<>();
+
+    public RuntimeServiceCoordinator(BrokerStateStore brokerState, GuestInvoker guestInvoker) {
+        if (brokerState == null || guestInvoker == null) {
+            throw new IllegalArgumentException("Service coordinator dependencies are required");
+        }
+        this.brokerState = brokerState;
+        this.guestInvoker = guestInvoker;
+    }
+
+    public ServiceRuntimeRegistry.Snapshot applySuccessfulOperation(
+            GuestSession session, Bundle request, Bundle result) {
+        ServiceRuntimeRegistry.Snapshot snapshot = runtime.applySuccessfulOperation(session, request, result);
+        String operation = request == null ? "" : request.getString(ComponentOperations.OPERATION, "");
+        if (ComponentOperations.BIND_SERVICE.equals(operation) && snapshot != null) {
+            registerConnection(session, request, result);
+        } else if (ComponentOperations.UNBIND_SERVICE.equals(operation)) {
+            removeConnection(session, request.getString(RuntimeKeys.COMPONENT_CLASS, ""),
+                    request.getString(RuntimeKeys.CONNECTION_ID, ""));
+        }
+        return snapshot;
+    }
+
+    public List<ServiceRuntimeRegistry.Snapshot> disconnectSession(GuestSession session) {
+        removeSessionConnections(session);
+        return runtime.processDisconnected(session);
+    }
+
+    /** Recreates sticky/redeliver services in the new Guest process before marking recovery complete. */
+    public List<ServiceRuntimeRegistry.Snapshot> recoverSession(
+            GuestSession stale, GuestSession current, Bundle currentSpec) throws Exception {
+        removeSessionConnections(stale);
+        List<ServiceRuntimeRegistry.Snapshot> recovering = runtime.recovering(stale);
+        for (ServiceRuntimeRegistry.Snapshot service : recovering) {
+            Bundle call = new Bundle(currentSpec);
+            call.putString(ComponentOperations.OPERATION, ComponentOperations.START_SERVICE);
+            call.putString(RuntimeKeys.COMPONENT_CLASS, service.component());
+            call.putBoolean(RuntimeKeys.SERVICE_RECOVERY, true);
+            call.putInt(RuntimeKeys.SERVICE_START_ID, service.lastStartId());
+            boolean redeliver = service.restartMode() == ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT;
+            call.putBoolean(RuntimeKeys.SERVICE_REDELIVERED, redeliver);
+            call.putString(ComponentOperations.ACTION, redeliver ? service.lastStartAction() : "");
+            Bundle result = guestInvoker.invoke(current.processSlot(), call);
+            if (result == null || "FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+                String reason = result == null ? "NO_RESULT"
+                        : result.getString(RuntimeKeys.ERROR_TYPE, result.getString(RuntimeKeys.STATUS, "FAILED"));
+                throw new IllegalStateException("SERVICE_RECOVERY_FAILED:" + service.component() + ":" + reason);
+            }
+        }
+        return runtime.processRecovered(stale, current);
+    }
+
+    public int stopSession(GuestSession session) {
+        removeSessionConnections(session);
+        return runtime.invalidate(session);
+    }
+
+    public int invalidate(GuestSession session) { return stopSession(session); }
+    @Override public int recordCount() { return runtime.recordCount(); }
+    public List<ServiceRuntimeRegistry.Snapshot> snapshot() { return runtime.snapshot(); }
+
+    public synchronized int activeConnectionLeases() { return connections.size(); }
+
+    public void close() {
+        List<ConnectionLease> leases;
+        synchronized (this) {
+            leases = new ArrayList<>(connections.values());
+            connections.clear();
+        }
+        for (ConnectionLease lease : leases) lease.unlink();
+    }
+
+    private void registerConnection(GuestSession session, Bundle request, Bundle result) {
+        String component = required(request, RuntimeKeys.COMPONENT_CLASS);
+        String connectionId = required(request, RuntimeKeys.CONNECTION_ID);
+        IBinder token = request.getBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER);
+        if (token == null) {
+            result.putBoolean(RuntimeKeys.SERVICE_CONNECTION_DEATH_TRACKED, false);
+            return;
+        }
+        String key = connectionKey(session, component, connectionId);
+        ConnectionLease lease = new ConnectionLease(key, session, component, connectionId, token);
+        synchronized (this) {
+            if (connections.containsKey(key)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION_LEASE");
+            connections.put(key, lease);
+        }
+        try {
+            token.linkToDeath(lease, 0);
+            lease.linked = true;
+            synchronized (this) {
+                if (connections.get(key) != lease) {
+                    lease.unlink();
+                    throw new IllegalStateException("SERVICE_CONNECTION_DIED_DURING_REGISTRATION");
+                }
+            }
+            result.putBoolean(RuntimeKeys.SERVICE_CONNECTION_DEATH_TRACKED, true);
+        } catch (RemoteException | RuntimeException error) {
+            synchronized (this) { connections.remove(key, lease); }
+            bestEffortGuestUnbind(lease);
+            runtime.connectionDied(session, component, connectionId);
+            throw new IllegalStateException("SERVICE_CONNECTION_TOKEN_DEAD", error);
+        }
+    }
+
+    private void removeConnection(GuestSession session, String component, String connectionId) {
+        if (component == null || component.trim().isEmpty() || connectionId == null || connectionId.trim().isEmpty()) return;
+        ConnectionLease lease;
+        synchronized (this) { lease = connections.remove(connectionKey(session, component, connectionId)); }
+        if (lease != null) lease.unlink();
+    }
+
+    private void connectionDied(ConnectionLease lease) {
+        lease.linked = false;
+        synchronized (this) {
+            if (!connections.remove(lease.key, lease)) return;
+        }
+        bestEffortGuestUnbind(lease);
+        try { runtime.connectionDied(lease.session, lease.component, lease.connectionId); }
+        catch (RuntimeException ignored) { }
+    }
+
+    private void bestEffortGuestUnbind(ConnectionLease lease) {
+        Bundle base = brokerState.prepared(processKey(lease.session));
+        if (base == null) return;
+        Bundle request = new Bundle(base);
+        request.putString(ComponentOperations.OPERATION, ComponentOperations.UNBIND_SERVICE);
+        request.putString(RuntimeKeys.COMPONENT_CLASS, lease.component);
+        request.putString(RuntimeKeys.CONNECTION_ID, lease.connectionId);
+        try { guestInvoker.invoke(lease.session.processSlot(), request); }
+        catch (Exception ignored) { }
+    }
+
+    private void removeSessionConnections(GuestSession session) {
+        List<ConnectionLease> removed = new ArrayList<>();
+        synchronized (this) {
+            java.util.Iterator<Map.Entry<String, ConnectionLease>> iterator = connections.entrySet().iterator();
+            while (iterator.hasNext()) {
+                ConnectionLease lease = iterator.next().getValue();
+                if (sameSession(lease.session, session)) {
+                    iterator.remove();
+                    removed.add(lease);
+                }
+            }
+        }
+        for (ConnectionLease lease : removed) lease.unlink();
+    }
+
+    private static boolean sameSession(GuestSession first, GuestSession second) {
+        return first.sessionId().equals(second.sessionId()) && first.generation() == second.generation();
+    }
+
+    private static String connectionKey(GuestSession session, String component, String connectionId) {
+        return session.sessionId() + "#" + session.generation() + "#" + component + "#" + connectionId;
+    }
+
+    private static String processKey(GuestSession session) {
+        return "u" + session.virtualUserId() + ":" + session.packageName()
+                + ":" + session.processName();
+    }
+
+    private static String required(Bundle request, String key) {
+        String value = request == null ? "" : request.getString(key, "");
+        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(key + " is required");
+        return value;
+    }
+
+    private final class ConnectionLease implements IBinder.DeathRecipient {
+        final String key;
+        final GuestSession session;
+        final String component;
+        final String connectionId;
+        final IBinder token;
+        volatile boolean linked;
+
+        ConnectionLease(String key, GuestSession session, String component, String connectionId, IBinder token) {
+            this.key = key;
+            this.session = session;
+            this.component = component;
+            this.connectionId = connectionId;
+            this.token = token;
+        }
+
+        @Override public void binderDied() { connectionDied(this); }
+        void unlink() {
+            if (!linked) return;
+            linked = false;
+            try { token.unlinkToDeath(this, 0); } catch (RuntimeException ignored) { }
+        }
+    }
+}
