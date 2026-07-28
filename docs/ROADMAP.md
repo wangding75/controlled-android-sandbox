@@ -94,3 +94,11 @@ Completed in source/host evidence: typed JobParameters transport, trusted Host J
 ## M4-T14 source baseline
 
 Completed in source/host evidence: dedicated Service coordinator ownership, started/bound multi-client state, Binder-death cleanup, latest-start-ID stop semantics, foreground state, and sticky/redeliver Guest-generation recovery. Remaining priority: complete Android IServiceConnection/foreground enforcement, Broker-process persistence, Activity/Task launch modes and device validation.
+
+## M4-T15 source baseline
+
+- DONE — bounded Activity launch-flag policy covers forward-result, no-history, document and recent-task controls in the source task model.
+- DONE — Runtime Broker owns package/user-isolated running/recent task query, move-to-front and remove-task operations.
+- DONE — versioned, atomic and CRC-protected Activity/Task checkpoints restore bounded task state after Broker restart while dropping dead transient route/result authority.
+- PARTIAL — Guest-facing `ActivityManager`/`ActivityTaskManager` task-object adapters, Window transitions, system Recents UI and complete compound flag parity remain open.
+- DEVICE — Activity/task restoration and Recents behavior across Android API levels and OEM variants.

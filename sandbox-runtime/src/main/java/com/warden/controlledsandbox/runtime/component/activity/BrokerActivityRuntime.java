@@ -4,6 +4,10 @@ import com.warden.controlledsandbox.runtime.broker.BrokerStateStore;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.ActivityTaskRequest;
+import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.contract.ActivityTaskSnapshot;
+import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchCoordinator;
@@ -11,6 +15,8 @@ import com.warden.controlledsandbox.framework.activity.ActivityLaunchSpec;
 import com.warden.controlledsandbox.framework.activity.ActivityLaunchTransaction;
 import com.warden.controlledsandbox.framework.activity.ActivityProcessIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskLedger;
+import com.warden.controlledsandbox.framework.activity.ActivityTaskRestoreOutcome;
+import com.warden.controlledsandbox.framework.activity.TaskQuerySnapshot;
 import com.warden.controlledsandbox.framework.activity.ConfigurationDecision;
 import com.warden.controlledsandbox.framework.activity.LaunchAction;
 import com.warden.controlledsandbox.framework.activity.LaunchFlags;
@@ -21,8 +27,10 @@ import com.warden.controlledsandbox.framework.routing.OneTimeRouteStore;
 import com.warden.controlledsandbox.framework.routing.RouteOwner;
 import com.warden.controlledsandbox.framework.routing.RoutePayload;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +44,9 @@ public final class BrokerActivityRuntime {
     private final ActivityLaunchCoordinator coordinator;
     private final BrokerStateStore transport;
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
+    private ActivityTaskCheckpointStore checkpointStore;
+    private String checkpointStatus = "DISABLED";
+    private ActivityTaskRestoreOutcome restoreOutcome = new ActivityTaskRestoreOutcome(0, 0, 0, 0);
 
     public BrokerActivityRuntime(BrokerStateStore transport) {
         this(new ActivityTaskLedger(), new OneTimeRouteStore(), transport);
@@ -48,7 +59,36 @@ public final class BrokerActivityRuntime {
         this.coordinator = new ActivityLaunchCoordinator(ledger, routeStore);
     }
 
+    public synchronized ActivityTaskRestoreOutcome configureCheckpointStore(Path file) {
+        if (checkpointStore != null) throw new IllegalStateException("Activity task checkpoint store already configured");
+        if (ledger.taskCount() != 0 || ledger.activityCount() != 0 || !pending.isEmpty()) {
+            throw new IllegalStateException("Activity runtime must be idle before checkpoint restore");
+        }
+        checkpointStore = new ActivityTaskCheckpointStore(file);
+        try {
+            Optional<com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint> checkpoint =
+                    checkpointStore.load();
+            if (checkpoint.isEmpty()) {
+                checkpointStatus = "EMPTY";
+                return restoreOutcome;
+            }
+            restoreOutcome = ledger.restore(checkpoint.get());
+            checkpointStatus = "RESTORED";
+            return restoreOutcome;
+        } catch (RuntimeException corruption) {
+            checkpointStore.quarantineCorrupt();
+            checkpointStatus = "QUARANTINED:" + corruption.getMessage();
+            restoreOutcome = new ActivityTaskRestoreOutcome(0, 0, 0, 0);
+            return restoreOutcome;
+        }
+    }
+
+    public synchronized String checkpointStatus() { return checkpointStatus; }
+    public synchronized ActivityTaskRestoreOutcome restoreOutcome() { return restoreOutcome; }
+
     public synchronized Bundle launch(GuestSession session, String component, Bundle prepared, Bundle request) {
+        int adopted = ledger.adoptRestoredProcessGeneration(
+                session.virtualUserId(), session.packageName(), session.processName(), session.generation());
         ActivityLaunchSpec spec = launchSpec(session, component, request);
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
@@ -71,6 +111,8 @@ public final class BrokerActivityRuntime {
             routeStore.revoke(token);
             throw new IllegalStateException("DUPLICATE_ACTIVITY_TRANSACTION");
         }
+        if (adopted > 0) envelope.putInt(RuntimeKeys.RESTORED_ACTIVITY_COUNT, adopted);
+        persistCheckpoint();
         return new Bundle(envelope);
     }
 
@@ -101,6 +143,7 @@ public final class BrokerActivityRuntime {
         LaunchAction action = transaction.decision().action();
         if (action == LaunchAction.CREATED_ACTIVITY || action == LaunchAction.CREATED_TASK) {
             ledger.finish(transaction.decision().activityToken());
+            persistCheckpoint();
         }
     }
 
@@ -135,6 +178,7 @@ public final class BrokerActivityRuntime {
         }
         out.putInt(RuntimeKeys.ACTIVITY_COUNT, ledger.activityCount());
         out.putInt(RuntimeKeys.TASK_COUNT, ledger.taskCount());
+        persistCheckpoint();
         return out;
     }
 
@@ -142,6 +186,7 @@ public final class BrokerActivityRuntime {
         coordinator.recreateProcessGeneration(stale.virtualUserId(), stale.packageName(), stale.processName(),
                 stale.generation(), current.generation());
         purgePending(stale);
+        persistCheckpoint();
     }
 
     public synchronized void processDisconnected(GuestSession stale) {
@@ -154,11 +199,87 @@ public final class BrokerActivityRuntime {
         coordinator.invalidateProcessGeneration(stale.virtualUserId(), stale.packageName(), stale.processName(),
                 stale.generation());
         purgePending(stale);
+        persistCheckpoint();
+    }
+
+    public synchronized ActivityTaskResult taskOperation(
+            GuestSession session,
+            ActivityTaskRequest request) {
+        java.util.Objects.requireNonNull(request, "request");
+        verifySession(request, session);
+        boolean changed = false;
+        List<ActivityTaskSnapshot> tasks = List.of();
+        switch (request.operation()) {
+            case ActivityTaskRequest.QUERY_RUNNING -> tasks = projectTasks(ledger.runningTasks(
+                    session.virtualUserId(), session.packageName(), request.maxCount()));
+            case ActivityTaskRequest.QUERY_RECENT -> tasks = projectTasks(ledger.recentTasks(
+                    session.virtualUserId(), session.packageName(), request.maxCount()));
+            case ActivityTaskRequest.MOVE_TO_FRONT -> {
+                changed = ledger.moveTaskToFront(
+                        session.virtualUserId(), session.packageName(), request.taskId());
+                persistCheckpoint();
+            }
+            case ActivityTaskRequest.REMOVE_TASK -> {
+                changed = ledger.removeTask(
+                        session.virtualUserId(), session.packageName(), request.taskId());
+                persistCheckpoint();
+            }
+            case ActivityTaskRequest.CHECKPOINT_STATUS -> { }
+            default -> throw new IllegalArgumentException(
+                    "Unknown Activity task operation: " + request.operation());
+        }
+        return ActivityTaskResult.success(
+                RuntimeProtocol.CURRENT,
+                request.requestId(),
+                request.operation(),
+                changed,
+                checkpointStatus,
+                ledger.taskCount(),
+                ledger.activityCount(),
+                restoreOutcome.restoredTaskCount(),
+                restoreOutcome.restoredActivityCount(),
+                restoreOutcome.droppedTransportDeliveryCount(),
+                tasks);
     }
 
     public synchronized int pendingRouteCount() { return pending.size(); }
     public synchronized int taskCount() { return ledger.taskCount(); }
     public synchronized int activityCount() { return ledger.activityCount(); }
+
+    private void persistCheckpoint() {
+        if (checkpointStore == null) return;
+        checkpointStore.save(ledger.checkpoint());
+        checkpointStatus = "PERSISTED";
+    }
+
+    private static List<ActivityTaskSnapshot> projectTasks(List<TaskQuerySnapshot> snapshots) {
+        return snapshots.stream().map(snapshot -> new ActivityTaskSnapshot(
+                snapshot.taskId(),
+                snapshot.virtualUserId(),
+                snapshot.packageName(),
+                snapshot.affinity(),
+                snapshot.documentTask(),
+                snapshot.active(),
+                snapshot.excludedFromRecents(),
+                snapshot.retainInRecents(),
+                snapshot.activityCount(),
+                snapshot.baseComponentName(),
+                snapshot.topComponentName(),
+                snapshot.lastActiveSequence(),
+                snapshot.moveToFrontCount())).toList();
+    }
+
+    private static void verifySession(ActivityTaskRequest request, GuestSession session) {
+        if (!RuntimeProtocol.isCompatible(request.protocolVersion())) {
+            throw new IllegalArgumentException("ACTIVITY_TASK_PROTOCOL_MISMATCH");
+        }
+        if (!session.sessionId().equals(request.sessionId())
+                || session.generation() != request.generation()
+                || session.virtualUserId() != request.virtualUserId()
+                || !session.packageName().equals(request.packageName())) {
+            throw new SecurityException("ACTIVITY_TASK_SESSION_MISMATCH");
+        }
+    }
 
     private void purgePending(GuestSession stale) {
         for (Map.Entry<String, ActivityLaunchTransaction> entry : pending.entrySet()) {

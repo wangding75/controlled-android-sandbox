@@ -1,7 +1,10 @@
 package com.warden.controlledsandbox.runtime.broker;
 
+import com.warden.controlledsandbox.contract.ActivityTaskRequest;
+import com.warden.controlledsandbox.contract.ActivityTaskResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 
+import com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractFailure;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity0;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity1;
@@ -110,6 +113,8 @@ public final class RuntimeBrokerService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
+        activityRuntime.configureCheckpointStore(
+                new File(new File(getFilesDir(), "runtime"), "activity-tasks.checkpoint").toPath());
         File registryFile = new File(new File(getFilesDir(), "runtime"), "virtual-uids.registry");
         virtualUids = new VirtualUidRegistry(registryFile.toPath());
         runtimePermissionCoordinator = new RuntimePermissionCoordinator(
@@ -573,6 +578,17 @@ public final class RuntimeBrokerService extends Service {
                 return activityRuntime.event(current, request);
             } catch (Throwable error) {
                 return failure(error);
+            }
+        }
+
+        @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request) {
+            CallerGuard.requireSameApplication();
+            try {
+                if (request == null) throw new IllegalArgumentException("request is required");
+                GuestSession current = findSession(request.sessionId(), request.generation());
+                return activityRuntime.taskOperation(current, request);
+            } catch (Throwable error) {
+                return ActivityTaskContractFailure.from(request, error);
             }
         }
 

@@ -1166,7 +1166,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Persistent Job state now transitions SCHEDULED→DISPATCHING→RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
+      "notes": "Persistent Job state now transitions SCHEDULED\u2192DISPATCHING\u2192RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
     },
     {
       "id": "runtime.guest-jobservice-execution-bridge",
@@ -1241,6 +1241,67 @@
       "productionStatus": "partial",
       "deviceStatus": "not-tested",
       "notes": "Foreground ownership, promotion/demotion and stop semantics are modeled and routed, but Android foreground notification deadlines, service types and OEM enforcement remain unimplemented."
+    },
+    {
+      "id": "framework.activity-launch-flag-semantics",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/LaunchFlags.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Virtual task policy now applies bounded Android-compatible NO_HISTORY, FORWARD_RESULT, EXCLUDE_FROM_RECENTS, RETAIN_IN_RECENTS, NEW_DOCUMENT, CLEAR_TOP, REORDER_TO_FRONT and launch-mode interactions."
+    },
+    {
+      "id": "framework.activity-result-forwarding",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "FLAG_ACTIVITY_FORWARD_RESULT transfers the one-shot result owner from the intermediate Activity to the terminal callee and rejects invalid or ownerless forwarding."
+    },
+    {
+      "id": "runtime.activity-task-checkpoint",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskCheckpoint.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStoreSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Broker-owned task/back-stack and saved-state metadata persist atomically with CRC validation; corrupt state is quarantined and route-bound deliveries are dropped fail-closed on restore."
+    },
+    {
+      "id": "runtime.activity-task-query-contract",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntimeSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Typed, versioned AIDL request/result/task projections expose bounded running/recent task queries and owner-checked move-to-front/remove-task mutations scoped to the active Session and generation."
+    },
+    {
+      "id": "framework.activity-recent-task-policy",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/TaskQuerySnapshot.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Running tasks are returned front-first; bounded recent history respects EXCLUDE_FROM_RECENTS and retained document-task policy and remains isolated by package and virtual user."
     }
   ],
   "statusDimensions": {

@@ -47,6 +47,7 @@ public final class RuntimeKeys {
     public static final String REMOVED_ACTIVITY_COUNT = "removedActivityCount";
     public static final String ACTIVITY_COUNT = "activityCount";
     public static final String TASK_COUNT = "taskCount";
+    public static final String RESTORED_ACTIVITY_COUNT = "restoredActivityCount";
     public static final String SERVICE_STATE = "serviceState";
     public static final String SERVICE_RESTART_MODE = "serviceRestartMode";
     public static final String SERVICE_START_COUNT = "serviceStartCount";

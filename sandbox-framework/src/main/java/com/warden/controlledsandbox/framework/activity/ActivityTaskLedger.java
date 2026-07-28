@@ -23,8 +23,12 @@ public final class ActivityTaskLedger {
 
     private final AtomicInteger nextTaskId = new AtomicInteger(1);
     private final AtomicLong nextNewIntentSequence = new AtomicLong(1);
+    private static final int MAX_RECENT_TASKS = 64;
+
     private final AtomicLong nextConfigurationSequence = new AtomicLong(1);
+    private final AtomicLong nextActivationSequence = new AtomicLong(1);
     private final LinkedHashMap<Integer, MutableTask> tasks = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, TaskQuerySnapshot> recentTasks = new LinkedHashMap<>();
     private final Map<String, MutableActivity> activitiesByToken = new LinkedHashMap<>();
     private final Map<String, List<ActivityResultDelivery>> resultDeliveriesByCaller =
             new LinkedHashMap<>();
@@ -32,7 +36,9 @@ public final class ActivityTaskLedger {
     public synchronized LaunchDecision launch(LaunchRequest request) {
         Objects.requireNonNull(request, "request");
         validateCallerTask(request);
-        String resultCallerToken = resolveResultCallerToken(request);
+        String callerActivityToken = resolveCallerActivityToken(request);
+        String resultCallerToken = resolveResultCallerToken(request, callerActivityToken);
+        validateForwardResult(request, callerActivityToken);
 
         boolean clearTask = LaunchFlags.has(request.flags(), LaunchFlags.CLEAR_TASK);
         if (clearTask && !LaunchFlags.has(request.flags(), LaunchFlags.NEW_TASK)) {
@@ -45,15 +51,15 @@ public final class ActivityTaskLedger {
                 MutableActivity activity = global.task.activities.get(global.index);
                 int removed = retainOnly(global.task, activity);
                 enqueueNewIntent(activity, request);
-                registerResultLink(activity, resultCallerToken, request);
-                moveTaskToFront(global.task.taskId);
-                return decision(
+                registerResultLink(activity, resultCallerToken, callerActivityToken, request);
+                return completeDecision(
                         LaunchAction.DELIVERED_NEW_INTENT,
                         global.task,
                         activity,
                         removed,
                         false,
-                        request.routeToken());
+                        request.routeToken(),
+                        callerActivityToken);
             }
         }
 
@@ -63,15 +69,15 @@ public final class ActivityTaskLedger {
                 int removed = clearAbove(global.task, global.index);
                 MutableActivity activity = global.task.activities.get(global.index);
                 enqueueNewIntent(activity, request);
-                registerResultLink(activity, resultCallerToken, request);
-                moveTaskToFront(global.task.taskId);
-                return decision(
+                registerResultLink(activity, resultCallerToken, callerActivityToken, request);
+                return completeDecision(
                         LaunchAction.CLEARED_TOP,
                         global.task,
                         activity,
                         removed,
                         false,
-                        request.routeToken());
+                        request.routeToken(),
+                        callerActivityToken);
             }
         }
 
@@ -92,15 +98,15 @@ public final class ActivityTaskLedger {
                 int removed = clearAbove(target, existingIndex);
                 MutableActivity activity = target.activities.get(existingIndex);
                 enqueueNewIntent(activity, request);
-                registerResultLink(activity, resultCallerToken, request);
-                moveTaskToFront(target.taskId);
-                return decision(
+                registerResultLink(activity, resultCallerToken, callerActivityToken, request);
+                return completeDecision(
                         LaunchAction.DELIVERED_NEW_INTENT,
                         target,
                         activity,
                         removed,
                         createdTask,
-                        request.routeToken());
+                        request.routeToken(),
+                        callerActivityToken);
             }
             if (!target.activities.isEmpty()) {
                 target = createTask(request);
@@ -113,15 +119,15 @@ public final class ActivityTaskLedger {
             if (existingIndex >= 0) {
                 MutableActivity activity = target.activities.remove(existingIndex);
                 target.activities.add(activity);
-                registerResultLink(activity, resultCallerToken, request);
-                moveTaskToFront(target.taskId);
-                return decision(
+                registerResultLink(activity, resultCallerToken, callerActivityToken, request);
+                return completeDecision(
                         LaunchAction.REORDERED_TO_FRONT,
                         target,
                         activity,
                         0,
                         createdTask,
-                        request.routeToken());
+                        request.routeToken(),
+                        callerActivityToken);
             }
         }
 
@@ -134,30 +140,30 @@ public final class ActivityTaskLedger {
                         || LaunchFlags.has(request.flags(), LaunchFlags.SINGLE_TOP);
                 if (deliver) {
                     enqueueNewIntent(activity, request);
-                    registerResultLink(activity, resultCallerToken, request);
-                    moveTaskToFront(target.taskId);
-                    return decision(
+                    registerResultLink(activity, resultCallerToken, callerActivityToken, request);
+                    return completeDecision(
                             LaunchAction.CLEARED_TOP,
                             target,
                             activity,
                             removed,
                             createdTask,
-                            request.routeToken());
+                            request.routeToken(),
+                            callerActivityToken);
                 }
                 removeActivityAt(target, existingIndex, false, RESULT_CANCELED, "");
                 removed++;
                 MutableActivity replacement = createActivity(request);
                 target.activities.add(replacement);
-                registerResultLink(replacement, resultCallerToken, request);
+                registerResultLink(replacement, resultCallerToken, callerActivityToken, request);
                 ensureTaskRegistered(target);
-                moveTaskToFront(target.taskId);
-                return decision(
+                return completeDecision(
                         LaunchAction.CLEARED_TOP,
                         target,
                         replacement,
                         removed,
                         createdTask,
-                        request.routeToken());
+                        request.routeToken(),
+                        callerActivityToken);
             }
         }
 
@@ -166,15 +172,15 @@ public final class ActivityTaskLedger {
                 || LaunchFlags.has(request.flags(), LaunchFlags.SINGLE_TOP);
         if (singleTop && top != null && top.identity.equals(request.identity())) {
             enqueueNewIntent(top, request);
-            registerResultLink(top, resultCallerToken, request);
-            moveTaskToFront(target.taskId);
-            return decision(
+            registerResultLink(top, resultCallerToken, callerActivityToken, request);
+            return completeDecision(
                     LaunchAction.DELIVERED_NEW_INTENT,
                     target,
                     top,
                     0,
                     createdTask,
-                    request.routeToken());
+                    request.routeToken(),
+                    callerActivityToken);
         }
 
         if (request.launchMode() == LaunchMode.SINGLE_INSTANCE && !target.activities.isEmpty()) {
@@ -184,16 +190,16 @@ public final class ActivityTaskLedger {
 
         MutableActivity created = createActivity(request);
         target.activities.add(created);
-        registerResultLink(created, resultCallerToken, request);
+        registerResultLink(created, resultCallerToken, callerActivityToken, request);
         ensureTaskRegistered(target);
-        moveTaskToFront(target.taskId);
-        return decision(
+        return completeDecision(
                 createdTask ? LaunchAction.CREATED_TASK : LaunchAction.CREATED_ACTIVITY,
                 target,
                 created,
                 0,
                 createdTask,
-                request.routeToken());
+                request.routeToken(),
+                callerActivityToken);
     }
 
     public synchronized boolean transition(String token, LifecycleState next) {
@@ -375,6 +381,227 @@ public final class ActivityTaskLedger {
         return tasks.values().stream().map(MutableTask::snapshot).toList();
     }
 
+    public synchronized List<TaskQuerySnapshot> runningTasks(
+            int virtualUserId,
+            String packageName,
+            int maxCount) {
+        String normalizedPackageName = requireText(packageName, "packageName");
+        validateTaskQuery(virtualUserId, maxCount);
+        List<TaskQuerySnapshot> result = new ArrayList<>();
+        List<MutableTask> ordered = new ArrayList<>(tasks.values());
+        for (int index = ordered.size() - 1; index >= 0 && result.size() < maxCount; index--) {
+            MutableTask task = ordered.get(index);
+            if (task.virtualUserId == virtualUserId && task.packageName.equals(normalizedPackageName)) {
+                result.add(querySnapshot(task, true));
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public synchronized List<TaskQuerySnapshot> recentTasks(
+            int virtualUserId,
+            String packageName,
+            int maxCount) {
+        String normalizedPackageName = requireText(packageName, "packageName");
+        validateTaskQuery(virtualUserId, maxCount);
+        List<TaskQuerySnapshot> result = new ArrayList<>();
+        java.util.Set<Integer> seen = new java.util.LinkedHashSet<>();
+        List<MutableTask> active = new ArrayList<>(tasks.values());
+        for (int index = active.size() - 1; index >= 0 && result.size() < maxCount; index--) {
+            MutableTask task = active.get(index);
+            if (task.virtualUserId != virtualUserId
+                    || !task.packageName.equals(normalizedPackageName)
+                    || task.excludedFromRecents) {
+                continue;
+            }
+            TaskQuerySnapshot snapshot = querySnapshot(task, true);
+            result.add(snapshot);
+            seen.add(snapshot.taskId());
+        }
+        List<TaskQuerySnapshot> archived = new ArrayList<>(recentTasks.values());
+        for (int index = archived.size() - 1; index >= 0 && result.size() < maxCount; index--) {
+            TaskQuerySnapshot snapshot = archived.get(index);
+            if (snapshot.virtualUserId() == virtualUserId
+                    && snapshot.packageName().equals(normalizedPackageName)
+                    && !snapshot.excludedFromRecents()
+                    && seen.add(snapshot.taskId())) {
+                result.add(snapshot);
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public synchronized boolean moveTaskToFront(
+            int virtualUserId,
+            String packageName,
+            int taskId) {
+        MutableTask task = requireOwnedTask(virtualUserId, packageName, taskId);
+        MutableTask currentFront = tasks.isEmpty() ? null
+                : new ArrayList<>(tasks.values()).get(tasks.size() - 1);
+        if (currentFront != null && currentFront.taskId == task.taskId) return false;
+        moveTaskToFrontInternal(task.taskId);
+        return true;
+    }
+
+    public synchronized boolean removeTask(
+            int virtualUserId,
+            String packageName,
+            int taskId) {
+        MutableTask task = requireOwnedTask(virtualUserId, packageName, taskId);
+        tasks.remove(task.taskId);
+        recentTasks.remove(task.taskId);
+        for (MutableActivity activity : new ArrayList<>(task.activities)) {
+            finalizeActivity(activity, RESULT_CANCELED, "");
+        }
+        task.activities.clear();
+        return true;
+    }
+
+    public synchronized ActivityTaskCheckpoint checkpoint() {
+        List<TaskRestoreSnapshot> taskSnapshots = new ArrayList<>();
+        int transportDeliveries = resultDeliveriesByCaller.values().stream()
+                .mapToInt(List::size)
+                .sum();
+        for (MutableTask task : tasks.values()) {
+            List<ActivityRestoreSnapshot> activities = new ArrayList<>();
+            for (MutableActivity activity : task.activities) {
+                transportDeliveries += activity.pendingNewIntents.size();
+                transportDeliveries += activity.pendingResultLinks.size();
+                activities.add(new ActivityRestoreSnapshot(
+                        activity.identity,
+                        activity.launchMode,
+                        activity.processName,
+                        activity.processGeneration,
+                        activity.resultWho,
+                        activity.requestCode,
+                        activity.launchFlags,
+                        activity.noHistory,
+                        activity.newIntentCount,
+                        activity.recreationCount,
+                        activity.savedState,
+                        activity.configurationCount,
+                        activity.lastConfigurationToken));
+            }
+            taskSnapshots.add(new TaskRestoreSnapshot(
+                    task.taskId,
+                    task.virtualUserId,
+                    task.packageName,
+                    task.affinity,
+                    task.documentTask,
+                    task.rootIntentFlags,
+                    task.excludedFromRecents,
+                    task.retainInRecents,
+                    task.lastActiveSequence,
+                    task.moveToFrontCount,
+                    activities));
+        }
+        return new ActivityTaskCheckpoint(
+                ActivityTaskCheckpoint.CURRENT_SCHEMA,
+                nextTaskId.get(),
+                nextNewIntentSequence.get(),
+                nextConfigurationSequence.get(),
+                nextActivationSequence.get(),
+                transportDeliveries,
+                taskSnapshots,
+                List.copyOf(recentTasks.values()));
+    }
+
+    public synchronized ActivityTaskRestoreOutcome restore(ActivityTaskCheckpoint checkpoint) {
+        Objects.requireNonNull(checkpoint, "checkpoint");
+        if (!tasks.isEmpty() || !activitiesByToken.isEmpty() || !recentTasks.isEmpty()
+                || !resultDeliveriesByCaller.isEmpty()) {
+            throw new IllegalStateException("Activity task ledger must be empty before restore");
+        }
+        java.util.Set<Integer> taskIds = new java.util.LinkedHashSet<>();
+        int restoredActivities = 0;
+        for (TaskRestoreSnapshot snapshot : checkpoint.tasks()) {
+            if (!taskIds.add(snapshot.taskId())) {
+                throw new IllegalArgumentException("duplicate restored taskId: " + snapshot.taskId());
+            }
+            MutableTask task = new MutableTask(
+                    snapshot.taskId(),
+                    snapshot.virtualUserId(),
+                    snapshot.packageName(),
+                    snapshot.affinity(),
+                    snapshot.documentTask(),
+                    snapshot.rootIntentFlags(),
+                    snapshot.excludedFromRecents(),
+                    snapshot.retainInRecents(),
+                    snapshot.lastActiveSequence());
+            task.moveToFrontCount = snapshot.moveToFrontCount();
+            for (ActivityRestoreSnapshot activitySnapshot : snapshot.activities()) {
+                String token = UUID.randomUUID().toString();
+                MutableActivity activity = new MutableActivity(
+                        activitySnapshot.identity(),
+                        token,
+                        activitySnapshot.launchMode(),
+                        activitySnapshot.processName(),
+                        activitySnapshot.processGeneration(),
+                        activitySnapshot.resultWho(),
+                        activitySnapshot.requestCode(),
+                        activitySnapshot.launchFlags(),
+                        activitySnapshot.noHistory());
+                activity.lifecycleState = LifecycleState.INITIALIZED;
+                activity.restoredFromCheckpoint = true;
+                activity.newIntentCount = activitySnapshot.newIntentCount();
+                activity.recreationCount = activitySnapshot.recreationCount() + 1;
+                activity.savedState = activitySnapshot.savedState();
+                activity.configurationCount = activitySnapshot.configurationCount();
+                activity.lastConfigurationToken = activitySnapshot.lastConfigurationToken();
+                task.activities.add(activity);
+                activitiesByToken.put(token, activity);
+                restoredActivities++;
+            }
+            tasks.put(task.taskId, task);
+        }
+        java.util.Set<Integer> recentTaskIds = new java.util.LinkedHashSet<>();
+        for (TaskQuerySnapshot recent : checkpoint.recentTasks()) {
+            if (recent.active()) throw new IllegalArgumentException("checkpoint recent task must be inactive");
+            if (!recentTaskIds.add(recent.taskId())) {
+                throw new IllegalArgumentException("duplicate restored recent taskId: " + recent.taskId());
+            }
+            if (taskIds.contains(recent.taskId())) continue;
+            recentTasks.put(recent.taskId(), recent);
+        }
+        trimRecentTasks();
+        nextTaskId.set(Math.max(checkpoint.nextTaskId(), maximumTaskId() + 1));
+        nextNewIntentSequence.set(checkpoint.nextNewIntentSequence());
+        nextConfigurationSequence.set(checkpoint.nextConfigurationSequence());
+        nextActivationSequence.set(Math.max(
+                checkpoint.nextActivationSequence(),
+                maximumActivationSequence() + 1));
+        return new ActivityTaskRestoreOutcome(
+                tasks.size(),
+                restoredActivities,
+                recentTasks.size(),
+                checkpoint.transportDeliveryCount());
+    }
+
+    public synchronized int adoptRestoredProcessGeneration(
+            int virtualUserId,
+            String packageName,
+            String processName,
+            long processGeneration) {
+        String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedProcessName = requireText(processName, "processName");
+        if (virtualUserId < 0 || processGeneration < 1) {
+            throw new IllegalArgumentException("invalid restored process identity");
+        }
+        int adopted = 0;
+        List<MutableActivity> candidates = new ArrayList<>(activitiesByToken.values());
+        for (MutableActivity activity : candidates) {
+            if (activity.restoredFromCheckpoint
+                    && activity.identity.virtualUserId() == virtualUserId
+                    && activity.identity.packageName().equals(normalizedPackageName)
+                    && activity.processName.equals(normalizedProcessName)) {
+                rotateActivityToken(activity, processGeneration, RecreationReason.PROCESS_RESTART);
+                activity.restoredFromCheckpoint = false;
+                adopted++;
+            }
+        }
+        return adopted;
+    }
+
     public synchronized int taskCount() {
         return tasks.size();
     }
@@ -398,6 +625,94 @@ public final class ActivityTaskLedger {
                 iterator.remove();
             }
         }
+        recentTasks.entrySet().removeIf(entry -> entry.getValue().virtualUserId() == virtualUserId);
+    }
+
+    private static void validateTaskQuery(int virtualUserId, int maxCount) {
+        if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+        if (maxCount < 1 || maxCount > 100) {
+            throw new IllegalArgumentException("maxCount must be between 1 and 100");
+        }
+    }
+
+    private MutableTask requireOwnedTask(int virtualUserId, String packageName, int taskId) {
+        if (virtualUserId < 0 || taskId < 1) throw new IllegalArgumentException("invalid task identity");
+        String normalizedPackageName = requireText(packageName, "packageName");
+        MutableTask task = tasks.get(taskId);
+        if (task == null) throw new IllegalArgumentException("Unknown taskId: " + taskId);
+        if (task.virtualUserId != virtualUserId || !task.packageName.equals(normalizedPackageName)) {
+            throw new SecurityException("TASK_OWNER_MISMATCH");
+        }
+        return task;
+    }
+
+    private TaskQuerySnapshot querySnapshot(MutableTask task, boolean active) {
+        MutableActivity base = task.activities.isEmpty() ? null : task.activities.get(0);
+        MutableActivity top = top(task);
+        return new TaskQuerySnapshot(
+                task.taskId,
+                task.virtualUserId,
+                task.packageName,
+                task.affinity,
+                task.documentTask,
+                active,
+                task.excludedFromRecents,
+                task.retainInRecents,
+                task.activities.size(),
+                base == null ? "" : base.identity.componentName(),
+                top == null ? "" : top.identity.componentName(),
+                task.lastActiveSequence,
+                task.moveToFrontCount);
+    }
+
+    private void archiveTask(MutableTask task) {
+        if (task.excludedFromRecents) return;
+        if (task.documentTask && !task.retainInRecents) {
+            recentTasks.remove(task.taskId);
+            return;
+        }
+        MutableActivity base = task.activities.isEmpty() ? null : task.activities.get(0);
+        MutableActivity top = top(task);
+        TaskQuerySnapshot snapshot = new TaskQuerySnapshot(
+                task.taskId,
+                task.virtualUserId,
+                task.packageName,
+                task.affinity,
+                task.documentTask,
+                false,
+                task.excludedFromRecents,
+                task.retainInRecents,
+                task.activities.size(),
+                base == null ? "" : base.identity.componentName(),
+                top == null ? "" : top.identity.componentName(),
+                task.lastActiveSequence,
+                task.moveToFrontCount);
+        recentTasks.remove(task.taskId);
+        recentTasks.put(task.taskId, snapshot);
+        trimRecentTasks();
+    }
+
+    private void trimRecentTasks() {
+        while (recentTasks.size() > MAX_RECENT_TASKS) {
+            Integer oldest = recentTasks.keySet().iterator().next();
+            recentTasks.remove(oldest);
+        }
+    }
+
+    private int maximumTaskId() {
+        int maximum = 0;
+        for (Integer taskId : tasks.keySet()) maximum = Math.max(maximum, taskId);
+        for (Integer taskId : recentTasks.keySet()) maximum = Math.max(maximum, taskId);
+        return maximum;
+    }
+
+    private long maximumActivationSequence() {
+        long maximum = 0;
+        for (MutableTask task : tasks.values()) maximum = Math.max(maximum, task.lastActiveSequence);
+        for (TaskQuerySnapshot task : recentTasks.values()) {
+            maximum = Math.max(maximum, task.lastActiveSequence());
+        }
+        return maximum;
     }
 
     private void validateCallerTask(LaunchRequest request) {
@@ -414,20 +729,35 @@ public final class ActivityTaskLedger {
         }
     }
 
-    private String resolveResultCallerToken(LaunchRequest request) {
-        if (request.requestCode() < 0) {
-            return null;
-        }
-        if (request.callerTaskId() == null) {
+    private String resolveCallerActivityToken(LaunchRequest request) {
+        if (request.callerTaskId() == null) return null;
+        MutableTask callerTask = tasks.get(request.callerTaskId());
+        MutableActivity caller = top(callerTask);
+        if (caller == null) throw new IllegalArgumentException("callerTaskId has no live Activity");
+        return caller.token;
+    }
+
+    private String resolveResultCallerToken(LaunchRequest request, String callerActivityToken) {
+        if (request.requestCode() < 0) return null;
+        if (callerActivityToken == null) {
             throw new IllegalArgumentException(
                     "requestCode requires a callerTaskId with a live top Activity");
         }
-        MutableTask callerTask = tasks.get(request.callerTaskId());
-        MutableActivity caller = top(callerTask);
-        if (caller == null) {
-            throw new IllegalArgumentException("callerTaskId has no live Activity");
+        return callerActivityToken;
+    }
+
+    private void validateForwardResult(LaunchRequest request, String callerActivityToken) {
+        if (!LaunchFlags.has(request.flags(), LaunchFlags.FORWARD_RESULT)) return;
+        if (request.requestCode() >= 0) {
+            throw new IllegalArgumentException("FORWARD_RESULT cannot be combined with requestCode");
         }
-        return caller.token;
+        if (callerActivityToken == null) {
+            throw new IllegalArgumentException("FORWARD_RESULT requires a live caller Activity");
+        }
+        MutableActivity caller = requireActivity(callerActivityToken);
+        if (caller.pendingResultLinks.isEmpty()) {
+            throw new IllegalStateException("FORWARD_RESULT caller has no pending result owner");
+        }
     }
 
     private MutableTask selectTargetTask(LaunchRequest request) {
@@ -465,7 +795,11 @@ public final class ActivityTaskLedger {
                 request.identity().virtualUserId(),
                 request.identity().packageName(),
                 request.taskAffinity(),
-                LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT));
+                LaunchFlags.has(request.flags(), LaunchFlags.NEW_DOCUMENT),
+                request.flags(),
+                LaunchFlags.has(request.flags(), LaunchFlags.EXCLUDE_FROM_RECENTS),
+                LaunchFlags.has(request.flags(), LaunchFlags.RETAIN_IN_RECENTS),
+                nextActivationSequence.getAndIncrement());
         tasks.put(id, task);
         return task;
     }
@@ -479,7 +813,9 @@ public final class ActivityTaskLedger {
                 request.processName(),
                 request.processGeneration(),
                 request.resultWho(),
-                request.requestCode());
+                request.requestCode(),
+                request.flags(),
+                LaunchFlags.has(request.flags(), LaunchFlags.NO_HISTORY));
         activitiesByToken.put(token, activity);
         return activity;
     }
@@ -585,6 +921,8 @@ public final class ActivityTaskLedger {
             boolean removeEmptyTask,
             int resultCode,
             String dataToken) {
+        boolean archiveWhenEmpty = removeEmptyTask && task.activities.size() == 1;
+        if (archiveWhenEmpty) archiveTask(task);
         MutableActivity removed = task.activities.remove(index);
         finalizeActivity(removed, resultCode, dataToken);
         if (removeEmptyTask && task.activities.isEmpty()) {
@@ -642,22 +980,15 @@ public final class ActivityTaskLedger {
     private void registerResultLink(
             MutableActivity callee,
             String callerActivityToken,
+            String launchCallerActivityToken,
             LaunchRequest request) {
-        if (callerActivityToken == null || !activitiesByToken.containsKey(callerActivityToken)) {
+        if (LaunchFlags.has(request.flags(), LaunchFlags.FORWARD_RESULT)) {
+            MutableActivity forwardingCaller = requireActivity(launchCallerActivityToken);
+            callee.pendingResultLinks.addAll(forwardingCaller.pendingResultLinks);
+            forwardingCaller.pendingResultLinks.clear();
             return;
         }
-        if (callerActivityToken.equals(callee.token)) {
-            resultDeliveriesByCaller
-                    .computeIfAbsent(callerActivityToken, ignored -> new ArrayList<>())
-                    .add(new ActivityResultDelivery(
-                            callerActivityToken,
-                            callee.token,
-                            request.resultWho(),
-                            request.requestCode(),
-                            RESULT_CANCELED,
-                            ""));
-            return;
-        }
+        if (callerActivityToken == null || request.requestCode() < 0) return;
         callee.pendingResultLinks.add(new PendingResultLink(
                 callerActivityToken,
                 request.resultWho(),
@@ -794,11 +1125,32 @@ public final class ActivityTaskLedger {
         tasks.putIfAbsent(task.taskId, task);
     }
 
-    private void moveTaskToFront(int taskId) {
+    private void moveTaskToFrontInternal(int taskId) {
+        MutableTask previousFront = tasks.isEmpty() ? null
+                : new ArrayList<>(tasks.values()).get(tasks.size() - 1);
         MutableTask task = tasks.remove(taskId);
         if (task != null) {
+            if (previousFront != null && previousFront.taskId != taskId) {
+                removeNoHistoryTop(previousFront);
+            }
+            task.lastActiveSequence = nextActivationSequence.getAndIncrement();
+            task.moveToFrontCount++;
+            recentTasks.remove(taskId);
             tasks.put(taskId, task);
         }
+    }
+
+    private void removeNoHistoryTop(MutableTask task) {
+        MutableActivity top = top(task);
+        if (top == null || !top.noHistory) return;
+        removeActivityAt(task, task.activities.size() - 1, true, RESULT_CANCELED, "");
+    }
+
+    private void retireNoHistoryCaller(String callerActivityToken, String selectedActivityToken) {
+        if (callerActivityToken == null || callerActivityToken.equals(selectedActivityToken)) return;
+        MutableActivity caller = activitiesByToken.get(callerActivityToken);
+        if (caller == null || !caller.noHistory) return;
+        removeActivityByToken(callerActivityToken, RESULT_CANCELED, "");
     }
 
     private static MutableActivity top(MutableTask task) {
@@ -807,13 +1159,16 @@ public final class ActivityTaskLedger {
                 : task.activities.get(task.activities.size() - 1);
     }
 
-    private static LaunchDecision decision(
+    private LaunchDecision completeDecision(
             LaunchAction action,
             MutableTask task,
             MutableActivity activity,
             int removedActivityCount,
             boolean createdNewTask,
-            String routeToken) {
+            String routeToken,
+            String callerActivityToken) {
+        retireNoHistoryCaller(callerActivityToken, activity.token);
+        moveTaskToFrontInternal(task.taskId);
         return new LaunchDecision(
                 action,
                 task.taskId,
@@ -846,6 +1201,11 @@ public final class ActivityTaskLedger {
         private final String packageName;
         private final String affinity;
         private final boolean documentTask;
+        private final int rootIntentFlags;
+        private final boolean excludedFromRecents;
+        private final boolean retainInRecents;
+        private long lastActiveSequence;
+        private long moveToFrontCount;
         private final List<MutableActivity> activities = new ArrayList<>();
 
         private MutableTask(
@@ -853,12 +1213,20 @@ public final class ActivityTaskLedger {
                 int virtualUserId,
                 String packageName,
                 String affinity,
-                boolean documentTask) {
+                boolean documentTask,
+                int rootIntentFlags,
+                boolean excludedFromRecents,
+                boolean retainInRecents,
+                long lastActiveSequence) {
             this.taskId = taskId;
             this.virtualUserId = virtualUserId;
             this.packageName = packageName;
             this.affinity = affinity;
             this.documentTask = documentTask;
+            this.rootIntentFlags = rootIntentFlags;
+            this.excludedFromRecents = excludedFromRecents;
+            this.retainInRecents = retainInRecents;
+            this.lastActiveSequence = lastActiveSequence;
         }
 
         private TaskSnapshot snapshot() {
@@ -880,6 +1248,9 @@ public final class ActivityTaskLedger {
         private long processGeneration;
         private final String resultWho;
         private final int requestCode;
+        private final int launchFlags;
+        private final boolean noHistory;
+        private boolean restoredFromCheckpoint;
         private LifecycleState lifecycleState = LifecycleState.INITIALIZED;
         private long newIntentCount;
         private final List<NewIntentDelivery> pendingNewIntents = new ArrayList<>();
@@ -896,7 +1267,9 @@ public final class ActivityTaskLedger {
                 String processName,
                 long processGeneration,
                 String resultWho,
-                int requestCode) {
+                int requestCode,
+                int launchFlags,
+                boolean noHistory) {
             this.identity = identity;
             this.token = token;
             this.launchMode = launchMode;
@@ -904,6 +1277,8 @@ public final class ActivityTaskLedger {
             this.processGeneration = processGeneration;
             this.resultWho = resultWho;
             this.requestCode = requestCode;
+            this.launchFlags = launchFlags;
+            this.noHistory = noHistory;
         }
 
         private ActivitySnapshot snapshot() {

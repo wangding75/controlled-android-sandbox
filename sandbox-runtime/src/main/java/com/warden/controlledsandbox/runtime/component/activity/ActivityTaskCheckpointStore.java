@@ -1,0 +1,301 @@
+package com.warden.controlledsandbox.runtime.component.activity;
+
+import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
+import com.warden.controlledsandbox.framework.activity.ActivityRestoreSnapshot;
+import com.warden.controlledsandbox.framework.activity.ActivityTaskCheckpoint;
+import com.warden.controlledsandbox.framework.activity.LaunchMode;
+import com.warden.controlledsandbox.framework.activity.SavedActivityState;
+import com.warden.controlledsandbox.framework.activity.TaskQuerySnapshot;
+import com.warden.controlledsandbox.framework.activity.TaskRestoreSnapshot;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.zip.CRC32;
+
+/** CRC-protected atomic persistence for the Broker-owned Activity task checkpoint. */
+public final class ActivityTaskCheckpointStore {
+    private static final int MAGIC = 0x43534154; // CSAT
+    private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
+    private static final int MAX_TASKS = 256;
+    private static final int MAX_ACTIVITIES = 2048;
+    private static final int MAX_RECENTS = 256;
+    private static final int MAX_SAVED_STATE_ENTRIES = 128;
+
+    private final Path file;
+
+    public ActivityTaskCheckpointStore(Path file) {
+        this.file = Objects.requireNonNull(file, "file").toAbsolutePath().normalize();
+    }
+
+    public synchronized Optional<ActivityTaskCheckpoint> load() {
+        if (!Files.isRegularFile(file)) return Optional.empty();
+        try {
+            long size = Files.size(file);
+            if (size < 20 || size > MAX_FILE_BYTES) {
+                throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_SIZE_INVALID");
+            }
+            byte[] container = Files.readAllBytes(file);
+            try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(container))) {
+                if (input.readInt() != MAGIC) {
+                    throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_MAGIC_INVALID");
+                }
+                int payloadLength = input.readInt();
+                if (payloadLength < 1 || payloadLength > MAX_FILE_BYTES - 16
+                        || payloadLength != container.length - 16) {
+                    throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_LENGTH_INVALID");
+                }
+                byte[] payload = input.readNBytes(payloadLength);
+                long expectedCrc = input.readLong();
+                CRC32 crc = new CRC32();
+                crc.update(payload);
+                if (expectedCrc != crc.getValue()) {
+                    throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_CRC_INVALID");
+                }
+                return Optional.of(decode(payload));
+            }
+        } catch (IOException error) {
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_READ_FAILED", error);
+        }
+    }
+
+    public synchronized void save(ActivityTaskCheckpoint checkpoint) {
+        Objects.requireNonNull(checkpoint, "checkpoint");
+        byte[] payload = encode(checkpoint);
+        if (payload.length > MAX_FILE_BYTES - 16) {
+            throw new IllegalArgumentException("Activity task checkpoint exceeds file limit");
+        }
+        CRC32 crc = new CRC32();
+        crc.update(payload);
+        Path parent = file.getParent();
+        Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
+        try {
+            if (parent != null) Files.createDirectories(parent);
+            try (DataOutputStream output = new DataOutputStream(Files.newOutputStream(temporary))) {
+                output.writeInt(MAGIC);
+                output.writeInt(payload.length);
+                output.write(payload);
+                output.writeLong(crc.getValue());
+                output.flush();
+            }
+            try {
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException error) {
+            try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_WRITE_FAILED", error);
+        }
+    }
+
+    public synchronized Path quarantineCorrupt() {
+        if (!Files.exists(file)) return file;
+        Path quarantine = file.resolveSibling(file.getFileName() + ".corrupt");
+        try {
+            Files.move(file, quarantine, StandardCopyOption.REPLACE_EXISTING);
+            return quarantine;
+        } catch (IOException error) {
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_QUARANTINE_FAILED", error);
+        }
+    }
+
+    public Path file() {
+        return file;
+    }
+
+    private static byte[] encode(ActivityTaskCheckpoint checkpoint) {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (DataOutputStream output = new DataOutputStream(bytes)) {
+                output.writeInt(checkpoint.schemaVersion());
+                output.writeInt(checkpoint.nextTaskId());
+                output.writeLong(checkpoint.nextNewIntentSequence());
+                output.writeLong(checkpoint.nextConfigurationSequence());
+                output.writeLong(checkpoint.nextActivationSequence());
+                output.writeInt(checkpoint.transportDeliveryCount());
+                output.writeInt(checkpoint.tasks().size());
+                for (TaskRestoreSnapshot task : checkpoint.tasks()) writeTask(output, task);
+                output.writeInt(checkpoint.recentTasks().size());
+                for (TaskQuerySnapshot recent : checkpoint.recentTasks()) writeRecent(output, recent);
+            }
+            return bytes.toByteArray();
+        } catch (IOException impossible) {
+            throw new IllegalStateException(impossible);
+        }
+    }
+
+    private static ActivityTaskCheckpoint decode(byte[] payload) {
+        try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload))) {
+            int schemaVersion = input.readInt();
+            int nextTaskId = input.readInt();
+            long nextNewIntent = input.readLong();
+            long nextConfiguration = input.readLong();
+            long nextActivation = input.readLong();
+            int transportDeliveries = input.readInt();
+            int taskCount = boundedCount(input.readInt(), MAX_TASKS, "task");
+            List<TaskRestoreSnapshot> tasks = new ArrayList<>(taskCount);
+            int activityCount = 0;
+            for (int index = 0; index < taskCount; index++) {
+                TaskRestoreSnapshot task = readTask(input);
+                activityCount = Math.addExact(activityCount, task.activities().size());
+                if (activityCount > MAX_ACTIVITIES) {
+                    throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_ACTIVITY_LIMIT");
+                }
+                tasks.add(task);
+            }
+            int recentCount = boundedCount(input.readInt(), MAX_RECENTS, "recent task");
+            List<TaskQuerySnapshot> recents = new ArrayList<>(recentCount);
+            for (int index = 0; index < recentCount; index++) recents.add(readRecent(input));
+            if (input.available() != 0) {
+                throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_TRAILING_DATA");
+            }
+            return new ActivityTaskCheckpoint(
+                    schemaVersion,
+                    nextTaskId,
+                    nextNewIntent,
+                    nextConfiguration,
+                    nextActivation,
+                    transportDeliveries,
+                    tasks,
+                    recents);
+        } catch (IOException | ArithmeticException error) {
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_DECODE_FAILED", error);
+        }
+    }
+
+    private static void writeTask(DataOutputStream output, TaskRestoreSnapshot task) throws IOException {
+        output.writeInt(task.taskId());
+        output.writeInt(task.virtualUserId());
+        output.writeUTF(task.packageName());
+        output.writeUTF(task.affinity());
+        output.writeBoolean(task.documentTask());
+        output.writeInt(task.rootIntentFlags());
+        output.writeBoolean(task.excludedFromRecents());
+        output.writeBoolean(task.retainInRecents());
+        output.writeLong(task.lastActiveSequence());
+        output.writeLong(task.moveToFrontCount());
+        output.writeInt(task.activities().size());
+        for (ActivityRestoreSnapshot activity : task.activities()) writeActivity(output, activity);
+    }
+
+    private static TaskRestoreSnapshot readTask(DataInputStream input) throws IOException {
+        int taskId = input.readInt();
+        int virtualUserId = input.readInt();
+        String packageName = input.readUTF();
+        String affinity = input.readUTF();
+        boolean documentTask = input.readBoolean();
+        int rootIntentFlags = input.readInt();
+        boolean excluded = input.readBoolean();
+        boolean retain = input.readBoolean();
+        long lastActive = input.readLong();
+        long moveCount = input.readLong();
+        int activityCount = boundedCount(input.readInt(), MAX_ACTIVITIES, "Activity");
+        List<ActivityRestoreSnapshot> activities = new ArrayList<>(activityCount);
+        for (int index = 0; index < activityCount; index++) activities.add(readActivity(input));
+        return new TaskRestoreSnapshot(taskId, virtualUserId, packageName, affinity, documentTask,
+                rootIntentFlags, excluded, retain, lastActive, moveCount, activities);
+    }
+
+    private static void writeActivity(DataOutputStream output, ActivityRestoreSnapshot activity)
+            throws IOException {
+        output.writeInt(activity.identity().virtualUserId());
+        output.writeUTF(activity.identity().packageName());
+        output.writeUTF(activity.identity().componentName());
+        output.writeUTF(activity.launchMode().name());
+        output.writeUTF(activity.processName());
+        output.writeLong(activity.processGeneration());
+        output.writeUTF(activity.resultWho());
+        output.writeInt(activity.requestCode());
+        output.writeInt(activity.launchFlags());
+        output.writeBoolean(activity.noHistory());
+        output.writeLong(activity.newIntentCount());
+        output.writeLong(activity.recreationCount());
+        output.writeBoolean(activity.savedState() != null);
+        if (activity.savedState() != null) {
+            output.writeLong(activity.savedState().version());
+            output.writeInt(activity.savedState().values().size());
+            for (Map.Entry<String, String> entry : activity.savedState().values().entrySet()) {
+                output.writeUTF(entry.getKey());
+                output.writeUTF(entry.getValue());
+            }
+        }
+        output.writeLong(activity.configurationCount());
+        output.writeUTF(activity.lastConfigurationToken());
+    }
+
+    private static ActivityRestoreSnapshot readActivity(DataInputStream input) throws IOException {
+        ActivityIdentity identity = new ActivityIdentity(input.readInt(), input.readUTF(), input.readUTF());
+        LaunchMode launchMode;
+        try {
+            launchMode = LaunchMode.valueOf(input.readUTF());
+        } catch (IllegalArgumentException error) {
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_LAUNCH_MODE_INVALID", error);
+        }
+        String processName = input.readUTF();
+        long processGeneration = input.readLong();
+        String resultWho = input.readUTF();
+        int requestCode = input.readInt();
+        int launchFlags = input.readInt();
+        boolean noHistory = input.readBoolean();
+        long newIntentCount = input.readLong();
+        long recreationCount = input.readLong();
+        SavedActivityState savedState = null;
+        if (input.readBoolean()) {
+            long version = input.readLong();
+            int count = boundedCount(input.readInt(), MAX_SAVED_STATE_ENTRIES, "saved state");
+            Map<String, String> values = new LinkedHashMap<>();
+            for (int index = 0; index < count; index++) values.put(input.readUTF(), input.readUTF());
+            savedState = new SavedActivityState(version, values);
+        }
+        long configurationCount = input.readLong();
+        String lastConfigurationToken = input.readUTF();
+        return new ActivityRestoreSnapshot(identity, launchMode, processName, processGeneration,
+                resultWho, requestCode, launchFlags, noHistory, newIntentCount, recreationCount,
+                savedState, configurationCount, lastConfigurationToken);
+    }
+
+    private static void writeRecent(DataOutputStream output, TaskQuerySnapshot task) throws IOException {
+        output.writeInt(task.taskId());
+        output.writeInt(task.virtualUserId());
+        output.writeUTF(task.packageName());
+        output.writeUTF(task.affinity());
+        output.writeBoolean(task.documentTask());
+        output.writeBoolean(task.active());
+        output.writeBoolean(task.excludedFromRecents());
+        output.writeBoolean(task.retainInRecents());
+        output.writeInt(task.activityCount());
+        output.writeUTF(task.baseComponentName());
+        output.writeUTF(task.topComponentName());
+        output.writeLong(task.lastActiveSequence());
+        output.writeLong(task.moveToFrontCount());
+    }
+
+    private static TaskQuerySnapshot readRecent(DataInputStream input) throws IOException {
+        return new TaskQuerySnapshot(
+                input.readInt(), input.readInt(), input.readUTF(), input.readUTF(),
+                input.readBoolean(), input.readBoolean(), input.readBoolean(), input.readBoolean(),
+                input.readInt(), input.readUTF(), input.readUTF(), input.readLong(), input.readLong());
+    }
+
+    private static int boundedCount(int value, int maximum, String label) {
+        if (value < 0 || value > maximum) {
+            throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_" + label.toUpperCase().replace(' ', '_')
+                    + "_COUNT_INVALID");
+        }
+        return value;
+    }
+}

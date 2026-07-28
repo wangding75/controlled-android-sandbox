@@ -25,6 +25,7 @@ python3 scripts/check-binder-system-services.py
 python3 scripts/check-notification-job-lifecycle.py
 python3 scripts/check-guest-jobservice-bridge.py
 python3 scripts/check-service-lifecycle.py
+python3 scripts/check-activity-task-virtualization.py
 python3 scripts/check-split-install-sessions.py
 python3 scripts/check-broadcast-model.py
 python3 scripts/check-native-file-hooks.py

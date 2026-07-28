@@ -59,3 +59,14 @@ The following remain unverified:
 Status: **LOCAL PASS CANDIDATE / SOURCE 97.8% / PRODUCTION WIRING 95.5% / DEVICE EVIDENCE 0.0%**
 
 The capability matrix contains 90 tracked entries. M4-T14 adds dedicated Service coordination, Binder-death cleanup, sticky/redeliver recovery and a partial foreground-service state model. Static Android compilation and Service-specific domain/Broker/coordinator regression tests pass. Emulator, physical-device, real APK and Android foreground-service policy tests remain intentionally deferred.
+
+
+# M4-T15 local test report
+
+Date: **2026-07-28**
+
+Status: **LOCAL PASS CANDIDATE / SOURCE 97.9% / PRODUCTION WIRING 95.7% / DEVICE EVIDENCE 0.0%**
+
+The capability matrix contains 95 tracked entries. M4-T15 adds selected Activity launch-flag semantics, forward-result ownership, no-history and recent-task policy, running/recent task queries, owner-checked task mutations and an atomic CRC-protected Activity/Task checkpoint. Static Android compilation, Activity ledger tests, checkpoint corruption tests and Runtime Broker restart restoration tests pass.
+
+The checkpoint restores bounded Activity/task state but deliberately does not restore one-time route tokens, Binder-backed transport authority or pending result delivery. Android framework task-object projection, system Recents behavior, Window transitions, Emulator execution and real APK compatibility remain unverified.

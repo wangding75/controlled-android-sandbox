@@ -25,6 +25,10 @@ public final class ActivityTaskLedgerSelfTest {
         testProcessRestartDropsStaleTransportTokens();
         testConfigurationRecreationPreservesTransportTokens();
         testSavedStateBoundsAndVersionCollision();
+        testForwardResultChain();
+        testNoHistoryAndRecentTaskPolicy();
+        testRunningRecentMoveAndRemoveQueries();
+        testCheckpointRestoreDropsTransportAndPreservesState();
         testFiveHundredLaunchesWithoutLedgerLeak();
         System.out.println("PASS ActivityTaskLedgerSelfTest");
     }
@@ -376,6 +380,131 @@ public final class ActivityTaskLedgerSelfTest {
         } catch (IllegalArgumentException expected) {
             check(expected.getMessage().contains("too long"), "size failure should be explicit");
         }
+    }
+
+    private static void testForwardResultChain() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision caller = ledger.launch(request(0, "Caller", LaunchMode.STANDARD, 0, null, 1));
+        LaunchDecision middle = ledger.launch(requestForResult(
+                0, "Middle", LaunchMode.STANDARD, 0, caller.taskId(), 1, "fragment", 17));
+        LaunchDecision leaf = ledger.launch(request(
+                0, "Leaf", LaunchMode.STANDARD, LaunchFlags.FORWARD_RESULT,
+                middle.taskId(), 1));
+        check(ledger.finishWithResult(leaf.activityToken(), -1, "leaf-result"),
+                "forwarded leaf should finish");
+        List<ActivityResultDelivery> deliveries = ledger.drainActivityResults(caller.activityToken());
+        check(deliveries.size() == 1, "forwarded result should reach original caller");
+        check(deliveries.get(0).requestCode() == 17, "forwarded request code must be preserved");
+        check(deliveries.get(0).calleeActivityToken().equals(leaf.activityToken()),
+                "forwarded result must identify terminal callee");
+        check(ledger.finish(middle.activityToken()), "middle Activity should still be finishable");
+        check(ledger.drainActivityResults(caller.activityToken()).isEmpty(),
+                "middle Activity must not emit a second result after forwarding");
+    }
+
+    private static void testNoHistoryAndRecentTaskPolicy() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(request(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 1));
+        LaunchDecision transientActivity = ledger.launch(request(
+                0, "Transient", LaunchMode.STANDARD, LaunchFlags.NO_HISTORY,
+                root.taskId(), 1));
+        ledger.launch(request(0, "Next", LaunchMode.STANDARD, 0, root.taskId(), 1));
+        expectUnknownToken(ledger, transientActivity.activityToken());
+        List<ActivitySnapshot> stack = ledger.snapshot().get(0).activities();
+        check(stack.size() == 2, "NO_HISTORY Activity should leave the back stack");
+        check(stack.get(0).identity().componentName().equals("Root"), "root should remain");
+        check(stack.get(1).identity().componentName().equals("Next"), "next should be top");
+
+        LaunchDecision retainedDocument = ledger.launch(request(
+                0, "Document", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.NEW_DOCUMENT | LaunchFlags.RETAIN_IN_RECENTS,
+                null, 1));
+        check(ledger.finish(retainedDocument.activityToken()), "retained document should finish");
+        List<TaskQuerySnapshot> recent = ledger.recentTasks(0, "guest.example", 10);
+        check(recent.stream().anyMatch(task -> task.taskId() == retainedDocument.taskId()
+                        && !task.active() && task.retainInRecents()),
+                "retained document should remain in recent-task history");
+
+        LaunchDecision excluded = ledger.launch(request(
+                0, "Excluded", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.MULTIPLE_TASK | LaunchFlags.EXCLUDE_FROM_RECENTS,
+                null, 1));
+        check(ledger.finish(excluded.activityToken()), "excluded task should finish");
+        check(ledger.recentTasks(0, "guest.example", 10).stream()
+                        .noneMatch(task -> task.taskId() == excluded.taskId()),
+                "EXCLUDE_FROM_RECENTS task must not be returned");
+    }
+
+    private static void testRunningRecentMoveAndRemoveQueries() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision first = ledger.launch(request(
+                0, "A", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 1));
+        LaunchDecision second = ledger.launch(request(
+                0, "B", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.MULTIPLE_TASK, null, 1));
+        List<TaskQuerySnapshot> running = ledger.runningTasks(0, "guest.example", 10);
+        check(running.size() == 2 && running.get(0).taskId() == second.taskId(),
+                "running tasks must be front-first");
+        check(ledger.moveTaskToFront(0, "guest.example", first.taskId()),
+                "background task should move to front");
+        running = ledger.runningTasks(0, "guest.example", 10);
+        check(running.get(0).taskId() == first.taskId(), "moved task should be foreground");
+        check(running.get(0).moveToFrontCount() >= 2,
+                "task activation count should include launch and explicit move");
+        try {
+            ledger.moveTaskToFront(1, "guest.example", first.taskId());
+            throw new AssertionError("foreign virtual user should not move task");
+        } catch (SecurityException expected) {
+            check(expected.getMessage().contains("TASK_OWNER_MISMATCH"),
+                    "task ownership rejection should be explicit");
+        }
+        check(ledger.removeTask(0, "guest.example", first.taskId()),
+                "owned task should be removable");
+        check(ledger.runningTasks(0, "guest.example", 10).size() == 1,
+                "removed task must disappear from running query");
+        check(ledger.recentTasks(0, "guest.example", 10).stream()
+                        .noneMatch(task -> task.taskId() == first.taskId()),
+                "explicit remove must remove task from recents");
+    }
+
+    private static void testCheckpointRestoreDropsTransportAndPreservesState() {
+        ActivityTaskLedger source = new ActivityTaskLedger();
+        LaunchDecision root = source.launch(request(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 4));
+        LaunchDecision top = source.launch(request(
+                0, "Top", LaunchMode.STANDARD, 0, root.taskId(), 4));
+        source.saveInstanceState(top.activityToken(),
+                new SavedActivityState(3, Map.of("screen", "details")));
+        source.launch(requestWithRoute(
+                0, "Top", LaunchMode.SINGLE_TOP, LaunchFlags.SINGLE_TOP,
+                root.taskId(), 4, "route-will-be-dropped"));
+        ActivityTaskCheckpoint checkpoint = source.checkpoint();
+        check(checkpoint.transportDeliveryCount() == 1,
+                "checkpoint should account for dropped route-bound delivery");
+
+        ActivityTaskLedger restored = new ActivityTaskLedger();
+        ActivityTaskRestoreOutcome outcome = restored.restore(checkpoint);
+        check(outcome.restoredTaskCount() == 1 && outcome.restoredActivityCount() == 2,
+                "checkpoint should restore task stack");
+        check(outcome.droppedTransportDeliveryCount() == 1,
+                "restore must report fail-closed transport drops");
+        TaskSnapshot restoredTask = restored.snapshot().get(0);
+        String restoredTopToken = restoredTask.activities().get(1).token();
+        check(restored.savedInstanceState(restoredTopToken).orElseThrow().values()
+                        .get("screen").equals("details"),
+                "saved state should survive checkpoint restore");
+        check(restored.drainNewIntents(restoredTopToken).isEmpty(),
+                "route-bound new Intent must not survive Broker checkpoint restore");
+        check(restored.adoptRestoredProcessGeneration(
+                0, "guest.example", "guest.example:main", 9) == 2,
+                "restored activities should adopt current Guest generation once");
+        String adoptedTopToken = restored.snapshot().get(0).activities().get(1).token();
+        check(restored.processIdentity(adoptedTopToken).processGeneration() == 9,
+                "adopted task must bind to current Guest generation");
+        check(restored.adoptRestoredProcessGeneration(
+                0, "guest.example", "guest.example:main", 10) == 0,
+                "restored generation adoption must be one-shot");
     }
 
     private static void testFiveHundredLaunchesWithoutLedgerLeak() {

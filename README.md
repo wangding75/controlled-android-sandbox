@@ -103,3 +103,7 @@ M4-T13 adds a typed Guest JobService execution bridge. Trusted Host Job callback
 ## M4-T14 source baseline
 
 M4-T14 moves Service ownership behind `RuntimeServiceCoordinator`. Started, bound and foreground state is generation-aware; bound clients may provide death-linked Binder tokens; stale start IDs cannot stop newer work; and sticky/redeliver Services are recreated after Guest process recovery. Foreground notification/type enforcement and Android/OEM lifecycle behavior remain device-gated.
+
+## M4-T15 source baseline
+
+M4-T15 makes the Broker-owned Activity/Task model recoverable and queryable. It adds bounded launch-flag/result semantics, package/user-isolated running and recent task operations, and an atomic CRC-protected checkpoint that restores saved task state without reviving dead one-time route or result-delivery authority. Complete Android `ActivityManager`/`ActivityTaskManager` adapters, system Recents behavior and device compatibility remain open.

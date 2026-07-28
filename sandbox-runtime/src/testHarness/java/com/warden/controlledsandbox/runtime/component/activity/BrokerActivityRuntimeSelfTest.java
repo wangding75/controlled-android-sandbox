@@ -4,6 +4,11 @@ import com.warden.controlledsandbox.runtime.broker.BrokerStateStore;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.ActivityTaskRequest;
+import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.SessionState;
 
@@ -11,9 +16,11 @@ import com.warden.controlledsandbox.domain.session.SessionState;
 public final class BrokerActivityRuntimeSelfTest {
     private BrokerActivityRuntimeSelfTest() { }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        Path checkpoint = Files.createTempDirectory("broker-activity-").resolve("tasks.bin");
         BrokerStateStore state = new BrokerStateStore();
         BrokerActivityRuntime runtime = new BrokerActivityRuntime(state);
+        runtime.configureCheckpointStore(checkpoint);
         GuestSession session = session("s1", 1, SessionState.READY);
         Bundle prepared = prepared(session);
         Bundle request = new Bundle(prepared);
@@ -26,6 +33,24 @@ public final class BrokerActivityRuntimeSelfTest {
         check(!route.isEmpty(), "route token missing");
         check(!activity.isEmpty(), "activity token missing");
         check(runtime.taskCount() == 1 && runtime.activityCount() == 1, "ledger launch not wired");
+        ActivityTaskResult running = runtime.taskOperation(
+                session, taskRequest(session, ActivityTaskRequest.QUERY_RUNNING));
+        check(running.successful() && running.tasks().size() == 1,
+                "running-task query should expose owned task");
+        check(running.tasks().get(0).taskId() == launch.getInt(RuntimeKeys.TASK_ID, 0),
+                "running-task query should preserve task identity");
+        ActivityTaskResult checkpointStatus = runtime.taskOperation(
+                session, taskRequest(session, ActivityTaskRequest.CHECKPOINT_STATUS));
+        check("PERSISTED".equals(checkpointStatus.checkpointStatus()),
+                "launch should persist task checkpoint");
+
+        BrokerActivityRuntime restoredRuntime = new BrokerActivityRuntime(new BrokerStateStore());
+        check(restoredRuntime.configureCheckpointStore(checkpoint).restoredTaskCount() == 1,
+                "Broker restart should restore persisted task");
+        ActivityTaskResult restoredStatus = restoredRuntime.taskOperation(
+                session, taskRequest(session, ActivityTaskRequest.CHECKPOINT_STATUS));
+        check(restoredStatus.restoredActivityCount() == 1,
+                "restored Broker should report restored Activity count");
 
         Bundle granted = runtime.consume(route, session);
         check("ROUTE_GRANTED".equals(granted.getString(RuntimeKeys.STATUS)), "route not granted");
@@ -57,6 +82,21 @@ public final class BrokerActivityRuntimeSelfTest {
         check(runtime.pendingRouteCount() == 0, "invalidation leaked route");
 
         System.out.println("PASS broker Activity production adapter self-test");
+    }
+
+    private static ActivityTaskRequest taskRequest(GuestSession session, String operation) {
+        int maxCount = ActivityTaskRequest.QUERY_RUNNING.equals(operation)
+                || ActivityTaskRequest.QUERY_RECENT.equals(operation) ? 10 : 0;
+        return new ActivityTaskRequest(
+                RuntimeProtocol.CURRENT,
+                "task-request-" + operation,
+                session.sessionId(),
+                session.generation(),
+                session.virtualUserId(),
+                session.packageName(),
+                operation,
+                0,
+                maxCount);
     }
 
     private static Bundle prepared(GuestSession session) {
