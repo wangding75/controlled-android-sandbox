@@ -717,7 +717,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Catalog schema v4 atomically stores bounded per-instance runtime-permission requests, resolutions, revocations and audit records. Android process-death and filesystem behavior remain untested."
+      "notes": "Runtime-permission requests and audit introduced in Catalog v4 remain atomically persisted in current schema v5 alongside per-user package/component state. Android process-death and filesystem behavior remain untested."
     },
     {
       "id": "package.runtime-permission-binder-capability",
@@ -776,6 +776,72 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "The active Guest generation replaces permission, AppOps and bounded camera/location service-acquisition policy without restart. Already-acquired service handles and deep native/static APIs are not revoked by this gate."
+    },
+    {
+      "id": "package.typed-intent-filter-snapshot",
+      "evidence": [
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualIntentDataSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualIntentFilterSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualComponentSnapshot.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Typed Binder snapshots carry filter priority, actions, categories, scheme/host/path rules and MIME declarations from the trusted package revision into the active Guest generation."
+    },
+    {
+      "id": "framework.intent-resolve-semantics",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest-local Activity, Service and Receiver resolution applies action/category/data/MIME rules, deterministic priority/specificity ordering, explicit package/component isolation and MATCH_DEFAULT_ONLY. Exact Android IntentFilter parity remains device-gated."
+    },
+    {
+      "id": "package.enabled-state-overrides",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxPolicyState.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Per-virtual-user package and declared-component enabled overrides persist in Catalog v5, are writable only through the management capability and affect package availability and component visibility."
+    },
+    {
+      "id": "package.install-query-metadata",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java",
+        "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "First-install time survives upgrades, last-update time advances, a stable virtual installer identity is exposed, component PackageInfo flags are honored and declared shared-library names remain in the revision snapshot."
+    },
+    {
+      "id": "package.query-target-isolation",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Explicit Guest package/component queries fail closed on local no-match or disabled state, host identity remains hidden, and non-Guest implicit/system queries retain the bounded host fallback. Full cross-package merged listings are not implemented."
     }
   ],
   "statusDimensions": {

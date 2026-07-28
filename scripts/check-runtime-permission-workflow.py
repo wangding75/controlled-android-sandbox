@@ -60,10 +60,10 @@ for name in ('RuntimePermissionRequestSnapshot', 'PermissionAuditSnapshot'):
 
 repository = require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java',
-    'SCHEMA_VERSION = 4',
+    'SCHEMA_VERSION = 5',
     'root.put("permissionRequests", permissionRequests)',
     'root.put("permissionAudit", permissionAudit)',
-    'version != 1 && version != 2 && version != 3 && version != SCHEMA_VERSION',
+    'version != 1 && version != 2 && version != 3 && version != 4 && version != SCHEMA_VERSION',
 )
 state = require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java',

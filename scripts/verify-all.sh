@@ -17,6 +17,7 @@ python3 scripts/check-apk-revision-binding.py
 python3 scripts/check-package-lifecycle-transaction.py
 python3 scripts/check-package-service-boundary.py
 python3 scripts/check-virtual-package-state.py
+python3 scripts/check-package-query-resolve.py
 python3 scripts/check-runtime-permission-workflow.py
 python3 scripts/check-split-install-sessions.py
 python3 scripts/check-broadcast-model.py

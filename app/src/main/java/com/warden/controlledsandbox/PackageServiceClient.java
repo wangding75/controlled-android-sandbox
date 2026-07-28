@@ -105,6 +105,18 @@ final class PackageServiceClient implements AutoCloseable {
         return packageState(requireSession().setAppOpMode(packageName, virtualUserId, opName, mode));
     }
 
+    VirtualPackageStateSnapshot setPackageEnabledSetting(String packageName, int virtualUserId,
+                                                          String state) throws Exception {
+        return packageState(requireSession().setPackageEnabledSetting(
+                packageName, virtualUserId, state));
+    }
+
+    VirtualPackageStateSnapshot setComponentEnabledSetting(String packageName, int virtualUserId,
+                                                            String className, String state) throws Exception {
+        return packageState(requireSession().setComponentEnabledSetting(
+                packageName, virtualUserId, className, state));
+    }
+
     VirtualPackageStateSnapshot resetVirtualPolicy(String packageName, int virtualUserId)
             throws Exception {
         return packageState(requireSession().resetVirtualPolicy(packageName, virtualUserId));

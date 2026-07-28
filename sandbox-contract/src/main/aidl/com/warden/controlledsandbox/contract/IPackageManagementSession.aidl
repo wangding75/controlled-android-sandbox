@@ -14,6 +14,8 @@ interface IPackageManagementSession {
     PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);
     PackageServiceResult setPermissionDecision(String packageName, int virtualUserId, String permission, String decision);
     PackageServiceResult setAppOpMode(String packageName, int virtualUserId, String opName, String mode);
+    PackageServiceResult setPackageEnabledSetting(String packageName, int virtualUserId, String state);
+    PackageServiceResult setComponentEnabledSetting(String packageName, int virtualUserId, String className, String state);
     PackageServiceResult resetVirtualPolicy(String packageName, int virtualUserId);
     PackageServiceResult resolveRuntimePermission(long requestId, String outcome, String reason);
     PackageServiceResult revokeRuntimePermission(String packageName, int virtualUserId, String permission, String reason);

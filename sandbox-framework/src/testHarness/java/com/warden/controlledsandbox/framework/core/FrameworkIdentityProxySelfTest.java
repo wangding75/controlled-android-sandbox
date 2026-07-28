@@ -75,7 +75,7 @@ public final class FrameworkIdentityProxySelfTest {
                 PackageManagerInvocationHandlerTestAccess.create(delegate, identity));
         ApplicationInfo application = proxy.getApplicationInfo("guest.pkg", 0);
         require("guest.pkg".equals(application.packageName), "virtual application info");
-        PackageInfo packageInfo = proxy.getPackageInfo("guest.pkg", 0);
+        PackageInfo packageInfo = proxy.getPackageInfo("guest.pkg", 0x0f);
         require(packageInfo.activities.length == 1 && packageInfo.services.length == 1
                 && packageInfo.receivers.length == 1 && packageInfo.providers.length == 1,
                 "package component matrix");
@@ -99,7 +99,10 @@ public final class FrameworkIdentityProxySelfTest {
         try { proxy.getApplicationInfo("host.pkg", 0); }
         catch (IllegalArgumentException expected) { hostHidden = expected.getMessage().contains("HOST_PACKAGE_HIDDEN"); }
         require(hostHidden, "host package identity hidden");
-        require(delegate.calls == 0, "virtual queries avoid host delegate");
+        ResolveInfo hiddenHostResolve = proxy.resolveIntent(
+                new Intent().setPackage("host.pkg"), null, 0, 0);
+        require(hiddenHostResolve == null, "explicit host Intent is hidden");
+        require(delegate.calls == 0, "virtual and hidden-host queries avoid host delegate");
         require("host-result".equals(proxy.unhandled("guest.pkg")), "fallback delegates with host identity");
         require("host.pkg".equals(delegate.lastPackage), "fallback package rewritten");
     }

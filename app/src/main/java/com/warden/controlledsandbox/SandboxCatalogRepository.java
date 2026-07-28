@@ -11,7 +11,7 @@ import org.json.JSONObject;
 
 /** Single atomic metadata authority for installed packages and virtual instances. */
 final class SandboxCatalogRepository {
-    private static final int SCHEMA_VERSION = 4;
+    private static final int SCHEMA_VERSION = 5;
     private final RecoverableFileStore store;
     private final SandboxRepository legacyPackages;
     private final SandboxInstanceRepository legacyInstances;
@@ -71,7 +71,7 @@ final class SandboxCatalogRepository {
     private static SandboxCatalogState decode(String content) throws Exception {
         JSONObject root = new JSONObject(content);
         int version = root.optInt("schemaVersion", -1);
-        if (version != 1 && version != 2 && version != 3 && version != SCHEMA_VERSION) {
+        if (version != 1 && version != 2 && version != 3 && version != 4 && version != SCHEMA_VERSION) {
             throw new IllegalArgumentException("Unsupported catalog schema: " + version);
         }
         JSONArray packageArray = root.getJSONArray("packages");

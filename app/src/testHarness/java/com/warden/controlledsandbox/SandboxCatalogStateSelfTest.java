@@ -17,6 +17,10 @@ public final class SandboxCatalogStateSelfTest {
         require(upgraded.records().get(0).versionCode == 2L, "package revision replaced");
         require(upgraded.instances().size() == 1, "instances survive upgrade");
         require(upgraded.instances().get(0).createdAt == 100L, "existing instance identity retained");
+        require(upgraded.records().get(0).firstInstallAt == alphaV1.firstInstallAt,
+                "first install timestamp survives upgrade");
+        require(upgraded.records().get(0).lastUpdateAt == 200L,
+                "last update timestamp advances on upgrade");
 
         SandboxCatalogState explicit = upgraded.withEnsuredInstance("com.example.alpha", 7, 250L);
         require(explicit.instances().size() == 2, "explicit test instance added");
@@ -33,6 +37,16 @@ public final class SandboxCatalogStateSelfTest {
         require("NOT_TESTED".equals(clone.state.instances().get(1).lastRuntimeStatus),
                 "prior aggregate remains immutable");
 
+        SandboxCatalogState packageOnlyDisabled = status.withPackageState(
+                "com.example.alpha", 1, "DISABLED");
+        require("DISABLED".equals(packageOnlyDisabled.policy("com.example.alpha", 1).packageState()),
+                "package-only override must survive aggregate persistence");
+        SandboxCatalogState componentOnlyDisabled = status.withComponentState(
+                "com.example.alpha", 1, "com.example.alpha.MainActivity", "DISABLED");
+        require("DISABLED".equals(componentOnlyDisabled.policy("com.example.alpha", 1)
+                .componentState("com.example.alpha.MainActivity")),
+                "component-only override must survive aggregate persistence");
+
         SandboxCatalogState permissionDenied = status.withPermissionDecision(
                 "com.example.alpha", 1, "android.permission.CAMERA", "DENIED");
         require("DENIED".equals(permissionDenied.policy("com.example.alpha", 1)
@@ -41,14 +55,25 @@ public final class SandboxCatalogStateSelfTest {
                 "com.example.alpha", 1, "android:camera", "IGNORED");
         require("IGNORED".equals(appOpIgnored.policy("com.example.alpha", 1)
                 .appOpMode("android:camera")), "AppOps mode persisted");
+        SandboxCatalogState componentDisabled = appOpIgnored.withComponentState(
+                "com.example.alpha", 1, "com.example.alpha.MainActivity", "DISABLED");
+        require("DISABLED".equals(componentDisabled.policy("com.example.alpha", 1)
+                .componentState("com.example.alpha.MainActivity")),
+                "component enabled override persisted");
+        SandboxCatalogState packageDisabled = componentDisabled.withPackageState(
+                "com.example.alpha", 1, "DISABLED");
+        require("DISABLED".equals(packageDisabled.policy("com.example.alpha", 1).packageState()),
+                "package enabled override persisted");
         require(appOpIgnored.policy("com.example.alpha", 0).permissionDecisions().isEmpty(),
                 "policy is isolated by virtual user");
-        SandboxCatalogState resetPolicy = appOpIgnored.withoutPolicy("com.example.alpha", 1);
-        require(resetPolicy.policy("com.example.alpha", 1).permissionDecisions().isEmpty()
-                && resetPolicy.policy("com.example.alpha", 1).appOpModes().isEmpty(),
+        SandboxCatalogState resetPolicy = packageDisabled.withoutPolicy("com.example.alpha", 1);
+        require("DEFAULT".equals(resetPolicy.policy("com.example.alpha", 1).packageState())
+                && resetPolicy.policy("com.example.alpha", 1).permissionDecisions().isEmpty()
+                && resetPolicy.policy("com.example.alpha", 1).appOpModes().isEmpty()
+                && resetPolicy.policy("com.example.alpha", 1).componentStates().isEmpty(),
                 "policy reset removes overrides");
 
-        SandboxCatalogState defaultOnly = appOpIgnored.withoutInstance("com.example.alpha", 1);
+        SandboxCatalogState defaultOnly = packageDisabled.withoutInstance("com.example.alpha", 1);
         require(defaultOnly.policies().isEmpty(), "instance deletion removes policy atomically");
         require(defaultOnly.records().size() == 1, "package retained while default exists");
         SandboxCatalogState empty = defaultOnly.withoutInstance("com.example.alpha", 0);

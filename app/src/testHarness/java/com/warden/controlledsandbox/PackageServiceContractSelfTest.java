@@ -8,6 +8,8 @@ import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
+import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
@@ -70,10 +72,16 @@ public final class PackageServiceContractSelfTest {
                 "com.example.fixture", 3, "Fixture", "1.0", 1L, "signer",
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 "com.example.fixture.MainActivity", "com.example.fixture.FixtureApplication", true,
+                100L, 200L, "com.warden.virtualinstaller",
                 List.of("payments"), List.of("org.apache.http.legacy"),
                 List.of(new VirtualComponentSnapshot("ACTIVITY",
                         "com.example.fixture.MainActivity", "com.example.fixture", true, true,
-                        false, "", "", List.of("android.intent.action.MAIN"))),
+                        false, "", "", "ENABLED", List.of("android.intent.action.MAIN"),
+                        List.of(new VirtualIntentFilterSnapshot(10,
+                                List.of("android.intent.action.MAIN"),
+                                List.of("android.intent.category.DEFAULT"),
+                                List.of(new VirtualIntentDataSnapshot("https", "example.com",
+                                        "", "/fixture", "", "text/*")))))),
                 List.of(new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", false)),
                 List.of(new PackageAppOpSnapshot("android:camera", "IGNORED")));
         Parcel stateParcel = Parcel.obtain();
@@ -92,6 +100,17 @@ public final class PackageServiceContractSelfTest {
                 "virtual split names lost");
         require(restoredState.packageState().sharedLibraries().equals(List.of("org.apache.http.legacy")),
                 "virtual shared libraries lost");
+        require(restoredState.packageState().firstInstallTime() == 100L
+                        && restoredState.packageState().lastUpdateTime() == 200L,
+                "install timestamps lost");
+        require("com.warden.virtualinstaller".equals(
+                restoredState.packageState().installerPackageName()), "install source lost");
+        require("ENABLED".equals(restoredState.packageState().components().get(0).enabledSetting())
+                        && restoredState.packageState().components().get(0).intentFilters().size() == 1,
+                "component override or intent filter lost");
+        require("/fixture".equals(restoredState.packageState().components().get(0)
+                        .intentFilters().get(0).data().get(0).pathPrefix()),
+                "intent data rule lost");
         boolean contradictionRejected = false;
         try { new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", true); }
         catch (IllegalArgumentException expected) { contradictionRejected = true; }

@@ -121,6 +121,24 @@ final class SandboxPackageLifecycle {
                 next.policy(packageName, virtualUserId), next);
     }
 
+    synchronized SandboxPackagePolicyView setPackageState(String packageName, int virtualUserId,
+                                                            String state) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withPackageState(packageName, virtualUserId, state);
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId), next);
+    }
+
+    synchronized SandboxPackagePolicyView setComponentState(String packageName, int virtualUserId,
+                                                              String className, String state) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState next = current.withComponentState(packageName, virtualUserId, className, state);
+        catalogRepository.save(next);
+        return new SandboxPackagePolicyView(next.findRecord(packageName),
+                next.policy(packageName, virtualUserId), next);
+    }
+
     synchronized SandboxPackagePolicyView resetPolicy(String packageName, int virtualUserId)
             throws Exception {
         SandboxCatalogState current = catalogRepository.load();

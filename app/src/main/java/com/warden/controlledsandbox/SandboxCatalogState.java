@@ -99,9 +99,11 @@ final class SandboxCatalogState {
     SandboxCatalogState withImported(SandboxRecord imported, long nowMs) {
         if (imported == null) throw new IllegalArgumentException("imported record is required");
         SandboxRecord previous = findRecord(imported.packageName);
+        long firstInstallAt = previous == null ? nowMs : previous.firstInstallAt;
+        SandboxRecord timedImport = imported.withInstallTimes(firstInstallAt, nowMs);
         List<SandboxRecord> nextRecords = records();
         nextRecords.removeIf(record -> record.packageName.equals(imported.packageName));
-        nextRecords.add(imported);
+        nextRecords.add(timedImport);
         List<SandboxInstance> nextInstances = instances();
         boolean found = false;
         for (SandboxInstance instance : nextInstances) {
@@ -207,6 +209,19 @@ final class SandboxCatalogState {
                                       String opName, String mode) {
         SandboxPolicyState current = policy(packageName, virtualUserId);
         SandboxPolicyState updated = current.withAppOpMode(opName, mode);
+        return withPolicy(updated);
+    }
+
+    SandboxCatalogState withPackageState(String packageName, int virtualUserId,
+                                          String state) {
+        SandboxPolicyState current = policy(packageName, virtualUserId);
+        return withPolicy(current.withPackageState(state));
+    }
+
+    SandboxCatalogState withComponentState(String packageName, int virtualUserId,
+                                            String className, String state) {
+        SandboxPolicyState current = policy(packageName, virtualUserId);
+        SandboxPolicyState updated = current.withComponentState(className, state);
         return withPolicy(updated);
     }
 
@@ -440,7 +455,9 @@ final class SandboxCatalogState {
         List<SandboxPolicyState> next = policies();
         next.removeIf(policy -> policy.packageName.equals(updated.packageName)
                 && policy.virtualUserId == updated.virtualUserId);
-        if (!updated.permissionDecisions().isEmpty() || !updated.appOpModes().isEmpty()) {
+        if (!updated.permissionDecisions().isEmpty() || !updated.appOpModes().isEmpty()
+                || !SandboxPolicyState.COMPONENT_DEFAULT.equals(updated.packageState())
+                || !updated.componentStates().isEmpty()) {
             next.add(updated);
         }
         return new SandboxCatalogState(records, instances, next, permissionRequests, permissionAudit);

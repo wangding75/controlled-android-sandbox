@@ -48,8 +48,10 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 ## Framework policy
 
 - DONE — Binder-issued, revision-bound virtual PackageManager application/package/component/query snapshot.
+- DONE — typed Intent-filter snapshots and bounded Guest-local Activity/Service/Receiver/Provider query and resolve semantics with per-user package/component enabled overrides, install timestamps and installer metadata.
+- PARTIAL — exact Android IntentFilter scoring, visibility rules, system/virtual cross-package list merging, SharedLibraryInfo resolution and all PackageManager Binder signature variants remain open.
 - DONE — per-package/per-virtual-user permission and bounded AppOps decisions persist atomically and are consumed by PackageManager/PermissionManager/AppOps proxies.
-- PARTIAL — permission semantics still lack host-capability checks, runtime-consent flow, roles/special access and signature/privileged handling.
+- PARTIAL — bounded host-capability checks and runtime-consent state are wired; roles, special access, one-time grants, permission groups and signature/privileged handling remain open.
 - PARTIAL — AppOps coverage is limited to bounded integer/boolean check/note/start-style calls.
 - DONE — reversible notification, JobScheduler and storage identity proxies with per-service diagnostics.
 - DONE — ActivityManager/ActivityTaskManager source mediation uses an atomic proxy pair, exact API-signature policies, callback/result task models and reversible rollback.

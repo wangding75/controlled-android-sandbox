@@ -9,7 +9,7 @@ import java.util.TreeMap;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-/** Immutable per-virtual-user permission and AppOps overrides owned by the package catalog. */
+/** Immutable per-virtual-user permission, AppOps, package, and component overrides. */
 final class SandboxPolicyState {
     static final String PERMISSION_DEFAULT = "DEFAULT";
     static final String PERMISSION_GRANTED = "GRANTED";
@@ -18,15 +18,36 @@ final class SandboxPolicyState {
     static final String APP_OP_ALLOWED = "ALLOWED";
     static final String APP_OP_IGNORED = "IGNORED";
     static final String APP_OP_ERRORED = "ERRORED";
+    static final String COMPONENT_DEFAULT = "DEFAULT";
+    static final String COMPONENT_ENABLED = "ENABLED";
+    static final String COMPONENT_DISABLED = "DISABLED";
 
     final String packageName;
     final int virtualUserId;
     private final Map<String, String> permissionDecisions;
     private final Map<String, String> appOpModes;
+    private final String packageState;
+    private final Map<String, String> componentStates;
 
     SandboxPolicyState(String packageName, int virtualUserId,
                        Map<String, String> permissionDecisions,
                        Map<String, String> appOpModes) {
+        this(packageName, virtualUserId, permissionDecisions, appOpModes, COMPONENT_DEFAULT, Map.of());
+    }
+
+    SandboxPolicyState(String packageName, int virtualUserId,
+                       Map<String, String> permissionDecisions,
+                       Map<String, String> appOpModes,
+                       Map<String, String> componentStates) {
+        this(packageName, virtualUserId, permissionDecisions, appOpModes,
+                COMPONENT_DEFAULT, componentStates);
+    }
+
+    SandboxPolicyState(String packageName, int virtualUserId,
+                       Map<String, String> permissionDecisions,
+                       Map<String, String> appOpModes,
+                       String packageState,
+                       Map<String, String> componentStates) {
         this.packageName = required(packageName, "packageName");
         if (virtualUserId < 0 || virtualUserId > 999) {
             throw new IllegalArgumentException("virtualUserId out of range: " + virtualUserId);
@@ -34,10 +55,12 @@ final class SandboxPolicyState {
         this.virtualUserId = virtualUserId;
         this.permissionDecisions = immutableValidated(permissionDecisions, true);
         this.appOpModes = immutableValidated(appOpModes, false);
+        this.packageState = componentStateValue(packageState);
+        this.componentStates = immutableComponentStates(componentStates);
     }
 
     static SandboxPolicyState empty(String packageName, int virtualUserId) {
-        return new SandboxPolicyState(packageName, virtualUserId, Map.of(), Map.of());
+        return new SandboxPolicyState(packageName, virtualUserId, Map.of(), Map.of(), COMPONENT_DEFAULT, Map.of());
     }
 
     Map<String, String> permissionDecisions() {
@@ -48,6 +71,10 @@ final class SandboxPolicyState {
         return appOpModes;
     }
 
+    String packageState() { return packageState; }
+
+    Map<String, String> componentStates() { return componentStates; }
+
     String permissionDecision(String permission) {
         return permissionDecisions.getOrDefault(permission, PERMISSION_DEFAULT);
     }
@@ -56,13 +83,17 @@ final class SandboxPolicyState {
         return appOpModes.getOrDefault(opName, APP_OP_DEFAULT);
     }
 
+    String componentState(String className) {
+        return componentStates.getOrDefault(className, COMPONENT_DEFAULT);
+    }
+
     SandboxPolicyState withPermissionDecision(String permission, String decision) {
         String key = stateKey(permission, "permission");
         String normalized = permissionDecisionValue(decision);
         Map<String, String> next = new LinkedHashMap<>(permissionDecisions);
         if (PERMISSION_DEFAULT.equals(normalized)) next.remove(key);
         else next.put(key, normalized);
-        return new SandboxPolicyState(packageName, virtualUserId, next, appOpModes);
+        return new SandboxPolicyState(packageName, virtualUserId, next, appOpModes, packageState, componentStates);
     }
 
     SandboxPolicyState withAppOpMode(String opName, String mode) {
@@ -71,7 +102,23 @@ final class SandboxPolicyState {
         Map<String, String> next = new LinkedHashMap<>(appOpModes);
         if (APP_OP_DEFAULT.equals(normalized)) next.remove(key);
         else next.put(key, normalized);
-        return new SandboxPolicyState(packageName, virtualUserId, permissionDecisions, next);
+        return new SandboxPolicyState(packageName, virtualUserId, permissionDecisions, next, packageState, componentStates);
+    }
+
+
+    SandboxPolicyState withPackageState(String state) {
+        String normalized = componentStateValue(state);
+        return new SandboxPolicyState(packageName, virtualUserId, permissionDecisions,
+                appOpModes, normalized, componentStates);
+    }
+
+    SandboxPolicyState withComponentState(String className, String state) {
+        String key = componentKey(className);
+        String normalized = componentStateValue(state);
+        Map<String, String> next = new LinkedHashMap<>(componentStates);
+        if (COMPONENT_DEFAULT.equals(normalized)) next.remove(key);
+        else next.put(key, normalized);
+        return new SandboxPolicyState(packageName, virtualUserId, permissionDecisions, appOpModes, packageState, next);
     }
 
     JSONObject toJson() throws Exception {
@@ -80,6 +127,8 @@ final class SandboxPolicyState {
         out.put("virtualUserId", virtualUserId);
         out.put("permissions", entries(permissionDecisions));
         out.put("appOps", entries(appOpModes));
+        out.put("packageState", packageState);
+        out.put("components", entries(componentStates));
         return out;
     }
 
@@ -88,13 +137,23 @@ final class SandboxPolicyState {
                 value.getString("packageName"),
                 value.getInt("virtualUserId"),
                 decodeEntries(value.optJSONArray("permissions"), true),
-                decodeEntries(value.optJSONArray("appOps"), false));
+                decodeEntries(value.optJSONArray("appOps"), false),
+                value.optString("packageState", COMPONENT_DEFAULT),
+                decodeComponentEntries(value.optJSONArray("components")));
     }
 
     static String permissionDecisionValue(String value) {
         String normalized = normalizedValue(value);
         if (!List.of(PERMISSION_DEFAULT, PERMISSION_GRANTED, PERMISSION_DENIED).contains(normalized)) {
             throw new IllegalArgumentException("Unsupported permission decision: " + value);
+        }
+        return normalized;
+    }
+
+    static String componentStateValue(String value) {
+        String normalized = normalizedValue(value);
+        if (!List.of(COMPONENT_DEFAULT, COMPONENT_ENABLED, COMPONENT_DISABLED).contains(normalized)) {
+            throw new IllegalArgumentException("Unsupported component state: " + value);
         }
         return normalized;
     }
@@ -122,6 +181,18 @@ final class SandboxPolicyState {
         return Collections.unmodifiableMap(sorted);
     }
 
+    private static Map<String, String> immutableComponentStates(Map<String, String> source) {
+        TreeMap<String, String> sorted = new TreeMap<>();
+        if (source != null) {
+            for (Map.Entry<String, String> item : source.entrySet()) {
+                String key = componentKey(item.getKey());
+                String value = componentStateValue(item.getValue());
+                if (!COMPONENT_DEFAULT.equals(value)) sorted.put(key, value);
+            }
+        }
+        return Collections.unmodifiableMap(sorted);
+    }
+
     private static JSONArray entries(Map<String, String> values) throws Exception {
         JSONArray out = new JSONArray();
         for (Map.Entry<String, String> item : values.entrySet()) {
@@ -129,6 +200,18 @@ final class SandboxPolicyState {
             entry.put("name", item.getKey());
             entry.put("value", item.getValue());
             out.put(entry);
+        }
+        return out;
+    }
+
+    private static Map<String, String> decodeComponentEntries(JSONArray values) throws Exception {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (values == null) return out;
+        for (int index = 0; index < values.length(); index++) {
+            JSONObject item = values.getJSONObject(index);
+            String name = componentKey(item.getString("name"));
+            String state = componentStateValue(item.getString("value"));
+            if (out.put(name, state) != null) throw new IllegalArgumentException("Duplicate component policy: " + name);
         }
         return out;
     }
@@ -147,6 +230,14 @@ final class SandboxPolicyState {
             }
         }
         return out;
+    }
+
+    private static String componentKey(String value) {
+        String normalized = required(value, "className").trim();
+        if (normalized.length() > 512 || !normalized.matches("[A-Za-z0-9_.$]+")) {
+            throw new IllegalArgumentException("Invalid component class: " + value);
+        }
+        return normalized;
     }
 
     private static String stateKey(String value, String name) {

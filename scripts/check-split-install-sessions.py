@@ -49,7 +49,7 @@ require('app/src/main/java/com/warden/controlledsandbox/MainActivity.java',
 require('app/src/main/java/com/warden/controlledsandbox/PackageArtifactRecord.java',
         'TYPE_BASE', 'TYPE_FEATURE', 'TYPE_CONFIG', 'sha256')
 require('app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java',
-        'SCHEMA_VERSION = 4', 'version != 1 && version != 2 && version != 3 && version != SCHEMA_VERSION')
+        'SCHEMA_VERSION = 5', 'version != 1 && version != 2 && version != 3 && version != 4 && version != SCHEMA_VERSION')
 require('app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java',
         'Package must contain exactly one base artifact', 'Duplicate split metadata')
 require('app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java',

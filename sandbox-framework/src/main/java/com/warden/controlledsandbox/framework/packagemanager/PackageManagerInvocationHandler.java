@@ -55,15 +55,16 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return guestTarget ? metadata.applicationInfo() : NoResult.VALUE;
             case "getPackageInfo":
             case "getPackageInfoVersioned":
-                return guestTarget ? metadata.packageInfo() : NoResult.VALUE;
+                return guestTarget ? metadata.packageInfo(firstLong(args, ~0L)) : NoResult.VALUE;
             case "getPackageUid":
             case "getPackageUidAsUser":
                 return guestTarget ? identity.virtualUid() : NoResult.VALUE;
             case "isPackageAvailable":
-                return guestTarget ? true : NoResult.VALUE;
+                return guestTarget ? metadata.enabled() : NoResult.VALUE;
             case "getInstallerPackageName":
+                return guestTarget ? metadata.installerPackageName() : NoResult.VALUE;
             case "getInstallSourceInfo":
-                return guestTarget ? null : NoResult.VALUE;
+                return guestTarget ? installSourceInfo(returnType) : NoResult.VALUE;
             case "checkPermission":
                 if (!guestTarget) return NoResult.VALUE;
                 String permission = firstString(args);
@@ -84,17 +85,20 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "getProviderInfo":
                 return component(args, VirtualPackageMetadata.Type.PROVIDER);
             case "resolveContentProvider": {
-                ProviderInfo provider = metadata.provider(firstString(args));
-                return provider == null ? NoResult.VALUE : provider;
+                String authority = firstString(args);
+                ProviderInfo provider = metadata.provider(authority, firstLong(args, 0L));
+                return provider == null && !metadata.ownsAuthority(authority) ? NoResult.VALUE : provider;
             }
             case "resolveIntent":
             case "resolveActivity": {
-                ResolveInfo resolved = metadata.resolve(firstIntent(args), VirtualPackageMetadata.Type.ACTIVITY);
-                return resolved == null ? NoResult.VALUE : resolved;
+                Intent intent = firstIntent(args);
+                ResolveInfo resolved = metadata.resolve(intent, VirtualPackageMetadata.Type.ACTIVITY, firstLong(args, 0L));
+                return resolved == null && !targetsGuest(intent) ? NoResult.VALUE : resolved;
             }
             case "resolveService": {
-                ResolveInfo resolved = metadata.resolve(firstIntent(args), VirtualPackageMetadata.Type.SERVICE);
-                return resolved == null ? NoResult.VALUE : resolved;
+                Intent intent = firstIntent(args);
+                ResolveInfo resolved = metadata.resolve(intent, VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L));
+                return resolved == null && !targetsGuest(intent) ? NoResult.VALUE : resolved;
             }
             case "queryIntentActivities":
                 return query(returnType, args, VirtualPackageMetadata.Type.ACTIVITY);
@@ -104,18 +108,48 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "queryIntentServices":
                 return query(returnType, args, VirtualPackageMetadata.Type.SERVICE);
             case "getInstalledPackages":
+                return metadata.adaptCollection(Collections.singletonList(
+                        metadata.packageInfo(firstLong(args, ~0L))), returnType);
             case "getPackagesHoldingPermissions":
-                return metadata.adaptCollection(Collections.singletonList(metadata.packageInfo()), returnType);
-            case "getInstalledApplications":
-                return metadata.adaptCollection(Collections.singletonList(metadata.applicationInfo()), returnType);
+                return metadata.adaptCollection(holdsAnyPermission(args)
+                        ? Collections.singletonList(metadata.packageInfo(firstLong(args, 0x1000L)))
+                        : Collections.emptyList(), returnType);
+            case "getInstalledApplications": {
+                long flags = firstLong(args, 0L);
+                boolean visible = metadata.enabled()
+                        || (flags & VirtualPackageMetadata.MATCH_DISABLED_COMPONENTS) != 0;
+                return metadata.adaptCollection(visible
+                        ? Collections.singletonList(metadata.applicationInfo())
+                        : Collections.emptyList(), returnType);
+            }
+            case "getPackageGids":
+            case "getPackageGidsEtc":
+                return guestTarget ? new int[0] : NoResult.VALUE;
             case "queryContentProviders": {
                 List<ProviderInfo> providers = new java.util.ArrayList<>();
+                long flags = firstLong(args, 0L);
                 for (VirtualPackageMetadata.Component item : metadata.components()) {
-                    if (item.type() != VirtualPackageMetadata.Type.PROVIDER || !item.enabled()) continue;
-                    providers.add(metadata.provider(firstAuthority(item.authority())));
+                    if (item.type() != VirtualPackageMetadata.Type.PROVIDER) continue;
+                    ProviderInfo provider = metadata.provider(firstAuthority(item.authority()), flags);
+                    if (provider != null) providers.add(provider);
                 }
                 return metadata.adaptCollection(providers, returnType);
             }
+            case "getComponentEnabledSetting": {
+                ComponentName component = firstComponent(args);
+                return component != null && identity.packageName().equals(component.getPackageName())
+                        ? metadata.componentEnabledSetting(component) : NoResult.VALUE;
+            }
+            case "setApplicationEnabledSetting":
+            case "setPackageStoppedState":
+            case "setComponentEnabledSetting":
+                if (guestTarget || firstComponent(args) != null) {
+                    throw new SecurityException("COMPONENT_STATE_REQUIRES_PACKAGE_SERVICE");
+                }
+                return NoResult.VALUE;
+            case "hasSigningCertificate":
+                if (!guestTarget) return NoResult.VALUE;
+                return signingDigestMatches(args, metadata.signatureSha256());
             default:
                 return NoResult.VALUE;
         }
@@ -124,14 +158,58 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private Object component(Object[] args, VirtualPackageMetadata.Type type) {
         ComponentName name = firstComponent(args);
         if (name == null || !identity.packageName().equals(name.getPackageName())) return NoResult.VALUE;
-        Object info = metadata.componentInfo(name, type);
-        return info == null ? NoResult.VALUE : info;
+        return metadata.componentInfo(name, type, firstLong(args, 0L));
     }
 
     private Object query(Class<?> returnType, Object[] args, VirtualPackageMetadata.Type type) {
         Intent intent = firstIntent(args);
-        List<ResolveInfo> matches = metadata.query(intent, type);
-        return matches.isEmpty() ? NoResult.VALUE : metadata.adaptCollection(matches, returnType);
+        List<ResolveInfo> matches = metadata.query(intent, type, firstLong(args, 0L));
+        return matches.isEmpty() && !targetsGuest(intent)
+                ? NoResult.VALUE : metadata.adaptCollection(matches, returnType);
+    }
+
+    private boolean targetsGuest(Intent intent) {
+        if (intent == null) return false;
+        ComponentName component = intent.getComponent();
+        if (component != null) return identity.packageName().equals(component.getPackageName());
+        return identity.packageName().equals(intent.getPackage());
+    }
+
+    private boolean holdsAnyPermission(Object[] args) {
+        if (args == null) return false;
+        for (Object arg : args) {
+            if (!(arg instanceof String[])) continue;
+            for (String permission : (String[]) arg) {
+                if (identity.permissionPolicy().isGranted(permission)) return true;
+            }
+        }
+        return false;
+    }
+
+    private Object installSourceInfo(Class<?> returnType) {
+        if (returnType == null || returnType == Object.class || metadata.installerPackageName().isEmpty()) return null;
+        for (java.lang.reflect.Constructor<?> constructor : returnType.getDeclaredConstructors()) {
+            try {
+                Class<?>[] types = constructor.getParameterTypes();
+                Object[] values = new Object[types.length];
+                int stringIndex = 0;
+                for (int index = 0; index < types.length; index++) {
+                    if (types[index] == String.class) {
+                        values[index] = stringIndex++ == 0 ? metadata.installerPackageName()
+                                : (stringIndex >= 3 ? metadata.installerPackageName() : null);
+                    } else if (types[index] == int.class || types[index] == Integer.class) {
+                        values[index] = 0;
+                    } else if (types[index] == boolean.class || types[index] == Boolean.class) {
+                        values[index] = false;
+                    } else {
+                        values[index] = null;
+                    }
+                }
+                constructor.setAccessible(true);
+                return constructor.newInstance(values);
+            } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        }
+        return null;
     }
 
     private Object hiddenHostResult(String methodName, Class<?> returnType) {
@@ -149,7 +227,21 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "isPackageAvailable": return false;
             case "checkPermission": return PackageManager.PERMISSION_DENIED;
             case "getInstallerPackageName":
-            case "getInstallSourceInfo": return null;
+            case "getInstallSourceInfo":
+            case "resolveIntent":
+            case "resolveActivity":
+            case "resolveService":
+            case "resolveContentProvider": return null;
+            case "queryIntentActivities":
+            case "queryIntentReceivers":
+            case "queryBroadcastReceivers":
+            case "queryIntentServices":
+            case "queryContentProviders":
+                return metadata.adaptCollection(Collections.emptyList(), returnType);
+            case "setApplicationEnabledSetting":
+            case "setPackageStoppedState":
+            case "setComponentEnabledSetting":
+                throw new SecurityException("HOST_PACKAGE_MUTATION_BLOCKED");
             default:
                 if (returnType == boolean.class || returnType == Boolean.class) return false;
                 return NoResult.VALUE;
@@ -162,6 +254,12 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             if (identity.hostPackageName().equals(arg)) return true;
             if (arg instanceof ComponentName
                     && identity.hostPackageName().equals(((ComponentName) arg).getPackageName())) return true;
+            if (arg instanceof Intent) {
+                Intent intent = (Intent) arg;
+                if (identity.hostPackageName().equals(intent.getPackage())) return true;
+                ComponentName component = intent.getComponent();
+                if (component != null && identity.hostPackageName().equals(component.getPackageName())) return true;
+            }
         }
         return false;
     }
@@ -172,6 +270,12 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             if (identity.packageName().equals(arg)) return true;
             if (arg instanceof ComponentName
                     && identity.packageName().equals(((ComponentName) arg).getPackageName())) return true;
+            if (arg instanceof Intent) {
+                Intent intent = (Intent) arg;
+                if (identity.packageName().equals(intent.getPackage())) return true;
+                ComponentName component = intent.getComponent();
+                if (component != null && identity.packageName().equals(component.getPackageName())) return true;
+            }
             if (arg != null && arg.getClass().getName().endsWith("VersionedPackage")) {
                 try {
                     Method getter = arg.getClass().getMethod("getPackageName");
@@ -187,6 +291,26 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         for (Object arg : args) if (arg instanceof String) return (String) arg;
         return "";
     }
+    private static long firstLong(Object[] args, long fallback) {
+        if (args == null) return fallback;
+        for (Object arg : args) {
+            if (arg instanceof Long) return (Long) arg;
+        }
+        for (Object arg : args) if (arg instanceof Integer) return ((Integer) arg).longValue();
+        return fallback;
+    }
+    private static boolean signingDigestMatches(Object[] args, String expectedHex) {
+        if (args == null || expectedHex == null || expectedHex.isEmpty()) return false;
+        for (Object arg : args) {
+            if (!(arg instanceof byte[])) continue;
+            byte[] value = (byte[]) arg;
+            StringBuilder hex = new StringBuilder(value.length * 2);
+            for (byte item : value) hex.append(String.format(java.util.Locale.ROOT, "%02x", item & 0xff));
+            return expectedHex.equalsIgnoreCase(hex.toString());
+        }
+        return false;
+    }
+
     private static int firstInt(Object[] args, int fallback) {
         if (args == null) return fallback;
         for (Object arg : args) if (arg instanceof Integer) return (Integer) arg;

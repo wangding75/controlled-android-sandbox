@@ -32,6 +32,8 @@ final class SandboxRecord {
     final String baseApkSha256;
     final List<PackageArtifactRecord> artifacts;
     final long importedAt;
+    final long firstInstallAt;
+    final long lastUpdateAt;
     String lastProbeStatus;
     long lastProbeAt;
 
@@ -59,6 +61,24 @@ final class SandboxRecord {
                   String sharedLibraries, String revisionSha256, String baseApkSha256,
                   List<PackageArtifactRecord> artifacts, long importedAt,
                   String lastProbeStatus, long lastProbeAt) {
+        this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
+                nativeLibraryDir, launchActivity, launchProcess, applicationClass,
+                serviceClass, serviceProcess, receiverClass, receiverProcess, receiverAction,
+                providerClass, providerProcess, providerAuthority, permissions, sharedLibraries,
+                revisionSha256, baseApkSha256, artifacts, importedAt, importedAt, importedAt,
+                lastProbeStatus, lastProbeAt);
+    }
+
+    SandboxRecord(String packageName, String label, String versionName, long versionCode,
+                  String signatureSha256, String apkPath, String nativeLibraryDir,
+                  String launchActivity, String launchProcess, String applicationClass,
+                  String serviceClass, String serviceProcess, String receiverClass,
+                  String receiverProcess, String receiverAction, String providerClass,
+                  String providerProcess, String providerAuthority, String permissions,
+                  String sharedLibraries, String revisionSha256, String baseApkSha256,
+                  List<PackageArtifactRecord> artifacts, long importedAt,
+                  long firstInstallAt, long lastUpdateAt,
+                  String lastProbeStatus, long lastProbeAt) {
         this.packageName = packageName;
         this.label = label;
         this.versionName = versionName;
@@ -85,6 +105,11 @@ final class SandboxRecord {
         if (copy.isEmpty()) copy.add(PackageArtifactRecord.legacyBase(apkPath, baseApkSha256));
         this.artifacts = PackageArtifactOrder.runtimeOrder(copy);
         this.importedAt = importedAt;
+        this.firstInstallAt = firstInstallAt > 0 ? firstInstallAt : importedAt;
+        this.lastUpdateAt = lastUpdateAt > 0 ? lastUpdateAt : importedAt;
+        if (this.firstInstallAt < 0 || this.lastUpdateAt < this.firstInstallAt) {
+            throw new IllegalArgumentException("Invalid install timestamps");
+        }
         this.lastProbeStatus = lastProbeStatus;
         this.lastProbeAt = lastProbeAt;
     }
@@ -105,7 +130,17 @@ final class SandboxRecord {
                 launchProcess, applicationClass, serviceClass, serviceProcess,
                 receiverClass, receiverProcess, receiverAction, providerClass,
                 providerProcess, providerAuthority, permissions, sharedLibraries, sha256,
-                baseApkSha256, newArtifacts, importedAt, lastProbeStatus, lastProbeAt);
+                baseApkSha256, newArtifacts, importedAt, firstInstallAt, lastUpdateAt,
+                lastProbeStatus, lastProbeAt);
+    }
+
+    SandboxRecord withInstallTimes(long firstInstallAt, long lastUpdateAt) {
+        return new SandboxRecord(packageName, label, versionName, versionCode, signatureSha256,
+                apkPath, nativeLibraryDir, launchActivity, launchProcess, applicationClass,
+                serviceClass, serviceProcess, receiverClass, receiverProcess, receiverAction,
+                providerClass, providerProcess, providerAuthority, permissions, sharedLibraries,
+                sha256, baseApkSha256, artifacts, importedAt, firstInstallAt, lastUpdateAt,
+                lastProbeStatus, lastProbeAt);
     }
 
     List<String> splitApkPaths() {
@@ -134,6 +169,7 @@ final class SandboxRecord {
                 .put("permissions", permissions).put("sharedLibraries", sharedLibraries)
                 .put("sha256", sha256).put("baseApkSha256", baseApkSha256)
                 .put("artifacts", artifactArray).put("importedAt", importedAt)
+                .put("firstInstallAt", firstInstallAt).put("lastUpdateAt", lastUpdateAt)
                 .put("lastProbeStatus", lastProbeStatus).put("lastProbeAt", lastProbeAt);
     }
 
@@ -160,6 +196,8 @@ final class SandboxRecord {
                 o.optString("providerProcess", packageName), o.optString("providerAuthority"),
                 o.optString("permissions"), o.optString("sharedLibraries"), revisionSha,
                 baseSha, artifacts, o.optLong("importedAt"),
+                o.optLong("firstInstallAt", o.optLong("importedAt")),
+                o.optLong("lastUpdateAt", o.optLong("importedAt")),
                 o.optString("lastProbeStatus", "NOT_TESTED"), o.optLong("lastProbeAt"));
     }
 

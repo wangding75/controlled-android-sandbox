@@ -18,6 +18,9 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private final String launchActivity;
     private final String applicationClass;
     private final boolean enabled;
+    private final long firstInstallTime;
+    private final long lastUpdateTime;
+    private final String installerPackageName;
     private final ArrayList<String> splitNames;
     private final ArrayList<String> sharedLibraries;
     private final ArrayList<VirtualComponentSnapshot> components;
@@ -33,8 +36,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<VirtualPermissionSnapshot> permissions,
                                        List<PackageAppOpSnapshot> appOps) {
         this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
-                apkSha256, launchActivity, applicationClass, enabled, List.of(), List.of(),
-                components, permissions, appOps);
+                apkSha256, launchActivity, applicationClass, enabled, 0L, 0L, "",
+                List.of(), List.of(), components, permissions, appOps);
     }
 
     public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
@@ -43,6 +46,21 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        String launchActivity, String applicationClass,
                                        boolean enabled, List<String> splitNames,
                                        List<String> sharedLibraries,
+                                       List<VirtualComponentSnapshot> components,
+                                       List<VirtualPermissionSnapshot> permissions,
+                                       List<PackageAppOpSnapshot> appOps) {
+        this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
+                apkSha256, launchActivity, applicationClass, enabled, 0L, 0L, "",
+                splitNames, sharedLibraries, components, permissions, appOps);
+    }
+
+    public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
+                                       String versionName, long versionCode,
+                                       String signatureSha256, String apkSha256,
+                                       String launchActivity, String applicationClass,
+                                       boolean enabled, long firstInstallTime,
+                                       long lastUpdateTime, String installerPackageName,
+                                       List<String> splitNames, List<String> sharedLibraries,
                                        List<VirtualComponentSnapshot> components,
                                        List<VirtualPermissionSnapshot> permissions,
                                        List<PackageAppOpSnapshot> appOps) {
@@ -59,6 +77,13 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         this.launchActivity = value(launchActivity);
         this.applicationClass = value(applicationClass);
         this.enabled = enabled;
+        if (firstInstallTime < 0 || lastUpdateTime < 0
+                || (firstInstallTime > 0 && lastUpdateTime > 0 && lastUpdateTime < firstInstallTime)) {
+            throw new IllegalArgumentException("Invalid package install timestamps");
+        }
+        this.firstInstallTime = firstInstallTime;
+        this.lastUpdateTime = lastUpdateTime;
+        this.installerPackageName = value(installerPackageName);
         this.splitNames = validatedNames(splitNames, "splitName", 255);
         this.sharedLibraries = validatedNames(sharedLibraries, "sharedLibrary", 1024);
         this.components = new ArrayList<>(components == null ? List.of() : components);
@@ -69,7 +94,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private VirtualPackageStateSnapshot(Parcel in) {
         this(in.readString(), in.readInt(), in.readString(), in.readString(), in.readLong(),
                 in.readString(), in.readString(), in.readString(), in.readString(),
-                in.readInt() != 0, in.createStringArrayList(), in.createStringArrayList(),
+                in.readInt() != 0, in.readLong(), in.readLong(), in.readString(),
+                in.createStringArrayList(), in.createStringArrayList(),
                 in.createTypedArrayList(VirtualComponentSnapshot.CREATOR),
                 in.createTypedArrayList(VirtualPermissionSnapshot.CREATOR),
                 in.createTypedArrayList(PackageAppOpSnapshot.CREATOR));
@@ -85,6 +111,9 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     public String launchActivity() { return launchActivity; }
     public String applicationClass() { return applicationClass; }
     public boolean enabled() { return enabled; }
+    public long firstInstallTime() { return firstInstallTime; }
+    public long lastUpdateTime() { return lastUpdateTime; }
+    public String installerPackageName() { return installerPackageName; }
     public List<String> splitNames() { return Collections.unmodifiableList(splitNames); }
     public List<String> sharedLibraries() { return Collections.unmodifiableList(sharedLibraries); }
     public List<VirtualComponentSnapshot> components() { return Collections.unmodifiableList(components); }
@@ -95,8 +124,10 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         out.writeString(packageName); out.writeInt(virtualUserId); out.writeString(label);
         out.writeString(versionName); out.writeLong(versionCode); out.writeString(signatureSha256);
         out.writeString(apkSha256); out.writeString(launchActivity); out.writeString(applicationClass);
-        out.writeInt(enabled ? 1 : 0); out.writeStringList(splitNames); out.writeStringList(sharedLibraries);
-        out.writeTypedList(components); out.writeTypedList(permissions); out.writeTypedList(appOps);
+        out.writeInt(enabled ? 1 : 0); out.writeLong(firstInstallTime); out.writeLong(lastUpdateTime);
+        out.writeString(installerPackageName); out.writeStringList(splitNames);
+        out.writeStringList(sharedLibraries); out.writeTypedList(components);
+        out.writeTypedList(permissions); out.writeTypedList(appOps);
     }
     @Override public int describeContents() { return 0; }
 
@@ -111,7 +142,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
 
     private static ArrayList<String> validatedNames(List<String> input, String name, int maximum) {
         ArrayList<String> output = new ArrayList<>();
-        java.util.Set<String> unique = new java.util.HashSet<>();
+        java.util.Set<String> unique = new java.util.LinkedHashSet<>();
         if (input == null) return output;
         if (input.size() > maximum) throw new IllegalArgumentException(name + " list is too large");
         for (String value : input) {

@@ -40,9 +40,20 @@ public final class GuestManifestMetadataLoader {
                                VirtualPackageMetadata.Type type) {
         for (ManifestModel.Component component : components) {
             Set<String> actions = new LinkedHashSet<>(component.actions());
+            List<VirtualPackageMetadata.Filter> filters = new ArrayList<>();
+            for (ManifestModel.IntentFilter filter : component.intentFilters()) {
+                List<VirtualPackageMetadata.DataRule> data = new ArrayList<>();
+                for (ManifestModel.DataRule rule : filter.dataRules()) {
+                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(), rule.path(),
+                            rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
+                }
+                filters.add(new VirtualPackageMetadata.Filter(filter.priority(),
+                        new LinkedHashSet<>(filter.actions()), new LinkedHashSet<>(filter.categories()), data));
+            }
             output.add(new VirtualPackageMetadata.Component(type, component.className(),
                     processName(packageName, component), component.exported(), component.enabled(),
-                    component.isolatedProcess(), actions, component.authorities(), component.permission()));
+                    component.isolatedProcess(), actions, component.authorities(), component.permission(),
+                    "DEFAULT", filters));
         }
     }
 

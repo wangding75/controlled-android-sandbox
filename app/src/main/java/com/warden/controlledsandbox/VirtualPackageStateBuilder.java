@@ -2,6 +2,8 @@ package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
+import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import android.content.Context;
@@ -41,10 +43,10 @@ final class VirtualPackageStateBuilder {
             throw new SecurityException("CATALOG_MANIFEST_PACKAGE_MISMATCH");
         }
         List<VirtualComponentSnapshot> components = new ArrayList<>();
-        append(components, record.packageName, set.activities, "ACTIVITY");
-        append(components, record.packageName, set.services, "SERVICE");
-        append(components, record.packageName, set.receivers, "RECEIVER");
-        append(components, record.packageName, set.providers, "PROVIDER");
+        append(components, record.packageName, set.activities, "ACTIVITY", policy);
+        append(components, record.packageName, set.services, "SERVICE", policy);
+        append(components, record.packageName, set.receivers, "RECEIVER", policy);
+        append(components, record.packageName, set.providers, "PROVIDER", policy);
 
         List<VirtualPermissionSnapshot> permissions = new ArrayList<>();
         Map<String, String> effectiveAppOps = new java.util.TreeMap<>(policy.appOpModes());
@@ -75,8 +77,15 @@ final class VirtualPackageStateBuilder {
         return new VirtualPackageStateSnapshot(record.packageName, virtualUserId,
                 record.label, record.versionName, record.versionCode,
                 record.signatureSha256, record.sha256, set.launcherActivity,
-                set.applicationClass, true, record.splitNames(),
+                set.applicationClass, effectivePackageEnabled(policy.packageState()),
+                record.firstInstallAt, record.lastUpdateAt,
+                "com.warden.virtualinstaller", record.splitNames(),
                 new ArrayList<>(set.sharedLibraries), components, permissions, appOps);
+    }
+
+    static boolean effectivePackageEnabled(String state) {
+        return !SandboxPolicyState.COMPONENT_DISABLED.equals(
+                SandboxPolicyState.componentStateValue(state));
     }
 
     static String effectiveAppOpMode(boolean permissionGranted, String configuredMode) {
@@ -99,6 +108,18 @@ final class VirtualPackageStateBuilder {
             manifestsByRevision.put(record.sha256, set);
         }
         return set.permissions.contains(permission);
+    }
+
+    boolean declaresComponent(SandboxRecord record, String className) throws Exception {
+        ManifestSet set = manifestsByRevision.get(record.sha256);
+        if (set == null) {
+            set = parse(record);
+            manifestsByRevision.put(record.sha256, set);
+        }
+        for (ManifestModel.Component component : set.allComponents()) {
+            if (component.className().equals(className)) return true;
+        }
+        return false;
     }
 
     void invalidate(String revisionSha256) {
@@ -136,13 +157,32 @@ final class VirtualPackageStateBuilder {
     }
 
     private static void append(List<VirtualComponentSnapshot> output, String packageName,
-                               List<ManifestModel.Component> components, String type) {
+                               List<ManifestModel.Component> components, String type,
+                               SandboxPolicyState policy) {
         for (ManifestModel.Component component : components) {
+            String enabledSetting = policy.componentState(component.className());
+            boolean enabled = effectiveComponentEnabled(component.enabled(), enabledSetting);
+            List<VirtualIntentFilterSnapshot> filters = new ArrayList<>();
+            for (ManifestModel.IntentFilter filter : component.intentFilters()) {
+                List<VirtualIntentDataSnapshot> data = new ArrayList<>();
+                for (ManifestModel.DataRule rule : filter.dataRules()) {
+                    data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.path(),
+                            rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
+                }
+                filters.add(new VirtualIntentFilterSnapshot(filter.priority(),
+                        new ArrayList<>(filter.actions()), new ArrayList<>(filter.categories()), data));
+            }
             output.add(new VirtualComponentSnapshot(type, component.className(),
-                    processName(packageName, component), component.exported(), component.enabled(),
+                    processName(packageName, component), component.exported(), enabled,
                     component.isolatedProcess(), component.authorities(), component.permission(),
-                    component.actions()));
+                    enabledSetting, component.actions(), filters));
         }
+    }
+
+    static boolean effectiveComponentEnabled(boolean manifestEnabled, String setting) {
+        if (SandboxPolicyState.COMPONENT_ENABLED.equals(setting)) return true;
+        if (SandboxPolicyState.COMPONENT_DISABLED.equals(setting)) return false;
+        return manifestEnabled;
     }
 
     private static String processName(String packageName, ManifestModel.Component component) {
@@ -162,5 +202,10 @@ final class VirtualPackageStateBuilder {
         final List<ManifestModel.Component> providers = new ArrayList<>();
         final Set<String> permissions = new LinkedHashSet<>();
         final Set<String> sharedLibraries = new LinkedHashSet<>();
+        List<ManifestModel.Component> allComponents() {
+            List<ManifestModel.Component> values = new ArrayList<>();
+            values.addAll(activities); values.addAll(services); values.addAll(receivers); values.addAll(providers);
+            return values;
+        }
     }
 }

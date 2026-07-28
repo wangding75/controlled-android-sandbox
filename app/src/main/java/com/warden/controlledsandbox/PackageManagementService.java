@@ -158,6 +158,32 @@ public final class PackageManagementService extends Service {
                     virtualUserId));
         }
 
+        @Override public PackageServiceResult setPackageEnabledSetting(String packageName,
+                                                                        int virtualUserId,
+                                                                        String state) {
+            return execute("setPackageEnabledSetting", () -> packageStateResult(
+                    "setPackageEnabledSetting", lifecycle.setPackageState(
+                            required(packageName, "packageName"), virtualUserId,
+                            SandboxPolicyState.componentStateValue(state)), virtualUserId));
+        }
+
+        @Override public PackageServiceResult setComponentEnabledSetting(String packageName,
+                                                                          int virtualUserId,
+                                                                          String className,
+                                                                          String state) {
+            return execute("setComponentEnabledSetting", () -> {
+                String normalizedPackage = required(packageName, "packageName");
+                String normalizedClass = required(className, "className");
+                SandboxPackagePolicyView current = lifecycle.packagePolicy(normalizedPackage, virtualUserId);
+                if (!packageStateBuilder.declaresComponent(current.record, normalizedClass)) {
+                    throw new IllegalArgumentException("Component is not declared by package: " + normalizedClass);
+                }
+                return packageStateResult("setComponentEnabledSetting",
+                        lifecycle.setComponentState(normalizedPackage, virtualUserId, normalizedClass,
+                                SandboxPolicyState.componentStateValue(state)), virtualUserId);
+            });
+        }
+
         @Override public PackageServiceResult resetVirtualPolicy(String packageName,
                                                                   int virtualUserId) {
             return execute("resetVirtualPolicy", () -> packageStateResult("resetVirtualPolicy",
