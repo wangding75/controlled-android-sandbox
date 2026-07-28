@@ -39,6 +39,7 @@ public record FrameworkServiceSpec(
                 "IActivityManagerSingleton",
                 List.of(
                         policy("moveTaskToFront", 5, pkg(1)),
+                        policy("moveTaskToFront", 6, pkg(1)),
                         policy("getContentProvider", 5, pkg(1)),
                         policy("registerReceiver", 7, pkg(1)),
                         policy("registerReceiverWithFeature", 9, pkg(1)),
@@ -86,7 +87,9 @@ public record FrameworkServiceSpec(
                         policy("startAssistantActivity", 9, pkg(0), uid(3)),
                         policy("startActivityFromGameSession", 8, pkg(1), uid(4)),
                         policy("moveTaskToFront", 5, pkg(1)),
-                        policy("getAppTasks", 1, pkg(0))),
+                        policy("moveTaskToFront", 6, pkg(1)),
+                        policy("getAppTasks", 1, pkg(0)),
+                        policy("getAppTasks", 2, pkg(0))),
                 Set.of(
                         "getAppTasks",
                         "getTasks",

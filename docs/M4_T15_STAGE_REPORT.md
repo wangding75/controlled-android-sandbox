@@ -1,141 +1,153 @@
-# M4-T15 stage report
+# M4-T15 Activity 与 Task 虚拟化补强阶段报告
 
-Date: **2026-07-28**
+## 1. 阶段结论
 
-Baseline: `68a93bc9983d3a8fe8929ce992d4f56649a8af19` (`feat(m4-t14): harden guest service lifecycle`)
+**PASS — SOURCE/HOST VERIFIED**
 
-Status: **SOURCE/HOST PASS CANDIDATE — DEVICE NOT TESTED**
+M4-T15 已按 B1、B2、B3 三个批次完成源码开发与 Host 验证，并形成可进入 M4-T16 的正式源码基线。
 
-## 1. Stage objective
+设备测试尚未开始。模拟器/真机完成度仍为 0，不能把源码证据换算为 APK 启动率或稳定运行率。
 
-M4-T15 establishes a recoverable and queryable Activity/Task source baseline. The iteration targets task ownership and lifecycle semantics that were still volatile at M4-T14: selected launch flags, result forwarding, no-history behavior, recent/running task state and Runtime Broker restart restoration.
+## 2. 三批次交付
 
-The scope excludes claims about Android system Recents, Window transitions, real Binder signature compatibility or third-party APK launch rates.
-
-## 2. Delivered capabilities
-
-| Area | Delivered result | Evidence boundary |
+| 批次 | 结果 | 主要交付 |
 |---|---|---|
-| Launch policy | Added bounded handling for no-history, forward-result, exclude/retain-recents, reset-task and new-document flags | Host/source tests only |
-| Result routing | `FORWARD_RESULT` transfers result ownership and rejects invalid chains | Ledger tests; no device callback evidence |
-| Task queries | Running/recent projections scoped by package and virtual user | Runtime Binder contract and tests |
-| Task operations | Owner-checked move-to-front and remove-task | Internal runtime path; Guest AppTask adapter pending |
-| Recent policy | Bounded deterministic recent history with exclusion and retention rules | Source model only |
-| Restart recovery | Atomic CRC-protected checkpoint restores task/activity state | Broker restart host test |
-| Security | Stale generations and cross-owner task operations fail closed | Unit/static integration tests |
-| Transport cleanup | One-time route and pending-result authority are not revived after restart | Restore tests |
+| B1 | PASS | 五种 LaunchMode、Intent Flag 组合、Document Mode、finish/move Task、APK Revision 清理、checkpoint 兼容 |
+| B2 | PASS | typed Result Intent、Result Who/Request Code/Registry Key、Intent Sender Result、Configuration 重建、schema 3 恢复、事务回滚 |
+| B3 | PASS | Running/Recent/AppTask Framework 入口、Task 操作入口、framework token 映射、Android 投影层、禁止宿主回落 |
 
-## 3. Implementation summary
+## 3. 冻结范围完成情况
 
-- Added five immutable Activity/Task checkpoint and query models.
-- Expanded `ActivityTaskLedger` with task query, mutation, result-forwarding, no-history and restoration behavior.
-- Added `ActivityTaskCheckpointStore` with bounded decode, CRC32 verification, atomic replacement and corrupt-file quarantine.
-- Added typed `ActivityTaskRequest`, `ActivityTaskResult` and `ActivityTaskSnapshot` contracts.
-- Added `IRuntimeBroker.activityTaskOperation` and Runtime Broker dispatch.
-- Added specialized source gate and integrated it into `verify-all.sh`.
-- Expanded the capability evidence matrix by five entries.
-- Added focused ledger, checkpoint-store and Broker-restart tests.
+### 3.1 LaunchMode
 
-## 4. Evidence and test result
+- `standard`
+- `singleTop`
+- `singleTask`
+- `singleInstance`
+- `singleInstancePerTask`
 
-Confirmed local passes before final packaging:
+五种模式已经进入统一 Task ledger 和专项矩阵测试。真实 Android/OEM 回调顺序仍待设备验证。
 
-- M4-T15 Activity/Task source gate.
-- M3 capability evidence matrix validation.
-- M4-T14 Service lifecycle regression gate.
-- Static Android-source compilation using local API/AIDL stubs.
-- Full Activity task ledger self-tests.
-- Checkpoint persistence/corruption/quarantine self-test.
-- Broker Activity production adapter and restart restoration self-test.
-- Existing package, process, Service, Receiver, Provider, permission, framework-proxy and virtual-system-service static regression suite.
+### 3.2 Intent Flags
 
-No Android SDK build, Emulator run, physical-device test or real third-party APK test is counted as completed.
+已实现并测试：
 
-## 5. Progress metrics
+- `FLAG_ACTIVITY_NEW_TASK`
+- `FLAG_ACTIVITY_CLEAR_TOP`
+- `FLAG_ACTIVITY_CLEAR_TASK`
+- `FLAG_ACTIVITY_NEW_DOCUMENT`
+- `FLAG_ACTIVITY_MULTIPLE_TASK`
+- `FLAG_ACTIVITY_REORDER_TO_FRONT`
+- `FLAG_ACTIVITY_NO_HISTORY`
+- `FLAG_ACTIVITY_FORWARD_RESULT`
 
-| Evidence dimension | M4-T14 | M4-T15 | Change |
-|---|---:|---:|---:|
-| Capability entries | 90 | 95 | +5 |
-| Source complete | 86 | 91 | +5 |
-| Source weighted | 97.8% | 97.9% | +0.1 percentage point |
-| Production wired | 82 | 87 | +5 |
-| Production weighted | 95.5% | 95.7% | +0.2 percentage point |
-| Device verified | 0 | 0 | no change |
-| Device weighted | 0.0% | 0.0% | no change |
+非法组合会在进入 Broker 状态前拒绝。
 
-The modest percentage increase is expected because the denominator also grew. The meaningful change is that five previously untracked Activity/Task requirements now have explicit evidence rows and gates.
+### 3.3 Result 链路
 
-## 6. Code-quality assessment
+已实现：
 
-### Improvements
+- `startActivityForResult` 的 Broker 所有权；
+- Result Who；
+- Request Code；
+- Result Code；
+- 有界 typed Result Intent；
+- Activity Result registry key；
+- Intent Sender Activity Result token；
+- Configuration 重建和进程恢复后的 Result owner 迁移；
+- Guest `onActivityResult` 投递入口。
 
-- Checkpoint input is bounded and integrity checked.
-- Persistence uses temporary-file replacement rather than in-place overwrite.
-- Task query and mutation enforce package, virtual-user and generation ownership.
-- Restoration deliberately removes dead transient capabilities.
-- New behavior is covered by a dedicated source gate and regression tests.
+一次性 route、Binder 传输权和已失效结果投递不会在 Broker 重启后复活。
 
-### Current liabilities
+### 3.4 Task 状态与恢复
 
-- `ActivityTaskLedger` has reached approximately 1,303 lines and mixes policy, state transition, recents and serialization concerns.
-- `RuntimeBrokerService` remains a large central Binder service at approximately 1,370 lines.
-- Checkpoint write failure does not roll back an already accepted in-memory task transition.
-- The new task operation contract is typed, while older Activity launch/event Binder paths still use `Bundle` envelopes.
-- Framework-facing Android task objects and API-version adapters are incomplete.
+已实现：
 
-Judgment: the iteration improves runtime safety and observability, but architectural quality will decline if further Activity features are added directly to the same ledger and Broker classes. M4-T16 should include extraction, not only new behavior.
+- 虚拟 Task ID；
+- Affinity；
+- Document Mode 和 Document Key；
+- Task 栈和 Saved State checkpoint；
+- Activity 销毁、重建和 Configuration Change；
+- Process Generation 恢复；
+- APK Revision 更新后的旧 Task 清理；
+- 实例删除清理；
+- `finishAffinity`；
+- `finishAndRemoveTask`；
+- `moveTaskToBack`；
+- Running/Recent Task typed 查询；
+- ActivityManager/ActivityTaskManager Framework 投影；
+- 本地 IAppTask Binder。
 
-## 7. VA/NBB position
+Checkpoint 使用版本、CRC、容量限制、原子替换和损坏隔离。写入失败时恢复精确内存状态。
 
-M4-T15 narrows the source-model gap in result routing, task recents and Broker restart recovery. VirtualApp and NewBlackbox still have broader Android framework interception, task/window integration and historical device compatibility work. Current Controlled Sandbox evidence cannot support functional equivalence or a percentage claim against VA/NBB.
+## 4. 能力矩阵
 
-See `docs/comparisons/M4_T15_VA_NBB_COMPARISON.md`.
+阶段完成后的仓库证据矩阵：
 
-## 8. Remaining uncertainty
+| 维度 | 结果 |
+|---|---:|
+| 能力条目 | 96 |
+| 源码 complete | 92 |
+| 源码 partial | 4 |
+| 源码加权完成度 | 97.9% |
+| 生产接线 wired | 88 |
+| 生产接线 partial | 6 |
+| 生产接线加权完成度 | 95.8% |
+| 设备 verified | 0 |
+| 设备证据完成度 | 0.0% |
 
-- Real Android Binder signatures may differ from the local stubs.
-- OEM task/Recents behavior is not represented by the source model.
-- The checkpoint has not been tested under actual process kill, filesystem pressure or app upgrade on Android.
-- Compound launch-flag behavior is incomplete.
-- No measured real-App launch or 20-minute stability result exists.
+这些统计描述仓库证据，不描述真实应用兼容率。
 
-## 9. Subsequent iteration plan
+## 5. 与 VA/NBB 的对比
 
-### M4-T16 — Android Activity/Task adapter and decomposition
+| 能力 | 当前项目 | VA/NBB 参照水平 | 判断 |
+|---|---|---|---|
+| LaunchMode/Flag 策略 | Broker ledger 已覆盖主要组合并有 Host 测试 | 长期经过 Android 版本与应用样本验证 | 源码广度接近中段，设备可信度明显落后 |
+| Result 链路 | typed、持久化、事务回滚和 owner 迁移 | 具备成熟 Framework/Instrumentation 接入 | 状态模型较完整，真实回调兼容仍不足 |
+| Running/Recent Task | Broker 隔离查询并投影 Android 对象 | 多版本 AMS/ATMS 适配更成熟 | 已补关键源码缺口，系统 Recents 仍有差距 |
+| AppTask | 本地 IAppTask Binder，支持查询、前移和移除 | 通常与完整 AMS/ATMS/Window 栈协同 | 入口已存在，版本与窗口系统适配不足 |
+| 恢复与一致性 | CRC checkpoint、容量限制、损坏隔离、精确回滚 | 各项目实现方式不同，设备经验更丰富 | 源码安全边界明确，但缺少设备压力证据 |
+| 多窗口/转场 | 未完成 | VA/NBB 有更多历史适配 | 明显落后 |
+| 第三方 APK 兼容 | 未测试 | 有历史设备运行积累 | 无法比较启动率与稳定性 |
 
-Priority: highest.
+M4-T15 完成后，Activity/Task 的源码能力广度可以称为接近 VA/NBB 的中段范围。由于设备证据为 0，不能称为达到 VA/NBB 的实际兼容水平。
 
-- Extract task persistence, recents policy and result routing from `ActivityTaskLedger` into narrower components.
-- Add bounded framework projections for running/recent tasks and `AppTask`.
-- Route Guest task queries, move-to-front and remove-task calls through the Runtime Broker.
-- Complete startActivity-for-result callback signatures and version policy.
-- Add compound launch-mode/flag matrix tests.
+## 6. 代码质量判断
 
-Exit condition: source gates prove that Guest framework calls consume the Broker-owned task model without direct host identity leakage.
+支持点：
 
-### M4-T17 — Service Android parity hardening
+- Framework 入口、Broker client、Android 投影和 Task ledger 职责分离；
+- 新增跨进程业务契约继续 typed 化；
+- Task 查询和操作绑定完整 Guest 身份；
+- 禁止宿主查询回落；
+- 持久化变更具备回滚；
+- M4-T14 Service 回归门禁继续通过。
 
-- Complete `IServiceConnection` callback adaptation.
-- Enforce foreground-service notification deadline/type policy.
-- Add Android-version background-start restrictions.
-- Persist bounded sticky/redeliver recovery metadata.
+剩余风险：
 
-Exit condition: Service lifecycle contract is framework-facing and version-policy controlled, with no stale Binder ownership after recovery.
+- `ActivityTaskLedger` 仍约 1,857 行，是下一次总收口需要拆分的主要 God Class；
+- `RuntimeBrokerService` 保持 1,370 行，仍高于 M4-T14 原始“低于 1,100 行”愿景；
+- Framework 隐藏 API 的反射投影只有 Host stub 证据；
+- host mirror 失败后缺少设备级恢复策略；
+- Window、Transition、TaskFragment、PiP 和多 Display 尚未进入模型。
 
-### M4-T18 — Job, alarm and callback version adapters
+## 7. 后续迭代
 
-- Add Job work-item handling and broader constraint/result callbacks.
-- Harden Alarm reboot/power semantics.
-- Complete Notification/Job callback ownership and recovery tests.
+下一阶段严格进入冻结计划的 **M4-T16：系统调度与通知深化**，不再继续扩展 M4-T15 范围。
 
-Exit condition: persistent virtual system-service resources have explicit reboot/recovery and version-adapter behavior.
+主要任务：
 
-### M4-T19 — Android build and Emulator evidence baseline
+- PendingIntent mutable/immutable、FillIn Intent、ClipData、Creator 身份、持久 Token 和跨进程恢复；
+- Alarm 持久调度、Guest 离线保留、Runtime 恢复投递、Exact/Repeating 和两类回调路径；
+- Notification Channel/Group 生命周期、点击/删除/Action PendingIntent、Foreground Service Notification 映射和状态恢复；
+- JobScheduler 约束 DTO、Periodic/Latency/Deadline/Expedited、持久化、重试与退避。
 
-- Run locked AGP/NDK build.
-- Execute Fixture Activity/task, Service, Receiver, Provider, WebView and JNI paths.
-- Validate API-level task/back-stack behavior.
-- Run the 20-minute zero-crash/zero-ANR gate.
-- Publish evidence bundle and measured failures without converting source percentages into APK compatibility claims.
+M4-T16 完成后继续 M4-T17 Native Hook 与 ABI 架构，最后由 M4-T18 做设备测试前源码总收口。
 
-Exit condition: first reproducible device-evidence baseline, even if some fixtures fail.
+## 8. 仍不确定的点
+
+- API 26～36 的隐藏 Binder 签名是否全部与当前审计覆盖一致；
+- OEM 对 TaskInfo、Recents、IAppTask 和 Activity token 的修改；
+- 系统 Recents UI、缩略图与转场的真实表现；
+- 进程强杀、低内存、升级和存储故障组合下的恢复顺序；
+- 第三方 APK 的真实启动率和 20 分钟稳定性。

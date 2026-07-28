@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.Process;
 import com.warden.controlledsandbox.framework.core.FrameworkHooks;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
@@ -32,6 +33,7 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /** Process-local runtime. One Android guest process hosts exactly one generation at a time. */
 public final class GuestRuntimeEnvironment {
@@ -302,6 +304,25 @@ public final class GuestRuntimeEnvironment {
         public GuestClassLoader classLoader() { return classLoader; }
         public GuestContext context() { return context; }
         public Application application() { return application; }
+
+        public void bindActivityTaskHost(IBinder frameworkToken, String activityToken, int taskId,
+                                         Runnable moveToFront, BooleanSupplier moveToBack,
+                                         Runnable finishAffinity, Runnable finishAndRemoveTask) {
+            frameworkCallRouter.activityTasks().bindHostActivity(frameworkToken, activityToken, taskId,
+                    moveToFront, moveToBack, finishAffinity, finishAndRemoveTask);
+        }
+
+        public void updateActivityTaskHost(IBinder frameworkToken, String activityToken) {
+            frameworkCallRouter.activityTasks().updateHostActivity(frameworkToken, activityToken);
+        }
+
+        public boolean consumeActivityTaskFinalized(IBinder frameworkToken) {
+            return frameworkCallRouter.activityTasks().consumeBrokerFinalized(frameworkToken);
+        }
+
+        public void unbindActivityTaskHost(IBinder frameworkToken) {
+            frameworkCallRouter.activityTasks().unbindHostActivity(frameworkToken);
+        }
 
         synchronized void updatePermissionState(VirtualPackageStateSnapshot updated) {
             if (updated == null || !spec.packageName.equals(updated.packageName())

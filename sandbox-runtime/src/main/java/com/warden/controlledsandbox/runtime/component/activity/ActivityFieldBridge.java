@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Build;
+import android.os.IBinder;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,6 +22,22 @@ public final class ActivityFieldBridge {
     private static final List<String> OPTIONAL_HOST_FIELDS = List.of("mCurrentConfig");
 
     private ActivityFieldBridge() { }
+
+    static IBinder hostToken(Activity activity) {
+        try {
+            Field field = requireField(activity.getClass(), "mToken");
+            field.setAccessible(true);
+            Object value = field.get(activity);
+            if (!(value instanceof IBinder token)) {
+                throw new IllegalStateException("ACTIVITY_FRAMEWORK_TOKEN_INVALID");
+            }
+            return token;
+        } catch (RuntimeException error) {
+            throw error;
+        } catch (Throwable error) {
+            throw new IllegalStateException("ACTIVITY_FRAMEWORK_TOKEN_READ_FAILED", error);
+        }
+    }
 
     static BridgeReport install(Activity host, Activity guest,
                                 GuestRuntimeEnvironment.Session session, String componentClass) {

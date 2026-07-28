@@ -106,4 +106,4 @@ M4-T14 moves Service ownership behind `RuntimeServiceCoordinator`. Started, boun
 
 ## M4-T15 source baseline
 
-M4-T15 makes the Broker-owned Activity/Task model recoverable and queryable. It adds bounded launch-flag/result semantics, package/user-isolated running and recent task operations, and an atomic CRC-protected checkpoint that restores saved task state without reviving dead one-time route or result-delivery authority. Complete Android `ActivityManager`/`ActivityTaskManager` adapters, system Recents behavior and device compatibility remain open.
+M4-T15 makes the Broker-owned Activity/Task model recoverable, queryable and reachable from Guest `ActivityManager`/`ActivityTaskManager` calls. It adds bounded launch-flag/result semantics, package/user/revision-isolated running and recent task projections, local `IAppTask` Binder handles, owner-checked task mutations, and an atomic CRC-protected checkpoint that restores saved task state without reviving dead one-time route or result-delivery authority. System Recents visuals, Window/Transition integration and Android/OEM device compatibility remain open.

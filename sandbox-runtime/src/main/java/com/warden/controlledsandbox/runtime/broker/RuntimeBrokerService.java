@@ -117,7 +117,7 @@ public final class RuntimeBrokerService extends Service {
         runtimePermissionCoordinator = new RuntimePermissionCoordinator(
                 new RuntimePermissionPackageClient(this), this::permissionSession);
         systemServiceCoordinator = new RuntimeSystemServiceCoordinator(
-                new RuntimeVirtualSystemServicePackageClient(this));
+                new RuntimeVirtualSystemServicePackageClient(this), binder.asBinder());
         componentRecoveryCoordinator = new RuntimeComponentRecoveryCoordinator(
                 sessions, clock, activityRuntime, serviceCoordinator, receiverCoordinator,
                 providerResources, systemServiceCoordinator);

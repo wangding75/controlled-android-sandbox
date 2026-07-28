@@ -1166,7 +1166,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Persistent Job state now transitions SCHEDULED\u2192DISPATCHING\u2192RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
+      "notes": "Persistent Job state now transitions SCHEDULED→DISPATCHING→RUNNING with owner process/generation validation, binder death handling, timeout reschedule and stale capability invalidation."
     },
     {
       "id": "runtime.guest-jobservice-execution-bridge",
@@ -1302,6 +1302,20 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Running tasks are returned front-first; bounded recent history respects EXCLUDE_FROM_RECENTS and retained document-task policy and remains isolated by package and virtual user."
+    },
+    {
+      "id": "framework.activity-task-framework-api",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/ActivityTaskFrameworkInterceptor.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/AndroidTaskInfoProjector.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityTaskClient.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/ActivityTaskFrameworkInterceptorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest ActivityManager/ActivityTaskManager running, recent and app-task queries are projected from Broker-owned virtual tasks. Task move/remove/finish operations bind framework Activity tokens to virtual Task identity and fail closed without host task-result fallback."
     }
   ],
   "statusDimensions": {

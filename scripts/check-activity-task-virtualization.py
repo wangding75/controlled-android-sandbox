@@ -59,6 +59,23 @@ require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/comp
  'captureRollbackState','restoreRollbackState','persistCheckpoint')
 require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityResultBridge.java',
  'launchForResult','intentSenderToken','ActivityResultRequest.DRAIN','toIntent')
+framework_tasks=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/ActivityTaskFrameworkInterceptor.java',
+ 'getTasks','getRecentTasks','getAppTasks','moveTaskToFront','removeTask',
+ 'moveActivityTaskToBack','finishActivityAffinity','finishActivityAndRemoveTask',
+ 'getTaskForActivity','VIRTUAL_ACTIVITY_FRAMEWORK_TOKEN_UNKNOWN')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityTaskClient.java',
+ 'IRuntimeBroker.Stub.asInterface','activityTaskOperation','VIRTUAL_TASK_BROKER_UNAVAILABLE',
+ 'VIRTUAL_TASK_RESPONSE_IDENTITY_MISMATCH')
+projector=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/AndroidTaskInfoProjector.java',
+ 'RunningTaskInfo','RecentTaskInfo','android.app.IAppTask','ParceledListSlice',
+ 'VIRTUAL_TASK_PROJECTION_UNAVAILABLE','attachInterface')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestFrameworkCallRouter.java',
+ 'activityTasks.intercept','activityTasks.close')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java',
+ 'runtimeBrokerBinder','RUNTIME_BROKER_BINDER')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java',
+ 'bindActivityTaskHost','consumeActivityTaskFinalized','moveHostTaskToBack',
+ 'finishHostAffinity','finishHostAndRemoveTask')
 require('sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java',
  'testLaunchFlagValidationMatrix','testDocumentLaunchModes','testFinishMoveBackAndRevisionCleanup',
  'testForwardResultChain','testCheckpointRestoreDropsTransportAndPreservesState',
@@ -72,16 +89,24 @@ require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runti
 require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntimeSelfTest.java',
  'MOVE_TO_BACK should reorder','finishAndRemoveTask should remove',
  'failed restore must roll back partial ledger state','failed cleanup checkpoint must restore')
+require('sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/ActivityTaskFrameworkInterceptorSelfTest.java',
+ 'running-task query is intercepted','AppTask Binder exposes only virtual task',
+ 'cross-package AppTask query rejected','Broker query failure throws instead of passing to host delegate')
 require('docs/plans/M4_T15_DEVELOPMENT_PLAN.md',
  'B1：LaunchMode','B2：Result','B3：Framework')
 require('docs/M4_T15_B1_DEVELOPMENT_REPORT.md',
  'PASS — SOURCE/HOST VERIFIED','schema 1','设备证据仍为 0')
 require('docs/M4_T15_B2_DEVELOPMENT_REPORT.md',
  'PASS — SOURCE/HOST VERIFIED','ActivityResultIntentSnapshot','事务回滚','设备证据仍为 0')
+require('docs/M4_T15_B3_DEVELOPMENT_REPORT.md',
+ 'PASS — SOURCE/HOST VERIFIED','IAppTask','不允许以宿主真实任务结果作为兼容回退','设备证据：0')
+require('docs/M4_T15_STAGE_REPORT.md',
+ 'PASS — SOURCE/HOST VERIFIED','能力条目 | 96','M4-T16：系统调度与通知深化',
+ '设备证据完成度 | 0.0%')
 runner=text('tools/static_android_compile.py')
 for test in ['ActivityTaskLedgerSelfTest','ActivityTaskCheckpointStoreSelfTest',
              'ActivityTaskContractSelfTest','ActivityResultContractSelfTest',
-             'BrokerActivityRuntimeSelfTest']:
+             'BrokerActivityRuntimeSelfTest','ActivityTaskFrameworkInterceptorSelfTest']:
  if runner.count(test)<1: errors.append(f'static compiler does not execute {test}')
 if len(broker.splitlines()) > 1375:
  errors.append(f'RuntimeBrokerService exceeded bounded M4-T15 growth: {len(broker.splitlines())} lines')
@@ -89,6 +114,10 @@ if len(runtime.splitlines()) > 330:
  errors.append(f'BrokerActivityRuntime should remain extracted: {len(runtime.splitlines())} lines')
 if len(result_dispatcher.splitlines()) > 180:
  errors.append(f'ActivityResultOperationDispatcher unexpectedly large: {len(result_dispatcher.splitlines())} lines')
+if len(framework_tasks.splitlines()) > 360:
+ errors.append(f'ActivityTaskFrameworkInterceptor unexpectedly large: {len(framework_tasks.splitlines())} lines')
+if len(projector.splitlines()) > 280:
+ errors.append(f'AndroidTaskInfoProjector unexpectedly large: {len(projector.splitlines())} lines')
 if len(dispatcher.splitlines()) > 180:
  errors.append(f'ActivityTaskOperationDispatcher unexpectedly large: {len(dispatcher.splitlines())} lines')
 matrix=ROOT/'verification/m3-source-capability-matrix.json'

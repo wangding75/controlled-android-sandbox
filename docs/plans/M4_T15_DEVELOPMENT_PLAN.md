@@ -68,7 +68,7 @@
 
 ### B2：Result、Activity 重建与恢复
 
-状态：**PASS；本批次提交将快进合入 `main`，并标记 `m4-t15-b2-source-pass`。**
+状态：**PASS，提交 `e2716eb` 已合入 `main`，标签 `m4-t15-b2-source-pass`，备份已生成。**
 
 交付：
 
@@ -81,6 +81,8 @@
 退出条件：Result/恢复专项测试、损坏/容量门禁和全仓门禁通过。
 
 ### B3：Framework 查询入口与最终收口
+
+状态：**PASS；随正式 M4-T15 提交合入 `main`，并生成 B3 与最终 M4-T15 两套备份。**
 
 交付：
 

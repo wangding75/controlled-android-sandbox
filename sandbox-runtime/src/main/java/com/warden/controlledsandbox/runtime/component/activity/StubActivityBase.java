@@ -8,12 +8,15 @@ import com.warden.controlledsandbox.runtime.guest.RouteBrokerClient;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.Intent;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.view.Gravity;
 import android.widget.TextView;
 import java.util.ArrayDeque;
@@ -21,6 +24,8 @@ import java.util.Deque;
 
 public abstract class StubActivityBase extends Activity {
     private GuestActivityController controller;
+    private GuestRuntimeEnvironment.Session guestSession;
+    private IBinder frameworkActivityToken;
     private GuestActivityResultBridge activityResults;
     private TextView diagnostic;
     private int hostStage = 1;
@@ -57,8 +62,13 @@ public abstract class StubActivityBase extends Activity {
             try {
                 GuestPackageSpec spec = new GuestPackageSpec(route);
                 GuestRuntimeEnvironment.Session session = GuestRuntimeEnvironment.require(spec.sessionId, spec.generation);
+                guestSession = session;
                 activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
                 int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
+                frameworkActivityToken = ActivityFieldBridge.hostToken(this);
+                session.bindActivityTaskHost(frameworkActivityToken, activityToken, taskId,
+                        this::moveHostTaskToFront, this::moveHostTaskToBack,
+                        this::finishHostAffinity, this::finishHostAndRemoveTask);
                 controller = new GuestActivityController(this, session, activityToken, taskId,
                         this::enqueueActivityEvent);
                 activityResults = new GuestActivityResultBridge(
@@ -69,10 +79,14 @@ public abstract class StubActivityBase extends Activity {
                     if (hostStage >= 2) controller.start();
                     if (hostStage >= 3) controller.resume();
                 } else {
+                    session.unbindActivityTaskHost(frameworkActivityToken);
                     showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_CREATE_FAILED"),
                             result.getString(RuntimeKeys.ERROR_MESSAGE, "Unknown failure") + "\n\n" + result.getString("stack", ""));
                 }
             } catch (Throwable error) {
+                if (guestSession != null && frameworkActivityToken != null) {
+                    guestSession.unbindActivityTaskHost(frameworkActivityToken);
+                }
                 showFailure(error.getClass().getName(), String.valueOf(error.getMessage()));
             }
         });
@@ -89,7 +103,15 @@ public abstract class StubActivityBase extends Activity {
     }
     @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
     @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
-    @Override protected void onDestroy() { if (controller != null) controller.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        boolean brokerFinalized = guestSession != null && frameworkActivityToken != null
+                && guestSession.consumeActivityTaskFinalized(frameworkActivityToken);
+        if (controller != null) controller.destroy(brokerFinalized);
+        if (guestSession != null && frameworkActivityToken != null) {
+            guestSession.unbindActivityTaskHost(frameworkActivityToken);
+        }
+        super.onDestroy();
+    }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
@@ -218,6 +240,9 @@ public abstract class StubActivityBase extends Activity {
                         activityToken = currentToken;
                         if (controller != null) controller.updateActivityToken(currentToken);
                         if (activityResults != null) activityResults.updateActivityToken(currentToken);
+                        if (guestSession != null && frameworkActivityToken != null) {
+                            guestSession.updateActivityTaskHost(frameworkActivityToken, currentToken);
+                        }
                     }
                 } else {
                     activityEvents.clear();
@@ -228,6 +253,19 @@ public abstract class StubActivityBase extends Activity {
             }
         });
     }
+
+
+    private void moveHostTaskToFront() {
+        Object service = getSystemService(Context.ACTIVITY_SERVICE);
+        if (!(service instanceof ActivityManager manager)) {
+            throw new IllegalStateException("HOST_ACTIVITY_MANAGER_UNAVAILABLE");
+        }
+        manager.moveTaskToFront(getTaskId(), 0);
+    }
+
+    private boolean moveHostTaskToBack() { return super.moveTaskToBack(true); }
+    private void finishHostAffinity() { super.finishAffinity(); }
+    private void finishHostAndRemoveTask() { super.finishAndRemoveTask(); }
 
     private void showFailure(String type, String message) {
         if (diagnostic != null) diagnostic.setText("Guest launch failed\n\n" + type + "\n" + message);

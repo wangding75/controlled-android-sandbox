@@ -41,6 +41,7 @@ public final class GuestPackageSpec {
     final List<String> sharedLibraries;
     final VirtualPackageStateSnapshot packageState;
     final IBinder virtualSystemServiceBinder;
+    final IBinder runtimeBrokerBinder;
 
     public GuestPackageSpec(Bundle bundle) {
         if (bundle == null) throw new IllegalArgumentException("request is required");
@@ -78,6 +79,7 @@ public final class GuestPackageSpec {
         sharedLibraries = csv(bundle.getString(RuntimeKeys.SHARED_LIBRARIES, ""));
         validateSplits();
         virtualSystemServiceBinder = bundle.getBinder(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER);
+        runtimeBrokerBinder = bundle.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER);
         packageState = bundle.getParcelable(RuntimeKeys.PACKAGE_STATE);
         if (packageState == null) throw new IllegalArgumentException("virtual package state is required");
         if (!packageName.equals(packageState.packageName()) || virtualUserId != packageState.virtualUserId()) {
@@ -108,6 +110,7 @@ public final class GuestPackageSpec {
         out.putStringArrayList(RuntimeKeys.SPLIT_SHA256S, new ArrayList<>(splitSha256s));
         out.putString(RuntimeKeys.SHARED_LIBRARIES, String.join(",", sharedLibraries));
         if (virtualSystemServiceBinder != null) out.putBinder(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER, virtualSystemServiceBinder);
+        out.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER, runtimeBrokerBinder);
         out.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
         return out;
     }

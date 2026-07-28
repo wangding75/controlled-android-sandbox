@@ -1,45 +1,115 @@
 PASS sandbox-domain self-test
 PASS XML and structure checks
 PASS repository self-test
+PASS host build environment lock check (Java 21)
+PASS frozen baseline integrity (7edf76364cf4, 387 files)
+PASS wrapper source compile and compatibility JAR checksum
+PASS verified Gradle bootstrap delegation
+PASS verified Gradle bootstrap delegation
+PASS Gradle wrapper checksum and fail-closed self-test
 PASS architecture boundary checks
+PASS typed contract checks
+PASS domain port and dispatcher checks
+PASS Runtime/Framework package boundary checks
+PASS Guest Context and class-loader boundary checks
+PASS immutable APK revision binding checks
+PASS package lifecycle transaction checks
+PASS Binder-owned package service boundary checks
+PASS virtual package state checks
+PASS virtual PackageManager query and Intent resolve checks
+PASS runtime permission capability and workflow checks
+PASS capability proxy and Runtime Broker split checks
+PASS M4-T10 system service and Broker split checks (broker lines=1370)
+PASS M4-T11 Binder-owned system-service checks (broker lines=1370)
+PASS M4-T12 Notification/Job lifecycle checks (broker lines=1370)
+PASS M4-T13 Guest JobService bridge checks
+PASS M4-T14 Service lifecycle checks (broker lines=1370, coordinator lines=222)
+PASS M4-T15 Activity/Task virtualization checks (ledger lines=1857, broker lines=1370, runtime lines=318)
+PASS split APK and install session checks
+PASS implicit, ordered and PendingResult broadcast architecture checks
+PASS native file-system hook architecture checks
 PASS generated SBOM with 7 components
-PASS M3 capability evidence matrix: source complete=31 partial=4 missing=0 weighted=94.3%; production wired=29 partial=4 blocked=1 n/a=1 weighted=91.2%; device verified=0 partial=0 not-tested=33 blocked=1 n/a=1 weighted=0.0%
+PASS M3 capability evidence matrix: source complete=92 partial=4 missing=0 weighted=97.9%; production wired=88 partial=6 blocked=1 n/a=1 weighted=95.8%; device verified=0 partial=0 not-tested=94 blocked=1 n/a=1 weighted=0.0%
+=== RESUME AFTER EXECUTION LIMIT ===
 PASS static Android-source compilation with local API stubs
+PASS package service typed contract self-test
+PASS package management authorization self-test
+PASS Binder-owned virtual system-service store self-test
+PASS atomic sandbox catalog aggregate self-test
+PASS runtime permission workflow self-test
+PASS virtual permission/AppOps merge policy self-test
+PASS immutable APK revision verifier self-test
+PASS immutable multi-APK revision set verifier self-test
+PASS persisted staged install session self-test
+PASS dependency-ordered split artifact self-test
 PASS sandbox SharedPreferences self-test
 PASS Provider cursor transport self-test
 PASS broker cursor lease runtime self-test
 PASS Guest Provider file transport self-test
 PASS broker Provider file lease runtime self-test
+PASS runtime PendingIntent framework routing self-test
+PASS virtual Activity/Task framework interception self-test
 PASS WebView profile isolation self-test
-PASS Guest class-loader policy self-test
+PASS Guest class-loader host-boundary policy self-test
+PASS Guest Context storage and unwrap boundary self-test
+PASS Guest JobService bridge callback self-test
+PASS Guest dangerous-capability service gate self-test
+PASS typed runtime-status contract
+PASS runtime-status dispatcher
+PASS broker architecture ports
 PASS runtime diagnostics evidence self-test
 PASS broker concurrent state self-test
 PASS broker Service production registry self-test
+PASS Runtime Service coordinator lifecycle self-test
 PASS broker Receiver production registry self-test
 PASS broker manifest Receiver runtime self-test
+PASS manifest broadcast dispatcher self-test
+PASS ordered Receiver token registry self-test
+PASS ReceiverLifecycleCoordinatorSelfTest
+PASS Runtime Receiver coordinator extraction self-test
+PASS ordered Receiver PendingResult bridge self-test
 PASS BrokerObserverRuntimeSelfTest
 PASS ProviderBatchRuntimeSelfTest
 PASS URI grant lifecycle integration self-test
 PASS ProviderLifecycleCoordinatorSelfTest
+PASS Runtime Provider resource coordinator extraction self-test
 PASS broker Provider authority lifecycle self-test
 PASS isolatedProcess fail-closed policy self-test
 PASS audited Activity field bridge self-test
+PASS typed Activity task Binder contract self-test
+PASS typed Activity result Binder contract self-test
 PASS broker Activity production adapter self-test
-PASS framework identity proxy self-test
+PASS Activity task checkpoint persistence self-test
+PASS framework identity and package-manager proxy self-test
+PASS capability service proxy and revocation self-test
+PASS virtual Alarm/Clipboard/Account/Notification/Job self-test
+PASS guest capability audit log self-test
+PASS capability proxy readiness self-test
+PASS runtime permission coordinator self-test
+PASS virtual PackageManager query and Intent resolve self-test
+PASS dynamic permission and AppOps policy replacement self-test
+PASS framework runtime-call interceptor self-test
 PASS FrameworkProxySelfTest
 PASS DefaultControllerSelfTest
 PASS ActivityTaskLedgerSelfTest
 PASS ActivityTaskLedgerConcurrencySelfTest
 PASS ActivityLaunchCoordinatorSelfTest
 PASS OneTimeRouteStoreSelfTest
+PASS virtual PendingIntent identity and lifecycle self-test
+PASS sandbox-native file-system resolver self-test
 PASS sandbox-native policy self-test
-PASS sandbox-native PLT hook self-test
+PASS sandbox-native PLT file hook self-test
 PASS sandbox-native crash recorder self-test
 PASS sandbox-native JNI boundary compile
 PASS strict M3 evidence gate self-test
-PASS structural PowerShell check scripts/run-emulator-m3.ps1
-PASS structural PowerShell check scripts/self-test.ps1
-PASS structural PowerShell check scripts/build-debug.ps1
+PASS reproducible source ZIP: /mnt/data/controlled-sandbox-m4-t15-repo/build/reproducible-source-test/first.zip
+PASS reproducible source ZIP: /mnt/data/controlled-sandbox-m4-t15-repo/build/reproducible-source-test/second.zip
+PASS reproducible source package byte comparison
 PASS structural PowerShell check scripts/emulator-smoke.ps1
-PASS custom Gradle bootstrap delegation
-PASS all locally executable verification gates
+PASS structural PowerShell check scripts/check-wrapper-bootstrap.ps1
+PASS structural PowerShell check scripts/self-test.ps1
+PASS structural PowerShell check scripts/run-emulator-m3.ps1
+PASS structural PowerShell check scripts/build-debug.ps1
+PASS structural PowerShell check scripts/reproducible-build.ps1
+PASS structural PowerShell check scripts/bootstrap-build-cache.ps1
+PASS all locally executable verification gates (resumed)

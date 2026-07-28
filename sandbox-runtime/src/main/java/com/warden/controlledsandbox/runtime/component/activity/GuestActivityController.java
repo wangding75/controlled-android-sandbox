@@ -99,18 +99,22 @@ public final class GuestActivityController {
         started = false;
     }
 
-    void destroy() {
+    void destroy() { destroy(false); }
+
+    void destroy(boolean brokerAlreadyFinalized) {
         if (!created || destroyed) return;
         if (started) stop();
         ActivityResultFieldBridge.Captured result = ActivityResultFieldBridge.capture(guest);
         invokeIfCreated("onDestroy", new Class<?>[0], new Object[0]);
-        if (result.explicit()) {
-            Bundle details = new Bundle();
-            details.putInt(RuntimeKeys.RESULT_CODE, result.resultCode());
-            putResultIntent(details, GuestActivityResultBridge.snapshot(result.data()));
-            emitBestEffort("FINISH_RESULT", details);
-        } else {
-            emitBestEffort("DESTROYED", new Bundle());
+        if (!brokerAlreadyFinalized) {
+            if (result.explicit()) {
+                Bundle details = new Bundle();
+                details.putInt(RuntimeKeys.RESULT_CODE, result.resultCode());
+                putResultIntent(details, GuestActivityResultBridge.snapshot(result.data()));
+                emitBestEffort("FINISH_RESULT", details);
+            } else {
+                emitBestEffort("DESTROYED", new Bundle());
+            }
         }
         destroyed = true;
         guest = null;

@@ -10,6 +10,7 @@ public final class RuntimeKeys {
     public static final String PERMISSIONS = "permissions";
     public static final String PACKAGE_STATE = "packageState";
     public static final String VIRTUAL_SYSTEM_SERVICE_BINDER = "virtualSystemServiceBinder";
+    public static final String RUNTIME_BROKER_BINDER = "runtimeBrokerBinder";
     public static final String PROCESS_SLOT = "processSlot";
     public static final String PROCESS_NAME = "processName";
     public static final String APK_PATH = "apkPath";
