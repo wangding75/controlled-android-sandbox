@@ -13,7 +13,7 @@ FRAMEWORK_ROOT = ROOT / 'sandbox-framework/src/main/java/com/warden/controlledsa
 
 REQUIRED_RUNTIME_PACKAGES = {
     'broker', 'guest', 'component.activity', 'component.service',
-    'component.receiver', 'provider', 'diagnostics', 'protocol', 'status', 'capability',
+    'component.receiver', 'provider', 'diagnostics', 'protocol', 'status', 'capability', 'systemservice',
 }
 REQUIRED_FRAMEWORK_PACKAGES = {
     'core', 'identity', 'activity', 'routing', 'packagemanager', 'permission', 'service', 'capability',
@@ -22,7 +22,7 @@ REQUIRED_FRAMEWORK_PACKAGES = {
 RUNTIME_ALLOWED_DEPS = {
     'broker': {'component.activity', 'component.receiver', 'component.service', 'diagnostics',
                'guest', 'protocol', 'provider', 'status'},
-    'guest': {'broker', 'capability', 'component.activity', 'diagnostics', 'protocol', 'provider'},
+    'guest': {'broker', 'capability', 'component.activity', 'diagnostics', 'protocol', 'provider', 'systemservice'},
     'component.activity': {'broker', 'diagnostics', 'guest', 'protocol'},
     'component.service': {'protocol'},
     'component.receiver': {'protocol'},
@@ -31,6 +31,7 @@ RUNTIME_ALLOWED_DEPS = {
     'protocol': set(),
     'status': {'component.activity', 'component.receiver', 'component.service', 'protocol', 'provider'},
     'capability': set(),
+    'systemservice': set(),
 }
 FRAMEWORK_ALLOWED_DEPS = {
     'core': {'capability', 'identity', 'packagemanager', 'permission', 'service'},
@@ -41,6 +42,7 @@ FRAMEWORK_ALLOWED_DEPS = {
     'permission': {'core', 'identity'},
     'service': {'core', 'identity'},
     'capability': set(),
+    'systemservice': set(),
 }
 
 

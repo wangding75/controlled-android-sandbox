@@ -76,6 +76,7 @@ public final class RuntimeBrokerService extends Service {
     private final SessionRegistry sessions = new SessionRegistry(SLOT_COUNT, tokenGenerator);
     private VirtualUidRegistry virtualUids;
     private RuntimePermissionCoordinator runtimePermissionCoordinator;
+    private RuntimeSystemServiceCoordinator systemServiceCoordinator;
     private final UriGrantRegistry uriGrants = new UriGrantRegistry();
     private final BrokerStateStore brokerState = new BrokerStateStore();
     private final RuntimeReceiverCoordinator receiverCoordinator = new RuntimeReceiverCoordinator(
@@ -105,6 +106,8 @@ public final class RuntimeBrokerService extends Service {
         virtualUids = new VirtualUidRegistry(registryFile.toPath());
         runtimePermissionCoordinator = new RuntimePermissionCoordinator(
                 new RuntimePermissionPackageClient(this), this::permissionSession);
+        systemServiceCoordinator = new RuntimeSystemServiceCoordinator(
+                new RuntimeVirtualSystemServicePackageClient(this));
     }
 
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
@@ -639,6 +642,7 @@ public final class RuntimeBrokerService extends Service {
                 throw new IllegalStateException("SESSION_BUSY:" + session.state());
             }
             Bundle spec = makeSpec(input, session);
+            systemServiceCoordinator.attach(session, spec);
             Bundle guestResult;
             try {
                 guestResult = callGuest(session.processSlot(), guest -> guest.prepareGuest(spec));
@@ -651,6 +655,7 @@ public final class RuntimeBrokerService extends Service {
                     applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
                             staleRecovery.sessionId(), staleRecovery.generation());
                 }
+                systemServiceCoordinator.stop(session);
                 throw error;
             }
             String guestStatus = guestResult.getString(RuntimeKeys.STATUS, "FAILED");
@@ -666,6 +671,7 @@ public final class RuntimeBrokerService extends Service {
                     applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
                             staleRecovery.sessionId(), staleRecovery.generation());
                 }
+                systemServiceCoordinator.stop(session);
                 return guestResult;
             }
             if (staleRecovery != null) {
@@ -676,6 +682,7 @@ public final class RuntimeBrokerService extends Service {
                         providerLifecycle.recoverSession(staleRecovery, session);
                 applyProviderCleanup(recovery.staleResources(),
                         staleRecovery.sessionId(), staleRecovery.generation());
+                systemServiceCoordinator.stop(staleRecovery);
             }
             GuestSession ready = sessions.transition(packageName, userId, processName, session.generation(),
                     SessionState.READY, now(), "");
@@ -741,6 +748,7 @@ public final class RuntimeBrokerService extends Service {
             serviceRuntime.invalidate(original);
             applyProviderCleanup(providerLifecycle.stopSession(original),
                     original.sessionId(), original.generation());
+            if (systemServiceCoordinator != null) systemServiceCoordinator.stop(original);
             releaseGuestConnection(original.processSlot());
         }
     }
@@ -1205,6 +1213,7 @@ public final class RuntimeBrokerService extends Service {
         for (int slot : slots) releaseGuestConnection(slot);
         receiverCoordinator.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
         if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
+        if (systemServiceCoordinator != null) systemServiceCoordinator.close();
         super.onDestroy();
     }
 

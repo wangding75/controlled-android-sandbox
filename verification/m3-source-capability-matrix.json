@@ -939,56 +939,70 @@
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/AlarmManagerHook.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Alarm metadata and marshalled Parcelable delivery tokens are persisted in the Package Service authority, bound to package/user/process/generation, reclaimed by the same virtual process on a new generation, and delivered through a scoped Binder observer. Android AlarmManager, Doze, wakeup and reboot semantics remain device-gated."
     },
     {
       "id": "framework.clipboard-generation-isolation",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/ClipboardManagerHook.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Clipboard contents are Binder-owned and shared across Guest processes of one package/virtual user while remaining isolated from other virtual users and the host clipboard. Real Android ClipData/OEM listener behavior remains unverified."
     },
     {
       "id": "framework.account-basic-generation-isolation",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/AccountManagerHook.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Basic accounts, passwords and auth tokens are persisted by package and virtual user and shared across Guest processes through a scoped Binder capability. Authenticator/OAuth UI and full AccountManager asynchronous protocol remain unsupported."
     },
     {
       "id": "framework.notification-id-tag-namespace",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/NotificationManagerHook.java",
         "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Notification IDs and channel/group string identities use a persistent package/user namespace. NotificationChannel object fields are rewritten and restored around host calls. Complete channel lifecycle, cancelAll and process-death cleanup remain partial."
     },
     {
       "id": "framework.job-id-query-namespace",
       "evidence": [
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/JobSchedulerHook.java",
         "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Job IDs use a persistent package/user namespace shared across Guest processes. Job constraints, JobService callback routing, cancelAll and durable scheduled-job recovery remain partial."
     },
     {
       "id": "runtime.receiver-coordinator-split",
@@ -1000,6 +1014,72 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested"
+    },
+    {
+      "id": "contract.virtual-system-service-capability",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualAccountSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualAlarmSnapshot.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Typed AIDL exposes a Runtime-Broker-only scoped capability for clipboard, account, alarm and persistent namespace operations without Bundle business payloads."
+    },
+    {
+      "id": "package.binder-system-service-authority",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Package Service owns durable per-package/per-user system-service state, death-linked capability sessions, process/generation-owned alarms and best-effort cleanup after instance deletion."
+    },
+    {
+      "id": "runtime.system-service-capability-coordinator",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeSystemServiceCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeVirtualSystemServicePackageClient.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeKeys.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Runtime Broker obtains a package/user/process/generation-scoped Binder capability and injects it into the Guest spec; capability lifetime follows the Runtime session."
+    },
+    {
+      "id": "framework.cross-process-virtual-system-state",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceAuthority.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest framework state delegates to a remote authority so Clipboard, Account and namespace state is shared across Guest processes without exposing the Package Service root Binder."
+    },
+    {
+      "id": "framework.persistent-notification-job-namespace",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Notification and Job guest-to-host ID mappings persist by package and virtual user across Guest process restarts. Full notification/job object lifecycle remains separately partial."
     }
   ],
   "statusDimensions": {

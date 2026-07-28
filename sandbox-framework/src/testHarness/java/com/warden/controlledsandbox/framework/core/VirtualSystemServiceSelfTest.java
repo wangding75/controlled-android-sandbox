@@ -3,6 +3,8 @@ package com.warden.controlledsandbox.framework.core;
 import android.content.pm.ApplicationInfo;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,9 +16,11 @@ import java.util.concurrent.TimeUnit;
 public final class VirtualSystemServiceSelfTest {
     public static void main(String[] args) throws Exception {
         testClipboardIsolation();
+        testBinderAuthorityClipboardDispatch();
         testAccountIsolation();
         testAlarmLifecycle();
         testNotificationNamespace();
+        testNotificationChannelObjects();
         testNotificationFailureRollback();
         testJobNamespace();
         testJobFailureRollbackAndCancelAllBoundary();
@@ -36,6 +40,19 @@ public final class VirtualSystemServiceSelfTest {
         require(two.getPrimaryClip("guest.two") == null, "clipboard isolated by Guest identity");
         require(listener.events == 1, "virtual clipboard listener dispatched");
         require(delegate.calls == 0, "host clipboard never called");
+    }
+
+    private static void testBinderAuthorityClipboardDispatch() {
+        FakeVirtualAuthority authority = new FakeVirtualAuthority();
+        VirtualSystemServiceState state = new VirtualSystemServiceState(authority);
+        Listener listener = new Listener();
+        state.clipboard().addListener(listener);
+        state.clipboard().set(new FakeClip("shared"));
+        require(listener.events == 1,
+                "Binder-owned clipboard dispatches one local listener event per authority callback");
+        require("shared".equals(((FakeClip) state.clipboard().get()).text),
+                "Binder-owned clipboard state visible through authority");
+        state.close();
     }
 
     private static void testAccountIsolation() {
@@ -79,6 +96,22 @@ public final class VirtualSystemServiceSelfTest {
         int hostId = delegate.lastId;
         notifications.cancelNotificationWithTag("guest.notify", "guest.notify", "updates", 42, 7);
         require(delegate.lastId == hostId, "notification cancellation reuses host namespace ID");
+    }
+
+
+    private static void testNotificationChannelObjects() {
+        GuestIdentity identity = identity("guest.channels", 6, 2L);
+        ChannelDelegate delegate = new ChannelDelegate();
+        ChannelApi api = proxy(ChannelApi.class, delegate, identity, "notification");
+        FakeNotificationChannel channel = new FakeNotificationChannel("updates", "group");
+        api.createNotificationChannels(List.of(channel));
+        require("updates".equals(channel.mId) && "group".equals(channel.mGroup),
+                "Guest channel object restored after host call");
+        require(delegate.hostId.startsWith("cs.u6.guest.channels."),
+                "channel object ID namespaced for host call");
+        List<FakeNotificationChannel> returned = api.getNotificationChannels();
+        require(returned.size() == 1 && "updates".equals(returned.get(0).mId),
+                "host channel result restored to Guest namespace");
     }
 
 
@@ -218,6 +251,21 @@ public final class VirtualSystemServiceSelfTest {
     }
     static final class FakeNotification { }
 
+    interface ChannelApi {
+        void createNotificationChannels(List<FakeNotificationChannel> channels);
+        List<FakeNotificationChannel> getNotificationChannels();
+    }
+    static final class ChannelDelegate implements ChannelApi {
+        String hostId = "";
+        public void createNotificationChannels(List<FakeNotificationChannel> channels) { hostId = channels.get(0).mId; }
+        public List<FakeNotificationChannel> getNotificationChannels() { return List.of(new FakeNotificationChannel(hostId, "cs.u6.guest.channels.group")); }
+    }
+    static final class FakeNotificationChannel {
+        private String mId;
+        private String mGroup;
+        FakeNotificationChannel(String id, String group) { mId = id; mGroup = group; }
+    }
+
     interface JobApi {
         int schedule(Job job); List<Job> getAllPendingJobs(); void cancel(int jobId); void cancelAll();
     }
@@ -235,6 +283,38 @@ public final class VirtualSystemServiceSelfTest {
         private int mJobId;
         Job(int id) { mJobId = id; }
         public int getId() { return mJobId; }
+    }
+
+    static final class FakeVirtualAuthority implements VirtualSystemServiceAuthority {
+        private Object clipboard;
+        private Runnable clipboardListener = () -> { };
+        public Object clipboard() { return clipboard; }
+        public void setClipboard(Object value) { clipboard = value; clipboardListener.run(); }
+        public void clearClipboard() { clipboard = null; clipboardListener.run(); }
+        public void setClipboardChangeListener(Runnable listener) {
+            clipboardListener = listener == null ? () -> { } : listener;
+        }
+        public List<AccountRecord> accounts(String requestedType) { return List.of(); }
+        public boolean addAccount(String name, String type, String password) { return false; }
+        public boolean removeAccount(String name, String type) { return false; }
+        public void setPassword(String name, String type, String password) { }
+        public String password(String name, String type) { return null; }
+        public void setToken(String name, String type, String tokenType, String token) { }
+        public String token(String name, String type, String tokenType) { return null; }
+        public void invalidateToken(String accountType, String token) { }
+        public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs,
+                                  Object token, Runnable delivery) { }
+        public boolean cancelAlarm(String alarmId) { return false; }
+        public List<AlarmRecord> alarms() { return List.of(); }
+        public NamespaceMapping ensureNamespace(String namespace, int guestId) {
+            return new NamespaceMapping(guestId + 1000, true);
+        }
+        public Integer hostIdIfPresent(String namespace, int guestId) { return null; }
+        public Integer guestId(String namespace, int hostId) { return null; }
+        public Integer removeNamespace(String namespace, int guestId) { return null; }
+        public List<Integer> guestIds(String namespace) { return List.of(); }
+        public int namespaceSize(String namespace) { return 0; }
+        public void close() { }
     }
 
     private static void require(boolean condition, String message) {

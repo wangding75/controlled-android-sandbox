@@ -21,6 +21,7 @@ python3 scripts/check-package-query-resolve.py
 python3 scripts/check-runtime-permission-workflow.py
 python3 scripts/check-capability-proxy-broker-split.py
 python3 scripts/check-system-services-broker-split.py
+python3 scripts/check-binder-system-services.py
 python3 scripts/check-split-install-sessions.py
 python3 scripts/check-broadcast-model.py
 python3 scripts/check-native-file-hooks.py

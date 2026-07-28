@@ -12,6 +12,8 @@ import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
 import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import java.util.List;
@@ -154,6 +156,25 @@ public final class PackageServiceContractSelfTest {
             hostlessGrantRejected = true;
         }
         require(hostlessGrantRejected, "hostless runtime grant rejected");
+
+        VirtualAccountSnapshot account = new VirtualAccountSnapshot(
+                "alice", "mail", "secret", List.of("access"), List.of("token"));
+        Parcel accountParcel = Parcel.obtain();
+        account.writeToParcel(accountParcel, 0); accountParcel.setDataPosition(0);
+        VirtualAccountSnapshot restoredAccount = VirtualAccountSnapshot.CREATOR.createFromParcel(accountParcel);
+        accountParcel.recycle();
+        require("alice".equals(restoredAccount.name())
+                        && restoredAccount.tokens().equals(List.of("token")),
+                "virtual account snapshot lost");
+
+        VirtualAlarmSnapshot alarm = new VirtualAlarmSnapshot("a7", 123L, 456L, new byte[]{1, 2, 3});
+        Parcel alarmParcel = Parcel.obtain();
+        alarm.writeToParcel(alarmParcel, 0); alarmParcel.setDataPosition(0);
+        VirtualAlarmSnapshot restoredAlarm = VirtualAlarmSnapshot.CREATOR.createFromParcel(alarmParcel);
+        alarmParcel.recycle();
+        require("a7".equals(restoredAlarm.alarmId()) && restoredAlarm.intervalMs() == 456L
+                        && java.util.Arrays.equals(new byte[]{1, 2, 3}, restoredAlarm.tokenPayload()),
+                "virtual alarm snapshot lost");
         System.out.println("PASS package service typed contract self-test");
     }
 

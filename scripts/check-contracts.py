@@ -52,6 +52,32 @@ for name in ['VirtualComponentSnapshot', 'VirtualPermissionSnapshot',
     if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
     elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
 
+package_root_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl').read_text()
+virtual_service_signatures = [
+    'IVirtualSystemServiceSession openVirtualSystemServiceSession(in IBinder clientToken, String packageName, int virtualUserId, String processName, long generation);',
+]
+for signature in virtual_service_signatures:
+    if signature not in package_root_aidl:
+        errors.append(f'IPackageService is missing {signature}')
+virtual_service_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl').read_text()
+for signature in [
+    'byte[] getClipboard();',
+    'List<VirtualAccountSnapshot> listAccounts(String type);',
+    'void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);',
+    'List<VirtualAlarmSnapshot> listAlarms();',
+    'int ensureNamespace(String namespace, int guestId);',
+]:
+    if signature not in virtual_service_aidl:
+        errors.append(f'IVirtualSystemServiceSession is missing {signature}')
+if 'Bundle' in virtual_service_aidl or 'Bundle' in package_root_aidl:
+    errors.append('virtual system-service contracts must not use Bundle')
+for name in ['VirtualAccountSnapshot', 'VirtualAlarmSnapshot']:
+    declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
+    source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
+    if not declaration.is_file(): errors.append(f'missing AIDL parcelable declaration for {name}')
+    if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
+    elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
+
 package_result = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java').read_text()
 for evidence in ['VirtualPackageStateSnapshot packageState', 'successPackageState(', 'packageState()',
                  'RuntimePermissionRequestSnapshot permissionRequest', 'successPermissionRequest(',

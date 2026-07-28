@@ -55,6 +55,8 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - PARTIAL — AppOps coverage is limited to bounded integer/boolean check/note/start-style calls.
 - DONE — reversible notification, JobScheduler and storage identity proxies with per-service diagnostics.
 - DONE — ActivityManager/ActivityTaskManager source mediation uses an atomic proxy pair, exact API-signature policies, callback/result task models and reversible rollback.
+- DONE — Package-Service-owned typed Binder authority shares Clipboard, basic Account and persistent Notification/Job namespaces per package/virtual user; Alarm ownership is bound to virtual process and Runtime generation with bounded recovery.
+- PARTIAL — AlarmManager power/reboot semantics, Account authenticators, Notification callbacks/channels and JobService constraints/callbacks remain open.
 - DEVICE — hidden API and Binder signature matrix on Android 12–16 and OEM variants.
 
 ## Native and WebView

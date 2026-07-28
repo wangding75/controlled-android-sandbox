@@ -9,6 +9,10 @@ import android.os.Process;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
+import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
+import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
+import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import java.io.File;
 
@@ -19,6 +23,7 @@ public final class PackageManagementService extends Service {
     private PackageCallerVerifier callerVerifier;
     private VirtualPackageStateBuilder packageStateBuilder;
     private HostPermissionStateResolver hostPermissions;
+    private VirtualSystemServiceStore systemServices;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -52,6 +57,41 @@ public final class PackageManagementService extends Service {
             }
             return session;
         }
+
+        @Override public IVirtualSystemServiceSession openVirtualSystemServiceSession(
+                IBinder clientToken, String packageName, int virtualUserId,
+                String processName, long generation) {
+            if (clientToken == null || !clientToken.isBinderAlive()) {
+                throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_REQUIRED");
+            }
+            callerVerifier.requireRuntimeBrokerCaller();
+            String normalizedPackage = required(packageName, "packageName");
+            synchronized (operationLock) {
+                boolean installed = false;
+                try {
+                    for (SandboxInstance instance : lifecycle.load().instances()) {
+                        if (normalizedPackage.equals(instance.packageName)
+                                && virtualUserId == instance.virtualUserId) {
+                            installed = true;
+                            break;
+                        }
+                    }
+                } catch (Exception error) {
+                    throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_SCOPE_LOOKUP_FAILED", error);
+                }
+                if (!installed) throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED");
+            }
+            VirtualSystemServiceSession session = new VirtualSystemServiceSession(
+                    Binder.getCallingUid(), clientToken,
+                    new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId),
+                    required(processName, "processName"), generation);
+            try { clientToken.linkToDeath(session, 0); }
+            catch (Exception error) {
+                throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_DEAD", error);
+            }
+            systemServices.register(session);
+            return session;
+        }
     };
 
     @Override public void onCreate() {
@@ -60,9 +100,23 @@ public final class PackageManagementService extends Service {
         callerVerifier = new PackageCallerVerifier(this);
         packageStateBuilder = new VirtualPackageStateBuilder(this);
         hostPermissions = new HostPermissionStateResolver(this);
+        systemServices = new VirtualSystemServiceStore(getFilesDir());
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
+
+    private String combinedMaintenanceWarning() {
+        String lifecycleWarning = lifecycle == null ? "" : lifecycle.maintenanceWarning();
+        String serviceWarning = systemServices == null ? "" : systemServices.maintenanceWarning();
+        if (lifecycleWarning == null || lifecycleWarning.trim().isEmpty()) return serviceWarning == null ? "" : serviceWarning;
+        if (serviceWarning == null || serviceWarning.trim().isEmpty()) return lifecycleWarning;
+        return lifecycleWarning + ";" + serviceWarning;
+    }
+
+    @Override public void onDestroy() {
+        if (systemServices != null) systemServices.close();
+        super.onDestroy();
+    }
 
     private final class ManagementSession extends IPackageManagementSession.Stub
             implements IBinder.DeathRecipient {
@@ -77,7 +131,7 @@ public final class PackageManagementService extends Service {
         @Override public PackageServiceResult loadCatalog() {
             return execute("loadCatalog", () -> PackageServiceResult.successCatalog(
                     "loadCatalog", PackageServiceMapper.toSnapshot(
-                            lifecycle.load(), lifecycle.maintenanceWarning())));
+                            lifecycle.load(), combinedMaintenanceWarning())));
         }
 
         @Override public PackageServiceResult importApk(String uri) {
@@ -276,15 +330,19 @@ public final class PackageManagementService extends Service {
         }
 
         @Override public PackageServiceResult deleteInstance(String packageName, int virtualUserId) {
-            return execute("deleteInstance", () -> PackageServiceResult.successCatalog(
-                    "deleteInstance", PackageServiceMapper.toSnapshot(
-                            lifecycle.deleteInstance(required(packageName, "packageName"), virtualUserId),
-                            lifecycle.maintenanceWarning())));
+            return execute("deleteInstance", () -> {
+                String normalizedPackage = required(packageName, "packageName");
+                var catalog = lifecycle.deleteInstance(normalizedPackage, virtualUserId);
+                systemServices.deleteScopeBestEffort(
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+                return PackageServiceResult.successCatalog("deleteInstance",
+                        PackageServiceMapper.toSnapshot(catalog, combinedMaintenanceWarning()));
+            });
         }
 
         @Override public PackageServiceResult maintenanceStatus() {
             return execute("maintenanceStatus", () -> PackageServiceResult.successText(
-                    "maintenanceStatus", lifecycle.maintenanceWarning()));
+                    "maintenanceStatus", combinedMaintenanceWarning()));
         }
 
         @Override public void close() {
@@ -417,6 +475,99 @@ public final class PackageManagementService extends Service {
         }
         private void closeInternal() {
             guard.close();
+            try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
+        }
+    }
+
+    private final class VirtualSystemServiceSession extends IVirtualSystemServiceSession.Stub
+            implements IBinder.DeathRecipient, VirtualSystemServiceStore.Client {
+        private final int ownerUid;
+        private final IBinder clientToken;
+        private final VirtualSystemServiceStore.Scope scope;
+        private final String processName;
+        private final long generation;
+        private volatile boolean active = true;
+        private volatile IVirtualSystemServiceObserver observer;
+
+        VirtualSystemServiceSession(int ownerUid, IBinder clientToken,
+                                    VirtualSystemServiceStore.Scope scope,
+                                    String processName, long generation) {
+            if (generation < 1L) throw new IllegalArgumentException("generation must be positive");
+            this.ownerUid = ownerUid; this.clientToken = clientToken;
+            this.scope = scope; this.processName = required(processName, "processName");
+            this.generation = generation;
+        }
+        @Override public byte[] getClipboard() { requireCapability(); return systemServices.clipboard(scope); }
+        @Override public void setClipboard(byte[] payload) { requireCapability(); systemServices.setClipboard(scope, payload); }
+        @Override public void clearClipboard() { requireCapability(); systemServices.clearClipboard(scope); }
+        @Override public void registerObserver(IVirtualSystemServiceObserver value) {
+            requireCapability(); observer = value;
+        }
+        @Override public java.util.List<VirtualAccountSnapshot> listAccounts(String type) {
+            requireCapability(); return systemServices.accounts(scope, type);
+        }
+        @Override public boolean addAccount(String name, String type, String password) {
+            requireCapability(); return systemServices.addAccount(scope, name, type, password);
+        }
+        @Override public boolean removeAccount(String name, String type) {
+            requireCapability(); return systemServices.removeAccount(scope, name, type);
+        }
+        @Override public void setPassword(String name, String type, String password) {
+            requireCapability(); systemServices.setPassword(scope, name, type, password);
+        }
+        @Override public String getPassword(String name, String type) {
+            requireCapability(); return systemServices.password(scope, name, type);
+        }
+        @Override public void setAuthToken(String name, String type, String tokenType, String token) {
+            requireCapability(); systemServices.setToken(scope, name, type, tokenType, token);
+        }
+        @Override public String peekAuthToken(String name, String type, String tokenType) {
+            requireCapability(); return systemServices.token(scope, name, type, tokenType);
+        }
+        @Override public void invalidateAuthToken(String accountType, String token) {
+            requireCapability(); systemServices.invalidateToken(scope, accountType, token);
+        }
+        @Override public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, byte[] tokenPayload) {
+            requireCapability(); systemServices.scheduleAlarm(scope, processName, generation,
+                    alarmId, triggerAtMs, intervalMs, tokenPayload);
+        }
+        @Override public boolean cancelAlarm(String alarmId) {
+            requireCapability(); return systemServices.cancelAlarm(scope, alarmId);
+        }
+        @Override public java.util.List<VirtualAlarmSnapshot> listAlarms() {
+            requireCapability(); return systemServices.alarms(scope, processName, generation);
+        }
+        @Override public int ensureNamespace(String namespace, int guestId) {
+            requireCapability(); return systemServices.ensureNamespace(scope, namespace, guestId);
+        }
+        @Override public int hostIdIfPresent(String namespace, int guestId) {
+            requireCapability(); return systemServices.hostIdIfPresent(scope, namespace, guestId);
+        }
+        @Override public int guestIdForHost(String namespace, int hostId) {
+            requireCapability(); return systemServices.guestIdForHost(scope, namespace, hostId);
+        }
+        @Override public int removeNamespace(String namespace, int guestId) {
+            requireCapability(); return systemServices.removeNamespace(scope, namespace, guestId);
+        }
+        @Override public int[] listNamespaceGuestIds(String namespace) {
+            requireCapability(); return systemServices.namespaceGuestIds(scope, namespace);
+        }
+        @Override public void close() { requireCapability(); closeInternal(); }
+        @Override public void binderDied() { closeInternal(); }
+        @Override public VirtualSystemServiceStore.Scope scope() { return scope; }
+        @Override public String processName() { return processName; }
+        @Override public long generation() { return generation; }
+        @Override public IVirtualSystemServiceObserver observer() { return observer; }
+        @Override public boolean active() { return active; }
+
+        private void requireCapability() {
+            if (!active || Binder.getCallingUid() != ownerUid) {
+                throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
+            }
+        }
+        private void closeInternal() {
+            if (!active) return; active = false; observer = null;
+            systemServices.unregister(this);
             try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
         }
     }

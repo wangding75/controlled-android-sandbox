@@ -151,6 +151,7 @@ public final class VirtualSystemServiceInterceptor {
             rewriteNotificationTag(arguments, restores);
             NamespaceRewrite rewrite = rewriteNotificationId(arguments, restores, true);
             rewriteChannelStrings(arguments, restores, name);
+            rewriteNotificationChannelFields(arguments, restores);
             return Call.passThroughLifecycle(restores, result -> result,
                     () -> { if (rewrite.created) state.notifications().removeGuest(rewrite.guestId); });
         }
@@ -165,7 +166,8 @@ public final class VirtualSystemServiceInterceptor {
         }
         if (name.contains("channel") || name.contains("group")) {
             rewriteChannelStrings(arguments, restores, name);
-            return Call.passThrough(restores);
+            rewriteChannelObjects(arguments, restores);
+            return Call.passThroughLifecycle(restores, this::restoreChannelResult, () -> { });
         }
         if (name.startsWith("arenotificationsenabled")) return Call.handled(Boolean.TRUE);
         return Call.passThrough();
@@ -262,13 +264,84 @@ public final class VirtualSystemServiceInterceptor {
         }
     }
 
+    private void rewriteNotificationChannelFields(Object[] arguments, List<Restore> restores) {
+        if (arguments == null) return;
+        for (Object value : arguments) {
+            if (value == null || !value.getClass().getName().contains("Notification")) continue;
+            rewriteStringField(value, restores, "mChannelId", "channelId");
+            rewriteStringField(value, restores, "mShortcutId", "shortcutId");
+        }
+    }
+
+    private void rewriteChannelObjects(Object[] arguments, List<Restore> restores) {
+        if (arguments == null) return;
+        java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (Object value : arguments) rewriteChannelObject(value, restores, visited, true);
+    }
+
+    private Object restoreChannelResult(Object result) {
+        java.util.Set<Object> visited = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        rewriteChannelObject(result, new ArrayList<>(), visited, false);
+        return result;
+    }
+
+    private void rewriteChannelObject(Object value, List<Restore> restores, java.util.Set<Object> visited,
+                                      boolean toHost) {
+        if (value == null || !visited.add(value)) return;
+        if (value instanceof Iterable<?> iterable) {
+            for (Object item : iterable) rewriteChannelObject(item, restores, visited, toHost);
+            return;
+        }
+        if (value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int index = 0; index < length; index++) rewriteChannelObject(
+                    java.lang.reflect.Array.get(value, index), restores, visited, toHost);
+            return;
+        }
+        String className = value.getClass().getName();
+        if (!className.contains("NotificationChannel") && !className.contains("NotificationChannelGroup")) return;
+        rewriteStringField(value, restores, toHost, "mId", "id");
+        if (className.contains("NotificationChannel") && !className.contains("Group")) {
+            rewriteStringField(value, restores, toHost, "mGroup", "group");
+        }
+    }
+
+    private void rewriteStringField(Object value, List<Restore> restores, String... names) {
+        rewriteStringField(value, restores, true, names);
+    }
+
+    private void rewriteStringField(Object value, List<Restore> restores, boolean toHost, String... names) {
+        Field field = findField(value.getClass(), names);
+        if (field == null) return;
+        try {
+            field.setAccessible(true);
+            Object raw = field.get(value);
+            if (!(raw instanceof String string) || string.isEmpty()) return;
+            String updated = toHost ? channelNamespace(string) : stripChannelNamespace(string);
+            if (updated.equals(string)) return;
+            field.set(value, updated);
+            if (toHost) restores.add(() -> field.set(value, raw));
+        } catch (ReflectiveOperationException error) {
+            throw new SecurityException("VIRTUAL_NOTIFICATION_CHANNEL_FIELD_UNSUPPORTED", error);
+        }
+    }
+
+    private String channelNamespace(String value) {
+        String prefix = "cs.u" + identity.virtualUserId() + "." + identity.packageName() + ".";
+        return value.startsWith(prefix) ? value : prefix + value;
+    }
+    private String stripChannelNamespace(String value) {
+        String prefix = "cs.u" + identity.virtualUserId() + "." + identity.packageName() + ".";
+        return value.startsWith(prefix) ? value.substring(prefix.length()) : value;
+    }
+
     private void rewriteChannelStrings(Object[] arguments, List<Restore> restores, String methodName) {
         if (arguments == null || !(methodName.contains("channel") || methodName.contains("group"))) return;
         for (int index = 0; index < arguments.length; index++) {
             Object value = arguments[index];
             if (!(value instanceof String string)) continue;
             if (string.equals(identity.packageName()) || string.equals(identity.hostPackageName())) continue;
-            String namespaced = "cs.u" + identity.virtualUserId() + "." + identity.packageName() + "." + string;
+            String namespaced = channelNamespace(string);
             arguments[index] = namespaced;
             int restoreIndex = index;
             restores.add(() -> arguments[restoreIndex] = value);
