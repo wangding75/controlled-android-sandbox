@@ -11,13 +11,7 @@ import com.warden.controlledsandbox.runtime.component.activity.StubActivity4;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity5;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity6;
 import com.warden.controlledsandbox.runtime.component.activity.StubActivity7;
-import com.warden.controlledsandbox.runtime.component.receiver.BrokerManifestReceiverRuntime;
-import com.warden.controlledsandbox.runtime.component.receiver.BrokerOrderedReceiverRuntime;
-import com.warden.controlledsandbox.runtime.component.receiver.OrderedReceiverTokenRegistry;
-import com.warden.controlledsandbox.runtime.component.receiver.BroadcastPayloadEstimator;
-import com.warden.controlledsandbox.runtime.component.receiver.ManifestBroadcastDispatcher;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
-import com.warden.controlledsandbox.runtime.component.receiver.ReceiverLifecycleCoordinator;
 import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService0;
@@ -39,8 +33,6 @@ import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinator;
 import com.warden.controlledsandbox.runtime.status.BrokerRuntimeStatusSource;
 
-import com.warden.controlledsandbox.domain.component.receiver.ManifestReceiverRegistry;
-import com.warden.controlledsandbox.domain.component.receiver.OrderedBroadcastState;
 
 import android.app.Service;
 import android.content.ComponentName;
@@ -50,7 +42,6 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IGuestProcess;
-import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
@@ -59,7 +50,6 @@ import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.PackageRevision;
-import com.warden.controlledsandbox.domain.component.receiver.DynamicReceiverRegistry;
 import com.warden.controlledsandbox.domain.component.provider.ProviderAuthorityRegistry;
 import com.warden.controlledsandbox.domain.component.provider.ProviderObserverRegistry;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
@@ -72,8 +62,6 @@ import com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcher;
 import com.warden.controlledsandbox.runtime.status.RuntimeStatusLegacyAdapter;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -89,14 +77,12 @@ public final class RuntimeBrokerService extends Service {
     private VirtualUidRegistry virtualUids;
     private RuntimePermissionCoordinator runtimePermissionCoordinator;
     private final UriGrantRegistry uriGrants = new UriGrantRegistry();
-    private final BrokerReceiverRuntime receiverRuntime = new BrokerReceiverRuntime();
-    private final BrokerManifestReceiverRuntime manifestReceiverRuntime = new BrokerManifestReceiverRuntime();
-    private final ManifestBroadcastDispatcher manifestBroadcastDispatcher = new ManifestBroadcastDispatcher();
-    private final BrokerOrderedReceiverRuntime orderedReceiverRuntime =
-            new BrokerOrderedReceiverRuntime(clock, tokenGenerator);
-    private final ReceiverLifecycleCoordinator receiverLifecycle = new ReceiverLifecycleCoordinator(
-            receiverRuntime, manifestReceiverRuntime, orderedReceiverRuntime);
     private final BrokerStateStore brokerState = new BrokerStateStore();
+    private final RuntimeReceiverCoordinator receiverCoordinator = new RuntimeReceiverCoordinator(
+            sessions, brokerState, clock, tokenGenerator,
+            this::prepareGuestInternal,
+            this::sessionById,
+            (processSlot, request) -> callGuest(processSlot, guest -> guest.invokeComponent(request)));
     private final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
     private final BrokerServiceRuntime serviceRuntime = new BrokerServiceRuntime();
     private final BrokerProviderRuntime providerRuntime = new BrokerProviderRuntime();
@@ -108,18 +94,10 @@ public final class RuntimeBrokerService extends Service {
     private final RuntimeStatusDispatcher runtimeStatusDispatcher = new RuntimeStatusDispatcher(
             clock,
             new BrokerRuntimeStatusSource(sessions, activityRuntime, serviceRuntime, providerLifecycle,
-                    providerRuntime, receiverLifecycle),
+                    providerRuntime, receiverCoordinator.lifecycle()),
             this::purgeExpiredResources,
             auditSink);
     private final ConcurrentMap<Integer, GuestConnection> guestConnections = new ConcurrentHashMap<>();
-
-    private final IOrderedReceiverCompletion.Stub orderedReceiverCompletion =
-            new IOrderedReceiverCompletion.Stub() {
-                @Override public Bundle complete(Bundle result) {
-                    CallerGuard.requireSameApplication();
-                    return orderedReceiverRuntime.complete(result);
-                }
-            };
 
     @Override public void onCreate() {
         super.onCreate();
@@ -240,14 +218,14 @@ public final class RuntimeBrokerService extends Service {
                 if (ComponentOperations.SEND_BROADCAST.equals(operation)
                         && !request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
                         && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                    return dispatchManifestBroadcast(request, session);
+                    return receiverCoordinator.dispatchManifestBroadcast(request, session);
                 }
                 if ((ComponentOperations.SEND_IMPLICIT_BROADCAST.equals(operation)
                         || ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
                         || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false))
                         && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
                         && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                    return dispatchImplicitManifestBroadcast(request, session,
+                    return receiverCoordinator.dispatchImplicitManifestBroadcast(request, session,
                             ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
                                     || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false));
                 }
@@ -345,9 +323,9 @@ public final class RuntimeBrokerService extends Service {
                 BrokerProviderRuntime.Reservation providerReservation = null;
                 try {
                     if (ComponentOperations.REGISTER_RECEIVER.equals(operation)) {
-                        receiverReservation = receiverRuntime.reserveRegistration(request, activeSession);
+                        receiverReservation = receiverCoordinator.reserveRegistration(request, activeSession);
                     } else if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
-                        receiverRuntime.requireOwnedRegistration(request, activeSession);
+                        receiverCoordinator.requireOwnedRegistration(request, activeSession);
                     } else if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
                         providerReservation = providerRuntime.reservePrepare(request, activeSession);
                     }
@@ -355,7 +333,7 @@ public final class RuntimeBrokerService extends Service {
                     if (ComponentOperations.SEND_BROADCAST.equals(operation)
                             && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
                             && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                        result = dispatchDynamicBroadcast(request, activeSession);
+                        result = receiverCoordinator.dispatchDynamicBroadcast(request, activeSession);
                     } else {
                         result = callGuest(session.processSlot(), guest -> guest.invokeComponent(call));
                     }
@@ -398,12 +376,12 @@ public final class RuntimeBrokerService extends Service {
                             providerRuntime.completeOperation(providerRoute, result, now());
                             providerAuditFinalized = true;
                         }
-                        receiverRuntime.rollbackRegistration(receiverReservation);
+                        receiverCoordinator.rollbackRegistration(receiverReservation);
                         providerRuntime.rollbackPrepare(providerReservation);
                     } else {
                         serviceRuntime.applySuccessfulOperation(activeSession, request, result);
                         if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
-                            receiverRuntime.commitUnregister(request, activeSession);
+                            receiverCoordinator.commitUnregister(request, activeSession);
                         }
                         if (ComponentOperations.PROVIDER_QUERY.equals(operation)) {
                             BrokerCursorRuntime.Lease committed = cursorRuntime.commitQuery(
@@ -435,7 +413,7 @@ public final class RuntimeBrokerService extends Service {
                     }
                     return result;
                 } catch (Throwable error) {
-                    receiverRuntime.rollbackRegistration(receiverReservation);
+                    receiverCoordinator.rollbackRegistration(receiverReservation);
                     providerRuntime.rollbackPrepare(providerReservation);
                     cursorRuntime.rollbackQuery(cursorQueryReservation);
                     if (cursorPageReservation != null) {
@@ -633,7 +611,7 @@ public final class RuntimeBrokerService extends Service {
             String packageRevision = required(input, RuntimeKeys.PACKAGE_REVISION);
             input.putString(RuntimeKeys.PROCESS_NAME, processName);
             stopMismatchedRevisionSessions(packageName, userId, packageRevision);
-            manifestReceiverRuntime.indexPackage(input);
+            receiverCoordinator.indexPackage(input);
             GuestSession session = sessions.allocate(
                     packageName, userId, processName, packageRevision, now());
             GuestSession staleRecovery = null;
@@ -645,7 +623,7 @@ public final class RuntimeBrokerService extends Service {
                         cached.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
                     throw new IllegalStateException("PREPARED_SPEC_REVISION_MISMATCH");
                 }
-                receiverLifecycle.bindSession(session);
+                receiverCoordinator.bindSession(session);
                 Bundle out = new Bundle(cached);
                 out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
                         ? "ALREADY_PREPARED_DEGRADED" : "ALREADY_PREPARED");
@@ -668,7 +646,7 @@ public final class RuntimeBrokerService extends Service {
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
                     serviceRuntime.invalidate(staleRecovery);
-                    receiverLifecycle.stopSession(staleRecovery,
+                    receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
                     applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
                             staleRecovery.sessionId(), staleRecovery.generation());
@@ -683,7 +661,7 @@ public final class RuntimeBrokerService extends Service {
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
                     serviceRuntime.invalidate(staleRecovery);
-                    receiverLifecycle.stopSession(staleRecovery,
+                    receiverCoordinator.stopSession(staleRecovery,
                             "ORDERED_RECEIVER_RECOVERY_FAILED");
                     applyProviderCleanup(providerLifecycle.stopSession(staleRecovery),
                             staleRecovery.sessionId(), staleRecovery.generation());
@@ -693,7 +671,7 @@ public final class RuntimeBrokerService extends Service {
             if (staleRecovery != null) {
                 activityRuntime.recreate(staleRecovery, session);
                 serviceRuntime.processRecovered(staleRecovery, session);
-                receiverLifecycle.recoverSession(staleRecovery, session);
+                receiverCoordinator.recoverSession(staleRecovery, session);
                 ProviderLifecycleCoordinator.RecoveryResult recovery =
                         providerLifecycle.recoverSession(staleRecovery, session);
                 applyProviderCleanup(recovery.staleResources(),
@@ -704,7 +682,7 @@ public final class RuntimeBrokerService extends Service {
             Bundle cachedSpec = new Bundle(spec);
             cachedSpec.putBoolean("frameworkDegraded", degraded);
             brokerState.putPrepared(key, cachedSpec);
-            receiverLifecycle.bindSession(ready);
+            receiverCoordinator.bindSession(ready);
             Bundle out = new Bundle(spec);
             out.putAll(guestResult);
             out.putString(RuntimeKeys.STATUS, degraded ? "PREPARED_DEGRADED" : "PREPARED");
@@ -727,7 +705,7 @@ public final class RuntimeBrokerService extends Service {
     private synchronized void stopGuestInternal(String packageName, int userId) {
         java.util.List<GuestSession> active = new ArrayList<>(sessions.getAll(packageName, userId));
         for (GuestSession session : active) stopSession(session);
-        receiverLifecycle.invalidateInstance(packageName, userId,
+        receiverCoordinator.invalidateInstance(packageName, userId,
                 "ORDERED_RECEIVER_INSTANCE_STOPPED");
         applyProviderCleanup(providerLifecycle.invalidateInstance(packageName, userId), "", -1);
     }
@@ -758,7 +736,7 @@ public final class RuntimeBrokerService extends Service {
             }
         } finally {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(), original.processName()));
-            receiverLifecycle.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
+            receiverCoordinator.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
             activityRuntime.invalidate(original);
             serviceRuntime.invalidate(original);
             applyProviderCleanup(providerLifecycle.stopSession(original),
@@ -854,283 +832,6 @@ public final class RuntimeBrokerService extends Service {
     private static ArrayList<String> optionalStringList(Bundle input, String key) {
         ArrayList<String> values = input.getStringArrayList(key);
         return values == null ? new ArrayList<>() : new ArrayList<>(values);
-    }
-
-    private Bundle dispatchManifestBroadcast(Bundle request, GuestSession sender) throws Exception {
-        return deliverManifestRoute(request, sender, manifestReceiverRuntime.routeExplicit(request, sender));
-    }
-
-    private Bundle dispatchImplicitManifestBroadcast(Bundle request, GuestSession sender,
-                                                     boolean ordered) throws Exception {
-        int payloadBytes = BroadcastPayloadEstimator.requireWithinLimit(request);
-        java.util.List<BrokerManifestReceiverRuntime.Route> routes =
-                manifestReceiverRuntime.routeImplicit(request, sender);
-        OrderedBroadcastState initialState = OrderedBroadcastState.initial(
-                request.getInt(RuntimeKeys.BROADCAST_RESULT_CODE, 0),
-                request.getString(RuntimeKeys.BROADCAST_RESULT_DATA, ""),
-                stringMap(request.getBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS)));
-        ManifestBroadcastDispatcher.DispatchReport report = manifestBroadcastDispatcher.dispatch(
-                routes, ordered, ordered && request.getBoolean(RuntimeKeys.BROADCAST_STOP_ON_FAILURE, false),
-                initialState, (route, currentState) -> {
-                    Bundle deliveryRequest = new Bundle(request);
-                    deliveryRequest.putString(ComponentOperations.OPERATION, ComponentOperations.SEND_BROADCAST);
-                    deliveryRequest.putBoolean(RuntimeKeys.BROADCAST_ORDERED, ordered);
-                    deliveryRequest.putInt(RuntimeKeys.BROADCAST_PRIORITY, route.priority());
-                    if (ordered) putOrderedState(deliveryRequest, currentState);
-                    Bundle result = deliverManifestRoute(deliveryRequest, sender, route);
-                    String deliveryStatus = result.getString(RuntimeKeys.STATUS, "");
-                    if (!"BROADCAST_DELIVERED".equals(deliveryStatus)) {
-                        String reason = result.getString(RuntimeKeys.ERROR_TYPE, deliveryStatus);
-                        return ManifestBroadcastDispatcher.DeliveryOutcome.failure(
-                                reason == null || reason.trim().isEmpty() ? "DELIVERY_NOT_COMPLETED" : reason);
-                    }
-                    return ManifestBroadcastDispatcher.DeliveryOutcome.success(
-                            ordered ? resultUpdate(result) : null);
-                });
-        Bundle out = new Bundle();
-        String status;
-        if (report.matchedCount() == 0) status = "BROADCAST_NO_RECEIVERS";
-        else if (ordered && report.finalState().aborted()
-                && report.processedCount() < report.matchedCount()) {
-            status = "ORDERED_BROADCAST_ABORTED";
-        } else if (report.failedCount() == 0) {
-            status = ordered ? "ORDERED_BROADCAST_DELIVERED" : "BROADCAST_DELIVERED";
-        } else if (report.deliveredCount() == 0) status = "BROADCAST_FAILED";
-        else status = "BROADCAST_PARTIAL";
-        out.putString(RuntimeKeys.STATUS, status);
-        out.putString(ComponentOperations.ACTION, required(request, ComponentOperations.ACTION));
-        out.putBoolean(RuntimeKeys.BROADCAST_ORDERED, ordered);
-        out.putInt(RuntimeKeys.BROADCAST_MATCHED_COUNT, report.matchedCount());
-        out.putInt(RuntimeKeys.BROADCAST_DELIVERED_COUNT, report.deliveredCount());
-        out.putInt(RuntimeKeys.BROADCAST_FAILED_COUNT, report.failedCount());
-        out.putInt(RuntimeKeys.BROADCAST_PAYLOAD_BYTES, payloadBytes);
-        out.putStringArrayList(RuntimeKeys.BROADCAST_DELIVERY_FAILURES,
-                new ArrayList<>(report.failures()));
-        if (ordered) putOrderedState(out, report.finalState());
-        out.putBoolean(RuntimeKeys.BROADCAST_ABORTED, ordered && report.finalState().aborted());
-        return out;
-    }
-
-    private Bundle deliverManifestRoute(Bundle request, GuestSession sender,
-                                        BrokerManifestReceiverRuntime.Route route) throws Exception {
-        ManifestReceiverRegistry.Receiver receiver = route.receiver();
-        GuestSession target = null;
-        if (route.resolution().binding().isPresent()) {
-            ManifestReceiverRegistry.SessionBinding binding = route.resolution().binding().get();
-            target = sessionById(binding.sessionId(), binding.generation());
-            if (target != null && target.state() != SessionState.READY
-                    && target.state() != SessionState.ACTIVE) target = null;
-        }
-        boolean processStarted = false;
-        if (target == null) {
-            GuestSession current = sessions.get(receiver.packageName(), route.virtualUserId(),
-                    receiver.processName());
-            if (current != null && (current.state() == SessionState.READY
-                    || current.state() == SessionState.ACTIVE)) target = current;
-        }
-        if (target == null) {
-            Bundle activation = manifestReceiverRuntime.activationRequest(route);
-            Bundle prepared = prepareGuestInternal(activation);
-            if (!isPrepared(prepared)) return prepared;
-            target = sessions.get(receiver.packageName(), route.virtualUserId(), receiver.processName());
-            if (target == null || (target.state() != SessionState.READY
-                    && target.state() != SessionState.ACTIVE)) {
-                throw new IllegalStateException("MANIFEST_RECEIVER_TARGET_SESSION_NOT_READY");
-            }
-            processStarted = true;
-        }
-        receiverLifecycle.bindSession(target);
-        Bundle base = brokerState.prepared(processKey(target.packageName(), target.virtualUserId(), target.processName()));
-        if (base == null) throw new IllegalStateException("MANIFEST_RECEIVER_PREPARED_SPEC_MISSING");
-        Bundle call = new Bundle(base);
-        call.putAll(request);
-        call.putString(ComponentOperations.OPERATION, ComponentOperations.SEND_BROADCAST);
-        call.putString(RuntimeKeys.PACKAGE_NAME, target.packageName());
-        call.putInt(RuntimeKeys.VIRTUAL_USER_ID, target.virtualUserId());
-        call.putString(RuntimeKeys.PROCESS_NAME, target.processName());
-        call.putString(RuntimeKeys.COMPONENT_CLASS, receiver.className());
-        call.putBoolean(RuntimeKeys.RECEIVER_MANIFEST, true);
-        call.putString(RuntimeKeys.RECEIVER_PERMISSION, receiver.permission());
-        call.putInt(RuntimeKeys.BROADCAST_PRIORITY, route.priority());
-        call.putString(RuntimeKeys.CALLER_PACKAGE_NAME, sender.packageName());
-        call.putInt(RuntimeKeys.CALLER_VIRTUAL_USER_ID, sender.virtualUserId());
-        call.putString(RuntimeKeys.CALLER_SESSION_ID, sender.sessionId());
-        call.putLong(RuntimeKeys.CALLER_GENERATION, sender.generation());
-        final GuestSession deliveryTarget = target;
-        boolean ordered = request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false);
-        OrderedReceiverTokenRegistry.Lease orderedLease = null;
-        if (ordered) {
-            receiverLifecycle.purgeExpired();
-            orderedLease = orderedReceiverRuntime.issue(deliveryTarget, receiver.className(),
-                    request.getLong(RuntimeKeys.BROADCAST_RECEIVER_TIMEOUT_MS,
-                            OrderedReceiverTokenRegistry.DEFAULT_TIMEOUT_MS));
-            call.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, orderedLease.token());
-            call.putLong(RuntimeKeys.ORDERED_RECEIVER_DEADLINE_MS, orderedLease.deadlineMs());
-            call.putBinder(RuntimeKeys.ORDERED_RECEIVER_COMPLETION_BINDER,
-                    orderedReceiverCompletion.asBinder());
-        }
-        Bundle result;
-        try {
-            result = callGuest(deliveryTarget.processSlot(), guest -> guest.invokeComponent(call));
-        } catch (Throwable error) {
-            if (orderedLease != null) {
-                orderedReceiverRuntime.cancel(orderedLease,
-                        "ORDERED_RECEIVER_GUEST_CALL_FAILED:" + error.getClass().getSimpleName());
-            }
-            throw error;
-        }
-        if (orderedLease != null) {
-            String guestStatus = result.getString(RuntimeKeys.STATUS, "");
-            boolean completionRejected = result.keySet().contains(RuntimeKeys.ORDERED_RECEIVER_ACCEPTED)
-                    && !result.getBoolean(RuntimeKeys.ORDERED_RECEIVER_ACCEPTED, false);
-            if ("FAILED".equals(guestStatus) || completionRejected) {
-                String reason = "FAILED".equals(guestStatus)
-                        ? result.getString(RuntimeKeys.ERROR_TYPE, "FAILED") : guestStatus;
-                orderedReceiverRuntime.cancel(orderedLease,
-                        "ORDERED_RECEIVER_GUEST_FAILED:" + reason);
-                if (completionRejected && !"FAILED".equals(guestStatus)) {
-                    result = failure("ORDERED_RECEIVER_COMPLETION_REJECTED", reason);
-                }
-            } else {
-                OrderedReceiverTokenRegistry.AwaitResult completion;
-                try {
-                    completion = orderedReceiverRuntime.await(orderedLease);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    orderedReceiverRuntime.cancel(orderedLease, "ORDERED_RECEIVER_WAIT_INTERRUPTED");
-                    throw interrupted;
-                }
-                if (completion.completed()) {
-                    result = new Bundle();
-                    result.putString(RuntimeKeys.STATUS, "BROADCAST_DELIVERED");
-                    putResultUpdate(result, completion.update());
-                } else {
-                    result = failure(completion.reason(), completion.state().name());
-                }
-                result.putString(RuntimeKeys.ORDERED_RECEIVER_STATE, completion.state().name());
-            }
-            result.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, orderedLease.token());
-            result.putLong(RuntimeKeys.ORDERED_RECEIVER_DEADLINE_MS, orderedLease.deadlineMs());
-        }
-        result.putString(RuntimeKeys.SESSION_ID, deliveryTarget.sessionId());
-        result.putLong(RuntimeKeys.GENERATION, deliveryTarget.generation());
-        result.putInt(RuntimeKeys.PROCESS_SLOT, deliveryTarget.processSlot());
-        result.putString(RuntimeKeys.PROCESS_NAME, deliveryTarget.processName());
-        result.putString(RuntimeKeys.TARGET_PACKAGE_NAME, deliveryTarget.packageName());
-        result.putInt(RuntimeKeys.TARGET_VIRTUAL_USER_ID, deliveryTarget.virtualUserId());
-        result.putString(RuntimeKeys.COMPONENT_CLASS, receiver.className());
-        result.putBoolean(RuntimeKeys.RECEIVER_MANIFEST, true);
-        result.putBoolean(RuntimeKeys.RECEIVER_PROCESS_STARTED, processStarted);
-        result.putInt(RuntimeKeys.BROADCAST_PRIORITY, route.priority());
-        result.putString(RuntimeKeys.RECEIVER_ACTIVATION_KEY,
-                "u" + deliveryTarget.virtualUserId() + ":" + deliveryTarget.packageName()
-                        + "#" + deliveryTarget.processName());
-        return result;
-    }
-
-    private static OrderedBroadcastState.ResultUpdate resultUpdate(Bundle result) {
-        OrderedBroadcastState.ResultUpdate update = new OrderedBroadcastState.ResultUpdate();
-        java.util.Set<String> keys = result.keySet();
-        if (keys.contains(RuntimeKeys.BROADCAST_RESULT_CODE)) {
-            update.resultCode(result.getInt(RuntimeKeys.BROADCAST_RESULT_CODE, 0));
-        }
-        if (keys.contains(RuntimeKeys.BROADCAST_RESULT_DATA)) {
-            update.resultData(result.getString(RuntimeKeys.BROADCAST_RESULT_DATA, ""));
-        }
-        if (keys.contains(RuntimeKeys.BROADCAST_RESULT_EXTRAS)) {
-            update.resultExtras(stringMap(result.getBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS)));
-        }
-        if (result.getBoolean(RuntimeKeys.BROADCAST_ABORT, false)) update.abort();
-        if (result.getBoolean(RuntimeKeys.BROADCAST_CLEAR_ABORT, false)) update.clearAbort();
-        return update;
-    }
-
-    private static void putResultUpdate(Bundle target, OrderedBroadcastState.ResultUpdate update) {
-        if (target == null || update == null) return;
-        if (update.hasResultCode()) {
-            target.putInt(RuntimeKeys.BROADCAST_RESULT_CODE, update.resultCode());
-        }
-        if (update.hasResultData()) {
-            target.putString(RuntimeKeys.BROADCAST_RESULT_DATA, update.resultData());
-        }
-        if (update.hasResultExtras()) {
-            Bundle extras = new Bundle();
-            for (Map.Entry<String, String> entry : update.resultExtras().entrySet()) {
-                extras.putString(entry.getKey(), entry.getValue());
-            }
-            target.putBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS, extras);
-        }
-        if (update.abortRequested()) target.putBoolean(RuntimeKeys.BROADCAST_ABORT, true);
-        if (update.clearAbortRequested()) target.putBoolean(RuntimeKeys.BROADCAST_CLEAR_ABORT, true);
-    }
-
-    private static void putOrderedState(Bundle target, OrderedBroadcastState state) {
-        target.putInt(RuntimeKeys.BROADCAST_RESULT_CODE, state.resultCode());
-        target.putString(RuntimeKeys.BROADCAST_RESULT_DATA, state.resultData());
-        Bundle extras = new Bundle();
-        for (Map.Entry<String, String> entry : state.resultExtras().entrySet()) {
-            extras.putString(entry.getKey(), entry.getValue());
-        }
-        target.putBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS, extras);
-        target.putBoolean(RuntimeKeys.BROADCAST_ABORTED, state.aborted());
-    }
-
-    private static Map<String, String> stringMap(Bundle bundle) {
-        if (bundle == null || bundle.keySet().isEmpty()) return java.util.Collections.emptyMap();
-        LinkedHashMap<String, String> result = new LinkedHashMap<>();
-        for (String key : bundle.keySet()) {
-            Object value = bundle.get(key);
-            if (!(value instanceof String)) throw new IllegalArgumentException("BROADCAST_RESULT_EXTRAS_STRING_ONLY");
-            result.put(key, (String) value);
-        }
-        return result;
-    }
-
-    private Bundle dispatchDynamicBroadcast(Bundle request, GuestSession sender) {
-        String action = required(request, ComponentOperations.ACTION);
-        boolean external = request.getBoolean("externalBroadcast", false);
-        java.util.List<DynamicReceiverRegistry.Registration> registrations = receiverRuntime.resolve(
-                action, sender.virtualUserId(), external ? "" : sender.sessionId(), external);
-        int delivered = 0;
-        int failed = 0;
-        ArrayList<String> failures = new ArrayList<>();
-        for (DynamicReceiverRegistry.Registration registration : registrations) {
-            GuestSession target = sessionById(registration.sessionId(), registration.generation());
-            if (target == null || (target.state() != SessionState.READY && target.state() != SessionState.ACTIVE)) {
-                failed++;
-                failures.add(registration.id() + ":SESSION_UNAVAILABLE");
-                continue;
-            }
-            Bundle base = brokerState.prepared(processKey(target.packageName(), target.virtualUserId(), target.processName()));
-            if (base == null) {
-                failed++;
-                failures.add(registration.id() + ":PREPARED_SPEC_MISSING");
-                continue;
-            }
-            Bundle call = new Bundle(base);
-            call.putAll(request);
-            call.putString(RuntimeKeys.COMPONENT_CLASS, registration.receiverClass());
-            call.putString(RuntimeKeys.RECEIVER_ID, registration.id());
-            try {
-                Bundle result = callGuest(target.processSlot(), guest -> guest.invokeComponent(call));
-                if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
-                    failed++;
-                    failures.add(registration.id() + ":" + result.getString(RuntimeKeys.ERROR_TYPE, "FAILED"));
-                } else {
-                    delivered++;
-                }
-            } catch (Exception error) {
-                failed++;
-                failures.add(registration.id() + ":" + error.getClass().getSimpleName());
-            }
-        }
-        Bundle out = new Bundle();
-        out.putString(RuntimeKeys.STATUS, failed == 0 ? "BROADCAST_DELIVERED" : "BROADCAST_PARTIAL");
-        out.putString(ComponentOperations.ACTION, action);
-        out.putInt("deliveredCount", delivered);
-        out.putInt("failedCount", failed);
-        out.putStringArrayList("deliveryFailures", failures);
-        return out;
     }
 
     private Bundle unregisterProviderObserver(Bundle request, String requestedPackage, int requestedUser) {
@@ -1357,7 +1058,7 @@ public final class RuntimeBrokerService extends Service {
 
     private void purgeExpiredResources(long nowMs) {
         applyProviderCleanup(providerLifecycle.purgeExpired(nowMs), "", -1);
-        receiverLifecycle.purgeExpired();
+        receiverCoordinator.purgeExpired();
     }
 
     private void applyProviderCleanup(ProviderLifecycleCoordinator.CleanupResult cleanup,
@@ -1465,7 +1166,7 @@ public final class RuntimeBrokerService extends Service {
                 if (affected != null) {
                     activityRuntime.processDisconnected(affected);
                     serviceRuntime.processDisconnected(affected);
-                    receiverLifecycle.disconnectSession(affected,
+                    receiverCoordinator.disconnectSession(affected,
                             "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + reason);
                     RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
                             sessionBundle(affected, affected.state().name()));
@@ -1495,14 +1196,14 @@ public final class RuntimeBrokerService extends Service {
 
     @Override public void onDestroy() {
         for (GuestSession session : sessions.snapshot()) {
-            receiverLifecycle.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
+            receiverCoordinator.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
             applyProviderCleanup(providerLifecycle.stopSession(session),
                     session.sessionId(), session.generation());
         }
         Integer[] slots;
         synchronized (this) { slots = guestConnections.keySet().toArray(new Integer[0]); }
         for (int slot : slots) releaseGuestConnection(slot);
-        receiverLifecycle.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
+        receiverCoordinator.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
         if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
         super.onDestroy();
     }

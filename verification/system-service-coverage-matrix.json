@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "scope": "source-production-device-system-service-evidence",
+  "services": [
+    {"id":"package-manager","hook":"virtual-query-and-resolve","isolation":"package-user-policy","production":"wired","hostFallback":"bounded-system-only","device":"not-tested"},
+    {"id":"activity-manager","hook":"identity-proxy-and-runtime-router","isolation":"session-generation","production":"wired","hostFallback":"bounded","device":"not-tested"},
+    {"id":"activity-task-manager","hook":"identity-proxy-and-runtime-router","isolation":"session-generation","production":"wired","hostFallback":"bounded","device":"not-tested"},
+    {"id":"appops","hook":"virtual-policy-and-attribution","isolation":"package-user-policy","production":"wired","hostFallback":"fail-closed-for-guest","device":"not-tested"},
+    {"id":"permission","hook":"virtual-policy-and-runtime-workflow","isolation":"package-user-policy","production":"wired","hostFallback":"fail-closed-for-guest","device":"not-tested"},
+    {"id":"camera","hook":"bounded-method-proxy","isolation":"generation-capability","production":"wired","hostFallback":"fail-closed-without-proxy","device":"not-tested"},
+    {"id":"location","hook":"bounded-method-proxy","isolation":"generation-capability","production":"wired","hostFallback":"fail-closed-without-proxy","device":"not-tested"},
+    {"id":"audio","hook":"bounded-audiomanager-capture-proxy","isolation":"generation-capability","production":"partial","hostFallback":"native-paths-not-covered","device":"not-tested"},
+    {"id":"alarm","hook":"generation-local-scheduler","isolation":"generation-local","production":"wired","hostFallback":"denied","device":"not-tested"},
+    {"id":"clipboard","hook":"generation-local-store","isolation":"generation-local","production":"wired","hostFallback":"denied","device":"not-tested"},
+    {"id":"account","hook":"basic-generation-local-store","isolation":"generation-local","production":"wired","hostFallback":"denied","device":"not-tested"},
+    {"id":"notification","hook":"id-tag-channel-namespace","isolation":"generation-namespace","production":"partial","hostFallback":"delegated-after-rewrite","device":"not-tested"},
+    {"id":"job-scheduler","hook":"id-query-namespace","isolation":"generation-namespace","production":"partial","hostFallback":"delegated-after-rewrite","device":"not-tested"},
+    {"id":"pending-intent","hook":"virtual-sender-registry-and-broker-route","isolation":"package-user-generation","production":"wired","hostFallback":"known-virtual-senders-denied","device":"not-tested"},
+    {"id":"storage","hook":"path-and-manager-rewrite","isolation":"instance-path","production":"partial","hostFallback":"bounded","device":"not-tested"}
+  ],
+  "limitations": [
+    "Alarm, Clipboard and Account state is generation-local and not yet Binder-persisted across Guest processes.",
+    "Notification channel object rewriting and cancel-all lifecycle are incomplete.",
+    "JobScheduler cancel-all is fail-closed to avoid cancelling host jobs.",
+    "PendingIntent activity-result delivery and OEM Binder variants are incomplete.",
+    "No service in this matrix has Android device evidence in M4-T10."
+  ]
+}

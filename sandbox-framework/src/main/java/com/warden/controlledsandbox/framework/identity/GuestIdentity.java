@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.framework.capability.CapabilityAccessPolicy;
 import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
 import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
 
+
 public final class GuestIdentity {
     private final String packageName;
     private final int virtualUid;
@@ -24,6 +25,7 @@ public final class GuestIdentity {
     private final CapabilityAccessPolicy capabilityPolicy;
     private final CapabilityAuditSink capabilityAudit;
     private final CapabilityLeaseRegistry capabilityLeases;
+    private final VirtualSystemServiceState virtualServices;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
                          Set<String> requestedPermissions) {
@@ -64,7 +66,7 @@ public final class GuestIdentity {
                          SandboxAppOpsPolicy appOpsPolicy) {
         this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName, hostUid,
                 packageMetadata, processName, virtualUserId, generation, permissionPolicy, appOpsPolicy,
-                CapabilityAuditSink.NO_OP, new CapabilityLeaseRegistry());
+                CapabilityAuditSink.NO_OP, new CapabilityLeaseRegistry(), new VirtualSystemServiceState());
     }
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
@@ -75,6 +77,20 @@ public final class GuestIdentity {
                          SandboxAppOpsPolicy appOpsPolicy,
                          CapabilityAuditSink capabilityAudit,
                          CapabilityLeaseRegistry capabilityLeases) {
+        this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName, hostUid,
+                packageMetadata, processName, virtualUserId, generation, permissionPolicy, appOpsPolicy,
+                capabilityAudit, capabilityLeases, new VirtualSystemServiceState());
+    }
+
+    public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
+                         Set<String> requestedPermissions, String hostPackageName, int hostUid,
+                         VirtualPackageMetadata packageMetadata, String processName,
+                         int virtualUserId, long generation,
+                         VirtualPermissionPolicy permissionPolicy,
+                         SandboxAppOpsPolicy appOpsPolicy,
+                         CapabilityAuditSink capabilityAudit,
+                         CapabilityLeaseRegistry capabilityLeases,
+                         VirtualSystemServiceState virtualServices) {
         if (packageName == null || packageName.trim().isEmpty()) {
             throw new IllegalArgumentException("packageName is required");
         }
@@ -105,6 +121,7 @@ public final class GuestIdentity {
         this.capabilityPolicy = new CapabilityAccessPolicy(this.permissionPolicy::isGranted, this.appOpsPolicy::mode);
         this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
         this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
+        this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
     }
 
     public String packageName() { return packageName; }
@@ -122,4 +139,5 @@ public final class GuestIdentity {
     public CapabilityAccessPolicy capabilityPolicy() { return capabilityPolicy; }
     public CapabilityAuditSink capabilityAudit() { return capabilityAudit; }
     public CapabilityLeaseRegistry capabilityLeases() { return capabilityLeases; }
+    public VirtualSystemServiceState virtualServices() { return virtualServices; }
 }

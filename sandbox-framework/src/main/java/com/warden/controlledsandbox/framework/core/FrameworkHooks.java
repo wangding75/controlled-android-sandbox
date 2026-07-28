@@ -10,6 +10,9 @@ import com.warden.controlledsandbox.framework.service.StorageManagerHook;
 import com.warden.controlledsandbox.framework.service.CameraServiceHook;
 import com.warden.controlledsandbox.framework.service.LocationServiceHook;
 import com.warden.controlledsandbox.framework.service.AudioCaptureServiceHook;
+import com.warden.controlledsandbox.framework.service.AlarmManagerHook;
+import com.warden.controlledsandbox.framework.service.ClipboardManagerHook;
+import com.warden.controlledsandbox.framework.service.AccountManagerHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -44,6 +47,7 @@ public final class FrameworkHooks implements AutoCloseable {
             Context guestContext, Context hostServiceContext, GuestIdentity identity,
             FrameworkCallInterceptor callInterceptor) {
         List<AutoCloseable> hooks = new ArrayList<>();
+        hooks.add(identity.virtualServices());
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
         attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(guestContext, identity));
@@ -57,6 +61,9 @@ public final class FrameworkHooks implements AutoCloseable {
         }
         attempt("notification", installed, failures, hooks, () -> NotificationManagerHook.install(identity));
         attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(guestContext, identity));
+        attempt("alarm", installed, failures, hooks, () -> AlarmManagerHook.install(hostServiceContext, identity));
+        attempt("clipboard", installed, failures, hooks, () -> ClipboardManagerHook.install(hostServiceContext, identity));
+        attempt("account", installed, failures, hooks, () -> AccountManagerHook.install(hostServiceContext, identity));
         attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(guestContext, identity));
         attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, () -> LocationServiceHook.install(hostServiceContext, identity));

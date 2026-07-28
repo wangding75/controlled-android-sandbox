@@ -49,13 +49,13 @@
       "name": "sandbox-framework",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 96,
+      "fileCount": 104,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "6e0c4870be8aa7cc405ffca4d5ac31f28623517319bbc66cd38951561dab7db3"
+      "sourceDigestSha256": "7bb989f7d144558d99d2cfdba5c4c3cfedd00e47510d9518855871ff1530fa7a"
     },
     {
       "type": "library",
@@ -77,13 +77,13 @@
       "name": "sandbox-runtime",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 126,
+      "fileCount": 132,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "756a57286d0e08f9eb992c2271ee4c950838a8d742e9de9902348f7826564179"
+      "sourceDigestSha256": "9ca7409a569f06e63d8c4174715305e2039a61f7582c4c6e5320c024efe99727"
     },
     {
       "type": "application",

@@ -40,7 +40,7 @@ public final class GuestRuntimeEnvironment {
         long started = android.os.SystemClock.elapsedRealtime();
         Bundle result = new Bundle();
         FrameworkHooks stagedHooks = null;
-        OrderedReceiverFinishInterceptor stagedOrderedReceiverInterceptor = null;
+        GuestFrameworkCallRouter stagedFrameworkCallRouter = null;
         Session stagedSession = null;
         try {
             RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot);
@@ -83,9 +83,11 @@ public final class GuestRuntimeEnvironment {
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo());
+            GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
+                    spec, new GuestPendingIntentDispatcher(guestContext, spec));
+            stagedFrameworkCallRouter = frameworkCallRouter;
             OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor =
-                    new OrderedReceiverFinishInterceptor();
-            stagedOrderedReceiverInterceptor = orderedReceiverFinishInterceptor;
+                    frameworkCallRouter.orderedReceivers();
             VirtualPermissionPolicy permissionPolicy = permissionPolicy(spec.packageState);
             SandboxAppOpsPolicy appOpsPolicy = appOpsPolicy(spec.packageState);
             GuestCapabilityAuditLog capabilityAudit = new GuestCapabilityAuditLog();
@@ -96,7 +98,7 @@ public final class GuestRuntimeEnvironment {
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
                             permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases),
-                    orderedReceiverFinishInterceptor);
+                    frameworkCallRouter);
             stagedHooks = frameworkHooks;
             frameworkHooks.report().requireMandatoryReady();
             CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(),
@@ -108,14 +110,14 @@ public final class GuestRuntimeEnvironment {
             }
             guestContext.application(application);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
-                    orderedReceiverFinishInterceptor, packageMetadata, permissionPolicy, appOpsPolicy,
+                    frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
                     capabilityPolicy, capabilityAudit, capabilityLeases, nativePolicyConfigured,
                     nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
             stagedSession = session;
             session.components = new GuestComponentRuntime(session);
             current = session;
             stagedHooks = null;
-            stagedOrderedReceiverInterceptor = null;
+            stagedFrameworkCallRouter = null;
             Thread.currentThread().setContextClassLoader(loader);
             application.onCreate();
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
@@ -130,7 +132,7 @@ public final class GuestRuntimeEnvironment {
             if (stagedSession != null) stagedSession.shutdown();
             else {
                 if (stagedHooks != null) stagedHooks.close();
-                if (stagedOrderedReceiverInterceptor != null) stagedOrderedReceiverInterceptor.close();
+                if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
             }
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
@@ -227,6 +229,7 @@ public final class GuestRuntimeEnvironment {
         final Application application;
         final GuestResourceLoader.LoadedResources resources;
         final FrameworkHooks frameworkHooks;
+        final GuestFrameworkCallRouter frameworkCallRouter;
         final OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor;
         final VirtualPackageMetadata packageMetadata;
         final VirtualPermissionPolicy permissionPolicy;
@@ -243,7 +246,7 @@ public final class GuestRuntimeEnvironment {
 
         Session(GuestPackageSpec spec, GuestClassLoader classLoader, GuestContext context,
                 Application application, GuestResourceLoader.LoadedResources resources, FrameworkHooks frameworkHooks,
-                OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor,
+                GuestFrameworkCallRouter frameworkCallRouter,
                 VirtualPackageMetadata packageMetadata, VirtualPermissionPolicy permissionPolicy,
                 SandboxAppOpsPolicy appOpsPolicy, CapabilityAccessPolicy capabilityPolicy,
                 GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
@@ -255,8 +258,9 @@ public final class GuestRuntimeEnvironment {
             this.application = application;
             this.resources = resources;
             this.frameworkHooks = frameworkHooks;
-            this.orderedReceiverFinishInterceptor = java.util.Objects.requireNonNull(
-                    orderedReceiverFinishInterceptor, "orderedReceiverFinishInterceptor");
+            this.frameworkCallRouter = java.util.Objects.requireNonNull(
+                    frameworkCallRouter, "frameworkCallRouter");
+            this.orderedReceiverFinishInterceptor = frameworkCallRouter.orderedReceivers();
             this.packageMetadata = java.util.Objects.requireNonNull(packageMetadata, "packageMetadata");
             this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
             this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
@@ -343,7 +347,7 @@ public final class GuestRuntimeEnvironment {
         void shutdown() {
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
-            orderedReceiverFinishInterceptor.close();
+            frameworkCallRouter.close();
             frameworkHooks.close();
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();

@@ -49,7 +49,7 @@ Product callers use a typed, death-linked `IPackageManagementSession` capability
 - one-time, expiring Activity route tokens;
 - Provider Authority, Cursor, FileDescriptor, ContentObserver and URI Grant ownership, coordinated through one lifecycle cleanup authority.
 
-UI code sends requests but does not mutate runtime state directly. Runtime permission request/report orchestration is delegated to `RuntimePermissionCoordinator`, which depends on a narrow session view and `RuntimePermissionGateway`; this is the first extraction from the still-large Broker service.
+Receiver implementation ownership is delegated to `RuntimeReceiverCoordinator`, which owns dynamic registrations, Manifest routing, ordered-broadcast tokens and Receiver lifecycle cleanup. Runtime permission request/report orchestration is delegated to `RuntimePermissionCoordinator`, which depends on a narrow session view and `RuntimePermissionGateway`. UI code sends requests but does not mutate runtime state directly; the central Broker remains large but no longer contains Receiver dispatch policy.
 
 ## IPC contracts
 
@@ -126,13 +126,13 @@ Current bridges are intentionally explicit:
 - Receiver: Broker-indexed explicit and action-indexed implicit manifest Receiver routing with deterministic process activation, plus session-owned dynamic Receiver delivery and a bounded ordered-result source model.
 - Provider: direct `attachInfo`/`onCreate`, broker-routed CRUD/file operations, Cursor/FileDescriptor leases and broker-owned observer callbacks.
 
-These are development implementations, not yet proof of complete Android compatibility. Provider Batch, ContentObserver, Session-bound URI Grant and explicit/implicit manifest Receiver routing are locally wired. Ordered result policy exists at source level, while platform `BroadcastReceiver.PendingResult`, protected/background broadcasts, PendingIntent and full task semantics remain open.
+These are development implementations, not yet proof of complete Android compatibility. Provider Batch, ContentObserver, Session-bound URI Grant, explicit/implicit manifest Receiver routing and a bounded `BroadcastReceiver.PendingResult` completion bridge are locally wired. Generation-bound PendingIntent senders now route Activity, Service and Broadcast delivery through the Broker; Activity-result senders, protected/background broadcasts and full task semantics remain open.
 
 ## Framework adapters
 
 `sandbox-framework` installs process-local PackageManager and selected system-service proxies. Package/application/component identity, virtual UID, per-user permission decisions and bounded AppOps modes originate from the package-service snapshot. Direct host-package PackageManager queries are hidden. Hook status and failures are reported; teardown restores original objects.
 
-Activity/task, notification, job and storage adapters remain bounded source implementations. Permission and AppOps proxies cover explicit check-style surfaces, known integer operation codes and nested Attribution chains. Camera, Location and bounded AudioManager capture methods are gated through reversible service-field proxies. Effective grants fail closed when the corresponding proxy is unavailable; recognized Location callbacks and Camera handles are released on policy revoke. Native AudioRecord/MediaRecorder and unrecognized Android/OEM service variants remain outside this source boundary.
+Activity/task, notification, job and storage adapters remain bounded source implementations. PendingIntent sender identity is generation-bound and known virtual senders route back through the Broker. Alarm, Clipboard and Account have fail-closed generation-local models; Notification and Job use bounded host-ID namespaces. These models are not yet Binder-owned durable services shared across Guest processes. Permission and AppOps proxies cover explicit check-style surfaces, known integer operation codes and nested Attribution chains. Camera, Location and bounded AudioManager capture methods are gated through reversible service-field proxies. Effective grants fail closed when the corresponding proxy is unavailable; recognized Location callbacks and Camera handles are released on policy revoke. Native AudioRecord/MediaRecorder and unrecognized Android/OEM service variants remain outside this source boundary.
 
 ## Native boundary
 

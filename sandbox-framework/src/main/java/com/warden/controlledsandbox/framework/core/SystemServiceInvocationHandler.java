@@ -18,6 +18,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final GuestIdentity identity;
     private final String serviceName;
     private final CapabilityServiceInterceptor capabilityInterceptor;
+    private final VirtualSystemServiceInterceptor virtualServiceInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -29,6 +30,8 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.serviceName = serviceName == null ? "" : serviceName;
         this.capabilityInterceptor = Set.of("camera", "location", "audio").contains(this.serviceName)
                 ? new CapabilityServiceInterceptor(identity, this.serviceName) : null;
+        this.virtualServiceInterceptor = Set.of("alarm", "clipboard", "account", "notification", "jobscheduler")
+                .contains(this.serviceName) ? new VirtualSystemServiceInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -38,6 +41,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
         Object[] rewritten = arguments == null ? null : arguments.clone();
+        VirtualSystemServiceInterceptor.Call virtualCall = virtualServiceInterceptor == null
+                ? VirtualSystemServiceInterceptor.Call.passThrough()
+                : virtualServiceInterceptor.before(method, rewritten);
+        if (virtualCall.handled()) return virtualCall.result();
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
         try {
             try {
@@ -45,17 +52,21 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
                 }
-                return IdentityObjectRewriter.rewriteResult(result, identity);
+                Object identityRewritten = IdentityObjectRewriter.rewriteResult(result, identity);
+                return virtualCall.rewriteResult(identityRewritten);
             } catch (InvocationTargetException error) {
                 Throwable cause = error.getCause();
+                virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, cause);
                 throw cause;
             } catch (Throwable error) {
+                virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, error);
                 throw error;
             }
         } finally {
             scope.close();
+            virtualCall.close();
         }
     }
 

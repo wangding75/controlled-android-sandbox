@@ -15,6 +15,8 @@ required = [
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java',
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/BrokerOrderedReceiverRuntime.java',
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/ReceiverLifecycleCoordinator.java',
+    'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java',
+    'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinatorSelfTest.java',
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridge.java',
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverFinishInterceptor.java',
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverFinishToken.java',
@@ -46,19 +48,36 @@ for token in ['SEND_IMPLICIT_BROADCAST', 'SEND_ORDERED_BROADCAST']:
         errors.append(f'ComponentOperations missing {token}')
 
 broker = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java').read_text()
+coordinator = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java').read_text()
 for token in [
-    'ManifestBroadcastDispatcher', 'dispatchImplicitManifestBroadcast(', 'BroadcastPayloadEstimator',
-    'BrokerOrderedReceiverRuntime', 'orderedReceiverCompletion', 'orderedReceiverRuntime.issue(',
-    'orderedReceiverRuntime.await(', 'ReceiverLifecycleCoordinator',
-    'receiverLifecycle.disconnectSession(', 'receiverLifecycle.recoverSession(',
-    'receiverLifecycle.stopSession(', 'receiverLifecycle.invalidateInstance(',
-    'receiverLifecycle.invalidateAll(', 'receiverLifecycle.purgeExpired(',
-    'ORDERED_RECEIVER_COMPLETION_BINDER',
+    'RuntimeReceiverCoordinator receiverCoordinator',
+    'receiverCoordinator.dispatchManifestBroadcast(',
+    'receiverCoordinator.dispatchImplicitManifestBroadcast(',
+    'receiverCoordinator.dispatchDynamicBroadcast(',
+    'receiverCoordinator.disconnectSession(',
+    'receiverCoordinator.recoverSession(',
+    'receiverCoordinator.stopSession(',
+    'receiverCoordinator.invalidateInstance(',
+    'receiverCoordinator.invalidateAll(',
+    'receiverCoordinator.purgeExpired(',
 ]:
     if token not in broker:
-        errors.append(f'RuntimeBrokerService missing broadcast routing token: {token}')
+        errors.append(f'RuntimeBrokerService missing Receiver coordinator delegation: {token}')
+for token in [
+    'ManifestBroadcastDispatcher', 'dispatchImplicitManifestBroadcast(', 'BroadcastPayloadEstimator',
+    'BrokerOrderedReceiverRuntime', 'completion = new IOrderedReceiverCompletion.Stub()',
+    'ordered.issue(', 'ordered.await(', 'ReceiverLifecycleCoordinator',
+    'lifecycle.disconnectSession(', 'lifecycle.recoverSession(', 'lifecycle.stopSession(',
+    'lifecycle.invalidateInstance(', 'lifecycle.invalidateAll(', 'lifecycle.purgeExpired(',
+    'ORDERED_RECEIVER_COMPLETION_BINDER',
+]:
+    if token not in coordinator:
+        errors.append(f'RuntimeReceiverCoordinator missing broadcast routing token: {token}')
 if 'for (BrokerManifestReceiverRuntime.Route route : routes)' in broker:
-    errors.append('ordered broadcast policy must remain inside ManifestBroadcastDispatcher')
+    errors.append('ordered broadcast policy must remain outside RuntimeBrokerService')
+if any(token in broker for token in ['BrokerOrderedReceiverRuntime', 'BrokerManifestReceiverRuntime',
+                                     'BrokerReceiverRuntime receiverRuntime', 'IOrderedReceiverCompletion.Stub']):
+    errors.append('RuntimeBrokerService still owns Receiver implementation registries')
 if 'new OrderedReceiverPendingResultBridge' in broker or 'setPendingResult(' in broker:
     errors.append('Broker must not construct Guest PendingResult objects')
 
@@ -149,7 +168,8 @@ if 'FrameworkCallInterceptor' not in framework_handler or '.intercept(' not in f
 runner = (ROOT / 'tools/static_android_compile.py').read_text()
 for test in [
     'ManifestBroadcastDispatcherSelfTest', 'OrderedReceiverTokenRegistrySelfTest',
-    'ReceiverLifecycleCoordinatorSelfTest', 'OrderedReceiverPendingResultBridgeSelfTest',
+    'ReceiverLifecycleCoordinatorSelfTest', 'RuntimeReceiverCoordinatorSelfTest',
+    'OrderedReceiverPendingResultBridgeSelfTest',
     'FrameworkCallInterceptorSelfTest',
 ]:
     if test not in runner:

@@ -15,6 +15,7 @@ A from-scratch Android application-virtualization research project. Production s
 - Typed virtual Intent filters and deterministic Guest-local PackageManager query/resolve for Activity, Service, Receiver and Provider metadata, including action/category/data/MIME, default-only, disabled-component, install-source and install-time semantics.
 - Catalog-v5 runtime-permission requests and audit, a Runtime-Broker-only typed Binder capability, host-capability-backed effective grants, Activity callback bridging and same-generation permission/AppOps/camera-location service-gate refresh.
 - Method-level Camera/Location and bounded AudioManager capture proxies, fail-closed proxy readiness, Attribution-aware AppOps, live cleanup of recognized capability resources and per-generation capability-call audit.
+- Guest-generation PendingIntent sender identity and Broker routing, bounded Alarm/Clipboard/Account virtualization, Notification/Job ID namespaces, and a Receiver authority extracted from the central Runtime Broker.
 - WebView data-directory suffix per virtual user/process slot.
 - Native C++ path/network policy engine with ARM64/x86_64 Android build definitions and a host-side self-test.
 - Structured JSONL runtime diagnostics, uncaught-exception capture and main-thread liveness watchdog.

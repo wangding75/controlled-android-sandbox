@@ -911,6 +911,95 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Runtime permission request/report validation and Package Service delegation are extracted from RuntimeBrokerService behind a testable gateway and session resolver. Other Broker responsibilities remain large and require further decomposition."
+    },
+    {
+      "id": "framework.pending-intent-virtual-identity",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.pending-intent-broker-routing",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestFrameworkCallRouter.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPendingIntentDispatcher.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/RouteBrokerClient.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.alarm-basic-lifecycle",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/AlarmManagerHook.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.clipboard-generation-isolation",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/ClipboardManagerHook.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.account-basic-generation-isolation",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/AccountManagerHook.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.notification-id-tag-namespace",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/NotificationManagerHook.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "framework.job-id-query-namespace",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/JobSchedulerHook.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
+    },
+    {
+      "id": "runtime.receiver-coordinator-split",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinatorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested"
     }
   ],
   "statusDimensions": {

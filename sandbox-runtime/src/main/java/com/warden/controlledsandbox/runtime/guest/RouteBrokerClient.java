@@ -27,6 +27,14 @@ public final class RouteBrokerClient {
         call(activity, broker -> broker.activityEvent(request), callback);
     }
 
+    public static void launchActivity(Context context, Bundle request, Callback callback) {
+        call(context, broker -> broker.launchActivity(request), callback);
+    }
+
+    public static void invokeComponent(Context context, Bundle request, Callback callback) {
+        call(context, broker -> broker.invokeComponent(request), callback);
+    }
+
     public static void requestPermission(Activity activity, String sessionId, long generation,
                                          String permission, int requestCode,
                                          PermissionCallback callback) {
@@ -63,19 +71,19 @@ public final class RouteBrokerClient {
         }
     }
 
-    private static void call(Activity activity, RemoteCall call, Callback callback) {
-        Intent service = new Intent(activity, RuntimeBrokerService.class);
+    private static void call(Context context, RemoteCall call, Callback callback) {
+        Intent service = new Intent(context, RuntimeBrokerService.class);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
                 Bundle result;
                 try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
                 catch (Exception error) { result = failure(error); }
-                try { activity.unbindService(this); } catch (Exception ignored) { }
+                try { context.unbindService(this); } catch (Exception ignored) { }
                 callback.complete(result);
             }
             @Override public void onServiceDisconnected(ComponentName name) { }
         };
-        if (!activity.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+        if (!context.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
             Bundle failed = new Bundle();
             failed.putString(RuntimeKeys.STATUS, "FAILED");
             failed.putString(RuntimeKeys.ERROR_TYPE, "BIND_FAILED");
