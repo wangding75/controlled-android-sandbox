@@ -775,7 +775,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "The active Guest generation replaces permission, AppOps and bounded camera/location service-acquisition policy without restart. Already-acquired service handles and deep native/static APIs are not revoked by this gate."
+      "notes": "The active Guest generation replaces permission and AppOps state without restart. M4-T9 actively releases tracked Location callbacks and Camera device handles when policy is revoked; native/static APIs and unrecognized resources remain outside this bounded cleanup model."
     },
     {
       "id": "package.typed-intent-filter-snapshot",
@@ -842,6 +842,75 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Explicit Guest package/component queries fail closed on local no-match or disabled state, host identity remains hidden, and non-Guest implicit/system queries retain the bounded host fallback. Full cross-package merged listings are not implemented."
+    },
+    {
+      "id": "framework.capability-method-proxies",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/CapabilityServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/CameraServiceHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/LocationServiceHook.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/AudioCaptureServiceHook.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/capability/CapabilityProxyReadiness.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/CapabilityServiceProxySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Camera, Location and bounded AudioManager Binder methods are gated by effective virtual permission plus AppOps. An effectively granted capability fails closed when its reflective proxy is unavailable. Native AudioRecord/MediaRecorder and static/native APIs are not covered."
+    },
+    {
+      "id": "runtime.capability-revocation-cleanup",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityLeaseRegistry.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/CapabilityServiceInterceptor.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/CapabilityServiceProxySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Tracked Location callbacks and returned Camera device handles are released best-effort when same-generation permission/AppOps policy is revoked or the Guest session closes. Android/OEM service signatures remain device-gated."
+    },
+    {
+      "id": "runtime.capability-call-audit",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityAuditEvent.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityAuditSink.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/capability/GuestCapabilityAuditLog.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/capability/GuestCapabilityAuditLogSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Each Guest generation keeps a bounded in-memory audit of allowed, denied, failed and cleanup capability events and exposes counts plus compact records through runtime status. It is diagnostic evidence, not persistent security logging."
+    },
+    {
+      "id": "framework.appops-attribution-chain",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/IdentityObjectRewriter.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SandboxAppOpsPolicy.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Known integer AppOps codes, proxy operations and nested AttributionSource identity chains use virtual policy; attribution tags are preserved and unknown integer operations fail closed to MODE_DEFAULT."
+    },
+    {
+      "id": "runtime.permission-coordinator-split",
+      "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionGateway.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionPackageClient.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionCoordinatorSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Runtime permission request/report validation and Package Service delegation are extracted from RuntimeBrokerService behind a testable gateway and session resolver. Other Broker responsibilities remain large and require further decomposition."
     }
   ],
   "statusDimensions": {

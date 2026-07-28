@@ -121,9 +121,16 @@ require(
 
 require(
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
-    'runtimePermissionPackages.request(',
-    'runtimePermissionPackages.report(',
-    'requirePermissionSession(',
+    'RuntimePermissionCoordinator runtimePermissionCoordinator',
+    'runtimePermissionCoordinator.request(',
+    'runtimePermissionCoordinator.report(',
+)
+require(
+    'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionCoordinator.java',
+    'gateway.request(',
+    'gateway.report(',
+    'requireSession(',
+    'RUNTIME_PERMISSION_SESSION_NOT_READY',
 )
 require(
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java',

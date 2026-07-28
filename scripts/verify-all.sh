@@ -19,6 +19,7 @@ python3 scripts/check-package-service-boundary.py
 python3 scripts/check-virtual-package-state.py
 python3 scripts/check-package-query-resolve.py
 python3 scripts/check-runtime-permission-workflow.py
+python3 scripts/check-capability-proxy-broker-split.py
 python3 scripts/check-split-install-sessions.py
 python3 scripts/check-broadcast-model.py
 python3 scripts/check-native-file-hooks.py

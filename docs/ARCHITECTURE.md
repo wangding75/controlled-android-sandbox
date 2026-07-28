@@ -32,7 +32,7 @@ Only canonical paths under the host application's private `files` directory may 
 
 ## Package lifecycle authority
 
-`PackageManagementService` in the dedicated `:sandbox_package` process owns the production `SandboxPackageLifecycle`. `SandboxCatalogState` validates package/instance/policy referential integrity and `SandboxCatalogRepository` persists the aggregate in one recoverable schema-v2 catalog. APK and extracted native payloads are addressed by SHA-256 under `files/packages/<package>/revisions/<digest>/`; legacy mutable payloads are copied forward before the first catalog commit. Catalog paths reject outside-root locations and managed symbolic-link traversal.
+`PackageManagementService` in the dedicated `:sandbox_package` process owns the production `SandboxPackageLifecycle`. `SandboxCatalogState` validates package/instance/policy referential integrity and `SandboxCatalogRepository` persists the aggregate in one recoverable schema-v5 catalog. APK and extracted native payloads are addressed by SHA-256 under `files/packages/<package>/revisions/<digest>/`; legacy mutable payloads are copied forward before the first catalog commit. Catalog paths reject outside-root locations and managed symbolic-link traversal.
 
 Product callers use a typed, death-linked `IPackageManagementSession` capability that is bound to the verified main-process PID and application UID. Package metadata, component metadata, permission decisions and bounded AppOps modes are issued as a revision-bound `VirtualPackageStateSnapshot` for each package and virtual user.
 
@@ -49,7 +49,7 @@ Product callers use a typed, death-linked `IPackageManagementSession` capability
 - one-time, expiring Activity route tokens;
 - Provider Authority, Cursor, FileDescriptor, ContentObserver and URI Grant ownership, coordinated through one lifecycle cleanup authority.
 
-UI code sends requests but does not mutate runtime state directly.
+UI code sends requests but does not mutate runtime state directly. Runtime permission request/report orchestration is delegated to `RuntimePermissionCoordinator`, which depends on a narrow session view and `RuntimePermissionGateway`; this is the first extraction from the still-large Broker service.
 
 ## IPC contracts
 
@@ -132,7 +132,7 @@ These are development implementations, not yet proof of complete Android compati
 
 `sandbox-framework` installs process-local PackageManager and selected system-service proxies. Package/application/component identity, virtual UID, per-user permission decisions and bounded AppOps modes originate from the package-service snapshot. Direct host-package PackageManager queries are hidden. Hook status and failures are reported; teardown restores original objects.
 
-Activity/task, notification, job and storage adapters remain bounded source implementations. Permission and AppOps proxies cover explicit check-style surfaces but do not yet reproduce every Android API-level signature, attribution model or host-capability rule.
+Activity/task, notification, job and storage adapters remain bounded source implementations. Permission and AppOps proxies cover explicit check-style surfaces, known integer operation codes and nested Attribution chains. Camera, Location and bounded AudioManager capture methods are gated through reversible service-field proxies. Effective grants fail closed when the corresponding proxy is unavailable; recognized Location callbacks and Camera handles are released on policy revoke. Native AudioRecord/MediaRecorder and unrecognized Android/OEM service variants remain outside this source boundary.
 
 ## Native boundary
 

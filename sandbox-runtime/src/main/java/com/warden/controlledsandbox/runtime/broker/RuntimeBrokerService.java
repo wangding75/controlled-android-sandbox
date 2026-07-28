@@ -87,7 +87,7 @@ public final class RuntimeBrokerService extends Service {
     private final AuditSink auditSink = new RuntimeAuditSink();
     private final SessionRegistry sessions = new SessionRegistry(SLOT_COUNT, tokenGenerator);
     private VirtualUidRegistry virtualUids;
-    private RuntimePermissionPackageClient runtimePermissionPackages;
+    private RuntimePermissionCoordinator runtimePermissionCoordinator;
     private final UriGrantRegistry uriGrants = new UriGrantRegistry();
     private final BrokerReceiverRuntime receiverRuntime = new BrokerReceiverRuntime();
     private final BrokerManifestReceiverRuntime manifestReceiverRuntime = new BrokerManifestReceiverRuntime();
@@ -125,7 +125,8 @@ public final class RuntimeBrokerService extends Service {
         super.onCreate();
         File registryFile = new File(new File(getFilesDir(), "runtime"), "virtual-uids.registry");
         virtualUids = new VirtualUidRegistry(registryFile.toPath());
-        runtimePermissionPackages = new RuntimePermissionPackageClient(this);
+        runtimePermissionCoordinator = new RuntimePermissionCoordinator(
+                new RuntimePermissionPackageClient(this), this::permissionSession);
     }
 
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
@@ -591,31 +592,15 @@ public final class RuntimeBrokerService extends Service {
         @Override public PackageServiceResult requestRuntimePermission(String sessionId,
                 long generation, String permission, int requestCode) {
             CallerGuard.requireSameApplication();
-            try {
-                GuestSession session = requirePermissionSession(sessionId, generation);
-                return runtimePermissionPackages.request(session.packageName(),
-                        session.virtualUserId(), requiredValue(permission, "permission"),
-                        requestCode, session.sessionId(), session.generation());
-            } catch (Throwable error) {
-                return PackageServiceResult.failure("requestRuntimePermission",
-                        error.getClass().getSimpleName(), String.valueOf(error.getMessage()));
-            }
+            return runtimePermissionCoordinator.request(sessionId, generation, permission, requestCode);
         }
 
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId,
                 long generation, String permission, int requestCode, boolean hostGranted,
                 String reason) {
             CallerGuard.requireSameApplication();
-            try {
-                GuestSession session = requirePermissionSession(sessionId, generation);
-                return runtimePermissionPackages.report(session.packageName(),
-                        session.virtualUserId(), requiredValue(permission, "permission"),
-                        requestCode, session.sessionId(), session.generation(), hostGranted,
-                        reason == null ? "" : reason);
-            } catch (Throwable error) {
-                return PackageServiceResult.failure("reportRuntimePermissionResult",
-                        error.getClass().getSimpleName(), String.valueOf(error.getMessage()));
-            }
+            return runtimePermissionCoordinator.report(sessionId, generation, permission, requestCode,
+                    hostGranted, reason);
         }
 
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) {
@@ -1200,23 +1185,13 @@ public final class RuntimeBrokerService extends Service {
         return new ObserverCaller(instance, caller);
     }
 
-    private GuestSession requirePermissionSession(String sessionId, long generation) {
-        if (sessionId == null || sessionId.trim().isEmpty() || generation < 1) {
-            throw new IllegalArgumentException("sessionId and generation are required");
-        }
-        GuestSession session = sessionById(sessionId.trim(), generation);
-        if (session == null || (session.state() != SessionState.READY
-                && session.state() != SessionState.ACTIVE)) {
-            throw new SecurityException("RUNTIME_PERMISSION_SESSION_NOT_READY");
-        }
-        return session;
-    }
-
-    private static String requiredValue(String value, String name) {
-        if (value == null || value.trim().isEmpty()) {
-            throw new IllegalArgumentException(name + " is required");
-        }
-        return value.trim();
+    private RuntimePermissionCoordinator.PermissionSession permissionSession(
+            String sessionId, long generation) {
+        GuestSession session = sessionById(sessionId, generation);
+        if (session == null) return null;
+        boolean ready = session.state() == SessionState.READY || session.state() == SessionState.ACTIVE;
+        return new RuntimePermissionCoordinator.PermissionSession(session.packageName(),
+                session.virtualUserId(), session.sessionId(), session.generation(), ready);
     }
 
     private GuestSession sessionById(String sessionId, long generation) {
@@ -1528,7 +1503,7 @@ public final class RuntimeBrokerService extends Service {
         synchronized (this) { slots = guestConnections.keySet().toArray(new Integer[0]); }
         for (int slot : slots) releaseGuestConnection(slot);
         receiverLifecycle.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
-        if (runtimePermissionPackages != null) runtimePermissionPackages.close();
+        if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
         super.onDestroy();
     }
 

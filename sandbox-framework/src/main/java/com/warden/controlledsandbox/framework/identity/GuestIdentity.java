@@ -4,6 +4,9 @@ import android.content.pm.ApplicationInfo;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import com.warden.controlledsandbox.framework.capability.CapabilityAccessPolicy;
+import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
+import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
 
 public final class GuestIdentity {
     private final String packageName;
@@ -18,6 +21,9 @@ public final class GuestIdentity {
     private final long generation;
     private final VirtualPermissionPolicy permissionPolicy;
     private final SandboxAppOpsPolicy appOpsPolicy;
+    private final CapabilityAccessPolicy capabilityPolicy;
+    private final CapabilityAuditSink capabilityAudit;
+    private final CapabilityLeaseRegistry capabilityLeases;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
                          Set<String> requestedPermissions) {
@@ -56,6 +62,19 @@ public final class GuestIdentity {
                          int virtualUserId, long generation,
                          VirtualPermissionPolicy permissionPolicy,
                          SandboxAppOpsPolicy appOpsPolicy) {
+        this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName, hostUid,
+                packageMetadata, processName, virtualUserId, generation, permissionPolicy, appOpsPolicy,
+                CapabilityAuditSink.NO_OP, new CapabilityLeaseRegistry());
+    }
+
+    public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
+                         Set<String> requestedPermissions, String hostPackageName, int hostUid,
+                         VirtualPackageMetadata packageMetadata, String processName,
+                         int virtualUserId, long generation,
+                         VirtualPermissionPolicy permissionPolicy,
+                         SandboxAppOpsPolicy appOpsPolicy,
+                         CapabilityAuditSink capabilityAudit,
+                         CapabilityLeaseRegistry capabilityLeases) {
         if (packageName == null || packageName.trim().isEmpty()) {
             throw new IllegalArgumentException("packageName is required");
         }
@@ -83,6 +102,9 @@ public final class GuestIdentity {
         this.generation = generation;
         this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
         this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
+        this.capabilityPolicy = new CapabilityAccessPolicy(this.permissionPolicy::isGranted, this.appOpsPolicy::mode);
+        this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
+        this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
     }
 
     public String packageName() { return packageName; }
@@ -97,4 +119,7 @@ public final class GuestIdentity {
     public long generation() { return generation; }
     public VirtualPermissionPolicy permissionPolicy() { return permissionPolicy; }
     public SandboxAppOpsPolicy appOpsPolicy() { return appOpsPolicy; }
+    public CapabilityAccessPolicy capabilityPolicy() { return capabilityPolicy; }
+    public CapabilityAuditSink capabilityAudit() { return capabilityAudit; }
+    public CapabilityLeaseRegistry capabilityLeases() { return capabilityLeases; }
 }

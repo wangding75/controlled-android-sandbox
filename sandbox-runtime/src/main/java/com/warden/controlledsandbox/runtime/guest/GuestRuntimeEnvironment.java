@@ -16,6 +16,10 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
+import com.warden.controlledsandbox.framework.capability.CapabilityAccessPolicy;
+import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
+import com.warden.controlledsandbox.runtime.capability.GuestCapabilityAuditLog;
+import com.warden.controlledsandbox.runtime.capability.CapabilityProxyReadiness;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
@@ -84,14 +88,19 @@ public final class GuestRuntimeEnvironment {
             stagedOrderedReceiverInterceptor = orderedReceiverFinishInterceptor;
             VirtualPermissionPolicy permissionPolicy = permissionPolicy(spec.packageState);
             SandboxAppOpsPolicy appOpsPolicy = appOpsPolicy(spec.packageState);
-            FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext,
+            GuestCapabilityAuditLog capabilityAudit = new GuestCapabilityAuditLog();
+            CapabilityLeaseRegistry capabilityLeases = new CapabilityLeaseRegistry();
+            CapabilityAccessPolicy capabilityPolicy = new CapabilityAccessPolicy(permissionPolicy::isGranted, appOpsPolicy::mode);
+            FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
-                            permissionPolicy, appOpsPolicy),
+                            permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases),
                     orderedReceiverFinishInterceptor);
             stagedHooks = frameworkHooks;
             frameworkHooks.report().requireMandatoryReady();
+            CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(),
+                    spec.packageState.permissions());
             Application application = createApplication(spec, loader, guestContext);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
@@ -100,7 +109,8 @@ public final class GuestRuntimeEnvironment {
             guestContext.application(application);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     orderedReceiverFinishInterceptor, packageMetadata, permissionPolicy, appOpsPolicy,
-                    nativePolicyConfigured, nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
+                    capabilityPolicy, capabilityAudit, capabilityLeases, nativePolicyConfigured,
+                    nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
             stagedSession = session;
             session.components = new GuestComponentRuntime(session);
             current = session;
@@ -221,6 +231,9 @@ public final class GuestRuntimeEnvironment {
         final VirtualPackageMetadata packageMetadata;
         final VirtualPermissionPolicy permissionPolicy;
         final SandboxAppOpsPolicy appOpsPolicy;
+        final CapabilityAccessPolicy capabilityPolicy;
+        final GuestCapabilityAuditLog capabilityAudit;
+        final CapabilityLeaseRegistry capabilityLeases;
         volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
@@ -232,7 +245,9 @@ public final class GuestRuntimeEnvironment {
                 Application application, GuestResourceLoader.LoadedResources resources, FrameworkHooks frameworkHooks,
                 OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor,
                 VirtualPackageMetadata packageMetadata, VirtualPermissionPolicy permissionPolicy,
-                SandboxAppOpsPolicy appOpsPolicy, boolean nativePolicyConfigured, boolean nativeHooksInstalled,
+                SandboxAppOpsPolicy appOpsPolicy, CapabilityAccessPolicy capabilityPolicy,
+                GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
+                boolean nativePolicyConfigured, boolean nativeHooksInstalled,
                 boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile) {
             this.spec = spec;
             this.classLoader = classLoader;
@@ -245,6 +260,9 @@ public final class GuestRuntimeEnvironment {
             this.packageMetadata = java.util.Objects.requireNonNull(packageMetadata, "packageMetadata");
             this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
             this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
+            this.capabilityPolicy = java.util.Objects.requireNonNull(capabilityPolicy, "capabilityPolicy");
+            this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
+            this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
             this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
@@ -265,12 +283,14 @@ public final class GuestRuntimeEnvironment {
             if (!spec.apkSha256.equals(updated.apkSha256())) {
                 throw new SecurityException("RUNTIME_PERMISSION_STATE_REVISION_MISMATCH");
             }
+            CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(), updated.permissions());
             VirtualPermissionPolicy nextPermissions = permissionPolicy(updated);
             SandboxAppOpsPolicy nextAppOps = appOpsPolicy(updated);
             permissionPolicy.replace(nextPermissions.declaredPermissions(), nextPermissions.decisions(),
                     nextPermissions.effectiveGrants());
             appOpsPolicy.replace(nextAppOps.modes());
             context.updatePermissionState(updated.permissions());
+            capabilityLeases.revokeDenied(capabilityPolicy, capabilityAudit);
             packageState = updated;
         }
 
@@ -300,6 +320,10 @@ public final class GuestRuntimeEnvironment {
             }
             out.putStringArrayList("frameworkHooksInstalled", installedHooks);
             out.putStringArrayList("frameworkHooksFailed", failedHooks);
+            out.putInt("capabilityAuditCount", capabilityAudit.size());
+            out.putInt("capabilityDeniedCount", capabilityAudit.deniedCount());
+            out.putInt("capabilityActiveLeases", capabilityLeases.activeCount());
+            out.putStringArrayList("capabilityAudit", capabilityAudit.compactSnapshot());
             out.putBoolean("isolatedProcessSupported", false);
             out.putString("isolatedProcessPolicy", "FAIL_CLOSED_UNTIL_REAL_ANDROID_UID_SLOT_IS_VERIFIED");
             out.putBoolean("nativePolicyAvailable", NativePolicy.available());
@@ -318,6 +342,7 @@ public final class GuestRuntimeEnvironment {
 
         void shutdown() {
             if (components != null) components.shutdown();
+            capabilityLeases.close(capabilityAudit);
             orderedReceiverFinishInterceptor.close();
             frameworkHooks.close();
             NativePolicy.resetHooks();

@@ -7,6 +7,9 @@ import com.warden.controlledsandbox.framework.permission.PermissionManagerHook;
 import com.warden.controlledsandbox.framework.service.JobSchedulerHook;
 import com.warden.controlledsandbox.framework.service.NotificationManagerHook;
 import com.warden.controlledsandbox.framework.service.StorageManagerHook;
+import com.warden.controlledsandbox.framework.service.CameraServiceHook;
+import com.warden.controlledsandbox.framework.service.LocationServiceHook;
+import com.warden.controlledsandbox.framework.service.AudioCaptureServiceHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -29,26 +32,35 @@ public final class FrameworkHooks implements AutoCloseable {
     }
 
     public static FrameworkHooks install(Context context, GuestIdentity identity) {
-        return install(context, identity, FrameworkCallInterceptor.NO_OP);
+        return install(context, context, identity, FrameworkCallInterceptor.NO_OP);
     }
 
     public static FrameworkHooks install(
             Context context, GuestIdentity identity, FrameworkCallInterceptor callInterceptor) {
+        return install(context, context, identity, callInterceptor);
+    }
+
+    public static FrameworkHooks install(
+            Context guestContext, Context hostServiceContext, GuestIdentity identity,
+            FrameworkCallInterceptor callInterceptor) {
         List<AutoCloseable> hooks = new ArrayList<>();
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
-        attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(context, identity));
+        attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(guestContext, identity));
         installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);
-        attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(context, identity));
-        attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(context, identity));
+        attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(guestContext, identity));
+        attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(guestContext, identity));
         FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
         if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
             rollbackInstalled(hooks, installed, failures);
             return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
         }
         attempt("notification", installed, failures, hooks, () -> NotificationManagerHook.install(identity));
-        attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(context, identity));
-        attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(context, identity));
+        attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(guestContext, identity));
+        attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(guestContext, identity));
+        attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
+        attempt("location", installed, failures, hooks, () -> LocationServiceHook.install(hostServiceContext, identity));
+        attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
         return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
     }
 

@@ -58,12 +58,26 @@ public final class FrameworkIdentityProxySelfTest {
         require("guest.pkg".equals(proxy.note("guest.pkg", 12001)), "result identity virtualization");
         require("host.pkg".equals(delegate.lastPackage) && delegate.lastUid == 10001,
                 "delegate host identity");
-        FakeAttribution attribution = new FakeAttribution("guest.pkg", 12001);
+        FakeAttribution tail = new FakeAttribution("guest.pkg", 12001, "tail", null);
+        FakeAttribution attribution = new FakeAttribution("guest.pkg", 12001, "root", tail);
         proxy.attribution(attribution);
         require("host.pkg".equals(delegate.lastPackage) && delegate.lastUid == 10001,
                 "nested attribution rewrite");
-        require("guest.pkg".equals(attribution.mPackageName) && attribution.mUid == 12001,
-                "nested attribution restored");
+        require("host.pkg".equals(delegate.lastTailPackage) && delegate.lastTailUid == 10001,
+                "attribution chain rewrite");
+        require("root".equals(delegate.lastAttributionTag) && "tail".equals(delegate.lastTailTag),
+                "attribution tags preserved");
+        require("guest.pkg".equals(attribution.mPackageName) && attribution.mUid == 12001
+                        && "guest.pkg".equals(tail.mPackageName) && tail.mUid == 12001,
+                "nested attribution chain restored");
+        FakeAttributionContext wrapped = new FakeAttributionContext(
+                new FakeAttributionState("guest.pkg", 12001));
+        proxy.wrappedAttribution(wrapped);
+        require("host.pkg".equals(delegate.lastPackage) && delegate.lastUid == 10001,
+                "nested attribution state holder rewritten");
+        require("guest.pkg".equals(wrapped.mAttributionSourceState.packageName)
+                        && wrapped.mAttributionSourceState.uid == 12001,
+                "nested attribution state holder restored");
         String[] packages = proxy.packages();
         require(packages.length == 1 && "guest.pkg".equals(packages[0]), "package array result");
     }
@@ -134,8 +148,14 @@ public final class FrameworkIdentityProxySelfTest {
                 "AppOps override maps to MODE_IGNORED");
         require(appOps.checkOperation("android:record_audio", 12001, "guest.pkg") == 3,
                 "AppOps default maps to MODE_DEFAULT");
-        require(appOps.checkOperation(26, 12001, "guest.pkg") == 3,
-                "integer AppOps code fails closed to MODE_DEFAULT without host delegation");
+        require(appOps.checkOperation(26, 12001, "guest.pkg") == 1,
+                "integer Camera AppOps code maps to virtual camera mode");
+        require(appOps.checkOperation(999, 12001, "guest.pkg") == 3,
+                "unknown integer AppOps code fails closed to MODE_DEFAULT");
+        FakeAttribution source = new FakeAttribution("guest.pkg", 12001, "proxy", null);
+        require(appOps.noteProxyOperation("android:camera", source) == 1,
+                "proxy AppOps attribution chain targets Guest policy");
+        require("proxy".equals(source.attributionTag), "proxy attributionTag remains unchanged");
         require(appOpsDelegate.calls == 0, "AppOps virtual decision avoids host delegate");
     }
 
@@ -173,12 +193,17 @@ public final class FrameworkIdentityProxySelfTest {
     interface FakeApi {
         String note(String packageName, int uid);
         void attribution(FakeAttribution source);
+        void wrappedAttribution(FakeAttributionContext source);
         String[] packages();
     }
 
     static final class FakeService implements FakeApi {
         String lastPackage;
         int lastUid;
+        String lastTailPackage;
+        int lastTailUid;
+        String lastAttributionTag;
+        String lastTailTag;
         @Override public String note(String packageName, int uid) {
             lastPackage = packageName;
             lastUid = uid;
@@ -187,6 +212,16 @@ public final class FrameworkIdentityProxySelfTest {
         @Override public void attribution(FakeAttribution source) {
             lastPackage = source.mPackageName;
             lastUid = source.mUid;
+            lastAttributionTag = source.attributionTag;
+            if (source.mNext != null) {
+                lastTailPackage = source.mNext.mPackageName;
+                lastTailUid = source.mNext.mUid;
+                lastTailTag = source.mNext.attributionTag;
+            }
+        }
+        @Override public void wrappedAttribution(FakeAttributionContext source) {
+            lastPackage = source.mAttributionSourceState.packageName;
+            lastUid = source.mAttributionSourceState.uid;
         }
         @Override public String[] packages() { return new String[]{"host.pkg"}; }
     }
@@ -236,6 +271,7 @@ public final class FrameworkIdentityProxySelfTest {
     interface FakeAppOpsApi {
         int checkOperation(String opName, int uid, String packageName);
         int checkOperation(int opCode, int uid, String packageName);
+        int noteProxyOperation(String opName, FakeAttribution source);
     }
 
     static final class FakeAppOpsService implements FakeAppOpsApi {
@@ -246,11 +282,34 @@ public final class FrameworkIdentityProxySelfTest {
         @Override public int checkOperation(int opCode, int uid, String packageName) {
             calls++; return -99;
         }
+        @Override public int noteProxyOperation(String opName, FakeAttribution source) {
+            calls++; return -99;
+        }
+    }
+
+
+    static final class FakeAttributionContext {
+        FakeAttributionState mAttributionSourceState;
+        FakeAttributionContext(FakeAttributionState state) { mAttributionSourceState = state; }
+    }
+
+    static final class FakeAttributionState {
+        String packageName;
+        int uid;
+        FakeAttributionState(String packageName, int uid) {
+            this.packageName = packageName;
+            this.uid = uid;
+        }
     }
 
     static final class FakeAttribution {
         String mPackageName;
         int mUid;
-        FakeAttribution(String packageName, int uid) { mPackageName = packageName; mUid = uid; }
+        String attributionTag;
+        FakeAttribution mNext;
+        FakeAttribution(String packageName, int uid) { this(packageName, uid, "", null); }
+        FakeAttribution(String packageName, int uid, String tag, FakeAttribution next) {
+            mPackageName = packageName; mUid = uid; attributionTag = tag; mNext = next;
+        }
     }
 }

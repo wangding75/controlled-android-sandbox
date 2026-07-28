@@ -28,6 +28,23 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         return replaceField(manager, fieldName, identity, serviceName);
     }
 
+    public static ReflectiveServiceHook managerFieldCandidates(
+            Context context, String androidServiceName, String logicalServiceName,
+            GuestIdentity identity, String... fieldPaths) throws Exception {
+        Object manager = context.getSystemService(androidServiceName);
+        if (manager == null) throw new IllegalStateException(
+                "System service unavailable: " + androidServiceName);
+        java.util.ArrayList<Throwable> failures = new java.util.ArrayList<>();
+        for (String path : fieldPaths) {
+            try { return replacePath(manager, path, identity, logicalServiceName); }
+            catch (Throwable error) { failures.add(error); }
+        }
+        IllegalStateException failure = new IllegalStateException(
+                "No supported Binder field for " + logicalServiceName);
+        for (Throwable error : failures) failure.addSuppressed(error);
+        throw failure;
+    }
+
     public static ReflectiveServiceHook staticField(String ownerClassName, String fieldName,
                                              String initializerMethod, GuestIdentity identity) throws Exception {
         Class<?> owner = Class.forName(ownerClassName);
@@ -69,6 +86,22 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         Field field = findField(owner.getClass(), fieldName);
         field.setAccessible(true);
         return replace(owner, field, field.get(owner), identity, serviceName);
+    }
+
+    private static ReflectiveServiceHook replacePath(Object root, String path, GuestIdentity identity,
+                                                     String serviceName) throws Exception {
+        if (path == null || path.trim().isEmpty()) throw new IllegalArgumentException("field path is required");
+        String[] segments = path.split("\\.");
+        Object owner = root;
+        for (int index = 0; index < segments.length - 1; index++) {
+            Field field = findField(owner.getClass(), segments[index]);
+            field.setAccessible(true);
+            owner = field.get(owner);
+            if (owner == null) throw new IllegalStateException("Null service field segment: " + segments[index]);
+        }
+        Field target = findField(owner.getClass(), segments[segments.length - 1]);
+        target.setAccessible(true);
+        return replace(owner, target, target.get(owner), identity, serviceName);
     }
 
     static Object createProxy(Object original, GuestIdentity identity) {

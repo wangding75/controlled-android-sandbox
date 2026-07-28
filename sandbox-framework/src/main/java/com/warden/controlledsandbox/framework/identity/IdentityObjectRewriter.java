@@ -81,16 +81,19 @@ public final class IdentityObjectRewriter {
                     Array.set(value, i, rewritten);
                     scope.add(() -> Array.set(value, index, original));
                 } else {
-                    rewriteAttributionObject(original, identity, scope);
+                    rewriteAttributionObject(original, identity, scope,
+                            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
                 }
             }
             return;
         }
-        rewriteAttributionObject(value, identity, scope);
+        rewriteAttributionObject(value, identity, scope,
+                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
     }
 
-    private static void rewriteAttributionObject(Object value, GuestIdentity identity, RewriteScope scope) {
-        if (value == null) return;
+    private static void rewriteAttributionObject(Object value, GuestIdentity identity, RewriteScope scope,
+                                                 java.util.Set<Object> visited, int depth) {
+        if (value == null || depth > 8 || !visited.add(value)) return;
         String name = value.getClass().getName();
         if (!name.endsWith("AttributionSource") && !name.contains("Attribution")) return;
         Class<?> cursor = value.getClass();
@@ -101,10 +104,17 @@ public final class IdentityObjectRewriter {
                         && (fieldName.equals("mPackageName") || fieldName.equals("packageName"));
                 boolean uidField = (field.getType() == int.class || field.getType() == Integer.class)
                         && (fieldName.equals("mUid") || fieldName.equals("uid"));
-                if (!packageField && !uidField) continue;
+                boolean nextField = fieldName.equals("mNext") || fieldName.equals("next");
+                boolean attributionField = nextField
+                        || field.getType().getName().contains("Attribution");
+                if (!packageField && !uidField && !attributionField) continue;
                 try {
                     field.setAccessible(true);
                     Object original = field.get(value);
+                    if (attributionField) {
+                        rewriteAttributionObject(original, identity, scope, visited, depth + 1);
+                        continue;
+                    }
                     Object replacement = packageField && identity.packageName().equals(original)
                             ? identity.hostPackageName()
                             : uidField && original instanceof Integer && ((Integer) original) == identity.virtualUid()

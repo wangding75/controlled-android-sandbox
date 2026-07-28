@@ -13,7 +13,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /** Runtime-Broker-only client for the Package Service permission capability. */
-final class RuntimePermissionPackageClient implements AutoCloseable {
+final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
     private static final String PACKAGE_SERVICE_CLASS =
             "com.warden.controlledsandbox.PackageManagementService";
     private final Context context;
@@ -45,14 +45,14 @@ final class RuntimePermissionPackageClient implements AutoCloseable {
         }
     }
 
-    PackageServiceResult request(String packageName, int virtualUserId, String permission,
+    @Override public PackageServiceResult request(String packageName, int virtualUserId, String permission,
                                  int requestCode, String sessionId, long generation)
             throws Exception {
         return requireSuccess(requireSession().requestRuntimePermission(packageName, virtualUserId,
                 permission, requestCode, sessionId, generation));
     }
 
-    PackageServiceResult report(String packageName, int virtualUserId, String permission,
+    @Override public PackageServiceResult report(String packageName, int virtualUserId, String permission,
                                 int requestCode, String sessionId, long generation,
                                 boolean hostGranted, String reason) throws Exception {
         return requireSuccess(requireSession().reportRuntimePermissionResult(packageName,

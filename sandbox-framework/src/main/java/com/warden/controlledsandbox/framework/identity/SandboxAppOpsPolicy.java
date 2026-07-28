@@ -40,6 +40,16 @@ public final class SandboxAppOpsPolicy {
         };
     }
 
+    public static String operationName(int code) {
+        return switch (code) {
+            case 0 -> "android:coarse_location";
+            case 1 -> "android:fine_location";
+            case 26 -> "android:camera";
+            case 27 -> "android:record_audio";
+            default -> "android:unknown_op_" + code;
+        };
+    }
+
     private static String normalize(String value) {
         String normalized = value == null ? DEFAULT : value.trim().toUpperCase(java.util.Locale.ROOT);
         if (!Set.of(DEFAULT, ALLOWED, IGNORED, ERRORED).contains(normalized)) {
