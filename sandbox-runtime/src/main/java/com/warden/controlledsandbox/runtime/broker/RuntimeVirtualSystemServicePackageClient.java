@@ -29,7 +29,7 @@ final class RuntimeVirtualSystemServicePackageClient implements AutoCloseable {
     RuntimeVirtualSystemServicePackageClient(Context context) {
         this.context = context.getApplicationContext();
         Intent service = new Intent().setComponent(new ComponentName(
-                this.context.getPackageName(), PACKAGE_SERVICE_CLASS));
+                RuntimePeerPolicy.hostPackageFor(this.context), PACKAGE_SERVICE_CLASS));
         if (!this.context.bindService(service, connection, Context.BIND_AUTO_CREATE)) connected.countDown();
     }
 

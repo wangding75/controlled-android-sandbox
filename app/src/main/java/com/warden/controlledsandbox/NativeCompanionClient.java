@@ -4,37 +4,88 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Bundle;
 import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.INativeAbiCompanion;
+import com.warden.controlledsandbox.contract.INativeCompanionArtifactService;
+import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
+import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
+import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import java.io.File;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-/** Explicit, signature-permission protected client for the independently packaged 32-bit process. */
+/** Signature-protected client for the independent 32-bit Runtime Broker and artifact workspace. */
 final class NativeCompanionClient implements AutoCloseable {
     private static final String RELEASE_PACKAGE = "com.warden.controlledsandbox.companion32";
     private static final String DEBUG_PACKAGE = RELEASE_PACKAGE + ".debug";
-    private static final String SERVICE_CLASS =
+    private static final String CONTROL_SERVICE =
             "com.warden.controlledsandbox.companion32.NativeCompanionService";
+    private static final String ARTIFACT_SERVICE =
+            "com.warden.controlledsandbox.companion32.NativeCompanionArtifactService";
+    private static final String RUNTIME_BROKER_SERVICE =
+            "com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService";
     private static final int PROTOCOL = 1;
-    private static final long BIND_TIMEOUT_SECONDS = 5L;
+    private static final long BIND_TIMEOUT_SECONDS = 10L;
+    private static final int MAX_NATIVE_LIBRARIES = 256;
 
     private final Context context;
     private final SecureRandom random = new SecureRandom();
-    private final CountDownLatch connected = new CountDownLatch(1);
-    private volatile INativeAbiCompanion companion;
-    private volatile boolean bound;
-    private final ServiceConnection connection = new ServiceConnection() {
+    private volatile CountDownLatch controlConnected = new CountDownLatch(1);
+    private volatile CountDownLatch artifactConnected = new CountDownLatch(1);
+    private volatile CountDownLatch brokerConnected = new CountDownLatch(1);
+    private final Set<String> stagedRevisions = new HashSet<>();
+    private volatile INativeAbiCompanion control;
+    private volatile INativeCompanionArtifactService artifacts;
+    private volatile IRuntimeBroker broker;
+    private volatile boolean controlBound;
+    private volatile boolean artifactBound;
+    private volatile boolean brokerBound;
+
+    private final ServiceConnection controlConnection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            companion = INativeAbiCompanion.Stub.asInterface(service);
-            connected.countDown();
+            control = INativeAbiCompanion.Stub.asInterface(service);
+            controlConnected.countDown();
         }
-        @Override public void onServiceDisconnected(ComponentName name) { companion = null; }
-        @Override public void onBindingDied(ComponentName name) { companion = null; }
-        @Override public void onNullBinding(ComponentName name) { companion = null; connected.countDown(); }
+        @Override public void onServiceDisconnected(ComponentName name) { resetControlBinding(); }
+        @Override public void onBindingDied(ComponentName name) { resetControlBinding(); }
+        @Override public void onNullBinding(ComponentName name) {
+            control = null; controlBound = false; controlConnected.countDown();
+        }
+    };
+
+    private final ServiceConnection artifactConnection = new ServiceConnection() {
+        @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            artifacts = INativeCompanionArtifactService.Stub.asInterface(service);
+            artifactConnected.countDown();
+        }
+        @Override public void onServiceDisconnected(ComponentName name) { resetArtifactBinding(); }
+        @Override public void onBindingDied(ComponentName name) { resetArtifactBinding(); }
+        @Override public void onNullBinding(ComponentName name) {
+            artifacts = null; artifactBound = false; artifactConnected.countDown();
+        }
+    };
+
+    private final ServiceConnection brokerConnection = new ServiceConnection() {
+        @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            broker = IRuntimeBroker.Stub.asInterface(service);
+            brokerConnected.countDown();
+        }
+        @Override public void onServiceDisconnected(ComponentName name) { resetBrokerBinding(); }
+        @Override public void onBindingDied(ComponentName name) { resetBrokerBinding(); }
+        @Override public void onNullBinding(ComponentName name) {
+            broker = null; brokerBound = false; brokerConnected.countDown();
+        }
     };
 
     NativeCompanionClient(Context context) {
@@ -45,39 +96,229 @@ final class NativeCompanionClient implements AutoCloseable {
         if (!NativeAbiRoutePlanner.requiresCompanion(record.nativeAbi)) {
             throw new IllegalArgumentException("NATIVE_COMPANION_NOT_REQUIRED:" + record.nativeAbi);
         }
-        INativeAbiCompanion service = requireCompanion();
-        byte[] nonce = new byte[32];
-        random.nextBytes(nonce);
+        byte[] nonce = nonce();
         NativeCompanionRequest request = new NativeCompanionRequest(
-                PROTOCOL,
-                "preflight-" + UUID.randomUUID(),
-                1L,
-                virtualUserId,
-                record.packageName,
-                record.sha256,
-                nonce,
-                record.nativeAbi,
+                PROTOCOL, "preflight-" + UUID.randomUUID(), 1L, virtualUserId,
+                record.packageName, record.sha256, nonce, record.nativeAbi,
                 NativeCompanionRequest.OP_PROBE);
-        NativeCompanionResult result = service.execute(request);
+        NativeCompanionResult result = requireControl().execute(request);
         if (result == null) throw new IllegalStateException("NATIVE_COMPANION_EMPTY_RESULT");
         return result;
     }
 
-    private INativeAbiCompanion requireCompanion() throws Exception {
-        INativeAbiCompanion current = companion;
-        if (current != null) return current;
-        synchronized (this) {
-            if (!bound) {
-                Intent intent = new Intent();
-                intent.setComponent(new ComponentName(companionPackage(), SERVICE_CLASS));
-                bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
-                if (!bound) connected.countDown();
+    Bundle prepare(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
+        return requireBroker().prepareGuest(stageRequest(record, virtualUserId, request));
+    }
+
+    Bundle launchActivity(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
+        return requireBroker().launchActivity(stageRequest(record, virtualUserId, request));
+    }
+
+    Bundle invokeComponent(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
+        return requireBroker().invokeComponent(stageRequest(record, virtualUserId, request));
+    }
+
+    void stopGuest(SandboxRecord record, int virtualUserId) throws Exception {
+        requireBroker().stopGuest(record.packageName, virtualUserId);
+        clearWorkspace(record, virtualUserId);
+    }
+
+    private synchronized Bundle stageRequest(SandboxRecord record, int virtualUserId,
+            Bundle request) throws Exception {
+        NativeCompanionResult probe = probe(record, virtualUserId);
+        if (!probe.successful()) {
+            throw new IllegalStateException("NATIVE_COMPANION_PROBE_FAILED:"
+                    + probe.errorType() + ":" + probe.errorMessage());
+        }
+        String key = record.packageName + "\n" + virtualUserId + "\n" + record.sha256
+                + "\n" + record.nativeAbi;
+        INativeCompanionArtifactService service = requireArtifacts();
+        NativeCompanionRequest workspaceRequest = workspaceRequest(record, virtualUserId,
+                NativeCompanionRequest.OP_PREPARE_GENERATION);
+        NativeCompanionArtifactResult workspace = requireSuccess(
+                service.prepareWorkspace(workspaceRequest));
+        Bundle staged = new Bundle(request);
+        if (!stagedRevisions.contains(key)) {
+            NativeCompanionArtifactResult base = stageFile(service, record, virtualUserId,
+                    NativeCompanionArtifactRequest.BASE_APK, "base.apk",
+                    new File(record.apkPath), record.baseApkSha256);
+            staged.putString(RuntimeKeys.APK_PATH, base.absolutePath());
+
+            ArrayList<String> names = staged.getStringArrayList(RuntimeKeys.SPLIT_NAMES);
+            ArrayList<String> paths = staged.getStringArrayList(RuntimeKeys.SPLIT_PATHS);
+            ArrayList<String> hashes = staged.getStringArrayList(RuntimeKeys.SPLIT_SHA256S);
+            ArrayList<String> stagedPaths = new ArrayList<>();
+            int splitCount = paths == null ? 0 : paths.size();
+            for (int index = 0; index < splitCount; index++) {
+                String name = names == null || index >= names.size() ? "split" + index : names.get(index);
+                String relative = "splits/" + index + "-" + safe(name) + ".apk";
+                NativeCompanionArtifactResult split = stageFile(service, record, virtualUserId,
+                        NativeCompanionArtifactRequest.SPLIT_APK, relative,
+                        new File(paths.get(index)), hashes.get(index));
+                stagedPaths.add(split.absolutePath());
+            }
+            staged.putStringArrayList(RuntimeKeys.SPLIT_PATHS, stagedPaths);
+
+            File nativeRoot = record.nativeLibraryDir == null || record.nativeLibraryDir.trim().isEmpty()
+                    ? null : new File(record.nativeLibraryDir);
+            if (nativeRoot != null && nativeRoot.isDirectory()) {
+                File[] libraries = nativeRoot.listFiles(file -> file.isFile()
+                        && file.getName().endsWith(".so"));
+                if (libraries == null) libraries = new File[0];
+                if (libraries.length > MAX_NATIVE_LIBRARIES) {
+                    throw new IllegalStateException("NATIVE_COMPANION_LIBRARY_LIMIT_EXCEEDED");
+                }
+                Set<String> namesSeen = new HashSet<>();
+                for (File library : libraries) {
+                    if (!namesSeen.add(library.getName())) {
+                        throw new IllegalStateException("NATIVE_COMPANION_DUPLICATE_LIBRARY_NAME");
+                    }
+                    stageFile(service, record, virtualUserId,
+                            NativeCompanionArtifactRequest.NATIVE_LIBRARY,
+                            "lib/" + library.getName(), library, ApkImportManager.sha256(library));
+                }
+                staged.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, workspace.nativeLibraryRoot());
+            }
+            stagedRevisions.add(key);
+        } else {
+            staged.putString(RuntimeKeys.APK_PATH,
+                    new File(workspace.workspaceRoot(), "base.apk").getCanonicalPath());
+            ArrayList<String> names = staged.getStringArrayList(RuntimeKeys.SPLIT_NAMES);
+            ArrayList<String> stagedPaths = new ArrayList<>();
+            if (names != null) {
+                for (int index = 0; index < names.size(); index++) {
+                    stagedPaths.add(new File(workspace.workspaceRoot(), "splits/" + index + "-"
+                            + safe(names.get(index)) + ".apk").getCanonicalPath());
+                }
+            }
+            staged.putStringArrayList(RuntimeKeys.SPLIT_PATHS, stagedPaths);
+            if (record.nativeLibraryDir != null && !record.nativeLibraryDir.trim().isEmpty()) {
+                staged.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, workspace.nativeLibraryRoot());
             }
         }
-        if (!connected.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || companion == null) {
-            throw new IllegalStateException("NATIVE_COMPANION_UNAVAILABLE:" + companionPackage());
+        staged.putString(RuntimeKeys.DATA_ROOT, workspace.dataRoot());
+        return staged;
+    }
+
+    private NativeCompanionArtifactResult stageFile(INativeCompanionArtifactService service,
+            SandboxRecord record, int virtualUserId, String kind, String relativePath,
+            File source, String sha256) throws Exception {
+        if (!source.isFile()) throw new IllegalArgumentException("COMPANION_SOURCE_MISSING:" + source);
+        NativeCompanionArtifactRequest request = new NativeCompanionArtifactRequest(
+                PROTOCOL, transferSession(record, virtualUserId), 1L, virtualUserId,
+                record.packageName, record.sha256, record.nativeAbi, kind, relativePath,
+                sha256, source.length());
+        try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(
+                source, ParcelFileDescriptor.MODE_READ_ONLY)) {
+            return requireSuccess(service.stageArtifact(request, descriptor));
         }
-        return companion;
+    }
+
+    private void clearWorkspace(SandboxRecord record, int virtualUserId) throws Exception {
+        NativeCompanionArtifactResult result = requireArtifacts().clearWorkspace(
+                workspaceRequest(record, virtualUserId, NativeCompanionRequest.OP_CLEAR_GENERATION));
+        requireSuccess(result);
+        stagedRevisions.remove(record.packageName + "\n" + virtualUserId + "\n" + record.sha256
+                + "\n" + record.nativeAbi);
+    }
+
+    private NativeCompanionRequest workspaceRequest(SandboxRecord record, int virtualUserId,
+            String operation) {
+        return new NativeCompanionRequest(PROTOCOL, transferSession(record, virtualUserId), 1L,
+                virtualUserId, record.packageName, record.sha256, nonce(), record.nativeAbi,
+                operation);
+    }
+
+    private static NativeCompanionArtifactResult requireSuccess(NativeCompanionArtifactResult result) {
+        if (result == null) throw new IllegalStateException("NATIVE_COMPANION_ARTIFACT_EMPTY_RESULT");
+        if (!result.successful()) {
+            throw new IllegalStateException("NATIVE_COMPANION_ARTIFACT_FAILED:"
+                    + result.errorType() + ":" + result.errorMessage());
+        }
+        return result;
+    }
+
+    private INativeAbiCompanion requireControl() throws Exception {
+        INativeAbiCompanion current = control;
+        if (current != null) return current;
+        CountDownLatch latch;
+        synchronized (this) {
+            if (control == null && !controlBound) {
+                controlConnected = new CountDownLatch(1);
+                controlBound = bind(CONTROL_SERVICE, controlConnection);
+                if (!controlBound) controlConnected.countDown();
+            }
+            latch = controlConnected;
+        }
+        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || control == null) {
+            throw new IllegalStateException("NATIVE_COMPANION_CONTROL_UNAVAILABLE:" + companionPackage());
+        }
+        return control;
+    }
+
+    private INativeCompanionArtifactService requireArtifacts() throws Exception {
+        INativeCompanionArtifactService current = artifacts;
+        if (current != null) return current;
+        CountDownLatch latch;
+        synchronized (this) {
+            if (artifacts == null && !artifactBound) {
+                artifactConnected = new CountDownLatch(1);
+                artifactBound = bind(ARTIFACT_SERVICE, artifactConnection);
+                if (!artifactBound) artifactConnected.countDown();
+            }
+            latch = artifactConnected;
+        }
+        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || artifacts == null) {
+            throw new IllegalStateException("NATIVE_COMPANION_ARTIFACT_UNAVAILABLE:" + companionPackage());
+        }
+        return artifacts;
+    }
+
+    private IRuntimeBroker requireBroker() throws Exception {
+        IRuntimeBroker current = broker;
+        if (current != null) return current;
+        CountDownLatch latch;
+        synchronized (this) {
+            if (broker == null && !brokerBound) {
+                brokerConnected = new CountDownLatch(1);
+                brokerBound = bind(RUNTIME_BROKER_SERVICE, brokerConnection);
+                if (!brokerBound) brokerConnected.countDown();
+            }
+            latch = brokerConnected;
+        }
+        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || broker == null) {
+            throw new IllegalStateException("NATIVE_COMPANION_BROKER_UNAVAILABLE:" + companionPackage());
+        }
+        return broker;
+    }
+
+    private synchronized void resetControlBinding() {
+        control = null;
+        controlBound = false;
+        controlConnected = new CountDownLatch(1);
+    }
+
+    private synchronized void resetArtifactBinding() {
+        artifacts = null;
+        artifactBound = false;
+        artifactConnected = new CountDownLatch(1);
+    }
+
+    private synchronized void resetBrokerBinding() {
+        broker = null;
+        brokerBound = false;
+        brokerConnected = new CountDownLatch(1);
+    }
+
+    private boolean bind(String className, ServiceConnection connection) {
+        Intent intent = new Intent().setComponent(new ComponentName(companionPackage(), className));
+        return context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+    }
+
+    private byte[] nonce() {
+        byte[] nonce = new byte[32];
+        random.nextBytes(nonce);
+        return nonce;
     }
 
     private String companionPackage() {
@@ -85,11 +326,25 @@ final class NativeCompanionClient implements AutoCloseable {
         return hostPackage != null && hostPackage.endsWith(".debug") ? DEBUG_PACKAGE : RELEASE_PACKAGE;
     }
 
+    private static String transferSession(SandboxRecord record, int virtualUserId) {
+        return "transfer-" + safe(record.packageName) + "-u" + virtualUserId + "-"
+                + record.sha256.substring(0, Math.min(16, record.sha256.length()));
+    }
+
+    private static String safe(String value) {
+        return value == null ? "artifact" : value.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
     @Override public void close() {
-        if (bound) {
-            try { context.unbindService(connection); } catch (RuntimeException ignored) { }
-        }
-        bound = false;
-        companion = null;
+        if (brokerBound) try { context.unbindService(brokerConnection); } catch (RuntimeException ignored) { }
+        if (artifactBound) try { context.unbindService(artifactConnection); } catch (RuntimeException ignored) { }
+        if (controlBound) try { context.unbindService(controlConnection); } catch (RuntimeException ignored) { }
+        brokerBound = false;
+        artifactBound = false;
+        controlBound = false;
+        broker = null;
+        artifacts = null;
+        control = null;
+        stagedRevisions.clear();
     }
 }

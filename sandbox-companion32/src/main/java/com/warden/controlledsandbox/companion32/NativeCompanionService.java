@@ -19,6 +19,7 @@ public final class NativeCompanionService extends Service {
 
     private final INativeAbiCompanion.Stub binder = new INativeAbiCompanion.Stub() {
         @Override public NativeCompanionResult execute(NativeCompanionRequest request) {
+            NativeCompanionCallerGuard.requireSignedPeer(NativeCompanionService.this);
             if (request == null) return NativeCompanionResult.failure("", "", "REQUEST_REQUIRED", "request is required");
             if (request.protocol() != PROTOCOL) {
                 return NativeCompanionResult.failure(request.operation(), request.requestedAbi(),

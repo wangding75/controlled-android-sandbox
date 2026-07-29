@@ -50,13 +50,17 @@ def main() -> int:
             fail(f"Missing device-test module in settings.gradle: {module}")
 
     module_text = {
-        "host": (ROOT / "sandbox-native/build.gradle").read_text(),
+        "host": (ROOT / "app/build.gradle").read_text(),
+        "sharedNative": (ROOT / "sandbox-native/build.gradle").read_text(),
         "fixture": (ROOT / "fixture-basic/build.gradle").read_text(),
         "companion32": (ROOT / "sandbox-companion32/build.gradle").read_text(),
     }
     for abi in android["hostAbis"]:
         if abi not in module_text["host"] or abi not in module_text["fixture"]:
-            fail(f"Host ABI not declared in both native modules: {abi}")
+            fail(f"Host ABI not declared in Host and fixture APKs: {abi}")
+    for abi in android["hostAbis"] + android["companionAbis"]:
+        if abi not in module_text["sharedNative"]:
+            fail(f"Shared native runtime does not build ABI: {abi}")
     for abi in android["companionAbis"]:
         if abi not in module_text["companion32"]:
             fail(f"Companion ABI not declared: {abi}")

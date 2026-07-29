@@ -67,11 +67,23 @@ production_unresolved = {
     if item.get("productionStatus") in {"partial", "blocked"}
 }
 declared_unresolved = set(preflight.get("matrixProductionUnresolved", []))
-if production_unresolved != declared_unresolved:
+resolved_after_m4: set[str] = set()
+for relative in ("verification/m5-t1-source-preflight.json", "verification/m5-t2-source-preflight.json"):
+    candidate = ROOT / relative
+    if not candidate.is_file():
+        continue
+    try:
+        later = json.loads(candidate.read_text(encoding="utf-8"))
+        resolved_after_m4.update(later.get("resolvedM4ProductionIds", []))
+    except Exception as exc:
+        errors.append(f"invalid post-M4 resolution manifest {relative}: {exc}")
+expected_current = declared_unresolved - resolved_after_m4
+if production_unresolved != expected_current:
     errors.append(
-        "preflight unresolved production IDs differ from capability matrix: "
-        f"missing={sorted(production_unresolved-declared_unresolved)} "
-        f"extra={sorted(declared_unresolved-production_unresolved)}"
+        "preflight unresolved production IDs differ from current matrix after explicit M5 resolutions: "
+        f"missing={sorted(production_unresolved-expected_current)} "
+        f"extra={sorted(expected_current-production_unresolved)} "
+        f"resolvedAfterM4={sorted(resolved_after_m4)}"
     )
 
 readme = (ROOT / "README.md").read_text(encoding="utf-8")

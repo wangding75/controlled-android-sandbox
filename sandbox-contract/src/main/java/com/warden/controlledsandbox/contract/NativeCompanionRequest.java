@@ -8,6 +8,7 @@ import java.util.Arrays;
 public final class NativeCompanionRequest implements Parcelable {
     public static final String OP_PROBE = "PROBE";
     public static final String OP_PREPARE_GENERATION = "PREPARE_GENERATION";
+    public static final String OP_CLEAR_GENERATION = "CLEAR_GENERATION";
     private static final int MAX_NONCE_BYTES = 64;
 
     private final int protocol;
@@ -91,7 +92,8 @@ public final class NativeCompanionRequest implements Parcelable {
     }
     private static String operation(String value) {
         String normalized = required(value, "operation", 64);
-        if (!OP_PROBE.equals(normalized) && !OP_PREPARE_GENERATION.equals(normalized)) {
+        if (!OP_PROBE.equals(normalized) && !OP_PREPARE_GENERATION.equals(normalized)
+                && !OP_CLEAR_GENERATION.equals(normalized)) {
             throw new IllegalArgumentException("unsupported operation: " + normalized);
         }
         return normalized;

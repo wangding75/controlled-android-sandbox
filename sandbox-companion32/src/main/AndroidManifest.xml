@@ -6,6 +6,18 @@
         android:label="Controlled Sandbox Native Companion"
         android:usesCleartextTraffic="false">
         <service
+            android:name="com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
+            android:process=":sandbox_server32"
+            android:stopWithTask="false" />
+        <service
+            android:name=".NativeCompanionArtifactService"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
+            android:process=":native32"
+            android:stopWithTask="false" />
+        <service
             android:name=".NativeCompanionService"
             android:exported="true"
             android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"

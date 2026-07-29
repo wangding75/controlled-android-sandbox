@@ -12,7 +12,8 @@ add_library(controlled_sandbox_native32 SHARED
     ${SHARED_NATIVE_ROOT}/native_audio.cpp
     ${SHARED_NATIVE_ROOT}/native_interceptors.cpp
     ${SHARED_NATIVE_ROOT}/native_hook.cpp
-    ${SHARED_NATIVE_ROOT}/native_crash.cpp)
+    ${SHARED_NATIVE_ROOT}/native_crash.cpp
+    ${SHARED_NATIVE_ROOT}/native_policy_jni.cpp)
 target_include_directories(controlled_sandbox_native32 PRIVATE ${SHARED_NATIVE_ROOT}/include)
 target_compile_features(controlled_sandbox_native32 PRIVATE cxx_std_20)
 target_compile_options(controlled_sandbox_native32 PRIVATE -Wall -Wextra -Werror)

@@ -16,8 +16,14 @@ for candidate in services:
 if service is None:
     errors.append('PackageManagementService missing from app manifest')
 else:
-    if service.get(android+'exported') != 'false': errors.append('PackageManagementService must not be exported')
+    if service.get(android+'exported') != 'true': errors.append('PackageManagementService must be exported for the signed 32-bit peer')
+    if service.get(android+'permission') != 'com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION':
+        errors.append('exported PackageManagementService must require the signature companion permission')
     if service.get(android+'process') != ':sandbox_package': errors.append('PackageManagementService must own :sandbox_package')
+permissions = manifest.findall('./permission')
+if not any(item.get(android+'name') == 'com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION'
+           and item.get(android+'protectionLevel') == 'signature' for item in permissions):
+    errors.append('Host manifest must declare the companion Binder permission at signature level')
 
 session_aidl=(ROOT/'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl').read_text()
 root_aidl=(ROOT/'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl').read_text()
@@ -30,6 +36,11 @@ for fragment in ['Binder.getCallingUid()', 'Binder.getCallingPid()', 'clientToke
                  'guard.requireOwner', 'callerVerifier.requireMainProcessCaller()',
                  'synchronized (operationLock)']:
     if fragment not in service_source: errors.append('missing package service security/serialization fragment: '+fragment)
+verifier_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java').read_text()
+for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER',
+                 'companionBrokerProcess', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
+    if fragment not in verifier_source:
+        errors.append('missing signed Companion process verification fragment: '+fragment)
 
 for path in [ROOT/'app/src/main/java/com/warden/controlledsandbox/MainActivity.java',
              ROOT/'app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java']:

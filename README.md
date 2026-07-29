@@ -31,7 +31,7 @@ The following remain device-gated or incomplete:
 - Real Android Gradle Plugin/NDK build in the current execution environment.
 - API-level validation of hidden/reflected framework fields and PackageManager Binder signatures.
 - Device validation of bound services, dynamic receivers, Provider transport/query routing, URI grants and PendingIntent ownership.
-- Declared remote-process and `isolatedProcess` routing.
+- Dedicated Android `isolatedProcess` UID/SELinux execution; declared remote process names are source-routed but remain device-unverified.
 - Activity task/back-stack fidelity across API levels.
 - Android-version validation of Guest native-library interception, linker namespace behavior and modern syscall availability across all target ABIs.
 - WebView renderer-process isolation evidence.
@@ -136,3 +136,7 @@ M4-T18 freezes the device-test preflight source baseline. Large mutable state ow
 ## M5-T1 real Android build baseline
 
 M5-T1 freezes one fail-closed build path for the 64-bit Host, 64-bit Fixture, and 32-bit Companion APKs. Exact SDK packages, Gradle tasks, APK paths, ABI sets, and required native libraries are machine-readable in `build-environment.lock.json`. Use `scripts/install-locked-android-components.*` to install the locked SDK set and `scripts/build-device-test-apks.*` to build and collect the three debug APKs. The artifact verifier rejects ABI leakage, missing native libraries, duplicate ZIP entries, and unsafe paths. Source gates can pass without an Android SDK; an APK build is only PASS when the three APKs are actually produced and validated.
+
+## M5-T2 cross-width runtime source baseline
+
+M5-T2 replaces the 32-bit Companion probe-only path with a source-wired production Runtime Broker route. The Host transfers the Base APK, Split APKs and selected native libraries through a signature-protected, bounded, SHA-256 verified Binder file channel into Companion-private revision-scoped storage. `armeabi-v7a` and `x86` prepare, Activity, Service, Receiver, Provider and shutdown operations then execute through the same Runtime Broker/Guest Runtime implementation used by the 64-bit Host. Declared remote process names retain the existing session/slot model. Isolated components now fail before ordinary process allocation, but a dedicated Android isolated-UID transport remains blocked. Real APK build and device evidence remain 0.

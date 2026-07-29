@@ -18,8 +18,34 @@ final class PackageCallerVerifier {
     }
 
     void requireRuntimeBrokerCaller() {
-        requireProcess(context.getPackageName() + ":sandbox_server",
-                "RUNTIME_PERMISSION_CALLER_NOT_BROKER_PROCESS");
+        int callerUid = Binder.getCallingUid();
+        if (callerUid == Process.myUid()) {
+            requireProcess(context.getPackageName() + ":sandbox_server",
+                    "RUNTIME_PERMISSION_CALLER_NOT_BROKER_PROCESS");
+            return;
+        }
+        if (context.checkCallingPermission(
+                com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy.SIGNATURE_PERMISSION)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_SIGNED_PEER");
+        }
+        int callerPid = Binder.getCallingPid();
+        for (ManagementCallerPolicy.ProcessIdentity identity : runningProcesses()) {
+            if (identity.pid == callerPid && identity.uid == callerUid
+                    && (com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
+                            .companionBrokerProcess(
+                                    com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
+                                            .COMPANION_RELEASE_PACKAGE)
+                            .equals(identity.processName)
+                        || com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
+                            .companionBrokerProcess(
+                                    com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
+                                            .COMPANION_DEBUG_PACKAGE)
+                            .equals(identity.processName))) {
+                return;
+            }
+        }
+        throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER");
     }
 
     private void requireProcess(String expectedProcessName, String errorCode) {

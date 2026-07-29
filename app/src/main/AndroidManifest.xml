@@ -24,7 +24,8 @@
         android:usesCleartextTraffic="false">
         <service
             android:name=".PackageManagementService"
-            android:exported="false"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
             android:process=":sandbox_package"
             android:stopWithTask="false" />
         <service

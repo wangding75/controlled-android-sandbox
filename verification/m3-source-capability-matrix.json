@@ -349,12 +349,14 @@
     {
       "id": "process.declared-isolated-planning",
       "evidence": [
-        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/process/ComponentProcessPlanner.java"
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/process/ComponentProcessPlanner.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessRoutePolicy.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessRoutePolicySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "blocked",
       "deviceStatus": "blocked",
-      "notes": "Manifest planning exists; runtime rejects isolated components until real Android isolated UID slots are implemented and verified."
+      "notes": "Manifest planning and production Broker preflight reject isolated components before ordinary Guest process allocation. A dedicated Android isolated-UID transport remains blocked until it is implemented against real platform UID/SELinux semantics."
     },
     {
       "id": "runtime.application",
@@ -1470,14 +1472,16 @@
       "id": "contract.native-abi-companion",
       "evidence": [
         "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/INativeAbiCompanion.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/INativeCompanionArtifactService.aidl",
         "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionRequest.java",
-        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionResult.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionArtifactRequest.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionArtifactResult.java",
         "app/src/testHarness/java/com/warden/controlledsandbox/NativeCompanionContractSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "A Bundle-free signature-permission Binder request carries protocol, session, generation, virtual user, package revision, single-use nonce, requested 32-bit ABI and operation. The companion enforces protocol, nonce replay, bitness, ABI and generation identity before accepting preparation."
+      "notes": "Bundle-free signature-permission Binder contracts carry protocol, session, generation, virtual user, package revision, single-use nonce, requested 32-bit ABI, operation and bounded artifact metadata. The companion validates protocol, nonce replay, bitness, ABI, generation identity, path containment, byte count and SHA-256 before accepting execution artifacts."
     },
     {
       "id": "native.four-abi-build-architecture",
@@ -1498,12 +1502,14 @@
         "app/src/main/java/com/warden/controlledsandbox/NativeAbiRoutePlanner.java",
         "app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java",
         "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
-        "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionGenerationRegistry.java"
+        "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionArtifactService.java",
+        "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionWorkspaceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePeerPolicy.java"
       ],
       "sourceStatus": "complete",
-      "productionStatus": "partial",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "64-bit ABIs route to the Host and 32-bit ABIs require the explicit companion. Unknown or legacy ABI metadata fails closed. The Host can probe the 32-bit companion but full cross-width Guest Activity/Service execution is intentionally rejected until a device-proven runtime transport exists."
+      "notes": "64-bit ABIs route to the Host Runtime Broker. armeabi-v7a/x86 guests are staged through a signature-protected bounded file channel and route prepare, Activity, Service, Receiver, Provider and stop operations to the production Runtime Broker embedded in the 32-bit Companion. Unknown or legacy ABI metadata fails closed. Android packaging and device execution remain untested."
     },
     {
       "id": "quality.source-contract-closure",

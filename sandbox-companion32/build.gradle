@@ -31,4 +31,7 @@ android {
     }
 }
 
-dependencies { implementation project(':sandbox-contract') }
+dependencies {
+    implementation project(':sandbox-contract')
+    implementation project(':sandbox-runtime')
+}

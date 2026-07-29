@@ -10,7 +10,6 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
-import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
@@ -48,10 +47,18 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle prepare(SandboxRecord record) throws Exception { return prepare(record, 0); }
     Bundle prepare(SandboxRecord record, int virtualUserId) throws Exception {
-        return requireBroker().prepareGuest(request(record, virtualUserId, record.launchProcess));
+        Bundle request = request(record, virtualUserId, record.launchProcess);
+        return companionRoute(record)
+                ? nativeCompanion.prepare(record, virtualUserId, request)
+                : requireBroker().prepareGuest(request);
     }
     Bundle launch(SandboxRecord record) throws Exception { return launch(record, 0); }
-    Bundle launch(SandboxRecord record, int virtualUserId) throws Exception { return requireBroker().launchActivity(request(record, virtualUserId, record.launchProcess)); }
+    Bundle launch(SandboxRecord record, int virtualUserId) throws Exception {
+        Bundle request = request(record, virtualUserId, record.launchProcess);
+        return companionRoute(record)
+                ? nativeCompanion.launchActivity(record, virtualUserId, request)
+                : requireBroker().launchActivity(request);
+    }
     Bundle startService(SandboxRecord record) throws Exception { return startService(record, 0); }
     Bundle startService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.START_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
     Bundle stopService(SandboxRecord record) throws Exception { return stopService(record, 0); }
@@ -64,13 +71,13 @@ final class RuntimeClient implements AutoCloseable {
         Bundle request = componentRequest(record, virtualUserId, ComponentOperations.STOP_SERVICE_START_ID,
                 record.serviceClass, record.serviceProcess, "", "");
         request.putInt(RuntimeKeys.SERVICE_START_ID, startId);
-        return requireBroker().invokeComponent(request);
+        return invoke(record, virtualUserId, request);
     }
     Bundle setServiceForeground(SandboxRecord record, int virtualUserId, boolean foreground) throws Exception {
         Bundle request = componentRequest(record, virtualUserId, ComponentOperations.SET_SERVICE_FOREGROUND,
                 record.serviceClass, record.serviceProcess, "", "");
         request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, foreground);
-        return requireBroker().invokeComponent(request);
+        return invoke(record, virtualUserId, request);
     }
     BoundServiceLease bindService(SandboxRecord record, int virtualUserId, String connectionId) throws Exception {
         Binder clientToken = new Binder();
@@ -78,7 +85,7 @@ final class RuntimeClient implements AutoCloseable {
                 record.serviceClass, record.serviceProcess, "", "");
         request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
         request.putBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER, clientToken);
-        Bundle result = requireBroker().invokeComponent(request);
+        Bundle result = invoke(record, virtualUserId, request);
         if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
             throw new IllegalStateException(result.getString(RuntimeKeys.ERROR_TYPE, "SERVICE_BIND_FAILED"));
         }
@@ -90,7 +97,10 @@ final class RuntimeClient implements AutoCloseable {
     Bundle prepareProvider(SandboxRecord record) throws Exception { return prepareProvider(record, 0); }
     Bundle prepareProvider(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.PREPARE_PROVIDER, record.providerClass, record.providerProcess, "", record.providerAuthority); }
     void stop(SandboxRecord record) throws Exception { stop(record, 0); }
-    void stop(SandboxRecord record, int virtualUserId) throws Exception { requireBroker().stopGuest(record.packageName, virtualUserId); }
+    void stop(SandboxRecord record, int virtualUserId) throws Exception {
+        if (companionRoute(record)) nativeCompanion.stopGuest(record, virtualUserId);
+        else requireBroker().stopGuest(record.packageName, virtualUserId);
+    }
 
     private Bundle component(SandboxRecord record, int virtualUserId, String operation, String component,
                              String processName, String action, String authority) throws Exception {
@@ -99,8 +109,9 @@ final class RuntimeClient implements AutoCloseable {
             out.putString(RuntimeKeys.STATUS, "SKIPPED_NO_COMPONENT");
             return out;
         }
-        return requireBroker().invokeComponent(componentRequest(record, virtualUserId, operation,
-                component, processName, action, authority));
+        Bundle request = componentRequest(record, virtualUserId, operation,
+                component, processName, action, authority);
+        return invoke(record, virtualUserId, request);
     }
 
     private Bundle componentRequest(SandboxRecord record, int virtualUserId, String operation, String component,
@@ -114,20 +125,17 @@ final class RuntimeClient implements AutoCloseable {
         return request;
     }
 
-    private void requireExecutableRoute(SandboxRecord record, int virtualUserId) throws Exception {
-        NativeAbiRoutePlanner.Route route = NativeAbiRoutePlanner.route(record.nativeAbi);
-        if (route == NativeAbiRoutePlanner.Route.HOST_64) return;
-        NativeCompanionResult result = nativeCompanion.probe(record, virtualUserId);
-        if (!result.successful()) {
-            throw new IllegalStateException("NATIVE_COMPANION_PROBE_FAILED:"
-                    + result.errorType() + ":" + result.errorMessage());
-        }
-        throw new IllegalStateException("NATIVE_COMPANION_CROSS_WIDTH_EXECUTION_NOT_WIRED:"
-                + record.nativeAbi);
+    private boolean companionRoute(SandboxRecord record) {
+        return NativeAbiRoutePlanner.requiresCompanion(record.nativeAbi);
+    }
+
+    private Bundle invoke(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
+        return companionRoute(record)
+                ? nativeCompanion.invokeComponent(record, virtualUserId, request)
+                : requireBroker().invokeComponent(request);
     }
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {
-        requireExecutableRoute(record, virtualUserId);
         VirtualPackageStateSnapshot packageState = packageService.virtualPackageState(
                 record.packageName, virtualUserId);
         if (!record.sha256.equals(packageState.apkSha256())) {
@@ -199,7 +207,7 @@ final class RuntimeClient implements AutoCloseable {
                 Bundle request = componentRequest(record, virtualUserId, ComponentOperations.UNBIND_SERVICE,
                         record.serviceClass, record.serviceProcess, "", "");
                 request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
-                requireBroker().invokeComponent(request);
+                invoke(record, virtualUserId, request);
             } catch (Exception error) {
                 throw new IllegalStateException("SERVICE_UNBIND_FAILED", error);
             }

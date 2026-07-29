@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "baseline": "M5-T2",
+  "baseCommit": "5555afdd2a518e4921dd13949ad56caea2726f1c",
+  "sourceStatus": "pass",
+  "androidBuildStatus": "blocked-toolchain",
+  "deviceEvidence": {
+    "status": "not-tested",
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "resolvedM4ProductionIds": [
+    "runtime.native-abi-routing"
+  ],
+  "remainingProductionIds": [
+    "process.declared-isolated-planning",
+    "native.four-abi-build-architecture"
+  ],
+  "crossWidthComponents": [
+    "ACTIVITY",
+    "SERVICE",
+    "RECEIVER",
+    "PROVIDER"
+  ],
+  "securityControls": [
+    "signature permission",
+    "explicit package and component",
+    "protocol version",
+    "virtual user",
+    "APK revision",
+    "32-bit ABI",
+    "bounded artifact count and size",
+    "canonical path containment",
+    "exact byte count",
+    "SHA-256 verification",
+    "temporary file plus atomic replace",
+    "fail-closed unknown ABI",
+    "isolated component preflight rejection"
+  ]
+}

@@ -2,6 +2,8 @@ package com.warden.controlledsandbox;
 
 import android.os.Parcel;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
+import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
+import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import java.util.Arrays;
 
@@ -35,6 +37,35 @@ public final class NativeCompanionContractSelfTest {
         require(restoredResult.processBitness() == 32, "result bitness lost");
         require(restoredResult.acceptedGeneration() == 7L, "generation lost");
 
+
+        NativeCompanionArtifactRequest artifact = new NativeCompanionArtifactRequest(
+                1, "transfer", 1L, 3, "com.example.fixture", "revision-7", "x86",
+                NativeCompanionArtifactRequest.SPLIT_APK, "splits/config.en.apk",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                4096L);
+        Parcel artifactParcel = Parcel.obtain();
+        artifact.writeToParcel(artifactParcel, 0);
+        artifactParcel.setDataPosition(0);
+        NativeCompanionArtifactRequest restoredArtifact =
+                NativeCompanionArtifactRequest.CREATOR.createFromParcel(artifactParcel);
+        artifactParcel.recycle();
+        require(restoredArtifact.sizeBytes() == 4096L, "artifact size lost");
+        require("splits/config.en.apk".equals(restoredArtifact.relativePath()),
+                "artifact path lost");
+        NativeCompanionArtifactResult artifactResult = NativeCompanionArtifactResult.success(
+                "STAGE_ARTIFACT", NativeCompanionArtifactRequest.SPLIT_APK,
+                artifact.relativePath(), "/workspace/splits/config.en.apk", "/workspace",
+                "/workspace/data", "/workspace/lib");
+        Parcel artifactResultParcel = Parcel.obtain();
+        artifactResult.writeToParcel(artifactResultParcel, 0);
+        artifactResultParcel.setDataPosition(0);
+        NativeCompanionArtifactResult restoredArtifactResult =
+                NativeCompanionArtifactResult.CREATOR.createFromParcel(artifactResultParcel);
+        artifactResultParcel.recycle();
+        require(restoredArtifactResult.successful(), "artifact result success lost");
+        require("/workspace/lib".equals(restoredArtifactResult.nativeLibraryRoot()),
+                "artifact native root lost");
+
         require(NativeAbiRoutePlanner.route("") == NativeAbiRoutePlanner.Route.HOST_64,
                 "Java-only package must stay on Host");
         require(NativeAbiRoutePlanner.route("arm64-v8a") == NativeAbiRoutePlanner.Route.HOST_64,
@@ -51,6 +82,17 @@ public final class NativeCompanionContractSelfTest {
                 new byte[8], "x86", NativeCompanionRequest.OP_PROBE), "short nonce accepted");
         expectFailure(() -> new NativeCompanionRequest(1, "s", 1L, 0, "p", "r",
                 new byte[32], "x86_64", NativeCompanionRequest.OP_PROBE), "64-bit companion ABI accepted");
+        expectFailure(() -> new NativeCompanionArtifactRequest(1, "s", 1L, 0,
+                "com.example.fixture", "r", "x86",
+                NativeCompanionArtifactRequest.SPLIT_APK, "../escape.apk",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 1L),
+                "artifact traversal accepted");
+        expectFailure(() -> new NativeCompanionArtifactRequest(1, "s", 1L, 0,
+                "com.example.fixture", "r", "x86_64",
+                NativeCompanionArtifactRequest.BASE_APK, "base.apk",
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 1L),
+                "64-bit artifact ABI accepted");
+
         System.out.println("PASS native companion typed contract and ABI routing");
     }
 

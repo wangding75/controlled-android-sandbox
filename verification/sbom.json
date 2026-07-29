@@ -16,7 +16,7 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "a410a51d51c519417f7e07844c13d32b50cadf34fa4c2bd90b3b3087553a4222"
+      "sourceDigestSha256": "a1cd927deb5e0abc295cac3d4fa16747020be4f3fe16bc47eb670420c5088f12"
     },
     {
       "type": "library",
@@ -35,14 +35,14 @@
       "name": "sandbox-contract",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 81,
+      "fileCount": 86,
       "languages": [
         "AIDL",
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "36574a87c268ec8f75dd5413ee91594f5aaaf3e18d2d36b61074495ea9fb3004"
+      "sourceDigestSha256": "dd199129037720ca4bceca14ea920144006d7f22733eecc772e111ed8e257d41"
     },
     {
       "type": "library",
@@ -70,14 +70,14 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "8c10d7cc425b2cc7bc4ab861da4482313b89859a7e676e760a09339278838317"
+      "sourceDigestSha256": "265edcaa2fcac897f421e7a0edd48ac4b5cc56e432f2205816a8c9dec05a3a75"
     },
     {
       "type": "library",
       "name": "sandbox-companion32",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 9,
+      "fileCount": 12,
       "languages": [
         "C++",
         "Gradle",
@@ -85,20 +85,20 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "b01de2eb3051715cf83dd0f2bb2d93e75584f8cd057d7a05380177ebf37fdcd3"
+      "sourceDigestSha256": "59be3c0a7921794cf38009fa7b2567201667927f5b992b65c5d633a46444a8db"
     },
     {
       "type": "library",
       "name": "sandbox-runtime",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 162,
+      "fileCount": 165,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "1a0f065e8e3705acecd73d2db37986e016a3acf675c546592541a60e9d76e7c9"
+      "sourceDigestSha256": "6faec8627b4e6ced3457fa98307d5abf5fa8b996111eb76b6c515f91defad848"
     },
     {
       "type": "application",

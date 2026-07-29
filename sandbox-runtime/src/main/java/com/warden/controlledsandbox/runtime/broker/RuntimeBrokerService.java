@@ -124,11 +124,11 @@ public final class RuntimeBrokerService extends Service {
     }
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
         @Override public Bundle prepareGuest(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return RuntimeBrokerService.this.prepareGuestInternal(request);
         }
         @Override public Bundle launchActivity(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
             Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
             if (!isPrepared(prepared)) return prepared;
             String issuedRouteToken = "";
@@ -160,7 +160,7 @@ public final class RuntimeBrokerService extends Service {
             }
         }
         @Override public Bundle invokeComponent(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             BrokerProviderRuntime.OperationRoute providerRoute = null;
             boolean providerAuditFinalized = false;
             UriGrantRegistry.Authorization uriGrantAuthorization = null;
@@ -173,7 +173,7 @@ public final class RuntimeBrokerService extends Service {
             BrokerFileRuntime.CloseReservation fileCloseReservation = null;
             GuestSession fileTargetSession = null;
             try {
-                if (request == null) throw new IllegalArgumentException("request is required");
+                if (request == null) throw new IllegalArgumentException("request is required"); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
                 purgeExpiredResources();
                 String operation = request.getString(ComponentOperations.OPERATION, "");
                 ComponentOperations.requireKnownProviderOperation(operation);
@@ -466,7 +466,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public Bundle grantUriPermission(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 if (request == null) throw new IllegalArgumentException("request is required");
                 String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
@@ -518,7 +518,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public Bundle revokeUriPermission(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 if (request == null) throw new IllegalArgumentException("request is required");
                 String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
@@ -541,7 +541,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public Bundle consumeRoute(String token, String sessionId, long generation) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 GuestSession current = findSession(sessionId, generation);
                 Bundle payload = activityRuntime.consume(token, current);
@@ -558,7 +558,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public Bundle activityEvent(Bundle request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 if (request == null) throw new IllegalArgumentException("request is required");
                 GuestSession current = findSession(required(request, RuntimeKeys.SESSION_ID),
@@ -570,7 +570,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 if (request == null) throw new IllegalArgumentException("request is required");
                 GuestSession current = findSession(request.sessionId(), request.generation());
@@ -581,7 +581,7 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
                 if (request == null) throw new IllegalArgumentException("request is required");
                 GuestSession current = findSession(request.sessionId(), request.generation());
@@ -592,39 +592,39 @@ public final class RuntimeBrokerService extends Service {
         }
 
         @Override public Bundle sessionStatus(String packageName, int virtualUserId) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             GuestSession session = sessions.get(packageName, virtualUserId, packageName);
             return session == null ? failure("SESSION_NOT_FOUND", "No active session") : sessionBundle(session, session.state().name());
         }
 
         @Override public PackageServiceResult requestRuntimePermission(String sessionId,
                 long generation, String permission, int requestCode) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return runtimePermissionCoordinator.request(sessionId, generation, permission, requestCode);
         }
 
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId,
                 long generation, String permission, int requestCode, boolean hostGranted,
                 String reason) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return runtimePermissionCoordinator.report(sessionId, generation, permission, requestCode,
                     hostGranted, reason);
         }
 
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return runtimeStatusDispatcher.dispatch(request);
         }
 
         @Override public Bundle runtimeStatus() {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             RuntimeStatusRequest legacyRequest = new RuntimeStatusRequest(
                     RuntimeProtocol.CURRENT, "legacy-runtime-status");
             return RuntimeStatusLegacyAdapter.toBundle(runtimeStatusDispatcher.dispatch(legacyRequest));
         }
 
         @Override public void stopGuest(String packageName, int virtualUserId) {
-            CallerGuard.requireSameApplication();
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             RuntimeBrokerService.this.stopGuestInternal(packageName, virtualUserId);
         }
     };

@@ -10,8 +10,15 @@ public final class NativePolicy {
         try {
             System.loadLibrary("controlled_sandbox_native");
             loaded = true;
-        } catch (Throwable error) {
-            loadError = error.getClass().getName() + ":" + String.valueOf(error.getMessage());
+        } catch (Throwable primary) {
+            try {
+                System.loadLibrary("controlled_sandbox_native32");
+                loaded = true;
+            } catch (Throwable fallback) {
+                loadError = primary.getClass().getName() + ":" + String.valueOf(primary.getMessage())
+                        + ";fallback=" + fallback.getClass().getName() + ":"
+                        + String.valueOf(fallback.getMessage());
+            }
         }
         AVAILABLE = loaded;
     }
