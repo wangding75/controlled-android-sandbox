@@ -68,6 +68,18 @@ require(
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java",
     "virtual job policy snapshot lost")
+require(
+    "docs/M4_T16_B3_DEVELOPMENT_REPORT.md",
+    "JobScheduler 约束、重试与阶段收口", "设备证据保持为 0")
+require(
+    "docs/M4_T16_STAGE_REPORT.md",
+    "M4-T16 阶段报告", "下一阶段为 M4-T17")
+require(
+    "docs/comparisons/M4_T16_VA_NBB_COMPARISON.md",
+    "设备证据", "不能称为达到 VA/NBB")
+require(
+    "docs/plans/M4_T16_DEVELOPMENT_PLAN.md",
+    "| B3 | PASS |", "M4-T17")
 
 matrix = ROOT / "verification/m3-source-capability-matrix.json"
 if matrix.is_file():

@@ -50,8 +50,8 @@
 | 批次 | 状态 | 提交 |
 |---|---|---|
 | B1 | PASS | `5c73203a14560ac8d2f939227e028ab8b3d9d1c4` |
-| B2 | PASS | 功能提交 `7b7ffe2447b8ffb85da47b752517cc4dbbdb012b` |
-| B3 | 待开发 | — |
+| B2 | PASS | `0fee00868e687f5990bc2d8ca2c39622f566f338` |
+| B3 | PASS | 功能提交 `f9f7deb`；最终文档提交见正式标签 |
 
 ### B1：PendingIntent 持久身份与发送语义
 
@@ -107,3 +107,7 @@
 - `controlled-sandbox-m4-t16-bN-<commit>-SHA256SUMS.txt`
 
 正式完成后另生成不带批次后缀的 M4-T16 完整备份和开发计划文档。
+
+## 6. 后续冻结路线
+
+M4-T16 正式 PASS 后进入 M4-T17：Native Hook 与 ABI 架构。M4-T18 再执行设备测试前源码总收口；不在 M4-T16 内提前引入 Native 或设备验收范围。
