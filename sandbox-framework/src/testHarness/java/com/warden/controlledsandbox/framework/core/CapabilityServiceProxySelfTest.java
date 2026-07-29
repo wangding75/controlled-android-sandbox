@@ -20,6 +20,7 @@ public final class CapabilityServiceProxySelfTest {
         testLocationLeaseRevoked();
         testComplexLocationSignatureTracksListener();
         testCameraDeviceRevoked();
+        testLeaseCapacityAndReplacementCleanup();
         System.out.println("PASS capability service proxy and revocation self-test");
     }
 
@@ -83,6 +84,25 @@ public final class CapabilityServiceProxySelfTest {
         fixture.leases.revokeDenied(fixture.identity.capabilityPolicy(), fixture.events::add);
         require(device.closed && fixture.leases.activeCount() == 0,
                 "camera device closed after AppOps revocation");
+    }
+
+    private static void testLeaseCapacityAndReplacementCleanup() {
+        CapabilityLeaseRegistry leases = new CapabilityLeaseRegistry();
+        java.util.concurrent.atomic.AtomicInteger cleanups = new java.util.concurrent.atomic.AtomicInteger();
+        Object replacement = new Object();
+        leases.register("camera", replacement, cleanups::incrementAndGet);
+        leases.register("camera", replacement, cleanups::incrementAndGet);
+        require(cleanups.get() == 1 && leases.activeCount() == 1,
+                "replacing a capability token releases the old resource");
+        for (int index = 1; index < CapabilityLeaseRegistry.MAX_ACTIVE_LEASES; index++) {
+            leases.register("camera", new Object(), cleanups::incrementAndGet);
+        }
+        boolean bounded = false;
+        try { leases.register("camera", new Object(), cleanups::incrementAndGet); }
+        catch (IllegalStateException expected) { bounded = true; }
+        require(bounded && cleanups.get() == 2,
+                "capacity overflow cleans the rejected resource and fails closed");
+        leases.close();
     }
 
     @SuppressWarnings("unchecked")

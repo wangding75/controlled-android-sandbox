@@ -11,6 +11,7 @@ import java.util.Set;
 
 /** Broker-owned virtual Provider authority namespace, isolated by virtual user. */
 public final class ProviderAuthorityRegistry {
+    public static final int MAX_AUTHORITIES = 2048;
     public static final class Entry {
         private final String instanceId;
         private final int virtualUserId;
@@ -112,6 +113,9 @@ public final class ProviderAuthorityRegistry {
             staged.add(entry);
             resolved.add(entry);
             created.add(authority);
+        }
+        if (entries.size() + staged.size() > MAX_AUTHORITIES) {
+            throw new IllegalStateException("PROVIDER_AUTHORITY_CAPACITY_EXHAUSTED");
         }
         for (Entry entry : staged) entries.put(key(virtualUserId, entry.authority), entry);
         return new Registration(resolved, created);

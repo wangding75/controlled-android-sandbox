@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Tracks callback/device resources so policy revocation can trigger best-effort release. */
 public final class CapabilityLeaseRegistry implements AutoCloseable {
+    public static final int MAX_ACTIVE_LEASES = 256;
     @FunctionalInterface public interface CleanupAction { void cleanup() throws Exception; }
 
     private final AtomicLong sequence = new AtomicLong();
@@ -15,6 +16,12 @@ public final class CapabilityLeaseRegistry implements AutoCloseable {
 
     public synchronized void register(String capability, Object token, CleanupAction cleanup) {
         if (token == null || cleanup == null) return;
+        Lease previous = leases.remove(token);
+        if (previous != null) cleanup(previous, CapabilityAuditSink.NO_OP, "TOKEN_REPLACED");
+        if (leases.size() >= MAX_ACTIVE_LEASES) {
+            try { cleanup.cleanup(); } catch (Exception ignored) { }
+            throw new IllegalStateException("CAPABILITY_LEASE_LIMIT_EXCEEDED");
+        }
         leases.put(token, new Lease(sequence.incrementAndGet(), capability, token, cleanup));
     }
 

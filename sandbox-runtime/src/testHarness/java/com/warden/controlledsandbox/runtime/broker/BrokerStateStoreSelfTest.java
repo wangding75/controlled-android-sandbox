@@ -16,6 +16,7 @@ public final class BrokerStateStoreSelfTest {
         testDefensiveCopies();
         testSingleConsume();
         testConcurrentRouteLoad();
+        testAdmissionBounds();
         System.out.println("PASS broker concurrent state self-test");
     }
 
@@ -80,6 +81,41 @@ public final class BrokerStateStoreSelfTest {
         for (java.util.concurrent.Future<?> future : futures) future.get(30, TimeUnit.SECONDS);
         executor.shutdownNow();
         require(store.pendingRoutes() == 0, "route state leak");
+    }
+
+    private static void testAdmissionBounds() {
+        BrokerStateStore prepared = new BrokerStateStore();
+        for (int index = 0; index < BrokerStateStore.MAX_PREPARED_SPECS; index++) {
+            prepared.putPrepared("prepared-" + index, route("session", 1));
+        }
+        boolean preparedLimit = false;
+        try { prepared.putPrepared("prepared-overflow", route("session", 1)); }
+        catch (IllegalStateException expected) { preparedLimit = true; }
+        require(preparedLimit, "prepared state count limit");
+        prepared.putPrepared("prepared-0", route("replacement", 2));
+        require("replacement".equals(prepared.prepared("prepared-0")
+                .getString(RuntimeKeys.SESSION_ID, "")), "prepared replacement at capacity");
+
+        BrokerStateStore routes = new BrokerStateStore();
+        for (int index = 0; index < BrokerStateStore.MAX_ROUTE_PAYLOADS; index++) {
+            routes.putRoute("route-" + index, route("session", 1));
+        }
+        boolean routeLimit = false;
+        try { routes.putRoute("route-overflow", route("session", 1)); }
+        catch (IllegalStateException expected) { routeLimit = true; }
+        require(routeLimit, "route state count limit");
+
+        Bundle oversized = route("session", 1);
+        oversized.putByteArray("payload", new byte[BrokerStateStore.MAX_ROUTE_BYTES + 1]);
+        boolean payloadLimit = false;
+        try { new BrokerStateStore().putRoute("oversized", oversized); }
+        catch (IllegalArgumentException expected) { payloadLimit = true; }
+        require(payloadLimit, "route payload byte limit");
+
+        boolean keyLimit = false;
+        try { new BrokerStateStore().putRoute("x".repeat(257), route("session", 1)); }
+        catch (IllegalArgumentException expected) { keyLimit = true; }
+        require(keyLimit, "route key length limit");
     }
 
     private static Bundle route(String sessionId, long generation) {

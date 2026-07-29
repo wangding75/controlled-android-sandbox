@@ -12,13 +12,17 @@ import java.util.Map;
 
 /** Thread-safe source of truth for per-declared-process leases and generations. */
 public final class SessionRegistry implements SessionMetricsRepository {
+    private static final int MIN_HISTORY_ENTRIES = 64;
+    private static final int HISTORY_ENTRIES_PER_SLOT = 64;
     private final SlotPool slots;
+    private final int maxEntries;
     private final TokenGenerator tokenGenerator;
     private final Map<String, GuestSession> sessions = new LinkedHashMap<>();
 
     public SessionRegistry(int slotCount, TokenGenerator tokenGenerator) {
         if (tokenGenerator == null) throw new IllegalArgumentException("tokenGenerator is required");
         slots = new SlotPool(slotCount);
+        maxEntries = Math.max(MIN_HISTORY_ENTRIES, Math.multiplyExact(slotCount, HISTORY_ENTRIES_PER_SLOT));
         this.tokenGenerator = tokenGenerator;
     }
 
@@ -41,6 +45,11 @@ public final class SessionRegistry implements SessionMetricsRepository {
                         + existing.packageRevision() + " actual=" + packageRevision);
             }
             return existing;
+        }
+        if (existing == null) {
+            sessions.entrySet().removeIf(entry -> entry.getValue().state() == SessionState.STOPPED
+                    || entry.getValue().state() == SessionState.FAILED);
+            if (sessions.size() >= maxEntries) throw new IllegalStateException("SESSION_HISTORY_LIMIT_EXCEEDED");
         }
         int slot = slots.reserve(slotOwner(packageName, processName), virtualUserId);
         if (slot < 0) throw new IllegalStateException("NO_PROCESS_SLOT");

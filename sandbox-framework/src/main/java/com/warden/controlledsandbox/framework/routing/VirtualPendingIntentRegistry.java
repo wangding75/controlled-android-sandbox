@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Durable identity and fail-closed send policy for Guest PendingIntent senders. */
 public final class VirtualPendingIntentRegistry implements AutoCloseable {
+    public static final int MAX_ACTIVE_RECORDS = 1024;
     public static final int FLAG_ONE_SHOT = 0x40000000;
     public static final int FLAG_NO_CREATE = 0x20000000;
     public static final int FLAG_CANCEL_CURRENT = 0x10000000;
@@ -168,6 +169,9 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
     public synchronized IssueResult issue(Spec spec, Object token, Object payload) {
         Objects.requireNonNull(spec, "spec"); Objects.requireNonNull(token, "token");
         Key key = spec.key(); Record local = byKey.get(key);
+        if (local == null && byToken.size() >= MAX_ACTIVE_RECORDS) {
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_LIMIT_EXCEEDED");
+        }
         if (persistence == null) return issueLocal(spec, token, payload, local);
         DurableRecord candidate =
                 new DurableRecord("", spec.kind().name(),
@@ -271,6 +275,9 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
 
     private Record materializePersistent(String tokenId) {
         if (persistence == null) return null;
+        if (byToken.size() >= MAX_ACTIVE_RECORDS) {
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_LIMIT_EXCEEDED");
+        }
         DurableRecord persisted = null;
         for (DurableRecord value : persistence.records()) {
             if (tokenId.equals(value.tokenId())) { persisted = value; break; }

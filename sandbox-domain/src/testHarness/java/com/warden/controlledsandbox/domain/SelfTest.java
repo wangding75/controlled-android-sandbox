@@ -203,6 +203,14 @@ public final class SelfTest {
             collisionRejected = "TOKEN_GENERATOR_SESSION_ID_COLLISION".equals(expected.getMessage());
         }
         require(collisionRejected, "duplicate session token rejected");
+
+        SessionRegistry boundedHistory = new SessionRegistry(1, testTokens());
+        for (int index = 0; index < 100; index++) {
+            GuestSession terminal = boundedHistory.allocate("com.example.history" + index, 0, index + 1L);
+            boundedHistory.markSlotDisconnected(terminal.processSlot(), index + 2L, "preparation failed");
+        }
+        require(boundedHistory.count() <= 64,
+                "terminal Session history is pruned before it can grow without bound");
     }
 
     private static void testMultiProcessSessionRegistry() {
@@ -302,6 +310,22 @@ public final class SelfTest {
             require(updateBlocked, "recoverable store reports update primary failure");
             require("old-state".equals(java.nio.file.Files.readString(rollbackStore.backup())),
                     "failed update restores previous backup");
+
+            java.nio.file.Path boundedPrimary = directory.resolve("bounded-state.txt");
+            RecoverableFileStore boundedStore = new RecoverableFileStore(boundedPrimary, 8);
+            boundedStore.write("12345678");
+            boolean oversizedWriteBlocked = false;
+            try { boundedStore.write("123456789"); }
+            catch (java.io.IOException expected) { oversizedWriteBlocked = true; }
+            require(oversizedWriteBlocked, "recoverable store bounds writes");
+            require("12345678".equals(boundedStore.read(value -> value, "empty")),
+                    "oversized write preserves durable state");
+            java.nio.file.Files.writeString(boundedPrimary, "123456789");
+            java.nio.file.Files.writeString(boundedStore.backup(), "123456789");
+            boolean oversizedReadBlocked = false;
+            try { boundedStore.read(value -> value, "empty"); }
+            catch (PersistentStateException expected) { oversizedReadBlocked = true; }
+            require(oversizedReadBlocked, "recoverable store bounds primary and backup reads");
         } finally {
             try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.walk(directory)) {
                 paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {

@@ -8,6 +8,7 @@ import java.util.Map;
 
 /** Broker-independent metadata registry for virtual ContentObserver ownership and URI matching. */
 public final class ProviderObserverRegistry {
+    public static final int MAX_OBSERVERS = 256;
     public static final class Entry {
         private final String id;
         private final String callerInstanceId;
@@ -95,6 +96,9 @@ public final class ProviderObserverRegistry {
                 throw new SecurityException("PROVIDER_OBSERVER_ID_CONFLICT");
             }
             return new Registration(existing, false);
+        }
+        if (entries.size() >= MAX_OBSERVERS) {
+            throw new IllegalStateException("PROVIDER_OBSERVER_CAPACITY_EXHAUSTED");
         }
         Entry created = new Entry(id, callerInstanceId, virtualUserId, callerSessionId,
                 callerGeneration, targetInstanceId, targetSessionId, targetGeneration,

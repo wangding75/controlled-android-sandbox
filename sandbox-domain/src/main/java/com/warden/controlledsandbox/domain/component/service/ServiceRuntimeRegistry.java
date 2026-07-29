@@ -10,6 +10,8 @@ import java.util.Set;
 
 /** Explicit started, bound, foreground, and recovery ownership model independent of Android Binder classes. */
 public final class ServiceRuntimeRegistry {
+    public static final int MAX_SERVICE_RECORDS = 1024;
+    public static final int MAX_CONNECTIONS_PER_SERVICE = 256;
     public enum State { CREATED, ACTIVE, STOPPING, DESTROYED, RECOVERING }
     public enum RestartMode { NOT_STICKY, STICKY, REDELIVER_INTENT }
 
@@ -84,6 +86,10 @@ public final class ServiceRuntimeRegistry {
         MutableRecord record = getOrCreate(instanceId, component, processName, generation);
         requireGeneration(record, generation);
         if (record.state == State.DESTROYED) throw new IllegalStateException("SERVICE_DESTROYED");
+        if (!record.connectionIds.contains(connectionId)
+                && record.connectionIds.size() >= MAX_CONNECTIONS_PER_SERVICE) {
+            throw new IllegalStateException("SERVICE_CONNECTION_LIMIT_EXCEEDED");
+        }
         if (!record.connectionIds.add(connectionId)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
         record.state = State.ACTIVE;
         return new Snapshot(record);
@@ -242,6 +248,12 @@ public final class ServiceRuntimeRegistry {
         String key = key(instanceId, component);
         MutableRecord record = records.get(key);
         if (record == null || record.state == State.DESTROYED) {
+            if (record == null) {
+                records.entrySet().removeIf(entry -> entry.getValue().state == State.DESTROYED);
+                if (records.size() >= MAX_SERVICE_RECORDS) {
+                    throw new IllegalStateException("SERVICE_RECORD_LIMIT_EXCEEDED");
+                }
+            }
             record = new MutableRecord(instanceId, component, processName, generation);
             records.put(key, record);
         } else if (!record.processName.equals(processName)) {

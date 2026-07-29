@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "domains": [
+    {
+      "id": "recoverable-metadata",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java",
+          "tokens": [
+            "DEFAULT_MAX_BYTES",
+            "Persisted state exceeds limit"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java",
+          "tokens": [
+            "previousBackupExists",
+            "rollbackFailure"
+          ]
+        },
+        {
+          "category": "corruption",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java",
+          "tokens": [
+            "last-known-good",
+            "no trusted backup"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java",
+          "tokens": [
+            "writePath(primary, recovered)",
+            "Files.deleteIfExists(backup)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "install-sessions",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+          "tokens": [
+            "MAX_ARTIFACT_BYTES",
+            "MAX_INSTALL_BYTES",
+            "MAX_ARTIFACTS"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+          "tokens": [
+            "stateFailure",
+            "Files.deleteIfExists(target.toPath())"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+          "tokens": [
+            "sweepStale",
+            "deleteSession"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "runtime-sessions",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+          "tokens": [
+            "maxEntries",
+            "SESSION_HISTORY_LIMIT_EXCEEDED"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+          "tokens": [
+            "requireGeneration",
+            "SESSION_REVISION_MISMATCH"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java",
+          "tokens": [
+            "SessionState.STOPPED",
+            "slots.release"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "broker-transient-state",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStore.java",
+          "tokens": [
+            "MAX_PREPARED_SPECS",
+            "MAX_ROUTE_PAYLOADS",
+            "MAX_ROUTE_BYTES"
+          ]
+        },
+        {
+          "category": "payload",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStore.java",
+          "tokens": [
+            "boundedCopy",
+            "dataSize"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStore.java",
+          "tokens": [
+            "purgeRoutes",
+            "consumeRoute"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStore.java",
+          "tokens": [
+            "RuntimeKeys.SESSION_ID",
+            "RuntimeKeys.GENERATION"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "activity-task",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+          "tokens": [
+            "MAX_ACTIVE_TASKS",
+            "MAX_ACTIVE_ACTIVITIES",
+            "MAX_RESULT_REGISTRATIONS"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+          "tokens": [
+            "RollbackState",
+            "restoreRollbackState"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+          "tokens": [
+            "packageRevision",
+            "processGeneration"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+          "tokens": [
+            "invalidateProcessGeneration",
+            "removeTask"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "service-runtime",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+          "tokens": [
+            "MAX_SERVICE_RECORDS",
+            "MAX_CONNECTIONS_PER_SERVICE"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+          "tokens": [
+            "requireGeneration",
+            "STALE_GENERATION"
+          ]
+        },
+        {
+          "category": "death-cleanup",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinator.java",
+          "tokens": [
+            "linkToDeath",
+            "unlinkToDeath"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
+          "tokens": [
+            "destroyInstance",
+            "markProcessDied"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "receiver-tokens",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java",
+          "tokens": [
+            "MAX_ACTIVE",
+            "MAX_TIMEOUT_MS"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java",
+          "tokens": [
+            "sessionId",
+            "generation"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java",
+          "tokens": [
+            "purgeExpired",
+            "cancelSession",
+            "cancelInstance"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "provider-resources",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/ProviderAuthorityRegistry.java",
+          "tokens": [
+            "MAX_AUTHORITIES",
+            "PROVIDER_AUTHORITY_CAPACITY_EXHAUSTED"
+          ]
+        },
+        {
+          "category": "capacity",
+          "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/provider/ProviderObserverRegistry.java",
+          "tokens": [
+            "MAX_OBSERVERS",
+            "PROVIDER_OBSERVER_CAPACITY_EXHAUSTED"
+          ]
+        },
+        {
+          "category": "capacity",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerCursorRuntime.java",
+          "tokens": [
+            "MAX_ACTIVE_LEASES",
+            "MAX_TOTAL_ROWS"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerCursorRuntime.java",
+          "tokens": [
+            "rollbackQuery",
+            "rollbackPage"
+          ]
+        },
+        {
+          "category": "death-cleanup",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntime.java",
+          "tokens": [
+            "linkToDeath",
+            "removeDead"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderLifecycleCoordinator.java",
+          "tokens": [
+            "invalidateInstance",
+            "cleanupSessionCapabilities"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "virtual-system-services",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+          "tokens": [
+            "MAX_PENDING_INTENTS_PER_SCOPE",
+            "MAX_ALARMS_PER_SCOPE",
+            "MAX_JOBS_PER_SCOPE"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+          "tokens": [
+            "MutationSnapshot",
+            "persistOrRestore"
+          ]
+        },
+        {
+          "category": "corruption",
+          "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStorePersistence.java",
+          "tokens": [
+            "MAX_FILE_BYTES",
+            "CRC32",
+            ".corrupt"
+          ]
+        },
+        {
+          "category": "revision-cleanup",
+          "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+          "tokens": [
+            "prunedRevision",
+            "pruneJobRevisionLocked"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+          "tokens": [
+            "binderDied",
+            "unregister"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pending-intent-local",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+          "tokens": [
+            "MAX_ACTIVE_RECORDS",
+            "VIRTUAL_PENDING_INTENT_LIMIT_EXCEEDED"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+          "tokens": [
+            "creatorUid",
+            "generation",
+            "packageRevision"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+          "tokens": [
+            "cancelAll",
+            "close"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "capability-leases",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityLeaseRegistry.java",
+          "tokens": [
+            "MAX_ACTIVE_LEASES",
+            "CAPABILITY_LEASE_LIMIT_EXCEEDED"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityLeaseRegistry.java",
+          "tokens": [
+            "SESSION_CLOSED",
+            "POLICY_REVOKED"
+          ]
+        },
+        {
+          "category": "rollback",
+          "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/capability/CapabilityLeaseRegistry.java",
+          "tokens": [
+            "TOKEN_REPLACED",
+            "cleanup.cleanup"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "native-companion",
+      "assertions": [
+        {
+          "category": "capacity",
+          "path": "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionService.java",
+          "tokens": [
+            "MAX_NONCES",
+            "trimOldest"
+          ]
+        },
+        {
+          "category": "identity",
+          "path": "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionGenerationRegistry.java",
+          "tokens": [
+            "STALE_GENERATION",
+            "sessionId",
+            "packageRevision"
+          ]
+        },
+        {
+          "category": "cleanup",
+          "path": "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionGenerationRegistry.java",
+          "tokens": [
+            "prepared.remove",
+            "maximum"
+          ]
+        }
+      ]
+    }
+  ],
+  "querySurfaces": [
+    {
+      "id": "package-manager",
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+      "requiredTokens": [
+        "isQueryMethod",
+        "isolatedQueryDefault",
+        "HOST_PACKAGE_HIDDEN"
+      ],
+      "forbiddenTokens": [
+        "return guestTarget ? metadata.applicationInfo() : NoResult.VALUE",
+        "matches.isEmpty() && !targetsGuest(intent)"
+      ]
+    },
+    {
+      "id": "activity-task",
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityTaskClient.java",
+      "requiredTokens": [
+        "VIRTUAL_TASK_BROKER_UNAVAILABLE",
+        "VIRTUAL_TASK_BROKER_EMPTY_RESULT",
+        "VIRTUAL_TASK_RESPONSE_IDENTITY_MISMATCH"
+      ],
+      "forbiddenTokens": [
+        "ActivityManager.getRunningTasks",
+        "ActivityManager.getRecentTasks"
+      ]
+    },
+    {
+      "id": "virtual-system-services",
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+      "requiredTokens": [
+        "VIRTUAL_CLIPBOARD_SIGNATURE_UNSUPPORTED",
+        "VIRTUAL_ACCOUNT_SIGNATURE_UNSUPPORTED",
+        "VIRTUAL_NOTIFICATION_SIGNATURE_UNSUPPORTED",
+        "VIRTUAL_JOB_SIGNATURE_UNSUPPORTED"
+      ],
+      "forbiddenTokens": []
+    }
+  ],
+  "reviewedPassThrough": [
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityInvocationHandler.java",
+      "reason": "Non-virtualized methods may reach Android only after explicit inbound identity rewriting; virtual package/task/system-service query surfaces are intercepted separately.",
+      "requiredTokens": [
+        "rewriteInbound",
+        "rewriteOutbound",
+        "Unsupported framework signature"
+      ]
+    }
+  ]
+}

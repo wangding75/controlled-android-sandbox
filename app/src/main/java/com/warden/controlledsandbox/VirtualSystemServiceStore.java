@@ -815,9 +815,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     parameters.forGuest(located.job.guestId, token), hostCallback, token);
             try { hostCallback.asBinder().linkToDeath(execution, 0); }
             catch (RemoteException error) {
+                MutationSnapshot compensation = snapshotMutation(located.scope);
                 located.job.state = VirtualJobSnapshot.SCHEDULED;
                 located.job.updatedAtMs = System.currentTimeMillis();
-                persist();
+                try {
+                    persistOrRestore(located.scope, compensation);
+                } catch (RuntimeException persistenceFailure) {
+                    persistenceFailure.addSuppressed(error);
+                    maintenanceWarning = "VIRTUAL_JOB_LINK_DEATH_ROLLBACK_FAILED:"
+                            + persistenceFailure.getClass().getSimpleName();
+                    throw persistenceFailure;
+                }
                 return false;
             }
             activeJobExecutions.put(located.job.hostId, execution);
@@ -842,10 +850,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             current.job.updatedAtMs = System.currentTimeMillis();
             try { persistOrRestore(current.scope, before); }
             catch (RuntimeException error) {
+                execution.invalidateLocked();
+                MutationSnapshot compensation = snapshotMutation(current.scope);
                 current.job.state = VirtualJobSnapshot.SCHEDULED;
                 current.job.updatedAtMs = System.currentTimeMillis();
-                execution.invalidateLocked();
-                try { persist(); } catch (RuntimeException ignored) { }
+                try {
+                    persistOrRestore(current.scope, compensation);
+                } catch (RuntimeException compensationFailure) {
+                    error.addSuppressed(compensationFailure);
+                    maintenanceWarning = "VIRTUAL_JOB_START_ROLLBACK_FAILED:"
+                            + compensationFailure.getClass().getSimpleName();
+                }
                 throw error;
             }
             execution.timeout = scheduler.schedule(execution::timeout,

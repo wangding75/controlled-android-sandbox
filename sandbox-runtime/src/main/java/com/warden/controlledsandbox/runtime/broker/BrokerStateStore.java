@@ -3,41 +3,55 @@ package com.warden.controlledsandbox.runtime.broker;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.os.Bundle;
+import android.os.Parcel;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-/** Concurrent, defensive-copy storage for Binder-visible broker state. */
+/** Concurrent, defensive-copy storage for bounded Binder-visible broker state. */
 public final class BrokerStateStore {
+    static final int MAX_PREPARED_SPECS = 64;
+    static final int MAX_ROUTE_PAYLOADS = 1024;
+    static final int MAX_PREPARED_BYTES = 1024 * 1024;
+    static final int MAX_ROUTE_BYTES = 512 * 1024;
+    private static final int MAX_STATE_KEY_CHARS = 256;
+
     private final ConcurrentMap<String, Bundle> preparedSpecs = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Bundle> routePayloads = new ConcurrentHashMap<>();
 
-    void putPrepared(String key, Bundle spec) {
+    synchronized void putPrepared(String key, Bundle spec) {
         requireKey(key);
-        preparedSpecs.put(key, copy(spec));
+        Bundle bounded = boundedCopy(spec, MAX_PREPARED_BYTES, "PREPARED_SPEC");
+        if (!preparedSpecs.containsKey(key) && preparedSpecs.size() >= MAX_PREPARED_SPECS) {
+            throw new IllegalStateException("PREPARED_SPEC_LIMIT_EXCEEDED");
+        }
+        preparedSpecs.put(key, bounded);
     }
 
-    Bundle prepared(String key) {
+    synchronized Bundle prepared(String key) {
         Bundle value = preparedSpecs.get(key);
         return value == null ? null : new Bundle(value);
     }
 
-    void removePrepared(String key) { preparedSpecs.remove(key); }
+    synchronized void removePrepared(String key) { preparedSpecs.remove(key); }
 
-    public void putRoute(String token, Bundle payload) {
+    public synchronized void putRoute(String token, Bundle payload) {
         requireKey(token);
-        Bundle previous = routePayloads.putIfAbsent(token, copy(payload));
-        if (previous != null) throw new IllegalStateException("DUPLICATE_ROUTE_PAYLOAD");
+        if (routePayloads.containsKey(token)) throw new IllegalStateException("DUPLICATE_ROUTE_PAYLOAD");
+        if (routePayloads.size() >= MAX_ROUTE_PAYLOADS) {
+            throw new IllegalStateException("ROUTE_PAYLOAD_LIMIT_EXCEEDED");
+        }
+        routePayloads.put(token, boundedCopy(payload, MAX_ROUTE_BYTES, "ROUTE_PAYLOAD"));
     }
 
-    public Bundle consumeRoute(String token) {
+    public synchronized Bundle consumeRoute(String token) {
         Bundle value = routePayloads.remove(token);
         return value == null ? null : new Bundle(value);
     }
 
-    public void removeRoute(String token) { routePayloads.remove(token); }
+    public synchronized void removeRoute(String token) { routePayloads.remove(token); }
 
-    int purgeRoutes(String sessionId, long generation) {
+    synchronized int purgeRoutes(String sessionId, long generation) {
         int removed = 0;
         for (Map.Entry<String, Bundle> entry : routePayloads.entrySet()) {
             Bundle value = entry.getValue();
@@ -48,16 +62,33 @@ public final class BrokerStateStore {
         return removed;
     }
 
-    int pendingRoutes() { return routePayloads.size(); }
-    int preparedCount() { return preparedSpecs.size(); }
+    synchronized int pendingRoutes() { return routePayloads.size(); }
+    synchronized int preparedCount() { return preparedSpecs.size(); }
 
-    private static Bundle copy(Bundle value) {
+    private static Bundle boundedCopy(Bundle value, int maxBytes, String label) {
         if (value == null) throw new IllegalArgumentException("Bundle is required");
-        return new Bundle(value);
+        Bundle copy = new Bundle(value);
+        Parcel parcel = Parcel.obtain();
+        try {
+            parcel.writeBundle(copy);
+            int bytes = parcel.dataSize();
+            if (bytes < 0 || bytes > maxBytes) {
+                throw new IllegalArgumentException(label + "_TOO_LARGE:" + bytes);
+            }
+        } catch (RuntimeException error) {
+            if (error instanceof IllegalArgumentException
+                    && error.getMessage() != null && error.getMessage().startsWith(label + "_TOO_LARGE")) {
+                throw error;
+            }
+            throw new IllegalArgumentException(label + "_UNMARSHALLABLE", error);
+        } finally {
+            parcel.recycle();
+        }
+        return copy;
     }
 
     private static void requireKey(String value) {
         if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("state key is required");
+        if (value.length() > MAX_STATE_KEY_CHARS) throw new IllegalArgumentException("state key is too long");
     }
-
 }

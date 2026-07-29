@@ -116,6 +116,14 @@ public final class FrameworkIdentityProxySelfTest {
         ResolveInfo hiddenHostResolve = proxy.resolveIntent(
                 new Intent().setPackage("host.pkg"), null, 0, 0);
         require(hiddenHostResolve == null, "explicit host Intent is hidden");
+        boolean foreignHidden = false;
+        try { proxy.getApplicationInfo("foreign.pkg", 0); }
+        catch (IllegalArgumentException expected) { foreignHidden = expected.getMessage().contains("HOST_PACKAGE_HIDDEN"); }
+        require(foreignHidden, "foreign package query cannot fall back to Host PackageManager");
+        require(proxy.resolveIntent(new Intent().setPackage("foreign.pkg"), null, 0, 0) == null,
+                "foreign Intent resolve cannot expose Host activities");
+        require(proxy.getPackagesForUid(424242).length == 0,
+                "foreign UID query cannot expose Host packages");
         require(delegate.calls == 0, "virtual and hidden-host queries avoid host delegate");
         require("host-result".equals(proxy.unhandled("guest.pkg")), "fallback delegates with host identity");
         require("host.pkg".equals(delegate.lastPackage), "fallback package rewritten");

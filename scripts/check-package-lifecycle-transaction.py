@@ -134,8 +134,16 @@ if not errors:
         if required not in text['debug_activity']:
             errors.append(f'DebugCommandActivity lifecycle wiring missing: {required}')
 
-    backup_write = text['store'].find('writePath(backup, content);')
-    primary_write = text['store'].find('writePath(primary, content);', backup_write)
+    backup_candidates = [
+        text['store'].find('writePath(backup, content);'),
+        text['store'].find('writePath(backup, content, encoded);'),
+    ]
+    backup_write = min((index for index in backup_candidates if index >= 0), default=-1)
+    primary_candidates = [
+        text['store'].find('writePath(primary, content);', backup_write),
+        text['store'].find('writePath(primary, content, encoded);', backup_write),
+    ]
+    primary_write = min((index for index in primary_candidates if index >= 0), default=-1)
     if backup_write < 0 or primary_write < 0 or backup_write > primary_write:
         errors.append('RecoverableFileStore must publish backup before primary')
     for fragment in ['previousBackupExists', 'Files.deleteIfExists(backup)',

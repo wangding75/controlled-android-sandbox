@@ -16,7 +16,7 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "0c33792c893b13705b1ca6b5df3e7fe1aebe0d6fdd1a9f04f52c2beeb4bfa8ad"
+      "sourceDigestSha256": "a410a51d51c519417f7e07844c13d32b50cadf34fa4c2bd90b3b3087553a4222"
     },
     {
       "type": "library",
@@ -28,7 +28,7 @@
         "Gradle",
         "Java"
       ],
-      "sourceDigestSha256": "4fde66bbef4db88dcb0bb1b6b207ca6ceccdc6da1c7f3b49f1755aadc6d9fe13"
+      "sourceDigestSha256": "fd95a39d60cfa9fe7b847c3d794de1ef10e025711aab01b7ec310a795bb8f520"
     },
     {
       "type": "library",
@@ -55,7 +55,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "ee07b25392b29ce10c32ac4069ce657112ea7020fc97e0ebf46e868ea726d240"
+      "sourceDigestSha256": "ef6499ea4bf1ac36ada732de4bb5e0a7ba19fbb52b8698219ef88aa5a5148bbd"
     },
     {
       "type": "library",
@@ -98,7 +98,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "82974c2d6350defc4180ee6ae6b3575155db77e2796a07100d65d2d66b1c10b0"
+      "sourceDigestSha256": "1a0f065e8e3705acecd73d2db37986e016a3acf675c546592541a60e9d76e7c9"
     },
     {
       "type": "application",

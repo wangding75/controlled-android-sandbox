@@ -7,6 +7,7 @@ public final class VirtualPendingIntentRegistrySelfTest {
     public static void main(String[] args) throws Exception {
         localLifecycle();
         durableLifecycle();
+        boundedLocalRegistry();
         System.out.println("PASS virtual PendingIntent identity and lifecycle self-test");
     }
 
@@ -149,6 +150,24 @@ public final class VirtualPendingIntentRegistrySelfTest {
         newRevision.cancelAll();
         require(shared.records().isEmpty(), "cancelAll removes durable senders");
         newRevision.close();
+    }
+
+    private static void boundedLocalRegistry() {
+        VirtualPendingIntentRegistry registry = new VirtualPendingIntentRegistry(
+                "bounded.pkg", 0, 1L, (record, request) -> 0);
+        for (int index = 0; index < VirtualPendingIntentRegistry.MAX_ACTIVE_RECORDS; index++) {
+            registry.issue(new VirtualPendingIntentRegistry.Spec(
+                    VirtualPendingIntentRegistry.Kind.BROADCAST, index,
+                    "bounded.ACTION." + index, "", "", 0), new Object(), null);
+        }
+        boolean bounded = false;
+        try {
+            registry.issue(new VirtualPendingIntentRegistry.Spec(
+                    VirtualPendingIntentRegistry.Kind.BROADCAST, 99999,
+                    "bounded.OVERFLOW", "", "", 0), new Object(), null);
+        } catch (IllegalStateException expected) { bounded = true; }
+        require(bounded, "local PendingIntent registry capacity");
+        registry.close();
     }
 
     private static final class MemoryPersistence implements VirtualPendingIntentRegistry.Persistence {

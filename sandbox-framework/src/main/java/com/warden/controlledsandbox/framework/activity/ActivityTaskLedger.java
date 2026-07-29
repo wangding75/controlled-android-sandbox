@@ -27,6 +27,8 @@ public final class ActivityTaskLedger {
 
     private final AtomicInteger nextTaskId = new AtomicInteger(1);
     private final AtomicLong nextNewIntentSequence = new AtomicLong(1);
+    private static final int MAX_ACTIVE_TASKS = 256;
+    private static final int MAX_ACTIVE_ACTIVITIES = 2048;
     private static final int MAX_RECENT_TASKS = 64;
     private static final int MAX_RESULT_REGISTRATIONS = 128;
 
@@ -1143,6 +1145,9 @@ public final class ActivityTaskLedger {
     }
 
     private ActivityTaskMutableTask createTask(LaunchRequest request) {
+        if (tasks.size() >= MAX_ACTIVE_TASKS) {
+            throw new IllegalStateException("ACTIVITY_TASK_LIMIT_EXCEEDED");
+        }
         int id = nextTaskId.getAndIncrement();
         boolean documentTask = request.documentRequested()
                 && request.documentLaunchMode() != DocumentLaunchMode.NEVER;
@@ -1166,6 +1171,9 @@ public final class ActivityTaskLedger {
     }
 
     private ActivityTaskMutableActivity createActivity(LaunchRequest request) {
+        if (activitiesByToken.size() >= MAX_ACTIVE_ACTIVITIES) {
+            throw new IllegalStateException("ACTIVITY_INSTANCE_LIMIT_EXCEEDED");
+        }
         String token = UUID.randomUUID().toString();
         ActivityTaskMutableActivity activity = new ActivityTaskMutableActivity(
                 request.identity(),
