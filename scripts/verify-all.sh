@@ -12,6 +12,7 @@ python3 scripts/check-architecture.py
 python3 scripts/check-contracts.py
 python3 scripts/check-m4-t18-source-closure.py
 python3 scripts/check-m4-t18-ownership-cleanup.py
+python3 scripts/check-m4-t18-final-freeze.py
 python3 scripts/check-ports-dispatchers.py
 python3 scripts/check-package-boundaries.py
 python3 scripts/check-guest-boundary.py

@@ -129,3 +129,7 @@ M4-T17 B3 adds an independent `sandbox-companion32` APK for `armeabi-v7a` and `x
 ## M4-T17 source baseline
 
 M4-T17 hardens Guest Native execution across filesystem, procfs, dynamic loading, IPv4/IPv6 network identity and audio capture authorization. Native ABI is now an explicit package/runtime field. The Host native runtime is limited to `arm64-v8a` and `x86_64`; a separate signature-permission `sandbox-companion32` APK carries `armeabi-v7a` and `x86` with a typed, generation-bound Binder contract. This baseline contains source and Host-native evidence only. Four-ABI Android packaging, cross-package Binder execution and complete 32-bit Guest lifecycle remain device-gated and fail closed in the current Host route.
+
+## M4-T18 source baseline
+
+M4-T18 freezes the device-test preflight source baseline. Large mutable state owners were split into dedicated persistence/state components; durable files are bounded, checksum-protected and corruption-isolated; the exact legacy AIDL `Bundle` exception set is frozen; and machine-readable gates cover capacity, rollback, Binder/process death cleanup, APK Revision cleanup and Guest-query Host-fallback controls across twelve resource domains. A final preflight manifest records every production partial/blocked capability and the required Android build, component, scheduling, Native/ABI, WebView and stability evidence. **Device evidence remains 0**: no Android APK build, Emulator run, physical-device run, third-party compatibility rate or 20-minute stability result is claimed by this source baseline.

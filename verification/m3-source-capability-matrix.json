@@ -1504,6 +1504,43 @@
       "productionStatus": "partial",
       "deviceStatus": "not-tested",
       "notes": "64-bit ABIs route to the Host and 32-bit ABIs require the explicit companion. Unknown or legacy ABI metadata fails closed. The Host can probe the 32-bit companion but full cross-width Guest Activity/Service execution is intentionally rejected until a device-proven runtime transport exists."
+    },
+    {
+      "id": "quality.source-contract-closure",
+      "evidence": [
+        "scripts/check-m4-t18-source-closure.py",
+        "verification/m4-t18-legacy-bundle-contracts.json",
+        "docs/M4_T18_B1_DEVELOPMENT_REPORT.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-applicable",
+      "notes": "M4-T18 freezes the exact legacy Bundle AIDL exception set, rejects new unapproved Bundle business contracts, enforces production source-size thresholds and keeps persistence/task decomposition under an executable source gate."
+    },
+    {
+      "id": "quality.resource-lifecycle-closure",
+      "evidence": [
+        "scripts/check-m4-t18-ownership-cleanup.py",
+        "verification/m4-t18-resource-lifecycle-audit.json",
+        "docs/M4_T18_B2_DEVELOPMENT_REPORT.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-applicable",
+      "notes": "A machine-readable audit covers bounded state, rollback, identity ownership, Binder/process death cleanup, revision cleanup and Guest-query Host-fallback controls across twelve resource domains and three query surfaces."
+    },
+    {
+      "id": "release.device-test-preflight-baseline",
+      "evidence": [
+        "scripts/check-m4-t18-final-freeze.py",
+        "verification/m4-t18-device-preflight.json",
+        "docs/M4_T18_DEVICE_PREFLIGHT_GAPS.md",
+        "docs/M4_T18_STAGE_REPORT.md"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "The repository is source-ready for the next device-test stage, with unresolved production and device tracks recorded explicitly. This status does not claim an Android build, Emulator run, third-party APK compatibility or stability evidence."
     }
   ],
   "statusDimensions": {

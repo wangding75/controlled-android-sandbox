@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "baseline": "M4-T18",
+  "targetTag": "m4-t18-source-pass",
+  "sourceReadyForDeviceTesting": true,
+  "deviceEvidence": {
+    "status": "not-tested",
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "sourceClosure": {
+    "legacyBundleAidlMethods": 13,
+    "productionJavaKotlinMaximumLines": 1800,
+    "productionNativeMaximumLines": 1600,
+    "resourceDomainsAudited": 12,
+    "guestQuerySurfacesAudited": 3
+  },
+  "matrixProductionUnresolved": [
+    "receiver.ordered-source-model",
+    "receiver.ordered-pending-result-bridge",
+    "process.declared-isolated-planning",
+    "native.network-hook",
+    "native.dynamic-loader-hook",
+    "diagnostics.crash-anr-events",
+    "runtime.foreground-service-state-model",
+    "native.four-abi-build-architecture",
+    "runtime.native-abi-routing"
+  ],
+  "deviceTestTracks": [
+    {
+      "id": "locked-android-build",
+      "requiredEvidence": [
+        "JDK 17 locked build",
+        "Gradle 8.13 verified distribution",
+        "AGP 8.11.1 build",
+        "NDK 27.2.12479018 build",
+        "host and companion APK hashes"
+      ]
+    },
+    {
+      "id": "install-signature-companion",
+      "requiredEvidence": [
+        "same-signature Host and Companion install",
+        "signature-permission Binder binding",
+        "32-bit and 64-bit process inventory"
+      ]
+    },
+    {
+      "id": "package-identity-storage",
+      "requiredEvidence": [
+        "two virtual instances",
+        "package and UID isolation",
+        "storage and SharedPreferences isolation",
+        "APK Revision upgrade cleanup"
+      ]
+    },
+    {
+      "id": "activity-task",
+      "requiredEvidence": [
+        "launchMode and Intent flag matrix",
+        "Activity Result delivery",
+        "process-death task restore",
+        "running and recent task projection"
+      ]
+    },
+    {
+      "id": "service-receiver-provider",
+      "requiredEvidence": [
+        "started/bound/foreground Service lifecycle",
+        "ordered and manifest Receiver callbacks",
+        "Provider CRUD/cursor/file/observer transport",
+        "Binder death and generation cleanup"
+      ]
+    },
+    {
+      "id": "system-scheduling-notification",
+      "requiredEvidence": [
+        "PendingIntent identity and restore",
+        "Alarm timing and reboot recovery",
+        "Notification Channel/interaction behavior",
+        "Job constraints, retry and periodic delivery"
+      ]
+    },
+    {
+      "id": "native-four-abi",
+      "requiredEvidence": [
+        "arm64-v8a hook execution",
+        "x86_64 hook execution",
+        "armeabi-v7a Companion execution",
+        "x86 Companion execution",
+        "linker namespace and procfs validation"
+      ]
+    },
+    {
+      "id": "network-audio-webview",
+      "requiredEvidence": [
+        "DNS/interface identity isolation",
+        "audio permission revocation termination",
+        "WebView renderer/profile isolation"
+      ]
+    },
+    {
+      "id": "stability-release-gate",
+      "requiredEvidence": [
+        "zero crash",
+        "zero ANR",
+        "20-minute stability run",
+        "evidence manifest and SHA-256",
+        "strict M3 release gate PASS"
+      ]
+    }
+  ]
+}

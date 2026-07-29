@@ -102,3 +102,23 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — versioned, atomic and CRC-protected Activity/Task checkpoints restore bounded task state after Broker restart while dropping dead transient route/result authority.
 - PARTIAL — Guest-facing `ActivityManager`/`ActivityTaskManager` task-object adapters, Window transitions, system Recents UI and complete compound flag parity remain open.
 - DEVICE — Activity/task restoration and Recents behavior across Android API levels and OEM variants.
+
+## M4-T16 source baseline
+
+- DONE — durable, revision-bound PendingIntent identity and typed sender semantics.
+- DONE — persistent Alarm, Notification and Job policy/recovery source paths.
+- DEVICE — Android timing, quota, SystemUI and OEM behavior.
+
+## M4-T17 source baseline
+
+- DONE — modern filesystem/procfs/loader/network/audio Native policy and Host-native tests.
+- DONE — explicit ABI metadata and 64-bit Host + 32-bit Companion architecture.
+- PARTIAL — complete 32-bit Guest runtime and four-ABI Android packaging.
+- DEVICE — Bionic/Linker/SELinux/OEM and real ABI execution.
+
+## M4-T18 source baseline
+
+- DONE — persistence/God-Class split, AIDL Bundle freeze and production source thresholds.
+- DONE — machine-readable capacity, rollback, death-cleanup, Revision-cleanup and Host-fallback audit.
+- DONE — final device-preflight manifest, unresolved capability list and reproducible source freeze.
+- DEVICE — locked Android build, complete Fixture matrix, four ABI evidence and 20-minute stability gate.
