@@ -20,6 +20,7 @@ public final class GuestIdentity {
     private final String processName;
     private final int virtualUserId;
     private final long generation;
+    private final String packageRevision;
     private final VirtualPermissionPolicy permissionPolicy;
     private final SandboxAppOpsPolicy appOpsPolicy;
     private final CapabilityAccessPolicy capabilityPolicy;
@@ -91,6 +92,21 @@ public final class GuestIdentity {
                          CapabilityAuditSink capabilityAudit,
                          CapabilityLeaseRegistry capabilityLeases,
                          VirtualSystemServiceState virtualServices) {
+        this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName, hostUid,
+                packageMetadata, processName, virtualUserId, generation, permissionPolicy, appOpsPolicy,
+                capabilityAudit, capabilityLeases, virtualServices, "legacy-revision");
+    }
+
+    public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
+                         Set<String> requestedPermissions, String hostPackageName, int hostUid,
+                         VirtualPackageMetadata packageMetadata, String processName,
+                         int virtualUserId, long generation,
+                         VirtualPermissionPolicy permissionPolicy,
+                         SandboxAppOpsPolicy appOpsPolicy,
+                         CapabilityAuditSink capabilityAudit,
+                         CapabilityLeaseRegistry capabilityLeases,
+                         VirtualSystemServiceState virtualServices,
+                         String packageRevision) {
         if (packageName == null || packageName.trim().isEmpty()) {
             throw new IllegalArgumentException("packageName is required");
         }
@@ -116,6 +132,10 @@ public final class GuestIdentity {
         this.processName = processName;
         this.virtualUserId = virtualUserId;
         this.generation = generation;
+        if (packageRevision == null || packageRevision.trim().isEmpty()) {
+            throw new IllegalArgumentException("packageRevision is required");
+        }
+        this.packageRevision = packageRevision.trim();
         this.permissionPolicy = java.util.Objects.requireNonNull(permissionPolicy, "permissionPolicy");
         this.appOpsPolicy = java.util.Objects.requireNonNull(appOpsPolicy, "appOpsPolicy");
         this.capabilityPolicy = new CapabilityAccessPolicy(this.permissionPolicy::isGranted, this.appOpsPolicy::mode);
@@ -134,6 +154,7 @@ public final class GuestIdentity {
     public String processName() { return processName; }
     public int virtualUserId() { return virtualUserId; }
     public long generation() { return generation; }
+    public String packageRevision() { return packageRevision; }
     public VirtualPermissionPolicy permissionPolicy() { return permissionPolicy; }
     public SandboxAppOpsPolicy appOpsPolicy() { return appOpsPolicy; }
     public CapabilityAccessPolicy capabilityPolicy() { return capabilityPolicy; }

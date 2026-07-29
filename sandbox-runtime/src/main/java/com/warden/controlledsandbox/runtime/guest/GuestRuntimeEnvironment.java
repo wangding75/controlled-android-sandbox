@@ -95,6 +95,10 @@ public final class GuestRuntimeEnvironment {
                     new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
                     spec, virtualServices.pendingIntents(), new GuestPendingIntentDispatcher(guestContext, spec));
+            virtualServices.alarms().setRecoveredDelivery(alarm ->
+                    com.warden.controlledsandbox.contract.VirtualAlarmSnapshot.PENDING_INTENT.equals(alarm.deliveryPath())
+                            && !alarm.pendingIntentTokenId().isEmpty()
+                            && frameworkCallRouter.sendPersistentPendingIntent(alarm.pendingIntentTokenId()));
             stagedFrameworkCallRouter = frameworkCallRouter;
             OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor =
                     frameworkCallRouter.orderedReceivers();
@@ -107,7 +111,8 @@ public final class GuestRuntimeEnvironment {
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
-                            permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices),
+                            permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices,
+                            spec.packageRevision),
                     frameworkCallRouter);
             stagedHooks = frameworkHooks;
             frameworkHooks.report().requireMandatoryReady();

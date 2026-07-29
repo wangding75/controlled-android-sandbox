@@ -28,6 +28,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private final ClassLoader classLoader;
     private final ConcurrentMap<String, Runnable> alarmDeliveries = new ConcurrentHashMap<>();
     private volatile Runnable clipboardListener = () -> { };
+    private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
         @Override public boolean onStart(int guestJobId, Object jobPayload,
                 JobParametersRecord parameters, JobExecution execution) { return false; }
@@ -36,9 +37,14 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private volatile boolean closed;
     private final IVirtualSystemServiceObserver observer = new IVirtualSystemServiceObserver.Stub() {
         @Override public void onClipboardChanged() { clipboardListener.run(); }
-        @Override public void onAlarm(String alarmId) {
-            Runnable delivery = alarmDeliveries.get(alarmId);
-            if (delivery != null) delivery.run();
+        @Override public void onAlarm(VirtualAlarmSnapshot alarm) {
+            if (alarm == null) return;
+            Runnable delivery = alarmDeliveries.get(alarm.alarmId());
+            if (delivery != null) { delivery.run(); return; }
+            AlarmRecord recovered = alarm(alarm);
+            if (!Boolean.TRUE.equals(recoveredAlarmDelivery.apply(recovered))) {
+                throw new IllegalStateException("VIRTUAL_ALARM_RECOVERED_TARGET_UNAVAILABLE:" + alarm.alarmId());
+            }
         }
         @Override public boolean onJobStart(int guestJobId, byte[] jobPayload,
                 VirtualJobParametersSnapshot parameters, IVirtualJobExecution execution) {
@@ -123,15 +129,20 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return Collections.unmodifiableList(out);
     }
 
-    @Override public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs,
-                                        Object token, Runnable delivery) {
+    @Override public void scheduleAlarm(AlarmRecord candidate, Runnable delivery) {
+        java.util.Objects.requireNonNull(candidate, "candidate");
         Runnable requiredDelivery = java.util.Objects.requireNonNull(delivery, "delivery");
-        Runnable registeredDelivery = intervalMs == 0L
-                ? () -> { try { requiredDelivery.run(); } finally { alarmDeliveries.remove(alarmId); } }
+        Runnable registeredDelivery = candidate.intervalMs() == 0L
+                ? () -> { try { requiredDelivery.run(); } finally { alarmDeliveries.remove(candidate.alarmId()); } }
                 : requiredDelivery;
-        alarmDeliveries.put(alarmId, registeredDelivery);
-        try { call(() -> { session.scheduleAlarm(alarmId, triggerAtMs, intervalMs, marshal(token)); return null; }); }
-        catch (RuntimeException error) { alarmDeliveries.remove(alarmId); throw error; }
+        alarmDeliveries.put(candidate.alarmId(), registeredDelivery);
+        byte[] payload = candidate.token() instanceof Parcelable ? marshal(candidate.token()) : new byte[0];
+        VirtualAlarmSnapshot snapshot = new VirtualAlarmSnapshot(candidate.alarmId(), candidate.triggerAtMs(),
+                candidate.intervalMs(), candidate.exact(), candidate.allowWhileIdle(), candidate.deliveryPath(),
+                candidate.pendingIntentTokenId(), candidate.ownerProcessName(), candidate.ownerGeneration(),
+                candidate.packageRevision(), payload, candidate.deliveryCount(), candidate.updatedAtMs());
+        try { call(() -> { session.scheduleAlarm(snapshot); return null; }); }
+        catch (RuntimeException error) { alarmDeliveries.remove(candidate.alarmId()); throw error; }
     }
     @Override public boolean cancelAlarm(String alarmId) {
         boolean removed = call(() -> session.cancelAlarm(alarmId));
@@ -140,19 +151,18 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     @Override public List<AlarmRecord> alarms() {
         List<VirtualAlarmSnapshot> snapshots = call(session::listAlarms);
         List<AlarmRecord> result = new ArrayList<>();
-        if (snapshots != null) for (VirtualAlarmSnapshot snapshot : snapshots) {
-            Object token = unmarshal(snapshot.tokenPayload());
-            if (token != null) result.add(new AlarmRecord(snapshot.alarmId(), snapshot.triggerAtMs(),
-                    snapshot.intervalMs(), token));
-        }
+        if (snapshots != null) for (VirtualAlarmSnapshot snapshot : snapshots) result.add(alarm(snapshot));
         return Collections.unmodifiableList(result);
     }
-
-    @Override public NotificationRecord reserveNotification(int guestId, String guestTag, String channelId) {
-        return notification(call(() -> session.reserveNotification(guestId, safe(guestTag), safe(channelId))));
+    @Override public void setRecoveredAlarmDelivery(java.util.function.Function<AlarmRecord, Boolean> delivery) {
+        recoveredAlarmDelivery = delivery == null ? value -> false : delivery;
     }
-    @Override public void commitNotification(int guestId, String guestTag, String channelId, Object payload) {
-        call(() -> { session.commitNotification(guestId, safe(guestTag), safe(channelId), marshal(payload)); return null; });
+
+    @Override public NotificationRecord reserveNotification(NotificationRecord candidate) {
+        return notification(call(() -> session.reserveNotification(notification(candidate, false))));
+    }
+    @Override public void commitNotification(NotificationRecord value) {
+        call(() -> { session.commitNotification(notification(value, true)); return null; });
     }
     @Override public boolean removeNotification(int guestId, String guestTag) {
         return call(() -> session.removeNotification(guestId, safe(guestTag)));
@@ -163,8 +173,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (values != null) for (VirtualNotificationSnapshot value : values) out.add(notification(value));
         return Collections.unmodifiableList(out);
     }
-    @Override public void upsertNotificationChannel(String kind, String id, String groupId, Object payload) {
-        call(() -> { session.upsertNotificationChannel(kind, id, safe(groupId), marshal(payload)); return null; });
+    @Override public void upsertNotificationChannel(NotificationChannelRecord value) {
+        call(() -> { session.upsertNotificationChannel(new VirtualNotificationChannelSnapshot(
+                value.kind(), value.id(), safe(value.groupId()), value.packageRevision(),
+                marshal(value.payload()), value.updatedAtMs())); return null; });
     }
     @Override public boolean removeNotificationChannel(String kind, String id) {
         return call(() -> session.removeNotificationChannel(kind, id));
@@ -174,7 +186,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         List<NotificationChannelRecord> out = new ArrayList<>();
         if (values != null) for (VirtualNotificationChannelSnapshot value : values) {
             out.add(new NotificationChannelRecord(value.kind(), value.id(), value.groupId(),
-                    unmarshal(value.payload()), value.updatedAtMs()));
+                    value.packageRevision(), unmarshal(value.payload()), value.updatedAtMs()));
         }
         return Collections.unmodifiableList(out);
     }
@@ -222,6 +234,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
 
     @Override public void close() {
         if (closed) return; closed = true; alarmDeliveries.clear(); clipboardListener = () -> { };
+        recoveredAlarmDelivery = value -> false;
         jobExecutionListener = new JobExecutionListener() {
             @Override public boolean onStart(int guestJobId, Object payload,
                     JobParametersRecord parameters, JobExecution execution) { return false; }
@@ -256,6 +269,13 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         catch (Exception error) { throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_REMOTE_FAILURE", error); }
     }
 
+    private AlarmRecord alarm(VirtualAlarmSnapshot snapshot) {
+        return new AlarmRecord(snapshot.alarmId(), snapshot.triggerAtMs(), snapshot.intervalMs(),
+                snapshot.exact(), snapshot.allowWhileIdle(), snapshot.deliveryPath(),
+                snapshot.pendingIntentTokenId(), snapshot.ownerProcessName(), snapshot.ownerGeneration(),
+                snapshot.packageRevision(), unmarshal(snapshot.tokenPayload()), snapshot.deliveryCount(),
+                snapshot.updatedAtMs());
+    }
     private PendingIntentRecord pendingIntent(VirtualPendingIntentSnapshot value) {
         return new PendingIntentRecord(value.tokenId(), value.kind(), value.requestCode(),
                 value.action(), value.component(), value.data(), value.filterIdentity(), value.flags(), value.creatorPackage(),
@@ -265,7 +285,16 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     private NotificationRecord notification(VirtualNotificationSnapshot value) {
         return new NotificationRecord(value.guestId(), value.hostId(), value.guestTag(), value.hostTag(),
-                value.channelId(), value.state(), unmarshal(value.payload()), value.updatedAtMs());
+                value.channelId(), value.state(), value.packageRevision(), value.contentIntentTokenId(),
+                value.deleteIntentTokenId(), value.actionIntentTokenIds(), value.foregroundService(),
+                value.foregroundServiceKey(), unmarshal(value.payload()), value.updatedAtMs());
+    }
+    private VirtualNotificationSnapshot notification(NotificationRecord value, boolean includePayload) {
+        return new VirtualNotificationSnapshot(value.guestId(), Math.max(0, value.hostId()), value.guestTag(),
+                value.hostTag(), value.channelId(), value.state(), value.packageRevision(),
+                value.contentIntentTokenId(), value.deleteIntentTokenId(), value.actionIntentTokenIds(),
+                value.foregroundService(), value.foregroundServiceKey(),
+                includePayload ? marshal(value.payload()) : new byte[0], value.updatedAtMs());
     }
     private JobRecord job(VirtualJobSnapshot value) {
         return new JobRecord(value.guestId(), value.hostId(), value.state(), value.ownerProcessName(),

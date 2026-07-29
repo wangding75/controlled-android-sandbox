@@ -937,16 +937,19 @@
     {
       "id": "framework.alarm-basic-lifecycle",
       "evidence": [
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualAlarmSnapshot.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
         "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
         "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Alarm metadata and marshalled Parcelable delivery tokens are persisted in the Package Service authority, bound to package/user/process/generation, reclaimed by the same virtual process on a new generation, and delivered through a scoped Binder observer. Android AlarmManager, Doze, wakeup and reboot semantics remain device-gated."
+      "notes": "Revision-scoped Alarm records persist exact/allow-while-idle/repeating state and Listener or durable PendingIntent delivery identity in Package Service. Offline Guest processes retain schedules; a new generation reclaims and delivers by persistent PendingIntent token. Android wakeup, Doze, reboot and OEM timing behavior remain device-gated."
     },
     {
       "id": "framework.clipboard-generation-isolation",
@@ -979,16 +982,19 @@
     {
       "id": "framework.notification-id-tag-namespace",
       "evidence": [
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualNotificationSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualNotificationChannelSnapshot.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
         "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/NotificationManagerHook.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Notification IDs and channel/group string identities use a persistent package/user namespace. NotificationChannel object fields are rewritten and restored around host calls. Complete channel lifecycle, cancelAll and process-death cleanup remain partial."
+      "notes": "Notification IDs/tags, channel/group lifecycle, foreground-service mapping and click/delete/action PendingIntent identities are revision-scoped and persistent. Group/channel deletion cascades only through owned resources and cancelAll enumerates owned host IDs. OEM listener callbacks and real process/device restoration remain unverified."
     },
     {
       "id": "framework.job-id-query-namespace",
@@ -1316,6 +1322,49 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Guest ActivityManager/ActivityTaskManager running, recent and app-task queries are projected from Broker-owned virtual tasks. Task move/remove/finish operations bind framework Activity tokens to virtual Task identity and fail closed without host task-result fallback."
+    },
+    {
+      "id": "contract.alarm-notification-lifecycle",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualAlarmSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualNotificationSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualNotificationChannelSnapshot.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Typed Bundle-free Alarm and Notification records carry revision, scheduling, PendingIntent and foreground-service metadata across the scoped Binder capability."
+    },
+    {
+      "id": "package.alarm-durable-delivery-lifecycle",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistrySelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Package Service retains one-shot and repeating alarms while the Guest is offline, rebinds generation ownership, retries unavailable targets and dispatches recovered PendingIntent alarms by durable token."
+    },
+    {
+      "id": "package.notification-interaction-lifecycle",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Owned notification state persists content/delete/action PendingIntent references and foreground-service keys; PendingIntent cancellation clears matching references and channel/group deletion cascades through owned state."
     }
   ],
   "statusDimensions": {

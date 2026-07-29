@@ -23,6 +23,7 @@ python3 scripts/check-capability-proxy-broker-split.py
 python3 scripts/check-system-services-broker-split.py
 python3 scripts/check-binder-system-services.py
 python3 scripts/check-pending-intent-lifecycle.py
+python3 scripts/check-alarm-notification-lifecycle.py
 python3 scripts/check-notification-job-lifecycle.py
 python3 scripts/check-guest-jobservice-bridge.py
 python3 scripts/check-service-lifecycle.py

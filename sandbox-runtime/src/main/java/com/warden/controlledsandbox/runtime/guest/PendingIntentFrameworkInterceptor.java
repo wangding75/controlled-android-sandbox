@@ -6,6 +6,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
+import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
@@ -96,6 +97,15 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
 
     VirtualPendingIntentRegistry.Snapshot snapshot() { return registry.snapshot(); }
 
+    boolean sendPersistent(String tokenId) {
+        try {
+            registry.sendPersistent(tokenId, VirtualPendingIntentRegistry.SendRequest.simple(null));
+            return true;
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
     @Override public synchronized void close() { registry.close(); proxies.clear(); }
 
     private Interception createSender(Method method, Object[] arguments) {
@@ -106,6 +116,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         SenderBinder candidate = new SenderBinder();
         VirtualPendingIntentRegistry.IssueResult issued = registry.issue(parsed.spec, candidate, parsed.intents);
         if (issued.record() == null) return Interception.handled(null);
+        candidate.bind(issued.record().persistentTokenId());
         Object token = issued.record().token();
         Object sender = proxies.get(token);
         if (sender == null) {
@@ -290,6 +301,11 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     }
     private static Object defaultValue(Class<?> type) { return returnFor(type, 0); }
 
-    private static final class SenderBinder extends Binder { }
+    private static final class SenderBinder extends Binder implements VirtualPendingIntentToken {
+        private volatile String tokenId = "";
+        void bind(String value) { if (value != null && !value.isBlank()) tokenId = value.trim(); }
+        @Override public String persistentTokenId() { return tokenId; }
+        @Override public String toString() { return "VirtualPendingIntentBinder[" + tokenId + "]"; }
+    }
     private record Parsed(VirtualPendingIntentRegistry.Spec spec, Intent[] intents) { }
 }

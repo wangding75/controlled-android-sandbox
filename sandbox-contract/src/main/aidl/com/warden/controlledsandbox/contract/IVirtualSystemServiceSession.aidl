@@ -29,15 +29,15 @@ interface IVirtualSystemServiceSession {
     boolean cancelPendingIntent(String tokenId);
     List<VirtualPendingIntentSnapshot> listPendingIntents();
 
-    void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);
+    void scheduleAlarm(in VirtualAlarmSnapshot candidate);
     boolean cancelAlarm(String alarmId);
     List<VirtualAlarmSnapshot> listAlarms();
 
-    VirtualNotificationSnapshot reserveNotification(int guestId, String guestTag, String channelId);
-    void commitNotification(int guestId, String guestTag, String channelId, in byte[] payload);
+    VirtualNotificationSnapshot reserveNotification(in VirtualNotificationSnapshot candidate);
+    void commitNotification(in VirtualNotificationSnapshot value);
     boolean removeNotification(int guestId, String guestTag);
     List<VirtualNotificationSnapshot> listNotifications();
-    void upsertNotificationChannel(String kind, String id, String groupId, in byte[] payload);
+    void upsertNotificationChannel(in VirtualNotificationChannelSnapshot value);
     boolean removeNotificationChannel(String kind, String id);
     List<VirtualNotificationChannelSnapshot> listNotificationChannels();
 

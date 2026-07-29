@@ -362,8 +362,7 @@ public final class VirtualSystemServiceSelfTest {
         public void setToken(String name, String type, String tokenType, String token) { }
         public String token(String name, String type, String tokenType) { return null; }
         public void invalidateToken(String accountType, String token) { }
-        public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs,
-                                  Object token, Runnable delivery) { }
+        public void scheduleAlarm(AlarmRecord candidate, Runnable delivery) { }
         public boolean cancelAlarm(String alarmId) { return false; }
         public List<AlarmRecord> alarms() { return List.of(); }
         public NamespaceMapping ensureNamespace(String namespace, int guestId) {

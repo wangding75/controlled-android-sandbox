@@ -250,33 +250,45 @@ public final class VirtualSystemServiceState implements AutoCloseable {
                 for (VirtualSystemServiceAuthority.AlarmRecord record : authority.alarms()) {
                     Object token = record.token();
                     if (token == null) continue;
-                    AlarmEntry entry = new AlarmEntry(record.alarmId(), token, record.triggerAtMs(), record.intervalMs());
+                    AlarmEntry entry = new AlarmEntry(record.alarmId(), token, record.triggerAtMs(), record.intervalMs(),
+                            record.exact(), record.allowWhileIdle(), record.deliveryPath(), record.pendingIntentTokenId(),
+                            record.ownerProcessName(), record.ownerGeneration(), record.packageRevision());
                     alarms.put(token, entry);
                     if (record.alarmId().startsWith("a")) {
                         try { nextId = Math.max(nextId, Long.parseLong(record.alarmId().substring(1)) + 1L); }
                         catch (NumberFormatException ignored) { }
                     }
-                    authority.scheduleAlarm(record.alarmId(), record.triggerAtMs(), record.intervalMs(), token,
-                            () -> dispatch(token));
+                    authority.scheduleAlarm(record, () -> dispatch(token));
                 }
                 remoteIds.set(nextId);
             }
         }
         public void schedule(Object token, long triggerAtMs, long intervalMs) {
+            schedule(token, triggerAtMs, intervalMs, false, false, "LISTENER", "",
+                    "legacy", 0L, "legacy-revision");
+        }
+        public void schedule(Object token, long triggerAtMs, long intervalMs, boolean exact,
+                             boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                             String ownerProcessName, long ownerGeneration, String packageRevision) {
             if (token == null) throw new IllegalArgumentException("VIRTUAL_ALARM_TOKEN_REQUIRED");
             cancel(token);
+            String id = authority == null ? "" : "a" + remoteIds.getAndIncrement();
+            AlarmEntry entry = new AlarmEntry(id, token, triggerAtMs, Math.max(0L, intervalMs), exact,
+                    allowWhileIdle, deliveryPath, pendingIntentTokenId, ownerProcessName,
+                    ownerGeneration, packageRevision);
+            alarms.put(token, entry);
             if (authority != null) {
-                String id = "a" + remoteIds.getAndIncrement();
-                AlarmEntry entry = new AlarmEntry(id, token, triggerAtMs, Math.max(0L, intervalMs));
-                alarms.put(token, entry);
-                authority.scheduleAlarm(id, triggerAtMs, entry.intervalMs, token, () -> {
+                VirtualSystemServiceAuthority.AlarmRecord record = new VirtualSystemServiceAuthority.AlarmRecord(
+                        id, triggerAtMs, entry.intervalMs, exact, allowWhileIdle, deliveryPath,
+                        pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
+                        token, 0, System.currentTimeMillis());
+                authority.scheduleAlarm(record, () -> {
                     try { dispatch(token); }
                     finally { if (entry.intervalMs == 0L) alarms.remove(token, entry); }
                 });
                 return;
             }
             long delay = Math.max(0L, triggerAtMs - System.currentTimeMillis());
-            AlarmEntry entry = new AlarmEntry("", token, triggerAtMs, Math.max(0L, intervalMs));
             Runnable delivery = () -> {
                 try { dispatch(token); }
                 finally { if (entry.intervalMs == 0L) alarms.remove(token, entry); }
@@ -284,7 +296,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             ScheduledFuture<?> future = entry.intervalMs > 0L
                     ? executor.scheduleAtFixedRate(delivery, delay, entry.intervalMs, TimeUnit.MILLISECONDS)
                     : executor.schedule(delivery, delay, TimeUnit.MILLISECONDS);
-            entry.future = future; alarms.put(token, entry);
+            entry.future = future;
         }
         public boolean cancel(Object token) {
             AlarmEntry removed = token == null ? null : alarms.remove(token);
@@ -292,12 +304,24 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             if (authority != null) return authority.cancelAlarm(removed.id);
             if (removed.future != null) removed.future.cancel(false); return true;
         }
+        public void setRecoveredDelivery(java.util.function.Function<VirtualSystemServiceAuthority.AlarmRecord, Boolean> delivery) {
+            if (authority != null) authority.setRecoveredAlarmDelivery(delivery);
+        }
         public int size() { return authority == null ? alarms.size() : authority.alarms().size(); }
         public List<Long> triggerTimes() {
             List<Long> times = new ArrayList<>();
             if (authority != null) for (VirtualSystemServiceAuthority.AlarmRecord record : authority.alarms()) times.add(record.triggerAtMs());
             else for (AlarmEntry entry : alarms.values()) times.add(entry.triggerAtMs);
             Collections.sort(times); return Collections.unmodifiableList(times);
+        }
+        public List<VirtualSystemServiceAuthority.AlarmRecord> records() {
+            if (authority != null) return Collections.unmodifiableList(new ArrayList<>(authority.alarms()));
+            List<VirtualSystemServiceAuthority.AlarmRecord> out = new ArrayList<>();
+            for (AlarmEntry entry : alarms.values()) out.add(new VirtualSystemServiceAuthority.AlarmRecord(
+                    entry.id, entry.triggerAtMs, entry.intervalMs, entry.exact, entry.allowWhileIdle,
+                    entry.deliveryPath, entry.pendingIntentTokenId, entry.ownerProcessName,
+                    entry.ownerGeneration, entry.packageRevision, entry.token, 0, 0L));
+            return Collections.unmodifiableList(out);
         }
         @Override public void close() {
             if (authority == null) {
@@ -317,12 +341,19 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         private record Key(int guestId, String guestTag) { }
         private static final class Entry {
             final int guestId; final int hostId; final String guestTag; final String hostTag;
-            String channelId; String state; Object payload; long updatedAtMs;
-            Entry(int guestId, int hostId, String guestTag, String hostTag, String channelId,
-                  String state, Object payload, long updatedAtMs) {
-                this.guestId = guestId; this.hostId = hostId; this.guestTag = guestTag;
-                this.hostTag = hostTag; this.channelId = channelId; this.state = state;
-                this.payload = payload; this.updatedAtMs = updatedAtMs;
+            String channelId; String state; final String packageRevision;
+            String contentIntentTokenId; String deleteIntentTokenId; List<String> actionIntentTokenIds;
+            boolean foregroundService; String foregroundServiceKey;
+            Object payload; long updatedAtMs;
+            Entry(VirtualSystemServiceAuthority.NotificationRecord value) {
+                this.guestId = value.guestId(); this.hostId = value.hostId(); this.guestTag = value.guestTag();
+                this.hostTag = value.hostTag(); this.channelId = value.channelId(); this.state = value.state();
+                this.packageRevision = value.packageRevision(); this.contentIntentTokenId = value.contentIntentTokenId();
+                this.deleteIntentTokenId = value.deleteIntentTokenId();
+                this.actionIntentTokenIds = immutableStrings(value.actionIntentTokenIds());
+                this.foregroundService = value.foregroundService();
+                this.foregroundServiceKey = value.foregroundServiceKey();
+                this.payload = value.payload(); this.updatedAtMs = value.updatedAtMs();
             }
         }
         private final VirtualSystemServiceAuthority authority;
@@ -332,25 +363,52 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         NotificationState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
 
         public synchronized VirtualSystemServiceAuthority.NotificationRecord reserve(int guestId, String tag, String channelId) {
-            String guestTag = normalize(tag); String channel = normalize(channelId);
-            if (authority != null) return authority.reserveNotification(guestId, guestTag, channel);
-            Key key = new Key(guestId, guestTag); Entry current = entries.get(key);
+            return reserve(new VirtualSystemServiceAuthority.NotificationRecord(guestId, 0, normalize(tag), "",
+                    normalize(channelId), "RESERVED", "legacy-revision", "", "", List.of(),
+                    false, "", null, System.currentTimeMillis()));
+        }
+        public synchronized VirtualSystemServiceAuthority.NotificationRecord reserve(
+                VirtualSystemServiceAuthority.NotificationRecord candidate) {
+            if (authority != null) return authority.reserveNotification(candidate);
+            Key key = new Key(candidate.guestId(), normalize(candidate.guestTag()));
+            Entry current = entries.get(key);
             if (current == null) {
                 int host = next.getAndIncrement();
-                current = new Entry(guestId, host, guestTag, "cs:" + host + ":" + guestTag,
-                        channel, "RESERVED", null, System.currentTimeMillis());
-                entries.put(key, current);
+                VirtualSystemServiceAuthority.NotificationRecord created = new VirtualSystemServiceAuthority.NotificationRecord(
+                        candidate.guestId(), host, key.guestTag(), "cs:" + host + ":" + key.guestTag(),
+                        normalize(candidate.channelId()), "RESERVED", candidate.packageRevision(),
+                        candidate.contentIntentTokenId(), candidate.deleteIntentTokenId(), candidate.actionIntentTokenIds(),
+                        candidate.foregroundService(), candidate.foregroundServiceKey(), null, System.currentTimeMillis());
+                current = new Entry(created); entries.put(key, current);
             } else {
-                current.channelId = channel; current.state = "RESERVED"; current.updatedAtMs = System.currentTimeMillis();
+                current.channelId = normalize(candidate.channelId()); current.state = "RESERVED";
+                current.contentIntentTokenId = normalize(candidate.contentIntentTokenId());
+                current.deleteIntentTokenId = normalize(candidate.deleteIntentTokenId());
+                current.actionIntentTokenIds = immutableStrings(candidate.actionIntentTokenIds());
+                current.foregroundService = candidate.foregroundService();
+                current.foregroundServiceKey = normalize(candidate.foregroundServiceKey());
+                current.updatedAtMs = System.currentTimeMillis();
             }
             return record(current);
         }
         public synchronized void commit(int guestId, String tag, String channelId, Object payload) {
-            String guestTag = normalize(tag); String channel = normalize(channelId);
-            if (authority != null) { authority.commitNotification(guestId, guestTag, channel, payload); return; }
-            Entry entry = entries.get(new Key(guestId, guestTag));
+            VirtualSystemServiceAuthority.NotificationRecord current = find(guestId, tag);
+            if (current == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
+            commit(new VirtualSystemServiceAuthority.NotificationRecord(current.guestId(), current.hostId(),
+                    current.guestTag(), current.hostTag(), normalize(channelId), "ACTIVE", current.packageRevision(),
+                    current.contentIntentTokenId(), current.deleteIntentTokenId(), current.actionIntentTokenIds(),
+                    current.foregroundService(), current.foregroundServiceKey(), payload, System.currentTimeMillis()));
+        }
+        public synchronized void commit(VirtualSystemServiceAuthority.NotificationRecord value) {
+            if (authority != null) { authority.commitNotification(value); return; }
+            Entry entry = entries.get(new Key(value.guestId(), normalize(value.guestTag())));
             if (entry == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
-            entry.channelId = channel; entry.payload = payload; entry.state = "ACTIVE";
+            entry.channelId = normalize(value.channelId()); entry.payload = value.payload(); entry.state = "ACTIVE";
+            entry.contentIntentTokenId = normalize(value.contentIntentTokenId());
+            entry.deleteIntentTokenId = normalize(value.deleteIntentTokenId());
+            entry.actionIntentTokenIds = immutableStrings(value.actionIntentTokenIds());
+            entry.foregroundService = value.foregroundService();
+            entry.foregroundServiceKey = normalize(value.foregroundServiceKey());
             entry.updatedAtMs = System.currentTimeMillis();
         }
         public synchronized boolean remove(int guestId, String tag) {
@@ -388,9 +446,12 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         }
         public synchronized int size() { return records().size(); }
         public synchronized void upsertChannel(String kind, String id, String groupId, Object payload) {
-            if (authority != null) { authority.upsertNotificationChannel(kind, id, groupId, payload); return; }
-            channels.put(kind + "#" + id, new VirtualSystemServiceAuthority.NotificationChannelRecord(
-                    kind, id, normalize(groupId), payload, System.currentTimeMillis()));
+            upsertChannel(new VirtualSystemServiceAuthority.NotificationChannelRecord(kind, id, normalize(groupId),
+                    "legacy-revision", payload, System.currentTimeMillis()));
+        }
+        public synchronized void upsertChannel(VirtualSystemServiceAuthority.NotificationChannelRecord value) {
+            if (authority != null) { authority.upsertNotificationChannel(value); return; }
+            channels.put(value.kind() + "#" + value.id(), value);
         }
         public synchronized boolean removeChannel(String kind, String id) {
             return authority != null ? authority.removeNotificationChannel(kind, id)
@@ -410,7 +471,12 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         }
         private static VirtualSystemServiceAuthority.NotificationRecord record(Entry entry) {
             return new VirtualSystemServiceAuthority.NotificationRecord(entry.guestId, entry.hostId,
-                    entry.guestTag, entry.hostTag, entry.channelId, entry.state, entry.payload, entry.updatedAtMs);
+                    entry.guestTag, entry.hostTag, entry.channelId, entry.state, entry.packageRevision,
+                    entry.contentIntentTokenId, entry.deleteIntentTokenId, entry.actionIntentTokenIds,
+                    entry.foregroundService, entry.foregroundServiceKey, entry.payload, entry.updatedAtMs);
+        }
+        private static List<String> immutableStrings(List<String> values) {
+            return Collections.unmodifiableList(new ArrayList<>(values == null ? List.of() : values));
         }
     }
 
@@ -535,9 +601,20 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         AccountEntry(Object account, String password) { this.account = account; this.password = password; }
     }
     private static final class AlarmEntry {
-        final String id; final Object token; final long triggerAtMs; final long intervalMs; volatile ScheduledFuture<?> future;
-        AlarmEntry(String id, Object token, long triggerAtMs, long intervalMs) {
+        final String id; final Object token; final long triggerAtMs; final long intervalMs;
+        final boolean exact; final boolean allowWhileIdle; final String deliveryPath;
+        final String pendingIntentTokenId; final String ownerProcessName; final long ownerGeneration;
+        final String packageRevision; volatile ScheduledFuture<?> future;
+        AlarmEntry(String id, Object token, long triggerAtMs, long intervalMs, boolean exact,
+                   boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                   String ownerProcessName, long ownerGeneration, String packageRevision) {
             this.id = id; this.token = token; this.triggerAtMs = triggerAtMs; this.intervalMs = intervalMs;
+            this.exact = exact; this.allowWhileIdle = allowWhileIdle;
+            this.deliveryPath = deliveryPath == null ? "LISTENER" : deliveryPath;
+            this.pendingIntentTokenId = pendingIntentTokenId == null ? "" : pendingIntentTokenId;
+            this.ownerProcessName = ownerProcessName == null ? "legacy" : ownerProcessName;
+            this.ownerGeneration = ownerGeneration;
+            this.packageRevision = packageRevision == null ? "legacy-revision" : packageRevision;
         }
     }
 

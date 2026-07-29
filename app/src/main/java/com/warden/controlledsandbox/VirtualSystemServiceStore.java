@@ -92,39 +92,77 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final String id;
         long triggerAtMs;
         final long intervalMs;
+        final boolean exact;
+        final boolean allowWhileIdle;
+        final String deliveryPath;
+        final String pendingIntentTokenId;
         final byte[] tokenPayload;
         final String ownerProcessName;
         long ownerGeneration;
+        final String packageRevision;
+        int deliveryCount;
+        long updatedAtMs;
         volatile ScheduledFuture<?> future;
-        AlarmRecord(String id, long triggerAtMs, long intervalMs, byte[] tokenPayload,
-                    String ownerProcessName, long ownerGeneration) {
+        AlarmRecord(String id, long triggerAtMs, long intervalMs, boolean exact,
+                    boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                    byte[] tokenPayload, String ownerProcessName, long ownerGeneration,
+                    String packageRevision, int deliveryCount, long updatedAtMs) {
             this.id = required(id, "alarmId");
             this.triggerAtMs = Math.max(0L, triggerAtMs);
             this.intervalMs = Math.max(0L, intervalMs);
+            this.exact = exact;
+            this.allowWhileIdle = allowWhileIdle;
+            this.deliveryPath = alarmDeliveryPath(deliveryPath);
+            this.pendingIntentTokenId = normalize(pendingIntentTokenId);
+            if (VirtualAlarmSnapshot.PENDING_INTENT.equals(this.deliveryPath)
+                    && this.pendingIntentTokenId.isEmpty()) {
+                throw new IllegalArgumentException("pendingIntentTokenId is required");
+            }
             this.tokenPayload = boundedPayload(tokenPayload, "alarmToken");
             this.ownerProcessName = required(ownerProcessName, "ownerProcessName");
-            if (ownerGeneration < 0L) throw new IllegalArgumentException("ownerGeneration must be non-negative");
+            if (ownerGeneration < 0L || deliveryCount < 0) {
+                throw new IllegalArgumentException("alarm owner/count must be non-negative");
+            }
             this.ownerGeneration = ownerGeneration;
+            this.packageRevision = required(packageRevision, "packageRevision");
+            this.deliveryCount = deliveryCount;
+            this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
     private record NotificationKey(int guestId, String guestTag) { }
     private static final class NotificationRecord {
         final int guestId; final int hostId; final String guestTag; final String hostTag;
-        String channelId; String state; byte[] payload; long updatedAtMs;
+        String channelId; String state; final String packageRevision;
+        String contentIntentTokenId; String deleteIntentTokenId;
+        List<String> actionIntentTokenIds; boolean foregroundService; String foregroundServiceKey;
+        byte[] payload; long updatedAtMs;
         NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
-                           String channelId, String state, byte[] payload, long updatedAtMs) {
+                           String channelId, String state, String packageRevision,
+                           String contentIntentTokenId, String deleteIntentTokenId,
+                           List<String> actionIntentTokenIds, boolean foregroundService,
+                           String foregroundServiceKey, byte[] payload, long updatedAtMs) {
             if (guestId < 0 || hostId < 0) throw new IllegalArgumentException("notification ids must be non-negative");
             this.guestId = guestId; this.hostId = hostId; this.guestTag = normalizeTag(guestTag);
             this.hostTag = required(hostTag, "hostTag"); this.channelId = normalize(channelId);
-            this.state = notificationState(state); this.payload = boundedPayload(payload, "notificationPayload");
+            this.state = notificationState(state); this.packageRevision = required(packageRevision, "packageRevision");
+            this.contentIntentTokenId = normalize(contentIntentTokenId);
+            this.deleteIntentTokenId = normalize(deleteIntentTokenId);
+            this.actionIntentTokenIds = boundedTokenIds(actionIntentTokenIds, "notificationActionTokens");
+            this.foregroundService = foregroundService;
+            this.foregroundServiceKey = optionalIdentity(foregroundServiceKey, "foregroundServiceKey");
+            this.payload = boundedPayload(payload, "notificationPayload");
             this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
     private static final class NotificationChannelRecord {
-        final String kind; final String id; String groupId; byte[] payload; long updatedAtMs;
-        NotificationChannelRecord(String kind, String id, String groupId, byte[] payload, long updatedAtMs) {
+        final String kind; final String id; String groupId; final String packageRevision;
+        byte[] payload; long updatedAtMs;
+        NotificationChannelRecord(String kind, String id, String groupId, String packageRevision,
+                                  byte[] payload, long updatedAtMs) {
             this.kind = channelKind(kind); this.id = required(id, "channelId"); this.groupId = normalize(groupId);
-            this.payload = boundedPayload(payload, "notificationChannelPayload"); this.updatedAtMs = Math.max(0L, updatedAtMs);
+            this.packageRevision = required(packageRevision, "packageRevision");
+            this.payload = boundedPayload(payload, "notificationChannelPayload");
+            this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
     private static final class JobRecord {
@@ -155,7 +193,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    private static final int SCHEMA = 3;
+    private static final int SCHEMA = 4;
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     private static final int MAX_ACCOUNTS_PER_SCOPE = 64;
     private static final int MAX_TOKENS_PER_ACCOUNT = 32;
@@ -363,13 +401,23 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         ScopeState before = snapshot(scope); PendingIntentRecord record = requirePendingIntent(scope, packageRevision, tokenId);
         record.sends++; record.updatedAtMs = System.currentTimeMillis();
         boolean oneShot = (record.flags & 0x40000000) != 0;
-        if (oneShot) { record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId); }
-        persistOrRestore(scope, before); return pendingIntentSnapshot(record);
+        List<AlarmRecord> removedAlarms = List.of();
+        if (oneShot) {
+            record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId);
+            removedAlarms = removePendingIntentDependentsLocked(state(scope), record.tokenId);
+        }
+        persistOrRestore(scope, before);
+        for (AlarmRecord alarm : removedAlarms) if (alarm.future != null) alarm.future.cancel(false);
+        return pendingIntentSnapshot(record);
     }
     synchronized boolean cancelPendingIntent(Scope scope, String packageRevision, String tokenId) {
         ScopeState before = snapshot(scope); PendingIntentRecord record = state(scope).pendingIntents.get(required(tokenId, "tokenId"));
         if (record == null || !required(packageRevision, "packageRevision").equals(record.packageRevision)) return false;
-        record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId); persistOrRestore(scope, before); return true;
+        record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId);
+        List<AlarmRecord> removedAlarms = removePendingIntentDependentsLocked(state(scope), record.tokenId);
+        persistOrRestore(scope, before);
+        for (AlarmRecord alarm : removedAlarms) if (alarm.future != null) alarm.future.cancel(false);
+        return true;
     }
     synchronized List<VirtualPendingIntentSnapshot> pendingIntents(Scope scope, String processName,
             long generation, String packageRevision) {
@@ -388,62 +436,118 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     synchronized void scheduleAlarm(Scope scope, String processName, long generation,
                                     String alarmId, long triggerAtMs, long intervalMs,
                                     byte[] tokenPayload) {
-        ScopeState before = snapshot(scope);
-        ScopeState state = state(scope);
-        String normalizedId = required(alarmId, "alarmId");
+        scheduleAlarm(scope, processName, generation, "legacy-revision",
+                new VirtualAlarmSnapshot(alarmId, triggerAtMs, intervalMs, false, false,
+                        VirtualAlarmSnapshot.LISTENER, "", processName, generation,
+                        "legacy-revision", tokenPayload, 0, System.currentTimeMillis()));
+    }
+    synchronized void scheduleAlarm(Scope scope, String processName, long generation,
+                                    String packageRevision, VirtualAlarmSnapshot candidate) {
+        if (candidate == null) throw new IllegalArgumentException("alarm candidate is required");
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        String revision = required(packageRevision, "packageRevision");
+        List<AlarmRecord> stale = new ArrayList<>();
+        for (AlarmRecord value : state.alarms.values()) {
+            if (!revision.equals(value.packageRevision)) stale.add(value);
+        }
+        for (AlarmRecord value : stale) state.alarms.remove(value.id);
+        String normalizedId = required(candidate.alarmId(), "alarmId");
         AlarmRecord previous = state.alarms.get(normalizedId);
         if (previous == null && state.alarms.size() >= MAX_ALARMS_PER_SCOPE) {
             throw new IllegalStateException("VIRTUAL_ALARM_LIMIT_EXCEEDED");
         }
-        AlarmRecord record = new AlarmRecord(normalizedId, triggerAtMs, intervalMs,
-                boundedPayload(tokenPayload, "alarmToken"),
-                required(processName, "processName"), generation);
+        String path = alarmDeliveryPath(candidate.deliveryPath());
+        String pendingIntentTokenId = normalize(candidate.pendingIntentTokenId());
+        if (VirtualAlarmSnapshot.PENDING_INTENT.equals(path)) {
+            requirePendingIntent(scope, revision, pendingIntentTokenId);
+        }
+        AlarmRecord record = new AlarmRecord(normalizedId, candidate.triggerAtMs(), candidate.intervalMs(),
+                candidate.exact(), candidate.allowWhileIdle(), path, pendingIntentTokenId,
+                boundedPayload(candidate.tokenPayload(), "alarmToken"),
+                required(processName, "processName"), generation, revision,
+                previous == null ? candidate.deliveryCount() : previous.deliveryCount,
+                System.currentTimeMillis());
         state.alarms.put(record.id, record);
         persistOrRestore(scope, before);
+        for (AlarmRecord value : stale) if (value.future != null) value.future.cancel(false);
         if (previous != null && previous.future != null) previous.future.cancel(false);
         scheduleFuture(scope, record);
     }
     synchronized boolean cancelAlarm(Scope scope, String alarmId) {
+        return cancelAlarm(scope, "legacy-revision", alarmId);
+    }
+    synchronized boolean cancelAlarm(Scope scope, String packageRevision, String alarmId) {
         ScopeState before = snapshot(scope);
-        AlarmRecord removed = state(scope).alarms.remove(required(alarmId, "alarmId"));
-        if (removed == null) return false;
+        AlarmRecord existing = state(scope).alarms.get(required(alarmId, "alarmId"));
+        if (existing == null || !required(packageRevision, "packageRevision").equals(existing.packageRevision)) {
+            return false;
+        }
+        AlarmRecord removed = state(scope).alarms.remove(existing.id);
         persistOrRestore(scope, before);
         if (removed.future != null) removed.future.cancel(false); return true;
     }
     synchronized List<VirtualAlarmSnapshot> alarms(Scope scope, String processName, long generation) {
+        return alarms(scope, processName, generation, "legacy-revision");
+    }
+    synchronized List<VirtualAlarmSnapshot> alarms(Scope scope, String processName, long generation,
+                                                    String packageRevision) {
         ScopeState before = snapshot(scope);
         String owner = required(processName, "processName");
+        String revision = required(packageRevision, "packageRevision");
         List<VirtualAlarmSnapshot> out = new ArrayList<>();
+        List<AlarmRecord> stale = new ArrayList<>();
         boolean claimed = false;
         for (AlarmRecord alarm : state(scope).alarms.values()) {
+            if (!revision.equals(alarm.packageRevision)) { stale.add(alarm); continue; }
             if (!owner.equals(alarm.ownerProcessName)) continue;
             if (alarm.ownerGeneration != generation) {
                 alarm.ownerGeneration = generation;
+                alarm.updatedAtMs = System.currentTimeMillis();
                 claimed = true;
             }
-            out.add(new VirtualAlarmSnapshot(alarm.id, alarm.triggerAtMs, alarm.intervalMs, alarm.tokenPayload));
+            out.add(alarmSnapshot(alarm));
         }
-        if (claimed) persistOrRestore(scope, before);
+        for (AlarmRecord value : stale) state(scope).alarms.remove(value.id);
+        if (claimed || !stale.isEmpty()) persistOrRestore(scope, before);
+        for (AlarmRecord value : stale) if (value.future != null) value.future.cancel(false);
         out.sort(Comparator.comparingLong(VirtualAlarmSnapshot::triggerAtMs).thenComparing(VirtualAlarmSnapshot::alarmId));
         return Collections.unmodifiableList(out);
     }
 
-    synchronized VirtualNotificationSnapshot reserveNotification(Scope scope, long generation, int guestId,
-                                                                  String guestTag, String channelId) {
+    synchronized VirtualNotificationSnapshot reserveNotification(Scope scope, long generation,
+                                                                  int guestId, String guestTag, String channelId) {
+        return reserveNotification(scope, generation, "legacy-revision",
+                new VirtualNotificationSnapshot(guestId, 0, guestTag, "", channelId,
+                        VirtualNotificationSnapshot.RESERVED, new byte[0], System.currentTimeMillis()));
+    }
+    synchronized VirtualNotificationSnapshot reserveNotification(Scope scope, long generation,
+            String packageRevision, VirtualNotificationSnapshot candidate) {
+        if (candidate == null) throw new IllegalArgumentException("notification candidate is required");
         ScopeState before = snapshot(scope); ScopeState state = state(scope);
-        NotificationKey key = notificationKey(guestId, guestTag);
+        String revision = required(packageRevision, "packageRevision");
+        pruneNotificationRevisionLocked(state, revision);
+        validateNotificationReferences(scope, revision, candidate);
+        NotificationKey key = notificationKey(candidate.guestId(), candidate.guestTag());
         NotificationRecord current = state.notifications.get(key);
         if (current == null) {
             if (state.notifications.size() >= MAX_NOTIFICATIONS_PER_SCOPE) {
                 throw new IllegalStateException("VIRTUAL_NOTIFICATION_LIMIT_EXCEEDED");
             }
             int hostId = allocateHostId("notification");
-            current = new NotificationRecord(guestId, hostId, key.guestTag(),
-                    hostNotificationTag(scope, key.guestTag(), generation), channelId,
-                    VirtualNotificationSnapshot.RESERVED, new byte[0], System.currentTimeMillis());
+            current = new NotificationRecord(candidate.guestId(), hostId, key.guestTag(),
+                    hostNotificationTag(scope, key.guestTag(), generation), candidate.channelId(),
+                    VirtualNotificationSnapshot.RESERVED, revision,
+                    candidate.contentIntentTokenId(), candidate.deleteIntentTokenId(),
+                    candidate.actionIntentTokenIds(), candidate.foregroundService(),
+                    candidate.foregroundServiceKey(), new byte[0], System.currentTimeMillis());
             state.notifications.put(key, current);
         } else {
-            current.channelId = normalize(channelId);
+            current.channelId = normalize(candidate.channelId());
+            current.contentIntentTokenId = normalize(candidate.contentIntentTokenId());
+            current.deleteIntentTokenId = normalize(candidate.deleteIntentTokenId());
+            current.actionIntentTokenIds = boundedTokenIds(candidate.actionIntentTokenIds(), "notificationActionTokens");
+            current.foregroundService = candidate.foregroundService();
+            current.foregroundServiceKey = optionalIdentity(candidate.foregroundServiceKey(), "foregroundServiceKey");
             current.state = VirtualNotificationSnapshot.RESERVED;
             current.updatedAtMs = System.currentTimeMillis();
         }
@@ -451,47 +555,120 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized void commitNotification(Scope scope, int guestId, String guestTag,
                                          String channelId, byte[] payload) {
-        ScopeState before = snapshot(scope);
-        NotificationRecord record = state(scope).notifications.get(notificationKey(guestId, guestTag));
-        if (record == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
-        record.channelId = normalize(channelId); record.payload = boundedPayload(payload, "notificationPayload");
+        NotificationRecord current = state(scope).notifications.get(notificationKey(guestId, guestTag));
+        if (current == null) throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
+        commitNotification(scope, "legacy-revision", new VirtualNotificationSnapshot(guestId,
+                current.hostId, guestTag, current.hostTag, channelId, VirtualNotificationSnapshot.ACTIVE,
+                "legacy-revision", "", "", List.of(), false, "", payload, System.currentTimeMillis()));
+    }
+    synchronized void commitNotification(Scope scope, String packageRevision,
+                                         VirtualNotificationSnapshot value) {
+        if (value == null) throw new IllegalArgumentException("notification value is required");
+        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        validateNotificationReferences(scope, revision, value);
+        NotificationRecord record = state(scope).notifications.get(notificationKey(value.guestId(), value.guestTag()));
+        if (record == null || !revision.equals(record.packageRevision)) {
+            throw new IllegalStateException("VIRTUAL_NOTIFICATION_RESERVATION_REQUIRED");
+        }
+        record.channelId = normalize(value.channelId());
+        record.contentIntentTokenId = normalize(value.contentIntentTokenId());
+        record.deleteIntentTokenId = normalize(value.deleteIntentTokenId());
+        record.actionIntentTokenIds = boundedTokenIds(value.actionIntentTokenIds(), "notificationActionTokens");
+        record.foregroundService = value.foregroundService();
+        record.foregroundServiceKey = optionalIdentity(value.foregroundServiceKey(), "foregroundServiceKey");
+        record.payload = boundedPayload(value.payload(), "notificationPayload");
         record.state = VirtualNotificationSnapshot.ACTIVE; record.updatedAtMs = System.currentTimeMillis();
         persistOrRestore(scope, before);
     }
     synchronized boolean removeNotification(Scope scope, int guestId, String guestTag) {
-        ScopeState before = snapshot(scope);
-        boolean removed = state(scope).notifications.remove(notificationKey(guestId, guestTag)) != null;
-        if (removed) persistOrRestore(scope, before); return removed;
+        return removeNotification(scope, "legacy-revision", guestId, guestTag);
+    }
+    synchronized boolean removeNotification(Scope scope, String packageRevision, int guestId, String guestTag) {
+        ScopeState before = snapshot(scope); NotificationKey key = notificationKey(guestId, guestTag);
+        NotificationRecord existing = state(scope).notifications.get(key);
+        if (existing == null || !required(packageRevision, "packageRevision").equals(existing.packageRevision)) return false;
+        state(scope).notifications.remove(key); persistOrRestore(scope, before); return true;
     }
     synchronized List<VirtualNotificationSnapshot> notifications(Scope scope) {
+        return notifications(scope, "legacy-revision");
+    }
+    synchronized List<VirtualNotificationSnapshot> notifications(Scope scope, String packageRevision) {
+        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        boolean pruned = pruneNotificationRevisionLocked(state(scope), revision);
+        if (pruned) persistOrRestore(scope, before);
         List<VirtualNotificationSnapshot> out = new ArrayList<>();
-        for (NotificationRecord record : state(scope).notifications.values()) out.add(notificationSnapshot(record));
+        for (NotificationRecord record : state(scope).notifications.values()) {
+            if (revision.equals(record.packageRevision)) out.add(notificationSnapshot(record));
+        }
         out.sort(Comparator.comparingInt(VirtualNotificationSnapshot::guestId)
                 .thenComparing(VirtualNotificationSnapshot::guestTag));
         return Collections.unmodifiableList(out);
     }
     synchronized void upsertNotificationChannel(Scope scope, String kind, String id,
                                                 String groupId, byte[] payload) {
+        upsertNotificationChannel(scope, "legacy-revision", new VirtualNotificationChannelSnapshot(
+                kind, id, groupId, "legacy-revision", payload, System.currentTimeMillis()));
+    }
+    synchronized void upsertNotificationChannel(Scope scope, String packageRevision,
+                                                VirtualNotificationChannelSnapshot value) {
+        if (value == null) throw new IllegalArgumentException("notification channel is required");
         ScopeState before = snapshot(scope); ScopeState state = state(scope);
-        String key = channelKey(kind, id);
+        String revision = required(packageRevision, "packageRevision");
+        pruneNotificationRevisionLocked(state, revision);
+        String key = channelKey(value.kind(), value.id());
         if (!state.notificationChannels.containsKey(key)
                 && state.notificationChannels.size() >= MAX_NOTIFICATION_CHANNELS_PER_SCOPE) {
             throw new IllegalStateException("VIRTUAL_NOTIFICATION_CHANNEL_LIMIT_EXCEEDED");
         }
-        state.notificationChannels.put(key, new NotificationChannelRecord(kind, id, groupId,
-                payload, System.currentTimeMillis()));
+        if (VirtualNotificationChannelSnapshot.CHANNEL.equals(value.kind()) && !value.groupId().isEmpty()) {
+            NotificationChannelRecord group = state.notificationChannels.get(
+                    channelKey(VirtualNotificationChannelSnapshot.GROUP, value.groupId()));
+            if (group == null || !revision.equals(group.packageRevision)) {
+                throw new IllegalStateException("VIRTUAL_NOTIFICATION_GROUP_REQUIRED");
+            }
+        }
+        state.notificationChannels.put(key, new NotificationChannelRecord(value.kind(), value.id(), value.groupId(),
+                revision, value.payload(), System.currentTimeMillis()));
         persistOrRestore(scope, before);
     }
     synchronized boolean removeNotificationChannel(Scope scope, String kind, String id) {
-        ScopeState before = snapshot(scope);
-        boolean removed = state(scope).notificationChannels.remove(channelKey(kind, id)) != null;
-        if (removed) persistOrRestore(scope, before); return removed;
+        return removeNotificationChannel(scope, "legacy-revision", kind, id);
+    }
+    synchronized boolean removeNotificationChannel(Scope scope, String packageRevision, String kind, String id) {
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        String revision = required(packageRevision, "packageRevision");
+        NotificationChannelRecord existing = state.notificationChannels.get(channelKey(kind, id));
+        if (existing == null || !revision.equals(existing.packageRevision)) return false;
+        Set<String> channelIds = new LinkedHashSet<>();
+        if (VirtualNotificationChannelSnapshot.GROUP.equals(channelKind(kind))) {
+            for (NotificationChannelRecord value : state.notificationChannels.values()) {
+                if (VirtualNotificationChannelSnapshot.CHANNEL.equals(value.kind)
+                        && value.groupId.equals(existing.id) && revision.equals(value.packageRevision)) {
+                    channelIds.add(value.id);
+                }
+            }
+            state.notificationChannels.values().removeIf(value -> revision.equals(value.packageRevision)
+                    && (value == existing || (VirtualNotificationChannelSnapshot.CHANNEL.equals(value.kind)
+                    && value.groupId.equals(existing.id))));
+        } else {
+            channelIds.add(existing.id); state.notificationChannels.remove(channelKey(kind, id));
+        }
+        if (!channelIds.isEmpty()) state.notifications.values().removeIf(value -> revision.equals(value.packageRevision)
+                && channelIds.contains(value.channelId));
+        persistOrRestore(scope, before); return true;
     }
     synchronized List<VirtualNotificationChannelSnapshot> notificationChannels(Scope scope) {
+        return notificationChannels(scope, "legacy-revision");
+    }
+    synchronized List<VirtualNotificationChannelSnapshot> notificationChannels(Scope scope,
+                                                                                String packageRevision) {
+        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        boolean pruned = pruneNotificationRevisionLocked(state(scope), revision);
+        if (pruned) persistOrRestore(scope, before);
         List<VirtualNotificationChannelSnapshot> out = new ArrayList<>();
         for (NotificationChannelRecord record : state(scope).notificationChannels.values()) {
-            out.add(new VirtualNotificationChannelSnapshot(record.kind, record.id, record.groupId,
-                    record.payload, record.updatedAtMs));
+            if (revision.equals(record.packageRevision)) out.add(new VirtualNotificationChannelSnapshot(
+                    record.kind, record.id, record.groupId, record.packageRevision, record.payload, record.updatedAtMs));
         }
         out.sort(Comparator.comparing(VirtualNotificationChannelSnapshot::kind)
                 .thenComparing(VirtualNotificationChannelSnapshot::id));
@@ -797,7 +974,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         boolean delivered = false;
         for (IVirtualSystemServiceObserver observer : observers) {
-            try { observer.onAlarm(alarmId); delivered = true; } catch (Exception ignored) { }
+            try { observer.onAlarm(alarmSnapshot(alarm)); delivered = true; } catch (Exception ignored) { }
         }
         synchronized (this) {
             AlarmRecord current = state(scope).alarms.get(alarmId);
@@ -808,12 +985,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 alarm.triggerAtMs = System.currentTimeMillis() + RETRY_WITHOUT_CLIENT_MS;
                 reschedule = true;
             } else if (alarm.intervalMs > 0L) {
+                alarm.deliveryCount++; alarm.updatedAtMs = System.currentTimeMillis();
                 long next = alarm.triggerAtMs + alarm.intervalMs;
                 long now = System.currentTimeMillis();
                 while (next <= now) next += alarm.intervalMs;
                 alarm.triggerAtMs = next;
                 reschedule = true;
             } else {
+                alarm.deliveryCount++; alarm.updatedAtMs = System.currentTimeMillis();
                 state(scope).alarms.remove(alarmId);
             }
             try {
@@ -866,7 +1045,9 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         for (Map.Entry<String, AlarmRecord> item : current.alarms.entrySet()) {
             AlarmRecord alarm = item.getValue();
             AlarmRecord alarmCopy = new AlarmRecord(alarm.id, alarm.triggerAtMs, alarm.intervalMs,
-                    alarm.tokenPayload, alarm.ownerProcessName, alarm.ownerGeneration);
+                    alarm.exact, alarm.allowWhileIdle, alarm.deliveryPath, alarm.pendingIntentTokenId,
+                    alarm.tokenPayload, alarm.ownerProcessName, alarm.ownerGeneration, alarm.packageRevision,
+                    alarm.deliveryCount, alarm.updatedAtMs);
             alarmCopy.future = alarm.future;
             copy.alarms.put(item.getKey(), alarmCopy);
         }
@@ -879,12 +1060,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         for (Map.Entry<NotificationKey, NotificationRecord> item : current.notifications.entrySet()) {
             NotificationRecord value = item.getValue();
             copy.notifications.put(item.getKey(), new NotificationRecord(value.guestId, value.hostId,
-                    value.guestTag, value.hostTag, value.channelId, value.state, value.payload, value.updatedAtMs));
+                    value.guestTag, value.hostTag, value.channelId, value.state, value.packageRevision,
+                    value.contentIntentTokenId, value.deleteIntentTokenId, value.actionIntentTokenIds,
+                    value.foregroundService, value.foregroundServiceKey, value.payload, value.updatedAtMs));
         }
         for (Map.Entry<String, NotificationChannelRecord> item : current.notificationChannels.entrySet()) {
             NotificationChannelRecord value = item.getValue();
             copy.notificationChannels.put(item.getKey(), new NotificationChannelRecord(value.kind, value.id,
-                    value.groupId, value.payload, value.updatedAtMs));
+                    value.groupId, value.packageRevision, value.payload, value.updatedAtMs));
         }
         for (Map.Entry<Integer, JobRecord> item : current.jobs.entrySet()) {
             JobRecord value = item.getValue();
@@ -964,9 +1147,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 if (alarms != null) for (int j = 0; j < alarms.length(); j++) {
                     JSONObject alarm = alarms.getJSONObject(j);
                     AlarmRecord record = new AlarmRecord(alarm.getString("id"), alarm.getLong("triggerAtMs"),
-                            alarm.optLong("intervalMs", 0L), decode(alarm.optString("token", "")),
+                            alarm.optLong("intervalMs", 0L), alarm.optBoolean("exact", false),
+                            alarm.optBoolean("allowWhileIdle", false),
+                            alarm.optString("deliveryPath", VirtualAlarmSnapshot.LISTENER),
+                            alarm.optString("pendingIntentTokenId", ""), decode(alarm.optString("token", "")),
                             alarm.optString("ownerProcessName", scope.packageName()),
-                            alarm.optLong("ownerGeneration", 0L));
+                            alarm.optLong("ownerGeneration", 0L),
+                            alarm.optString("packageRevision", "legacy-revision"),
+                            alarm.optInt("deliveryCount", 0), alarm.optLong("updatedAtMs", 0L));
                     state.alarms.put(record.id, record);
                 }
                 JSONObject namespaces = item.optJSONObject("namespaces");
@@ -988,8 +1176,12 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                         JSONObject value = notifications.getJSONObject(j);
                         NotificationRecord record = new NotificationRecord(value.getInt("guestId"), value.getInt("hostId"),
                                 value.optString("guestTag", ""), value.getString("hostTag"), value.optString("channelId", ""),
-                                value.optString("state", VirtualNotificationSnapshot.ACTIVE), decode(value.optString("payload", "")),
-                                value.optLong("updatedAtMs", 0L));
+                                value.optString("state", VirtualNotificationSnapshot.ACTIVE),
+                                value.optString("packageRevision", "legacy-revision"),
+                                value.optString("contentIntentTokenId", ""), value.optString("deleteIntentTokenId", ""),
+                                jsonStrings(value.optJSONArray("actionIntentTokenIds")),
+                                value.optBoolean("foregroundService", false), value.optString("foregroundServiceKey", ""),
+                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
                         state.notifications.put(new NotificationKey(record.guestId, record.guestTag), record);
                         nextNotificationHostId = Math.max(nextNotificationHostId, record.hostId + 1);
                     }
@@ -998,6 +1190,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                         JSONObject value = channels.getJSONObject(j);
                         NotificationChannelRecord record = new NotificationChannelRecord(value.getString("kind"),
                                 value.getString("id"), value.optString("groupId", ""),
+                                value.optString("packageRevision", "legacy-revision"),
                                 decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
                         state.notificationChannels.put(channelKey(record.kind, record.id), record);
                     }
@@ -1052,8 +1245,11 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 JSONArray alarms = new JSONArray();
                 for (AlarmRecord alarm : state.alarms.values()) alarms.put(new JSONObject().put("id", alarm.id)
                         .put("triggerAtMs", alarm.triggerAtMs).put("intervalMs", alarm.intervalMs)
+                        .put("exact", alarm.exact).put("allowWhileIdle", alarm.allowWhileIdle)
+                        .put("deliveryPath", alarm.deliveryPath).put("pendingIntentTokenId", alarm.pendingIntentTokenId)
                         .put("token", encode(alarm.tokenPayload)).put("ownerProcessName", alarm.ownerProcessName)
-                        .put("ownerGeneration", alarm.ownerGeneration));
+                        .put("ownerGeneration", alarm.ownerGeneration).put("packageRevision", alarm.packageRevision)
+                        .put("deliveryCount", alarm.deliveryCount).put("updatedAtMs", alarm.updatedAtMs));
                 item.put("alarms", alarms);
                 JSONObject namespaces = new JSONObject();
                 for (Map.Entry<String, NamespaceState> namespace : state.namespaces.entrySet()) {
@@ -1068,11 +1264,18 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 for (NotificationRecord value : state.notifications.values()) notifications.put(new JSONObject()
                         .put("guestId", value.guestId).put("hostId", value.hostId).put("guestTag", value.guestTag)
                         .put("hostTag", value.hostTag).put("channelId", value.channelId).put("state", value.state)
+                        .put("packageRevision", value.packageRevision)
+                        .put("contentIntentTokenId", value.contentIntentTokenId)
+                        .put("deleteIntentTokenId", value.deleteIntentTokenId)
+                        .put("actionIntentTokenIds", new JSONArray(value.actionIntentTokenIds))
+                        .put("foregroundService", value.foregroundService)
+                        .put("foregroundServiceKey", value.foregroundServiceKey)
                         .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
                 item.put("notifications", notifications);
                 JSONArray channels = new JSONArray();
                 for (NotificationChannelRecord value : state.notificationChannels.values()) channels.put(new JSONObject()
                         .put("kind", value.kind).put("id", value.id).put("groupId", value.groupId)
+                        .put("packageRevision", value.packageRevision)
                         .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
                 item.put("notificationChannels", channels);
                 JSONArray jobs = new JSONArray();
@@ -1159,6 +1362,24 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         return record;
     }
+    private static List<AlarmRecord> removePendingIntentDependentsLocked(ScopeState state, String tokenId) {
+        List<AlarmRecord> alarms = new ArrayList<>();
+        for (AlarmRecord value : state.alarms.values()) {
+            if (tokenId.equals(value.pendingIntentTokenId)) alarms.add(value);
+        }
+        for (AlarmRecord value : alarms) state.alarms.remove(value.id);
+        for (NotificationRecord value : state.notifications.values()) {
+            if (tokenId.equals(value.contentIntentTokenId)) value.contentIntentTokenId = "";
+            if (tokenId.equals(value.deleteIntentTokenId)) value.deleteIntentTokenId = "";
+            if (value.actionIntentTokenIds.contains(tokenId)) {
+                List<String> updated = new ArrayList<>(value.actionIntentTokenIds);
+                updated.removeIf(tokenId::equals);
+                value.actionIntentTokenIds = Collections.unmodifiableList(updated);
+            }
+        }
+        return alarms;
+    }
+
     private static boolean rebindPendingIntent(PendingIntentRecord record, String processName, long generation) {
         String owner = required(processName, "processName");
         if (record.ownerProcessName.equals(owner) && record.ownerGeneration == generation) return false;
@@ -1211,6 +1432,58 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         return normalized;
     }
+    private static String alarmDeliveryPath(String value) {
+        String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!VirtualAlarmSnapshot.LISTENER.equals(normalized)
+                && !VirtualAlarmSnapshot.PENDING_INTENT.equals(normalized)) {
+            throw new IllegalArgumentException("invalid alarm delivery path");
+        }
+        return normalized;
+    }
+    private static VirtualAlarmSnapshot alarmSnapshot(AlarmRecord value) {
+        return new VirtualAlarmSnapshot(value.id, value.triggerAtMs, value.intervalMs,
+                value.exact, value.allowWhileIdle, value.deliveryPath, value.pendingIntentTokenId,
+                value.ownerProcessName, value.ownerGeneration, value.packageRevision,
+                value.tokenPayload, value.deliveryCount, value.updatedAtMs);
+    }
+    private void validateNotificationReferences(Scope scope, String revision,
+                                                VirtualNotificationSnapshot value) {
+        if (!value.contentIntentTokenId().isEmpty()) {
+            requirePendingIntent(scope, revision, value.contentIntentTokenId());
+        }
+        if (!value.deleteIntentTokenId().isEmpty()) {
+            requirePendingIntent(scope, revision, value.deleteIntentTokenId());
+        }
+        for (String tokenId : value.actionIntentTokenIds()) requirePendingIntent(scope, revision, tokenId);
+    }
+    private static boolean pruneNotificationRevisionLocked(ScopeState state, String revision) {
+        int beforeNotifications = state.notifications.size();
+        int beforeChannels = state.notificationChannels.size();
+        state.notifications.values().removeIf(value -> !revision.equals(value.packageRevision));
+        state.notificationChannels.values().removeIf(value -> !revision.equals(value.packageRevision));
+        return beforeNotifications != state.notifications.size() || beforeChannels != state.notificationChannels.size();
+    }
+    private static List<String> boundedTokenIds(List<String> values, String name) {
+        if (values == null || values.isEmpty()) return List.of();
+        if (values.size() > 32) throw new IllegalArgumentException(name + " exceeds 32 entries");
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        for (String value : values) {
+            String normalized = value == null ? "" : value.trim();
+            if (normalized.isEmpty()) continue;
+            out.add(required(normalized, name));
+        }
+        return Collections.unmodifiableList(new ArrayList<>(out));
+    }
+    private static List<String> jsonStrings(JSONArray values) {
+        if (values == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (int index = 0; index < values.length(); index++) {
+            String value = values.optString(index, "").trim();
+            if (!value.isEmpty()) out.add(value);
+        }
+        return out;
+    }
+
     private static String jobState(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
         if (!VirtualJobSnapshot.RESERVED.equals(normalized) && !VirtualJobSnapshot.SCHEDULED.equals(normalized)
@@ -1220,7 +1493,9 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     private static VirtualNotificationSnapshot notificationSnapshot(NotificationRecord value) {
         return new VirtualNotificationSnapshot(value.guestId, value.hostId, value.guestTag, value.hostTag,
-                value.channelId, value.state, value.payload, value.updatedAtMs);
+                value.channelId, value.state, value.packageRevision, value.contentIntentTokenId,
+                value.deleteIntentTokenId, value.actionIntentTokenIds, value.foregroundService,
+                value.foregroundServiceKey, value.payload, value.updatedAtMs);
     }
     private static VirtualJobSnapshot jobSnapshot(JobRecord value) {
         return new VirtualJobSnapshot(value.guestId, value.hostId, value.state, value.ownerProcessName,
@@ -1261,6 +1536,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             throw new IllegalArgumentException(name + " is required");
         }
         String normalized = value.trim();
+        if (normalized.length() > MAX_KEY_CHARS) {
+            throw new IllegalArgumentException(name + " exceeds " + MAX_KEY_CHARS + " characters");
+        }
+        return normalized;
+    }
+    private static String optionalIdentity(String value, String name) {
+        String normalized = value == null ? "" : value.trim();
         if (normalized.length() > MAX_KEY_CHARS) {
             throw new IllegalArgumentException(name + " exceeds " + MAX_KEY_CHARS + " characters");
         }

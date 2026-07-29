@@ -68,8 +68,8 @@
     },
     {
       "id": "alarm",
-      "hook": "binder-owned-persistent-callback-scheduler",
-      "isolation": "package-user-process-generation",
+      "hook": "binder-owned-revision-scoped-exact-repeating-listener-pending-intent-recovery",
+      "isolation": "package-user-process-generation-revision",
       "production": "wired",
       "hostFallback": "denied",
       "device": "not-tested"
@@ -92,8 +92,8 @@
     },
     {
       "id": "notification",
-      "hook": "binder-owned-persistent-owned-resource-channel-lifecycle",
-      "isolation": "package-user",
+      "hook": "persistent-binder-owned-revision-scoped-owned-resource-channel-group-fgs-pending-intent-lifecycle",
+      "isolation": "package-user-revision",
       "production": "wired",
       "hostFallback": "delegated-owned-only",
       "device": "not-tested"
@@ -108,8 +108,8 @@
     },
     {
       "id": "pending-intent",
-      "hook": "virtual-sender-registry-and-broker-route",
-      "isolation": "package-user-generation",
+      "hook": "durable-virtual-sender-registry-and-broker-route",
+      "isolation": "package-user-generation-revision",
       "production": "wired",
       "hostFallback": "known-virtual-senders-denied",
       "device": "not-tested"
@@ -125,9 +125,9 @@
   ],
   "limitations": [
     "All rows remain source/host evidence only; no Android device evidence exists.",
-    "Notification ownership, channel/group metadata and bounded cancelAll are persistent, but OEM listener/callback and every Android-version field layout remain unverified.",
-    "Job specs and ownership persist and the host JobService bridge is wired; a version-safe Guest JobParameters/JobService execution bridge remains partial, so unacknowledged callbacks request rescheduling.",
-    "Alarm persistence does not reproduce Android AlarmManager wakeup, Doze, exact-alarm permission or reboot semantics.",
+    "Alarm exact/allow-while-idle flags, repeating cadence and offline recovery are source-wired, but Android wakeup, Doze, reboot, quota and OEM timing behavior remain unverified.",
+    "Notification ownership, channel/group lifecycle, foreground-service mapping and PendingIntent metadata are persistent; host SystemUI interaction and OEM listener/callback behavior remain unverified.",
+    "Job specs and ownership persist and the host JobService bridge is wired; M4-T16 B3 still needs typed constraints, periodic/deadline/expedited policy and retry/backoff completion.",
     "Native AudioRecord/MediaRecorder and OEM Binder variants remain outside the current bounded proxy coverage."
   ]
 }

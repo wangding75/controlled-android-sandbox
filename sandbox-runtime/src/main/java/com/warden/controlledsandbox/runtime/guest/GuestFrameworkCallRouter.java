@@ -22,6 +22,7 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     ActivityTaskFrameworkInterceptor activityTasks() { return activityTasks; }
     OrderedReceiverFinishInterceptor orderedReceivers() { return orderedReceivers; }
     PendingIntentFrameworkInterceptor pendingIntents() { return pendingIntents; }
+    boolean sendPersistentPendingIntent(String tokenId) { return pendingIntents.sendPersistent(tokenId); }
 
     @Override public Interception intercept(String serviceName, Method method, Object[] arguments) throws Throwable {
         Interception tasks = activityTasks.intercept(serviceName, method, arguments);

@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
@@ -17,6 +18,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public final class VirtualSystemServiceStoreSelfTest {
     public static void main(String[] args) throws Exception {
+        alarmRecoveryAndRepeatingLifecycle();
+        notificationOwnershipLifecycle();
         java.io.File root = Files.createTempDirectory("virtual-system-services").toFile();
         VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
         VirtualSystemServiceStore.Scope owner = new VirtualSystemServiceStore.Scope("guest.pkg", 3);
@@ -218,6 +221,138 @@ public final class VirtualSystemServiceStoreSelfTest {
         System.out.println("PASS Binder-owned virtual system-service store self-test");
     }
 
+    private static void alarmRecoveryAndRepeatingLifecycle() throws Exception {
+        java.io.File root = Files.createTempDirectory("virtual-alarm-recovery").toFile();
+        VirtualSystemServiceStore.Scope scope = new VirtualSystemServiceStore.Scope("alarm.pkg", 8);
+        VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
+        VirtualPendingIntentSnapshot pending = store.reservePendingIntent(scope, "alarm.pkg", 1L,
+                "alarm-rev-a", 18008, new VirtualPendingIntentSnapshot("",
+                        VirtualPendingIntentSnapshot.BROADCAST, 71, "alarm.ACTION", "", "",
+                        "a=alarm.ACTION|c=|d=", 0x04000000, "alarm.pkg", 18008, "",
+                        "alarm.pkg", 1L, "alarm-rev-a", new byte[]{7, 1}, 0, false, 1L),
+                false, false, false);
+        long trigger = System.currentTimeMillis() + 450L;
+        store.scheduleAlarm(scope, "alarm.pkg", 1L, "alarm-rev-a",
+                new VirtualAlarmSnapshot("alarm-pi", trigger, 0L, true, true,
+                        VirtualAlarmSnapshot.PENDING_INTENT, pending.tokenId(), "alarm.pkg", 1L,
+                        "alarm-rev-a", new byte[0], 0, System.currentTimeMillis()));
+        VirtualAlarmSnapshot scheduled = store.alarms(scope, "alarm.pkg", 1L, "alarm-rev-a").get(0);
+        require(scheduled.exact() && scheduled.allowWhileIdle()
+                        && VirtualAlarmSnapshot.PENDING_INTENT.equals(scheduled.deliveryPath())
+                        && pending.tokenId().equals(scheduled.pendingIntentTokenId()),
+                "exact PendingIntent alarm metadata must be durable");
+        store.close();
+
+        VirtualSystemServiceStore recovered = new VirtualSystemServiceStore(root);
+        AtomicInteger alarmEvents = new AtomicInteger();
+        TestClient client = new TestClient(scope, "alarm.pkg", 2L, new AtomicInteger(), alarmEvents,
+                new AtomicInteger(), new AtomicInteger(-1), false);
+        recovered.register(client);
+        List<VirtualAlarmSnapshot> rebound = recovered.alarms(scope, "alarm.pkg", 2L, "alarm-rev-a");
+        require(rebound.size() == 1 && rebound.get(0).ownerGeneration() == 2L,
+                "Package Service recovery must rebind an alarm to the current Guest generation");
+        Thread.sleep(700L);
+        require(alarmEvents.get() == 1
+                        && recovered.alarms(scope, "alarm.pkg", 2L, "alarm-rev-a").isEmpty(),
+                "recovered one-shot alarm must deliver once and then be removed");
+
+        recovered.scheduleAlarm(scope, "alarm.pkg", 2L, "alarm-rev-a",
+                new VirtualAlarmSnapshot("alarm-repeat", System.currentTimeMillis() + 30L, 90L,
+                        false, false, VirtualAlarmSnapshot.LISTENER, "", "alarm.pkg", 2L,
+                        "alarm-rev-a", new byte[]{7, 2}, 0, System.currentTimeMillis()));
+        Thread.sleep(320L);
+        List<VirtualAlarmSnapshot> repeating = recovered.alarms(scope, "alarm.pkg", 2L, "alarm-rev-a");
+        require(alarmEvents.get() >= 3 && repeating.size() == 1
+                        && repeating.get(0).deliveryCount() >= 2
+                        && repeating.get(0).intervalMs() == 90L,
+                "repeating listener alarm must persist delivery count and next trigger");
+        require(recovered.cancelAlarm(scope, "alarm-rev-a", "alarm-repeat"),
+                "repeating alarm cancellation must remove the owned schedule");
+
+        recovered.scheduleAlarm(scope, "alarm.pkg", 2L, "alarm-rev-a",
+                new VirtualAlarmSnapshot("alarm-stale", System.currentTimeMillis() + 60_000L, 0L,
+                        false, false, VirtualAlarmSnapshot.LISTENER, "", "alarm.pkg", 2L,
+                        "alarm-rev-a", new byte[0], 0, System.currentTimeMillis()));
+        require(recovered.alarms(scope, "alarm.pkg", 3L, "alarm-rev-b").isEmpty(),
+                "APK revision query must prune stale alarms instead of leaking them");
+        recovered.unregister(client);
+        recovered.close();
+    }
+
+    private static void notificationOwnershipLifecycle() throws Exception {
+        java.io.File root = Files.createTempDirectory("virtual-notification-lifecycle").toFile();
+        VirtualSystemServiceStore.Scope scope = new VirtualSystemServiceStore.Scope("notify.pkg", 9);
+        VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
+        VirtualPendingIntentSnapshot content = reserveNotificationPendingIntent(store, scope, 81, "notify.CONTENT");
+        VirtualPendingIntentSnapshot deletion = reserveNotificationPendingIntent(store, scope, 82, "notify.DELETE");
+        VirtualPendingIntentSnapshot action = reserveNotificationPendingIntent(store, scope, 83, "notify.ACTION");
+
+        store.upsertNotificationChannel(scope, "notify-rev-a",
+                new VirtualNotificationChannelSnapshot(VirtualNotificationChannelSnapshot.GROUP,
+                        "messages", "", "notify-rev-a", new byte[]{8, 1}, System.currentTimeMillis()));
+        store.upsertNotificationChannel(scope, "notify-rev-a",
+                new VirtualNotificationChannelSnapshot(VirtualNotificationChannelSnapshot.CHANNEL,
+                        "direct", "messages", "notify-rev-a", new byte[]{8, 2}, System.currentTimeMillis()));
+        VirtualNotificationSnapshot candidate = new VirtualNotificationSnapshot(91, 0, "foreground", "",
+                "direct", VirtualNotificationSnapshot.RESERVED, "notify-rev-a", content.tokenId(),
+                deletion.tokenId(), List.of(action.tokenId()), true, "notify.pkg/.SyncService",
+                new byte[0], System.currentTimeMillis());
+        VirtualNotificationSnapshot reserved = store.reserveNotification(scope, 1L, "notify-rev-a", candidate);
+        store.commitNotification(scope, "notify-rev-a", new VirtualNotificationSnapshot(91,
+                reserved.hostId(), "foreground", reserved.hostTag(), "direct",
+                VirtualNotificationSnapshot.ACTIVE, "notify-rev-a", content.tokenId(), deletion.tokenId(),
+                List.of(action.tokenId()), true, "notify.pkg/.SyncService", new byte[]{9, 1},
+                System.currentTimeMillis()));
+        store.close();
+
+        VirtualSystemServiceStore recovered = new VirtualSystemServiceStore(root);
+        List<VirtualNotificationSnapshot> notifications = recovered.notifications(scope, "notify-rev-a");
+        require(notifications.size() == 1 && notifications.get(0).hostId() == reserved.hostId()
+                        && notifications.get(0).foregroundService()
+                        && "notify.pkg/.SyncService".equals(notifications.get(0).foregroundServiceKey())
+                        && content.tokenId().equals(notifications.get(0).contentIntentTokenId())
+                        && deletion.tokenId().equals(notifications.get(0).deleteIntentTokenId())
+                        && notifications.get(0).actionIntentTokenIds().equals(List.of(action.tokenId())),
+                "notification recovery must retain FGS mapping and click/delete/action PendingIntent identity");
+        require(recovered.notificationChannels(scope, "notify-rev-a").size() == 2,
+                "notification group and channel lifecycle must survive Package Service recreation");
+
+        require(recovered.cancelPendingIntent(scope, "notify-rev-a", deletion.tokenId()),
+                "owned delete PendingIntent cancellation must succeed");
+        VirtualNotificationSnapshot cleared = recovered.notifications(scope, "notify-rev-a").get(0);
+        require(cleared.deleteIntentTokenId().isEmpty()
+                        && content.tokenId().equals(cleared.contentIntentTokenId()),
+                "PendingIntent cancellation must clear only the matching notification reference");
+
+        require(recovered.removeNotificationChannel(scope, "notify-rev-a",
+                        VirtualNotificationChannelSnapshot.GROUP, "messages"),
+                "notification group deletion must remove the owned group");
+        require(recovered.notificationChannels(scope, "notify-rev-a").isEmpty()
+                        && recovered.notifications(scope, "notify-rev-a").isEmpty(),
+                "group deletion must cascade through channels and notifications");
+
+        store = recovered;
+        reserveNotificationPendingIntent(store, scope, 84, "notify.REVISION");
+        store.upsertNotificationChannel(scope, "notify-rev-a",
+                new VirtualNotificationChannelSnapshot(VirtualNotificationChannelSnapshot.CHANNEL,
+                        "stale", "", "notify-rev-a", new byte[0], System.currentTimeMillis()));
+        require(store.notificationChannels(scope, "notify-rev-b").isEmpty()
+                        && store.notifications(scope, "notify-rev-b").isEmpty(),
+                "APK revision update must prune stale notification state");
+        store.close();
+    }
+
+    private static VirtualPendingIntentSnapshot reserveNotificationPendingIntent(
+            VirtualSystemServiceStore store, VirtualSystemServiceStore.Scope scope,
+            int requestCode, String action) {
+        return store.reservePendingIntent(scope, "notify.pkg", 1L, "notify-rev-a", 19009,
+                new VirtualPendingIntentSnapshot("", VirtualPendingIntentSnapshot.BROADCAST,
+                        requestCode, action, "", "", "a=" + action + "|c=|d=", 0x04000000,
+                        "notify.pkg", 19009, "", "notify.pkg", 1L, "notify-rev-a",
+                        new byte[]{(byte) requestCode}, 0, false, System.currentTimeMillis()),
+                false, false, false);
+    }
+
     private static final class TestClient implements VirtualSystemServiceStore.Client {
         final VirtualSystemServiceStore.Scope scope;
         final String processName;
@@ -232,7 +367,7 @@ public final class VirtualSystemServiceStoreSelfTest {
             this.scope = scope; this.processName = processName; this.generation = generation;
             observer = new IVirtualSystemServiceObserver.Stub() {
                 @Override public void onClipboardChanged() { clipboardEvents.incrementAndGet(); }
-                @Override public void onAlarm(String alarmId) { alarmEvents.incrementAndGet(); }
+                @Override public void onAlarm(com.warden.controlledsandbox.contract.VirtualAlarmSnapshot alarm) { alarmEvents.incrementAndGet(); }
                 @Override public boolean onJobStart(int guestJobId, byte[] payload,
                                                     VirtualJobParametersSnapshot parameters,
                                                     IVirtualJobExecution jobExecution) {

@@ -567,36 +567,36 @@ public final class PackageManagementService extends Service {
         @Override public java.util.List<VirtualPendingIntentSnapshot> listPendingIntents() {
             requireCapability(); return systemServices.pendingIntents(scope, processName, generation, packageRevision);
         }
-        @Override public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, byte[] tokenPayload) {
+        @Override public void scheduleAlarm(VirtualAlarmSnapshot candidate) {
             requireCapability(); systemServices.scheduleAlarm(scope, processName, generation,
-                    alarmId, triggerAtMs, intervalMs, tokenPayload);
+                    packageRevision, candidate);
         }
         @Override public boolean cancelAlarm(String alarmId) {
-            requireCapability(); return systemServices.cancelAlarm(scope, alarmId);
+            requireCapability(); return systemServices.cancelAlarm(scope, packageRevision, alarmId);
         }
         @Override public java.util.List<VirtualAlarmSnapshot> listAlarms() {
-            requireCapability(); return systemServices.alarms(scope, processName, generation);
+            requireCapability(); return systemServices.alarms(scope, processName, generation, packageRevision);
         }
-        @Override public VirtualNotificationSnapshot reserveNotification(int guestId, String guestTag, String channelId) {
-            requireCapability(); return systemServices.reserveNotification(scope, generation, guestId, guestTag, channelId);
+        @Override public VirtualNotificationSnapshot reserveNotification(VirtualNotificationSnapshot candidate) {
+            requireCapability(); return systemServices.reserveNotification(scope, generation, packageRevision, candidate);
         }
-        @Override public void commitNotification(int guestId, String guestTag, String channelId, byte[] payload) {
-            requireCapability(); systemServices.commitNotification(scope, guestId, guestTag, channelId, payload);
+        @Override public void commitNotification(VirtualNotificationSnapshot value) {
+            requireCapability(); systemServices.commitNotification(scope, packageRevision, value);
         }
         @Override public boolean removeNotification(int guestId, String guestTag) {
-            requireCapability(); return systemServices.removeNotification(scope, guestId, guestTag);
+            requireCapability(); return systemServices.removeNotification(scope, packageRevision, guestId, guestTag);
         }
         @Override public java.util.List<VirtualNotificationSnapshot> listNotifications() {
-            requireCapability(); return systemServices.notifications(scope);
+            requireCapability(); return systemServices.notifications(scope, packageRevision);
         }
-        @Override public void upsertNotificationChannel(String kind, String id, String groupId, byte[] payload) {
-            requireCapability(); systemServices.upsertNotificationChannel(scope, kind, id, groupId, payload);
+        @Override public void upsertNotificationChannel(VirtualNotificationChannelSnapshot value) {
+            requireCapability(); systemServices.upsertNotificationChannel(scope, packageRevision, value);
         }
         @Override public boolean removeNotificationChannel(String kind, String id) {
-            requireCapability(); return systemServices.removeNotificationChannel(scope, kind, id);
+            requireCapability(); return systemServices.removeNotificationChannel(scope, packageRevision, kind, id);
         }
         @Override public java.util.List<VirtualNotificationChannelSnapshot> listNotificationChannels() {
-            requireCapability(); return systemServices.notificationChannels(scope);
+            requireCapability(); return systemServices.notificationChannels(scope, packageRevision);
         }
         @Override public VirtualJobSnapshot reserveJob(int guestId, byte[] payload) {
             requireCapability(); return systemServices.reserveJob(scope, processName, generation, guestId, payload);

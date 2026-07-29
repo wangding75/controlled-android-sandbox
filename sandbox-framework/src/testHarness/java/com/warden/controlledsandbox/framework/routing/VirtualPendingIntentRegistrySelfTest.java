@@ -78,14 +78,27 @@ public final class VirtualPendingIntentRegistrySelfTest {
         require(shared.records().size() == 1,
                 "process shutdown retains persistent sender token");
 
-        VirtualPendingIntentRegistry secondProcess = new VirtualPendingIntentRegistry(
+        AtomicReference<Object> recoveredPayload = new AtomicReference<>();
+        VirtualPendingIntentRegistry alarmRecoveryProcess = new VirtualPendingIntentRegistry(
                 "guest.pkg", 2, 12002, 12L, "guest.pkg", "rev-a", shared,
+                (record, request) -> { recoveredPayload.set(record.payload()); return 79; });
+        int recoveredDelivery = alarmRecoveryProcess.sendPersistent(persistentId,
+                new VirtualPendingIntentRegistry.SendRequest(null, 0, 0,
+                        "guest.permission.SEND_RESULT", -1));
+        require(recoveredDelivery == 79 && "base".equals(recoveredPayload.get()),
+                "durable sender dispatches by persistent token without Binder reissue");
+        require(alarmRecoveryProcess.snapshot().active() == 1,
+                "persistent delivery materializes one current-process handle");
+        alarmRecoveryProcess.close();
+
+        VirtualPendingIntentRegistry secondProcess = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 13L, "guest.pkg", "rev-a", shared,
                 (record, request) -> 78);
         Object tokenTwo = new Object();
         VirtualPendingIntentRegistry.IssueResult recovered = secondProcess.issue(mutable, tokenTwo, "ignored");
         require(!recovered.created() && persistentId.equals(recovered.record().persistentTokenId()),
                 "equivalent sender rebinds persistent token after process restart");
-        require(recovered.record().generation() == 12L && recovered.record().sends() == 1,
+        require(recovered.record().generation() == 13L && recovered.record().sends() == 2,
                 "recovered sender binds current generation and send count");
 
         boolean permissionDenied = false;
@@ -124,7 +137,7 @@ public final class VirtualPendingIntentRegistrySelfTest {
 
         secondProcess.close();
         VirtualPendingIntentRegistry newRevision = new VirtualPendingIntentRegistry(
-                "guest.pkg", 2, 12002, 13L, "guest.pkg", "rev-b", shared,
+                "guest.pkg", 2, 12002, 14L, "guest.pkg", "rev-b", shared,
                 (record, request) -> 0);
         Object replacement = new Object();
         VirtualPendingIntentRegistry.IssueResult replaced = newRevision.issue(mutable, replacement, "rev-b");

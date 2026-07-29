@@ -225,25 +225,74 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
 
     public int send(Object token, SendRequest request) throws Exception {
         Record record;
+        SendRequest resolved = request == null ? SendRequest.simple(null) : request;
         synchronized (this) {
             record = byToken.get(token);
-            if (record == null || record.cancelled()) throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
-            validateSend(record, request == null ? SendRequest.simple(null) : request);
+            requireSendable(record, resolved);
         }
+        return deliver(record, resolved);
+    }
+
+    /** Rehydrates and sends a durable sender when the original process Binder no longer exists. */
+    public int sendPersistent(String tokenId, SendRequest request) throws Exception {
         SendRequest resolved = request == null ? SendRequest.simple(null) : request;
-        try { return delivery.deliver(record, resolved); }
+        Record record;
+        synchronized (this) {
+            String normalized = required(tokenId, "tokenId");
+            record = byPersistentId.get(normalized);
+            if (record == null) record = materializePersistent(normalized);
+            requireSendable(record, resolved);
+        }
+        return deliver(record, resolved);
+    }
+
+    private int deliver(Record record, SendRequest request) throws Exception {
+        try { return delivery.deliver(record, request); }
         finally {
             synchronized (this) {
                 if (persistence != null) {
-                    DurableRecord updated =
-                            persistence.markSent(record.persistentTokenId());
+                    DurableRecord updated = persistence.markSent(record.persistentTokenId());
                     if (updated != null) record.sent(updated.sends(), updated.cancelled());
+                    else record.cancel();
                 } else {
                     record.sent(record.sends() + 1, record.spec().oneShot());
                 }
                 if (record.cancelled() || record.spec().oneShot()) cancelLocal(record);
             }
         }
+    }
+
+    private void requireSendable(Record record, SendRequest request) {
+        if (record == null || record.cancelled()) {
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+        }
+        validateSend(record, request);
+    }
+
+    private Record materializePersistent(String tokenId) {
+        if (persistence == null) return null;
+        DurableRecord persisted = null;
+        for (DurableRecord value : persistence.records()) {
+            if (tokenId.equals(value.tokenId())) { persisted = value; break; }
+        }
+        if (persisted == null || persisted.cancelled()
+                || !packageName.equals(persisted.creatorPackage())
+                || creatorUid != persisted.creatorUid()
+                || !packageRevision.equals(persisted.packageRevision())) {
+            return null;
+        }
+        Object token = new Object();
+        Record restored = new Record(ids.getAndIncrement(), persisted.tokenId(), packageName,
+                virtualUserId, creatorUid, generation, token, specFrom(persisted), persisted.payload(),
+                persisted.sends(), false);
+        Record sameKey = byKey.get(restored.spec().key());
+        if (sameKey != null && !sameKey.persistentTokenId().equals(restored.persistentTokenId())) {
+            cancelLocal(sameKey);
+        }
+        byKey.put(restored.spec().key(), restored);
+        byToken.put(token, restored);
+        byPersistentId.put(restored.persistentTokenId(), restored);
+        return restored;
     }
 
     private static void validateSend(Record record, SendRequest request) {

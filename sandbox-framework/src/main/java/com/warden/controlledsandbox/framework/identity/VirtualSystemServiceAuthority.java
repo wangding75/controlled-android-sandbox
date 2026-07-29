@@ -11,12 +11,18 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
                                int creatorUid, String requiredPermission, String ownerProcessName,
                                long ownerGeneration, String packageRevision, Object payload,
                                int sends, boolean cancelled, long updatedAtMs) { }
-    record AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, Object token) { }
+    record AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, boolean exact,
+                       boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                       String ownerProcessName, long ownerGeneration, String packageRevision,
+                       Object token, int deliveryCount, long updatedAtMs) { }
     record NamespaceMapping(int hostId, boolean created) { }
     record NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
-                              String channelId, String state, Object payload, long updatedAtMs) { }
+                              String channelId, String state, String packageRevision,
+                              String contentIntentTokenId, String deleteIntentTokenId,
+                              java.util.List<String> actionIntentTokenIds, boolean foregroundService,
+                              String foregroundServiceKey, Object payload, long updatedAtMs) { }
     record NotificationChannelRecord(String kind, String id, String groupId,
-                                     Object payload, long updatedAtMs) { }
+                                     String packageRevision, Object payload, long updatedAtMs) { }
     record JobRecord(int guestId, int hostId, String state, String ownerProcessName,
                      long ownerGeneration, Object payload, long updatedAtMs) { }
     record JobParametersRecord(int hostJobId, int guestJobId, String namespace,
@@ -64,15 +70,16 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     default boolean cancelPendingIntent(String tokenId) { return false; }
     default List<PendingIntentRecord> pendingIntents() { return List.of(); }
 
-    void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, Object token, Runnable delivery);
+    void scheduleAlarm(AlarmRecord candidate, Runnable delivery);
     boolean cancelAlarm(String alarmId);
     List<AlarmRecord> alarms();
+    default void setRecoveredAlarmDelivery(java.util.function.Function<AlarmRecord, Boolean> delivery) { }
 
-    default NotificationRecord reserveNotification(int guestId, String guestTag, String channelId) { throw new UnsupportedOperationException("notification authority"); }
-    default void commitNotification(int guestId, String guestTag, String channelId, Object payload) { throw new UnsupportedOperationException("notification authority"); }
+    default NotificationRecord reserveNotification(NotificationRecord candidate) { throw new UnsupportedOperationException("notification authority"); }
+    default void commitNotification(NotificationRecord value) { throw new UnsupportedOperationException("notification authority"); }
     default boolean removeNotification(int guestId, String guestTag) { return false; }
     default List<NotificationRecord> notifications() { return List.of(); }
-    default void upsertNotificationChannel(String kind, String id, String groupId, Object payload) { throw new UnsupportedOperationException("notification channel authority"); }
+    default void upsertNotificationChannel(NotificationChannelRecord value) { throw new UnsupportedOperationException("notification channel authority"); }
     default boolean removeNotificationChannel(String kind, String id) { return false; }
     default List<NotificationChannelRecord> notificationChannels() { return List.of(); }
 

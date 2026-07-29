@@ -67,10 +67,10 @@ for signature in [
     'List<VirtualAccountSnapshot> listAccounts(String type);',
     'VirtualPendingIntentSnapshot reservePendingIntent(',
     'List<VirtualPendingIntentSnapshot> listPendingIntents();',
-    'void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);',
+    'void scheduleAlarm(in VirtualAlarmSnapshot candidate);',
     'List<VirtualAlarmSnapshot> listAlarms();',
     'int ensureNamespace(String namespace, int guestId);',
-    'VirtualNotificationSnapshot reserveNotification(int guestId, String guestTag, String channelId);',
+    'VirtualNotificationSnapshot reserveNotification(in VirtualNotificationSnapshot candidate);',
     'VirtualJobSnapshot reserveJob(int guestId, in byte[] payload);',
 ]:
     if signature not in virtual_service_aidl:

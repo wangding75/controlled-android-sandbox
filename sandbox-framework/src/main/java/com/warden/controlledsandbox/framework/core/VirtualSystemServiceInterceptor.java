@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.framework.core;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
+import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -125,7 +126,12 @@ public final class VirtualSystemServiceInterceptor {
             Object token = alarmToken(arguments);
             long trigger = normalizedTrigger(arguments);
             long interval = repeating(name) ? interval(arguments, trigger) : 0L;
-            state.alarms().schedule(token, trigger, interval);
+            String pendingIntentTokenId = pendingIntentTokenId(token);
+            String deliveryPath = pendingIntentTokenId.isEmpty() ? "LISTENER" : "PENDING_INTENT";
+            boolean exact = name.contains("exact") || name.contains("alarmclock");
+            boolean allowWhileIdle = name.contains("allowwhileidle");
+            state.alarms().schedule(token, trigger, interval, exact, allowWhileIdle, deliveryPath,
+                    pendingIntentTokenId, identity.processName(), identity.generation(), identity.packageRevision());
             return Call.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("remove") || name.startsWith("cancel")) {
@@ -153,15 +159,23 @@ public final class VirtualSystemServiceInterceptor {
             String guestTag = notificationGuestTag(arguments);
             String channelId = notificationChannelId(arguments);
             boolean created = findNotification(guestId, guestTag) == null;
-            VirtualSystemServiceAuthority.NotificationRecord reservation =
-                    state.notifications().reserve(guestId, guestTag, channelId);
+            NotificationMetadata metadata = notificationMetadata(arguments, guestId, guestTag);
+            VirtualSystemServiceAuthority.NotificationRecord candidate = new VirtualSystemServiceAuthority.NotificationRecord(
+                    guestId, 0, guestTag, "", channelId, "RESERVED", identity.packageRevision(),
+                    metadata.contentIntentTokenId, metadata.deleteIntentTokenId, metadata.actionIntentTokenIds,
+                    metadata.foregroundService, metadata.foregroundServiceKey, null, System.currentTimeMillis());
+            VirtualSystemServiceAuthority.NotificationRecord reservation = state.notifications().reserve(candidate);
             rewriteNotificationTag(arguments, restores, notificationHostTag(guestTag));
             rewriteNotificationId(arguments, restores, reservation.hostId());
             rewriteChannelStrings(arguments, restores, name);
             rewriteNotificationChannelFields(arguments, restores);
             Object notificationPayload = notificationPayload(arguments);
             return Call.passThroughLifecycle(restores, result -> {
-                state.notifications().commit(guestId, guestTag, channelId, notificationPayload);
+                state.notifications().commit(new VirtualSystemServiceAuthority.NotificationRecord(
+                        guestId, reservation.hostId(), guestTag, reservation.hostTag(), channelId, "ACTIVE",
+                        identity.packageRevision(), metadata.contentIntentTokenId, metadata.deleteIntentTokenId,
+                        metadata.actionIntentTokenIds, metadata.foregroundService, metadata.foregroundServiceKey,
+                        notificationPayload, System.currentTimeMillis()));
                 return result;
             }, () -> { if (created) state.notifications().remove(guestId, guestTag); });
         }
@@ -183,7 +197,9 @@ public final class VirtualSystemServiceInterceptor {
             rewriteChannelObjects(arguments, restores);
             return Call.passThroughLifecycle(restores, result -> {
                 for (ChannelDraft draft : drafts) {
-                    state.notifications().upsertChannel(draft.kind, draft.id, draft.groupId, draft.payload);
+                    state.notifications().upsertChannel(new VirtualSystemServiceAuthority.NotificationChannelRecord(
+                            draft.kind, draft.id, draft.groupId, identity.packageRevision(), draft.payload,
+                            System.currentTimeMillis()));
                 }
                 return filterAndRestoreChannelResult(result);
             }, () -> { });
@@ -426,6 +442,8 @@ public final class VirtualSystemServiceInterceptor {
         return "";
     }
     private record ChannelDraft(String kind, String id, String groupId, Object payload) { }
+    private record NotificationMetadata(String contentIntentTokenId, String deleteIntentTokenId,
+            List<String> actionIntentTokenIds, boolean foregroundService, String foregroundServiceKey) { }
 
     private NamespaceRewrite rewriteNotificationId(Object[] arguments, List<Restore> restores,
                                                    boolean create) {
@@ -618,6 +636,57 @@ public final class VirtualSystemServiceInterceptor {
         }
         for (int index = 0; index < arguments.length; index++) if (arguments[index] instanceof Integer) return index;
         return -1;
+    }
+
+    private NotificationMetadata notificationMetadata(Object[] arguments, int guestId, String guestTag) {
+        Object notification = notificationPayload(arguments);
+        String content = pendingIntentTokenId(member(notification, "contentIntent", "mContentIntent", "getContentIntent"));
+        String delete = pendingIntentTokenId(member(notification, "deleteIntent", "mDeleteIntent", "getDeleteIntent"));
+        List<String> actions = new ArrayList<>();
+        Object rawActions = member(notification, "actions", "mActions", "getActions");
+        if (rawActions != null) {
+            if (rawActions instanceof Iterable<?> iterable) {
+                for (Object action : iterable) addToken(actions,
+                        pendingIntentTokenId(member(action, "actionIntent", "mActionIntent", "getActionIntent")));
+            } else if (rawActions.getClass().isArray()) {
+                for (int index = 0; index < Array.getLength(rawActions); index++) addToken(actions,
+                        pendingIntentTokenId(member(Array.get(rawActions, index), "actionIntent", "mActionIntent", "getActionIntent")));
+            }
+        }
+        boolean foreground = (intMember(notification, "flags", "mFlags", "getFlags") & 0x40) != 0;
+        String serviceKey = foreground ? identity.packageName() + ":u" + identity.virtualUserId()
+                + ":" + guestId + ":" + (guestTag == null ? "" : guestTag.trim()) : "";
+        return new NotificationMetadata(content, delete, java.util.Collections.unmodifiableList(actions),
+                foreground, serviceKey);
+    }
+    private static void addToken(List<String> values, String token) {
+        if (token != null && !token.isEmpty() && !values.contains(token)) values.add(token);
+    }
+    private static String pendingIntentTokenId(Object value) {
+        return pendingIntentTokenId(value, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()), 0);
+    }
+    private static String pendingIntentTokenId(Object value, java.util.Set<Object> visited, int depth) {
+        if (value == null || depth > 4 || !visited.add(value)) return "";
+        if (value instanceof VirtualPendingIntentToken token) return token.persistentTokenId();
+        Object target = member(value, "mTarget", "target", "getTarget");
+        if (target != null && target != value) {
+            String found = pendingIntentTokenId(target, visited, depth + 1);
+            if (!found.isEmpty()) return found;
+        }
+        Object binder = member(value, "mBinder", "binder", "asBinder");
+        if (binder != null && binder != value) return pendingIntentTokenId(binder, visited, depth + 1);
+        return "";
+    }
+    private static Object member(Object value, String field, String alternateField, String method) {
+        if (value == null) return null;
+        Field found = findField(value.getClass(), field, alternateField);
+        if (found != null) try { found.setAccessible(true); return found.get(value); } catch (ReflectiveOperationException ignored) { }
+        try { Method candidate = value.getClass().getMethod(method); candidate.setAccessible(true); return candidate.invoke(value); }
+        catch (ReflectiveOperationException ignored) { return null; }
+    }
+    private static int intMember(Object value, String field, String alternateField, String method) {
+        Object raw = member(value, field, alternateField, method);
+        return raw instanceof Number ? ((Number) raw).intValue() : 0;
     }
 
     private static Object alarmToken(Object[] arguments) {
