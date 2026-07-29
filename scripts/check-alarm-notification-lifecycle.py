@@ -42,7 +42,7 @@ if "Bundle" in session or "Bundle" in observer:
 
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "private static final int SCHEMA = 4", "MAX_ALARMS_PER_SCOPE",
+    "private static final int SCHEMA = 5", "MAX_ALARMS_PER_SCOPE",
     "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_NOTIFICATION_CHANNELS_PER_SCOPE",
     "requirePendingIntent(scope, revision, pendingIntentTokenId)",
     "RETRY_WITHOUT_CLIENT_MS", "alarm.deliveryCount++", "pruneNotificationRevisionLocked",

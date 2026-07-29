@@ -230,7 +230,8 @@ public final class VirtualSystemServiceInterceptor {
             if (job == null) throw new SecurityException("VIRTUAL_JOB_OBJECT_REQUIRED");
             int virtualId = intResult(job, "getId");
             boolean created = state.jobs().hostIdIfPresent(virtualId) == null;
-            VirtualSystemServiceAuthority.JobRecord reservation = state.jobs().reserve(virtualId, job);
+            VirtualSystemServiceAuthority.JobRecord reservation = state.jobs().reserve(
+                    VirtualJobPolicySnapshotFactory.from(job, virtualId, identity));
             Field field = findField(job.getClass(), "jobId", "mJobId");
             if (field == null) {
                 if (created) state.jobs().remove(virtualId);

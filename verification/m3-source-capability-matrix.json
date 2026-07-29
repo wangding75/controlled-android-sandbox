@@ -1008,7 +1008,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Job IDs use a persistent package/user namespace shared across Guest processes. Job constraints, JobService callback routing, cancelAll and durable scheduled-job recovery remain partial."
+      "notes": "Job IDs use a persistent package/user/revision namespace shared across Guest processes. Query and cancel operations retain Guest IDs while the host receives only owned rewritten IDs."
     },
     {
       "id": "runtime.receiver-coordinator-split",
@@ -1123,7 +1123,7 @@
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Marshalled Guest JobInfo ownership, stable host ID, process/generation owner and SCHEDULED/RUNNING state survive Package Service recreation; host JobService dispatch is wired."
+      "notes": "Typed Guest JobInfo ownership, constraints, timing, retry counters, stable host ID and process/generation/revision state survive Package Service recreation; stale revisions are pruned."
     },
     {
       "id": "runtime.job-callback-acknowledgement",
@@ -1365,6 +1365,42 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Owned notification state persists content/delete/action PendingIntent references and foreground-service keys; PendingIntent cancellation clears matching references and channel/group deletion cascades through owned state."
+    },
+    {
+      "id": "contract.job-scheduling-policy",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualJobSnapshot.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Bundle-free typed Job policy carries network, charging, battery, storage, idle, periodic, latency, deadline, expedited, persisted and backoff state across the scoped Binder capability."
+    },
+    {
+      "id": "framework.job-policy-projection",
+      "evidence": [
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualJobPolicySnapshotFactory.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "JobScheduler schedule/enqueue extracts Android JobInfo policy into virtual typed state before host ID/service rewriting; pending JobInfo objects retain their original constraints while IDs are projected back to Guest values."
+    },
+    {
+      "id": "package.job-retry-persistence",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Package Service persists periodic scheduling, minimum latency, override deadline, linear/exponential bounded backoff, failure count, next-run time and APK revision cleanup; stale RUNNING/DISPATCHING work recovers to SCHEDULED."
     }
   ],
   "statusDimensions": {

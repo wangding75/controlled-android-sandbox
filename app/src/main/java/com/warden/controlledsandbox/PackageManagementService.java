@@ -598,13 +598,14 @@ public final class PackageManagementService extends Service {
         @Override public java.util.List<VirtualNotificationChannelSnapshot> listNotificationChannels() {
             requireCapability(); return systemServices.notificationChannels(scope, packageRevision);
         }
-        @Override public VirtualJobSnapshot reserveJob(int guestId, byte[] payload) {
-            requireCapability(); return systemServices.reserveJob(scope, processName, generation, guestId, payload);
+        @Override public VirtualJobSnapshot reserveJob(VirtualJobSnapshot candidate) {
+            requireCapability(); return systemServices.reserveJob(scope, processName, generation,
+                    packageRevision, candidate);
         }
         @Override public void commitJob(int guestId) { requireCapability(); systemServices.commitJob(scope, guestId); }
         @Override public boolean removeJob(int guestId) { requireCapability(); return systemServices.removeJob(scope, guestId); }
         @Override public java.util.List<VirtualJobSnapshot> listJobs() {
-            requireCapability(); return systemServices.jobs(scope, processName, generation);
+            requireCapability(); return systemServices.jobs(scope, processName, generation, packageRevision);
         }
         @Override public int ensureNamespace(String namespace, int guestId) {
             requireCapability(); return systemServices.ensureNamespace(scope, namespace, guestId);

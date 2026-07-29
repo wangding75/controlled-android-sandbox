@@ -482,40 +482,43 @@ public final class VirtualSystemServiceState implements AutoCloseable {
 
     public static final class JobState {
         public record Mapping(int hostId, boolean created) { }
-        private static final class Entry {
-            final int guestId; final int hostId; String state; Object payload; long updatedAtMs;
-            Entry(int guestId, int hostId, String state, Object payload, long updatedAtMs) {
-                this.guestId = guestId; this.hostId = hostId; this.state = state;
-                this.payload = payload; this.updatedAtMs = updatedAtMs;
-            }
-        }
         private final VirtualSystemServiceAuthority authority;
         private final AtomicInteger next = new AtomicInteger(0x52000000);
-        private final Map<Integer, Entry> entries = new LinkedHashMap<>();
+        private final Map<Integer, VirtualSystemServiceAuthority.JobRecord> entries = new LinkedHashMap<>();
         JobState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
+
+        public synchronized VirtualSystemServiceAuthority.JobRecord reserve(
+                VirtualSystemServiceAuthority.JobRecord candidate) {
+            if (candidate == null) throw new IllegalArgumentException("VIRTUAL_JOB_CANDIDATE_REQUIRED");
+            if (authority != null) return authority.reserveJob(candidate);
+            VirtualSystemServiceAuthority.JobRecord existing = entries.get(candidate.guestId());
+            int hostId = existing == null ? next.getAndIncrement() : existing.hostId();
+            VirtualSystemServiceAuthority.JobRecord value = copy(candidate, hostId, "RESERVED",
+                    candidate.failureCount(), candidate.nextRunAtMs(), candidate.lastFailureAtMs(),
+                    System.currentTimeMillis());
+            entries.put(candidate.guestId(), value);
+            return value;
+        }
+        /** Compatibility helper for legacy namespace-only tests. */
         public synchronized VirtualSystemServiceAuthority.JobRecord reserve(int guestId, Object payload) {
-            if (authority != null) return authority.reserveJob(guestId, payload);
-            Entry entry = entries.get(guestId);
-            if (entry == null) {
-                entry = new Entry(guestId, next.getAndIncrement(), "RESERVED", payload, System.currentTimeMillis());
-                entries.put(guestId, entry);
-            } else { entry.state = "RESERVED"; entry.payload = payload; entry.updatedAtMs = System.currentTimeMillis(); }
-            return record(entry);
+            return reserve(new VirtualSystemServiceAuthority.JobRecord(guestId, 0, "RESERVED", "local", 0L,
+                    "legacy-revision", 0, false, false, false, false, false, 0L, 0L,
+                    0L, 0L, false, false, 1, 30_000L, 0, 0L, 0L, payload,
+                    System.currentTimeMillis()));
         }
         public synchronized void commit(int guestId) {
             if (authority != null) { authority.commitJob(guestId); return; }
-            Entry entry = entries.get(guestId);
+            VirtualSystemServiceAuthority.JobRecord entry = entries.get(guestId);
             if (entry == null) throw new IllegalStateException("VIRTUAL_JOB_RESERVATION_REQUIRED");
-            entry.state = "SCHEDULED"; entry.updatedAtMs = System.currentTimeMillis();
+            entries.put(guestId, copy(entry, entry.hostId(), "SCHEDULED", entry.failureCount(),
+                    entry.nextRunAtMs(), entry.lastFailureAtMs(), System.currentTimeMillis()));
         }
         public synchronized boolean remove(int guestId) {
             return authority != null ? authority.removeJob(guestId) : entries.remove(guestId) != null;
         }
         public synchronized List<VirtualSystemServiceAuthority.JobRecord> records() {
-            if (authority != null) return Collections.unmodifiableList(new ArrayList<>(authority.jobs()));
-            List<VirtualSystemServiceAuthority.JobRecord> out = new ArrayList<>();
-            for (Entry entry : entries.values()) out.add(record(entry));
-            return Collections.unmodifiableList(out);
+            return authority != null ? Collections.unmodifiableList(new ArrayList<>(authority.jobs()))
+                    : Collections.unmodifiableList(new ArrayList<>(entries.values()));
         }
         public synchronized Mapping ensure(int guestId) {
             VirtualSystemServiceAuthority.JobRecord before = findGuest(guestId);
@@ -547,9 +550,16 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             for (VirtualSystemServiceAuthority.JobRecord value : records()) if (value.guestId() == guestId) return value;
             return null;
         }
-        private static VirtualSystemServiceAuthority.JobRecord record(Entry entry) {
-            return new VirtualSystemServiceAuthority.JobRecord(entry.guestId, entry.hostId, entry.state,
-                    "local", 0L, entry.payload, entry.updatedAtMs);
+        private static VirtualSystemServiceAuthority.JobRecord copy(
+                VirtualSystemServiceAuthority.JobRecord value, int hostId, String state,
+                int failureCount, long nextRunAtMs, long lastFailureAtMs, long updatedAtMs) {
+            return new VirtualSystemServiceAuthority.JobRecord(value.guestId(), hostId, state,
+                    value.ownerProcessName(), value.ownerGeneration(), value.packageRevision(),
+                    value.requiredNetworkType(), value.requiresCharging(), value.requiresBatteryNotLow(),
+                    value.requiresStorageNotLow(), value.requiresDeviceIdle(), value.periodic(),
+                    value.intervalMs(), value.flexMs(), value.minimumLatencyMs(), value.overrideDeadlineMs(),
+                    value.expedited(), value.persisted(), value.backoffPolicy(), value.initialBackoffMs(),
+                    failureCount, nextRunAtMs, lastFailureAtMs, value.payload(), updatedAtMs);
         }
     }
 

@@ -24,7 +24,13 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     record NotificationChannelRecord(String kind, String id, String groupId,
                                      String packageRevision, Object payload, long updatedAtMs) { }
     record JobRecord(int guestId, int hostId, String state, String ownerProcessName,
-                     long ownerGeneration, Object payload, long updatedAtMs) { }
+                     long ownerGeneration, String packageRevision, int requiredNetworkType,
+                     boolean requiresCharging, boolean requiresBatteryNotLow,
+                     boolean requiresStorageNotLow, boolean requiresDeviceIdle,
+                     boolean periodic, long intervalMs, long flexMs, long minimumLatencyMs,
+                     long overrideDeadlineMs, boolean expedited, boolean persisted,
+                     int backoffPolicy, long initialBackoffMs, int failureCount,
+                     long nextRunAtMs, long lastFailureAtMs, Object payload, long updatedAtMs) { }
     record JobParametersRecord(int hostJobId, int guestJobId, String namespace,
                                Object extras, Object transientExtras, Object clipData,
                                int clipGrantFlags, boolean overrideDeadlineExpired,
@@ -83,7 +89,7 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     default boolean removeNotificationChannel(String kind, String id) { return false; }
     default List<NotificationChannelRecord> notificationChannels() { return List.of(); }
 
-    default JobRecord reserveJob(int guestId, Object payload) { throw new UnsupportedOperationException("job authority"); }
+    default JobRecord reserveJob(JobRecord candidate) { throw new UnsupportedOperationException("job authority"); }
     default void commitJob(int guestId) { throw new UnsupportedOperationException("job authority"); }
     default boolean removeJob(int guestId) { return false; }
     default List<JobRecord> jobs() { return List.of(); }

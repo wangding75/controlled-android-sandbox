@@ -20,6 +20,7 @@ public final class VirtualSystemServiceStoreSelfTest {
     public static void main(String[] args) throws Exception {
         alarmRecoveryAndRepeatingLifecycle();
         notificationOwnershipLifecycle();
+        jobPolicyPersistenceAndRetryLifecycle();
         java.io.File root = Files.createTempDirectory("virtual-system-services").toFile();
         VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
         VirtualSystemServiceStore.Scope owner = new VirtualSystemServiceStore.Scope("guest.pkg", 3);
@@ -340,6 +341,69 @@ public final class VirtualSystemServiceStoreSelfTest {
                         && store.notifications(scope, "notify-rev-b").isEmpty(),
                 "APK revision update must prune stale notification state");
         store.close();
+    }
+
+    private static void jobPolicyPersistenceAndRetryLifecycle() throws Exception {
+        java.io.File root = Files.createTempDirectory("virtual-job-policy").toFile();
+        VirtualSystemServiceStore.Scope scope = new VirtualSystemServiceStore.Scope("job.pkg", 10);
+        VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
+        long now = System.currentTimeMillis();
+        VirtualJobSnapshot candidate = new VirtualJobSnapshot(81, 0, VirtualJobSnapshot.RESERVED,
+                "job.pkg:worker", 1L, "job-rev-a", VirtualJobSnapshot.NETWORK_UNMETERED,
+                true, true, true, true, false, 0L, 0L, 0L, 60_000L,
+                true, true, VirtualJobSnapshot.BACKOFF_LINEAR, 50L,
+                0, now, 0L, new byte[]{8, 1}, now);
+        VirtualJobSnapshot reserved = store.reserveJob(scope, "job.pkg:worker", 1L,
+                "job-rev-a", candidate);
+        store.commitJob(scope, 81);
+        store.close();
+
+        VirtualSystemServiceStore reloaded = new VirtualSystemServiceStore(root);
+        VirtualJobSnapshot restored = reloaded.jobs(scope, "job.pkg:worker", 1L,
+                "job-rev-a").get(0);
+        require(restored.hostId() == reserved.hostId()
+                        && restored.requiredNetworkType() == VirtualJobSnapshot.NETWORK_UNMETERED
+                        && restored.requiresCharging() && restored.requiresBatteryNotLow()
+                        && restored.requiresStorageNotLow() && restored.requiresDeviceIdle()
+                        && restored.expedited() && restored.persisted()
+                        && restored.backoffPolicy() == VirtualJobSnapshot.BACKOFF_LINEAR,
+                "typed Job constraints must survive Package Service recreation");
+        AtomicInteger starts = new AtomicInteger();
+        TestClient client = new TestClient(scope, "job.pkg:worker", 1L,
+                new AtomicInteger(), new AtomicInteger(), starts, new AtomicInteger(-1), true);
+        reloaded.register(client);
+        require(reloaded.startJob(parameters(restored.hostId()), new IHostJobCallback.Stub() {
+                    @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                }, 0), "eligible persisted job must dispatch");
+        client.execution.get().finish(true);
+        VirtualJobSnapshot retried = reloaded.jobs(scope, "job.pkg:worker", 1L,
+                "job-rev-a").get(0);
+        require(retried.failureCount() == 1 && retried.lastFailureAtMs() > 0L
+                        && retried.nextRunAtMs() - retried.lastFailureAtMs() == 50L,
+                "linear retry must persist failure count and bounded backoff deadline");
+
+        long periodicNow = System.currentTimeMillis();
+        VirtualJobSnapshot periodic = new VirtualJobSnapshot(82, 0, VirtualJobSnapshot.RESERVED,
+                "job.pkg:worker", 1L, "job-rev-a", VirtualJobSnapshot.NETWORK_ANY,
+                false, false, false, false, true, 1_000L, 200L, 0L, 0L,
+                false, true, VirtualJobSnapshot.BACKOFF_EXPONENTIAL, 40L,
+                0, periodicNow, 0L, new byte[]{8, 2}, periodicNow);
+        VirtualJobSnapshot periodicReserved = reloaded.reserveJob(scope, "job.pkg:worker", 1L,
+                "job-rev-a", periodic);
+        reloaded.commitJob(scope, 82);
+        require(reloaded.startJob(parameters(periodicReserved.hostId()), new IHostJobCallback.Stub() {
+                    @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                }, 0), "periodic job must dispatch");
+        client.execution.get().finish(false);
+        VirtualJobSnapshot nextPeriod = reloaded.jobs(scope, "job.pkg:worker", 1L,
+                "job-rev-a").stream().filter(value -> value.guestId() == 82).findFirst().orElseThrow();
+        require(VirtualJobSnapshot.SCHEDULED.equals(nextPeriod.state()) && nextPeriod.failureCount() == 0
+                        && nextPeriod.nextRunAtMs() >= nextPeriod.updatedAtMs() + 1_000L,
+                "successful periodic job must remain scheduled for its next interval");
+        require(reloaded.jobs(scope, "job.pkg:worker", 2L, "job-rev-b").isEmpty(),
+                "APK revision update must prune stale persisted jobs");
+        reloaded.unregister(client);
+        reloaded.close();
     }
 
     private static VirtualPendingIntentSnapshot reserveNotificationPendingIntent(

@@ -30,7 +30,7 @@ require("sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/Vi
         "parcelable VirtualPendingIntentSnapshot")
 
 store = require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-                "private static final int SCHEMA = 4", "MAX_PENDING_INTENTS_PER_SCOPE",
+                "private static final int SCHEMA = 5", "MAX_PENDING_INTENTS_PER_SCOPE",
                 "VIRTUAL_PENDING_INTENT_CREATOR_UID_MISMATCH", "nextPendingIntentToken",
                 "packageRevision", "filterIdentity", "persistOrRestore")
 service = require("app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",

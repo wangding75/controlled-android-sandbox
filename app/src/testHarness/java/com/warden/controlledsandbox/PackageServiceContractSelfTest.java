@@ -222,15 +222,28 @@ public final class PackageServiceContractSelfTest {
 
         VirtualJobSnapshot job = new VirtualJobSnapshot(17, 0x52000011,
                 VirtualJobSnapshot.SCHEDULED, "com.example.fixture:worker", 6L,
-                new byte[]{1, 7}, 99L);
+                "job-revision-a", VirtualJobSnapshot.NETWORK_UNMETERED,
+                true, true, true, true, true, 900_000L, 300_000L,
+                12_000L, 60_000L, true, true, VirtualJobSnapshot.BACKOFF_LINEAR,
+                45_000L, 3, 120_000L, 90_000L, new byte[]{1, 7}, 99L);
         Parcel jobParcel = Parcel.obtain();
         job.writeToParcel(jobParcel, 0); jobParcel.setDataPosition(0);
         VirtualJobSnapshot restoredJob = VirtualJobSnapshot.CREATOR.createFromParcel(jobParcel);
         jobParcel.recycle();
         require(restoredJob.guestId() == 17 && restoredJob.hostId() == 0x52000011
                         && VirtualJobSnapshot.SCHEDULED.equals(restoredJob.state())
+                        && "job-revision-a".equals(restoredJob.packageRevision())
+                        && restoredJob.requiredNetworkType() == VirtualJobSnapshot.NETWORK_UNMETERED
+                        && restoredJob.requiresCharging() && restoredJob.requiresBatteryNotLow()
+                        && restoredJob.requiresStorageNotLow() && restoredJob.requiresDeviceIdle()
+                        && restoredJob.periodic() && restoredJob.intervalMs() == 900_000L
+                        && restoredJob.flexMs() == 300_000L && restoredJob.minimumLatencyMs() == 12_000L
+                        && restoredJob.overrideDeadlineMs() == 60_000L && restoredJob.expedited()
+                        && restoredJob.persisted() && restoredJob.backoffPolicy() == VirtualJobSnapshot.BACKOFF_LINEAR
+                        && restoredJob.initialBackoffMs() == 45_000L && restoredJob.failureCount() == 3
+                        && restoredJob.nextRunAtMs() == 120_000L && restoredJob.lastFailureAtMs() == 90_000L
                         && java.util.Arrays.equals(new byte[]{1, 7}, restoredJob.payload()),
-                "virtual job snapshot lost");
+                "virtual job policy snapshot lost");
         VirtualJobParametersSnapshot jobParameters = new VirtualJobParametersSnapshot(
                 0x52000011, 17, "guest", new byte[]{1}, new byte[]{2}, new byte[]{3}, 4,
                 true, true, false, List.of("content://guest/jobs/17"), List.of("guest.jobs"),

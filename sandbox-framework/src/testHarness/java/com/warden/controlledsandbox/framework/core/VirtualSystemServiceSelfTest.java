@@ -168,6 +168,15 @@ public final class VirtualSystemServiceSelfTest {
         Job job = new Job(17);
         require(jobs.schedule(job) == 1, "job delegated");
         require(delegate.observedId != 17 && job.getId() == 17, "job ID rewritten only for host call");
+        VirtualSystemServiceAuthority.JobRecord policy = identity.virtualServices().jobs().records().get(0);
+        require(policy.requiredNetworkType() == 2 && policy.requiresCharging()
+                        && policy.requiresBatteryNotLow() && policy.requiresStorageNotLow()
+                        && policy.requiresDeviceIdle() && policy.periodic()
+                        && policy.intervalMs() == 900_000L && policy.flexMs() == 300_000L
+                        && policy.minimumLatencyMs() == 12_000L && policy.overrideDeadlineMs() == 60_000L
+                        && policy.expedited() && policy.persisted() && policy.backoffPolicy() == 0
+                        && policy.initialBackoffMs() == 45_000L,
+                "JobInfo constraints and scheduling policy must enter typed virtual state");
         delegate.pending.add(new Job(delegate.observedId));
         List<Job> pending = jobs.getAllPendingJobs();
         require(pending.size() == 1 && pending.get(0).getId() == 17, "pending job ID restored to Guest namespace");
@@ -343,6 +352,20 @@ public final class VirtualSystemServiceSelfTest {
         private int mJobId;
         Job(int id) { mJobId = id; }
         public int getId() { return mJobId; }
+        public int getNetworkType() { return 2; }
+        public boolean isRequireCharging() { return true; }
+        public boolean isRequireBatteryNotLow() { return true; }
+        public boolean isRequireStorageNotLow() { return true; }
+        public boolean isRequireDeviceIdle() { return true; }
+        public boolean isPeriodic() { return true; }
+        public long getIntervalMillis() { return 900_000L; }
+        public long getFlexMillis() { return 300_000L; }
+        public long getMinLatencyMillis() { return 12_000L; }
+        public long getMaxExecutionDelayMillis() { return 60_000L; }
+        public boolean isExpedited() { return true; }
+        public boolean isPersisted() { return true; }
+        public int getBackoffPolicy() { return 0; }
+        public long getInitialBackoffMillis() { return 45_000L; }
     }
 
     static final class FakeVirtualAuthority implements VirtualSystemServiceAuthority {

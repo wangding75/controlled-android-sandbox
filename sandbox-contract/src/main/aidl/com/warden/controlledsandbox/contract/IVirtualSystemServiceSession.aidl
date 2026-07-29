@@ -41,7 +41,7 @@ interface IVirtualSystemServiceSession {
     boolean removeNotificationChannel(String kind, String id);
     List<VirtualNotificationChannelSnapshot> listNotificationChannels();
 
-    VirtualJobSnapshot reserveJob(int guestId, in byte[] payload);
+    VirtualJobSnapshot reserveJob(in VirtualJobSnapshot candidate);
     void commitJob(int guestId);
     boolean removeJob(int guestId);
     List<VirtualJobSnapshot> listJobs();

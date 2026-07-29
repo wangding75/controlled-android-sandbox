@@ -167,12 +167,46 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     private static final class JobRecord {
         final int guestId; final int hostId; String state; final String ownerProcessName;
-        long ownerGeneration; byte[] payload; long updatedAtMs;
+        long ownerGeneration; final String packageRevision; final int requiredNetworkType;
+        final boolean requiresCharging; final boolean requiresBatteryNotLow;
+        final boolean requiresStorageNotLow; final boolean requiresDeviceIdle;
+        final boolean periodic; final long intervalMs; final long flexMs;
+        final long minimumLatencyMs; final long overrideDeadlineMs;
+        final boolean expedited; final boolean persisted; final int backoffPolicy;
+        final long initialBackoffMs; int failureCount; long nextRunAtMs;
+        long lastFailureAtMs; byte[] payload; long updatedAtMs;
         JobRecord(int guestId, int hostId, String state, String ownerProcessName,
-                  long ownerGeneration, byte[] payload, long updatedAtMs) {
-            if (guestId < 0 || hostId < 0 || ownerGeneration < 0L) throw new IllegalArgumentException("invalid job identity");
+                  long ownerGeneration, String packageRevision, int requiredNetworkType,
+                  boolean requiresCharging, boolean requiresBatteryNotLow,
+                  boolean requiresStorageNotLow, boolean requiresDeviceIdle,
+                  boolean periodic, long intervalMs, long flexMs, long minimumLatencyMs,
+                  long overrideDeadlineMs, boolean expedited, boolean persisted,
+                  int backoffPolicy, long initialBackoffMs, int failureCount,
+                  long nextRunAtMs, long lastFailureAtMs, byte[] payload, long updatedAtMs) {
+            if (guestId < 0 || hostId < 0 || ownerGeneration < 0L || failureCount < 0
+                    || nextRunAtMs < 0L || lastFailureAtMs < 0L) {
+                throw new IllegalArgumentException("invalid job identity/state");
+            }
+            if (requiredNetworkType < VirtualJobSnapshot.NETWORK_NONE
+                    || requiredNetworkType > VirtualJobSnapshot.NETWORK_METERED) {
+                throw new IllegalArgumentException("invalid job network type");
+            }
+            if (backoffPolicy != VirtualJobSnapshot.BACKOFF_LINEAR
+                    && backoffPolicy != VirtualJobSnapshot.BACKOFF_EXPONENTIAL) {
+                throw new IllegalArgumentException("invalid job backoff policy");
+            }
             this.guestId = guestId; this.hostId = hostId; this.state = jobState(state);
-            this.ownerProcessName = required(ownerProcessName, "ownerProcessName"); this.ownerGeneration = ownerGeneration;
+            this.ownerProcessName = required(ownerProcessName, "ownerProcessName");
+            this.ownerGeneration = ownerGeneration; this.packageRevision = required(packageRevision, "packageRevision");
+            this.requiredNetworkType = requiredNetworkType; this.requiresCharging = requiresCharging;
+            this.requiresBatteryNotLow = requiresBatteryNotLow; this.requiresStorageNotLow = requiresStorageNotLow;
+            this.requiresDeviceIdle = requiresDeviceIdle; this.periodic = periodic;
+            this.intervalMs = Math.max(0L, intervalMs); this.flexMs = Math.max(0L, Math.min(flexMs, this.intervalMs));
+            this.minimumLatencyMs = Math.max(0L, minimumLatencyMs);
+            this.overrideDeadlineMs = Math.max(0L, overrideDeadlineMs);
+            this.expedited = expedited; this.persisted = persisted; this.backoffPolicy = backoffPolicy;
+            this.initialBackoffMs = Math.max(1L, initialBackoffMs); this.failureCount = failureCount;
+            this.nextRunAtMs = nextRunAtMs; this.lastFailureAtMs = lastFailureAtMs;
             this.payload = boundedPayload(payload, "jobPayload"); this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
@@ -193,7 +227,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    private static final int SCHEMA = 4;
+    private static final int SCHEMA = 5;
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     private static final int MAX_ACCOUNTS_PER_SCOPE = 64;
     private static final int MAX_TOKENS_PER_ACCOUNT = 32;
@@ -676,28 +710,47 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     synchronized VirtualJobSnapshot reserveJob(Scope scope, String processName, long generation,
-                                               int guestId, byte[] payload) {
+                                               String packageRevision, VirtualJobSnapshot candidate) {
+        if (candidate == null) throw new IllegalArgumentException("VIRTUAL_JOB_CANDIDATE_REQUIRED");
+        String revision = required(packageRevision, "packageRevision");
         ScopeState before = snapshot(scope); ScopeState state = state(scope);
-        JobRecord current = state.jobs.get(guestId);
-        if (current == null) {
-            if (state.jobs.size() >= MAX_JOBS_PER_SCOPE) throw new IllegalStateException("VIRTUAL_JOB_LIMIT_EXCEEDED");
-            current = new JobRecord(guestId, allocateHostId("job"), VirtualJobSnapshot.RESERVED,
-                    processName, generation, payload, System.currentTimeMillis());
-            state.jobs.put(guestId, current);
-        } else {
-            JobExecution active = activeJobExecutions.get(current.hostId);
-            if (active != null && active.active()) {
-                throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_ACTIVE");
-            }
-            current.state = VirtualJobSnapshot.RESERVED; current.ownerGeneration = generation;
-            current.payload = boundedPayload(payload, "jobPayload"); current.updatedAtMs = System.currentTimeMillis();
+        pruneJobRevisionLocked(state, revision);
+        JobRecord current = state.jobs.get(candidate.guestId());
+        int hostId = current == null ? allocateHostId("job") : current.hostId;
+        if (current == null && state.jobs.size() >= MAX_JOBS_PER_SCOPE) {
+            throw new IllegalStateException("VIRTUAL_JOB_LIMIT_EXCEEDED");
         }
+        if (current != null) {
+            JobExecution active = activeJobExecutions.get(current.hostId);
+            if (active != null && active.active()) throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_ACTIVE");
+        }
+        long now = System.currentTimeMillis();
+        long nextRunAt = candidate.nextRunAtMs() > 0L ? candidate.nextRunAtMs()
+                : safeAdd(now, candidate.minimumLatencyMs());
+        current = new JobRecord(candidate.guestId(), hostId, VirtualJobSnapshot.RESERVED,
+                required(processName, "processName"), generation, revision,
+                candidate.requiredNetworkType(), candidate.requiresCharging(),
+                candidate.requiresBatteryNotLow(), candidate.requiresStorageNotLow(),
+                candidate.requiresDeviceIdle(), candidate.periodic(), candidate.intervalMs(),
+                candidate.flexMs(), candidate.minimumLatencyMs(), candidate.overrideDeadlineMs(),
+                candidate.expedited(), candidate.persisted(), candidate.backoffPolicy(),
+                candidate.initialBackoffMs(), 0, nextRunAt, 0L, candidate.payload(), now);
+        state.jobs.put(candidate.guestId(), current);
         persistOrRestore(scope, before); return jobSnapshot(current);
+    }
+    /** Compatibility helper retained for schema 1-4 tests. */
+    synchronized VirtualJobSnapshot reserveJob(Scope scope, String processName, long generation,
+                                               int guestId, byte[] payload) {
+        return reserveJob(scope, processName, generation, "legacy-revision",
+                new VirtualJobSnapshot(guestId, 0, VirtualJobSnapshot.RESERVED, processName,
+                        generation, payload, System.currentTimeMillis()));
     }
     synchronized void commitJob(Scope scope, int guestId) {
         ScopeState before = snapshot(scope); JobRecord record = state(scope).jobs.get(guestId);
         if (record == null) throw new IllegalStateException("VIRTUAL_JOB_RESERVATION_REQUIRED");
-        record.state = VirtualJobSnapshot.SCHEDULED; record.updatedAtMs = System.currentTimeMillis();
+        record.state = VirtualJobSnapshot.SCHEDULED;
+        if (record.nextRunAtMs == 0L) record.nextRunAtMs = safeAdd(System.currentTimeMillis(), record.minimumLatencyMs);
+        record.updatedAtMs = System.currentTimeMillis();
         persistOrRestore(scope, before);
     }
     boolean removeJob(Scope scope, int guestId) {
@@ -715,9 +768,12 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (removed) persistOrRestore(scope, before); return removed;
         }
     }
-    synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation) {
-        ScopeState before = snapshot(scope); boolean changed = false; List<VirtualJobSnapshot> out = new ArrayList<>();
+    synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation,
+                                                String packageRevision) {
+        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        boolean changed = pruneJobRevisionLocked(state(scope), revision); List<VirtualJobSnapshot> out = new ArrayList<>();
         for (JobRecord record : state(scope).jobs.values()) {
+            if (!revision.equals(record.packageRevision)) continue;
             if (record.ownerProcessName.equals(processName) && record.ownerGeneration != generation) {
                 JobExecution active = activeJobExecutions.get(record.hostId);
                 if (active != null && active.active()) continue;
@@ -725,6 +781,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 if (VirtualJobSnapshot.DISPATCHING.equals(record.state)
                         || VirtualJobSnapshot.RUNNING.equals(record.state)) {
                     record.state = VirtualJobSnapshot.SCHEDULED;
+                    record.nextRunAtMs = Math.max(record.nextRunAtMs, System.currentTimeMillis());
                 }
                 record.updatedAtMs = System.currentTimeMillis(); changed = true;
             }
@@ -733,6 +790,9 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         if (changed) persistOrRestore(scope, before);
         out.sort(Comparator.comparingInt(VirtualJobSnapshot::guestId));
         return Collections.unmodifiableList(out);
+    }
+    synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation) {
+        return jobs(scope, processName, generation, "legacy-revision");
     }
 
     boolean startJob(VirtualJobParametersSnapshot parameters, IHostJobCallback hostCallback,
@@ -744,6 +804,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             LocatedJob located = findJobByHost(parameters.hostJobId());
             if (located == null || !VirtualJobSnapshot.SCHEDULED.equals(located.job.state)
                     || activeJobExecutions.containsKey(parameters.hostJobId())) return false;
+            long now = System.currentTimeMillis();
+            long deadlineAt = located.job.overrideDeadlineMs == 0L ? Long.MAX_VALUE
+                    : safeAdd(located.job.updatedAtMs, located.job.overrideDeadlineMs);
+            if (now < located.job.nextRunAtMs && now < deadlineAt) return false;
             Client client = matchingClient(located.scope, located.job);
             if (client == null) return false;
             ScopeState before = snapshot(located.scope);
@@ -868,9 +932,19 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             synchronized (VirtualSystemServiceStore.this) {
                 if (!active()) return;
                 ScopeState before = snapshot(scope);
+                long now = System.currentTimeMillis();
                 if (needsReschedule) {
+                    job.failureCount = Math.min(31, job.failureCount + 1);
+                    job.lastFailureAtMs = now;
+                    job.nextRunAtMs = safeAdd(now, retryDelay(job));
                     job.state = VirtualJobSnapshot.SCHEDULED;
-                    job.updatedAtMs = System.currentTimeMillis();
+                    job.updatedAtMs = now;
+                } else if (job.periodic) {
+                    job.failureCount = 0;
+                    job.lastFailureAtMs = 0L;
+                    job.nextRunAtMs = safeAdd(now, job.intervalMs);
+                    job.state = VirtualJobSnapshot.SCHEDULED;
+                    job.updatedAtMs = now;
                 } else {
                     state(scope).jobs.remove(job.guestId);
                 }
@@ -1072,7 +1146,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         for (Map.Entry<Integer, JobRecord> item : current.jobs.entrySet()) {
             JobRecord value = item.getValue();
             copy.jobs.put(item.getKey(), new JobRecord(value.guestId, value.hostId, value.state,
-                    value.ownerProcessName, value.ownerGeneration, value.payload, value.updatedAtMs));
+                    value.ownerProcessName, value.ownerGeneration, value.packageRevision,
+                    value.requiredNetworkType, value.requiresCharging, value.requiresBatteryNotLow,
+                    value.requiresStorageNotLow, value.requiresDeviceIdle, value.periodic,
+                    value.intervalMs, value.flexMs, value.minimumLatencyMs, value.overrideDeadlineMs,
+                    value.expedited, value.persisted, value.backoffPolicy, value.initialBackoffMs,
+                    value.failureCount, value.nextRunAtMs, value.lastFailureAtMs,
+                    value.payload, value.updatedAtMs));
         }
         return copy;
     }
@@ -1200,6 +1280,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                         JobRecord record = new JobRecord(value.getInt("guestId"), value.getInt("hostId"),
                                 value.optString("state", VirtualJobSnapshot.SCHEDULED),
                                 value.optString("ownerProcessName", scope.packageName()), value.optLong("ownerGeneration", 0L),
+                                value.optString("packageRevision", "legacy-revision"),
+                                value.optInt("requiredNetworkType", VirtualJobSnapshot.NETWORK_NONE),
+                                value.optBoolean("requiresCharging", false), value.optBoolean("requiresBatteryNotLow", false),
+                                value.optBoolean("requiresStorageNotLow", false), value.optBoolean("requiresDeviceIdle", false),
+                                value.optBoolean("periodic", false), value.optLong("intervalMs", 0L),
+                                value.optLong("flexMs", 0L), value.optLong("minimumLatencyMs", 0L),
+                                value.optLong("overrideDeadlineMs", 0L), value.optBoolean("expedited", false),
+                                value.optBoolean("persisted", false),
+                                value.optInt("backoffPolicy", VirtualJobSnapshot.BACKOFF_EXPONENTIAL),
+                                value.optLong("initialBackoffMs", 30_000L), value.optInt("failureCount", 0),
+                                value.optLong("nextRunAtMs", 0L), value.optLong("lastFailureAtMs", 0L),
                                 decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
                         state.jobs.put(record.guestId, record); nextJobHostId = Math.max(nextJobHostId, record.hostId + 1);
                     }
@@ -1282,6 +1373,15 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 for (JobRecord value : state.jobs.values()) jobs.put(new JSONObject()
                         .put("guestId", value.guestId).put("hostId", value.hostId).put("state", value.state)
                         .put("ownerProcessName", value.ownerProcessName).put("ownerGeneration", value.ownerGeneration)
+                        .put("packageRevision", value.packageRevision).put("requiredNetworkType", value.requiredNetworkType)
+                        .put("requiresCharging", value.requiresCharging).put("requiresBatteryNotLow", value.requiresBatteryNotLow)
+                        .put("requiresStorageNotLow", value.requiresStorageNotLow).put("requiresDeviceIdle", value.requiresDeviceIdle)
+                        .put("periodic", value.periodic).put("intervalMs", value.intervalMs).put("flexMs", value.flexMs)
+                        .put("minimumLatencyMs", value.minimumLatencyMs).put("overrideDeadlineMs", value.overrideDeadlineMs)
+                        .put("expedited", value.expedited).put("persisted", value.persisted)
+                        .put("backoffPolicy", value.backoffPolicy).put("initialBackoffMs", value.initialBackoffMs)
+                        .put("failureCount", value.failureCount).put("nextRunAtMs", value.nextRunAtMs)
+                        .put("lastFailureAtMs", value.lastFailureAtMs)
                         .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
                 item.put("jobs", jobs); scopes.put(item);
             }
@@ -1456,6 +1556,33 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         for (String tokenId : value.actionIntentTokenIds()) requirePendingIntent(scope, revision, tokenId);
     }
+    private boolean pruneJobRevisionLocked(ScopeState state, String revision) {
+        List<JobRecord> stale = new ArrayList<>();
+        for (JobRecord value : state.jobs.values()) {
+            if (!revision.equals(value.packageRevision)) stale.add(value);
+        }
+        for (JobRecord value : stale) {
+            JobExecution execution = activeJobExecutions.get(value.hostId);
+            if (execution != null) execution.invalidateLocked();
+            state.jobs.remove(value.guestId);
+        }
+        return !stale.isEmpty();
+    }
+    private static long retryDelay(JobRecord job) {
+        long multiplier;
+        if (job.backoffPolicy == VirtualJobSnapshot.BACKOFF_LINEAR) {
+            multiplier = Math.max(1, job.failureCount);
+        } else {
+            multiplier = 1L << Math.min(20, Math.max(0, job.failureCount - 1));
+        }
+        long value = job.initialBackoffMs > Long.MAX_VALUE / multiplier
+                ? Long.MAX_VALUE : job.initialBackoffMs * multiplier;
+        return Math.min(value, 5L * 60L * 60L * 1000L);
+    }
+    private static long safeAdd(long left, long right) {
+        if (right <= 0L) return left;
+        return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
     private static boolean pruneNotificationRevisionLocked(ScopeState state, String revision) {
         int beforeNotifications = state.notifications.size();
         int beforeChannels = state.notificationChannels.size();
@@ -1499,7 +1626,12 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     private static VirtualJobSnapshot jobSnapshot(JobRecord value) {
         return new VirtualJobSnapshot(value.guestId, value.hostId, value.state, value.ownerProcessName,
-                value.ownerGeneration, value.payload, value.updatedAtMs);
+                value.ownerGeneration, value.packageRevision, value.requiredNetworkType,
+                value.requiresCharging, value.requiresBatteryNotLow, value.requiresStorageNotLow,
+                value.requiresDeviceIdle, value.periodic, value.intervalMs, value.flexMs,
+                value.minimumLatencyMs, value.overrideDeadlineMs, value.expedited, value.persisted,
+                value.backoffPolicy, value.initialBackoffMs, value.failureCount, value.nextRunAtMs,
+                value.lastFailureAtMs, value.payload, value.updatedAtMs);
     }
 
     @Override public synchronized void close() {

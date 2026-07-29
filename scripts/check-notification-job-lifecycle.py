@@ -45,7 +45,7 @@ for name in ["VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot"
 
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "private static final int SCHEMA = 4", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE",
+    "private static final int SCHEMA = 5", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE",
     "reserveNotification", "commitNotification", "notificationChannels", "reserveJob",
     "commitJob", "startJob", "observer().onJobStart", "VirtualJobSnapshot.SCHEDULED")
 if "VirtualJobSnapshot.DISPATCHING" not in store or "VirtualJobSnapshot.RUNNING" not in store:
@@ -127,8 +127,8 @@ if service_matrix.is_file():
     job = services.get("job-scheduler", {})
     if notification.get("production") != "wired" or "owned-resource" not in notification.get("hook", ""):
         errors.append("notification service matrix must disclose wired owned-resource lifecycle")
-    if job.get("production") != "partial" or ("host-bridge" not in job.get("hook", "") and "execution-bridge" not in job.get("hook", "")):
-        errors.append("job service matrix must disclose partial host bridge")
+    if job.get("production") != "wired" or "execution-bridge" not in job.get("hook", ""):
+        errors.append("job service matrix must disclose wired host/Guest execution bridge")
 else:
     errors.append("missing system service coverage matrix")
 

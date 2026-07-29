@@ -191,8 +191,17 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return Collections.unmodifiableList(out);
     }
 
-    @Override public JobRecord reserveJob(int guestId, Object payload) {
-        return job(call(() -> session.reserveJob(guestId, marshal(payload))));
+    @Override public JobRecord reserveJob(JobRecord candidate) {
+        VirtualJobSnapshot snapshot = new VirtualJobSnapshot(candidate.guestId(), Math.max(0, candidate.hostId()),
+                candidate.state(), candidate.ownerProcessName(), candidate.ownerGeneration(),
+                candidate.packageRevision(), candidate.requiredNetworkType(), candidate.requiresCharging(),
+                candidate.requiresBatteryNotLow(), candidate.requiresStorageNotLow(), candidate.requiresDeviceIdle(),
+                candidate.periodic(), candidate.intervalMs(), candidate.flexMs(), candidate.minimumLatencyMs(),
+                candidate.overrideDeadlineMs(), candidate.expedited(), candidate.persisted(),
+                candidate.backoffPolicy(), candidate.initialBackoffMs(), candidate.failureCount(),
+                candidate.nextRunAtMs(), candidate.lastFailureAtMs(), marshal(candidate.payload()),
+                candidate.updatedAtMs());
+        return job(call(() -> session.reserveJob(snapshot)));
     }
     @Override public void commitJob(int guestId) { call(() -> { session.commitJob(guestId); return null; }); }
     @Override public boolean removeJob(int guestId) { return call(() -> session.removeJob(guestId)); }
@@ -298,7 +307,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     private JobRecord job(VirtualJobSnapshot value) {
         return new JobRecord(value.guestId(), value.hostId(), value.state(), value.ownerProcessName(),
-                value.ownerGeneration(), unmarshal(value.payload()), value.updatedAtMs());
+                value.ownerGeneration(), value.packageRevision(), value.requiredNetworkType(),
+                value.requiresCharging(), value.requiresBatteryNotLow(), value.requiresStorageNotLow(),
+                value.requiresDeviceIdle(), value.periodic(), value.intervalMs(), value.flexMs(),
+                value.minimumLatencyMs(), value.overrideDeadlineMs(), value.expedited(), value.persisted(),
+                value.backoffPolicy(), value.initialBackoffMs(), value.failureCount(), value.nextRunAtMs(),
+                value.lastFailureAtMs(), unmarshal(value.payload()), value.updatedAtMs());
     }
     private byte[] marshal(Object value) {
         if (value == null) return new byte[0];

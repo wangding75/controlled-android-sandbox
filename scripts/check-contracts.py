@@ -71,7 +71,7 @@ for signature in [
     'List<VirtualAlarmSnapshot> listAlarms();',
     'int ensureNamespace(String namespace, int guestId);',
     'VirtualNotificationSnapshot reserveNotification(in VirtualNotificationSnapshot candidate);',
-    'VirtualJobSnapshot reserveJob(int guestId, in byte[] payload);',
+    'VirtualJobSnapshot reserveJob(in VirtualJobSnapshot candidate);',
 ]:
     if signature not in virtual_service_aidl:
         errors.append(f'IVirtualSystemServiceSession is missing {signature}')

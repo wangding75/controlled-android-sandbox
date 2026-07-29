@@ -100,10 +100,10 @@
     },
     {
       "id": "job-scheduler",
-      "hook": "binder-owned-persistent-spec-host-guest-jobservice-execution-bridge",
-      "isolation": "package-user",
-      "production": "partial",
-      "hostFallback": "delegated-after-rewrite-with-typed-jobparameters-and-scoped-callback",
+      "hook": "binder-owned-persistent-revision-scoped-typed-policy-host-guest-jobservice-execution-bridge",
+      "isolation": "package-user-process-generation-revision",
+      "production": "wired",
+      "hostFallback": "delegated-after-owned-id-service-rewrite-with-typed-policy-and-scoped-callback",
       "device": "not-tested"
     },
     {
@@ -127,7 +127,7 @@
     "All rows remain source/host evidence only; no Android device evidence exists.",
     "Alarm exact/allow-while-idle flags, repeating cadence and offline recovery are source-wired, but Android wakeup, Doze, reboot, quota and OEM timing behavior remain unverified.",
     "Notification ownership, channel/group lifecycle, foreground-service mapping and PendingIntent metadata are persistent; host SystemUI interaction and OEM listener/callback behavior remain unverified.",
-    "Job specs and ownership persist and the host JobService bridge is wired; M4-T16 B3 still needs typed constraints, periodic/deadline/expedited policy and retry/backoff completion.",
+    "Job constraints, periodic/latency/deadline/expedited metadata and retry/backoff state are source-wired and persisted; actual Android quota, standby bucket, reboot and OEM constraint timing remain unverified.",
     "Native AudioRecord/MediaRecorder and OEM Binder variants remain outside the current bounded proxy coverage."
   ]
 }
