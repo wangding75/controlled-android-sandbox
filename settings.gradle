@@ -22,3 +22,5 @@ include ':sandbox-runtime'
 include ':sandbox-framework'
 include ':fixture-basic'
 include ':sandbox-native'
+
+include ':sandbox-companion32'

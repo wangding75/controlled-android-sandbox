@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION" />
+    <application
+        android:allowBackup="false"
+        android:extractNativeLibs="true"
+        android:label="Controlled Sandbox Native Companion"
+        android:usesCleartextTraffic="false">
+        <service
+            android:name=".NativeCompanionService"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
+            android:process=":native32"
+            android:stopWithTask="false" />
+    </application>
+</manifest>

@@ -121,3 +121,7 @@ M4-T17 B1 extends the Guest-only PLT/GOT hook set with `openat2`, `statx`, `rena
 ## M4-T17 B2 source baseline
 
 M4-T17 B2 extends the Guest-only native policy to IPv4/IPv6 sockets, forward and reverse DNS, virtual hostname and bounded synthetic interface enumeration. Host network-interface identity is not returned to Guest native code. RECORD_AUDIO and AppOps decisions now configure a generation-bound native capture gate; AAudio and NDK MediaRecorder start/stop symbols are intercepted when present, and revocation clears active capture authority while the existing Binder capability lease registry releases Java/Binder audio resources. These are source and Host-native tests; Android audio-server, VPN, proxy and OEM network behavior remain device-gated.
+
+## M4-T17 B3 source baseline
+
+M4-T17 B3 adds an independent `sandbox-companion32` APK for `armeabi-v7a` and `x86`, while the Host native module remains limited to `arm64-v8a` and `x86_64`. A Bundle-free, signature-permission Binder contract carries protocol, session, generation, virtual user, APK revision, one-time nonce and requested ABI. Host routing rejects unknown ABI metadata and never silently executes a 32-bit Guest in the 64-bit Broker process. The companion module and JNI boundary are source/Host-compile verified; Android APK packaging, cross-package Binder behavior and full 32-bit Guest execution remain device-gated.

@@ -111,4 +111,9 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_crash.cpp" \
   -o "$OUT/native_crash.o"
+g++ -std=c++20 -Wall -Wextra -Werror \
+  -I"$JAVA_HOME_REAL/include" -I"$JAVA_HOME_REAL/include/linux" \
+  -c "$ROOT/sandbox-companion32/src/main/cpp/native_companion_jni.cpp" \
+  -o "$OUT/native_companion_jni.o"
+echo 'PASS 32-bit companion JNI source boundary compile'
 echo 'PASS sandbox-native JNI boundary compile'

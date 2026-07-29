@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'verification/sbom.json'
-MODULES = ['app', 'sandbox-domain', 'sandbox-contract', 'sandbox-framework', 'sandbox-native', 'sandbox-runtime', 'fixture-basic']
+MODULES = ['app', 'sandbox-domain', 'sandbox-contract', 'sandbox-framework', 'sandbox-native', 'sandbox-companion32', 'sandbox-runtime', 'fixture-basic']
 components = []
 for module in MODULES:
     base = ROOT / module

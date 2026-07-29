@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission
+        android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

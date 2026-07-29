@@ -1465,6 +1465,45 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "RECORD_AUDIO/AppOps policy configures a generation-bound native capture gate. AAudio and NDK MediaRecorder start/stop symbols are intercepted when imported; permission revocation invalidates active native tokens, best-effort stops tracked handles and existing Binder audio leases are cleaned up."
+    },
+    {
+      "id": "contract.native-abi-companion",
+      "evidence": [
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/INativeAbiCompanion.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionRequest.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionResult.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/NativeCompanionContractSelfTest.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "A Bundle-free signature-permission Binder request carries protocol, session, generation, virtual user, package revision, single-use nonce, requested 32-bit ABI and operation. The companion enforces protocol, nonce replay, bitness, ABI and generation identity before accepting preparation."
+    },
+    {
+      "id": "native.four-abi-build-architecture",
+      "evidence": [
+        "sandbox-native/build.gradle",
+        "sandbox-companion32/build.gradle",
+        "sandbox-companion32/src/main/cpp/CMakeLists.txt",
+        "scripts/check-native-abi-companion.py"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "Source/build configuration separates arm64-v8a/x86_64 Host libraries from armeabi-v7a/x86 companion libraries and compiles an independent controlled_sandbox_native32 target. Android APK packaging and installation are not proven in this source-only stage."
+    },
+    {
+      "id": "runtime.native-abi-routing",
+      "evidence": [
+        "app/src/main/java/com/warden/controlledsandbox/NativeAbiRoutePlanner.java",
+        "app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java",
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+        "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionGenerationRegistry.java"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "partial",
+      "deviceStatus": "not-tested",
+      "notes": "64-bit ABIs route to the Host and 32-bit ABIs require the explicit companion. Unknown or legacy ABI metadata fails closed. The Host can probe the 32-bit companion but full cross-width Guest Activity/Service execution is intentionally rejected until a device-proven runtime transport exists."
     }
   ],
   "statusDimensions": {

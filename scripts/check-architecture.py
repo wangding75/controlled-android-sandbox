@@ -10,12 +10,14 @@ MODULES = {
     'sandbox-domain': {'forbidden': ('android.', 'com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.framework', 'com.warden.controlledsandbox.nativebridge', 'com.warden.controlledsandbox.app')},
     'sandbox-framework': {'forbidden': ('com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.app')},
     'sandbox-native': {'forbidden': ('com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.framework', 'com.warden.controlledsandbox.app')},
+    'sandbox-companion32': {'forbidden': ('com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.framework', 'com.warden.controlledsandbox.MainActivity', 'com.warden.controlledsandbox.SandboxRecord')},
     'sandbox-runtime': {'forbidden': ('com.warden.controlledsandbox.MainActivity', 'com.warden.controlledsandbox.ApkImportManager', 'com.warden.controlledsandbox.SandboxRecord')},
     'fixture-basic': {'forbidden': ('com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.framework', 'com.warden.controlledsandbox.domain')},
 }
 PRODUCTION_ROOTS = [
     ROOT / 'app/src/main', ROOT / 'sandbox-domain/src/main', ROOT / 'sandbox-framework/src/main',
-    ROOT / 'sandbox-native/src/main', ROOT / 'sandbox-runtime/src/main', ROOT / 'sandbox-contract/src/main',
+    ROOT / 'sandbox-native/src/main', ROOT / 'sandbox-companion32/src/main',
+    ROOT / 'sandbox-runtime/src/main', ROOT / 'sandbox-contract/src/main',
 ]
 TARGET_SPECIAL_CASES = ('com.alibaba.android.rimet', 'com.tencent.wework', 'com.ss.android.lark', 'com.lark')
 UPSTREAM_NAMES = ('virtualapp', 'newblackbox', 'twoyi')
@@ -135,7 +137,7 @@ for package_name in sorted(DOMAIN_REQUIRED_PACKAGES - actual_domain_packages):
     errors.append(f'sandbox-domain is missing required subdomain package {package_name}')
 
 settings = (ROOT / 'settings.gradle').read_text(encoding='utf-8')
-required = (':app', ':sandbox-domain', ':sandbox-contract', ':sandbox-framework', ':sandbox-native', ':sandbox-runtime', ':fixture-basic')
+required = (':app', ':sandbox-domain', ':sandbox-contract', ':sandbox-framework', ':sandbox-native', ':sandbox-companion32', ':sandbox-runtime', ':fixture-basic')
 for module in required:
     if f"include '{module}'" not in settings:
         errors.append(f'settings.gradle is missing {module}')
