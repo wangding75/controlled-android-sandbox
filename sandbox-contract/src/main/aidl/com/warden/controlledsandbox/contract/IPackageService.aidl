@@ -11,7 +11,7 @@ interface IPackageService {
     IPackageManagementSession openManagementSession(in IBinder clientToken);
     IRuntimePermissionSession openRuntimePermissionSession(in IBinder clientToken);
     IVirtualSystemServiceSession openVirtualSystemServiceSession(in IBinder clientToken,
-            String packageName, int virtualUserId, String processName, long generation);
+            String packageName, int virtualUserId, int virtualUid, String processName, long generation, String packageRevision);
     boolean startVirtualJob(in VirtualJobParametersSnapshot parameters, IHostJobCallback callback);
     boolean stopVirtualJob(int hostJobId, int stopReason, int internalStopReason,
             String debugStopReason);

@@ -35,6 +35,14 @@ public final class ActivityResultContractSelfTest {
         check(result.results().get(0).registryKey().equals("registry-key")
                         && result.results().get(0).intentSenderToken().equals("sender-token"),
                 "result ownership metadata changed during parceling");
+        ActivityResultRequest senderRequest = roundTripRequest(new ActivityResultRequest(
+                RuntimeProtocol.CURRENT, "pending-intent-7", "session-1", 4, 2,
+                "guest.example", ActivityResultRequest.SEND, "activity-1", "fragment:sender",
+                27, -1, intent));
+        check(ActivityResultRequest.SEND.equals(senderRequest.operation())
+                        && senderRequest.requestCode() == 27
+                        && senderRequest.resultCode() == -1,
+                "Activity Result PendingIntent request metadata changed during parceling");
 
         expectFailure(() -> new ActivityResultRequest(
                 RuntimeProtocol.CURRENT, "bad", "session-1", 4, 2, "guest.example",

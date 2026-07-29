@@ -30,6 +30,7 @@ final class ActivityResultOperationDispatcher {
             case ActivityResultRequest.UNREGISTER -> unregister(request);
             case ActivityResultRequest.FINISH -> finish(request);
             case ActivityResultRequest.DRAIN -> drain(request);
+            case ActivityResultRequest.SEND -> send(request);
             default -> throw new IllegalArgumentException(
                     "Unknown Activity result operation: " + request.operation());
         };
@@ -80,6 +81,20 @@ final class ActivityResultOperationDispatcher {
         } catch (RuntimeException failure) {
             ledger.restoreRollbackState(before);
             throw failure;
+        }
+    }
+
+    private ActivityResultResult send(ActivityResultRequest request) {
+        ActivityTaskLedger.RollbackState before = ledger.captureRollbackState();
+        try {
+            boolean changed = ledger.deliverActivityResult(request.activityToken(),
+                    request.registryKey(), request.requestCode(), request.resultCode(),
+                    request.requestId(), ActivityResultContractMapper.toFramework(request.resultIntent()));
+            if (changed) persistCheckpoint.run();
+            return ActivityResultResult.success(RuntimeProtocol.CURRENT, request.requestId(),
+                    request.operation(), changed, request.requestCode(), List.of());
+        } catch (RuntimeException failure) {
+            ledger.restoreRollbackState(before); throw failure;
         }
     }
 

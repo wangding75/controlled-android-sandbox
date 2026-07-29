@@ -1,12 +1,19 @@
 package com.warden.controlledsandbox.framework.routing;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class VirtualPendingIntentRegistrySelfTest {
     public static void main(String[] args) throws Exception {
+        localLifecycle();
+        durableLifecycle();
+        System.out.println("PASS virtual PendingIntent identity and lifecycle self-test");
+    }
+
+    private static void localLifecycle() throws Exception {
         AtomicInteger deliveries = new AtomicInteger();
         VirtualPendingIntentRegistry registry = new VirtualPendingIntentRegistry(
-                "guest.pkg", 2, 7L, (record, fillIn) -> deliveries.incrementAndGet());
+                "guest.pkg", 2, 7L, (record, request) -> deliveries.incrementAndGet());
         Object firstToken = new Object();
         VirtualPendingIntentRegistry.Spec base = new VirtualPendingIntentRegistry.Spec(
                 VirtualPendingIntentRegistry.Kind.BROADCAST, 8, "guest.ACTION", "", "", 0);
@@ -45,8 +52,158 @@ public final class VirtualPendingIntentRegistrySelfTest {
         try { registry.send(cancelled, null); } catch (IllegalStateException expected) { rejected = true; }
         require(rejected, "cancelled sender cannot send");
         registry.close();
-        require(registry.snapshot().active() == 0, "registry close clears all senders");
-        System.out.println("PASS virtual PendingIntent identity and lifecycle self-test");
+        require(registry.snapshot().active() == 0, "registry close clears all local handles");
+    }
+
+    private static void durableLifecycle() throws Exception {
+        MemoryPersistence shared = new MemoryPersistence();
+        AtomicReference<VirtualPendingIntentRegistry.SendRequest> observed = new AtomicReference<>();
+        VirtualPendingIntentRegistry firstProcess = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 11L, "guest.pkg", "rev-a", shared,
+                (record, request) -> { observed.set(request); return 77; });
+        Object tokenOne = new Object();
+        VirtualPendingIntentRegistry.Spec mutable = new VirtualPendingIntentRegistry.Spec(
+                VirtualPendingIntentRegistry.Kind.ACTIVITY_RESULT, 41, "guest.RESULT", "activity-7", "",
+                VirtualPendingIntentRegistry.FLAG_MUTABLE, "guest.permission.SEND_RESULT");
+        VirtualPendingIntentRegistry.IssueResult issued = firstProcess.issue(mutable, tokenOne, "base");
+        require(issued.created() && issued.record().creatorUid() == 12002,
+                "creator identity is virtual and durable");
+        String persistentId = issued.record().persistentTokenId();
+        int result = firstProcess.send(tokenOne, new VirtualPendingIntentRegistry.SendRequest(
+                "fill", 0x30, 0x20, "guest.permission.SEND_RESULT", 13000));
+        require(result == 77 && "fill".equals(observed.get().fillInPayload()),
+                "mutable sender accepts bounded fill-in request");
+        require(issued.record().sends() == 1, "durable send count committed");
+        firstProcess.close();
+        require(shared.records().size() == 1,
+                "process shutdown retains persistent sender token");
+
+        VirtualPendingIntentRegistry secondProcess = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 12L, "guest.pkg", "rev-a", shared,
+                (record, request) -> 78);
+        Object tokenTwo = new Object();
+        VirtualPendingIntentRegistry.IssueResult recovered = secondProcess.issue(mutable, tokenTwo, "ignored");
+        require(!recovered.created() && persistentId.equals(recovered.record().persistentTokenId()),
+                "equivalent sender rebinds persistent token after process restart");
+        require(recovered.record().generation() == 12L && recovered.record().sends() == 1,
+                "recovered sender binds current generation and send count");
+
+        boolean permissionDenied = false;
+        try {
+            secondProcess.send(tokenTwo, new VirtualPendingIntentRegistry.SendRequest(
+                    null, 0, 0, "guest.permission.WRONG", 13000));
+        } catch (SecurityException expected) { permissionDenied = true; }
+        require(permissionDenied, "sender permission enforced before delivery");
+
+        Object immutableToken = new Object();
+        VirtualPendingIntentRegistry.Spec immutable = new VirtualPendingIntentRegistry.Spec(
+                VirtualPendingIntentRegistry.Kind.BROADCAST, 55, "guest.IMMUTABLE", "", "",
+                VirtualPendingIntentRegistry.FLAG_IMMUTABLE);
+        secondProcess.issue(immutable, immutableToken, "base");
+        boolean flagsDenied = false;
+        try {
+            secondProcess.send(immutableToken,
+                    new VirtualPendingIntentRegistry.SendRequest(null, 1, 1, "", -1));
+        } catch (SecurityException expected) { flagsDenied = true; }
+        require(flagsDenied, "immutable sender rejects flag mutation");
+
+        Object noCreate = new Object();
+        VirtualPendingIntentRegistry.IssueResult noCreateResult = secondProcess.issue(
+                new VirtualPendingIntentRegistry.Spec(VirtualPendingIntentRegistry.Kind.SERVICE,
+                        99, "guest.MISSING", "", "", VirtualPendingIntentRegistry.FLAG_NO_CREATE),
+                noCreate, null);
+        require(noCreateResult.record() == null, "NO_CREATE does not allocate a sender");
+
+        boolean conflictingMutability = false;
+        try {
+            new VirtualPendingIntentRegistry.Spec(VirtualPendingIntentRegistry.Kind.ACTIVITY, 1,
+                    "guest.INVALID", "", "", VirtualPendingIntentRegistry.FLAG_IMMUTABLE
+                            | VirtualPendingIntentRegistry.FLAG_MUTABLE);
+        } catch (IllegalArgumentException expected) { conflictingMutability = true; }
+        require(conflictingMutability, "conflicting mutable and immutable flags rejected");
+
+        secondProcess.close();
+        VirtualPendingIntentRegistry newRevision = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 13L, "guest.pkg", "rev-b", shared,
+                (record, request) -> 0);
+        Object replacement = new Object();
+        VirtualPendingIntentRegistry.IssueResult replaced = newRevision.issue(mutable, replacement, "rev-b");
+        require(replaced.created() && !persistentId.equals(replaced.record().persistentTokenId()),
+                "APK revision change invalidates old persistent sender");
+        require(shared.records().stream()
+                        .allMatch(value -> "rev-b".equals(value.packageRevision())),
+                "old revision senders are removed from authority state");
+        newRevision.cancelAll();
+        require(shared.records().isEmpty(), "cancelAll removes durable senders");
+        newRevision.close();
+    }
+
+    private static final class MemoryPersistence implements VirtualPendingIntentRegistry.Persistence {
+        private final java.util.Map<String, VirtualPendingIntentRegistry.DurableRecord> records =
+                new java.util.LinkedHashMap<>();
+        private long next = 1L;
+
+        @Override public synchronized VirtualPendingIntentRegistry.DurableRecord reserve(
+                VirtualPendingIntentRegistry.DurableRecord candidate, boolean noCreate,
+                boolean cancelCurrent, boolean updateCurrent) {
+            records.values().removeIf(value -> !value.packageRevision().equals(candidate.packageRevision()));
+            VirtualPendingIntentRegistry.DurableRecord existing = records.values().stream()
+                    .filter(value -> !value.cancelled()
+                            && value.kind().equals(candidate.kind())
+                            && value.requestCode() == candidate.requestCode()
+                            && value.filterIdentity().equals(candidate.filterIdentity()))
+                    .findFirst().orElse(null);
+            if (noCreate) return existing == null ? null : rebind(existing, candidate);
+            if (existing != null && cancelCurrent) {
+                records.remove(existing.tokenId()); existing = null;
+            }
+            if (existing != null) {
+                VirtualPendingIntentRegistry.DurableRecord value = updateCurrent
+                        ? new VirtualPendingIntentRegistry.DurableRecord(existing.tokenId(), candidate.kind(),
+                                candidate.requestCode(), candidate.action(), candidate.component(),
+                                candidate.data(), candidate.filterIdentity(), candidate.flags(),
+                                candidate.creatorPackage(), candidate.creatorUid(), candidate.requiredPermission(),
+                                candidate.ownerProcessName(), candidate.ownerGeneration(), candidate.packageRevision(),
+                                candidate.payload(), existing.sends(), false, System.currentTimeMillis())
+                        : rebind(existing, candidate);
+                records.put(value.tokenId(), value); return value;
+            }
+            VirtualPendingIntentRegistry.DurableRecord created = new VirtualPendingIntentRegistry.DurableRecord(
+                    "memory-pi-" + next++, candidate.kind(), candidate.requestCode(), candidate.action(),
+                    candidate.component(), candidate.data(), candidate.filterIdentity(), candidate.flags(),
+                    candidate.creatorPackage(), candidate.creatorUid(), candidate.requiredPermission(),
+                    candidate.ownerProcessName(), candidate.ownerGeneration(), candidate.packageRevision(),
+                    candidate.payload(), 0, false, System.currentTimeMillis());
+            records.put(created.tokenId(), created); return created;
+        }
+
+        @Override public synchronized VirtualPendingIntentRegistry.DurableRecord markSent(String tokenId) {
+            VirtualPendingIntentRegistry.DurableRecord value = records.get(tokenId);
+            if (value == null) throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+            boolean cancelled = (value.flags() & VirtualPendingIntentRegistry.FLAG_ONE_SHOT) != 0;
+            VirtualPendingIntentRegistry.DurableRecord updated = new VirtualPendingIntentRegistry.DurableRecord(
+                    value.tokenId(), value.kind(), value.requestCode(), value.action(), value.component(),
+                    value.data(), value.filterIdentity(), value.flags(), value.creatorPackage(), value.creatorUid(),
+                    value.requiredPermission(), value.ownerProcessName(), value.ownerGeneration(),
+                    value.packageRevision(), value.payload(), value.sends() + 1, cancelled,
+                    System.currentTimeMillis());
+            if (cancelled) records.remove(tokenId); else records.put(tokenId, updated);
+            return updated;
+        }
+
+        @Override public synchronized boolean cancel(String tokenId) { return records.remove(tokenId) != null; }
+        @Override public synchronized java.util.List<VirtualPendingIntentRegistry.DurableRecord> records() {
+            return java.util.List.copyOf(records.values());
+        }
+        private static VirtualPendingIntentRegistry.DurableRecord rebind(
+                VirtualPendingIntentRegistry.DurableRecord value,
+                VirtualPendingIntentRegistry.DurableRecord owner) {
+            return new VirtualPendingIntentRegistry.DurableRecord(value.tokenId(), value.kind(), value.requestCode(),
+                    value.action(), value.component(), value.data(), value.filterIdentity(), value.flags(),
+                    value.creatorPackage(), value.creatorUid(), value.requiredPermission(), owner.ownerProcessName(),
+                    owner.ownerGeneration(), value.packageRevision(), value.payload(), value.sends(),
+                    value.cancelled(), System.currentTimeMillis());
+        }
     }
 
     private static void require(boolean condition, String message) {

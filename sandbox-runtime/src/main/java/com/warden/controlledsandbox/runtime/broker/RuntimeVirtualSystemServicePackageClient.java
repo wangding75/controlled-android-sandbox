@@ -34,13 +34,13 @@ final class RuntimeVirtualSystemServicePackageClient implements AutoCloseable {
     }
 
     IVirtualSystemServiceSession open(IBinder clientToken, String packageName,
-                                      int virtualUserId, String processName, long generation) throws Exception {
+                                      int virtualUserId, int virtualUid, String processName, long generation, String packageRevision) throws Exception {
         if (!connected.await(10, TimeUnit.SECONDS) || root == null) {
             throw new IllegalStateException("Virtual system-service package authority is unavailable",
                     connectionFailure);
         }
         IVirtualSystemServiceSession session = root.openVirtualSystemServiceSession(
-                clientToken, packageName, virtualUserId, processName, generation);
+                clientToken, packageName, virtualUserId, virtualUid, processName, generation, packageRevision);
         if (session == null) throw new IllegalStateException("Package service returned no virtual system-service session");
         return session;
     }

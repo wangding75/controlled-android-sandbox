@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -58,6 +59,35 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<String, String> tokens = new LinkedHashMap<>();
         AccountRecord(String password) { this.password = safe(password); }
     }
+    private record PendingIntentKey(String kind, int requestCode, String filterIdentity) { }
+    private static final class PendingIntentRecord {
+        final String tokenId; final String kind; final int requestCode; final String action;
+        final String component; final String data; final String filterIdentity; int flags; final String creatorPackage;
+        final int creatorUid; String requiredPermission; String ownerProcessName;
+        long ownerGeneration; final String packageRevision; byte[] payload; int sends;
+        boolean cancelled; long updatedAtMs;
+        PendingIntentRecord(String tokenId, String kind, int requestCode, String action,
+                String component, String data, String filterIdentity, int flags, String creatorPackage, int creatorUid,
+                String requiredPermission, String ownerProcessName, long ownerGeneration,
+                String packageRevision, byte[] payload, int sends, boolean cancelled, long updatedAtMs) {
+            this.tokenId = required(tokenId, "pendingIntentTokenId");
+            this.kind = pendingIntentKind(kind);
+            if (requestCode < 0 || creatorUid < 0 || ownerGeneration < 0L || sends < 0) {
+                throw new IllegalArgumentException("invalid PendingIntent identity");
+            }
+            this.requestCode = requestCode; this.action = normalize(action);
+            this.component = normalize(component); this.data = normalize(data);
+            this.filterIdentity = required(filterIdentity, "pendingIntentFilterIdentity"); this.flags = flags;
+            this.creatorPackage = required(creatorPackage, "creatorPackage"); this.creatorUid = creatorUid;
+            this.requiredPermission = normalize(requiredPermission);
+            this.ownerProcessName = required(ownerProcessName, "ownerProcessName");
+            this.ownerGeneration = ownerGeneration; this.packageRevision = required(packageRevision, "packageRevision");
+            this.payload = boundedPayload(payload, "pendingIntentPayload"); this.sends = sends;
+            this.cancelled = cancelled; this.updatedAtMs = Math.max(0L, updatedAtMs);
+        }
+        PendingIntentKey key() { return new PendingIntentKey(kind, requestCode, filterIdentity); }
+    }
+
     private static final class AlarmRecord {
         final String id;
         long triggerAtMs;
@@ -117,6 +147,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private static final class ScopeState {
         byte[] clipboard = new byte[0];
         final Map<AccountKey, AccountRecord> accounts = new LinkedHashMap<>();
+        final Map<String, PendingIntentRecord> pendingIntents = new LinkedHashMap<>();
         final Map<String, AlarmRecord> alarms = new LinkedHashMap<>();
         final Map<String, NamespaceState> namespaces = new LinkedHashMap<>();
         final Map<NotificationKey, NotificationRecord> notifications = new LinkedHashMap<>();
@@ -124,10 +155,11 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    private static final int SCHEMA = 2;
+    private static final int SCHEMA = 3;
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     private static final int MAX_ACCOUNTS_PER_SCOPE = 64;
     private static final int MAX_TOKENS_PER_ACCOUNT = 32;
+    private static final int MAX_PENDING_INTENTS_PER_SCOPE = 512;
     private static final int MAX_ALARMS_PER_SCOPE = 256;
     private static final int MAX_NAMESPACE_MAPPINGS = 4096;
     private static final int MAX_NOTIFICATIONS_PER_SCOPE = 1024;
@@ -143,6 +175,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private final Set<Client> clients = new LinkedHashSet<>();
     private final Map<Integer, JobExecution> activeJobExecutions = new LinkedHashMap<>();
     private final AtomicLong nextJobDispatchToken = new AtomicLong(1L);
+    private long nextPendingIntentToken = 1L;
     private int nextNotificationHostId = 0x51000000;
     private int nextJobHostId = 0x52000000;
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -271,6 +304,85 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             changed |= item.getValue().tokens.values().removeIf(value -> java.util.Objects.equals(value, token));
         }
         if (changed) persistOrRestore(scope, before);
+    }
+
+
+    synchronized VirtualPendingIntentSnapshot reservePendingIntent(Scope scope, String processName,
+            long generation, String packageRevision, int expectedCreatorUid, VirtualPendingIntentSnapshot candidate,
+            boolean noCreate, boolean cancelCurrent, boolean updateCurrent) {
+        if (candidate == null) throw new IllegalArgumentException("PendingIntent candidate is required");
+        String revision = required(packageRevision, "packageRevision");
+        if (!candidate.creatorPackage().equals(scope.packageName())) {
+            throw new SecurityException("VIRTUAL_PENDING_INTENT_CREATOR_PACKAGE_MISMATCH");
+        }
+        if (candidate.creatorUid() != expectedCreatorUid) {
+            throw new SecurityException("VIRTUAL_PENDING_INTENT_CREATOR_UID_MISMATCH");
+        }
+        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        boolean prunedRevision = state.pendingIntents.values()
+                .removeIf(value -> !revision.equals(value.packageRevision));
+        PendingIntentKey key = pendingIntentKey(candidate);
+        PendingIntentRecord existing = findPendingIntent(state, key);
+        if (noCreate) {
+            if (existing == null) {
+                if (prunedRevision) persistOrRestore(scope, before);
+                return null;
+            }
+            boolean changed = rebindPendingIntent(existing, processName, generation);
+            if (changed || prunedRevision) persistOrRestore(scope, before);
+            return pendingIntentSnapshot(existing);
+        }
+        if (existing != null && cancelCurrent) {
+            existing.cancelled = true; state.pendingIntents.remove(existing.tokenId); existing = null;
+        }
+        if (existing != null) {
+            boolean changed = rebindPendingIntent(existing, processName, generation);
+            if (updateCurrent) {
+                existing.flags = candidate.flags();
+                existing.requiredPermission = normalize(candidate.requiredPermission());
+                existing.payload = boundedPayload(candidate.payload(), "pendingIntentPayload");
+                existing.updatedAtMs = System.currentTimeMillis(); changed = true;
+            }
+            if (changed) persistOrRestore(scope, before);
+            return pendingIntentSnapshot(existing);
+        }
+        if (state.pendingIntents.size() >= MAX_PENDING_INTENTS_PER_SCOPE) {
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_LIMIT_EXCEEDED");
+        }
+        String tokenId = "pi-" + Long.toUnsignedString(nextPendingIntentToken++, 36);
+        PendingIntentRecord created = new PendingIntentRecord(tokenId, candidate.kind(),
+                candidate.requestCode(), candidate.action(), candidate.component(), candidate.data(),
+                candidate.filterIdentity(), candidate.flags(), candidate.creatorPackage(), candidate.creatorUid(),
+                candidate.requiredPermission(), required(processName, "processName"), generation,
+                revision, candidate.payload(), 0, false, System.currentTimeMillis());
+        state.pendingIntents.put(tokenId, created); persistOrRestore(scope, before);
+        return pendingIntentSnapshot(created);
+    }
+    synchronized VirtualPendingIntentSnapshot markPendingIntentSent(Scope scope, String packageRevision,
+            String tokenId) {
+        ScopeState before = snapshot(scope); PendingIntentRecord record = requirePendingIntent(scope, packageRevision, tokenId);
+        record.sends++; record.updatedAtMs = System.currentTimeMillis();
+        boolean oneShot = (record.flags & 0x40000000) != 0;
+        if (oneShot) { record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId); }
+        persistOrRestore(scope, before); return pendingIntentSnapshot(record);
+    }
+    synchronized boolean cancelPendingIntent(Scope scope, String packageRevision, String tokenId) {
+        ScopeState before = snapshot(scope); PendingIntentRecord record = state(scope).pendingIntents.get(required(tokenId, "tokenId"));
+        if (record == null || !required(packageRevision, "packageRevision").equals(record.packageRevision)) return false;
+        record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId); persistOrRestore(scope, before); return true;
+    }
+    synchronized List<VirtualPendingIntentSnapshot> pendingIntents(Scope scope, String processName,
+            long generation, String packageRevision) {
+        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        List<VirtualPendingIntentSnapshot> out = new ArrayList<>(); boolean changed = false;
+        for (PendingIntentRecord record : state(scope).pendingIntents.values()) {
+            if (record.cancelled || !revision.equals(record.packageRevision)) continue;
+            changed |= rebindPendingIntent(record, processName, generation);
+            out.add(pendingIntentSnapshot(record));
+        }
+        if (changed) persistOrRestore(scope, before);
+        out.sort(Comparator.comparing(VirtualPendingIntentSnapshot::tokenId));
+        return Collections.unmodifiableList(out);
     }
 
     synchronized void scheduleAlarm(Scope scope, String processName, long generation,
@@ -743,6 +855,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             account.tokens.putAll(item.getValue().tokens);
             copy.accounts.put(item.getKey(), account);
         }
+        for (Map.Entry<String, PendingIntentRecord> item : current.pendingIntents.entrySet()) {
+            PendingIntentRecord value = item.getValue();
+            copy.pendingIntents.put(item.getKey(), new PendingIntentRecord(value.tokenId, value.kind,
+                    value.requestCode, value.action, value.component, value.data, value.filterIdentity, value.flags,
+                    value.creatorPackage, value.creatorUid, value.requiredPermission,
+                    value.ownerProcessName, value.ownerGeneration, value.packageRevision,
+                    value.payload, value.sends, value.cancelled, value.updatedAtMs));
+        }
         for (Map.Entry<String, AlarmRecord> item : current.alarms.entrySet()) {
             AlarmRecord alarm = item.getValue();
             AlarmRecord alarmCopy = new AlarmRecord(alarm.id, alarm.triggerAtMs, alarm.intervalMs,
@@ -803,6 +923,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (schema < 1 || schema > SCHEMA) throw new IllegalStateException("Unsupported virtual service schema");
             nextNotificationHostId = root.optInt("nextNotificationHostId", 0x51000000);
             nextJobHostId = root.optInt("nextJobHostId", 0x52000000);
+            nextPendingIntentToken = Math.max(1L, root.optLong("nextPendingIntentToken", 1L));
             JSONArray scopes = root.optJSONArray("scopes");
             if (scopes == null) return;
             for (int i = 0; i < scopes.length(); i++) {
@@ -818,6 +939,26 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     JSONObject tokens = account.optJSONObject("tokens");
                     if (tokens != null) for (String tokenType : tokens.keySet()) record.tokens.put(tokenType, tokens.optString(tokenType, ""));
                     state.accounts.put(key, record);
+                }
+                if (schema >= 3) {
+                    JSONArray pending = item.optJSONArray("pendingIntents");
+                    if (pending != null) for (int j = 0; j < pending.length(); j++) {
+                        JSONObject value = pending.getJSONObject(j);
+                        PendingIntentRecord record = new PendingIntentRecord(value.getString("tokenId"),
+                                value.getString("kind"), value.getInt("requestCode"),
+                                value.optString("action", ""), value.optString("component", ""),
+                                value.optString("data", ""), value.optString("filterIdentity",
+                                        "a=" + value.optString("action", "") + "|c="
+                                                + value.optString("component", "") + "|d="
+                                                + value.optString("data", "")), value.optInt("flags", 0),
+                                value.getString("creatorPackage"), value.getInt("creatorUid"),
+                                value.optString("requiredPermission", ""),
+                                value.optString("ownerProcessName", scope.packageName()),
+                                value.optLong("ownerGeneration", 0L), value.getString("packageRevision"),
+                                decode(value.optString("payload", "")), value.optInt("sends", 0),
+                                value.optBoolean("cancelled", false), value.optLong("updatedAtMs", 0L));
+                        if (!record.cancelled) state.pendingIntents.put(record.tokenId, record);
+                    }
                 }
                 JSONArray alarms = item.optJSONArray("alarms");
                 if (alarms != null) for (int j = 0; j < alarms.length(); j++) {
@@ -881,7 +1022,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         try {
             JSONObject root = new JSONObject().put("schemaVersion", SCHEMA)
                     .put("nextNotificationHostId", nextNotificationHostId)
-                    .put("nextJobHostId", nextJobHostId);
+                    .put("nextJobHostId", nextJobHostId)
+                    .put("nextPendingIntentToken", nextPendingIntentToken);
             JSONArray scopes = new JSONArray();
             List<Scope> keys = new ArrayList<>(states.keySet());
             keys.sort(Comparator.comparing(Scope::packageName).thenComparingInt(Scope::virtualUserId));
@@ -897,6 +1039,16 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                             .put("password", account.getValue().password).put("tokens", tokens));
                 }
                 item.put("accounts", accounts);
+                JSONArray pending = new JSONArray();
+                for (PendingIntentRecord value : state.pendingIntents.values()) pending.put(new JSONObject()
+                        .put("tokenId", value.tokenId).put("kind", value.kind).put("requestCode", value.requestCode)
+                        .put("action", value.action).put("component", value.component).put("data", value.data)
+                        .put("filterIdentity", value.filterIdentity).put("flags", value.flags).put("creatorPackage", value.creatorPackage)
+                        .put("creatorUid", value.creatorUid).put("requiredPermission", value.requiredPermission)
+                        .put("ownerProcessName", value.ownerProcessName).put("ownerGeneration", value.ownerGeneration)
+                        .put("packageRevision", value.packageRevision).put("payload", encode(value.payload))
+                        .put("sends", value.sends).put("cancelled", value.cancelled).put("updatedAtMs", value.updatedAtMs));
+                item.put("pendingIntents", pending);
                 JSONArray alarms = new JSONArray();
                 for (AlarmRecord alarm : state.alarms.values()) alarms.put(new JSONObject().put("id", alarm.id)
                         .put("triggerAtMs", alarm.triggerAtMs).put("intervalMs", alarm.intervalMs)
@@ -989,6 +1141,47 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             }
         }
     }
+    private static PendingIntentKey pendingIntentKey(VirtualPendingIntentSnapshot value) {
+        return new PendingIntentKey(pendingIntentKind(value.kind()), value.requestCode(),
+                required(value.filterIdentity(), "pendingIntentFilterIdentity"));
+    }
+    private static PendingIntentRecord findPendingIntent(ScopeState state, PendingIntentKey key) {
+        for (PendingIntentRecord value : state.pendingIntents.values()) {
+            if (!value.cancelled && value.key().equals(key)) return value;
+        }
+        return null;
+    }
+    private PendingIntentRecord requirePendingIntent(Scope scope, String packageRevision, String tokenId) {
+        PendingIntentRecord record = state(scope).pendingIntents.get(required(tokenId, "tokenId"));
+        if (record == null || record.cancelled) throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+        if (!required(packageRevision, "packageRevision").equals(record.packageRevision)) {
+            throw new SecurityException("VIRTUAL_PENDING_INTENT_REVISION_MISMATCH");
+        }
+        return record;
+    }
+    private static boolean rebindPendingIntent(PendingIntentRecord record, String processName, long generation) {
+        String owner = required(processName, "processName");
+        if (record.ownerProcessName.equals(owner) && record.ownerGeneration == generation) return false;
+        record.ownerProcessName = owner; record.ownerGeneration = generation;
+        record.updatedAtMs = System.currentTimeMillis(); return true;
+    }
+    private static String pendingIntentKind(String value) {
+        String normalized = required(value, "pendingIntentKind").toUpperCase(java.util.Locale.ROOT);
+        return switch (normalized) {
+            case VirtualPendingIntentSnapshot.BROADCAST, VirtualPendingIntentSnapshot.ACTIVITY,
+                    VirtualPendingIntentSnapshot.ACTIVITY_RESULT, VirtualPendingIntentSnapshot.SERVICE,
+                    VirtualPendingIntentSnapshot.FOREGROUND_SERVICE -> normalized;
+            default -> throw new IllegalArgumentException("invalid PendingIntent kind");
+        };
+    }
+    private static VirtualPendingIntentSnapshot pendingIntentSnapshot(PendingIntentRecord value) {
+        return new VirtualPendingIntentSnapshot(value.tokenId, value.kind, value.requestCode,
+                value.action, value.component, value.data, value.filterIdentity, value.flags, value.creatorPackage,
+                value.creatorUid, value.requiredPermission, value.ownerProcessName,
+                value.ownerGeneration, value.packageRevision, value.payload, value.sends,
+                value.cancelled, value.updatedAtMs);
+    }
+
     private static NotificationKey notificationKey(int guestId, String guestTag) {
         if (guestId < 0) throw new IllegalArgumentException("guestId must be non-negative");
         return new NotificationKey(guestId, normalizeTag(guestTag));

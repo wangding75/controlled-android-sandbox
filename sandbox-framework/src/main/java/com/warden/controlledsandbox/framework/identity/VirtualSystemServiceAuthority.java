@@ -6,6 +6,11 @@ import java.util.List;
 public interface VirtualSystemServiceAuthority extends AutoCloseable {
     record AccountRecord(String name, String type, String password,
                          java.util.Map<String, String> tokens) { }
+    record PendingIntentRecord(String tokenId, String kind, int requestCode, String action,
+                               String component, String data, String filterIdentity, int flags, String creatorPackage,
+                               int creatorUid, String requiredPermission, String ownerProcessName,
+                               long ownerGeneration, String packageRevision, Object payload,
+                               int sends, boolean cancelled, long updatedAtMs) { }
     record AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, Object token) { }
     record NamespaceMapping(int hostId, boolean created) { }
     record NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
@@ -48,6 +53,16 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     void setToken(String name, String type, String tokenType, String token);
     String token(String name, String type, String tokenType);
     void invalidateToken(String accountType, String token);
+
+    default PendingIntentRecord reservePendingIntent(PendingIntentRecord candidate,
+            boolean noCreate, boolean cancelCurrent, boolean updateCurrent) {
+        throw new UnsupportedOperationException("pending-intent authority");
+    }
+    default PendingIntentRecord markPendingIntentSent(String tokenId) {
+        throw new UnsupportedOperationException("pending-intent authority");
+    }
+    default boolean cancelPendingIntent(String tokenId) { return false; }
+    default List<PendingIntentRecord> pendingIntents() { return List.of(); }
 
     void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, Object token, Runnable delivery);
     boolean cancelAlarm(String alarmId);

@@ -27,18 +27,18 @@ def require(relative: str, *tokens: str) -> str:
 root_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
     "IVirtualSystemServiceSession openVirtualSystemServiceSession(",
-    "String processName", "long generation")
+    "int virtualUid", "String processName", "long generation", "String packageRevision")
 session_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceSession.aidl",
     "byte[] getClipboard()", "List<VirtualAccountSnapshot> listAccounts",
-    "void scheduleAlarm", "int ensureNamespace", "reserveNotification", "reserveJob", "void close()")
+    "reservePendingIntent", "listPendingIntents", "void scheduleAlarm", "int ensureNamespace", "reserveNotification", "reserveJob", "void close()")
 observer_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IVirtualSystemServiceObserver.aidl",
     "interface IVirtualSystemServiceObserver", "onClipboardChanged", "onAlarm", "boolean onJobStart", "boolean onJobStop")
 for aidl in [root_aidl, session_aidl, observer_aidl]:
     if "Bundle" in aidl:
         errors.append("M4-T11 virtual system-service AIDL must not use Bundle")
-for name in ["VirtualAccountSnapshot", "VirtualAlarmSnapshot", "VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot", "VirtualJobSnapshot"]:
+for name in ["VirtualAccountSnapshot", "VirtualAlarmSnapshot", "VirtualPendingIntentSnapshot", "VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot", "VirtualJobSnapshot"]:
     require(f"sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl",
             f"parcelable {name}")
     source = require(f"sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java",
@@ -50,7 +50,7 @@ store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
     '"sandbox-system-services.json"', "class VirtualSystemServiceStore",
     "ownerProcessName", "ownerGeneration", "deleteScopeBestEffort",
-    "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_ALARMS_PER_SCOPE",
+    "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_PENDING_INTENTS_PER_SCOPE", "MAX_ALARMS_PER_SCOPE",
     "MAX_NAMESPACE_MAPPINGS", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE", "ensureNamespace", "notifyClipboard", "RETRY_WITHOUT_CLIENT_MS")
 if "client.processName().equals(alarm.ownerProcessName)" not in store:
     errors.append("alarm delivery must be bound to the owning virtual process")

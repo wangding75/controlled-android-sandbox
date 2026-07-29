@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
 import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import java.util.List;
@@ -170,6 +171,22 @@ public final class PackageServiceContractSelfTest {
         require("alice".equals(restoredAccount.name())
                         && restoredAccount.tokens().equals(List.of("token")),
                 "virtual account snapshot lost");
+
+        VirtualPendingIntentSnapshot pendingIntent = new VirtualPendingIntentSnapshot(
+                "pi-7", VirtualPendingIntentSnapshot.ACTIVITY_RESULT, 17, "guest.RESULT",
+                "activity-token", "content://guest/result", "a=guest.RESULT|c=activity-token|d=content://guest/result", 0x02000000, "com.example.fixture",
+                12003, "guest.permission.RESULT", "com.example.fixture", 9L,
+                "revision-7", new byte[]{7, 1}, 2, false, 111L);
+        Parcel pendingIntentParcel = Parcel.obtain();
+        pendingIntent.writeToParcel(pendingIntentParcel, 0); pendingIntentParcel.setDataPosition(0);
+        VirtualPendingIntentSnapshot restoredPendingIntent = VirtualPendingIntentSnapshot.CREATOR
+                .createFromParcel(pendingIntentParcel);
+        pendingIntentParcel.recycle();
+        require("pi-7".equals(restoredPendingIntent.tokenId())
+                        && restoredPendingIntent.creatorUid() == 12003
+                        && restoredPendingIntent.ownerGeneration() == 9L
+                        && java.util.Arrays.equals(new byte[]{7, 1}, restoredPendingIntent.payload()),
+                "virtual PendingIntent snapshot lost");
 
         VirtualAlarmSnapshot alarm = new VirtualAlarmSnapshot("a7", 123L, 456L, new byte[]{1, 2, 3});
         Parcel alarmParcel = Parcel.obtain();

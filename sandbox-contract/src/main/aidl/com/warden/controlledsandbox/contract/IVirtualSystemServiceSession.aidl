@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.contract;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
@@ -21,6 +22,12 @@ interface IVirtualSystemServiceSession {
     void setAuthToken(String name, String type, String tokenType, String token);
     String peekAuthToken(String name, String type, String tokenType);
     void invalidateAuthToken(String accountType, String token);
+
+    VirtualPendingIntentSnapshot reservePendingIntent(in VirtualPendingIntentSnapshot candidate,
+            boolean noCreate, boolean cancelCurrent, boolean updateCurrent);
+    VirtualPendingIntentSnapshot markPendingIntentSent(String tokenId);
+    boolean cancelPendingIntent(String tokenId);
+    List<VirtualPendingIntentSnapshot> listPendingIntents();
 
     void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);
     boolean cancelAlarm(String alarmId);

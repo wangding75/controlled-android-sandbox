@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import java.io.File;
 
@@ -64,8 +65,8 @@ public final class PackageManagementService extends Service {
         }
 
         @Override public IVirtualSystemServiceSession openVirtualSystemServiceSession(
-                IBinder clientToken, String packageName, int virtualUserId,
-                String processName, long generation) {
+                IBinder clientToken, String packageName, int virtualUserId, int virtualUid,
+                String processName, long generation, String packageRevision) {
             if (clientToken == null || !clientToken.isBinderAlive()) {
                 throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_REQUIRED");
             }
@@ -88,8 +89,8 @@ public final class PackageManagementService extends Service {
             }
             VirtualSystemServiceSession session = new VirtualSystemServiceSession(
                     Binder.getCallingUid(), clientToken,
-                    new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId),
-                    required(processName, "processName"), generation);
+                    new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId), virtualUid,
+                    required(processName, "processName"), generation, required(packageRevision, "packageRevision"));
             try { clientToken.linkToDeath(session, 0); }
             catch (Exception error) {
                 throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_DEAD", error);
@@ -506,18 +507,20 @@ public final class PackageManagementService extends Service {
         private final int ownerUid;
         private final IBinder clientToken;
         private final VirtualSystemServiceStore.Scope scope;
+        private final int virtualUid;
         private final String processName;
         private final long generation;
+        private final String packageRevision;
         private volatile boolean active = true;
         private volatile IVirtualSystemServiceObserver observer;
 
         VirtualSystemServiceSession(int ownerUid, IBinder clientToken,
-                                    VirtualSystemServiceStore.Scope scope,
-                                    String processName, long generation) {
-            if (generation < 1L) throw new IllegalArgumentException("generation must be positive");
+                                    VirtualSystemServiceStore.Scope scope, int virtualUid,
+                                    String processName, long generation, String packageRevision) {
+            if (generation < 1L || virtualUid < 0) throw new IllegalArgumentException("virtual identity is invalid");
             this.ownerUid = ownerUid; this.clientToken = clientToken;
-            this.scope = scope; this.processName = required(processName, "processName");
-            this.generation = generation;
+            this.scope = scope; this.virtualUid = virtualUid; this.processName = required(processName, "processName");
+            this.generation = generation; this.packageRevision = required(packageRevision, "packageRevision");
         }
         @Override public byte[] getClipboard() { requireCapability(); return systemServices.clipboard(scope); }
         @Override public void setClipboard(byte[] payload) { requireCapability(); systemServices.setClipboard(scope, payload); }
@@ -548,6 +551,21 @@ public final class PackageManagementService extends Service {
         }
         @Override public void invalidateAuthToken(String accountType, String token) {
             requireCapability(); systemServices.invalidateToken(scope, accountType, token);
+        }
+        @Override public VirtualPendingIntentSnapshot reservePendingIntent(
+                VirtualPendingIntentSnapshot candidate, boolean noCreate,
+                boolean cancelCurrent, boolean updateCurrent) {
+            requireCapability(); return systemServices.reservePendingIntent(scope, processName,
+                    generation, packageRevision, virtualUid, candidate, noCreate, cancelCurrent, updateCurrent);
+        }
+        @Override public VirtualPendingIntentSnapshot markPendingIntentSent(String tokenId) {
+            requireCapability(); return systemServices.markPendingIntentSent(scope, packageRevision, tokenId);
+        }
+        @Override public boolean cancelPendingIntent(String tokenId) {
+            requireCapability(); return systemServices.cancelPendingIntent(scope, packageRevision, tokenId);
+        }
+        @Override public java.util.List<VirtualPendingIntentSnapshot> listPendingIntents() {
+            requireCapability(); return systemServices.pendingIntents(scope, processName, generation, packageRevision);
         }
         @Override public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, byte[] tokenPayload) {
             requireCapability(); systemServices.scheduleAlarm(scope, processName, generation,

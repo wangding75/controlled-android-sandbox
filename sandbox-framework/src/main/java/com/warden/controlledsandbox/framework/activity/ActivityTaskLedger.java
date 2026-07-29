@@ -290,6 +290,21 @@ public final class ActivityTaskLedger {
                 : Optional.of(new ActivityResultRegistration(key, requestCode));
     }
 
+    public synchronized boolean deliverActivityResult(String callerActivityToken,
+            String resultWho, int requestCode, int resultCode, String intentSenderToken,
+            ResultIntentSnapshot resultIntent) {
+        MutableActivity caller = requireActivity(callerActivityToken);
+        if (requestCode < 0 || requestCode > 0xffff) {
+            throw new IllegalArgumentException("requestCode must be 0..65535");
+        }
+        ActivityResultDelivery delivery = new ActivityResultDelivery(caller.token,
+                "intent-sender:" + requireBoundedText(intentSenderToken, "intentSenderToken", 512),
+                normalizeOptional(resultWho), "", requestCode, resultCode,
+                intentSenderToken, "", Objects.requireNonNull(resultIntent, "resultIntent"));
+        resultDeliveriesByCaller.computeIfAbsent(caller.token, ignored -> new ArrayList<>()).add(delivery);
+        return true;
+    }
+
     public synchronized List<ActivityResultDelivery> drainActivityResults(String callerActivityToken) {
         MutableActivity caller = requireActivity(callerActivityToken);
         List<ActivityResultDelivery> deliveries = resultDeliveriesByCaller.remove(caller.token);

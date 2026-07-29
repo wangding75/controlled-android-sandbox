@@ -1,35 +1,90 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class PendingIntentFrameworkInterceptorSelfTest {
     public static void main(String[] args) throws Throwable {
         Bundle specBundle = TestGuestSpecFactory.bundle();
         GuestPackageSpec spec = new GuestPackageSpec(specBundle);
+        VirtualSystemServiceState durableState = new VirtualSystemServiceState();
         AtomicInteger deliveries = new AtomicInteger();
+        AtomicReference<VirtualPendingIntentRegistry.Record> delivered = new AtomicReference<>();
+        AtomicReference<VirtualPendingIntentRegistry.SendRequest> request = new AtomicReference<>();
         PendingIntentFrameworkInterceptor interceptor = new PendingIntentFrameworkInterceptor(
-                spec, (record, fillIn) -> deliveries.incrementAndGet());
+                spec, durableState.pendingIntents(), token -> "activity-token-7",
+                (record, value) -> { delivered.set(record); request.set(value); return deliveries.incrementAndGet(); });
+
         Method create = FakeAms.class.getMethod("getIntentSender", int.class, String.class,
-                int.class, Intent[].class, int.class, int.class);
+                int.class, Intent[].class, int.class, int.class, String.class);
         Intent intent = new Intent("guest.ACTION").setComponent(
-                new ComponentName(spec.packageName, "guest.pkg.Receiver"));
+                new ComponentName(spec.packageName, "guest.pkg.Receiver"))
+                .setDataAndType(Uri.parse("content://guest/item/7"), "text/plain")
+                .setPackage(spec.packageName).addCategory("guest.CATEGORY")
+                .putExtra("base", "payload");
         Object[] createArgs = {1, spec.packageName, 7, new Intent[]{intent},
-                VirtualPendingIntentRegistry.FLAG_UPDATE_CURRENT, spec.virtualUserId};
+                VirtualPendingIntentRegistry.FLAG_UPDATE_CURRENT
+                        | VirtualPendingIntentRegistry.FLAG_MUTABLE,
+                spec.virtualUserId, "guest.permission.SEND"};
         FrameworkCallInterceptor.Interception created = interceptor.intercept(
                 "activity-manager", create, createArgs);
         require(created.handled() && created.result() instanceof FakeIntentSender,
                 "virtual sender created");
         FakeIntentSender sender = (FakeIntentSender) created.result();
-        require(sender.asBinder() != null && sender.send(null) == 1 && deliveries.get() == 1,
+
+        Intent equivalentIntent = new Intent(intent).putExtra("base", "updated");
+        FakeIntentSender equivalent = (FakeIntentSender) interceptor.intercept(
+                "activity-manager", create, new Object[]{1, spec.packageName, 7,
+                        new Intent[]{equivalentIntent}, VirtualPendingIntentRegistry.FLAG_UPDATE_CURRENT
+                                | VirtualPendingIntentRegistry.FLAG_MUTABLE,
+                        spec.virtualUserId, "guest.permission.SEND"}).result();
+        require(sender == equivalent && sender.equals(equivalent)
+                        && sender.hashCode() == equivalent.hashCode(),
+                "PendingIntent equality ignores extras and reuses filter identity");
+
+        Intent differentType = new Intent(intent).setType("application/json");
+        FakeIntentSender distinct = (FakeIntentSender) interceptor.intercept(
+                "activity-manager", create, new Object[]{1, spec.packageName, 7,
+                        new Intent[]{differentType}, VirtualPendingIntentRegistry.FLAG_MUTABLE,
+                        spec.virtualUserId, "guest.permission.SEND"}).result();
+        require(distinct != sender && !sender.equals(distinct),
+                "MIME type participates in PendingIntent equality");
+
+        Intent fillIn = new Intent().putExtra("fill", "value")
+                .setClipData(ClipData.newRawUri("guest-clip", Uri.parse("content://guest/clip")));
+        require(sender.asBinder() != null
+                        && sender.send(fillIn, 0x30, 0x20, "guest.permission.SEND") == 1
+                        && deliveries.get() == 1,
                 "virtual sender dispatches through runtime callback");
+        require(request.get().fillInPayload() == fillIn && request.get().flagsMask() == 0x30
+                        && request.get().flagsValues() == 0x20,
+                "mutable FillIn Intent and flag mask reach delivery policy");
+        Intent merged = GuestPendingIntentDispatcher.selectedIntent(delivered.get().payload(), request.get());
+        require("payload".equals(merged.getStringExtra("base"))
+                        || "updated".equals(merged.getStringExtra("base")),
+                "base extras survive PendingIntent dispatch");
+        require("value".equals(merged.getStringExtra("fill"))
+                        && merged.getClipData() != null
+                        && merged.getClipData().getItemCount() == 1
+                        && merged.getFlags() == 0x20,
+                "FillIn extras, ClipData and flags are merged");
+
+        boolean permissionDenied = false;
+        try { sender.send(null, 0, 0, "guest.permission.WRONG"); }
+        catch (SecurityException expected) { permissionDenied = true; }
+        require(permissionDenied, "sender permission is enforced");
 
         Method packageQuery = FakeAms.class.getMethod("getPackageForIntentSender", FakeIntentSender.class);
         FrameworkCallInterceptor.Interception packageResult = interceptor.intercept(
@@ -39,26 +94,67 @@ public final class PendingIntentFrameworkInterceptorSelfTest {
         Method uidQuery = FakeAms.class.getMethod("getUidForIntentSender", FakeIntentSender.class);
         require(((Integer) interceptor.intercept("activity-manager", uidQuery,
                 new Object[]{sender}).result()) == spec.virtualUid, "sender UID remains virtual");
+        Method flagsQuery = FakeAms.class.getMethod("getFlagsForIntentSender", FakeIntentSender.class);
+        require((((Integer) interceptor.intercept("activity-manager", flagsQuery,
+                new Object[]{sender}).result()) & VirtualPendingIntentRegistry.FLAG_MUTABLE) != 0,
+                "sender flags query returns virtual flags");
+
+        Method createResult = FakeAms.class.getMethod("getIntentSenderResult", int.class,
+                String.class, IBinder.class, int.class, Intent[].class, int.class, int.class);
+        FakeIntentSender resultSender = (FakeIntentSender) interceptor.intercept(
+                "activity-task-manager", createResult, new Object[]{3, spec.packageName,
+                        new Binder(), 19, new Intent[]{new Intent("guest.RESULT")},
+                        VirtualPendingIntentRegistry.FLAG_MUTABLE, spec.virtualUserId}).result();
+        resultSender.send(new Intent("guest.RESULT.FILL"), 0, 0, "");
+        require(delivered.get().spec().kind() == VirtualPendingIntentRegistry.Kind.ACTIVITY_RESULT
+                        && "activity-token-7".equals(delivered.get().spec().component()),
+                "Activity Result PendingIntent binds virtual Activity token");
+
+        Object immutableCreated = interceptor.intercept("activity-manager", create,
+                new Object[]{1, spec.packageName, 28, new Intent[]{new Intent("guest.IMMUTABLE")},
+                        VirtualPendingIntentRegistry.FLAG_IMMUTABLE, spec.virtualUserId, ""}).result();
+        boolean immutableDenied = false;
+        try { ((FakeIntentSender) immutableCreated).send(new Intent("fill"), 0, 0, ""); }
+        catch (SecurityException expected) { immutableDenied = true; }
+        require(immutableDenied, "immutable sender rejects FillIn Intent");
+
+        require(durableState.pendingIntents().records().size() >= 4,
+                "PendingIntent tokens are stored outside Guest process");
+        interceptor.close();
+        require(durableState.pendingIntents().records().size() >= 4,
+                "Guest process close does not delete durable tokens");
+
+        PendingIntentFrameworkInterceptor recovered = new PendingIntentFrameworkInterceptor(
+                spec, durableState.pendingIntents(), token -> "activity-token-7", (record, value) -> 9);
+        FakeIntentSender recoveredSender = (FakeIntentSender) recovered.intercept(
+                "activity-manager", create, createArgs).result();
+        require(recoveredSender.send(null, 0, 0, "guest.permission.SEND") == 9,
+                "persistent sender is reattached after Guest process recreation");
 
         Method cancel = FakeAms.class.getMethod("cancelIntentSender", FakeIntentSender.class);
-        interceptor.intercept("activity-manager", cancel, new Object[]{sender});
+        recovered.intercept("activity-manager", cancel, new Object[]{recoveredSender});
         boolean rejected = false;
-        try { sender.send(null); } catch (IllegalStateException expected) { rejected = true; }
-        require(rejected && interceptor.snapshot().active() == 0, "cancelled sender cannot dispatch");
-        interceptor.close();
+        try { recoveredSender.send(null, 0, 0, "guest.permission.SEND"); }
+        catch (IllegalStateException expected) { rejected = true; }
+        require(rejected, "cancelled sender cannot dispatch");
+        recovered.close();
+        durableState.close();
         System.out.println("PASS runtime PendingIntent framework routing self-test");
     }
 
     public interface FakeIntentSender {
         IBinder asBinder();
-        int send(Intent fillIn) throws Exception;
+        int send(Intent fillIn, int flagsMask, int flagsValues, String permission) throws Exception;
     }
     public interface FakeAms {
         FakeIntentSender getIntentSender(int type, String packageName, int requestCode,
-                                        Intent[] intents, int flags, int userId);
+                                        Intent[] intents, int flags, int userId, String permission);
+        FakeIntentSender getIntentSenderResult(int type, String packageName, IBinder activityToken,
+                                              int requestCode, Intent[] intents, int flags, int userId);
         void cancelIntentSender(FakeIntentSender sender);
         String getPackageForIntentSender(FakeIntentSender sender);
         int getUidForIntentSender(FakeIntentSender sender);
+        int getFlagsForIntentSender(FakeIntentSender sender);
     }
 
     private static void require(boolean condition, String message) {

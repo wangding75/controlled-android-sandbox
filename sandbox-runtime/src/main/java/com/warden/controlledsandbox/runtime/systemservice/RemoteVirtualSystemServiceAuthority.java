@@ -10,6 +10,7 @@ import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.util.ArrayList;
@@ -94,6 +95,32 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     @Override public void invalidateToken(String accountType, String token) {
         call(() -> { session.invalidateAuthToken(accountType, token); return null; });
+    }
+
+    @Override public PendingIntentRecord reservePendingIntent(PendingIntentRecord candidate,
+            boolean noCreate, boolean cancelCurrent, boolean updateCurrent) {
+        VirtualPendingIntentSnapshot value = new VirtualPendingIntentSnapshot(candidate.tokenId(),
+                candidate.kind(), candidate.requestCode(), candidate.action(), candidate.component(),
+                candidate.data(), candidate.filterIdentity(), candidate.flags(), candidate.creatorPackage(), candidate.creatorUid(),
+                candidate.requiredPermission(), candidate.ownerProcessName(), candidate.ownerGeneration(),
+                candidate.packageRevision(), marshal(candidate.payload()), candidate.sends(),
+                candidate.cancelled(), candidate.updatedAtMs());
+        VirtualPendingIntentSnapshot result = call(() -> session.reservePendingIntent(
+                value, noCreate, cancelCurrent, updateCurrent));
+        return result == null ? null : pendingIntent(result);
+    }
+    @Override public PendingIntentRecord markPendingIntentSent(String tokenId) {
+        VirtualPendingIntentSnapshot value = call(() -> session.markPendingIntentSent(tokenId));
+        return value == null ? null : pendingIntent(value);
+    }
+    @Override public boolean cancelPendingIntent(String tokenId) {
+        return call(() -> session.cancelPendingIntent(tokenId));
+    }
+    @Override public List<PendingIntentRecord> pendingIntents() {
+        List<VirtualPendingIntentSnapshot> values = call(session::listPendingIntents);
+        List<PendingIntentRecord> out = new ArrayList<>();
+        if (values != null) for (VirtualPendingIntentSnapshot value : values) out.add(pendingIntent(value));
+        return Collections.unmodifiableList(out);
     }
 
     @Override public void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs,
@@ -229,6 +256,13 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         catch (Exception error) { throw new IllegalStateException("VIRTUAL_JOB_EXECUTION_REMOTE_FAILURE", error); }
     }
 
+    private PendingIntentRecord pendingIntent(VirtualPendingIntentSnapshot value) {
+        return new PendingIntentRecord(value.tokenId(), value.kind(), value.requestCode(),
+                value.action(), value.component(), value.data(), value.filterIdentity(), value.flags(), value.creatorPackage(),
+                value.creatorUid(), value.requiredPermission(), value.ownerProcessName(),
+                value.ownerGeneration(), value.packageRevision(), unmarshal(value.payload()),
+                value.sends(), value.cancelled(), value.updatedAtMs());
+    }
     private NotificationRecord notification(VirtualNotificationSnapshot value) {
         return new NotificationRecord(value.guestId(), value.hostId(), value.guestTag(), value.hostTag(),
                 value.channelId(), value.state(), unmarshal(value.payload()), value.updatedAtMs());

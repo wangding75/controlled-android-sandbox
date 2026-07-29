@@ -6,6 +6,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -18,19 +19,32 @@ import java.util.Map;
 
 /** Intercepts AMS/ATMS PendingIntent sender creation and keeps Guest identity out of host sender metadata. */
 final class PendingIntentFrameworkInterceptor implements FrameworkCallInterceptor, AutoCloseable {
+    @FunctionalInterface interface ActivityTokenResolver {
+        String resolve(IBinder frameworkToken);
+    }
     @FunctionalInterface interface Dispatcher {
-        int dispatch(VirtualPendingIntentRegistry.Record record, Intent fillInIntent) throws Exception;
+        int dispatch(VirtualPendingIntentRegistry.Record record,
+                     VirtualPendingIntentRegistry.SendRequest request) throws Exception;
     }
 
     private final GuestPackageSpec spec;
     private final VirtualPendingIntentRegistry registry;
+    private final ActivityTokenResolver activityTokenResolver;
     private final Map<Object, Object> proxies = new IdentityHashMap<>();
 
     PendingIntentFrameworkInterceptor(GuestPackageSpec spec, Dispatcher dispatcher) {
+        this(spec, null, token -> { throw new SecurityException("VIRTUAL_ACTIVITY_FRAMEWORK_TOKEN_UNKNOWN"); }, dispatcher);
+    }
+
+    PendingIntentFrameworkInterceptor(GuestPackageSpec spec,
+            VirtualSystemServiceState.PendingIntentState persistence,
+            ActivityTokenResolver activityTokenResolver, Dispatcher dispatcher) {
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
+        this.activityTokenResolver = java.util.Objects.requireNonNull(activityTokenResolver, "activityTokenResolver");
         this.registry = new VirtualPendingIntentRegistry(spec.packageName, spec.virtualUserId,
-                spec.generation, (record, fillIn) -> dispatcher.dispatch(record,
-                        fillIn instanceof Intent ? (Intent) fillIn : null));
+                spec.virtualUid, spec.generation, spec.processName, spec.packageRevision,
+                persistence == null ? null : new PendingIntentPersistenceAdapter(persistence),
+                dispatcher::dispatch);
     }
 
     @Override public synchronized Interception intercept(String serviceName, Method method, Object[] arguments)
@@ -47,7 +61,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         if (name.startsWith("sendintentsender")) {
             Object token = senderToken(arguments);
             if (token == null) return Interception.passThrough();
-            int result = registry.send(token, firstIntent(arguments));
+            int result = registry.send(token, sendRequest(arguments));
             return Interception.handled(returnFor(method.getReturnType(), result));
         }
         if (name.startsWith("getpackageforintentsender")) {
@@ -55,6 +69,10 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         }
         if (name.startsWith("getuidforintentsender")) {
             return senderToken(arguments) == null ? Interception.passThrough() : Interception.handled(spec.virtualUid);
+        }
+        if (name.startsWith("getflagsforintentsender")) {
+            Object token = senderToken(arguments); VirtualPendingIntentRegistry.Record record = registry.find(token);
+            return record == null ? Interception.passThrough() : Interception.handled(record.spec().flags());
         }
         if (name.startsWith("isintentsendertargetedtopackage")) {
             return senderToken(arguments) == null ? Interception.passThrough() : Interception.handled(Boolean.TRUE);
@@ -105,14 +123,18 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             if (method.getDeclaringClass() == Object.class) {
                 return switch (name) {
                     case "toString" -> "VirtualIntentSender[" + spec.packageName + ",u" + spec.virtualUserId + "]";
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "equals" -> proxy == (arguments == null || arguments.length == 0 ? null : arguments[0]);
+                    case "hashCode" -> registry.find(token).persistentTokenId().hashCode();
+                    case "equals" -> {
+                        Object other = arguments == null || arguments.length == 0 ? null : arguments[0];
+                        Object otherToken = senderToken(new Object[]{other});
+                        yield otherToken != null && registry.equivalent(token, otherToken);
+                    }
                     default -> null;
                 };
             }
             if (name.equals("asBinder")) return token;
             if (name.toLowerCase(Locale.ROOT).startsWith("send")) {
-                int result = registry.send(token, firstIntent(arguments));
+                int result = registry.send(token, sendRequest(arguments));
                 return returnFor(method.getReturnType(), result);
             }
             throw new SecurityException("VIRTUAL_PENDING_INTENT_SENDER_SIGNATURE_UNSUPPORTED:" + name);
@@ -130,10 +152,56 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         Intent intent = intents.length == 0 ? new Intent() : intents[intents.length - 1];
         ComponentName component = intent.getComponent();
         String componentName = component == null ? "" : component.getClassName();
+        if (kind(type) == VirtualPendingIntentRegistry.Kind.ACTIVITY_RESULT) {
+            componentName = activityResultTarget(arguments);
+        }
         String data = intent.getData() == null ? "" : intent.getData().toString();
         VirtualPendingIntentRegistry.Spec senderSpec = new VirtualPendingIntentRegistry.Spec(kind(type),
-                requestCode, intent.getAction(), componentName, data, flags);
+                requestCode, intent.getAction(), componentName, data, filterIdentity(intent), flags,
+                requiredPermission(arguments));
         return new Parsed(senderSpec, intents);
+    }
+
+    private String activityResultTarget(Object[] arguments) {
+        if (arguments != null) for (Object value : arguments) {
+            if (value instanceof IBinder binder && registry.find(value) == null) {
+                return activityTokenResolver.resolve(binder);
+            }
+        }
+        throw new SecurityException("VIRTUAL_PENDING_INTENT_ACTIVITY_RESULT_TARGET_REQUIRED");
+    }
+
+    private static String filterIdentity(Intent intent) {
+        StringBuilder out = new StringBuilder(160);
+        out.append("a=").append(normalizeIdentity(intent.getAction()));
+        out.append("|d=").append(intent.getData() == null ? "" : intent.getData());
+        out.append("|t=").append(normalizeIdentity(intent.getType()));
+        out.append("|p=").append(normalizeIdentity(intent.getPackage()));
+        ComponentName component = intent.getComponent();
+        out.append("|c=");
+        if (component != null) {
+            out.append(normalizeIdentity(component.getPackageName())).append('/')
+                    .append(normalizeIdentity(component.getClassName()));
+        }
+        java.util.Set<String> categories = intent.getCategories();
+        if (categories != null && !categories.isEmpty()) {
+            java.util.List<String> sorted = new java.util.ArrayList<>(categories);
+            java.util.Collections.sort(sorted);
+            out.append("|g=").append(String.join(",", sorted));
+        } else {
+            out.append("|g=");
+        }
+        try {
+            Object identifier = Intent.class.getMethod("getIdentifier").invoke(intent);
+            out.append("|i=").append(identifier == null ? "" : identifier);
+        } catch (ReflectiveOperationException ignored) {
+            out.append("|i=");
+        }
+        return out.toString();
+    }
+
+    private static String normalizeIdentity(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static VirtualPendingIntentRegistry.Kind kind(int type) {
@@ -193,6 +261,27 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         }
         return null;
     }
+    private static VirtualPendingIntentRegistry.SendRequest sendRequest(Object[] arguments) {
+        Intent fillIn = firstIntent(arguments);
+        List<Integer> integers = new ArrayList<>();
+        if (arguments != null) for (Object value : arguments) if (value instanceof Integer) integers.add((Integer) value);
+        int mask = integers.size() >= 2 ? integers.get(integers.size() - 2) : 0;
+        int values = integers.size() >= 1 ? integers.get(integers.size() - 1) : 0;
+        return new VirtualPendingIntentRegistry.SendRequest(fillIn, mask, values,
+                requiredPermission(arguments), -1);
+    }
+    private static String requiredPermission(Object[] arguments) {
+        if (arguments == null) return "";
+        for (Object value : arguments) {
+            if (!(value instanceof String text)) continue;
+            String normalized = text.trim();
+            if (normalized.startsWith("android.permission.") || normalized.contains(".permission.")) {
+                return normalized;
+            }
+        }
+        return "";
+    }
+
     private static Object returnFor(Class<?> type, int result) {
         if (type == void.class) return null;
         if (type == int.class || type == Integer.class) return result;

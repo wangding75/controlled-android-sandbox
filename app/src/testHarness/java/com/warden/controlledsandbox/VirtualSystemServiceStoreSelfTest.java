@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import java.nio.file.Files;
 import java.util.List;
@@ -79,6 +80,26 @@ public final class VirtualSystemServiceStoreSelfTest {
         require(store.alarms(owner, "guest.pkg", 1L).isEmpty(),
                 "one-shot alarm must be removed after delivery");
 
+        VirtualPendingIntentSnapshot pendingCandidate = new VirtualPendingIntentSnapshot(
+                "", VirtualPendingIntentSnapshot.ACTIVITY_RESULT, 31, "guest.RESULT",
+                "activity-token", "content://guest/result", "a=guest.RESULT|c=activity-token|d=content://guest/result", 0x02000000, "guest.pkg", 12003,
+                "guest.permission.RESULT", "guest.pkg", 1L, "revision-a",
+                new byte[]{3, 1}, 0, false, 1L);
+        VirtualPendingIntentSnapshot reservedPending = store.reservePendingIntent(owner,
+                "guest.pkg", 1L, "revision-a", 12003, pendingCandidate,
+                false, false, false);
+        require(!reservedPending.tokenId().isEmpty() && reservedPending.creatorUid() == 12003,
+                "PendingIntent must receive durable token and virtual creator UID");
+        boolean creatorUidRejected = false;
+        try {
+            store.reservePendingIntent(owner, "guest.pkg", 1L, "revision-a", 12003,
+                    new VirtualPendingIntentSnapshot("", VirtualPendingIntentSnapshot.BROADCAST,
+                            32, "guest.BAD_UID", "", "", "a=guest.BAD_UID|c=|d=", 0, "guest.pkg", 99999, "",
+                            "guest.pkg", 1L, "revision-a", new byte[0], 0, false, 1L),
+                    false, false, false);
+        } catch (SecurityException expected) { creatorUidRejected = true; }
+        require(creatorUidRejected, "Package Service must reject forged virtual creator UID");
+
         VirtualNotificationSnapshot reservedNotification = store.reserveNotification(
                 owner, 1L, 41, "updates", "general");
         store.commitNotification(owner, 41, "updates", "general", new byte[]{4, 1});
@@ -89,6 +110,27 @@ public final class VirtualSystemServiceStoreSelfTest {
         store.commitJob(owner, 51);
 
         VirtualSystemServiceStore reloaded = new VirtualSystemServiceStore(root);
+        List<VirtualPendingIntentSnapshot> recoveredPending = reloaded.pendingIntents(
+                owner, "guest.pkg", 2L, "revision-a");
+        require(recoveredPending.size() == 1
+                        && reservedPending.tokenId().equals(recoveredPending.get(0).tokenId())
+                        && recoveredPending.get(0).ownerGeneration() == 2L,
+                "durable PendingIntent must survive Package Service recreation and rebind generation");
+        VirtualPendingIntentSnapshot sentPending = reloaded.markPendingIntentSent(
+                owner, "revision-a", reservedPending.tokenId());
+        require(sentPending.sends() == 1 && !sentPending.cancelled(),
+                "persistent PendingIntent send count must commit");
+        VirtualPendingIntentSnapshot revisionReplacement = reloaded.reservePendingIntent(owner,
+                "guest.pkg", 3L, "revision-b", 12003,
+                new VirtualPendingIntentSnapshot("", VirtualPendingIntentSnapshot.ACTIVITY_RESULT,
+                        31, "guest.RESULT", "activity-token", "content://guest/result", "a=guest.RESULT|c=activity-token|d=content://guest/result", 0x02000000,
+                        "guest.pkg", 12003, "guest.permission.RESULT", "guest.pkg", 3L,
+                        "revision-b", new byte[]{3, 2}, 0, false, 2L),
+                false, false, false);
+        require(!revisionReplacement.tokenId().equals(reservedPending.tokenId())
+                        && reloaded.pendingIntents(owner, "guest.pkg", 3L, "revision-b").size() == 1,
+                "APK revision update must remove stale PendingIntent records");
+
         require(reloaded.notifications(owner).size() == 1
                         && VirtualNotificationSnapshot.ACTIVE.equals(reloaded.notifications(owner).get(0).state())
                         && reloaded.notifications(owner).get(0).hostId() == reservedNotification.hostId(),

@@ -65,6 +65,8 @@ virtual_service_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/contro
 for signature in [
     'byte[] getClipboard();',
     'List<VirtualAccountSnapshot> listAccounts(String type);',
+    'VirtualPendingIntentSnapshot reservePendingIntent(',
+    'List<VirtualPendingIntentSnapshot> listPendingIntents();',
     'void scheduleAlarm(String alarmId, long triggerAtMs, long intervalMs, in byte[] tokenPayload);',
     'List<VirtualAlarmSnapshot> listAlarms();',
     'int ensureNamespace(String namespace, int guestId);',
@@ -75,7 +77,7 @@ for signature in [
         errors.append(f'IVirtualSystemServiceSession is missing {signature}')
 if 'Bundle' in virtual_service_aidl or 'Bundle' in package_root_aidl:
     errors.append('virtual system-service contracts must not use Bundle')
-for name in ['VirtualAccountSnapshot', 'VirtualAlarmSnapshot', 'VirtualNotificationSnapshot',
+for name in ['VirtualAccountSnapshot', 'VirtualAlarmSnapshot', 'VirtualPendingIntentSnapshot', 'VirtualNotificationSnapshot',
              'VirtualNotificationChannelSnapshot', 'VirtualJobSnapshot', 'VirtualJobParametersSnapshot']:
     declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
     source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'

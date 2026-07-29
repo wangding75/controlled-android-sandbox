@@ -88,8 +88,13 @@ public final class GuestRuntimeEnvironment {
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo());
+            IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
+                    spec.virtualSystemServiceBinder);
+            if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
+            VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
+                    new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
-                    spec, new GuestPendingIntentDispatcher(guestContext, spec));
+                    spec, virtualServices.pendingIntents(), new GuestPendingIntentDispatcher(guestContext, spec));
             stagedFrameworkCallRouter = frameworkCallRouter;
             OrderedReceiverFinishInterceptor orderedReceiverFinishInterceptor =
                     frameworkCallRouter.orderedReceivers();
@@ -98,11 +103,6 @@ public final class GuestRuntimeEnvironment {
             GuestCapabilityAuditLog capabilityAudit = new GuestCapabilityAuditLog();
             CapabilityLeaseRegistry capabilityLeases = new CapabilityLeaseRegistry();
             CapabilityAccessPolicy capabilityPolicy = new CapabilityAccessPolicy(permissionPolicy::isGranted, appOpsPolicy::mode);
-            IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
-                    spec.virtualSystemServiceBinder);
-            if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
-            VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
-                    new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),

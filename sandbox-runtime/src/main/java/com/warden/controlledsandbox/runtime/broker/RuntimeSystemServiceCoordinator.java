@@ -27,7 +27,8 @@ final class RuntimeSystemServiceCoordinator implements AutoCloseable {
         if (current == null) {
             Binder token = new Binder();
             IVirtualSystemServiceSession session = client.open(token, guest.packageName(),
-                    guest.virtualUserId(), guest.processName(), guest.generation());
+                    guest.virtualUserId(), spec.getInt(RuntimeKeys.VIRTUAL_UID, -1),
+                    guest.processName(), guest.generation(), guest.packageRevision());
             current = new Capability(token, session); capabilities.put(key, current);
         }
         if (!current.session().asBinder().isBinderAlive()) {

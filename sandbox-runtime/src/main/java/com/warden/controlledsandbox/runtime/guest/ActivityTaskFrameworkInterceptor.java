@@ -58,6 +58,10 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
         return value;
     }
 
+    synchronized String virtualActivityToken(IBinder frameworkToken) {
+        return requireBinding(frameworkToken).activityToken;
+    }
+
     synchronized void unbindHostActivity(IBinder frameworkToken) {
         if (frameworkToken != null) hostBindings.remove(frameworkToken);
     }

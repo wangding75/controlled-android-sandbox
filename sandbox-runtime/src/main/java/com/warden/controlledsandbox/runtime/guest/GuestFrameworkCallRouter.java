@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import java.lang.reflect.Method;
 
 /** Composite runtime-owned interceptor for Activity tasks, ordered Receivers and PendingIntent senders. */
@@ -9,10 +10,13 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     private final OrderedReceiverFinishInterceptor orderedReceivers;
     private final PendingIntentFrameworkInterceptor pendingIntents;
 
-    GuestFrameworkCallRouter(GuestPackageSpec spec, PendingIntentFrameworkInterceptor.Dispatcher dispatcher) {
+    GuestFrameworkCallRouter(GuestPackageSpec spec,
+            VirtualSystemServiceState.PendingIntentState pendingIntentState,
+            PendingIntentFrameworkInterceptor.Dispatcher dispatcher) {
         activityTasks = new ActivityTaskFrameworkInterceptor(spec);
         orderedReceivers = new OrderedReceiverFinishInterceptor();
-        pendingIntents = new PendingIntentFrameworkInterceptor(spec, dispatcher);
+        pendingIntents = new PendingIntentFrameworkInterceptor(spec, pendingIntentState,
+                activityTasks::virtualActivityToken, dispatcher);
     }
 
     ActivityTaskFrameworkInterceptor activityTasks() { return activityTasks; }

@@ -25,6 +25,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     private final VirtualSystemServiceAuthority authority;
     private final ClipboardState clipboard;
     private final AccountState accounts;
+    private final PendingIntentState pendingIntents;
     private final AlarmState alarms;
     private final NotificationState notifications;
     private final JobState jobs;
@@ -35,6 +36,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         this.authority = authority;
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
+        pendingIntents = new PendingIntentState(authority);
         alarms = new AlarmState(authority);
         notifications = new NotificationState(authority);
         jobs = new JobState(authority);
@@ -42,6 +44,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
 
     public ClipboardState clipboard() { return clipboard; }
     public AccountState accounts() { return accounts; }
+    public PendingIntentState pendingIntents() { return pendingIntents; }
     public AlarmState alarms() { return alarms; }
     public NotificationState notifications() { return notifications; }
     public JobState jobs() { return jobs; }
@@ -51,7 +54,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         alarms.close();
         clipboard.close();
         if (authority == null) {
-            accounts.clear(); notifications.clear(); jobs.clear();
+            accounts.clear(); pendingIntents.clear(); notifications.clear(); jobs.clear();
         } else {
             try { authority.close(); } catch (Exception ignored) { }
         }
@@ -168,6 +171,66 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             } catch (Throwable error) {
                 throw new IllegalStateException("VIRTUAL_ACCOUNT_RECONSTRUCTION_UNSUPPORTED:" + type.getName(), error);
             }
+        }
+    }
+
+
+    /** Package-Service-backed durable PendingIntent identity namespace. */
+    public static final class PendingIntentState {
+        private final VirtualSystemServiceAuthority authority;
+        private final Map<String, VirtualSystemServiceAuthority.PendingIntentRecord> local = new LinkedHashMap<>();
+        private long nextToken = 1L;
+        PendingIntentState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
+        public synchronized VirtualSystemServiceAuthority.PendingIntentRecord reserve(
+                VirtualSystemServiceAuthority.PendingIntentRecord candidate,
+                boolean noCreate, boolean cancelCurrent, boolean updateCurrent) {
+            if (authority != null) return authority.reservePendingIntent(candidate, noCreate, cancelCurrent, updateCurrent);
+            local.values().removeIf(value -> !value.packageRevision().equals(candidate.packageRevision()));
+            VirtualSystemServiceAuthority.PendingIntentRecord existing = null;
+            for (VirtualSystemServiceAuthority.PendingIntentRecord value : local.values()) {
+                if (sameIdentity(value, candidate) && !value.cancelled()) { existing = value; break; }
+            }
+            if (noCreate) return existing;
+            if (existing != null && cancelCurrent) { local.remove(existing.tokenId()); existing = null; }
+            if (existing != null) {
+                if (updateCurrent) local.put(existing.tokenId(), candidateWithToken(candidate, existing.tokenId(), existing.sends()));
+                return local.get(existing.tokenId());
+            }
+            String token = candidate.tokenId().isEmpty() ? "local-pi-" + (nextToken++) : candidate.tokenId();
+            VirtualSystemServiceAuthority.PendingIntentRecord created = candidateWithToken(candidate, token, 0);
+            local.put(token, created); return created;
+        }
+        public synchronized VirtualSystemServiceAuthority.PendingIntentRecord markSent(String tokenId) {
+            if (authority != null) return authority.markPendingIntentSent(tokenId);
+            VirtualSystemServiceAuthority.PendingIntentRecord value = local.get(tokenId);
+            if (value == null) throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+            VirtualSystemServiceAuthority.PendingIntentRecord updated = new VirtualSystemServiceAuthority.PendingIntentRecord(
+                    value.tokenId(), value.kind(), value.requestCode(), value.action(), value.component(), value.data(), value.filterIdentity(),
+                    value.flags(), value.creatorPackage(), value.creatorUid(), value.requiredPermission(),
+                    value.ownerProcessName(), value.ownerGeneration(), value.packageRevision(), value.payload(),
+                    value.sends() + 1, (value.flags() & 0x40000000) != 0, System.currentTimeMillis());
+            if (updated.cancelled()) local.remove(tokenId); else local.put(tokenId, updated);
+            return updated;
+        }
+        public synchronized boolean cancel(String tokenId) {
+            return authority != null ? authority.cancelPendingIntent(tokenId) : local.remove(tokenId) != null;
+        }
+        public synchronized List<VirtualSystemServiceAuthority.PendingIntentRecord> records() {
+            return authority != null ? Collections.unmodifiableList(new ArrayList<>(authority.pendingIntents()))
+                    : Collections.unmodifiableList(new ArrayList<>(local.values()));
+        }
+        public synchronized void clear() { if (authority == null) local.clear(); }
+        private static boolean sameIdentity(VirtualSystemServiceAuthority.PendingIntentRecord a,
+                VirtualSystemServiceAuthority.PendingIntentRecord b) {
+            return a.kind().equals(b.kind()) && a.requestCode() == b.requestCode()
+                    && a.filterIdentity().equals(b.filterIdentity());
+        }
+        private static VirtualSystemServiceAuthority.PendingIntentRecord candidateWithToken(
+                VirtualSystemServiceAuthority.PendingIntentRecord value, String token, int sends) {
+            return new VirtualSystemServiceAuthority.PendingIntentRecord(token, value.kind(), value.requestCode(),
+                    value.action(), value.component(), value.data(), value.filterIdentity(), value.flags(), value.creatorPackage(),
+                    value.creatorUid(), value.requiredPermission(), value.ownerProcessName(), value.ownerGeneration(),
+                    value.packageRevision(), value.payload(), sends, false, System.currentTimeMillis());
         }
     }
 

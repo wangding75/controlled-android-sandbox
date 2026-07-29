@@ -642,6 +642,18 @@ public final class ActivityTaskLedgerSelfTest {
                 "Result Who should be preserved");
         check(delivery.resultIntent().equals(resultIntent),
                 "typed Result Intent should survive delivery");
+        ResultIntentSnapshot senderResult = new ResultIntentSnapshot(
+                "guest.SENDER_RESULT", "content://guest/sender/9", "application/json",
+                "guest.example/RegistryCaller", 5, "sender clip", Map.of("source", "intent-sender"));
+        check(ledger.deliverActivityResult(caller.activityToken(), "fragment:sender", 9,
+                        -1, "pending-intent-9", senderResult),
+                "Activity Result PendingIntent should enqueue direct result delivery");
+        ActivityResultDelivery senderDelivery = ledger.drainActivityResults(caller.activityToken()).get(0);
+        check(senderDelivery.resultWho().equals("fragment:sender")
+                        && senderDelivery.requestCode() == 9
+                        && senderDelivery.intentSenderToken().equals("pending-intent-9")
+                        && senderDelivery.resultIntent().equals(senderResult),
+                "direct Activity Result sender metadata must survive ledger delivery");
         check(ledger.unregisterActivityResult(caller.activityToken(), "profile-editor"),
                 "registry key should unregister");
     }
