@@ -1439,6 +1439,32 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "dlopen and android_dlopen_ext are routed through Guest native-root and explicit system-soname policy. Unknown sonames, Host private paths and foreign linker namespaces fail closed; real Android linker namespace behavior remains device-deferred."
+    },
+    {
+      "id": "native.network-identity-isolation",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_network.cpp",
+        "sandbox-native/src/main/cpp/native_interceptors.cpp",
+        "sandbox-native/src/test/cpp/native_network_self_test.cpp",
+        "scripts/check-native-network-audio.py"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest native socket creation, IPv4/IPv6 connect, DNS/reverse-DNS, hostname, uname and interface enumeration are routed through fail-closed policy. Interface and host identity are projected from a bounded typed NativeNetworkIdentity; Android VPN/Connectivity OEM behavior remains device-deferred."
+    },
+    {
+      "id": "native.audio-capture-revocation",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_audio.cpp",
+        "sandbox-native/src/main/cpp/native_interceptors.cpp",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-native/src/test/cpp/native_audio_self_test.cpp"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "RECORD_AUDIO/AppOps policy configures a generation-bound native capture gate. AAudio and NDK MediaRecorder start/stop symbols are intercepted when imported; permission revocation invalidates active native tokens, best-effort stops tracked handles and existing Binder audio leases are cleaned up."
     }
   ],
   "statusDimensions": {

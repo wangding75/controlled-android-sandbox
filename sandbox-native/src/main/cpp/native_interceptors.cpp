@@ -3,6 +3,8 @@
 #include "controlled_sandbox/native_file_system.h"
 #include "controlled_sandbox/native_policy.h"
 #include "controlled_sandbox/native_loader.h"
+#include "controlled_sandbox/native_network.h"
+#include "controlled_sandbox/native_audio.h"
 
 #include <arpa/inet.h>
 #include <cerrno>
@@ -11,8 +13,10 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <ifaddrs.h>
 #include <netdb.h>
 #include <sys/mman.h>
+#include <sys/utsname.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -58,6 +62,8 @@ struct android_dlextinfo {
 
 #include <algorithm>
 #include <atomic>
+#include <map>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -81,8 +87,16 @@ using Getdents64Fn = ssize_t (*)(int, void*, std::size_t);
 using MmapFn = void* (*)(void*, std::size_t, int, int, int, off_t);
 using ReadlinkFn = ssize_t (*)(const char*, char*, size_t);
 using ReadlinkAtFn = ssize_t (*)(int, const char*, char*, size_t);
+using SocketFn = int (*)(int, int, int);
 using ConnectFn = int (*)(int, const sockaddr*, socklen_t);
 using GetAddrInfoFn = int (*)(const char*, const char*, const addrinfo*, addrinfo**);
+using FreeAddrInfoFn = void (*)(addrinfo*);
+using GetNameInfoFn = int (*)(const sockaddr*, socklen_t, char*, socklen_t, char*, socklen_t, int);
+using GetHostNameFn = int (*)(char*, std::size_t);
+using UnameFn = int (*)(struct utsname*);
+using GetIfAddrsFn = int (*)(ifaddrs**);
+using FreeIfAddrsFn = void (*)(ifaddrs*);
+using AudioCallFn = int (*)(void*);
 using DlopenFn = void* (*)(const char*, int);
 using AndroidDlopenExtFn = void* (*)(const char*, int, const android_dlextinfo*);
 
@@ -105,8 +119,22 @@ std::atomic<Getdents64Fn> real_getdents64{nullptr};
 std::atomic<MmapFn> real_mmap{nullptr};
 std::atomic<ReadlinkFn> real_readlink{nullptr};
 std::atomic<ReadlinkAtFn> real_readlinkat{nullptr};
+std::atomic<SocketFn> real_socket{nullptr};
 std::atomic<ConnectFn> real_connect{nullptr};
 std::atomic<GetAddrInfoFn> real_getaddrinfo{nullptr};
+std::atomic<FreeAddrInfoFn> real_freeaddrinfo{nullptr};
+std::atomic<GetNameInfoFn> real_getnameinfo{nullptr};
+std::atomic<GetHostNameFn> real_gethostname{nullptr};
+std::atomic<UnameFn> real_uname{nullptr};
+std::atomic<GetIfAddrsFn> real_getifaddrs{nullptr};
+std::atomic<FreeIfAddrsFn> real_freeifaddrs{nullptr};
+std::atomic<AudioCallFn> real_aaudio_start{nullptr};
+std::atomic<AudioCallFn> real_aaudio_stop{nullptr};
+std::atomic<AudioCallFn> real_media_recorder_start{nullptr};
+std::atomic<AudioCallFn> real_media_recorder_stop{nullptr};
+std::mutex audio_handles_mutex;
+std::map<void*, std::uint64_t> aaudio_handles;
+std::map<void*, std::uint64_t> media_recorder_handles;
 std::atomic<DlopenFn> real_dlopen{nullptr};
 std::atomic<AndroidDlopenExtFn> real_android_dlopen_ext{nullptr};
 thread_local bool inside_refresh = false;
@@ -472,27 +500,123 @@ extern "C" ssize_t controlled_readlinkat(int directory, const char* path, char* 
     }, buffer, size);
 }
 
+extern "C" int controlled_socket(int domain, int type, int protocol) {
+    SocketFn function = require_real(real_socket, "socket");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (domain != AF_INET && domain != AF_INET6 && domain != AF_UNIX) { errno = EAFNOSUPPORT; return -1; }
+    return function(domain, type, protocol);
+}
+
 extern "C" int controlled_connect(int socket_fd, const sockaddr* address, socklen_t length) {
     ConnectFn function = require_real(real_connect, "connect");
     if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (address != nullptr && address->sa_family == AF_INET && length >= sizeof(sockaddr_in)) {
-        const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(address);
-        char text[INET_ADDRSTRLEN]{};
-        if (inet_ntop(AF_INET, &ipv4->sin_addr, text, sizeof(text)) != nullptr
-                && !global_policy().allow_ipv4(text)) {
-            errno = EACCES;
-            return -1;
-        }
-    }
+    if (!native_socket_address_allowed(address, length)) { errno = EACCES; return -1; }
     return function(socket_fd, address, length);
 }
 
 extern "C" int controlled_getaddrinfo(const char* node, const char* service,
                                        const addrinfo* hints, addrinfo** result) {
     GetAddrInfoFn function = require_real(real_getaddrinfo, "getaddrinfo");
+    FreeAddrInfoFn release = require_real(real_freeaddrinfo, "freeaddrinfo");
+    if (function == nullptr || release == nullptr) return EAI_SYSTEM;
+    if (result == nullptr || (node != nullptr && !global_policy().allow_host(node))) return EAI_NONAME;
+    *result = nullptr;
+    const int status = function(node, service, hints, result);
+    if (status != 0 || *result == nullptr) return status;
+    for (addrinfo* item = *result; item != nullptr; item = item->ai_next) {
+        if (item->ai_addr != nullptr && !native_socket_address_allowed(item->ai_addr, item->ai_addrlen)) {
+            release(*result); *result = nullptr; return EAI_NONAME;
+        }
+    }
+    return 0;
+}
+
+extern "C" int controlled_getnameinfo(const sockaddr* address, socklen_t address_length,
+                                       char* host, socklen_t host_length,
+                                       char* service, socklen_t service_length, int flags) {
+    GetNameInfoFn function = require_real(real_getnameinfo, "getnameinfo");
     if (function == nullptr) return EAI_SYSTEM;
-    if (node != nullptr && !global_policy().allow_host(node)) return EAI_NONAME;
-    return function(node, service, hints, result);
+    if (!native_socket_address_allowed(address, address_length)) return EAI_NONAME;
+    const int status = function(address, address_length, host, host_length, service, service_length,
+                                flags | NI_NUMERICHOST);
+    if (status != 0) return status;
+    if (host != nullptr && host_length > 0 && (flags & NI_NUMERICHOST) == 0) {
+        const std::string value = native_virtual_hostname();
+        if (value.size() + 1 > host_length) return EAI_OVERFLOW;
+        std::memcpy(host, value.c_str(), value.size() + 1);
+    }
+    return 0;
+}
+
+extern "C" int controlled_gethostname(char* name, std::size_t length) {
+    if (name == nullptr || length == 0) { errno = EINVAL; return -1; }
+    try {
+        const std::string value = native_virtual_hostname();
+        if (value.size() + 1 > length) { errno = ENAMETOOLONG; return -1; }
+        std::memcpy(name, value.c_str(), value.size() + 1);
+        return 0;
+    } catch (...) { errno = EACCES; return -1; }
+}
+
+extern "C" int controlled_uname(struct utsname* value) {
+    UnameFn function = require_real(real_uname, "uname");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (value == nullptr) { errno = EFAULT; return -1; }
+    if (function(value) != 0) return -1;
+    try {
+        const std::string hostname = native_virtual_hostname();
+        std::memset(value->nodename, 0, sizeof(value->nodename));
+        std::memcpy(value->nodename, hostname.data(), std::min(hostname.size(), sizeof(value->nodename) - 1));
+        return 0;
+    } catch (...) { errno = EACCES; return -1; }
+}
+
+extern "C" int controlled_getifaddrs(ifaddrs** result) {
+    return native_project_ifaddrs(result);
+}
+
+extern "C" void controlled_freeifaddrs(ifaddrs* value) {
+    if (native_free_projected_ifaddrs(value)) return;
+    FreeIfAddrsFn function = require_real(real_freeifaddrs, "freeifaddrs");
+    if (function != nullptr) function(value);
+}
+
+int controlled_audio_start(void* handle, const char* api, std::atomic<AudioCallFn>& storage,
+                           std::map<void*, std::uint64_t>& handles) {
+    AudioCallFn function = require_real(storage, api);
+    if (function == nullptr) return -38;
+    const std::uint64_t token = global_audio_capture_policy().begin(api);
+    if (token == 0) return -1;
+    const int status = function(handle);
+    if (status != 0) { global_audio_capture_policy().end(token); return status; }
+    std::lock_guard lock(audio_handles_mutex);
+    handles[handle] = token;
+    return status;
+}
+
+int controlled_audio_stop(void* handle, const char* api, std::atomic<AudioCallFn>& storage,
+                          std::map<void*, std::uint64_t>& handles) {
+    AudioCallFn function = require_real(storage, api);
+    if (function == nullptr) return -38;
+    const int status = function(handle);
+    std::uint64_t token = 0;
+    { std::lock_guard lock(audio_handles_mutex); auto found = handles.find(handle);
+      if (found != handles.end()) { token = found->second; handles.erase(found); } }
+    global_audio_capture_policy().end(token);
+    return status;
+}
+
+extern "C" int controlled_AAudioStream_requestStart(void* stream) {
+    return controlled_audio_start(stream, "AAudioStream_requestStart", real_aaudio_start, aaudio_handles);
+}
+extern "C" int controlled_AAudioStream_requestStop(void* stream) {
+    return controlled_audio_stop(stream, "AAudioStream_requestStop", real_aaudio_stop, aaudio_handles);
+}
+extern "C" int controlled_AMediaRecorder_start(void* recorder) {
+    return controlled_audio_start(recorder, "AMediaRecorder_start", real_media_recorder_start, media_recorder_handles);
+}
+extern "C" int controlled_AMediaRecorder_stop(void* recorder) {
+    return controlled_audio_stop(recorder, "AMediaRecorder_stop", real_media_recorder_stop, media_recorder_handles);
 }
 
 bool refresh_loaded_handle(void* handle) {
@@ -576,8 +700,18 @@ void* replacement_for(std::string_view name) {
     if (name == "mmap") return reinterpret_cast<void*>(&controlled_mmap);
     if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);
     if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);
+    if (name == "socket") return reinterpret_cast<void*>(&controlled_socket);
     if (name == "connect") return reinterpret_cast<void*>(&controlled_connect);
     if (name == "getaddrinfo") return reinterpret_cast<void*>(&controlled_getaddrinfo);
+    if (name == "getnameinfo") return reinterpret_cast<void*>(&controlled_getnameinfo);
+    if (name == "gethostname") return reinterpret_cast<void*>(&controlled_gethostname);
+    if (name == "uname") return reinterpret_cast<void*>(&controlled_uname);
+    if (name == "getifaddrs") return reinterpret_cast<void*>(&controlled_getifaddrs);
+    if (name == "freeifaddrs") return reinterpret_cast<void*>(&controlled_freeifaddrs);
+    if (name == "AAudioStream_requestStart") return reinterpret_cast<void*>(&controlled_AAudioStream_requestStart);
+    if (name == "AAudioStream_requestStop") return reinterpret_cast<void*>(&controlled_AAudioStream_requestStop);
+    if (name == "AMediaRecorder_start") return reinterpret_cast<void*>(&controlled_AMediaRecorder_start);
+    if (name == "AMediaRecorder_stop") return reinterpret_cast<void*>(&controlled_AMediaRecorder_stop);
     if (name == "dlopen") return reinterpret_cast<void*>(&controlled_dlopen);
     if (name == "android_dlopen_ext") return reinterpret_cast<void*>(&controlled_android_dlopen_ext);
     return nullptr;
@@ -585,6 +719,16 @@ void* replacement_for(std::string_view name) {
 
 
 }  // namespace
+
+void revoke_native_audio_captures() noexcept {
+    std::lock_guard lock(audio_handles_mutex);
+    AudioCallFn stop_aaudio = require_real(real_aaudio_stop, "AAudioStream_requestStop");
+    AudioCallFn stop_media = require_real(real_media_recorder_stop, "AMediaRecorder_stop");
+    for (const auto& item : aaudio_handles) { if (stop_aaudio != nullptr) (void) stop_aaudio(item.first); }
+    for (const auto& item : media_recorder_handles) { if (stop_media != nullptr) (void) stop_media(item.first); }
+    aaudio_handles.clear();
+    media_recorder_handles.clear();
+}
 
 void* replacement_for_symbol(std::string_view name) noexcept {
     return replacement_for(name);

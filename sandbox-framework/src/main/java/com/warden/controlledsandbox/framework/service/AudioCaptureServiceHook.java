@@ -4,7 +4,7 @@ import android.content.Context;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 
-/** Bounded AudioManager Binder hook. Native AudioRecord/MediaRecorder paths remain outside this hook. */
+/** Bounded AudioManager Binder hook paired with the generation-bound native audio capture gate. */
 public final class AudioCaptureServiceHook {
     private AudioCaptureServiceHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <shared_mutex>
@@ -15,6 +16,23 @@ struct CidrV4 {
     std::uint32_t mask{};
     bool contains(std::uint32_t address) const noexcept;
     static std::optional<CidrV4> parse(std::string_view value) noexcept;
+};
+
+struct CidrV6 {
+    std::array<std::uint8_t, 16> network{};
+    std::uint8_t prefix_length{};
+    bool contains(const std::array<std::uint8_t, 16>& address) const noexcept;
+    static std::optional<CidrV6> parse(std::string_view value) noexcept;
+};
+
+struct NativeNetworkIdentity {
+    std::string hostname;
+    std::string interface_name;
+    std::string ipv4_address;
+    std::string ipv6_address;
+    std::string proxy_host;
+    int proxy_port{};
+    bool cleartext_permitted{true};
 };
 
 class PathPolicyError final : public std::runtime_error {
@@ -47,6 +65,7 @@ struct NativePolicySnapshot {
     std::string instance_root;
     std::string apk_path;
     std::string native_library_root;
+    NativeNetworkIdentity network_identity;
 };
 
 class NativePolicyEngine final {
@@ -59,7 +78,10 @@ public:
                    std::vector<std::string> allow_hosts,
                    std::vector<std::string> deny_hosts,
                    std::vector<CidrV4> allow_cidrs,
-                   std::vector<CidrV4> deny_cidrs);
+                   std::vector<CidrV4> deny_cidrs,
+                   std::vector<CidrV6> allow_cidrs_v6 = {},
+                   std::vector<CidrV6> deny_cidrs_v6 = {},
+                   NativeNetworkIdentity network_identity = {});
 
     void reset() noexcept;
 
@@ -68,6 +90,8 @@ public:
     [[nodiscard]] std::string reverse_map_path(std::string_view host_path) const;
     [[nodiscard]] bool allow_host(std::string_view host) const;
     [[nodiscard]] bool allow_ipv4(std::string_view address) const;
+    [[nodiscard]] bool allow_ipv6(std::string_view address) const;
+    [[nodiscard]] NativeNetworkIdentity network_identity() const;
     [[nodiscard]] bool configured() const noexcept;
     [[nodiscard]] NativePolicySnapshot snapshot() const;
 
@@ -91,6 +115,9 @@ private:
     std::vector<std::string> deny_hosts_;
     std::vector<CidrV4> allow_cidrs_;
     std::vector<CidrV4> deny_cidrs_;
+    std::vector<CidrV6> allow_cidrs_v6_;
+    std::vector<CidrV6> deny_cidrs_v6_;
+    NativeNetworkIdentity network_identity_;
 };
 
 NativePolicyEngine& global_policy();

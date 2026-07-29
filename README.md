@@ -116,3 +116,8 @@ M4-T16 makes PendingIntent identity durable and revision-bound, including Activi
 ## M4-T17 B1 source baseline
 
 M4-T17 B1 extends the Guest-only PLT/GOT hook set with `openat2`, `statx`, `renameat2`, `faccessat2`, `getdents64` and file-backed `mmap`. `/proc/self/maps`, `/proc/self/cmdline` and `/proc/self/status` are projected from virtual process identity without exposing Host private paths. `dlopen` and `android_dlopen_ext` are constrained to the Guest native-library root and an explicit public system-library allowlist. These are source and Host-native test results; Android linker, OEM and ABI behavior is not yet device-proven.
+
+
+## M4-T17 B2 source baseline
+
+M4-T17 B2 extends the Guest-only native policy to IPv4/IPv6 sockets, forward and reverse DNS, virtual hostname and bounded synthetic interface enumeration. Host network-interface identity is not returned to Guest native code. RECORD_AUDIO and AppOps decisions now configure a generation-bound native capture gate; AAudio and NDK MediaRecorder start/stop symbols are intercepted when present, and revocation clears active capture authority while the existing Binder capability lease registry releases Java/Binder audio resources. These are source and Host-native tests; Android audio-server, VPN, proxy and OEM network behavior remain device-gated.

@@ -33,6 +33,7 @@ python3 scripts/check-split-install-sessions.py
 python3 scripts/check-broadcast-model.py
 python3 scripts/check-native-file-hooks.py
 python3 scripts/check-native-files-loader.py
+python3 scripts/check-native-network-audio.py
 python3 scripts/generate-sbom.py
 python3 scripts/check-m3-source-progress.py
 python3 tools/static_android_compile.py

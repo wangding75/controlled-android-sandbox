@@ -42,7 +42,13 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("faccessat2"), "faccessat2 target");
     require_hook(NativeHookRuntime::is_target_symbol("getdents64"), "getdents64 target");
     require_hook(NativeHookRuntime::is_target_symbol("mmap"), "mmap target");
+    require_hook(NativeHookRuntime::is_target_symbol("socket"), "socket target");
     require_hook(NativeHookRuntime::is_target_symbol("getaddrinfo"), "DNS target");
+    require_hook(NativeHookRuntime::is_target_symbol("getnameinfo"), "reverse DNS target");
+    require_hook(NativeHookRuntime::is_target_symbol("getifaddrs"), "interface projection target");
+    require_hook(NativeHookRuntime::is_target_symbol("gethostname"), "hostname target");
+    require_hook(NativeHookRuntime::is_target_symbol("AAudioStream_requestStart"), "AAudio capture target");
+    require_hook(NativeHookRuntime::is_target_symbol("AMediaRecorder_start"), "MediaRecorder capture target");
     require_hook(NativeHookRuntime::is_target_symbol("dlopen"), "dynamic loader target");
     require_hook(NativeHookRuntime::is_target_symbol("android_dlopen_ext"), "Android loader target");
     require_hook(!NativeHookRuntime::is_target_symbol("close"), "non-target");

@@ -1,4 +1,6 @@
 #include "controlled_sandbox/native_policy.h"
+#include "controlled_sandbox/native_audio.h"
+#include "controlled_sandbox/native_interceptors.h"
 
 #include <jni.h>
 #include <stdexcept>
@@ -39,6 +41,16 @@ std::vector<controlled_sandbox::CidrV4> cidr_array(JNIEnv* env, jobjectArray val
     return out;
 }
 
+std::vector<controlled_sandbox::CidrV6> cidr6_array(JNIEnv* env, jobjectArray values) {
+    std::vector<controlled_sandbox::CidrV6> out;
+    for (const auto& value : string_array(env, values)) {
+        auto parsed = controlled_sandbox::CidrV6::parse(value);
+        if (!parsed) throw std::invalid_argument("Invalid IPv6 CIDR: " + value);
+        out.push_back(*parsed);
+    }
+    return out;
+}
+
 void throw_java(JNIEnv* env, const char* type, const std::string& message) {
     jclass klass = env->FindClass(type);
     if (klass != nullptr) env->ThrowNew(klass, message.c_str());
@@ -53,7 +65,11 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
         jint virtual_pid, jstring abi_name, jstring instance_root,
         jstring apk_path, jstring native_library_root, jboolean default_allow,
         jobjectArray allow_hosts, jobjectArray deny_hosts,
-        jobjectArray allow_cidrs, jobjectArray deny_cidrs) {
+        jobjectArray allow_cidrs, jobjectArray deny_cidrs,
+        jobjectArray allow_cidrs_v6, jobjectArray deny_cidrs_v6,
+        jstring virtual_hostname, jstring virtual_interface_name,
+        jstring virtual_ipv4, jstring virtual_ipv6,
+        jstring proxy_host, jint proxy_port, jboolean cleartext_permitted) {
     try {
         if (generation <= 0) throw std::invalid_argument("generation must be positive");
         controlled_sandbox::global_policy().configure(
@@ -62,7 +78,12 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
                 virtual_uid, virtual_pid, string_value(env, abi_name), string_value(env, instance_root),
                 string_value(env, apk_path), string_value(env, native_library_root), default_allow,
                 string_array(env, allow_hosts), string_array(env, deny_hosts),
-                cidr_array(env, allow_cidrs), cidr_array(env, deny_cidrs));
+                cidr_array(env, allow_cidrs), cidr_array(env, deny_cidrs),
+                cidr6_array(env, allow_cidrs_v6), cidr6_array(env, deny_cidrs_v6),
+                controlled_sandbox::NativeNetworkIdentity{string_value(env, virtual_hostname),
+                        string_value(env, virtual_interface_name), string_value(env, virtual_ipv4),
+                        string_value(env, virtual_ipv6), string_value(env, proxy_host), proxy_port,
+                        cleartext_permitted == JNI_TRUE});
         return JNI_TRUE;
     } catch (const std::exception& error) {
         throw_java(env, "java/lang/IllegalArgumentException", error.what());
@@ -92,6 +113,71 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeAllowIpv4(
         JNIEnv* env, jclass, jstring address) {
     return controlled_sandbox::global_policy().allow_ipv4(string_value(env, address)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeAllowIpv6(
+        JNIEnv* env, jclass, jstring address) {
+    return controlled_sandbox::global_policy().allow_ipv6(string_value(env, address)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureAudioCapture(
+        JNIEnv* env, jclass, jstring session_id, jlong generation, jboolean allowed) {
+    try {
+        if (allowed != JNI_TRUE) controlled_sandbox::revoke_native_audio_captures();
+        controlled_sandbox::global_audio_capture_policy().configure(
+                string_value(env, session_id), static_cast<std::uint64_t>(generation), allowed == JNI_TRUE);
+        return JNI_TRUE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalArgumentException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeSetAudioCaptureAllowed(
+        JNIEnv* env, jclass, jlong generation, jboolean allowed) {
+    try {
+        if (allowed != JNI_TRUE) controlled_sandbox::revoke_native_audio_captures();
+        controlled_sandbox::global_audio_capture_policy().set_allowed(
+                static_cast<std::uint64_t>(generation), allowed == JNI_TRUE);
+        return JNI_TRUE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalStateException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeBeginAudioCapture(
+        JNIEnv* env, jclass, jstring api) {
+    try { return static_cast<jlong>(controlled_sandbox::global_audio_capture_policy().begin(string_value(env, api))); }
+    catch (const std::exception& error) { throw_java(env, "java/lang/IllegalArgumentException", error.what()); return 0; }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeEndAudioCapture(
+        JNIEnv*, jclass, jlong token) {
+    return controlled_sandbox::global_audio_capture_policy().end(static_cast<std::uint64_t>(token))
+            ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeAudioCaptureStatus(JNIEnv* env, jclass) {
+    const auto snapshot = controlled_sandbox::global_audio_capture_policy().snapshot();
+    const std::string value = "configured=" + std::string(snapshot.configured ? "true" : "false")
+            + ";generation=" + std::to_string(snapshot.generation)
+            + ";allowed=" + std::string(snapshot.allowed ? "true" : "false")
+            + ";active=" + std::to_string(snapshot.active_count)
+            + ";revision=" + std::to_string(snapshot.revision);
+    return env->NewStringUTF(value.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetAudioCapture(JNIEnv*, jclass) {
+    controlled_sandbox::revoke_native_audio_captures();
+    controlled_sandbox::global_audio_capture_policy().reset();
 }
 
 #include "controlled_sandbox/native_hook.h"

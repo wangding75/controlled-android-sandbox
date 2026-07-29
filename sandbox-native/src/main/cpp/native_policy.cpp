@@ -38,6 +38,35 @@ std::optional<std::uint32_t> parse_ipv4(std::string_view value) noexcept {
     return ntohl(address.s_addr);
 }
 
+std::optional<std::array<std::uint8_t, 16>> parse_ipv6(std::string_view value) noexcept {
+    in6_addr address{};
+    std::string copy(value);
+    if (inet_pton(AF_INET6, copy.c_str(), &address) != 1) return std::nullopt;
+    std::array<std::uint8_t, 16> out{};
+    std::copy(std::begin(address.s6_addr), std::end(address.s6_addr), out.begin());
+    return out;
+}
+
+NativeNetworkIdentity normalize_network_identity(NativeNetworkIdentity value,
+                                                  const std::string& package_name,
+                                                  int virtual_user_id) {
+    if (value.hostname.empty()) value.hostname = package_name + ".sandbox";
+    if (value.interface_name.empty()) value.interface_name = "vnet0";
+    if (value.ipv4_address.empty()) value.ipv4_address = "10.64." + std::to_string(virtual_user_id % 250) + ".2";
+    if (value.ipv6_address.empty()) value.ipv6_address = "fd00::" + std::to_string(virtual_user_id + 2);
+    if (value.hostname.size() > 253 || value.interface_name.size() > 15) {
+        throw std::invalid_argument("virtual network identity is too long");
+    }
+    if (!parse_ipv4(value.ipv4_address) || !parse_ipv6(value.ipv6_address)) {
+        throw std::invalid_argument("virtual network address is invalid");
+    }
+    if (value.proxy_port < 0 || value.proxy_port > 65535) {
+        throw std::invalid_argument("proxy port is invalid");
+    }
+    value.proxy_host = lower_ascii(value.proxy_host);
+    return value;
+}
+
 bool path_has_prefix(std::string_view path, std::string_view prefix) {
     return path == prefix || (path.size() > prefix.size()
             && path.compare(0, prefix.size(), prefix) == 0
@@ -175,6 +204,36 @@ std::optional<CidrV4> CidrV4::parse(std::string_view value) noexcept {
     return CidrV4{*address & mask, mask};
 }
 
+bool CidrV6::contains(const std::array<std::uint8_t, 16>& address) const noexcept {
+    unsigned bits = prefix_length;
+    for (std::size_t index = 0; index < network.size(); index++) {
+        if (bits == 0) return true;
+        const unsigned compare = std::min(bits, 8U);
+        const std::uint8_t mask = static_cast<std::uint8_t>(0xFFU << (8U - compare));
+        if ((address[index] & mask) != (network[index] & mask)) return false;
+        bits -= compare;
+    }
+    return true;
+}
+
+std::optional<CidrV6> CidrV6::parse(std::string_view value) noexcept {
+    const auto slash = value.find('/');
+    if (slash == std::string_view::npos) return std::nullopt;
+    auto address = parse_ipv6(value.substr(0, slash));
+    if (!address) return std::nullopt;
+    int bits = -1;
+    try { bits = std::stoi(std::string(value.substr(slash + 1))); } catch (...) { return std::nullopt; }
+    if (bits < 0 || bits > 128) return std::nullopt;
+    CidrV6 out{*address, static_cast<std::uint8_t>(bits)};
+    unsigned remaining = static_cast<unsigned>(bits);
+    for (std::size_t index = 0; index < out.network.size(); index++) {
+        if (remaining >= 8) { remaining -= 8; continue; }
+        if (remaining == 0) out.network[index] = 0;
+        else { out.network[index] &= static_cast<std::uint8_t>(0xFFU << (8U - remaining)); remaining = 0; }
+    }
+    return out;
+}
+
 void NativePolicyEngine::configure(std::string session_id, std::uint64_t generation,
                                    std::string package_name, std::string process_name,
                                    int virtual_user_id, int virtual_uid, int virtual_pid,
@@ -183,7 +242,10 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
                                    std::vector<std::string> allow_hosts,
                                    std::vector<std::string> deny_hosts,
                                    std::vector<CidrV4> allow_cidrs,
-                                   std::vector<CidrV4> deny_cidrs) {
+                                   std::vector<CidrV4> deny_cidrs,
+                                   std::vector<CidrV6> allow_cidrs_v6,
+                                   std::vector<CidrV6> deny_cidrs_v6,
+                                   NativeNetworkIdentity network_identity) {
     if (session_id.empty() || session_id.size() > 128) throw std::invalid_argument("session id is invalid");
     if (generation < 1) throw std::invalid_argument("generation must be positive");
     if (package_name.empty()) throw std::invalid_argument("package name is required");
@@ -206,6 +268,7 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     };
     normalize_rules(allow_hosts);
     normalize_rules(deny_hosts);
+    network_identity = normalize_network_identity(std::move(network_identity), package_name, virtual_user_id);
 
     std::unique_lock lock(mutex_);
     if (configured_) {
@@ -215,7 +278,11 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
                 || virtual_user_id != virtual_user_id_ || virtual_uid != virtual_uid_
                 || virtual_pid != virtual_pid_ || abi_name != abi_name_
                 || instance_root != instance_root_ || apk_path != apk_path_
-                || native_library_root != native_library_root_) {
+                || native_library_root != native_library_root_
+                || network_identity.hostname != network_identity_.hostname
+                || network_identity.interface_name != network_identity_.interface_name
+                || network_identity.ipv4_address != network_identity_.ipv4_address
+                || network_identity.ipv6_address != network_identity_.ipv6_address) {
             throw std::logic_error("NATIVE_POLICY_IDENTITY_CHANGED_WITHIN_SESSION");
         }
     }
@@ -236,6 +303,9 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     deny_hosts_ = std::move(deny_hosts);
     allow_cidrs_ = std::move(allow_cidrs);
     deny_cidrs_ = std::move(deny_cidrs);
+    allow_cidrs_v6_ = std::move(allow_cidrs_v6);
+    deny_cidrs_v6_ = std::move(deny_cidrs_v6);
+    network_identity_ = std::move(network_identity);
     configured_ = true;
 }
 
@@ -257,6 +327,9 @@ void NativePolicyEngine::reset() noexcept {
     deny_hosts_.clear();
     allow_cidrs_.clear();
     deny_cidrs_.clear();
+    allow_cidrs_v6_.clear();
+    deny_cidrs_v6_.clear();
+    network_identity_ = {};
     configured_ = false;
     revision_++;
 }
@@ -371,6 +444,22 @@ bool NativePolicyEngine::allow_ipv4(std::string_view address_value) const {
     return default_network_allow_;
 }
 
+bool NativePolicyEngine::allow_ipv6(std::string_view address_value) const {
+    auto address = parse_ipv6(address_value);
+    if (!address) return false;
+    std::shared_lock lock(mutex_);
+    if (!configured_) return false;
+    for (const auto& range : deny_cidrs_v6_) if (range.contains(*address)) return false;
+    for (const auto& range : allow_cidrs_v6_) if (range.contains(*address)) return true;
+    return default_network_allow_;
+}
+
+NativeNetworkIdentity NativePolicyEngine::network_identity() const {
+    std::shared_lock lock(mutex_);
+    if (!configured_) throw std::logic_error("NATIVE_POLICY_NOT_CONFIGURED");
+    return network_identity_;
+}
+
 bool NativePolicyEngine::configured() const noexcept {
     std::shared_lock lock(mutex_);
     return configured_;
@@ -380,7 +469,7 @@ NativePolicySnapshot NativePolicyEngine::snapshot() const {
     std::shared_lock lock(mutex_);
     return NativePolicySnapshot{configured_, session_id_, generation_, revision_, package_name_,
             process_name_, virtual_user_id_, virtual_uid_, virtual_pid_, abi_name_,
-            instance_root_, apk_path_, native_library_root_};
+            instance_root_, apk_path_, native_library_root_, network_identity_};
 }
 
 NativePolicyEngine& global_policy() {

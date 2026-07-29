@@ -27,6 +27,7 @@ import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
+import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -79,7 +80,9 @@ public final class GuestRuntimeEnvironment {
             boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
                     spec.packageName, spec.processName, spec.virtualUserId, spec.virtualUid,
                     virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
-                    spec.nativeLibraryDir, true, new String[0], new String[0], new String[0], new String[0]);
+                    spec.nativeLibraryDir, true, new String[0], new String[0], new String[0], new String[0],
+                    new String[0], new String[0],
+                    NativeNetworkIdentity.isolated(spec.packageName, spec.virtualUserId));
             boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
@@ -110,6 +113,10 @@ public final class GuestRuntimeEnvironment {
             GuestCapabilityAuditLog capabilityAudit = new GuestCapabilityAuditLog();
             CapabilityLeaseRegistry capabilityLeases = new CapabilityLeaseRegistry();
             CapabilityAccessPolicy capabilityPolicy = new CapabilityAccessPolicy(permissionPolicy::isGranted, appOpsPolicy::mode);
+            if (nativePolicyConfigured && !NativePolicy.configureAudioCapture(spec.sessionId, spec.generation,
+                    capabilityPolicy.allowed(CapabilityAccessPolicy.MICROPHONE))) {
+                throw new IllegalStateException("NATIVE_AUDIO_POLICY_UNAVAILABLE");
+            }
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
@@ -164,6 +171,7 @@ public final class GuestRuntimeEnvironment {
                 if (stagedHooks != null) stagedHooks.close();
                 if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
             }
+            NativePolicy.resetAudioCapture();
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             current = null;
@@ -348,6 +356,10 @@ public final class GuestRuntimeEnvironment {
             appOpsPolicy.replace(nextAppOps.modes());
             context.updatePermissionState(updated.permissions());
             capabilityLeases.revokeDenied(capabilityPolicy, capabilityAudit);
+            if (nativePolicyConfigured) {
+                NativePolicy.setAudioCaptureAllowed(spec.generation,
+                        capabilityPolicy.allowed(CapabilityAccessPolicy.MICROPHONE));
+            }
             packageState = updated;
         }
 
@@ -399,6 +411,7 @@ public final class GuestRuntimeEnvironment {
             out.putBoolean("nativePolicyConfigured", nativePolicyConfigured);
             out.putBoolean("nativeHooksInstalled", nativeHooksInstalled);
             out.putString("nativeHookStatus", NativePolicy.hookStatus());
+            out.putString("nativeAudioCaptureStatus", NativePolicy.audioCaptureStatus());
             out.putBoolean("nativeCrashRecorderInstalled", nativeCrashRecorderInstalled);
             out.putString("nativeCrashStatus", NativePolicy.crashStatus());
             out.putAll(RuntimeDiagnostics.snapshot());
