@@ -15,6 +15,7 @@ public final class PackageRecordSnapshot implements Parcelable {
     private final String signatureSha256;
     private final String apkPath;
     private final String nativeLibraryDir;
+    private final String nativeAbi;
     private final String launchActivity;
     private final String launchProcess;
     private final String applicationClass;
@@ -46,7 +47,7 @@ public final class PackageRecordSnapshot implements Parcelable {
                                  String permissions, String apkSha256, long importedAt,
                                  String lastProbeStatus, long lastProbeAt) {
         this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
-                nativeLibraryDir, launchActivity, launchProcess, applicationClass,
+                nativeLibraryDir, "", launchActivity, launchProcess, applicationClass,
                 serviceClass, serviceProcess, receiverClass, receiverProcess, receiverAction,
                 providerClass, providerProcess, providerAuthority, permissions, "", apkSha256,
                 apkSha256, List.of(new PackageArtifactSnapshot("", "BASE", "", "", apkPath, apkSha256)),
@@ -65,10 +66,30 @@ public final class PackageRecordSnapshot implements Parcelable {
                                  String apkSha256, String baseApkSha256,
                                  List<PackageArtifactSnapshot> artifacts, long importedAt,
                                  String lastProbeStatus, long lastProbeAt) {
+        this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
+                nativeLibraryDir, "", launchActivity, launchProcess, applicationClass,
+                serviceClass, serviceProcess, receiverClass, receiverProcess, receiverAction,
+                providerClass, providerProcess, providerAuthority, permissions, sharedLibraries,
+                apkSha256, baseApkSha256, artifacts, importedAt, lastProbeStatus, lastProbeAt);
+    }
+
+    public PackageRecordSnapshot(String packageName, String label, String versionName,
+                                 long versionCode, String signatureSha256, String apkPath,
+                                 String nativeLibraryDir, String nativeAbi, String launchActivity,
+                                 String launchProcess, String applicationClass,
+                                 String serviceClass, String serviceProcess,
+                                 String receiverClass, String receiverProcess,
+                                 String receiverAction, String providerClass,
+                                 String providerProcess, String providerAuthority,
+                                 String permissions, String sharedLibraries,
+                                 String apkSha256, String baseApkSha256,
+                                 List<PackageArtifactSnapshot> artifacts, long importedAt,
+                                 String lastProbeStatus, long lastProbeAt) {
         this.packageName = required(packageName, "packageName");
         this.label = value(label); this.versionName = value(versionName); this.versionCode = versionCode;
         this.signatureSha256 = required(signatureSha256, "signatureSha256");
         this.apkPath = required(apkPath, "apkPath"); this.nativeLibraryDir = value(nativeLibraryDir);
+        this.nativeAbi = nativeAbi(nativeAbi, this.nativeLibraryDir);
         this.launchActivity = value(launchActivity); this.launchProcess = value(launchProcess);
         this.applicationClass = value(applicationClass); this.serviceClass = value(serviceClass);
         this.serviceProcess = value(serviceProcess); this.receiverClass = value(receiverClass);
@@ -88,15 +109,16 @@ public final class PackageRecordSnapshot implements Parcelable {
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
-                in.readString(), in.readString(), in.createTypedArrayList(PackageArtifactSnapshot.CREATOR),
+                in.readString(), in.readString(), in.readString(), in.createTypedArrayList(PackageArtifactSnapshot.CREATOR),
                 in.readLong(), in.readString(), in.readLong());
     }
 
     public String packageName() { return packageName; } public String label() { return label; }
     public String versionName() { return versionName; } public long versionCode() { return versionCode; }
     public String signatureSha256() { return signatureSha256; } public String apkPath() { return apkPath; }
-    public String nativeLibraryDir() { return nativeLibraryDir; } public String launchActivity() { return launchActivity; }
-    public String launchProcess() { return launchProcess; } public String applicationClass() { return applicationClass; }
+    public String nativeLibraryDir() { return nativeLibraryDir; } public String nativeAbi() { return nativeAbi; }
+    public String launchActivity() { return launchActivity; } public String launchProcess() { return launchProcess; }
+    public String applicationClass() { return applicationClass; }
     public String serviceClass() { return serviceClass; } public String serviceProcess() { return serviceProcess; }
     public String receiverClass() { return receiverClass; } public String receiverProcess() { return receiverProcess; }
     public String receiverAction() { return receiverAction; } public String providerClass() { return providerClass; }
@@ -109,7 +131,7 @@ public final class PackageRecordSnapshot implements Parcelable {
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeString(packageName); out.writeString(label); out.writeString(versionName); out.writeLong(versionCode);
-        out.writeString(signatureSha256); out.writeString(apkPath); out.writeString(nativeLibraryDir);
+        out.writeString(signatureSha256); out.writeString(apkPath); out.writeString(nativeLibraryDir); out.writeString(nativeAbi);
         out.writeString(launchActivity); out.writeString(launchProcess); out.writeString(applicationClass);
         out.writeString(serviceClass); out.writeString(serviceProcess); out.writeString(receiverClass);
         out.writeString(receiverProcess); out.writeString(receiverAction); out.writeString(providerClass);
@@ -122,6 +144,7 @@ public final class PackageRecordSnapshot implements Parcelable {
         @Override public PackageRecordSnapshot createFromParcel(Parcel in) { return new PackageRecordSnapshot(in); }
         @Override public PackageRecordSnapshot[] newArray(int size) { return new PackageRecordSnapshot[size]; }
     };
+
     private static void validateArtifacts(List<PackageArtifactSnapshot> artifacts,
                                           String apkPath, String baseApkSha256) {
         if (artifacts.isEmpty() || artifacts.size() > 256) {
@@ -142,6 +165,17 @@ public final class PackageRecordSnapshot implements Parcelable {
         }
         if (baseCount != 1) throw new IllegalArgumentException("Exactly one base artifact is required");
     }
+
+    private static String nativeAbi(String nativeAbi, String nativeLibraryDir) {
+        String value = value(nativeAbi).trim();
+        if (value.isEmpty() && !nativeLibraryDir.trim().isEmpty()) return "legacy-unknown";
+        if (!value.isEmpty() && !value.equals("arm64-v8a") && !value.equals("armeabi-v7a")
+                && !value.equals("x86_64") && !value.equals("x86") && !value.equals("legacy-unknown")) {
+            throw new IllegalArgumentException("Unsupported native ABI: " + value);
+        }
+        return value;
+    }
+
     private static String digest(String value, String name) {
         String normalized = required(value, name).toLowerCase(java.util.Locale.ROOT);
         if (!normalized.matches("[0-9a-f]{64}")) {

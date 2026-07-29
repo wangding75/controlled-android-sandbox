@@ -28,6 +28,7 @@ public final class GuestPackageSpec {
     final long apkVersionCode;
     final String packageRevision;
     final String nativeLibraryDir;
+    final String nativeAbi;
     final String applicationClass;
     public final String componentClass;
     final String dataRoot;
@@ -66,6 +67,8 @@ public final class GuestPackageSpec {
         if (apkVersionCode < 0) throw new IllegalArgumentException("apkVersionCode must be non-negative");
         packageRevision = required(bundle, RuntimeKeys.PACKAGE_REVISION);
         nativeLibraryDir = bundle.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
+        nativeAbi = bundle.getString(RuntimeKeys.NATIVE_ABI, "");
+        validateNativeAbi(nativeLibraryDir, nativeAbi);
         applicationClass = bundle.getString(RuntimeKeys.APPLICATION_CLASS, "");
         componentClass = bundle.getString(RuntimeKeys.COMPONENT_CLASS, "");
         dataRoot = required(bundle, RuntimeKeys.DATA_ROOT);
@@ -99,7 +102,8 @@ public final class GuestPackageSpec {
         out.putString(RuntimeKeys.APK_PATH, apkPath); out.putString(RuntimeKeys.APK_SHA256, apkSha256);
         out.putString(RuntimeKeys.BASE_APK_SHA256, baseApkSha256);
         out.putLong(RuntimeKeys.APK_VERSION_CODE, apkVersionCode); out.putString(RuntimeKeys.PACKAGE_REVISION, packageRevision);
-        out.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, nativeLibraryDir); out.putString(RuntimeKeys.APPLICATION_CLASS, applicationClass);
+        out.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, nativeLibraryDir); out.putString(RuntimeKeys.NATIVE_ABI, nativeAbi);
+        out.putString(RuntimeKeys.APPLICATION_CLASS, applicationClass);
         out.putString(RuntimeKeys.COMPONENT_CLASS, componentClass); out.putString(RuntimeKeys.DATA_ROOT, dataRoot);
         out.putStringArrayList(RuntimeKeys.PERMISSIONS, new ArrayList<>(permissions));
         out.putStringArrayList(RuntimeKeys.SPLIT_NAMES, new ArrayList<>(splitNames));
@@ -113,6 +117,18 @@ public final class GuestPackageSpec {
         out.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER, runtimeBrokerBinder);
         out.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
         return out;
+    }
+
+    private static void validateNativeAbi(String nativeLibraryDir, String nativeAbi) {
+        String dir = nativeLibraryDir == null ? "" : nativeLibraryDir.trim();
+        String abi = nativeAbi == null ? "" : nativeAbi.trim();
+        if (!dir.isEmpty() && (abi.isEmpty() || abi.equals("legacy-unknown"))) {
+            throw new IllegalArgumentException("NATIVE_ABI_METADATA_MISSING");
+        }
+        if (!abi.isEmpty() && !abi.equals("arm64-v8a") && !abi.equals("armeabi-v7a")
+                && !abi.equals("x86_64") && !abi.equals("x86")) {
+            throw new IllegalArgumentException("UNSUPPORTED_NATIVE_ABI:" + abi);
+        }
     }
 
     File apkFile() { return new File(apkPath); }

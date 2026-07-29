@@ -176,8 +176,9 @@ std::optional<CidrV4> CidrV4::parse(std::string_view value) noexcept {
 }
 
 void NativePolicyEngine::configure(std::string session_id, std::uint64_t generation,
-                                   std::string package_name, int virtual_user_id,
-                                   std::string instance_root, std::string apk_path,
+                                   std::string package_name, std::string process_name,
+                                   int virtual_user_id, int virtual_uid, int virtual_pid,
+                                   std::string abi_name, std::string instance_root, std::string apk_path,
                                    std::string native_library_root, bool default_network_allow,
                                    std::vector<std::string> allow_hosts,
                                    std::vector<std::string> deny_hosts,
@@ -186,7 +187,11 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     if (session_id.empty() || session_id.size() > 128) throw std::invalid_argument("session id is invalid");
     if (generation < 1) throw std::invalid_argument("generation must be positive");
     if (package_name.empty()) throw std::invalid_argument("package name is required");
+    if (process_name.empty() || process_name.size() > 255) throw std::invalid_argument("process name is invalid");
     if (virtual_user_id < 0) throw std::invalid_argument("virtual user id must be non-negative");
+    if (virtual_uid < 0) throw std::invalid_argument("virtual uid must be non-negative");
+    if (virtual_pid < 1) throw std::invalid_argument("virtual pid must be positive");
+    if (abi_name.empty() || abi_name.size() > 32) throw std::invalid_argument("ABI name is invalid");
     instance_root = trim_root(std::move(instance_root), "instance root");
     apk_path = trim_root(std::move(apk_path), "apk path");
     if (!native_library_root.empty()) {
@@ -206,7 +211,9 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     if (configured_) {
         if (session_id != session_id_) throw std::logic_error("NATIVE_POLICY_SESSION_ACTIVE");
         if (generation < generation_) throw std::logic_error("STALE_NATIVE_POLICY_GENERATION");
-        if (package_name != package_name_ || virtual_user_id != virtual_user_id_
+        if (package_name != package_name_ || process_name != process_name_
+                || virtual_user_id != virtual_user_id_ || virtual_uid != virtual_uid_
+                || virtual_pid != virtual_pid_ || abi_name != abi_name_
                 || instance_root != instance_root_ || apk_path != apk_path_
                 || native_library_root != native_library_root_) {
             throw std::logic_error("NATIVE_POLICY_IDENTITY_CHANGED_WITHIN_SESSION");
@@ -216,7 +223,11 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     generation_ = generation;
     revision_++;
     package_name_ = std::move(package_name);
+    process_name_ = std::move(process_name);
     virtual_user_id_ = virtual_user_id;
+    virtual_uid_ = virtual_uid;
+    virtual_pid_ = virtual_pid;
+    abi_name_ = std::move(abi_name);
     instance_root_ = std::move(instance_root);
     apk_path_ = std::move(apk_path);
     native_library_root_ = std::move(native_library_root);
@@ -233,7 +244,11 @@ void NativePolicyEngine::reset() noexcept {
     session_id_.clear();
     generation_ = 0;
     package_name_.clear();
+    process_name_.clear();
     virtual_user_id_ = 0;
+    virtual_uid_ = 0;
+    virtual_pid_ = 0;
+    abi_name_.clear();
     instance_root_.clear();
     apk_path_.clear();
     native_library_root_.clear();
@@ -320,7 +335,7 @@ std::string NativePolicyEngine::reverse_map_path(std::string_view host_path) con
     if (normalized == apk_path_) return "/data/app/" + package_name_ + "/base.apk";
     if (!native_library_root_.empty() && path_has_prefix(normalized, native_library_root_)) {
         const std::string suffix = suffix_after(normalized, native_library_root_);
-        return append_relative("/data/app/" + package_name_ + "/lib", suffix);
+        return append_relative("/data/app/" + package_name_ + "/lib/" + abi_name_, suffix);
     }
     const std::string data_target = instance_root_ + "/data";
     if (path_has_prefix(normalized, data_target)) {
@@ -364,7 +379,8 @@ bool NativePolicyEngine::configured() const noexcept {
 NativePolicySnapshot NativePolicyEngine::snapshot() const {
     std::shared_lock lock(mutex_);
     return NativePolicySnapshot{configured_, session_id_, generation_, revision_, package_name_,
-            virtual_user_id_, instance_root_, apk_path_, native_library_root_};
+            process_name_, virtual_user_id_, virtual_uid_, virtual_pid_, abi_name_,
+            instance_root_, apk_path_, native_library_root_};
 }
 
 NativePolicyEngine& global_policy() {

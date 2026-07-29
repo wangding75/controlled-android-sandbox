@@ -62,7 +62,7 @@
       "name": "sandbox-native",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 18,
+      "fileCount": 25,
       "languages": [
         "C++",
         "Gradle",
@@ -70,7 +70,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "54867680def82b402daab3dd36004c456e4c381adb1b8e522ce240ca3305c0ab"
+      "sourceDigestSha256": "6436e0c9bc7928c0d734f311af8065b593cbe2866b055e7625239e64faa28521"
     },
     {
       "type": "library",
@@ -83,7 +83,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "b5f54758a06ffc15af30059da6bc7e6eaf25f73d00c47ceca118caf64313ea2c"
+      "sourceDigestSha256": "b2885dd0111033cc9ce2cd72d3d8cca282c414577c1d230e23fd163b342cc20c"
     },
     {
       "type": "application",

@@ -1401,6 +1401,44 @@
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
       "notes": "Package Service persists periodic scheduling, minimum latency, override deadline, linear/exponential bounded backoff, failure count, next-run time and APK revision cleanup; stale RUNNING/DISPATCHING work recovers to SCHEDULED."
+    },
+    {
+      "id": "native.modern-filesystem-syscalls",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_hook.cpp",
+        "sandbox-native/src/main/cpp/native_file_system.cpp",
+        "sandbox-native/src/test/cpp/native_hook_self_test.cpp",
+        "scripts/check-native-files-loader.py"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "Guest-library PLT/GOT hooks apply confinement policy to openat2, statx, renameat2, faccessat2, getdents64 and file-backed mmap. Host-native tests execute each path; Android API/ABI behavior remains device-deferred."
+    },
+    {
+      "id": "native.proc-self-virtualization",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_procfs.cpp",
+        "sandbox-native/src/main/cpp/include/controlled_sandbox/native_procfs.h",
+        "sandbox-native/src/test/cpp/native_procfs_self_test.cpp"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "/proc/self/maps, cmdline and status are materialized as bounded read-only Guest snapshots. Host private mappings are redacted and PID/UID/process identity is virtualized."
+    },
+    {
+      "id": "native.dynamic-loader-policy",
+      "evidence": [
+        "sandbox-native/src/main/cpp/native_loader.cpp",
+        "sandbox-native/src/main/cpp/native_hook.cpp",
+        "sandbox-native/src/test/cpp/native_loader_self_test.cpp",
+        "sandbox-native/src/test/cpp/native_loader_child_fixture.cpp"
+      ],
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
+      "deviceStatus": "not-tested",
+      "notes": "dlopen and android_dlopen_ext are routed through Guest native-root and explicit system-soname policy. Unknown sonames, Host private paths and foreign linker namespaces fail closed; real Android linker namespace behavior remains device-deferred."
     }
   ],
   "statusDimensions": {

@@ -13,11 +13,31 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_file_system_self_test.cpp" \
   -o "$OUT/native_file_system_self_test"
 "$OUT/native_file_system_self_test"
 "$OUT/native_policy_self_test"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/test/cpp/native_procfs_self_test.cpp" \
+  -o "$OUT/native_procfs_self_test"
+"$OUT/native_procfs_self_test"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
+  "$ROOT/sandbox-native/src/test/cpp/native_loader_self_test.cpp" \
+  -o "$OUT/native_loader_self_test"
+"$OUT/native_loader_self_test"
 mkdir -p "$OUT/guest"
+g++ -std=c++20 -Wall -Wextra -Werror -fPIC -shared \
+  "$ROOT/sandbox-native/src/test/cpp/native_loader_child_fixture.cpp" \
+  -o "$OUT/guest/libnative_loader_child.so"
 g++ -std=c++20 -Wall -Wextra -Werror -fPIC -shared \
   "$ROOT/sandbox-native/src/test/cpp/native_file_hook_fixture.cpp" \
   -o "$OUT/guest/libnative_file_hook_fixture.so"
@@ -25,6 +45,9 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_hook_self_test.cpp" \
   -ldl -o "$OUT/native_hook_self_test"
@@ -45,6 +68,18 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   -o "$OUT/native_file_system.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  -o "$OUT/native_procfs.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
+  -o "$OUT/native_loader.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
+  -o "$OUT/native_interceptors.o"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \

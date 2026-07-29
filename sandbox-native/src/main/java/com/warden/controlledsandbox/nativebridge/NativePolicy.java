@@ -22,7 +22,8 @@ public final class NativePolicy {
     public static String loadError() { return loadError; }
 
     public static boolean configure(String sessionId, long generation, String packageName,
-                                    int virtualUserId, String instanceRoot, String apkPath,
+                                    String processName, int virtualUserId, int virtualUid,
+                                    int virtualPid, String abiName, String instanceRoot, String apkPath,
                                     String nativeLibraryRoot, boolean defaultNetworkAllow,
                                     String[] allowHosts, String[] denyHosts,
                                     String[] allowCidrs, String[] denyCidrs) {
@@ -30,11 +31,16 @@ public final class NativePolicy {
         if (sessionId == null || sessionId.trim().isEmpty()) throw new IllegalArgumentException("sessionId is required");
         if (generation < 1) throw new IllegalArgumentException("generation must be positive");
         if (packageName == null || packageName.trim().isEmpty()) throw new IllegalArgumentException("packageName is required");
+        if (processName == null || processName.trim().isEmpty()) throw new IllegalArgumentException("processName is required");
         if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+        if (virtualUid < 0) throw new IllegalArgumentException("virtualUid must be non-negative");
+        if (virtualPid < 1) throw new IllegalArgumentException("virtualPid must be positive");
+        if (abiName == null || abiName.trim().isEmpty()) throw new IllegalArgumentException("abiName is required");
         if (instanceRoot == null || instanceRoot.trim().isEmpty()) throw new IllegalArgumentException("instanceRoot is required");
         if (apkPath == null || apkPath.trim().isEmpty()) throw new IllegalArgumentException("apkPath is required");
-        return nativeConfigure(sessionId, generation, packageName, virtualUserId, instanceRoot,
-                apkPath, nativeLibraryRoot == null ? "" : nativeLibraryRoot,
+        return nativeConfigure(sessionId, generation, packageName, processName, virtualUserId,
+                virtualUid, virtualPid, abiName, instanceRoot, apkPath,
+                nativeLibraryRoot == null ? "" : nativeLibraryRoot,
                 defaultNetworkAllow, safe(allowHosts), safe(denyHosts), safe(allowCidrs), safe(denyCidrs));
     }
 
@@ -70,7 +76,8 @@ public final class NativePolicy {
 
     private static String[] safe(String[] values) { return values == null ? new String[0] : values.clone(); }
     private static native boolean nativeConfigure(String sessionId, long generation, String packageName,
-                                                  int virtualUserId, String instanceRoot, String apkPath,
+                                                  String processName, int virtualUserId, int virtualUid,
+                                                  int virtualPid, String abiName, String instanceRoot, String apkPath,
                                                   String nativeLibraryRoot, boolean defaultNetworkAllow,
                                                   String[] allowHosts, String[] denyHosts,
                                                   String[] allowCidrs, String[] denyCidrs);

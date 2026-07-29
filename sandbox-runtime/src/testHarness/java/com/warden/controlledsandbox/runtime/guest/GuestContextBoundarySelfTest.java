@@ -30,6 +30,7 @@ public final class GuestContextBoundarySelfTest {
             request.putLong(RuntimeKeys.APK_VERSION_CODE, 1L);
             request.putString(RuntimeKeys.PACKAGE_REVISION, "v1:sha256:" + "a".repeat(64));
             request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, new File(root, "lib").getAbsolutePath());
+            request.putString(RuntimeKeys.NATIVE_ABI, "x86_64");
             request.putString(RuntimeKeys.DATA_ROOT, new File(root, "instance").getAbsolutePath());
             request.putParcelable(RuntimeKeys.PACKAGE_STATE, new VirtualPackageStateSnapshot(
                     "com.example.guest", 3, "Guest", "1", 1L, "b".repeat(64),

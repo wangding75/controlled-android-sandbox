@@ -20,7 +20,7 @@ void configure(NativePolicyEngine& policy, std::uint64_t generation = 7) {
     auto allow = CidrV4::parse("10.0.0.0/8");
     auto deny = CidrV4::parse("10.8.0.0/16");
     require(allow.has_value() && deny.has_value(), "CIDR parse");
-    policy.configure("session-a", generation, "com.example.guest", 3,
+    policy.configure("session-a", generation, "com.example.guest", "com.example.guest:main", 3, 103000, 20300, "x86_64",
                      "/sandbox/users/3/apps/com.example.guest",
                      "/sandbox/packages/com.example.guest/base.apk",
                      "/sandbox/packages/com.example.guest/lib/arm64",
@@ -95,7 +95,7 @@ int main() {
     require(stale, "stale generation rejected");
     bool identity_change = false;
     try {
-        policy.configure("session-a", 9, "com.changed.guest", 3,
+        policy.configure("session-a", 9, "com.changed.guest", "com.example.guest:main", 3, 103000, 20300, "x86_64",
                 "/sandbox/users/3/apps/com.example.guest",
                 "/sandbox/packages/com.example.guest/base.apk",
                 "/sandbox/packages/com.example.guest/lib/arm64", true, {}, {}, {}, {});
@@ -103,7 +103,7 @@ int main() {
     require(identity_change, "identity change within session rejected");
     bool session_collision = false;
     try {
-        policy.configure("session-b", 9, "com.example.guest", 3,
+        policy.configure("session-b", 9, "com.example.guest", "com.example.guest:main", 3, 103000, 20300, "x86_64",
                 "/sandbox/users/3/apps/com.example.guest",
                 "/sandbox/packages/com.example.guest/base.apk",
                 "/sandbox/packages/com.example.guest/lib/arm64", true, {}, {}, {}, {});

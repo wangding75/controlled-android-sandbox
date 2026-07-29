@@ -39,7 +39,11 @@ struct NativePolicySnapshot {
     std::uint64_t generation{};
     std::uint64_t revision{};
     std::string package_name;
+    std::string process_name;
     int virtual_user_id{};
+    int virtual_uid{};
+    int virtual_pid{};
+    std::string abi_name;
     std::string instance_root;
     std::string apk_path;
     std::string native_library_root;
@@ -48,8 +52,9 @@ struct NativePolicySnapshot {
 class NativePolicyEngine final {
 public:
     void configure(std::string session_id, std::uint64_t generation,
-                   std::string package_name, int virtual_user_id,
-                   std::string instance_root, std::string apk_path,
+                   std::string package_name, std::string process_name,
+                   int virtual_user_id, int virtual_uid, int virtual_pid,
+                   std::string abi_name, std::string instance_root, std::string apk_path,
                    std::string native_library_root, bool default_network_allow,
                    std::vector<std::string> allow_hosts,
                    std::vector<std::string> deny_hosts,
@@ -72,7 +77,11 @@ private:
     std::uint64_t generation_{};
     std::uint64_t revision_{};
     std::string package_name_;
+    std::string process_name_;
     int virtual_user_id_{};
+    int virtual_uid_{};
+    int virtual_pid_{};
+    std::string abi_name_;
     std::string instance_root_;
     std::string apk_path_;
     std::string native_library_root_;

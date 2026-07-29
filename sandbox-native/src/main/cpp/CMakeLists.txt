@@ -4,6 +4,9 @@ project(controlled_sandbox_native LANGUAGES CXX)
 add_library(controlled_sandbox_native SHARED
     native_policy.cpp
     native_file_system.cpp
+    native_procfs.cpp
+    native_loader.cpp
+    native_interceptors.cpp
     native_hook.cpp
     native_crash.cpp
     native_policy_jni.cpp

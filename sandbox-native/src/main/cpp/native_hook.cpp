@@ -1,344 +1,21 @@
 #include "controlled_sandbox/native_hook.h"
-#include "controlled_sandbox/native_file_system.h"
+#include "controlled_sandbox/native_interceptors.h"
 #include "controlled_sandbox/native_policy.h"
 
-#include <arpa/inet.h>
-#include <cerrno>
-#include <cstdarg>
-#include <cstdint>
-#include <cstring>
-#include <dlfcn.h>
-#include <fcntl.h>
 #include <cstdio>
+#include <cstdint>
 #include <link.h>
 #include <mutex>
-#include <netdb.h>
 #include <sys/mman.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <string>
 #include <string_view>
-#include <unordered_set>
-#include <vector>
 
 namespace controlled_sandbox {
 namespace {
-
-using OpenFn = int (*)(const char*, int, ...);
-using OpenAtFn = int (*)(int, const char*, int, ...);
-using Open2Fn = int (*)(const char*, int);
-using OpenAt2Fn = int (*)(int, const char*, int);
-using AccessFn = int (*)(const char*, int);
-using FaccessAtFn = int (*)(int, const char*, int, int);
-using StatFn = int (*)(const char*, struct stat*);
-using FstatAtFn = int (*)(int, const char*, struct stat*, int);
-using ReadlinkFn = ssize_t (*)(const char*, char*, size_t);
-using ReadlinkAtFn = ssize_t (*)(int, const char*, char*, size_t);
-using ConnectFn = int (*)(int, const sockaddr*, socklen_t);
-using GetAddrInfoFn = int (*)(const char*, const char*, const addrinfo*, addrinfo**);
-using DlopenFn = void* (*)(const char*, int);
-
-std::atomic<OpenFn> real_open{nullptr};
-std::atomic<OpenFn> real_open64{nullptr};
-std::atomic<OpenAtFn> real_openat{nullptr};
-std::atomic<OpenAtFn> real_openat64{nullptr};
-std::atomic<Open2Fn> real_open_2{nullptr};
-std::atomic<OpenAt2Fn> real_openat_2{nullptr};
-std::atomic<AccessFn> real_access{nullptr};
-std::atomic<FaccessAtFn> real_faccessat{nullptr};
-std::atomic<StatFn> real_stat{nullptr};
-std::atomic<StatFn> real_lstat{nullptr};
-std::atomic<FstatAtFn> real_fstatat{nullptr};
-std::atomic<ReadlinkFn> real_readlink{nullptr};
-std::atomic<ReadlinkAtFn> real_readlinkat{nullptr};
-std::atomic<ConnectFn> real_connect{nullptr};
-std::atomic<GetAddrInfoFn> real_getaddrinfo{nullptr};
-std::atomic<DlopenFn> real_dlopen{nullptr};
-thread_local bool inside_refresh = false;
-
-void* resolve_next(const char* name) {
-    dlerror();
-    void* value = dlsym(RTLD_NEXT, name);
-    (void) dlerror();
-    return value;
-}
-
-template <typename Function>
-Function require_real(std::atomic<Function>& storage, const char* name) {
-    Function current = storage.load(std::memory_order_acquire);
-    if (current != nullptr) return current;
-    current = reinterpret_cast<Function>(resolve_next(name));
-    storage.store(current, std::memory_order_release);
-    return current;
-}
-
-bool requires_mode(int flags) {
-    if ((flags & O_CREAT) != 0) return true;
-#ifdef O_TMPFILE
-    if ((flags & O_TMPFILE) == O_TMPFILE) return true;
-#endif
-    return false;
-}
-
-template <typename Resolver>
-bool resolve_checked(Resolver&& resolver, bool follow_final_symlink, NativeResolvedPath& out) {
-    try {
-        out = resolver();
-        NativeFileSystemResolver::validate_confinement(out, follow_final_symlink);
-        return true;
-    } catch (const PathPolicyError& error) {
-        errno = error.error_number();
-        return false;
-    } catch (...) {
-        errno = EACCES;
-        return false;
-    }
-}
-
-extern "C" int controlled_open(const char* path, int flags, ...) {
-    OpenFn function = require_real(real_open, "open");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    if (requires_mode(flags)) {
-        va_list values;
-        va_start(values, flags);
-        mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return function(resolved.path.c_str(), flags, mode);
-    }
-    return function(resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_open64(const char* path, int flags, ...) {
-    OpenFn function = require_real(real_open64, "open64");
-    if (function == nullptr) function = require_real(real_open, "open");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    if (requires_mode(flags)) {
-        va_list values;
-        va_start(values, flags);
-        mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return function(resolved.path.c_str(), flags, mode);
-    }
-    return function(resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_openat(int directory, const char* path, int flags, ...) {
-    OpenAtFn function = require_real(real_openat, "openat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, true, resolved)) return -1;
-    if (requires_mode(flags)) {
-        va_list values;
-        va_start(values, flags);
-        mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
-    }
-    return function(resolved.directory_fd, resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_openat64(int directory, const char* path, int flags, ...) {
-    OpenAtFn function = require_real(real_openat64, "openat64");
-    if (function == nullptr) function = require_real(real_openat, "openat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, true, resolved)) return -1;
-    if (requires_mode(flags)) {
-        va_list values;
-        va_start(values, flags);
-        mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
-    }
-    return function(resolved.directory_fd, resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_open_2(const char* path, int flags) {
-    Open2Fn function = require_real(real_open_2, "__open_2");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_openat_2(int directory, const char* path, int flags) {
-    OpenAt2Fn function = require_real(real_openat_2, "__openat_2");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, true, resolved)) return -1;
-    return function(resolved.directory_fd, resolved.path.c_str(), flags);
-}
-
-extern "C" int controlled_access(const char* path, int mode) {
-    AccessFn function = require_real(real_access, "access");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), mode);
-}
-
-extern "C" int controlled_faccessat(int directory, const char* path, int mode, int flags) {
-    FaccessAtFn function = require_real(real_faccessat, "faccessat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-#ifdef AT_EMPTY_PATH
-    if (path != nullptr && path[0] == '\0' && (flags & AT_EMPTY_PATH) != 0) {
-        return function(directory, path, mode, flags);
-    }
-#endif
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, true, resolved)) return -1;
-    return function(resolved.directory_fd, resolved.path.c_str(), mode, flags);
-}
-
-extern "C" int controlled_stat(const char* path, struct stat* value) {
-    StatFn function = require_real(real_stat, "stat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), value);
-}
-
-extern "C" int controlled_lstat(const char* path, struct stat* value) {
-    StatFn function = require_real(real_lstat, "lstat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) return -1;
-    return function(resolved.path.c_str(), value);
-}
-
-extern "C" int controlled_fstatat(int directory, const char* path, struct stat* value, int flags) {
-    FstatAtFn function = require_real(real_fstatat, "fstatat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-#ifdef AT_EMPTY_PATH
-    if (path != nullptr && path[0] == '\0' && (flags & AT_EMPTY_PATH) != 0) {
-        return function(directory, path, value, flags);
-    }
-#endif
-    const bool follow = (flags & AT_SYMLINK_NOFOLLOW) == 0;
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, follow, resolved)) return -1;
-    return function(resolved.directory_fd, resolved.path.c_str(), value, flags);
-}
-
-ssize_t copy_readlink_value(const std::string& value, char* buffer, size_t size) {
-    if (size == 0) { errno = EINVAL; return -1; }
-    if (buffer == nullptr) { errno = EFAULT; return -1; }
-    const std::size_t count = std::min(size, value.size());
-    std::memcpy(buffer, value.data(), count);
-    return static_cast<ssize_t>(count);
-}
-
-template <typename Call>
-ssize_t controlled_readlink_common(Call&& call, char* buffer, size_t size) {
-    if (size == 0) { errno = EINVAL; return -1; }
-    if (buffer == nullptr) { errno = EFAULT; return -1; }
-    std::vector<char> raw(256);
-    for (;;) {
-        const ssize_t length = call(raw.data(), raw.size());
-        if (length < 0) return -1;
-        if (static_cast<std::size_t>(length) < raw.size()) {
-            const std::string rewritten = NativeFileSystemResolver::rewrite_readlink_result(
-                    std::string_view(raw.data(), static_cast<std::size_t>(length)));
-            return copy_readlink_value(rewritten, buffer, size);
-        }
-        if (raw.size() >= 65536U) { errno = ENAMETOOLONG; return -1; }
-        raw.resize(raw.size() * 2U);
-    }
-}
-
-extern "C" ssize_t controlled_readlink(const char* path, char* buffer, size_t size) {
-    ReadlinkFn function = require_real(real_readlink, "readlink");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) return -1;
-    return controlled_readlink_common([&](char* out, size_t capacity) {
-        return function(resolved.path.c_str(), out, capacity);
-    }, buffer, size);
-}
-
-extern "C" ssize_t controlled_readlinkat(int directory, const char* path, char* buffer, size_t size) {
-    ReadlinkAtFn function = require_real(real_readlinkat, "readlinkat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (path != nullptr && path[0] == '\0' && directory != AT_FDCWD) {
-        return controlled_readlink_common([&](char* out, size_t capacity) {
-            return function(directory, path, out, capacity);
-        }, buffer, size);
-    }
-    NativeResolvedPath resolved;
-    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, false, resolved)) return -1;
-    return controlled_readlink_common([&](char* out, size_t capacity) {
-        return function(resolved.directory_fd, resolved.path.c_str(), out, capacity);
-    }, buffer, size);
-}
-
-extern "C" int controlled_connect(int socket_fd, const sockaddr* address, socklen_t length) {
-    ConnectFn function = require_real(real_connect, "connect");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (address != nullptr && address->sa_family == AF_INET && length >= sizeof(sockaddr_in)) {
-        const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(address);
-        char text[INET_ADDRSTRLEN]{};
-        if (inet_ntop(AF_INET, &ipv4->sin_addr, text, sizeof(text)) != nullptr
-                && !global_policy().allow_ipv4(text)) {
-            errno = EACCES;
-            return -1;
-        }
-    }
-    return function(socket_fd, address, length);
-}
-
-extern "C" int controlled_getaddrinfo(const char* node, const char* service,
-                                       const addrinfo* hints, addrinfo** result) {
-    GetAddrInfoFn function = require_real(real_getaddrinfo, "getaddrinfo");
-    if (function == nullptr) return EAI_SYSTEM;
-    if (node != nullptr && !global_policy().allow_host(node)) return EAI_NONAME;
-    return function(node, service, hints, result);
-}
-
-extern "C" void* controlled_dlopen(const char* name, int flags) {
-    DlopenFn function = require_real(real_dlopen, "dlopen");
-    if (function == nullptr) { errno = ENOSYS; return nullptr; }
-    void* handle = function(name, flags);
-    if (handle != nullptr && !inside_refresh) {
-        inside_refresh = true;
-        const bool refreshed = global_hooks().refresh();
-        inside_refresh = false;
-        if (!refreshed) {
-            (void) dlclose(handle);
-            errno = EACCES;
-            return nullptr;
-        }
-    }
-    return handle;
-}
-
-void* replacement_for(std::string_view name) {
-    if (name == "open") return reinterpret_cast<void*>(&controlled_open);
-    if (name == "open64") return reinterpret_cast<void*>(&controlled_open64);
-    if (name == "openat") return reinterpret_cast<void*>(&controlled_openat);
-    if (name == "openat64") return reinterpret_cast<void*>(&controlled_openat64);
-    if (name == "__open_2") return reinterpret_cast<void*>(&controlled_open_2);
-    if (name == "__openat_2") return reinterpret_cast<void*>(&controlled_openat_2);
-    if (name == "access") return reinterpret_cast<void*>(&controlled_access);
-    if (name == "faccessat") return reinterpret_cast<void*>(&controlled_faccessat);
-    if (name == "stat") return reinterpret_cast<void*>(&controlled_stat);
-    if (name == "lstat") return reinterpret_cast<void*>(&controlled_lstat);
-    if (name == "fstatat") return reinterpret_cast<void*>(&controlled_fstatat);
-    if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);
-    if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);
-    if (name == "connect") return reinterpret_cast<void*>(&controlled_connect);
-    if (name == "getaddrinfo") return reinterpret_cast<void*>(&controlled_getaddrinfo);
-    if (name == "dlopen") return reinterpret_cast<void*>(&controlled_dlopen);
-    return nullptr;
-}
 
 std::uintptr_t runtime_pointer(std::uintptr_t base, std::uintptr_t value) {
     return value < base ? base + value : value;
@@ -425,7 +102,7 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
         if (symbol_index == 0) continue;
         const char* name = strings + symbols[symbol_index].st_name;
         if (name == nullptr || !NativeHookRuntime::is_target_symbol(name)) continue;
-        void* replacement = replacement_for(name);
+        void* replacement = replacement_for_symbol(name);
         if (replacement == nullptr) continue;
         targets++;
         auto** slot = reinterpret_cast<void**>(base + relocation.r_offset);
@@ -589,10 +266,11 @@ NativeHookStatus NativeHookRuntime::status() const {
 }
 
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 16> targets{
-            "open", "open64", "openat", "openat64", "__open_2", "__openat_2",
-            "access", "faccessat", "stat", "lstat", "fstatat", "readlink", "readlinkat",
-            "connect", "getaddrinfo", "dlopen"};
+    static constexpr std::array<std::string_view, 23> targets{
+            "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
+            "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
+            "renameat2", "readlink", "readlinkat", "getdents64", "mmap",
+            "connect", "getaddrinfo", "dlopen", "android_dlopen_ext"};
     return std::find(targets.begin(), targets.end(), symbol) != targets.end();
 }
 

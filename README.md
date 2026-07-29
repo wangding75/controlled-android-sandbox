@@ -17,7 +17,7 @@ A from-scratch Android application-virtualization research project. Production s
 - Method-level Camera/Location and bounded AudioManager capture proxies, fail-closed proxy readiness, Attribution-aware AppOps, live cleanup of recognized capability resources and per-generation capability-call audit.
 - Durable PendingIntent identity and Broker routing, plus a Package-Service-owned scoped Binder authority for cross-process Clipboard and basic Account state. Revision-scoped exact/repeating Alarm scheduling, offline PendingIntent recovery, Notification Channel/Group/foreground-service/interaction lifecycle and typed JobScheduler constraints, periodic/latency/deadline/expedited/persisted/backoff policy survive Package Service recreation. Android-version device validation remains pending. Receiver and Provider cleanup authorities are extracted from the central Runtime Broker.
 - WebView data-directory suffix per virtual user/process slot.
-- Native C++ path/network policy engine with ARM64/x86_64 Android build definitions and a host-side self-test.
+- Native C++ Guest-library PLT/GOT interception with modern filesystem syscall confinement, virtual `/proc/self` identity files, controlled dynamic-library loading and host-side native tests. Android device/ABI evidence remains pending.
 - Structured JSONL runtime diagnostics, uncaught-exception capture and main-thread liveness watchdog.
 - A debug-only ADB command surface, comprehensive Fixture APK and strict 20-minute Emulator gate.
 - Architecture-boundary checks and generated SBOM.
@@ -33,7 +33,7 @@ The following remain device-gated or incomplete:
 - Device validation of bound services, dynamic receivers, Provider transport/query routing, URI grants and PendingIntent ownership.
 - Declared remote-process and `isolatedProcess` routing.
 - Activity task/back-stack fidelity across API levels.
-- Arbitrary Guest native-library file/network interception; the current native module is a policy engine and JNI boundary, not a general libc hook.
+- Android-version validation of Guest native-library interception, linker namespace behavior and modern syscall availability across all target ABIs.
 - WebView renderer-process isolation evidence.
 - A 20-minute zero-crash/zero-ANR Emulator report.
 
@@ -111,3 +111,8 @@ M4-T15 makes the Broker-owned Activity/Task model recoverable, queryable and rea
 ## M4-T16 source baseline
 
 M4-T16 makes PendingIntent identity durable and revision-bound, including Activity Result, mutability, FillIn/ClipData, sender permissions, virtual creator identity and cross-generation reattachment. It adds typed exact/repeating Alarm state, Listener and PendingIntent delivery, offline retention, Package-Service recovery, Notification Channel/Group lifecycle, foreground-service mapping and persistent click/delete/action sender identity. JobScheduler now persists typed network/power/storage/idle constraints, periodic/latency/deadline/expedited/persisted policy and bounded linear/exponential retry state while retaining the trusted Host-to-Guest JobService bridge. Android AlarmManager/SystemUI/JobScheduler timing, quota and OEM behavior remain device-gated.
+
+
+## M4-T17 B1 source baseline
+
+M4-T17 B1 extends the Guest-only PLT/GOT hook set with `openat2`, `statx`, `renameat2`, `faccessat2`, `getdents64` and file-backed `mmap`. `/proc/self/maps`, `/proc/self/cmdline` and `/proc/self/status` are projected from virtual process identity without exposing Host private paths. `dlopen` and `android_dlopen_ext` are constrained to the Guest native-library root and an explicit public system-library allowlist. These are source and Host-native test results; Android linker, OEM and ABI behavior is not yet device-proven.

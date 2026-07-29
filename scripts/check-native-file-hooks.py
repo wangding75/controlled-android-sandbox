@@ -23,12 +23,14 @@ for relative in required:
         errors.append(f"missing native file-hook evidence: {relative}")
 
 hook = (ROOT / "sandbox-native/src/main/cpp/native_hook.cpp").read_text(encoding="utf-8")
+interceptors = (ROOT / "sandbox-native/src/main/cpp/native_interceptors.cpp").read_text(encoding="utf-8")
+implementation = hook + "\n" + interceptors
 for symbol in [
     '"open"', '"open64"', '"openat"', '"openat64"', '"__open_2"', '"__openat_2"',
     '"access"', '"faccessat"', '"stat"', '"lstat"', '"fstatat"',
     '"readlink"', '"readlinkat"',
 ]:
-    if symbol not in hook:
+    if symbol not in implementation:
         errors.append(f"native hook target missing: {symbol}")
 for token in [
     "NativeFileSystemResolver::resolve(",
@@ -40,11 +42,11 @@ for token in [
     "POLICY_REVISION_CHANGED_REINSTALL_REQUIRED",
     "patch_failures",
 ]:
-    if token not in hook:
+    if token not in implementation:
         errors.append(f"native hook implementation missing: {token}")
-if "global_policy().map_path(" in hook:
+if "global_policy().map_path(" in implementation:
     errors.append("native syscall wrappers must route through NativeFileSystemResolver")
-if "restore_readonly" in hook:
+if "restore_readonly" in implementation:
     errors.append("PLT patching must restore original page protection, not force read-only")
 
 resolver = (ROOT / "sandbox-native/src/main/cpp/native_file_system.cpp").read_text(encoding="utf-8")

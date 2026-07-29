@@ -74,8 +74,11 @@ public final class GuestRuntimeEnvironment {
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
             GuestContext guestContext = new GuestContext(host, spec, loader, loadedResources.resources, loadedResources.assets);
+            String nativeAbi = spec.nativeAbi;
+            int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
             boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
-                    spec.packageName, spec.virtualUserId, spec.dataRoot, spec.apkPath,
+                    spec.packageName, spec.processName, spec.virtualUserId, spec.virtualUid,
+                    virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
                     spec.nativeLibraryDir, true, new String[0], new String[0], new String[0], new String[0]);
             boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
             if (requiresNativeHooks && !nativePolicyConfigured) {

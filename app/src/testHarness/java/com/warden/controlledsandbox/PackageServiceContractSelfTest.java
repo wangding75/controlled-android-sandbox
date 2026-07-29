@@ -30,7 +30,7 @@ public final class PackageServiceContractSelfTest {
         PackageRecordSnapshot record = new PackageRecordSnapshot(
                 "com.example.fixture", "Fixture", "1.0", 1,
                 "signer", "/files/packages/com.example.fixture/revisions/abc/base.apk",
-                "/files/packages/com.example.fixture/revisions/abc/lib", ".MainActivity",
+                "/files/packages/com.example.fixture/revisions/abc/lib", "arm64-v8a", ".MainActivity",
                 "com.example.fixture", ".FixtureApplication", ".FixtureService",
                 "com.example.fixture", ".FixtureReceiver", "com.example.fixture",
                 "com.example.ACTION", ".FixtureProvider", "com.example.fixture",
@@ -74,6 +74,8 @@ public final class PackageServiceContractSelfTest {
                 "split identity lost");
         require("org.apache.http.legacy".equals(restored.catalog().packages().get(0).sharedLibraries()),
                 "shared library metadata lost");
+        require("arm64-v8a".equals(restored.catalog().packages().get(0).nativeAbi()),
+                "native ABI metadata lost");
 
         VirtualPackageStateSnapshot packageState = new VirtualPackageStateSnapshot(
                 "com.example.fixture", 3, "Fixture", "1.0", 1L, "signer",

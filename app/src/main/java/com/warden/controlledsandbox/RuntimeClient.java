@@ -145,6 +145,7 @@ final class RuntimeClient implements AutoCloseable {
         request.putString(RuntimeKeys.SHARED_LIBRARIES, record.sharedLibraries);
         request.putLong(RuntimeKeys.APK_VERSION_CODE, record.versionCode);
         request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, record.nativeLibraryDir);
+        request.putString(RuntimeKeys.NATIVE_ABI, record.nativeAbi);
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.launchActivity);
         ArrayList<String> permissions = new ArrayList<>();

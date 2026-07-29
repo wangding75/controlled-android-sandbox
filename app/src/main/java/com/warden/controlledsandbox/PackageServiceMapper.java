@@ -19,7 +19,7 @@ final class PackageServiceMapper {
         }
         return new PackageRecordSnapshot(record.packageName, record.label, record.versionName,
                 record.versionCode, record.signatureSha256, record.apkPath,
-                record.nativeLibraryDir, record.launchActivity, record.launchProcess,
+                record.nativeLibraryDir, record.nativeAbi, record.launchActivity, record.launchProcess,
                 record.applicationClass, record.serviceClass, record.serviceProcess,
                 record.receiverClass, record.receiverProcess, record.receiverAction,
                 record.providerClass, record.providerProcess, record.providerAuthority,
@@ -37,7 +37,7 @@ final class PackageServiceMapper {
         }
         return new SandboxRecord(record.packageName(), record.label(), record.versionName(),
                 record.versionCode(), record.signatureSha256(), record.apkPath(),
-                record.nativeLibraryDir(), record.launchActivity(), record.launchProcess(),
+                record.nativeLibraryDir(), record.nativeAbi(), record.launchActivity(), record.launchProcess(),
                 record.applicationClass(), record.serviceClass(), record.serviceProcess(),
                 record.receiverClass(), record.receiverProcess(), record.receiverAction(),
                 record.providerClass(), record.providerProcess(), record.providerAuthority(),

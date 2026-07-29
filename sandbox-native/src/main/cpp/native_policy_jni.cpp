@@ -49,7 +49,8 @@ void throw_java(JNIEnv* env, const char* type, const std::string& message) {
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
         JNIEnv* env, jclass, jstring session_id, jlong generation,
-        jstring package_name, jint user_id, jstring instance_root,
+        jstring package_name, jstring process_name, jint user_id, jint virtual_uid,
+        jint virtual_pid, jstring abi_name, jstring instance_root,
         jstring apk_path, jstring native_library_root, jboolean default_allow,
         jobjectArray allow_hosts, jobjectArray deny_hosts,
         jobjectArray allow_cidrs, jobjectArray deny_cidrs) {
@@ -57,7 +58,8 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
         if (generation <= 0) throw std::invalid_argument("generation must be positive");
         controlled_sandbox::global_policy().configure(
                 string_value(env, session_id), static_cast<std::uint64_t>(generation),
-                string_value(env, package_name), user_id, string_value(env, instance_root),
+                string_value(env, package_name), string_value(env, process_name), user_id,
+                virtual_uid, virtual_pid, string_value(env, abi_name), string_value(env, instance_root),
                 string_value(env, apk_path), string_value(env, native_library_root), default_allow,
                 string_array(env, allow_hosts), string_array(env, deny_hosts),
                 cidr_array(env, allow_cidrs), cidr_array(env, deny_cidrs));

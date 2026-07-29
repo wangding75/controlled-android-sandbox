@@ -18,7 +18,10 @@ class NativeFileSystemResolver final {
 public:
     [[nodiscard]] static NativeResolvedPath resolve(const char* path);
     [[nodiscard]] static NativeResolvedPath resolve_at(int directory_fd, const char* path);
+    [[nodiscard]] static NativeResolvedPath resolve_fd(int file_descriptor);
     static void validate_confinement(const NativeResolvedPath& resolved, bool follow_final_symlink);
+    static void validate_same_confinement(const NativeResolvedPath& first,
+                                          const NativeResolvedPath& second);
     [[nodiscard]] static std::string rewrite_readlink_result(std::string_view value);
 };
 

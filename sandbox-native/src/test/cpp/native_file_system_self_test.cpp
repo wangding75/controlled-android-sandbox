@@ -37,7 +37,7 @@ int main() {
 
     auto& policy = controlled_sandbox::global_policy();
     policy.reset();
-    policy.configure("session-fs", 1, "com.example.guest", 3,
+    policy.configure("session-fs", 1, "com.example.guest", "com.example.guest:main", 3, 103000, 20300, "x86_64",
             instance.string(), apk.string(), lib.string(), true, {}, {}, {}, {});
 
     auto absolute = NativeFileSystemResolver::resolve("/data/data/com.example.guest/files/a.txt");

@@ -179,7 +179,7 @@ final class ApkImportManager {
 
         return new SandboxRecord(packageName, label, version, base.versionCode,
                 base.signatureSha256, apk.getAbsolutePath(),
-                selectedAbi.isEmpty() ? "" : nativeDir.getAbsolutePath(),
+                selectedAbi.isEmpty() ? "" : nativeDir.getAbsolutePath(), selectedAbi,
                 merged.launcherActivity, processName(packageName, activity),
                 base.manifest.applicationClass(), className(service), processName(packageName, service),
                 className(receiver), processName(packageName, receiver), firstAction(receiver),
