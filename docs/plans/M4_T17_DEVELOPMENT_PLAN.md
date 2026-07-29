@@ -46,6 +46,8 @@ The main Host APK carries 64-bit native runtime libraries (`arm64-v8a`, `x86_64`
 
 ## B2 — Network identity and audio capture lifecycle
 
+**Execution status: PASS (`336889e`)**
+
 ### Scope
 
 - Expand network interception and policy for:
