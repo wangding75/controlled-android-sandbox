@@ -151,3 +151,12 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — ELF ABI/type validation plus library-FD, offset, RELRO, reserved-address and linker-namespace policy.
 - DONE — alternate-stack native fatal evidence, real Host SIGSEGV fixture, ANR episode state, bounded thread dumps and SHA-256 export.
 - DEVICE — Android Bionic/linker, VPN/Connectivity, tombstone/AMS ANR and OEM behavior.
+
+## M5-T5 locked four-APK device-lab source baseline
+
+- DONE — independent 32-bit Fixture and shared package-neutral component/native probes.
+- DONE — exact Host, Fixture64, Fixture32 and Companion32 artifact/ABI/native-library contract.
+- DONE — offline-first checksummed Android toolchain bootstrap for Windows and Linux.
+- DONE — deterministic AVD runner, two-user 64/32-bit component suites and independent formal evidence gate.
+- BLOCKED — actual APK build and official Emulator execution in the current environment because JDK 17 and Android SDK/NDK/Emulator are unavailable.
+- DEVICE — first formal x86_64+x86 run, 20-minute stability, then ARM64/ARM32 and OEM validation.

@@ -77,15 +77,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--output", type=Path, help="copy validated APKs and write build-manifest.json")
+    parser.add_argument(
+        "--profile", choices=("device-test", "device-lab"), default="device-test",
+        help="select the historical three-APK contract or the M5 device-lab four-APK contract",
+    )
     parser.add_argument("--android-tools", action="store_true", help="require aapt2 package-id and apksigner verification")
     args = parser.parse_args()
 
     root = args.root.resolve()
     lock_path = root / "build-environment.lock.json"
     lock = json.loads(lock_path.read_text())
-    config = lock.get("deviceTestBuild")
+    config_key = "deviceTestBuild" if args.profile == "device-test" else "deviceLabBuild"
+    config = lock.get(config_key)
     if not isinstance(config, dict) or config.get("schemaVersion") != 1:
-        fail("Missing deviceTestBuild schema 1 in build-environment.lock.json")
+        fail(f"Missing {config_key} schema 1 in build-environment.lock.json")
 
     output = args.output.resolve() if args.output else None
     if output:
@@ -148,6 +153,7 @@ def main() -> int:
 
     manifest = {
         "schemaVersion": 1,
+        "profile": args.profile,
         "commit": git_value(root, "rev-parse", "HEAD"),
         "commitShort": git_value(root, "rev-parse", "--short=12", "HEAD"),
         "toolchainLockSha256": sha256(lock_path),
@@ -162,7 +168,7 @@ def main() -> int:
         (output / "SHA256SUMS.txt").write_text(checksums)
 
     print(
-        "PASS locked device-test APK set: "
+        f"PASS locked {args.profile} APK set: "
         + ", ".join(f"{item['id']}={item['size']}B" for item in artifacts)
     )
     return 0

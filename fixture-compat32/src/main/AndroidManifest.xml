@@ -3,7 +3,8 @@
     <application
         android:name="com.warden.controlledsandbox.fixture.FixtureApplication"
         android:allowBackup="false"
-        android:label="Controlled Sandbox Fixture"
+        android:extractNativeLibs="true"
+        android:label="Controlled Sandbox 32-bit Fixture"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity android:name="com.warden.controlledsandbox.fixture.MainActivity" android:exported="true">
@@ -18,7 +19,7 @@
         <service android:name="com.warden.controlledsandbox.fixture.RemoteFixtureService" android:exported="false" android:process=":remote" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
         <receiver android:name="com.warden.controlledsandbox.fixture.FixtureReceiver" android:exported="true">
-            <intent-filter><action android:name="com.warden.controlledsandbox.fixture.PING" /></intent-filter>
+            <intent-filter><action android:name="com.warden.controlledsandbox.fixture32.PING" /></intent-filter>
         </receiver>
         <provider
             android:name="com.warden.controlledsandbox.fixture.FixtureProvider"

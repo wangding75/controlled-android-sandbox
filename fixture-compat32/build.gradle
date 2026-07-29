@@ -1,0 +1,36 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.warden.controlledsandbox.fixture'
+    compileSdk rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
+    ndkVersion rootProject.ext.controlledNdkVersion
+
+    defaultConfig {
+        applicationId 'com.warden.controlledsandbox.fixture32'
+        minSdk rootProject.ext.controlledMinSdk
+        targetSdk rootProject.ext.controlledTargetSdk
+        versionCode 1
+        versionName '1.0-fixture32'
+        externalNativeBuild { cmake { cppFlags '-std=c++20 -Wall -Wextra -Werror' } }
+        ndk { abiFilters 'armeabi-v7a', 'x86' }
+    }
+
+    buildTypes { release { minifyEnabled false } }
+    sourceSets {
+        main {
+            java.srcDirs = ['../fixture-basic/src/main/java']
+            manifest.srcFile 'src/main/AndroidManifest.xml'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path '../fixture-basic/src/main/cpp/CMakeLists.txt'
+            version rootProject.ext.controlledCmakeVersion
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

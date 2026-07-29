@@ -93,11 +93,11 @@ def main() -> int:
     require_text(root_build, f"controlledNdkVersion = '{android['ndk']}'")
     require_text(root_build, f"controlledCmakeVersion = '{android['cmake']}'")
 
-    for module in ("app", "fixture-basic", "sandbox-companion32", "sandbox-contract", "sandbox-framework", "sandbox-native", "sandbox-runtime"):
+    for module in ("app", "fixture-basic", "fixture-compat32", "sandbox-companion32", "sandbox-contract", "sandbox-framework", "sandbox-native", "sandbox-runtime"):
         path = root / module / "build.gradle"
         require_text(path, "compileSdk rootProject.ext.controlledCompileSdk")
         require_text(path, "buildToolsVersion rootProject.ext.controlledBuildTools")
-    for module in ("fixture-basic", "sandbox-companion32", "sandbox-native"):
+    for module in ("fixture-basic", "fixture-compat32", "sandbox-companion32", "sandbox-native"):
         require_text(root / module / "build.gradle", "ndkVersion rootProject.ext.controlledNdkVersion")
         require_text(root / module / "build.gradle", "version rootProject.ext.controlledCmakeVersion")
 
@@ -119,6 +119,63 @@ def main() -> int:
         fail("deviceTestBuild schema/variant is missing from build lock")
     if [item.get("id") for item in device_build.get("artifacts", [])] != ["host", "fixture", "companion32"]:
         fail("deviceTestBuild artifact set is not frozen")
+
+    lab_build = lock.get("deviceLabBuild", {})
+    if lab_build.get("schemaVersion") != 1 or lab_build.get("variant") != "debug":
+        fail("deviceLabBuild schema/variant is missing from build lock")
+    lab_artifacts = lab_build.get("artifacts", [])
+    if [item.get("id") for item in lab_artifacts] != ["host", "fixture64", "fixture32", "companion32"]:
+        fail("deviceLabBuild artifact set/order is not frozen")
+    expected_lab = {
+        "host": ("app", ["arm64-v8a", "x86_64"], "com.warden.controlledsandbox.debug"),
+        "fixture64": ("fixture-basic", ["arm64-v8a", "x86_64"], "com.warden.controlledsandbox.fixture"),
+        "fixture32": ("fixture-compat32", ["armeabi-v7a", "x86"], "com.warden.controlledsandbox.fixture32"),
+        "companion32": ("sandbox-companion32", ["armeabi-v7a", "x86"], "com.warden.controlledsandbox.companion32.debug"),
+    }
+    for item in lab_artifacts:
+        artifact_id = item.get("id")
+        module, abis, application_id = expected_lab[artifact_id]
+        if item.get("module") != module or item.get("allowedAbis") != abis:
+            fail(f"deviceLabBuild {artifact_id} module/ABI lock mismatch")
+        if item.get("applicationId") != application_id:
+            fail(f"deviceLabBuild {artifact_id} applicationId lock mismatch")
+        if not str(item.get("gradleTask", "")).startswith(f":{module}:"):
+            fail(f"deviceLabBuild {artifact_id} Gradle task is not module-scoped")
+        if not item.get("requiredNativeLibraries"):
+            fail(f"deviceLabBuild {artifact_id} native library requirement is empty")
+    if lab_build.get("outputDirectory") != "artifacts/m5-device-lab-build":
+        fail("deviceLabBuild output directory is not frozen")
+
+    lab = lock.get("deviceLab", {})
+    if lab.get("schemaVersion") != 1:
+        fail("deviceLab schemaVersion must be 1")
+    if lab.get("requiredDeviceAbis") != ["x86_64", "x86"]:
+        fail("deviceLab must require x86_64 and x86")
+    if lab.get("formalStabilitySeconds") != 1200:
+        fail("deviceLab formal stability gate must be 1200 seconds")
+    if int(lab.get("bootTimeoutSeconds", 0)) < 300:
+        fail("deviceLab boot timeout is too short")
+    expected_lab_packages = ["emulator", str(lab.get("systemImage", ""))]
+    if lab.get("sdkPackages") != expected_lab_packages:
+        fail("deviceLab SDK packages must be emulator plus the locked system image")
+    cli = lab.get("commandLineTools", {})
+    if not re.fullmatch(r"\d+", str(cli.get("version", ""))):
+        fail("deviceLab command-line tools version is not numeric")
+    for platform in ("windows", "linux"):
+        package = cli.get(platform, {})
+        if not str(package.get("filename", "")).endswith(".zip"):
+            fail(f"deviceLab {platform} command-line tools filename is invalid")
+        if not str(package.get("url", "")).startswith("https://dl.google.com/android/repository/"):
+            fail(f"deviceLab {platform} command-line tools URL is not frozen to dl.google.com")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(package.get("sha256", ""))):
+            fail(f"deviceLab {platform} command-line tools SHA-256 is invalid")
+    if lab.get("packages") != {
+        "host": "com.warden.controlledsandbox.debug",
+        "fixture64": "com.warden.controlledsandbox.fixture",
+        "fixture32": "com.warden.controlledsandbox.fixture32",
+        "companion32": "com.warden.controlledsandbox.companion32.debug",
+    }:
+        fail("deviceLab package contract is not frozen")
 
     for gradle_file in root.rglob("*.gradle"):
         if not gradle_file.is_file():

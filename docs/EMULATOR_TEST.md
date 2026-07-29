@@ -42,3 +42,61 @@ A shorter run can diagnose failures but cannot satisfy `check-m3-release-gate.sh
 ## Result
 
 Evidence is written to `artifacts\m3-emulator-YYYYMMDD-HHMMSS`. The script returns non-zero if either virtual-user Activity creation is missing, the component suite fails, diagnostics are absent, required processes or instance roots are missing, a crash/ANR is detected, or the formal stability duration is not met.
+
+## M5-T5 formal four-APK device lab
+
+The M5-T5 path supersedes the older two-APK M3 smoke flow for cross-width evidence.
+
+### 1. Bootstrap the locked toolchain
+
+Windows:
+
+```powershell
+.\scripts\bootstrap-m5-device-lab.ps1 -AcceptLicenses
+```
+
+Linux:
+
+```bash
+./scripts/bootstrap-m5-device-lab.sh --accept-licenses
+```
+
+The default is offline-first. Place the frozen Android Command-line Tools archive in `.toolchain-cache`, or explicitly enable online download.
+
+### 2. Build and validate four APKs
+
+Windows:
+
+```powershell
+.\scripts\build-device-lab-apks.ps1
+```
+
+Linux:
+
+```bash
+./scripts/build-device-lab-apks.sh
+```
+
+### 3. Run the formal official-Emulator experiment
+
+Windows:
+
+```powershell
+.\scripts\run-emulator-m5.ps1 -Headless
+```
+
+Linux:
+
+```bash
+./scripts/run-emulator-m5.sh --headless
+```
+
+Formal mode always requires at least 1,200 seconds. For diagnosis only, use `--diagnostic --stability-seconds 0` on Linux or `-Diagnostic -StabilitySeconds 0` on Windows; diagnostic output cannot satisfy the release gate.
+
+### 4. Independently validate evidence
+
+```bash
+python3 scripts/check-m5-device-evidence.py artifacts/m5-device-lab-*/device-lab-result.json
+```
+
+A PASS requires the exact commit, hashes for all four APKs, both virtual users, all required 64/32-bit command flows, Companion32 process bitness 32, runtime diagnostic files, zero fatal findings and a minimum 1,200-second observation.

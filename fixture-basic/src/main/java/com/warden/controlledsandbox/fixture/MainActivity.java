@@ -17,7 +17,7 @@ public final class MainActivity extends Activity {
         int count = getSharedPreferences("fixture", Context.MODE_PRIVATE).getInt("activityCreates", 0) + 1;
         getSharedPreferences("fixture", Context.MODE_PRIVATE).edit().putInt("activityCreates", count).commit();
         dynamicReceiver = new DynamicFixtureReceiver();
-        IntentFilter filter = new IntentFilter("com.warden.controlledsandbox.fixture.DYNAMIC_PING");
+        IntentFilter filter = new IntentFilter(getPackageName() + ".DYNAMIC_PING");
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(dynamicReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(dynamicReceiver, filter);
         webView = new WebView(this);
@@ -27,7 +27,7 @@ public final class MainActivity extends Activity {
                 "text/html", "UTF-8", null);
         setContentView(webView);
         Log.i("CS_FIXTURE", "ACTIVITY_CREATE count=" + count + " files=" + getFilesDir());
-        Log.i("CS_FIXTURE", "NATIVE_PROBE " + FixtureNative.probe());
+        Log.i("CS_FIXTURE", "NATIVE_PROBE " + FixtureNative.probe(getFilesDir()));
     }
 
     @Override protected void onResume() { super.onResume(); Log.i("CS_FIXTURE", "ACTIVITY_RESUME"); }

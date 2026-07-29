@@ -21,6 +21,7 @@ include ':sandbox-contract'
 include ':sandbox-runtime'
 include ':sandbox-framework'
 include ':fixture-basic'
+include ':fixture-compat32'
 include ':sandbox-native'
 
 include ':sandbox-companion32'

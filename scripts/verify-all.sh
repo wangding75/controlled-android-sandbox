@@ -17,7 +17,9 @@ python3 scripts/check-m5-build-baseline.py
 python3 scripts/check-m5-t2-cross-width-runtime.py
 python3 scripts/check-m5-t3-broadcast-fgs.py
 python3 scripts/check-m5-t4-native-diagnostics.py
+python3 scripts/check-m5-t5-device-lab.py
 ./scripts/test-m5-artifact-verifier.sh
+./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py
 python3 scripts/check-package-boundaries.py
 python3 scripts/check-guest-boundary.py

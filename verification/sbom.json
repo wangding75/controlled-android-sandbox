@@ -16,7 +16,7 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "93a5fac893d8a4cb0a2c1806c7a6415a7a9903257149e59dd7332b7f0c16bcb3"
+      "sourceDigestSha256": "db69210ebff4524f6bcf0caddda333e1ad8e978a206b4ecf3f78a2dbf120b130"
     },
     {
       "type": "library",
@@ -113,7 +113,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "73350e1c54916e8fdbeffb7341be26cf2f34896be628b14346290ee373b16631"
+      "sourceDigestSha256": "8feadbc4264779606dbe475e70915b55f3b3ac87833a09aec93f6954a14ee353"
     }
   ],
   "externalRuntimeDependencies": [

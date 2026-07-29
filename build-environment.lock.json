@@ -106,5 +106,104 @@
       }
     ],
     "outputDirectory": "artifacts/m5-device-test-build"
+  },
+  "deviceLabBuild": {
+    "schemaVersion": 1,
+    "variant": "debug",
+    "artifacts": [
+      {
+        "id": "host",
+        "module": "app",
+        "gradleTask": ":app:assembleDebug",
+        "apk": "app/build/outputs/apk/debug/app-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.debug",
+        "allowedAbis": [
+          "arm64-v8a",
+          "x86_64"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_native.so"
+        ]
+      },
+      {
+        "id": "fixture64",
+        "module": "fixture-basic",
+        "gradleTask": ":fixture-basic:assembleDebug",
+        "apk": "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.fixture",
+        "allowedAbis": [
+          "arm64-v8a",
+          "x86_64"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_fixture.so"
+        ]
+      },
+      {
+        "id": "fixture32",
+        "module": "fixture-compat32",
+        "gradleTask": ":fixture-compat32:assembleDebug",
+        "apk": "fixture-compat32/build/outputs/apk/debug/fixture-compat32-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.fixture32",
+        "allowedAbis": [
+          "armeabi-v7a",
+          "x86"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_fixture.so"
+        ]
+      },
+      {
+        "id": "companion32",
+        "module": "sandbox-companion32",
+        "gradleTask": ":sandbox-companion32:assembleDebug",
+        "apk": "sandbox-companion32/build/outputs/apk/debug/sandbox-companion32-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.companion32.debug",
+        "allowedAbis": [
+          "armeabi-v7a",
+          "x86"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_native32.so"
+        ]
+      }
+    ],
+    "outputDirectory": "artifacts/m5-device-lab-build"
+  },
+  "deviceLab": {
+    "schemaVersion": 1,
+    "avdName": "ControlledSandbox_API35_x86_64",
+    "systemImage": "system-images;android-35;google_apis;x86_64",
+    "deviceProfile": "pixel_6",
+    "requiredDeviceAbis": [
+      "x86_64",
+      "x86"
+    ],
+    "formalStabilitySeconds": 1200,
+    "bootTimeoutSeconds": 600,
+    "commandTimeoutSeconds": 90,
+    "sdkPackages": [
+      "emulator",
+      "system-images;android-35;google_apis;x86_64"
+    ],
+    "commandLineTools": {
+      "version": "15859902",
+      "windows": {
+        "filename": "commandlinetools-win-15859902_latest.zip",
+        "url": "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip",
+        "sha256": "90ae805d20434428bffcb699c290860f19bb5f66a67e6b330067e3de801fb04a"
+      },
+      "linux": {
+        "filename": "commandlinetools-linux-15859902_latest.zip",
+        "url": "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip",
+        "sha256": "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583"
+      }
+    },
+    "packages": {
+      "host": "com.warden.controlledsandbox.debug",
+      "fixture64": "com.warden.controlledsandbox.fixture",
+      "fixture32": "com.warden.controlledsandbox.fixture32",
+      "companion32": "com.warden.controlledsandbox.companion32.debug"
+    }
   }
 }

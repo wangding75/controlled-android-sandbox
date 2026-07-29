@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.util.Log;
+import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -68,6 +69,16 @@ public final class DebugCommandActivity extends Activity {
                 throw new IllegalArgumentException("Unsupported command: " + command);
             }
             result.put("operation", bundleJson(operation));
+            if (NativeAbiRoutePlanner.requiresCompanion(record.nativeAbi)) {
+                try (NativeCompanionClient companion = new NativeCompanionClient(this)) {
+                    NativeCompanionResult probe = companion.probe(record, virtualUserId);
+                    result.put("companion", companionJson(probe));
+                    if (!probe.successful() || probe.processBitness() != 32) {
+                        throw new IllegalStateException("NATIVE_COMPANION_PROBE_FAILED:"
+                                + probe.errorType() + ":" + probe.errorMessage());
+                    }
+                }
+            }
             result.put("status", "PASS");
             Log.i(TAG, "PASS " + command + " " + packageName + " user=" + virtualUserId + " " + operation.getString(RuntimeKeys.STATUS, ""));
         } catch (Throwable error) {
@@ -101,6 +112,20 @@ public final class DebugCommandActivity extends Activity {
         out.put("sessionId", bundle.getString(RuntimeKeys.SESSION_ID, ""));
         out.put("generation", bundle.getLong(RuntimeKeys.GENERATION, 0));
         out.put("processSlot", bundle.getInt(RuntimeKeys.PROCESS_SLOT, -1));
+        return out;
+    }
+
+
+    private static JSONObject companionJson(NativeCompanionResult value) throws Exception {
+        JSONObject out = new JSONObject();
+        out.put("successful", value.successful());
+        out.put("operation", value.operation());
+        out.put("requestedAbi", value.requestedAbi());
+        out.put("processBitness", value.processBitness());
+        out.put("acceptedGeneration", value.acceptedGeneration());
+        out.put("nativeStatus", value.nativeStatus());
+        out.put("errorType", value.errorType());
+        out.put("errorMessage", value.errorMessage());
         return out;
     }
 

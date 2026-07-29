@@ -148,3 +148,7 @@ M5-T3 completes the source-wired Ordered Broadcast result chain, Guest PendingRe
 ## M5-T4 native network, loader and diagnostics source baseline
 
 M5-T4 completes the source-wired Native network, dynamic-loader and Crash/ANR closure. Guest sockets now use bounded lifecycle tracking, IPv4/IPv6 endpoint policy, local/interface identity projection and sensitive socket-option controls. Guest library loading validates ELF ABI/type plus `android_dlopen_ext` FD/offset/RELRO/reserved-address/namespace inputs. Diagnostics add alternate-stack fatal-signal evidence, a real SIGSEGV Host fixture, ANR episode tracking, bounded thread dumps and SHA-256 exports. Android APK build and device evidence remain 0 because the current environment lacks the locked JDK 17 and Android SDK/NDK.
+
+## M5-T5 locked four-APK device-lab source baseline
+
+M5-T5 adds an independent 32-bit Fixture, freezes Host/Fixture64/Fixture32/Companion32 as one ABI-checked build set, and provides offline-first toolchain bootstrap plus a deterministic official-Emulator runner. Formal evidence requires both x86_64 and x86, two virtual users, complete 64/32-bit component commands, typed Companion32 bitness proof, runtime diagnostics and at least 1,200 seconds without controlled-sandbox crash or ANR evidence. The current environment has no locked JDK 17 or Android SDK/Emulator, so Android build and device evidence remain 0.
