@@ -19,6 +19,8 @@ The main Host APK carries 64-bit native runtime libraries (`arm64-v8a`, `x86_64`
 
 ## B1 — Native filesystem and dynamic loader hardening
 
+**Execution status: PASS (`594f81d`)**
+
 ### Scope
 
 - Add native interception and policy for:
