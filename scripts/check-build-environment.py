@@ -93,13 +93,32 @@ def main() -> int:
     require_text(root_build, f"controlledNdkVersion = '{android['ndk']}'")
     require_text(root_build, f"controlledCmakeVersion = '{android['cmake']}'")
 
-    for module in ("app", "fixture-basic", "sandbox-contract", "sandbox-framework", "sandbox-native", "sandbox-runtime"):
+    for module in ("app", "fixture-basic", "sandbox-companion32", "sandbox-contract", "sandbox-framework", "sandbox-native", "sandbox-runtime"):
         path = root / module / "build.gradle"
         require_text(path, "compileSdk rootProject.ext.controlledCompileSdk")
         require_text(path, "buildToolsVersion rootProject.ext.controlledBuildTools")
-    for module in ("fixture-basic", "sandbox-native"):
+    for module in ("fixture-basic", "sandbox-companion32", "sandbox-native"):
         require_text(root / module / "build.gradle", "ndkVersion rootProject.ext.controlledNdkVersion")
         require_text(root / module / "build.gradle", "version rootProject.ext.controlledCmakeVersion")
+
+    expected_sdk_packages = [
+        "platform-tools",
+        f"platforms;android-{android['compileSdk']}",
+        f"build-tools;{android['buildTools']}",
+        f"ndk;{android['ndk']}",
+        f"cmake;{android['cmake']}",
+    ]
+    if android.get("sdkPackages") != expected_sdk_packages:
+        fail("Android SDK package lock does not match declared toolchain")
+    if android.get("hostAbis") != ["arm64-v8a", "x86_64"]:
+        fail("Host ABI lock must be arm64-v8a,x86_64")
+    if android.get("companionAbis") != ["armeabi-v7a", "x86"]:
+        fail("Companion ABI lock must be armeabi-v7a,x86")
+    device_build = lock.get("deviceTestBuild", {})
+    if device_build.get("schemaVersion") != 1 or device_build.get("variant") != "debug":
+        fail("deviceTestBuild schema/variant is missing from build lock")
+    if [item.get("id") for item in device_build.get("artifacts", [])] != ["host", "fixture", "companion32"]:
+        fail("deviceTestBuild artifact set is not frozen")
 
     for gradle_file in root.rglob("*.gradle"):
         if not gradle_file.is_file():

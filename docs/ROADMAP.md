@@ -122,3 +122,11 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — machine-readable capacity, rollback, death-cleanup, Revision-cleanup and Host-fallback audit.
 - DONE — final device-preflight manifest, unresolved capability list and reproducible source freeze.
 - DEVICE — locked Android build, complete Fixture matrix, four ABI evidence and 20-minute stability gate.
+
+## M5-T1 real Android build baseline
+
+- DONE — exact Host, Fixture and Companion32 debug APK contract is machine-readable.
+- DONE — cross-platform locked SDK installation and three-APK build entry points.
+- DONE — fail-closed APK ABI/native-library verification and artifact manifest.
+- BLOCKED — actual APK production in the current execution container because JDK 17, Android SDK and external dependency access are unavailable.
+- NEXT — run the locked build on a prepared workstation, then begin x86_64 Host + x86 Companion Emulator execution.

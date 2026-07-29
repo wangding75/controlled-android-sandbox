@@ -29,7 +29,24 @@
       "cmake": "3.22.1",
       "abis": [
         "arm64-v8a",
+        "armeabi-v7a",
+        "x86_64",
+        "x86"
+      ],
+      "hostAbis": [
+        "arm64-v8a",
         "x86_64"
+      ],
+      "companionAbis": [
+        "armeabi-v7a",
+        "x86"
+      ],
+      "sdkPackages": [
+        "platform-tools",
+        "platforms;android-36",
+        "build-tools;35.0.0",
+        "ndk;27.2.12479018",
+        "cmake;3.22.1"
       ]
     }
   },
@@ -40,5 +57,54 @@
     "sourceDateEpoch": "gitCommitTimestamp",
     "androidBuildMode": "offline,no-daemon,no-build-cache,no-parallel",
     "packageFormat": "sorted ZIP with normalized timestamp and mode"
+  },
+  "deviceTestBuild": {
+    "schemaVersion": 1,
+    "variant": "debug",
+    "artifacts": [
+      {
+        "id": "host",
+        "module": "app",
+        "gradleTask": ":app:assembleDebug",
+        "apk": "app/build/outputs/apk/debug/app-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.debug",
+        "allowedAbis": [
+          "arm64-v8a",
+          "x86_64"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_native.so"
+        ]
+      },
+      {
+        "id": "fixture",
+        "module": "fixture-basic",
+        "gradleTask": ":fixture-basic:assembleDebug",
+        "apk": "fixture-basic/build/outputs/apk/debug/fixture-basic-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.fixture",
+        "allowedAbis": [
+          "arm64-v8a",
+          "x86_64"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_fixture.so"
+        ]
+      },
+      {
+        "id": "companion32",
+        "module": "sandbox-companion32",
+        "gradleTask": ":sandbox-companion32:assembleDebug",
+        "apk": "sandbox-companion32/build/outputs/apk/debug/sandbox-companion32-debug.apk",
+        "applicationId": "com.warden.controlledsandbox.companion32.debug",
+        "allowedAbis": [
+          "armeabi-v7a",
+          "x86"
+        ],
+        "requiredNativeLibraries": [
+          "libcontrolled_sandbox_native32.so"
+        ]
+      }
+    ],
+    "outputDirectory": "artifacts/m5-device-test-build"
   }
 }

@@ -22,7 +22,7 @@ export TZ=UTC LC_ALL=C LANG=C
 export GRADLE_USER_HOME=${GRADLE_USER_HOME:-"$ROOT/.gradle-reproducible"}
 ARGS=(--no-daemon --no-build-cache --no-parallel --stacktrace)
 if [[ $ONLINE -eq 0 ]]; then ARGS+=(--offline); fi
-TASKS=(clean check :fixture-basic:assembleRelease :app:assembleRelease)
+TASKS=(clean check :fixture-basic:assembleRelease :app:assembleRelease :sandbox-companion32:assembleRelease)
 COMMIT=$(git rev-parse --short=12 HEAD)
 OUT="$ROOT/build/reproducible/$COMMIT"
 rm -rf "$OUT"
@@ -31,7 +31,7 @@ run_build() {
   local label=$1
   ./gradlew "${ARGS[@]}" "${TASKS[@]}"
   mkdir -p "$OUT/$label"
-  find app/build/outputs/apk fixture-basic/build/outputs/apk -type f -name '*.apk' -print0 \
+  find app/build/outputs/apk fixture-basic/build/outputs/apk sandbox-companion32/build/outputs/apk -type f -name '*.apk' -print0 \
     | LC_ALL=C sort -z \
     | while IFS= read -r -d '' apk; do cp "$apk" "$OUT/$label/$(basename "$apk")"; done
   (cd "$OUT/$label" && sha256sum *.apk | LC_ALL=C sort > SHA256SUMS.txt)

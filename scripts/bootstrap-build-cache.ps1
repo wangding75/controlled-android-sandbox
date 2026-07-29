@@ -10,7 +10,7 @@ try {
     if (-not $env:GRADLE_USER_HOME) { $env:GRADLE_USER_HOME = Join-Path $Root '.gradle-reproducible' }
     & .\gradlew.bat --no-daemon --no-build-cache --no-parallel --refresh-dependencies help
     if ($LASTEXITCODE -ne 0) { throw 'Dependency bootstrap failed' }
-    & .\gradlew.bat --no-daemon --no-build-cache --no-parallel :fixture-basic:assembleRelease :app:assembleRelease
+    & .\gradlew.bat --no-daemon --no-build-cache --no-parallel :fixture-basic:assembleRelease :app:assembleRelease :sandbox-companion32:assembleRelease
     if ($LASTEXITCODE -ne 0) { throw 'Android cache bootstrap build failed' }
     Write-Host "PASS populated locked Gradle cache at $env:GRADLE_USER_HOME"
 } finally { Pop-Location }
