@@ -69,6 +69,8 @@ The main Host APK carries 64-bit native runtime libraries (`arm64-v8a`, `x86_64`
 
 ## B3 — Four-ABI build architecture and 32-bit companion
 
+**Execution status: PASS (`0d0c4f9`)**
+
 ### Scope
 
 - Keep Host native runtime restricted to 64-bit ABIs.
