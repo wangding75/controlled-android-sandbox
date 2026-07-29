@@ -49,6 +49,24 @@ struct android_dlextinfo {
 #ifndef ANDROID_DLEXT_USE_NAMESPACE
 #define ANDROID_DLEXT_USE_NAMESPACE 0x200ULL
 #endif
+#ifndef ANDROID_DLEXT_RESERVED_ADDRESS
+#define ANDROID_DLEXT_RESERVED_ADDRESS 0x1ULL
+#endif
+#ifndef ANDROID_DLEXT_RESERVED_ADDRESS_HINT
+#define ANDROID_DLEXT_RESERVED_ADDRESS_HINT 0x2ULL
+#endif
+#ifndef ANDROID_DLEXT_WRITE_RELRO
+#define ANDROID_DLEXT_WRITE_RELRO 0x4ULL
+#endif
+#ifndef ANDROID_DLEXT_USE_RELRO
+#define ANDROID_DLEXT_USE_RELRO 0x8ULL
+#endif
+#ifndef ANDROID_DLEXT_FORCE_LOAD
+#define ANDROID_DLEXT_FORCE_LOAD 0x40ULL
+#endif
+#ifndef ANDROID_DLEXT_RESERVED_ADDRESS_RECURSIVE
+#define ANDROID_DLEXT_RESERVED_ADDRESS_RECURSIVE 0x400ULL
+#endif
 #endif
 #ifndef RESOLVE_NO_SYMLINKS
 #define RESOLVE_NO_SYMLINKS 0x04ULL
@@ -88,7 +106,17 @@ using MmapFn = void* (*)(void*, std::size_t, int, int, int, off_t);
 using ReadlinkFn = ssize_t (*)(const char*, char*, size_t);
 using ReadlinkAtFn = ssize_t (*)(int, const char*, char*, size_t);
 using SocketFn = int (*)(int, int, int);
+using BindFn = int (*)(int, const sockaddr*, socklen_t);
 using ConnectFn = int (*)(int, const sockaddr*, socklen_t);
+using SendToFn = ssize_t (*)(int, const void*, size_t, int, const sockaddr*, socklen_t);
+using RecvFromFn = ssize_t (*)(int, void*, size_t, int, sockaddr*, socklen_t*);
+using GetSockNameFn = int (*)(int, sockaddr*, socklen_t*);
+using GetPeerNameFn = int (*)(int, sockaddr*, socklen_t*);
+using SetSockOptFn = int (*)(int, int, int, const void*, socklen_t);
+using GetSockOptFn = int (*)(int, int, int, void*, socklen_t*);
+using CloseFn = int (*)(int);
+using IfNameToIndexFn = unsigned int (*)(const char*);
+using IfIndexToNameFn = char* (*)(unsigned int, char*);
 using GetAddrInfoFn = int (*)(const char*, const char*, const addrinfo*, addrinfo**);
 using FreeAddrInfoFn = void (*)(addrinfo*);
 using GetNameInfoFn = int (*)(const sockaddr*, socklen_t, char*, socklen_t, char*, socklen_t, int);
@@ -120,7 +148,17 @@ std::atomic<MmapFn> real_mmap{nullptr};
 std::atomic<ReadlinkFn> real_readlink{nullptr};
 std::atomic<ReadlinkAtFn> real_readlinkat{nullptr};
 std::atomic<SocketFn> real_socket{nullptr};
+std::atomic<BindFn> real_bind{nullptr};
 std::atomic<ConnectFn> real_connect{nullptr};
+std::atomic<SendToFn> real_sendto{nullptr};
+std::atomic<RecvFromFn> real_recvfrom{nullptr};
+std::atomic<GetSockNameFn> real_getsockname{nullptr};
+std::atomic<GetPeerNameFn> real_getpeername{nullptr};
+std::atomic<SetSockOptFn> real_setsockopt{nullptr};
+std::atomic<GetSockOptFn> real_getsockopt{nullptr};
+std::atomic<CloseFn> real_close{nullptr};
+std::atomic<IfNameToIndexFn> real_if_nametoindex{nullptr};
+std::atomic<IfIndexToNameFn> real_if_indextoname{nullptr};
 std::atomic<GetAddrInfoFn> real_getaddrinfo{nullptr};
 std::atomic<FreeAddrInfoFn> real_freeaddrinfo{nullptr};
 std::atomic<GetNameInfoFn> real_getnameinfo{nullptr};
@@ -504,14 +542,107 @@ extern "C" int controlled_socket(int domain, int type, int protocol) {
     SocketFn function = require_real(real_socket, "socket");
     if (function == nullptr) { errno = ENOSYS; return -1; }
     if (domain != AF_INET && domain != AF_INET6 && domain != AF_UNIX) { errno = EAFNOSUPPORT; return -1; }
-    return function(domain, type, protocol);
+    const int socket_fd = function(domain, type, protocol);
+    if (socket_fd < 0) return socket_fd;
+    if (!native_register_socket(socket_fd, domain, type, protocol)) {
+        CloseFn close_function = require_real(real_close, "close");
+        if (close_function != nullptr) (void) close_function(socket_fd);
+        errno = EMFILE;
+        return -1;
+    }
+    return socket_fd;
+}
+
+extern "C" int controlled_close(int descriptor) {
+    CloseFn function = require_real(real_close, "close");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    native_unregister_socket(descriptor);
+    return function(descriptor);
+}
+
+extern "C" int controlled_bind(int socket_fd, const sockaddr* address, socklen_t length) {
+    BindFn function = require_real(real_bind, "bind");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    sockaddr_storage projected{};
+    socklen_t projected_length = 0;
+    if (native_project_bind_address(address, length, &projected, &projected_length) != 0) return -1;
+    return function(socket_fd, reinterpret_cast<const sockaddr*>(&projected), projected_length);
 }
 
 extern "C" int controlled_connect(int socket_fd, const sockaddr* address, socklen_t length) {
     ConnectFn function = require_real(real_connect, "connect");
     if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (!native_socket_address_allowed(address, length)) { errno = EACCES; return -1; }
+    if (!native_socket_destination_allowed(socket_fd, address, length)) { errno = EACCES; return -1; }
     return function(socket_fd, address, length);
+}
+
+extern "C" ssize_t controlled_sendto(int socket_fd, const void* buffer, size_t length, int flags,
+                                      const sockaddr* destination, socklen_t destination_length) {
+    SendToFn function = require_real(real_sendto, "sendto");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (destination != nullptr
+            && !native_socket_destination_allowed(socket_fd, destination, destination_length)) {
+        errno = EACCES;
+        return -1;
+    }
+    return function(socket_fd, buffer, length, flags, destination, destination_length);
+}
+
+extern "C" ssize_t controlled_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
+                                        sockaddr* source, socklen_t* source_length) {
+    RecvFromFn function = require_real(real_recvfrom, "recvfrom");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    const ssize_t received = function(socket_fd, buffer, length, flags, source, source_length);
+    if (received < 0 || source == nullptr || source_length == nullptr) return received;
+    if (!native_socket_address_allowed(source, *source_length)) { errno = EACCES; return -1; }
+    return received;
+}
+
+extern "C" int controlled_getsockname(int socket_fd, sockaddr* address, socklen_t* length) {
+    GetSockNameFn function = require_real(real_getsockname, "getsockname");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    const int status = function(socket_fd, address, length);
+    if (status == 0 && address != nullptr && length != nullptr) native_project_local_address(address, *length);
+    return status;
+}
+
+extern "C" int controlled_getpeername(int socket_fd, sockaddr* address, socklen_t* length) {
+    GetPeerNameFn function = require_real(real_getpeername, "getpeername");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    const int status = function(socket_fd, address, length);
+    if (status != 0 || address == nullptr || length == nullptr) return status;
+    if (!native_socket_address_allowed(address, *length)) { errno = EACCES; return -1; }
+    return 0;
+}
+
+extern "C" int controlled_setsockopt(int socket_fd, int level, int option_name,
+                                      const void* option_value, socklen_t option_length) {
+    bool handled = false;
+    const int virtual_status = native_set_virtual_socket_option(
+            socket_fd, level, option_name, option_value, option_length, &handled);
+    if (handled) return virtual_status;
+    SetSockOptFn function = require_real(real_setsockopt, "setsockopt");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    return function(socket_fd, level, option_name, option_value, option_length);
+}
+
+extern "C" int controlled_getsockopt(int socket_fd, int level, int option_name,
+                                      void* option_value, socklen_t* option_length) {
+    bool handled = false;
+    const int virtual_status = native_get_virtual_socket_option(
+            socket_fd, level, option_name, option_value, option_length, &handled);
+    if (handled) return virtual_status;
+    GetSockOptFn function = require_real(real_getsockopt, "getsockopt");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    return function(socket_fd, level, option_name, option_value, option_length);
+}
+
+extern "C" unsigned int controlled_if_nametoindex(const char* name) {
+    return native_virtual_if_nametoindex(name);
+}
+
+extern "C" char* controlled_if_indextoname(unsigned int index, char* name) {
+    return native_virtual_if_indextoname(index, name);
 }
 
 extern "C" int controlled_getaddrinfo(const char* node, const char* service,
@@ -637,12 +768,15 @@ extern "C" void* controlled_dlopen(const char* name, int flags) {
     if (function == nullptr) { errno = ENOSYS; return nullptr; }
     try {
         const NativeLibraryDecision decision = NativeLibraryLoaderPolicy::resolve(name);
+        NativeLibraryLoaderPolicy::validate_library(decision);
         void* handle = function(decision.resolved_name.c_str(), flags);
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
+        NativeLibraryLoaderPolicy::record_denial(error.what());
         errno = error.error_number();
         return nullptr;
     } catch (...) {
+        NativeLibraryLoaderPolicy::record_denial("DLOPEN_UNEXPECTED_FAILURE");
         errno = EACCES;
         return nullptr;
     }
@@ -653,9 +787,15 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
     AndroidDlopenExtFn function = require_real(real_android_dlopen_ext, "android_dlopen_ext");
     if (function == nullptr) { errno = ENOSYS; return nullptr; }
     try {
-        if (info != nullptr && (info->flags & ANDROID_DLEXT_USE_NAMESPACE) != 0) {
-            throw PathPolicyError(EACCES, "FOREIGN_LINKER_NAMESPACE_DENIED");
-        }
+        const std::uint64_t extension_flags = info == nullptr ? 0 : info->flags;
+        NativeLibraryLoaderPolicy::validate_android_dlext(
+                extension_flags,
+                info == nullptr ? -1 : info->library_fd,
+                info == nullptr ? 0 : info->library_fd_offset,
+                info == nullptr ? -1 : info->relro_fd,
+                info == nullptr ? nullptr : info->reserved_addr,
+                info == nullptr ? 0 : info->reserved_size,
+                info != nullptr && info->library_namespace != nullptr);
         if (info != nullptr && (info->flags & ANDROID_DLEXT_USE_LIBRARY_FD) != 0) {
             NativeResolvedPath descriptor = NativeFileSystemResolver::resolve_fd(info->library_fd);
             NativeFileSystemResolver::validate_confinement(descriptor, true);
@@ -664,6 +804,7 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
         const char* call_name = name;
         if (name != nullptr && name[0] != '\0') {
             NativeLibraryDecision decision = NativeLibraryLoaderPolicy::resolve(name);
+            NativeLibraryLoaderPolicy::validate_library(decision);
             resolved_name = std::move(decision.resolved_name);
             call_name = resolved_name.c_str();
         } else if (info == nullptr || (info->flags & ANDROID_DLEXT_USE_LIBRARY_FD) == 0) {
@@ -672,9 +813,11 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
         void* handle = function(call_name, flags, info);
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
+        NativeLibraryLoaderPolicy::record_denial(error.what());
         errno = error.error_number();
         return nullptr;
     } catch (...) {
+        NativeLibraryLoaderPolicy::record_denial("ANDROID_DLOPEN_EXT_UNEXPECTED_FAILURE");
         errno = EACCES;
         return nullptr;
     }
@@ -701,7 +844,17 @@ void* replacement_for(std::string_view name) {
     if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);
     if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);
     if (name == "socket") return reinterpret_cast<void*>(&controlled_socket);
+    if (name == "close") return reinterpret_cast<void*>(&controlled_close);
+    if (name == "bind") return reinterpret_cast<void*>(&controlled_bind);
     if (name == "connect") return reinterpret_cast<void*>(&controlled_connect);
+    if (name == "sendto") return reinterpret_cast<void*>(&controlled_sendto);
+    if (name == "recvfrom") return reinterpret_cast<void*>(&controlled_recvfrom);
+    if (name == "getsockname") return reinterpret_cast<void*>(&controlled_getsockname);
+    if (name == "getpeername") return reinterpret_cast<void*>(&controlled_getpeername);
+    if (name == "setsockopt") return reinterpret_cast<void*>(&controlled_setsockopt);
+    if (name == "getsockopt") return reinterpret_cast<void*>(&controlled_getsockopt);
+    if (name == "if_nametoindex") return reinterpret_cast<void*>(&controlled_if_nametoindex);
+    if (name == "if_indextoname") return reinterpret_cast<void*>(&controlled_if_indextoname);
     if (name == "getaddrinfo") return reinterpret_cast<void*>(&controlled_getaddrinfo);
     if (name == "getnameinfo") return reinterpret_cast<void*>(&controlled_getnameinfo);
     if (name == "gethostname") return reinterpret_cast<void*>(&controlled_gethostname);

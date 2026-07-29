@@ -9,6 +9,7 @@ import java.nio.file.Files;
 
 public final class RuntimeDiagnosticsSelfTest {
     public static void main(String[] args) throws Exception {
+        testAnrEpisodes();
         File root = new File("build/runtime-diagnostics-self-test").getCanonicalFile();
         deleteTree(root);
         Context context = new TestContext(root);
@@ -26,9 +27,26 @@ public final class RuntimeDiagnosticsSelfTest {
         require(manifest.isFile(), "manifest exported");
         require(new File(manifest.getParentFile(), "runtime-events.jsonl").isFile(), "events exported");
         String body = Files.readString(manifest.toPath());
+        require(body.contains("schemaVersion=2"), "manifest schema");
+        require(body.contains("fileCount="), "manifest count");
         require(body.contains("sha256="), "manifest hashes");
         deleteTree(root);
         System.out.println("PASS runtime diagnostics evidence self-test");
+    }
+
+    private static void testAnrEpisodes() {
+        AnrEpisodeTracker tracker = new AnrEpisodeTracker(100);
+        require(tracker.observe(10, 50).transition == AnrEpisodeTracker.Transition.NONE, "healthy sample");
+        AnrEpisodeTracker.Sample started = tracker.observe(200, 120);
+        require(started.transition == AnrEpisodeTracker.Transition.STARTED && started.episodeId == 1,
+                "ANR start");
+        AnrEpisodeTracker.Sample continuing = tracker.observe(350, 180);
+        require(continuing.transition == AnrEpisodeTracker.Transition.CONTINUING
+                && continuing.maxDelayMs == 180 && continuing.sampleCount == 2, "ANR continuation");
+        AnrEpisodeTracker.Sample recovered = tracker.observe(500, 10);
+        require(recovered.transition == AnrEpisodeTracker.Transition.RECOVERED
+                && recovered.durationMs == 300 && recovered.maxDelayMs == 180, "ANR recovery");
+        require(tracker.observe(600, 130).episodeId == 2, "ANR episode monotonic id");
     }
 
     private static void require(boolean condition, String label) {

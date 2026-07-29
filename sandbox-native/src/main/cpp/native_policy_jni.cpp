@@ -1,6 +1,8 @@
 #include "controlled_sandbox/native_policy.h"
 #include "controlled_sandbox/native_audio.h"
 #include "controlled_sandbox/native_interceptors.h"
+#include "controlled_sandbox/native_loader.h"
+#include "controlled_sandbox/native_network.h"
 
 #include <jni.h>
 #include <stdexcept>
@@ -69,7 +71,10 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
         jobjectArray allow_cidrs_v6, jobjectArray deny_cidrs_v6,
         jstring virtual_hostname, jstring virtual_interface_name,
         jstring virtual_ipv4, jstring virtual_ipv6,
-        jstring proxy_host, jint proxy_port, jboolean cleartext_permitted) {
+        jstring proxy_host, jint proxy_port, jboolean cleartext_permitted,
+        jint network_id, jstring transport, jboolean vpn_active,
+        jboolean metered, jboolean validated, jint mtu,
+        jstring private_dns_server_name, jobjectArray dns_servers) {
     try {
         if (generation <= 0) throw std::invalid_argument("generation must be positive");
         controlled_sandbox::global_policy().configure(
@@ -83,7 +88,9 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
                 controlled_sandbox::NativeNetworkIdentity{string_value(env, virtual_hostname),
                         string_value(env, virtual_interface_name), string_value(env, virtual_ipv4),
                         string_value(env, virtual_ipv6), string_value(env, proxy_host), proxy_port,
-                        cleartext_permitted == JNI_TRUE});
+                        cleartext_permitted == JNI_TRUE, network_id, string_value(env, transport),
+                        vpn_active == JNI_TRUE, metered == JNI_TRUE, validated == JNI_TRUE, mtu,
+                        string_value(env, private_dns_server_name), string_array(env, dns_servers)});
         return JNI_TRUE;
     } catch (const std::exception& error) {
         throw_java(env, "java/lang/IllegalArgumentException", error.what());
@@ -230,7 +237,10 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetPolicy(JN
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallCrashRecorder(
         JNIEnv* env, jclass, jstring output_path) {
-    return controlled_sandbox::global_crash_recorder().install(string_value(env, output_path))
+    const auto policy = controlled_sandbox::global_policy().snapshot();
+    return controlled_sandbox::global_crash_recorder().install(
+            string_value(env, output_path), controlled_sandbox::NativeCrashContext{
+                    policy.session_id, policy.generation, policy.process_name, policy.abi_name})
             ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -238,7 +248,32 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeCrashStatus(JNIEnv* env, jclass) {
     const auto status = controlled_sandbox::global_crash_recorder().status();
     std::string value = "installed=" + std::string(status.installed ? "true" : "false")
+            + ";altStack=" + std::string(status.alternate_stack_installed ? "true" : "false")
+            + ";generation=" + std::to_string(status.generation)
+            + ";records=" + std::to_string(status.records_written)
             + ";path=" + status.output_path + ";error=" + status.last_error;
+    return env->NewStringUTF(value.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeNetworkStatus(JNIEnv* env, jclass) {
+    try {
+        const std::string value = controlled_sandbox::native_network_status_string();
+        return env->NewStringUTF(value.c_str());
+    } catch (const std::exception& error) {
+        const std::string value = std::string("error=") + error.what();
+        return env->NewStringUTF(value.c_str());
+    }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeLoaderStatus(JNIEnv* env, jclass) {
+    const auto status = controlled_sandbox::NativeLibraryLoaderPolicy::status();
+    const std::string value = "pathValidations=" + std::to_string(status.path_validations)
+            + ";fdValidations=" + std::to_string(status.fd_validations)
+            + ";relroValidations=" + std::to_string(status.relro_validations)
+            + ";denied=" + std::to_string(status.denied_requests)
+            + ";error=" + status.last_error;
     return env->NewStringUTF(value.c_str());
 }
 

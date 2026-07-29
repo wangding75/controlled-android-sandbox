@@ -33,6 +33,14 @@ struct NativeNetworkIdentity {
     std::string proxy_host;
     int proxy_port{};
     bool cleartext_permitted{true};
+    int network_id{100};
+    std::string transport{"WIFI"};
+    bool vpn_active{false};
+    bool metered{false};
+    bool validated{true};
+    int mtu{1500};
+    std::string private_dns_server_name;
+    std::vector<std::string> dns_servers;
 };
 
 class PathPolicyError final : public std::runtime_error {

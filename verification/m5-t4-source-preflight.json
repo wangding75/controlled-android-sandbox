@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "baseline": "M5-T4",
+  "baseCommit": "07b3c3164fc8dc0e1c67dcc707e2e0495a6aac7f",
+  "sourceStatus": "pass",
+  "androidBuildStatus": "blocked-toolchain",
+  "deviceEvidence": {
+    "status": "not-tested",
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "resolvedM4ProductionIds": [
+    "native.network-hook",
+    "native.dynamic-loader-hook",
+    "diagnostics.crash-anr-events"
+  ],
+  "remainingProductionIds": [
+    "process.declared-isolated-planning",
+    "native.four-abi-build-architecture"
+  ],
+  "sourceControls": [
+    "bounded native socket registry",
+    "bind and local-address projection",
+    "sendto and recvfrom endpoint policy",
+    "virtual interface index and sensitive socket-option policy",
+    "Connectivity metadata projection",
+    "ELF class machine and shared-object validation",
+    "library-FD offset and RELRO validation",
+    "android_dlopen_ext flag and reserved-address validation",
+    "alternate native signal stack",
+    "real fatal-signal evidence fixture",
+    "ANR episode state machine",
+    "bounded thread-dump export with SHA-256 manifest"
+  ]
+}

@@ -411,6 +411,8 @@ public final class GuestRuntimeEnvironment {
             out.putBoolean("nativePolicyConfigured", nativePolicyConfigured);
             out.putBoolean("nativeHooksInstalled", nativeHooksInstalled);
             out.putString("nativeHookStatus", NativePolicy.hookStatus());
+            out.putString("nativeNetworkStatus", NativePolicy.networkStatus());
+            out.putString("nativeLoaderStatus", NativePolicy.loaderStatus());
             out.putString("nativeAudioCaptureStatus", NativePolicy.audioCaptureStatus());
             out.putBoolean("nativeCrashRecorderInstalled", nativeCrashRecorderInstalled);
             out.putString("nativeCrashStatus", NativePolicy.crashStatus());

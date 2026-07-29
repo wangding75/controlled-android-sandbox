@@ -43,6 +43,12 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("getdents64"), "getdents64 target");
     require_hook(NativeHookRuntime::is_target_symbol("mmap"), "mmap target");
     require_hook(NativeHookRuntime::is_target_symbol("socket"), "socket target");
+    require_hook(NativeHookRuntime::is_target_symbol("close"), "socket close target");
+    require_hook(NativeHookRuntime::is_target_symbol("bind"), "bind target");
+    require_hook(NativeHookRuntime::is_target_symbol("sendto"), "sendto target");
+    require_hook(NativeHookRuntime::is_target_symbol("recvfrom"), "recvfrom target");
+    require_hook(NativeHookRuntime::is_target_symbol("setsockopt"), "socket option target");
+    require_hook(NativeHookRuntime::is_target_symbol("if_nametoindex"), "interface index target");
     require_hook(NativeHookRuntime::is_target_symbol("getaddrinfo"), "DNS target");
     require_hook(NativeHookRuntime::is_target_symbol("getnameinfo"), "reverse DNS target");
     require_hook(NativeHookRuntime::is_target_symbol("getifaddrs"), "interface projection target");
@@ -51,7 +57,7 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("AMediaRecorder_start"), "MediaRecorder capture target");
     require_hook(NativeHookRuntime::is_target_symbol("dlopen"), "dynamic loader target");
     require_hook(NativeHookRuntime::is_target_symbol("android_dlopen_ext"), "Android loader target");
-    require_hook(!NativeHookRuntime::is_target_symbol("close"), "non-target");
+    require_hook(!NativeHookRuntime::is_target_symbol("fork"), "non-target");
     require_hook(NativeHookRuntime::is_guest_module(fixture_path.string(), fixture_root.string()),
             "guest module");
     require_hook(!NativeHookRuntime::is_guest_module("/system/lib64/libc.so", fixture_root.string()),

@@ -578,24 +578,28 @@
       "id": "native.network-hook",
       "evidence": [
         "sandbox-native/src/main/cpp/native_hook.cpp",
-        "sandbox-native/src/main/cpp/native_policy.cpp",
-        "sandbox-native/src/test/cpp/native_hook_self_test.cpp"
+        "sandbox-native/src/main/cpp/native_interceptors.cpp",
+        "sandbox-native/src/main/cpp/native_network.cpp",
+        "sandbox-native/src/main/java/com/warden/controlledsandbox/nativebridge/NativeNetworkIdentity.java",
+        "sandbox-native/src/test/cpp/native_network_self_test.cpp"
       ],
-      "sourceStatus": "partial",
-      "productionStatus": "partial",
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+      "notes": "Guest modules route socket creation/close, bind/connect, sendto/recvfrom, local/peer address queries, sensitive socket options, DNS, hostname and interface identity through a bounded fail-closed native network policy. Virtual Connectivity metadata includes network ID, transport, VPN, metering, validation, MTU, proxy and private DNS. Android VPN/ConnectivityService and OEM behavior remain device-deferred."
     },
     {
       "id": "native.dynamic-loader-hook",
       "evidence": [
         "sandbox-native/src/main/cpp/native_hook.cpp",
-        "sandbox-native/src/test/cpp/native_hook_self_test.cpp"
+        "sandbox-native/src/main/cpp/native_interceptors.cpp",
+        "sandbox-native/src/main/cpp/native_loader.cpp",
+        "sandbox-native/src/test/cpp/native_loader_self_test.cpp"
       ],
-      "sourceStatus": "partial",
-      "productionStatus": "partial",
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+      "notes": "dlopen/android_dlopen_ext now enforce Guest-root resolution, ELF class/machine/type matching, library-FD offsets, bounded extension flags, RELRO descriptor policy, reserved-address alignment and foreign-namespace denial with audit status. Bionic/API linker behavior and actual APK RELRO remain device-deferred."
     },
     {
       "id": "webview.profile-isolation",
@@ -610,15 +614,16 @@
     {
       "id": "diagnostics.crash-anr-events",
       "evidence": [
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/diagnostics/AnrEpisodeTracker.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/diagnostics/RuntimeDiagnostics.java",
         "sandbox-native/src/main/cpp/native_crash.cpp",
         "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/diagnostics/RuntimeDiagnosticsSelfTest.java",
         "sandbox-native/src/test/cpp/native_crash_self_test.cpp"
       ],
-      "sourceStatus": "partial",
-      "productionStatus": "partial",
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Current implementation covers a bounded symbol/policy subset and requires broader device validation."
+      "notes": "Runtime diagnostics record bounded Java crash evidence, ANR episode start/continuation/recovery with thread dumps, rotated exports and SHA-256 manifests. Native fatal-signal capture uses an alternate signal stack and records PID/TID/signal/code/address/session/generation/process/ABI; the host test executes a real SIGSEGV child fixture. Android tombstone/DropBox/AMS ANR correlation remains device-deferred."
     },
     {
       "id": "fixtures.component-matrix",

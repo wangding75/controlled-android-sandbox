@@ -144,3 +144,7 @@ M5-T2 replaces the 32-bit Companion probe-only path with a source-wired producti
 ## M5-T3 ordered broadcast and foreground-service source baseline
 
 M5-T3 completes the source-wired Ordered Broadcast result chain, Guest PendingResult completion bridge and foreground-Service policy model. Ordered chains now have a bounded global deadline, timeout/skipped accounting and explicit terminal reasons. PendingResult completion is one-shot, payload-bounded and tied to Binder death. `startForegroundService` now creates a pending promotion with background-start policy, declared/requested type validation, notification ownership, timeout cleanup and process-death re-promotion. Android APK build and device evidence remain 0 because the current environment lacks the locked JDK 17 and Android SDK/NDK.
+
+## M5-T4 native network, loader and diagnostics source baseline
+
+M5-T4 completes the source-wired Native network, dynamic-loader and Crash/ANR closure. Guest sockets now use bounded lifecycle tracking, IPv4/IPv6 endpoint policy, local/interface identity projection and sensitive socket-option controls. Guest library loading validates ELF ABI/type plus `android_dlopen_ext` FD/offset/RELRO/reserved-address/namespace inputs. Diagnostics add alternate-stack fatal-signal evidence, a real SIGSEGV Host fixture, ANR episode tracking, bounded thread dumps and SHA-256 exports. Android APK build and device evidence remain 0 because the current environment lacks the locked JDK 17 and Android SDK/NDK.

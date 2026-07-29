@@ -16,6 +16,7 @@ python3 scripts/check-m4-t18-final-freeze.py
 python3 scripts/check-m5-build-baseline.py
 python3 scripts/check-m5-t2-cross-width-runtime.py
 python3 scripts/check-m5-t3-broadcast-fgs.py
+python3 scripts/check-m5-t4-native-diagnostics.py
 ./scripts/test-m5-artifact-verifier.sh
 python3 scripts/check-ports-dispatchers.py
 python3 scripts/check-package-boundaries.py

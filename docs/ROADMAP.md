@@ -144,3 +144,10 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — Guest PendingResult one-shot finish, Binder-death cleanup and bounded result payload validation.
 - DONE — pending foreground promotion, background-start policy, type-mask validation, notification ownership, demotion, timeout and process recovery.
 - DEVICE — Android AMS/SystemUI enforcement, hidden PendingResult compatibility and OEM behavior.
+
+## M5-T4 native network, loader and diagnostics source baseline
+
+- DONE — bounded socket lifecycle, IPv4/IPv6 endpoint policy, address/interface projection and sensitive socket-option controls.
+- DONE — ELF ABI/type validation plus library-FD, offset, RELRO, reserved-address and linker-namespace policy.
+- DONE — alternate-stack native fatal evidence, real Host SIGSEGV fixture, ANR episode state, bounded thread dumps and SHA-256 export.
+- DEVICE — Android Bionic/linker, VPN/Connectivity, tombstone/AMS ANR and OEM behavior.

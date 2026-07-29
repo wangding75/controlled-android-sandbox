@@ -68,7 +68,7 @@ production_unresolved = {
 }
 declared_unresolved = set(preflight.get("matrixProductionUnresolved", []))
 resolved_after_m4: set[str] = set()
-for relative in ("verification/m5-t1-source-preflight.json", "verification/m5-t2-source-preflight.json", "verification/m5-t3-source-preflight.json"):
+for relative in ("verification/m5-t1-source-preflight.json", "verification/m5-t2-source-preflight.json", "verification/m5-t3-source-preflight.json", "verification/m5-t4-source-preflight.json"):
     candidate = ROOT / relative
     if not candidate.is_file():
         continue

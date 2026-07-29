@@ -266,11 +266,13 @@ NativeHookStatus NativeHookRuntime::status() const {
 }
 
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 35> targets{
+    static constexpr std::array<std::string_view, 45> targets{
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
             "renameat2", "readlink", "readlinkat", "getdents64", "mmap",
-            "socket", "connect", "getaddrinfo", "getnameinfo", "gethostname", "uname",
+            "socket", "close", "bind", "connect", "sendto", "recvfrom", "getsockname",
+            "getpeername", "setsockopt", "getsockopt", "if_nametoindex", "if_indextoname",
+            "getaddrinfo", "getnameinfo", "gethostname", "uname",
             "getifaddrs", "freeifaddrs", "AAudioStream_requestStart",
             "AAudioStream_requestStop", "AMediaRecorder_start", "AMediaRecorder_stop",
             "dlopen", "android_dlopen_ext"};

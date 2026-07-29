@@ -22,6 +22,14 @@ std::string lower_ascii(std::string_view value) {
     return out;
 }
 
+std::string upper_ascii(std::string_view value) {
+    std::string out(value);
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
+        return static_cast<char>(std::toupper(c));
+    });
+    return out;
+}
+
 bool host_matches(const std::string& host, const std::string& rule) {
     if (rule.empty()) return false;
     if (rule.front() == '.') {
@@ -63,7 +71,24 @@ NativeNetworkIdentity normalize_network_identity(NativeNetworkIdentity value,
     if (value.proxy_port < 0 || value.proxy_port > 65535) {
         throw std::invalid_argument("proxy port is invalid");
     }
+    if (value.network_id < 1) throw std::invalid_argument("network id is invalid");
+    value.transport = upper_ascii(value.transport);
+    if (value.transport != "WIFI" && value.transport != "CELLULAR"
+            && value.transport != "ETHERNET" && value.transport != "VPN") {
+        throw std::invalid_argument("network transport is invalid");
+    }
+    if (value.mtu < 576 || value.mtu > 65535) throw std::invalid_argument("network MTU is invalid");
+    if (value.private_dns_server_name.size() > 253) {
+        throw std::invalid_argument("private DNS server name is too long");
+    }
+    if (value.dns_servers.size() > 8) throw std::invalid_argument("too many DNS servers");
+    for (auto& server : value.dns_servers) {
+        if (server.size() > 64 || (!parse_ipv4(server) && !parse_ipv6(server))) {
+            throw std::invalid_argument("DNS server address is invalid");
+        }
+    }
     value.proxy_host = lower_ascii(value.proxy_host);
+    value.private_dns_server_name = lower_ascii(value.private_dns_server_name);
     return value;
 }
 
@@ -282,7 +307,18 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
                 || network_identity.hostname != network_identity_.hostname
                 || network_identity.interface_name != network_identity_.interface_name
                 || network_identity.ipv4_address != network_identity_.ipv4_address
-                || network_identity.ipv6_address != network_identity_.ipv6_address) {
+                || network_identity.ipv6_address != network_identity_.ipv6_address
+                || network_identity.proxy_host != network_identity_.proxy_host
+                || network_identity.proxy_port != network_identity_.proxy_port
+                || network_identity.cleartext_permitted != network_identity_.cleartext_permitted
+                || network_identity.network_id != network_identity_.network_id
+                || network_identity.transport != network_identity_.transport
+                || network_identity.vpn_active != network_identity_.vpn_active
+                || network_identity.metered != network_identity_.metered
+                || network_identity.validated != network_identity_.validated
+                || network_identity.mtu != network_identity_.mtu
+                || network_identity.private_dns_server_name != network_identity_.private_dns_server_name
+                || network_identity.dns_servers != network_identity_.dns_servers) {
             throw std::logic_error("NATIVE_POLICY_IDENTITY_CHANGED_WITHIN_SESSION");
         }
     }

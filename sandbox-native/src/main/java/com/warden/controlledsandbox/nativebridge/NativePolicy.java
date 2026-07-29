@@ -55,7 +55,10 @@ public final class NativePolicy {
                 networkIdentity.hostname(), networkIdentity.interfaceName(),
                 networkIdentity.ipv4Address(), networkIdentity.ipv6Address(),
                 networkIdentity.proxyHost(), networkIdentity.proxyPort(),
-                networkIdentity.cleartextPermitted());
+                networkIdentity.cleartextPermitted(), networkIdentity.networkId(),
+                networkIdentity.transport(), networkIdentity.vpnActive(),
+                networkIdentity.metered(), networkIdentity.validated(), networkIdentity.mtu(),
+                networkIdentity.privateDnsServerName(), networkIdentity.dnsServers());
     }
 
     public static boolean configure(String sessionId, long generation, String packageName,
@@ -67,7 +70,10 @@ public final class NativePolicy {
                                     String[] allowCidrsV6, String[] denyCidrsV6,
                                     String virtualHostname, String virtualInterfaceName,
                                     String virtualIpv4, String virtualIpv6,
-                                    String proxyHost, int proxyPort, boolean cleartextPermitted) {
+                                    String proxyHost, int proxyPort, boolean cleartextPermitted,
+                                    int networkId, String transport, boolean vpnActive,
+                                    boolean metered, boolean validated, int mtu,
+                                    String privateDnsServerName, String[] dnsServers) {
         if (!AVAILABLE) return false;
         if (sessionId == null || sessionId.trim().isEmpty()) throw new IllegalArgumentException("sessionId is required");
         if (generation < 1) throw new IllegalArgumentException("generation must be positive");
@@ -82,13 +88,18 @@ public final class NativePolicy {
         if (virtualHostname == null || virtualHostname.trim().isEmpty()) throw new IllegalArgumentException("virtualHostname is required");
         if (virtualInterfaceName == null || virtualInterfaceName.trim().isEmpty()) throw new IllegalArgumentException("virtualInterfaceName is required");
         if (proxyPort < 0 || proxyPort > 65535) throw new IllegalArgumentException("proxyPort out of range");
+        if (networkId < 1) throw new IllegalArgumentException("networkId must be positive");
+        if (transport == null || transport.trim().isEmpty()) throw new IllegalArgumentException("transport is required");
+        if (mtu < 576 || mtu > 65535) throw new IllegalArgumentException("mtu out of range");
         return nativeConfigure(sessionId, generation, packageName, processName, virtualUserId,
                 virtualUid, virtualPid, abiName, instanceRoot, apkPath,
                 nativeLibraryRoot == null ? "" : nativeLibraryRoot,
                 defaultNetworkAllow, safe(allowHosts), safe(denyHosts), safe(allowCidrs), safe(denyCidrs),
                 safe(allowCidrsV6), safe(denyCidrsV6), virtualHostname, virtualInterfaceName,
                 virtualIpv4 == null ? "" : virtualIpv4, virtualIpv6 == null ? "" : virtualIpv6,
-                proxyHost == null ? "" : proxyHost, proxyPort, cleartextPermitted);
+                proxyHost == null ? "" : proxyHost, proxyPort, cleartextPermitted,
+                networkId, transport, vpnActive, metered, validated, mtu,
+                privateDnsServerName == null ? "" : privateDnsServerName, safe(dnsServers));
     }
 
     public static String mapPath(String guestPath) {
@@ -139,6 +150,8 @@ public final class NativePolicy {
                 && nativeInstallCrashRecorder(outputPath);
     }
     public static String crashStatus() { return AVAILABLE ? nativeCrashStatus() : "unavailable:" + loadError; }
+    public static String networkStatus() { return AVAILABLE ? nativeNetworkStatus() : "unavailable:" + loadError; }
+    public static String loaderStatus() { return AVAILABLE ? nativeLoaderStatus() : "unavailable:" + loadError; }
     public static void resetCrashRecorder() { if (AVAILABLE) nativeResetCrashRecorder(); }
 
     private static String[] safe(String[] values) { return values == null ? new String[0] : values.clone(); }
@@ -151,7 +164,10 @@ public final class NativePolicy {
                                                   String[] allowCidrsV6, String[] denyCidrsV6,
                                                   String virtualHostname, String virtualInterfaceName,
                                                   String virtualIpv4, String virtualIpv6,
-                                                  String proxyHost, int proxyPort, boolean cleartextPermitted);
+                                                  String proxyHost, int proxyPort, boolean cleartextPermitted,
+                                                  int networkId, String transport, boolean vpnActive,
+                                                  boolean metered, boolean validated, int mtu,
+                                                  String privateDnsServerName, String[] dnsServers);
     private static native String nativeMapPath(String guestPath);
     private static native boolean nativeAllowHost(String host);
     private static native boolean nativeAllowIpv4(String address);
@@ -169,5 +185,7 @@ public final class NativePolicy {
     private static native void nativeResetPolicy();
     private static native boolean nativeInstallCrashRecorder(String outputPath);
     private static native String nativeCrashStatus();
+    private static native String nativeNetworkStatus();
+    private static native String nativeLoaderStatus();
     private static native void nativeResetCrashRecorder();
 }
