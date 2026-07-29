@@ -45,7 +45,7 @@ for name in ["VirtualNotificationSnapshot", "VirtualNotificationChannelSnapshot"
 
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "private static final int SCHEMA = 5", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE",
+    "static final int SCHEMA = 5", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE",
     "reserveNotification", "commitNotification", "notificationChannels", "reserveJob",
     "commitJob", "startJob", "observer().onJobStart", "VirtualJobSnapshot.SCHEDULED")
 if "VirtualJobSnapshot.DISPATCHING" not in store or "VirtualJobSnapshot.RUNNING" not in store:

@@ -14,11 +14,6 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,8 +27,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 /** Binder-owned durable state for bounded virtual system services. */
 final class VirtualSystemServiceStore implements AutoCloseable {
@@ -53,14 +46,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         String key() { return packageName + "#u" + virtualUserId; }
     }
-    private record AccountKey(String name, String type) { }
-    private static final class AccountRecord {
+    record AccountKey(String name, String type) { }
+    static final class AccountRecord {
         String password;
         final Map<String, String> tokens = new LinkedHashMap<>();
         AccountRecord(String password) { this.password = safe(password); }
     }
-    private record PendingIntentKey(String kind, int requestCode, String filterIdentity) { }
-    private static final class PendingIntentRecord {
+    record PendingIntentKey(String kind, int requestCode, String filterIdentity) { }
+    static final class PendingIntentRecord {
         final String tokenId; final String kind; final int requestCode; final String action;
         final String component; final String data; final String filterIdentity; int flags; final String creatorPackage;
         final int creatorUid; String requiredPermission; String ownerProcessName;
@@ -88,7 +81,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         PendingIntentKey key() { return new PendingIntentKey(kind, requestCode, filterIdentity); }
     }
 
-    private static final class AlarmRecord {
+    static final class AlarmRecord {
         final String id;
         long triggerAtMs;
         final long intervalMs;
@@ -129,8 +122,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
-    private record NotificationKey(int guestId, String guestTag) { }
-    private static final class NotificationRecord {
+    record NotificationKey(int guestId, String guestTag) { }
+    static final class NotificationRecord {
         final int guestId; final int hostId; final String guestTag; final String hostTag;
         String channelId; String state; final String packageRevision;
         String contentIntentTokenId; String deleteIntentTokenId;
@@ -154,7 +147,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
-    private static final class NotificationChannelRecord {
+    static final class NotificationChannelRecord {
         final String kind; final String id; String groupId; final String packageRevision;
         byte[] payload; long updatedAtMs;
         NotificationChannelRecord(String kind, String id, String groupId, String packageRevision,
@@ -165,7 +158,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
-    private static final class JobRecord {
+    static final class JobRecord {
         final int guestId; final int hostId; String state; final String ownerProcessName;
         long ownerGeneration; final String packageRevision; final int requiredNetworkType;
         final boolean requiresCharging; final boolean requiresBatteryNotLow;
@@ -210,13 +203,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             this.payload = boundedPayload(payload, "jobPayload"); this.updatedAtMs = Math.max(0L, updatedAtMs);
         }
     }
-    private static final class NamespaceState {
+    static final class NamespaceState {
         int next;
         final Map<Integer, Integer> guestToHost = new LinkedHashMap<>();
         final Map<Integer, Integer> hostToGuest = new LinkedHashMap<>();
         NamespaceState(int seed) { next = seed; }
     }
-    private static final class ScopeState {
+    static final class ScopeState {
         byte[] clipboard = new byte[0];
         final Map<AccountKey, AccountRecord> accounts = new LinkedHashMap<>();
         final Map<String, PendingIntentRecord> pendingIntents = new LinkedHashMap<>();
@@ -227,21 +220,23 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    private static final int SCHEMA = 5;
-    private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
-    private static final int MAX_ACCOUNTS_PER_SCOPE = 64;
-    private static final int MAX_TOKENS_PER_ACCOUNT = 32;
-    private static final int MAX_PENDING_INTENTS_PER_SCOPE = 512;
-    private static final int MAX_ALARMS_PER_SCOPE = 256;
-    private static final int MAX_NAMESPACE_MAPPINGS = 4096;
-    private static final int MAX_NOTIFICATIONS_PER_SCOPE = 1024;
-    private static final int MAX_NOTIFICATION_CHANNELS_PER_SCOPE = 512;
-    private static final int MAX_JOBS_PER_SCOPE = 512;
-    private static final int MAX_KEY_CHARS = 512;
-    private static final int MAX_SECRET_CHARS = 16 * 1024;
+    static final int SCHEMA = 5;
+    static final int MAX_PAYLOAD_BYTES = 512 * 1024;
+    static final int MAX_ACCOUNTS_PER_SCOPE = 64;
+    static final int MAX_TOKENS_PER_ACCOUNT = 32;
+    static final int MAX_PENDING_INTENTS_PER_SCOPE = 512;
+    static final int MAX_ALARMS_PER_SCOPE = 256;
+    static final int MAX_NAMESPACE_MAPPINGS = 4096;
+    static final int MAX_NOTIFICATIONS_PER_SCOPE = 1024;
+    static final int MAX_NOTIFICATION_CHANNELS_PER_SCOPE = 512;
+    static final int MAX_JOBS_PER_SCOPE = 512;
+    static final int MAX_KEY_CHARS = 512;
+    static final int MAX_SECRET_CHARS = 16 * 1024;
+    static final int MAX_SCOPES = 256;
+    static final int MAX_NAMESPACES_PER_SCOPE = 32;
     private static final long RETRY_WITHOUT_CLIENT_MS = 30_000L;
     private static final long JOB_EXECUTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
-    private final File file;
+    private final VirtualSystemServiceStorePersistence persistence;
     private volatile String maintenanceWarning = "";
     private final Map<Scope, ScopeState> states = new LinkedHashMap<>();
     private final Set<Client> clients = new LinkedHashSet<>();
@@ -256,7 +251,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     });
 
     VirtualSystemServiceStore(File filesDir) {
-        file = new File(filesDir, "sandbox-system-services.json");
+        persistence = new VirtualSystemServiceStorePersistence(
+                new File(filesDir, "sandbox-system-services.json"));
         load();
         synchronized (this) {
             for (Map.Entry<Scope, ScopeState> item : states.entrySet()) {
@@ -303,13 +299,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
 
     synchronized byte[] clipboard(Scope scope) { return state(scope).clipboard.clone(); }
     synchronized void setClipboard(Scope scope, byte[] payload) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         state(scope).clipboard = boundedPayload(payload, "clipboard");
         persistOrRestore(scope, before);
         scheduler.execute(() -> notifyClipboard(scope));
     }
     synchronized void clearClipboard(Scope scope) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         state(scope).clipboard = new byte[0];
         persistOrRestore(scope, before);
         scheduler.execute(() -> notifyClipboard(scope));
@@ -335,17 +331,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         if (state.accounts.size() >= MAX_ACCOUNTS_PER_SCOPE) {
             throw new IllegalStateException("VIRTUAL_ACCOUNT_LIMIT_EXCEEDED");
         }
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         state.accounts.put(key, new AccountRecord(password));
         persistOrRestore(scope, before); return true;
     }
     synchronized boolean removeAccount(Scope scope, String name, String type) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         boolean removed = state(scope).accounts.remove(accountKey(name, type)) != null;
         if (removed) persistOrRestore(scope, before); return removed;
     }
     synchronized void setPassword(Scope scope, String name, String type, String password) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         requireAccount(scope, name, type).password = safe(password);
         persistOrRestore(scope, before);
     }
@@ -360,7 +356,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                 && record.tokens.size() >= MAX_TOKENS_PER_ACCOUNT) {
             throw new IllegalStateException("VIRTUAL_ACCOUNT_TOKEN_LIMIT_EXCEEDED");
         }
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         record.tokens.put(normalizedType, safe(token));
         persistOrRestore(scope, before);
     }
@@ -369,7 +365,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return record == null ? null : record.tokens.get(normalize(tokenType));
     }
     synchronized void invalidateToken(Scope scope, String accountType, String token) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         String normalizedType = normalize(accountType); boolean changed = false;
         for (Map.Entry<AccountKey, AccountRecord> item : state(scope).accounts.entrySet()) {
             if (!normalizedType.isEmpty() && !normalizedType.equals(item.getKey().type)) continue;
@@ -390,7 +386,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         if (candidate.creatorUid() != expectedCreatorUid) {
             throw new SecurityException("VIRTUAL_PENDING_INTENT_CREATOR_UID_MISMATCH");
         }
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         boolean prunedRevision = state.pendingIntents.values()
                 .removeIf(value -> !revision.equals(value.packageRevision));
         PendingIntentKey key = pendingIntentKey(candidate);
@@ -432,7 +428,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized VirtualPendingIntentSnapshot markPendingIntentSent(Scope scope, String packageRevision,
             String tokenId) {
-        ScopeState before = snapshot(scope); PendingIntentRecord record = requirePendingIntent(scope, packageRevision, tokenId);
+        MutationSnapshot before = snapshotMutation(scope); PendingIntentRecord record = requirePendingIntent(scope, packageRevision, tokenId);
         record.sends++; record.updatedAtMs = System.currentTimeMillis();
         boolean oneShot = (record.flags & 0x40000000) != 0;
         List<AlarmRecord> removedAlarms = List.of();
@@ -445,7 +441,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return pendingIntentSnapshot(record);
     }
     synchronized boolean cancelPendingIntent(Scope scope, String packageRevision, String tokenId) {
-        ScopeState before = snapshot(scope); PendingIntentRecord record = state(scope).pendingIntents.get(required(tokenId, "tokenId"));
+        MutationSnapshot before = snapshotMutation(scope); PendingIntentRecord record = state(scope).pendingIntents.get(required(tokenId, "tokenId"));
         if (record == null || !required(packageRevision, "packageRevision").equals(record.packageRevision)) return false;
         record.cancelled = true; state(scope).pendingIntents.remove(record.tokenId);
         List<AlarmRecord> removedAlarms = removePendingIntentDependentsLocked(state(scope), record.tokenId);
@@ -455,7 +451,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized List<VirtualPendingIntentSnapshot> pendingIntents(Scope scope, String processName,
             long generation, String packageRevision) {
-        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        MutationSnapshot before = snapshotMutation(scope); String revision = required(packageRevision, "packageRevision");
         List<VirtualPendingIntentSnapshot> out = new ArrayList<>(); boolean changed = false;
         for (PendingIntentRecord record : state(scope).pendingIntents.values()) {
             if (record.cancelled || !revision.equals(record.packageRevision)) continue;
@@ -478,7 +474,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     synchronized void scheduleAlarm(Scope scope, String processName, long generation,
                                     String packageRevision, VirtualAlarmSnapshot candidate) {
         if (candidate == null) throw new IllegalArgumentException("alarm candidate is required");
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         String revision = required(packageRevision, "packageRevision");
         List<AlarmRecord> stale = new ArrayList<>();
         for (AlarmRecord value : state.alarms.values()) {
@@ -511,7 +507,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return cancelAlarm(scope, "legacy-revision", alarmId);
     }
     synchronized boolean cancelAlarm(Scope scope, String packageRevision, String alarmId) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         AlarmRecord existing = state(scope).alarms.get(required(alarmId, "alarmId"));
         if (existing == null || !required(packageRevision, "packageRevision").equals(existing.packageRevision)) {
             return false;
@@ -525,7 +521,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized List<VirtualAlarmSnapshot> alarms(Scope scope, String processName, long generation,
                                                     String packageRevision) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         String owner = required(processName, "processName");
         String revision = required(packageRevision, "packageRevision");
         List<VirtualAlarmSnapshot> out = new ArrayList<>();
@@ -557,7 +553,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     synchronized VirtualNotificationSnapshot reserveNotification(Scope scope, long generation,
             String packageRevision, VirtualNotificationSnapshot candidate) {
         if (candidate == null) throw new IllegalArgumentException("notification candidate is required");
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         String revision = required(packageRevision, "packageRevision");
         pruneNotificationRevisionLocked(state, revision);
         validateNotificationReferences(scope, revision, candidate);
@@ -598,7 +594,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     synchronized void commitNotification(Scope scope, String packageRevision,
                                          VirtualNotificationSnapshot value) {
         if (value == null) throw new IllegalArgumentException("notification value is required");
-        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        MutationSnapshot before = snapshotMutation(scope); String revision = required(packageRevision, "packageRevision");
         validateNotificationReferences(scope, revision, value);
         NotificationRecord record = state(scope).notifications.get(notificationKey(value.guestId(), value.guestTag()));
         if (record == null || !revision.equals(record.packageRevision)) {
@@ -618,7 +614,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return removeNotification(scope, "legacy-revision", guestId, guestTag);
     }
     synchronized boolean removeNotification(Scope scope, String packageRevision, int guestId, String guestTag) {
-        ScopeState before = snapshot(scope); NotificationKey key = notificationKey(guestId, guestTag);
+        MutationSnapshot before = snapshotMutation(scope); NotificationKey key = notificationKey(guestId, guestTag);
         NotificationRecord existing = state(scope).notifications.get(key);
         if (existing == null || !required(packageRevision, "packageRevision").equals(existing.packageRevision)) return false;
         state(scope).notifications.remove(key); persistOrRestore(scope, before); return true;
@@ -627,7 +623,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return notifications(scope, "legacy-revision");
     }
     synchronized List<VirtualNotificationSnapshot> notifications(Scope scope, String packageRevision) {
-        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        MutationSnapshot before = snapshotMutation(scope); String revision = required(packageRevision, "packageRevision");
         boolean pruned = pruneNotificationRevisionLocked(state(scope), revision);
         if (pruned) persistOrRestore(scope, before);
         List<VirtualNotificationSnapshot> out = new ArrayList<>();
@@ -646,7 +642,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     synchronized void upsertNotificationChannel(Scope scope, String packageRevision,
                                                 VirtualNotificationChannelSnapshot value) {
         if (value == null) throw new IllegalArgumentException("notification channel is required");
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         String revision = required(packageRevision, "packageRevision");
         pruneNotificationRevisionLocked(state, revision);
         String key = channelKey(value.kind(), value.id());
@@ -669,7 +665,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return removeNotificationChannel(scope, "legacy-revision", kind, id);
     }
     synchronized boolean removeNotificationChannel(Scope scope, String packageRevision, String kind, String id) {
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         String revision = required(packageRevision, "packageRevision");
         NotificationChannelRecord existing = state.notificationChannels.get(channelKey(kind, id));
         if (existing == null || !revision.equals(existing.packageRevision)) return false;
@@ -696,7 +692,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized List<VirtualNotificationChannelSnapshot> notificationChannels(Scope scope,
                                                                                 String packageRevision) {
-        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        MutationSnapshot before = snapshotMutation(scope); String revision = required(packageRevision, "packageRevision");
         boolean pruned = pruneNotificationRevisionLocked(state(scope), revision);
         if (pruned) persistOrRestore(scope, before);
         List<VirtualNotificationChannelSnapshot> out = new ArrayList<>();
@@ -713,7 +709,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                                                String packageRevision, VirtualJobSnapshot candidate) {
         if (candidate == null) throw new IllegalArgumentException("VIRTUAL_JOB_CANDIDATE_REQUIRED");
         String revision = required(packageRevision, "packageRevision");
-        ScopeState before = snapshot(scope); ScopeState state = state(scope);
+        MutationSnapshot before = snapshotMutation(scope); ScopeState state = state(scope);
         pruneJobRevisionLocked(state, revision);
         JobRecord current = state.jobs.get(candidate.guestId());
         int hostId = current == null ? allocateHostId("job") : current.hostId;
@@ -746,7 +742,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                         generation, payload, System.currentTimeMillis()));
     }
     synchronized void commitJob(Scope scope, int guestId) {
-        ScopeState before = snapshot(scope); JobRecord record = state(scope).jobs.get(guestId);
+        MutationSnapshot before = snapshotMutation(scope); JobRecord record = state(scope).jobs.get(guestId);
         if (record == null) throw new IllegalStateException("VIRTUAL_JOB_RESERVATION_REQUIRED");
         record.state = VirtualJobSnapshot.SCHEDULED;
         if (record.nextRunAtMs == 0L) record.nextRunAtMs = safeAdd(System.currentTimeMillis(), record.minimumLatencyMs);
@@ -764,13 +760,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             return true;
         }
         synchronized (this) {
-            ScopeState before = snapshot(scope); boolean removed = state(scope).jobs.remove(guestId) != null;
+            MutationSnapshot before = snapshotMutation(scope); boolean removed = state(scope).jobs.remove(guestId) != null;
             if (removed) persistOrRestore(scope, before); return removed;
         }
     }
     synchronized List<VirtualJobSnapshot> jobs(Scope scope, String processName, long generation,
                                                 String packageRevision) {
-        ScopeState before = snapshot(scope); String revision = required(packageRevision, "packageRevision");
+        MutationSnapshot before = snapshotMutation(scope); String revision = required(packageRevision, "packageRevision");
         boolean changed = pruneJobRevisionLocked(state(scope), revision); List<VirtualJobSnapshot> out = new ArrayList<>();
         for (JobRecord record : state(scope).jobs.values()) {
             if (!revision.equals(record.packageRevision)) continue;
@@ -810,7 +806,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (now < located.job.nextRunAtMs && now < deadlineAt) return false;
             Client client = matchingClient(located.scope, located.job);
             if (client == null) return false;
-            ScopeState before = snapshot(located.scope);
+            MutationSnapshot before = snapshotMutation(located.scope);
             located.job.state = VirtualJobSnapshot.DISPATCHING;
             located.job.updatedAtMs = System.currentTimeMillis();
             persistOrRestore(located.scope, before);
@@ -841,7 +837,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (current == null || current.job != execution.job) {
                 execution.invalidateLocked(); return false;
             }
-            ScopeState before = snapshot(current.scope);
+            MutationSnapshot before = snapshotMutation(current.scope);
             current.job.state = VirtualJobSnapshot.RUNNING;
             current.job.updatedAtMs = System.currentTimeMillis();
             try { persistOrRestore(current.scope, before); }
@@ -931,7 +927,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             boolean callHost = false;
             synchronized (VirtualSystemServiceStore.this) {
                 if (!active()) return;
-                ScopeState before = snapshot(scope);
+                MutationSnapshot before = snapshotMutation(scope);
                 long now = System.currentTimeMillis();
                 if (needsReschedule) {
                     job.failureCount = Math.min(31, job.failureCount + 1);
@@ -997,7 +993,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     synchronized int ensureNamespace(Scope scope, String namespace, int guestId) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         NamespaceState state = namespace(scope, namespace); Integer existing = state.guestToHost.get(guestId);
         if (existing != null) return existing;
         if (state.guestToHost.size() >= MAX_NAMESPACE_MAPPINGS) {
@@ -1015,7 +1011,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         Integer value = namespace(scope, namespace).hostToGuest.get(hostId); return value == null ? -1 : value;
     }
     synchronized int removeNamespace(Scope scope, String namespace, int guestId) {
-        ScopeState before = snapshot(scope);
+        MutationSnapshot before = snapshotMutation(scope);
         NamespaceState state = namespace(scope, namespace); Integer host = state.guestToHost.remove(guestId);
         if (host == null) return -1; state.hostToGuest.remove(host);
         persistOrRestore(scope, before); return host;
@@ -1053,7 +1049,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         synchronized (this) {
             AlarmRecord current = state(scope).alarms.get(alarmId);
             if (current != alarm) return;
-            ScopeState before = snapshot(scope);
+            MutationSnapshot before = snapshotMutation(scope);
             boolean reschedule = false;
             if (!delivered) {
                 alarm.triggerAtMs = System.currentTimeMillis() + RETRY_WITHOUT_CLIENT_MS;
@@ -1098,7 +1094,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
     }
 
-    private ScopeState snapshot(Scope scope) {
+    private ScopeState snapshotScope(Scope scope) {
         ScopeState current = states.get(scope);
         if (current == null) return null;
         ScopeState copy = new ScopeState();
@@ -1156,13 +1152,28 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         return copy;
     }
-    private void persistOrRestore(Scope scope, ScopeState before) {
+    private MutationSnapshot snapshotMutation(Scope scope) {
+        return new MutationSnapshot(snapshotScope(scope), nextPendingIntentToken,
+                nextNotificationHostId, nextJobHostId);
+    }
+
+    private void persistOrRestore(Scope scope, MutationSnapshot before) {
         try { persist(); }
         catch (RuntimeException error) {
-            if (before == null) states.remove(scope); else states.put(scope, before);
+            if (before.scopeState() == null) states.remove(scope);
+            else states.put(scope, before.scopeState());
+            nextPendingIntentToken = before.nextPendingIntentToken();
+            nextNotificationHostId = before.nextNotificationHostId();
+            nextJobHostId = before.nextJobHostId();
             throw error;
         }
     }
+
+    private record MutationSnapshot(
+            ScopeState scopeState,
+            long nextPendingIntentToken,
+            int nextNotificationHostId,
+            int nextJobHostId) { }
 
     private ScopeState state(Scope scope) { return states.computeIfAbsent(scope, ignored -> new ScopeState()); }
     private NamespaceState namespace(Scope scope, String namespace) {
@@ -1174,230 +1185,32 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         AccountRecord record = state(scope).accounts.get(accountKey(name, type));
         if (record == null) throw new IllegalArgumentException("VIRTUAL_ACCOUNT_NOT_FOUND"); return record;
     }
-    private static AccountKey accountKey(String name, String type) {
+    static AccountKey accountKey(String name, String type) {
         return new AccountKey(required(name, "name"), required(type, "type"));
     }
 
     private void load() {
-        if (!file.isFile()) return;
         try {
-            JSONObject root = new JSONObject(Files.readString(file.toPath(), StandardCharsets.UTF_8));
-            int schema = root.optInt("schemaVersion", -1);
-            if (schema < 1 || schema > SCHEMA) throw new IllegalStateException("Unsupported virtual service schema");
-            nextNotificationHostId = root.optInt("nextNotificationHostId", 0x51000000);
-            nextJobHostId = root.optInt("nextJobHostId", 0x52000000);
-            nextPendingIntentToken = Math.max(1L, root.optLong("nextPendingIntentToken", 1L));
-            JSONArray scopes = root.optJSONArray("scopes");
-            if (scopes == null) return;
-            for (int i = 0; i < scopes.length(); i++) {
-                JSONObject item = scopes.getJSONObject(i);
-                Scope scope = new Scope(item.getString("packageName"), item.getInt("virtualUserId"));
-                ScopeState state = new ScopeState();
-                state.clipboard = decode(item.optString("clipboard", ""));
-                JSONArray accounts = item.optJSONArray("accounts");
-                if (accounts != null) for (int j = 0; j < accounts.length(); j++) {
-                    JSONObject account = accounts.getJSONObject(j);
-                    AccountKey key = accountKey(account.getString("name"), account.getString("type"));
-                    AccountRecord record = new AccountRecord(account.optString("password", ""));
-                    JSONObject tokens = account.optJSONObject("tokens");
-                    if (tokens != null) for (String tokenType : tokens.keySet()) record.tokens.put(tokenType, tokens.optString(tokenType, ""));
-                    state.accounts.put(key, record);
-                }
-                if (schema >= 3) {
-                    JSONArray pending = item.optJSONArray("pendingIntents");
-                    if (pending != null) for (int j = 0; j < pending.length(); j++) {
-                        JSONObject value = pending.getJSONObject(j);
-                        PendingIntentRecord record = new PendingIntentRecord(value.getString("tokenId"),
-                                value.getString("kind"), value.getInt("requestCode"),
-                                value.optString("action", ""), value.optString("component", ""),
-                                value.optString("data", ""), value.optString("filterIdentity",
-                                        "a=" + value.optString("action", "") + "|c="
-                                                + value.optString("component", "") + "|d="
-                                                + value.optString("data", "")), value.optInt("flags", 0),
-                                value.getString("creatorPackage"), value.getInt("creatorUid"),
-                                value.optString("requiredPermission", ""),
-                                value.optString("ownerProcessName", scope.packageName()),
-                                value.optLong("ownerGeneration", 0L), value.getString("packageRevision"),
-                                decode(value.optString("payload", "")), value.optInt("sends", 0),
-                                value.optBoolean("cancelled", false), value.optLong("updatedAtMs", 0L));
-                        if (!record.cancelled) state.pendingIntents.put(record.tokenId, record);
-                    }
-                }
-                JSONArray alarms = item.optJSONArray("alarms");
-                if (alarms != null) for (int j = 0; j < alarms.length(); j++) {
-                    JSONObject alarm = alarms.getJSONObject(j);
-                    AlarmRecord record = new AlarmRecord(alarm.getString("id"), alarm.getLong("triggerAtMs"),
-                            alarm.optLong("intervalMs", 0L), alarm.optBoolean("exact", false),
-                            alarm.optBoolean("allowWhileIdle", false),
-                            alarm.optString("deliveryPath", VirtualAlarmSnapshot.LISTENER),
-                            alarm.optString("pendingIntentTokenId", ""), decode(alarm.optString("token", "")),
-                            alarm.optString("ownerProcessName", scope.packageName()),
-                            alarm.optLong("ownerGeneration", 0L),
-                            alarm.optString("packageRevision", "legacy-revision"),
-                            alarm.optInt("deliveryCount", 0), alarm.optLong("updatedAtMs", 0L));
-                    state.alarms.put(record.id, record);
-                }
-                JSONObject namespaces = item.optJSONObject("namespaces");
-                if (namespaces != null) for (String name : namespaces.keySet()) {
-                    JSONObject namespace = namespaces.getJSONObject(name);
-                    NamespaceState value = new NamespaceState(namespace.getInt("next"));
-                    JSONArray mappings = namespace.optJSONArray("mappings");
-                    if (mappings != null) for (int j = 0; j < mappings.length(); j++) {
-                        JSONObject mapping = mappings.getJSONObject(j); int guest = mapping.getInt("guest"); int host = mapping.getInt("host");
-                        value.guestToHost.put(guest, host); value.hostToGuest.put(host, guest);
-                        if ("notification".equals(name)) nextNotificationHostId = Math.max(nextNotificationHostId, host + 1);
-                        if ("job".equals(name)) nextJobHostId = Math.max(nextJobHostId, host + 1);
-                    }
-                    state.namespaces.put(name, value);
-                }
-                if (schema >= 2) {
-                    JSONArray notifications = item.optJSONArray("notifications");
-                    if (notifications != null) for (int j = 0; j < notifications.length(); j++) {
-                        JSONObject value = notifications.getJSONObject(j);
-                        NotificationRecord record = new NotificationRecord(value.getInt("guestId"), value.getInt("hostId"),
-                                value.optString("guestTag", ""), value.getString("hostTag"), value.optString("channelId", ""),
-                                value.optString("state", VirtualNotificationSnapshot.ACTIVE),
-                                value.optString("packageRevision", "legacy-revision"),
-                                value.optString("contentIntentTokenId", ""), value.optString("deleteIntentTokenId", ""),
-                                jsonStrings(value.optJSONArray("actionIntentTokenIds")),
-                                value.optBoolean("foregroundService", false), value.optString("foregroundServiceKey", ""),
-                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
-                        state.notifications.put(new NotificationKey(record.guestId, record.guestTag), record);
-                        nextNotificationHostId = Math.max(nextNotificationHostId, record.hostId + 1);
-                    }
-                    JSONArray channels = item.optJSONArray("notificationChannels");
-                    if (channels != null) for (int j = 0; j < channels.length(); j++) {
-                        JSONObject value = channels.getJSONObject(j);
-                        NotificationChannelRecord record = new NotificationChannelRecord(value.getString("kind"),
-                                value.getString("id"), value.optString("groupId", ""),
-                                value.optString("packageRevision", "legacy-revision"),
-                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
-                        state.notificationChannels.put(channelKey(record.kind, record.id), record);
-                    }
-                    JSONArray jobs = item.optJSONArray("jobs");
-                    if (jobs != null) for (int j = 0; j < jobs.length(); j++) {
-                        JSONObject value = jobs.getJSONObject(j);
-                        JobRecord record = new JobRecord(value.getInt("guestId"), value.getInt("hostId"),
-                                value.optString("state", VirtualJobSnapshot.SCHEDULED),
-                                value.optString("ownerProcessName", scope.packageName()), value.optLong("ownerGeneration", 0L),
-                                value.optString("packageRevision", "legacy-revision"),
-                                value.optInt("requiredNetworkType", VirtualJobSnapshot.NETWORK_NONE),
-                                value.optBoolean("requiresCharging", false), value.optBoolean("requiresBatteryNotLow", false),
-                                value.optBoolean("requiresStorageNotLow", false), value.optBoolean("requiresDeviceIdle", false),
-                                value.optBoolean("periodic", false), value.optLong("intervalMs", 0L),
-                                value.optLong("flexMs", 0L), value.optLong("minimumLatencyMs", 0L),
-                                value.optLong("overrideDeadlineMs", 0L), value.optBoolean("expedited", false),
-                                value.optBoolean("persisted", false),
-                                value.optInt("backoffPolicy", VirtualJobSnapshot.BACKOFF_EXPONENTIAL),
-                                value.optLong("initialBackoffMs", 30_000L), value.optInt("failureCount", 0),
-                                value.optLong("nextRunAtMs", 0L), value.optLong("lastFailureAtMs", 0L),
-                                decode(value.optString("payload", "")), value.optLong("updatedAtMs", 0L));
-                        state.jobs.put(record.guestId, record); nextJobHostId = Math.max(nextJobHostId, record.hostId + 1);
-                    }
-                }
-                states.put(scope, state);
-            }
+            String payload = persistence.readPayload();
+            if (payload == null) return;
+            VirtualSystemServiceStoreCodec.Decoded decoded =
+                    VirtualSystemServiceStoreCodec.decode(payload);
+            states.clear();
+            states.putAll(decoded.states());
+            nextNotificationHostId = decoded.nextNotificationHostId();
+            nextJobHostId = decoded.nextJobHostId();
+            nextPendingIntentToken = decoded.nextPendingIntentToken();
             removeStaleReservations();
-        } catch (Exception error) {
-            throw new IllegalStateException("Cannot load virtual system-service store", error);
+        } catch (RuntimeException error) {
+            persistence.quarantine();
+            maintenanceWarning = error.getMessage() == null
+                    ? "VIRTUAL_SYSTEM_SERVICE_STORE_CORRUPT"
+                    : error.getMessage();
         }
     }
     private synchronized void persist() {
-        try {
-            JSONObject root = new JSONObject().put("schemaVersion", SCHEMA)
-                    .put("nextNotificationHostId", nextNotificationHostId)
-                    .put("nextJobHostId", nextJobHostId)
-                    .put("nextPendingIntentToken", nextPendingIntentToken);
-            JSONArray scopes = new JSONArray();
-            List<Scope> keys = new ArrayList<>(states.keySet());
-            keys.sort(Comparator.comparing(Scope::packageName).thenComparingInt(Scope::virtualUserId));
-            for (Scope scope : keys) {
-                ScopeState state = states.get(scope);
-                JSONObject item = new JSONObject().put("packageName", scope.packageName())
-                        .put("virtualUserId", scope.virtualUserId()).put("clipboard", encode(state.clipboard));
-                JSONArray accounts = new JSONArray();
-                for (Map.Entry<AccountKey, AccountRecord> account : state.accounts.entrySet()) {
-                    JSONObject tokens = new JSONObject();
-                    for (Map.Entry<String, String> token : account.getValue().tokens.entrySet()) tokens.put(token.getKey(), token.getValue());
-                    accounts.put(new JSONObject().put("name", account.getKey().name).put("type", account.getKey().type)
-                            .put("password", account.getValue().password).put("tokens", tokens));
-                }
-                item.put("accounts", accounts);
-                JSONArray pending = new JSONArray();
-                for (PendingIntentRecord value : state.pendingIntents.values()) pending.put(new JSONObject()
-                        .put("tokenId", value.tokenId).put("kind", value.kind).put("requestCode", value.requestCode)
-                        .put("action", value.action).put("component", value.component).put("data", value.data)
-                        .put("filterIdentity", value.filterIdentity).put("flags", value.flags).put("creatorPackage", value.creatorPackage)
-                        .put("creatorUid", value.creatorUid).put("requiredPermission", value.requiredPermission)
-                        .put("ownerProcessName", value.ownerProcessName).put("ownerGeneration", value.ownerGeneration)
-                        .put("packageRevision", value.packageRevision).put("payload", encode(value.payload))
-                        .put("sends", value.sends).put("cancelled", value.cancelled).put("updatedAtMs", value.updatedAtMs));
-                item.put("pendingIntents", pending);
-                JSONArray alarms = new JSONArray();
-                for (AlarmRecord alarm : state.alarms.values()) alarms.put(new JSONObject().put("id", alarm.id)
-                        .put("triggerAtMs", alarm.triggerAtMs).put("intervalMs", alarm.intervalMs)
-                        .put("exact", alarm.exact).put("allowWhileIdle", alarm.allowWhileIdle)
-                        .put("deliveryPath", alarm.deliveryPath).put("pendingIntentTokenId", alarm.pendingIntentTokenId)
-                        .put("token", encode(alarm.tokenPayload)).put("ownerProcessName", alarm.ownerProcessName)
-                        .put("ownerGeneration", alarm.ownerGeneration).put("packageRevision", alarm.packageRevision)
-                        .put("deliveryCount", alarm.deliveryCount).put("updatedAtMs", alarm.updatedAtMs));
-                item.put("alarms", alarms);
-                JSONObject namespaces = new JSONObject();
-                for (Map.Entry<String, NamespaceState> namespace : state.namespaces.entrySet()) {
-                    JSONArray mappings = new JSONArray();
-                    for (Map.Entry<Integer, Integer> mapping : namespace.getValue().guestToHost.entrySet()) {
-                        mappings.put(new JSONObject().put("guest", mapping.getKey()).put("host", mapping.getValue()));
-                    }
-                    namespaces.put(namespace.getKey(), new JSONObject().put("next", namespace.getValue().next).put("mappings", mappings));
-                }
-                item.put("namespaces", namespaces);
-                JSONArray notifications = new JSONArray();
-                for (NotificationRecord value : state.notifications.values()) notifications.put(new JSONObject()
-                        .put("guestId", value.guestId).put("hostId", value.hostId).put("guestTag", value.guestTag)
-                        .put("hostTag", value.hostTag).put("channelId", value.channelId).put("state", value.state)
-                        .put("packageRevision", value.packageRevision)
-                        .put("contentIntentTokenId", value.contentIntentTokenId)
-                        .put("deleteIntentTokenId", value.deleteIntentTokenId)
-                        .put("actionIntentTokenIds", new JSONArray(value.actionIntentTokenIds))
-                        .put("foregroundService", value.foregroundService)
-                        .put("foregroundServiceKey", value.foregroundServiceKey)
-                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
-                item.put("notifications", notifications);
-                JSONArray channels = new JSONArray();
-                for (NotificationChannelRecord value : state.notificationChannels.values()) channels.put(new JSONObject()
-                        .put("kind", value.kind).put("id", value.id).put("groupId", value.groupId)
-                        .put("packageRevision", value.packageRevision)
-                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
-                item.put("notificationChannels", channels);
-                JSONArray jobs = new JSONArray();
-                for (JobRecord value : state.jobs.values()) jobs.put(new JSONObject()
-                        .put("guestId", value.guestId).put("hostId", value.hostId).put("state", value.state)
-                        .put("ownerProcessName", value.ownerProcessName).put("ownerGeneration", value.ownerGeneration)
-                        .put("packageRevision", value.packageRevision).put("requiredNetworkType", value.requiredNetworkType)
-                        .put("requiresCharging", value.requiresCharging).put("requiresBatteryNotLow", value.requiresBatteryNotLow)
-                        .put("requiresStorageNotLow", value.requiresStorageNotLow).put("requiresDeviceIdle", value.requiresDeviceIdle)
-                        .put("periodic", value.periodic).put("intervalMs", value.intervalMs).put("flexMs", value.flexMs)
-                        .put("minimumLatencyMs", value.minimumLatencyMs).put("overrideDeadlineMs", value.overrideDeadlineMs)
-                        .put("expedited", value.expedited).put("persisted", value.persisted)
-                        .put("backoffPolicy", value.backoffPolicy).put("initialBackoffMs", value.initialBackoffMs)
-                        .put("failureCount", value.failureCount).put("nextRunAtMs", value.nextRunAtMs)
-                        .put("lastFailureAtMs", value.lastFailureAtMs)
-                        .put("payload", encode(value.payload)).put("updatedAtMs", value.updatedAtMs));
-                item.put("jobs", jobs); scopes.put(item);
-            }
-            root.put("scopes", scopes);
-            File parent = file.getParentFile();
-            if (!parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) throw new IllegalStateException("Cannot create store directory");
-            File temp = new File(parent, file.getName() + ".tmp");
-            byte[] bytes = root.toString().getBytes(StandardCharsets.UTF_8);
-            try {
-                try (FileOutputStream out = new FileOutputStream(temp)) { out.write(bytes); out.flush(); out.getFD().sync(); }
-                try { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
-                catch (AtomicMoveNotSupportedException error) { Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING); }
-            } finally { if (temp.exists()) temp.delete(); }
-        } catch (Exception error) {
-            throw new IllegalStateException("Cannot persist virtual system-service store", error);
-        }
+        persistence.writePayload(VirtualSystemServiceStoreCodec.encode(
+                states, nextNotificationHostId, nextJobHostId, nextPendingIntentToken));
     }
 
 
@@ -1515,7 +1328,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private static String hostNotificationTag(Scope scope, String guestTag, long generation) {
         return "cs:u" + scope.virtualUserId() + ":g" + generation + ":" + guestTag;
     }
-    private static String channelKey(String kind, String id) { return channelKind(kind) + "#" + required(id, "channelId"); }
+    static String channelKey(String kind, String id) { return channelKind(kind) + "#" + required(id, "channelId"); }
     private static String channelKind(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
         if (!VirtualNotificationChannelSnapshot.CHANNEL.equals(normalized)
@@ -1590,7 +1403,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         state.notificationChannels.values().removeIf(value -> !revision.equals(value.packageRevision));
         return beforeNotifications != state.notifications.size() || beforeChannels != state.notificationChannels.size();
     }
-    private static List<String> boundedTokenIds(List<String> values, String name) {
+    static List<String> boundedTokenIds(List<String> values, String name) {
         if (values == null || values.isEmpty()) return List.of();
         if (values.size() > 32) throw new IllegalArgumentException(name + " exceeds 32 entries");
         LinkedHashSet<String> out = new LinkedHashSet<>();
@@ -1601,15 +1414,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         return Collections.unmodifiableList(new ArrayList<>(out));
     }
-    private static List<String> jsonStrings(JSONArray values) {
-        if (values == null) return List.of();
-        List<String> out = new ArrayList<>();
-        for (int index = 0; index < values.length(); index++) {
-            String value = values.optString(index, "").trim();
-            if (!value.isEmpty()) out.add(value);
-        }
-        return out;
-    }
+
 
     private static String jobState(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
@@ -1639,31 +1444,16 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         for (JobExecution execution : new ArrayList<>(activeJobExecutions.values())) execution.invalidateLocked();
         clients.clear(); scheduler.shutdownNow();
     }
-    private static byte[] boundedPayload(byte[] value, String name) {
+    static byte[] boundedPayload(byte[] value, String name) {
         byte[] copy = value == null ? new byte[0] : value.clone();
         if (copy.length > MAX_PAYLOAD_BYTES) {
             throw new IllegalArgumentException(name + " exceeds " + MAX_PAYLOAD_BYTES + " bytes");
         }
         return copy;
     }
-    private static String encode(byte[] value) {
-        if (value == null || value.length == 0) return "";
-        StringBuilder out = new StringBuilder(value.length * 2);
-        for (byte item : value) out.append(Character.forDigit((item >>> 4) & 0xF, 16)).append(Character.forDigit(item & 0xF, 16));
-        return out.toString();
-    }
-    private static byte[] decode(String value) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isEmpty()) return new byte[0];
-        if ((normalized.length() & 1) != 0) throw new IllegalArgumentException("Invalid hex payload");
-        byte[] out = new byte[normalized.length() / 2];
-        for (int i = 0; i < out.length; i++) {
-            int high = Character.digit(normalized.charAt(i * 2), 16); int low = Character.digit(normalized.charAt(i * 2 + 1), 16);
-            if (high < 0 || low < 0) throw new IllegalArgumentException("Invalid hex payload"); out[i] = (byte) ((high << 4) | low);
-        }
-        return out;
-    }
-    private static String required(String value, String name) {
+
+
+    static String required(String value, String name) {
         if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException(name + " is required");
         }
@@ -1673,16 +1463,16 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         return normalized;
     }
-    private static String optionalIdentity(String value, String name) {
+    static String optionalIdentity(String value, String name) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.length() > MAX_KEY_CHARS) {
             throw new IllegalArgumentException(name + " exceeds " + MAX_KEY_CHARS + " characters");
         }
         return normalized;
     }
-    private static String normalizeRequired(String value, String name) { return normalize(required(value, name)); }
-    private static String normalize(String value) { return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT); }
-    private static String safe(String value) {
+    static String normalizeRequired(String value, String name) { return normalize(required(value, name)); }
+    static String normalize(String value) { return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT); }
+    static String safe(String value) {
         String normalized = value == null ? "" : value;
         if (normalized.length() > MAX_SECRET_CHARS) {
             throw new IllegalArgumentException("virtual secret exceeds " + MAX_SECRET_CHARS + " characters");

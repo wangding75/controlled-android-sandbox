@@ -10,14 +10,19 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.json.JSONObject;
 
 public final class VirtualSystemServiceStoreSelfTest {
     public static void main(String[] args) throws Exception {
+        persistenceEnvelopeAndCorruptionLifecycle();
         alarmRecoveryAndRepeatingLifecycle();
         notificationOwnershipLifecycle();
         jobPolicyPersistenceAndRetryLifecycle();
@@ -404,6 +409,58 @@ public final class VirtualSystemServiceStoreSelfTest {
                 "APK revision update must prune stale persisted jobs");
         reloaded.unregister(client);
         reloaded.close();
+    }
+
+    private static void persistenceEnvelopeAndCorruptionLifecycle() throws Exception {
+        java.io.File root = Files.createTempDirectory("virtual-system-store-envelope").toFile();
+        java.io.File stateFile = new java.io.File(root, "sandbox-system-services.json");
+        VirtualSystemServiceStore.Scope scope = new VirtualSystemServiceStore.Scope("persist.pkg", 17);
+        VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
+        store.setClipboard(scope, new byte[]{4, 2});
+        store.close();
+
+        String envelope = Files.readString(stateFile.toPath(), StandardCharsets.UTF_8);
+        JSONObject parsedEnvelope = new JSONObject(envelope);
+        require(parsedEnvelope.optInt("envelopeVersion", -1) == 1
+                        && parsedEnvelope.keySet().contains("crc32")
+                        && parsedEnvelope.keySet().contains("payload"),
+                "new virtual system-service writes must use a checksummed envelope");
+        VirtualSystemServiceStore recovered = new VirtualSystemServiceStore(root);
+        require(java.util.Arrays.equals(new byte[]{4, 2}, recovered.clipboard(scope)),
+                "checksummed store must restore valid state");
+        recovered.close();
+
+        Map<VirtualSystemServiceStore.Scope, VirtualSystemServiceStore.ScopeState> legacyStates =
+                new LinkedHashMap<>();
+        VirtualSystemServiceStore.ScopeState legacyState = new VirtualSystemServiceStore.ScopeState();
+        legacyState.clipboard = new byte[]{7, 1};
+        legacyStates.put(scope, legacyState);
+        String legacyPayload = VirtualSystemServiceStoreCodec.encode(
+                legacyStates, 0x51000000, 0x52000000, 1L);
+        Files.writeString(stateFile.toPath(), legacyPayload, StandardCharsets.UTF_8);
+        VirtualSystemServiceStore legacyRecovered = new VirtualSystemServiceStore(root);
+        require(java.util.Arrays.equals(new byte[]{7, 1}, legacyRecovered.clipboard(scope)),
+                "legacy raw schema 1-5 payload must remain readable");
+        legacyRecovered.setClipboard(scope, new byte[]{7, 2});
+        legacyRecovered.close();
+
+        String validEnvelope = Files.readString(stateFile.toPath(), StandardCharsets.UTF_8);
+        JSONObject corruptObject = new JSONObject(validEnvelope).put("crc32", "0");
+        Files.writeString(stateFile.toPath(), corruptObject.toString(), StandardCharsets.UTF_8);
+        VirtualSystemServiceStore corruptRecovered = new VirtualSystemServiceStore(root);
+        require(corruptRecovered.clipboard(scope).length == 0,
+                "checksum mismatch must fail closed to empty state");
+        require(corruptRecovered.maintenanceWarning().contains("CHECKSUM_MISMATCH")
+                        && new java.io.File(root, "sandbox-system-services.json.corrupt").isFile(),
+                "checksum mismatch must be quarantined with a maintenance warning");
+        corruptRecovered.close();
+
+        byte[] oversized = new byte[VirtualSystemServiceStorePersistence.MAX_FILE_BYTES + 1];
+        Files.write(stateFile.toPath(), oversized);
+        VirtualSystemServiceStore oversizedRecovered = new VirtualSystemServiceStore(root);
+        require(oversizedRecovered.maintenanceWarning().contains("FILE_LIMIT_EXCEEDED"),
+                "oversized persistent state must fail closed before JSON parsing");
+        oversizedRecovered.close();
     }
 
     private static VirtualPendingIntentSnapshot reserveNotificationPendingIntent(

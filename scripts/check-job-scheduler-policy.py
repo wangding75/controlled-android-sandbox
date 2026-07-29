@@ -50,7 +50,7 @@ require(
     "jobs(scope, processName, generation, packageRevision)")
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "private static final int SCHEMA = 5", "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
+    "static final int SCHEMA = 5", "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
     "VirtualJobSnapshot.BACKOFF_LINEAR", "1L <<", "job.failureCount = Math.min",
     "job.periodic", "safeAdd(now, job.intervalMs)", "minimumLatencyMs", "overrideDeadlineMs")
 for forbidden in ["new Bundle(", "android.os.Bundle"]:
