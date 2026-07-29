@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "baseline": "M5-T3",
+  "baseCommit": "b4b94ec8a5eb0ab2c4c72f8f723932d2c28507db",
+  "sourceStatus": "pass",
+  "androidBuildStatus": "blocked-toolchain",
+  "deviceEvidence": {
+    "status": "not-tested",
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "resolvedM4ProductionIds": [
+    "receiver.ordered-source-model",
+    "receiver.ordered-pending-result-bridge",
+    "runtime.foreground-service-state-model"
+  ],
+  "remainingProductionIds": [
+    "process.declared-isolated-planning",
+    "native.network-hook",
+    "native.dynamic-loader-hook",
+    "diagnostics.crash-anr-events",
+    "native.four-abi-build-architecture"
+  ],
+  "sourceControls": [
+    "ordered chain-wide timeout",
+    "per-receiver timeout accounting",
+    "explicit terminal reason and abort source",
+    "PendingResult Binder-death cancellation",
+    "bounded result payload",
+    "foreground promotion deadline",
+    "background-start exemption policy",
+    "foreground service type validation",
+    "notification ownership",
+    "process-death re-promotion",
+    "promotion-timeout cleanup"
+  ]
+}

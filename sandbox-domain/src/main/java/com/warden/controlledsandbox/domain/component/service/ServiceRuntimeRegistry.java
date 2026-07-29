@@ -26,7 +26,8 @@ public final class ServiceRuntimeRegistry {
         private final Set<String> connectionIds;
         private final long generation;
         private final String lastStartAction;
-        private final boolean foreground;
+        private final ForegroundServiceStateMachine.Snapshot foreground;
+        private final boolean recoverForeground;
 
         private Snapshot(MutableRecord record) {
             instanceId = record.instanceId;
@@ -39,7 +40,8 @@ public final class ServiceRuntimeRegistry {
             connectionIds = Collections.unmodifiableSet(new LinkedHashSet<>(record.connectionIds));
             generation = record.generation;
             lastStartAction = record.lastStartAction;
-            foreground = record.foreground;
+            foreground = record.foreground.snapshot();
+            recoverForeground = record.recoverForeground;
         }
 
         public String instanceId() { return instanceId; }
@@ -52,7 +54,10 @@ public final class ServiceRuntimeRegistry {
         public Set<String> connectionIds() { return connectionIds; }
         public long generation() { return generation; }
         public String lastStartAction() { return lastStartAction; }
-        public boolean foreground() { return foreground; }
+        public boolean foreground() { return foreground.active(); }
+        public ForegroundServiceStateMachine.Snapshot foregroundSnapshot() { return foreground; }
+        public boolean foregroundRequested() { return foreground.pending() || foreground.active(); }
+        public boolean recoverForeground() { return recoverForeground; }
         public boolean started() { return startCount > 0; }
         public boolean bound() { return !connectionIds.isEmpty(); }
         public boolean recoverable() { return state == State.RECOVERING; }
@@ -65,19 +70,70 @@ public final class ServiceRuntimeRegistry {
         return start(instanceId, component, processName, restartMode, generation, "", false);
     }
 
+    /** Legacy source entry; foreground=true is treated as an immediate controlled promotion. */
     public synchronized Snapshot start(String instanceId, String component, String processName,
                                        RestartMode restartMode, long generation, String action,
                                        boolean foreground) {
-        MutableRecord record = getOrCreate(instanceId, component, processName, generation);
+        MutableRecord record = startRecord(instanceId, component, processName, restartMode,
+                generation, action);
+        if (foreground) {
+            record.foreground.requestStart(0L, ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
+                    true, "LEGACY_IMMEDIATE_PROMOTION", 0);
+            record.lastDeclaredForegroundTypeMask = 0;
+            record.foreground.promote(0L, 0, 1, "legacy");
+        }
+        return new Snapshot(record);
+    }
+
+    public synchronized Snapshot startForegroundRequested(
+            String instanceId, String component, String processName, RestartMode restartMode,
+            long generation, String action, long nowMs, long promotionTimeoutMs,
+            boolean backgroundAllowed, String exemptionReason, int declaredTypeMask) {
+        ForegroundServiceStateMachine validation = new ForegroundServiceStateMachine();
+        validation.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
+                exemptionReason, declaredTypeMask);
+        MutableRecord record = startRecord(instanceId, component, processName, restartMode,
+                generation, action);
+        record.foreground.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
+                exemptionReason, declaredTypeMask);
+        record.lastDeclaredForegroundTypeMask = declaredTypeMask;
+        record.recoverForeground = true;
+        return new Snapshot(record);
+    }
+
+    public synchronized Snapshot promoteForeground(
+            String instanceId, String component, long generation, long nowMs,
+            int requestedTypeMask, int notificationId, String notificationTag) {
+        MutableRecord record = requireRecord(instanceId, component);
         requireGeneration(record, generation);
-        if (record.state == State.DESTROYED) throw new IllegalStateException("SERVICE_DESTROYED");
-        record.lastStartId++;
-        record.startCount++;
-        record.restartMode = restartMode == null ? RestartMode.NOT_STICKY : restartMode;
-        record.lastStartAction = action == null ? "" : action;
-        record.foreground = record.foreground || foreground;
+        if (record.startCount == 0) throw new IllegalStateException("FOREGROUND_SERVICE_NOT_STARTED");
+        record.foreground.promote(nowMs, requestedTypeMask, notificationId, notificationTag);
+        record.recoverForeground = true;
         record.state = State.ACTIVE;
         return new Snapshot(record);
+    }
+
+    public synchronized Snapshot demoteForeground(
+            String instanceId, String component, long generation,
+            boolean removeNotification, String reason) {
+        MutableRecord record = requireRecord(instanceId, component);
+        requireGeneration(record, generation);
+        record.foreground.demote(removeNotification, reason);
+        record.recoverForeground = false;
+        settle(record);
+        return new Snapshot(record);
+    }
+
+    public synchronized List<Snapshot> expireForeground(long nowMs) {
+        List<Snapshot> expired = new ArrayList<>();
+        for (MutableRecord record : records.values()) {
+            if (!record.foreground.expire(nowMs)) continue;
+            record.startCount = 0;
+            record.recoverForeground = false;
+            settle(record);
+            expired.add(new Snapshot(record));
+        }
+        return Collections.unmodifiableList(expired);
     }
 
     public synchronized Snapshot bind(String instanceId, String component, String processName,
@@ -117,7 +173,8 @@ public final class ServiceRuntimeRegistry {
         MutableRecord record = requireRecord(instanceId, component);
         requireGeneration(record, generation);
         record.startCount = 0;
-        record.foreground = false;
+        record.recoverForeground = false;
+        record.foreground.terminate("SERVICE_STOPPED");
         settle(record);
         return new Snapshot(record);
     }
@@ -130,20 +187,27 @@ public final class ServiceRuntimeRegistry {
         requireGeneration(record, generation);
         if (startId == record.lastStartId) {
             record.startCount = 0;
-            record.foreground = false;
+            record.recoverForeground = false;
+            record.foreground.terminate("SERVICE_STOPPED_BY_START_ID");
             settle(record);
         }
         return new Snapshot(record);
     }
 
+    /** Compatibility entry used by older callers. */
     public synchronized Snapshot setForeground(String instanceId, String component, boolean foreground,
                                                long generation) {
-        MutableRecord record = requireRecord(instanceId, component);
-        requireGeneration(record, generation);
-        if (foreground && record.startCount == 0) throw new IllegalStateException("FOREGROUND_SERVICE_NOT_STARTED");
-        record.foreground = foreground;
-        settle(record);
-        return new Snapshot(record);
+        if (foreground) {
+            MutableRecord record = requireRecord(instanceId, component);
+            requireGeneration(record, generation);
+            if (!record.foreground.pending() && !record.foreground.active()) {
+                record.foreground.requestStart(0L,
+                        ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
+                        true, "LEGACY_SET_FOREGROUND", 0);
+            }
+            return promoteForeground(instanceId, component, generation, 0L, 0, 1, "legacy");
+        }
+        return demoteForeground(instanceId, component, generation, true, "LEGACY_DEMOTION");
     }
 
     public synchronized List<Snapshot> markProcessDied(
@@ -158,11 +222,13 @@ public final class ServiceRuntimeRegistry {
                     || record.generation != generation
                     || record.state == State.DESTROYED) continue;
             record.connectionIds.clear();
-            record.foreground = false;
+            record.recoverForeground = record.foreground.requested();
+            record.foreground.terminate("SERVICE_PROCESS_DIED");
             if (record.startCount > 0 && record.restartMode != RestartMode.NOT_STICKY) {
                 record.state = State.RECOVERING;
             } else {
                 record.startCount = 0;
+                record.recoverForeground = false;
                 record.state = State.DESTROYED;
             }
             affected.add(new Snapshot(record));
@@ -172,12 +238,23 @@ public final class ServiceRuntimeRegistry {
 
     public synchronized Snapshot completeRecovery(String instanceId, String component,
                                                   long oldGeneration, long newGeneration) {
+        return completeRecovery(instanceId, component, oldGeneration, newGeneration, 0L);
+    }
+
+    public synchronized Snapshot completeRecovery(String instanceId, String component,
+                                                  long oldGeneration, long newGeneration,
+                                                  long nowMs) {
         MutableRecord record = requireRecord(instanceId, component);
         requireGeneration(record, oldGeneration);
         if (record.state != State.RECOVERING) throw new IllegalStateException("SERVICE_NOT_RECOVERING");
         if (newGeneration <= oldGeneration) throw new IllegalArgumentException("new generation must increase");
         record.generation = newGeneration;
         record.state = State.ACTIVE;
+        if (record.recoverForeground) {
+            record.foreground.requestStart(nowMs,
+                    ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
+                    true, "PROCESS_RECOVERY", record.lastDeclaredForegroundTypeMask);
+        }
         return new Snapshot(record);
     }
 
@@ -200,6 +277,12 @@ public final class ServiceRuntimeRegistry {
 
     public synchronized List<Snapshot> completeProcessRecovery(
             String instanceId, String processName, long oldGeneration, long newGeneration) {
+        return completeProcessRecovery(instanceId, processName, oldGeneration, newGeneration, 0L);
+    }
+
+    public synchronized List<Snapshot> completeProcessRecovery(
+            String instanceId, String processName, long oldGeneration, long newGeneration,
+            long nowMs) {
         requireText(instanceId, "instanceId");
         requireText(processName, "processName");
         if (oldGeneration < 1 || newGeneration <= oldGeneration) {
@@ -213,6 +296,11 @@ public final class ServiceRuntimeRegistry {
                     && record.state == State.RECOVERING) {
                 record.generation = newGeneration;
                 record.state = State.ACTIVE;
+                if (record.recoverForeground) {
+                    record.foreground.requestStart(nowMs,
+                            ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
+                            true, "PROCESS_RECOVERY", record.lastDeclaredForegroundTypeMask);
+                }
                 recovered.add(new Snapshot(record));
             }
         }
@@ -227,6 +315,7 @@ public final class ServiceRuntimeRegistry {
         while (iterator.hasNext()) {
             MutableRecord record = iterator.next().getValue();
             if (record.instanceId.equals(instanceId) && record.generation <= generation) {
+                record.foreground.terminate("SERVICE_INSTANCE_DESTROYED");
                 iterator.remove();
                 removed++;
             }
@@ -238,6 +327,19 @@ public final class ServiceRuntimeRegistry {
         List<Snapshot> out = new ArrayList<>();
         for (MutableRecord record : records.values()) out.add(new Snapshot(record));
         return Collections.unmodifiableList(out);
+    }
+
+    private MutableRecord startRecord(String instanceId, String component, String processName,
+                                      RestartMode restartMode, long generation, String action) {
+        MutableRecord record = getOrCreate(instanceId, component, processName, generation);
+        requireGeneration(record, generation);
+        if (record.state == State.DESTROYED) throw new IllegalStateException("SERVICE_DESTROYED");
+        record.lastStartId++;
+        record.startCount++;
+        record.restartMode = restartMode == null ? RestartMode.NOT_STICKY : restartMode;
+        record.lastStartAction = action == null ? "" : action;
+        record.state = State.ACTIVE;
+        return record;
     }
 
     private MutableRecord getOrCreate(String instanceId, String component, String processName, long generation) {
@@ -270,7 +372,6 @@ public final class ServiceRuntimeRegistry {
 
     private static void settle(MutableRecord record) {
         if (record.startCount == 0 && record.connectionIds.isEmpty()) {
-            record.foreground = false;
             record.state = State.DESTROYED;
         } else record.state = State.ACTIVE;
     }
@@ -289,13 +390,15 @@ public final class ServiceRuntimeRegistry {
         final String component;
         final String processName;
         final Set<String> connectionIds = new LinkedHashSet<>();
+        final ForegroundServiceStateMachine foreground = new ForegroundServiceStateMachine();
         State state = State.CREATED;
         RestartMode restartMode = RestartMode.NOT_STICKY;
         int lastStartId;
         int startCount;
         long generation;
         String lastStartAction = "";
-        boolean foreground;
+        boolean recoverForeground;
+        int lastDeclaredForegroundTypeMask;
 
         MutableRecord(String instanceId, String component, String processName, long generation) {
             this.instanceId = instanceId;

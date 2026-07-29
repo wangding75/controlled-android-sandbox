@@ -43,6 +43,7 @@ public final class RuntimeReceiverCoordinator {
     private final GuestPreparer guestPreparer;
     private final SessionFinder sessionFinder;
     private final GuestInvoker guestInvoker;
+    private final Clock clock;
     private final BrokerReceiverRuntime dynamic = new BrokerReceiverRuntime();
     private final BrokerManifestReceiverRuntime manifest = new BrokerManifestReceiverRuntime();
     private final ManifestBroadcastDispatcher dispatcher = new ManifestBroadcastDispatcher();
@@ -68,6 +69,7 @@ public final class RuntimeReceiverCoordinator {
         this.guestPreparer = guestPreparer;
         this.sessionFinder = sessionFinder;
         this.guestInvoker = guestInvoker;
+        this.clock = clock;
         this.ordered = new BrokerOrderedReceiverRuntime(clock, tokens);
         this.lifecycle = new ReceiverLifecycleCoordinator(dynamic, manifest, ordered);
     }
@@ -120,18 +122,34 @@ public final class RuntimeReceiverCoordinator {
         ManifestBroadcastDispatcher.DispatchReport report = dispatcher.dispatch(
                 routes, orderedDelivery,
                 orderedDelivery && request.getBoolean(RuntimeKeys.BROADCAST_STOP_ON_FAILURE, false),
-                initialState, (route, currentState) -> {
+                initialState, clock,
+                request.getLong(RuntimeKeys.BROADCAST_CHAIN_TIMEOUT_MS,
+                        ManifestBroadcastDispatcher.DEFAULT_CHAIN_TIMEOUT_MS),
+                (route, currentState, remainingChainBudgetMs) -> {
                     Bundle deliveryRequest = new Bundle(request);
                     deliveryRequest.putString(ComponentOperations.OPERATION, ComponentOperations.SEND_BROADCAST);
                     deliveryRequest.putBoolean(RuntimeKeys.BROADCAST_ORDERED, orderedDelivery);
                     deliveryRequest.putInt(RuntimeKeys.BROADCAST_PRIORITY, route.priority());
+                    long configuredReceiverTimeoutMs = request.getLong(
+                            RuntimeKeys.BROADCAST_RECEIVER_TIMEOUT_MS,
+                            OrderedReceiverTokenRegistry.DEFAULT_TIMEOUT_MS);
+                    if (configuredReceiverTimeoutMs <= 0) {
+                        configuredReceiverTimeoutMs = OrderedReceiverTokenRegistry.DEFAULT_TIMEOUT_MS;
+                    }
+                    deliveryRequest.putLong(RuntimeKeys.BROADCAST_RECEIVER_TIMEOUT_MS,
+                            Math.max(1L, Math.min(configuredReceiverTimeoutMs,
+                                    remainingChainBudgetMs)));
                     if (orderedDelivery) putOrderedState(deliveryRequest, currentState);
                     Bundle result = deliverManifestRoute(deliveryRequest, sender, route);
                     String deliveryStatus = result.getString(RuntimeKeys.STATUS, "");
                     if (!"BROADCAST_DELIVERED".equals(deliveryStatus)) {
                         String reason = result.getString(RuntimeKeys.ERROR_TYPE, deliveryStatus);
-                        return ManifestBroadcastDispatcher.DeliveryOutcome.failure(
-                                reason == null || reason.trim().isEmpty() ? "DELIVERY_NOT_COMPLETED" : reason);
+                        String orderedState = result.getString(RuntimeKeys.ORDERED_RECEIVER_STATE, "");
+                        String normalized = reason == null || reason.trim().isEmpty()
+                                ? "DELIVERY_NOT_COMPLETED" : reason;
+                        return "TIMED_OUT".equals(orderedState) || normalized.contains("TIMEOUT")
+                                ? ManifestBroadcastDispatcher.DeliveryOutcome.timeout(normalized)
+                                : ManifestBroadcastDispatcher.DeliveryOutcome.failure(normalized);
                     }
                     return ManifestBroadcastDispatcher.DeliveryOutcome.success(
                             orderedDelivery ? resultUpdate(result) : null);
@@ -151,6 +169,11 @@ public final class RuntimeReceiverCoordinator {
         out.putInt(RuntimeKeys.BROADCAST_MATCHED_COUNT, report.matchedCount());
         out.putInt(RuntimeKeys.BROADCAST_DELIVERED_COUNT, report.deliveredCount());
         out.putInt(RuntimeKeys.BROADCAST_FAILED_COUNT, report.failedCount());
+        out.putInt(RuntimeKeys.BROADCAST_SKIPPED_COUNT, report.skippedCount());
+        out.putInt(RuntimeKeys.BROADCAST_TIMED_OUT_COUNT, report.timedOutCount());
+        out.putLong(RuntimeKeys.BROADCAST_CHAIN_DEADLINE_MS, report.deadlineMs());
+        out.putString(RuntimeKeys.BROADCAST_TERMINAL_REASON, report.terminalReason());
+        out.putString(RuntimeKeys.BROADCAST_ABORT_SOURCE, report.abortSource());
         out.putInt(RuntimeKeys.BROADCAST_PAYLOAD_BYTES, payloadBytes);
         out.putStringArrayList(RuntimeKeys.BROADCAST_DELIVERY_FAILURES, new ArrayList<>(report.failures()));
         if (orderedDelivery) putOrderedState(out, report.finalState());

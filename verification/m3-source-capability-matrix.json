@@ -227,12 +227,15 @@
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
         "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/ManifestBroadcastDispatcherSelfTest.java",
         "docs/fixes/b3-t4b-implicit-ordered-broadcast.md",
-        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md"
+        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeKeys.java",
+        "docs/M5_T3_DEVELOPMENT_REPORT.md"
       ],
       "sourceStatus": "complete",
-      "productionStatus": "partial",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Priority-ordered result propagation, abort/clear-abort, failure policy and payload limits are wired at Broker/Guest source level. Ordinary Receiver PendingResult bridging is tracked separately and remains device-deferred."
+      "notes": "Priority-ordered result propagation, abort/clear-abort, bounded chain-wide execution budget, per-receiver timeout accounting, skipped/terminal statistics, failure policy and payload limits are wired at Broker/Guest source level. Android platform background-delivery and OEM behavior remain device-unverified."
     },
     {
       "id": "receiver.ordered-pending-result-bridge",
@@ -247,12 +250,13 @@
         "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistrySelfTest.java",
         "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridgeSelfTest.java",
         "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkCallInterceptorSelfTest.java",
-        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md"
+        "docs/fixes/b3-t4c-ordered-pending-result-bridge.md",
+        "docs/M5_T3_DEVELOPMENT_REPORT.md"
       ],
       "sourceStatus": "complete",
-      "productionStatus": "partial",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Broker one-shot token authority, sync/async PendingResult capture, finishReceiver interception, deadline cleanup, Session/Binder cancellation, replay and late-token rejection are source-wired. Hidden-API constructor access, real Binder/AMS interception and API/OEM compatibility remain unverified."
+      "notes": "Broker one-shot token authority, sync/async PendingResult capture, finishReceiver interception, Binder-death cancellation, bounded payload validation, deadline cleanup, Session cancellation, replay and late-token rejection are source-wired. Hidden-API and API/OEM execution remain device-unverified."
     },
     {
       "id": "receiver.lifecycle-consistency",
@@ -1243,12 +1247,16 @@
       "evidence": [
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ServiceRuntimeRegistry.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
-        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java"
+        "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/service/ForegroundServiceStateMachine.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/service/BrokerServiceRuntime.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeServiceCoordinator.java",
+        "docs/M5_T3_DEVELOPMENT_REPORT.md"
       ],
-      "sourceStatus": "partial",
-      "productionStatus": "partial",
+      "sourceStatus": "complete",
+      "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Foreground ownership, promotion/demotion and stop semantics are modeled and routed, but Android foreground notification deadlines, service types and OEM enforcement remain unimplemented."
+      "notes": "startForegroundService pending-promotion state, bounded deadline, background-start allow/exemption policy, declared/requested type validation, notification ownership, demotion, process-death recovery and timeout cleanup are wired in Broker and Guest source paths. SystemUI/AMS/OEM enforcement remains device-unverified."
     },
     {
       "id": "framework.activity-launch-flag-semantics",

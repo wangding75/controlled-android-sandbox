@@ -7,6 +7,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 
 import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
+import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.SessionState;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
@@ -21,25 +22,40 @@ public final class RuntimeServiceCoordinatorSelfTest {
     public static void main(String[] args) {
         BrokerStateStore state = new BrokerStateStore();
         List<Bundle> calls = new ArrayList<>();
+        FakeClock clock = new FakeClock(1_000L);
         RuntimeServiceCoordinator coordinator = new RuntimeServiceCoordinator(state, (slot, request) -> {
             calls.add(new Bundle(request));
             Bundle result = new Bundle();
             result.putString(RuntimeKeys.STATUS, "SERVICE_RECOVERED");
             result.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
             return result;
-        });
+        }, clock);
         GuestSession stale = session("old", 1);
         Bundle prepared = new Bundle();
         prepared.putString(RuntimeKeys.SESSION_ID, stale.sessionId());
         prepared.putLong(RuntimeKeys.GENERATION, stale.generation());
+        prepared.putInt(RuntimeKeys.PROCESS_SLOT, stale.processSlot());
         state.putPrepared(processKey(stale), prepared);
 
         Bundle start = request(ComponentOperations.START_FOREGROUND_SERVICE);
         start.putString(ComponentOperations.ACTION, "ACTION_REDELIVER");
+        start.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0b0011);
         Bundle startResult = success();
         startResult.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
         coordinator.applySuccessfulOperation(stale, start, startResult);
-        check(startResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false), "foreground start not tracked");
+        check(!startResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, true)
+                        && "PENDING".equals(startResult.getString(RuntimeKeys.SERVICE_FOREGROUND_STATE, "")),
+                "foreground start not tracked as pending");
+
+        Bundle promote = request(ComponentOperations.SET_SERVICE_FOREGROUND);
+        promote.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, true);
+        promote.putInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0b0001);
+        promote.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, 7);
+        promote.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, "sync");
+        Bundle promoted = success();
+        coordinator.applySuccessfulOperation(stale, promote, promoted);
+        check(promoted.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false),
+                "foreground promotion not tracked");
 
         DeathToken token = new DeathToken();
         Bundle bind = request(ComponentOperations.BIND_SERVICE);
@@ -68,6 +84,8 @@ public final class RuntimeServiceCoordinatorSelfTest {
         Bundle newSpec = new Bundle();
         newSpec.putString(RuntimeKeys.SESSION_ID, current.sessionId());
         newSpec.putLong(RuntimeKeys.GENERATION, current.generation());
+        newSpec.putInt(RuntimeKeys.PROCESS_SLOT, current.processSlot());
+        state.putPrepared(processKey(current), newSpec);
         try {
             List<ServiceRuntimeRegistry.Snapshot> recovered = coordinator.recoverSession(stale, current, newSpec);
             check(recovered.size() == 1 && recovered.get(0).generation() == 2,
@@ -76,9 +94,9 @@ public final class RuntimeServiceCoordinatorSelfTest {
             throw new AssertionError("recovery failed", error);
         }
         Bundle recoveryCall = calls.get(calls.size() - 1);
-        check(ComponentOperations.START_SERVICE.equals(
+        check(ComponentOperations.START_FOREGROUND_SERVICE.equals(
                         recoveryCall.getString(ComponentOperations.OPERATION, "")),
-                "recovery did not restart service");
+                "recovery did not restart foreground service");
         check(recoveryCall.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false)
                         && recoveryCall.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false),
                 "recovery metadata missing");
@@ -86,8 +104,31 @@ public final class RuntimeServiceCoordinatorSelfTest {
                 "redelivery action missing");
         check(recoveryCall.getInt(RuntimeKeys.SERVICE_START_ID, -1) == 1,
                 "recovery start id continuity missing");
+        check("PENDING".equals(coordinator.snapshot().get(0).foregroundSnapshot().state().name()),
+                "foreground recovery must require re-promotion");
 
-        check(coordinator.stopSession(current) == 1 && coordinator.recordCount() == 0,
+        Bundle promoteRecovered = request(ComponentOperations.SET_SERVICE_FOREGROUND);
+        promoteRecovered.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, true);
+        promoteRecovered.putInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0b0001);
+        promoteRecovered.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, 8);
+        coordinator.applySuccessfulOperation(current, promoteRecovered, success());
+
+        Bundle timeoutStart = request(ComponentOperations.START_FOREGROUND_SERVICE,
+                "com.example.TimeoutService");
+        timeoutStart.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS, 100L);
+        Bundle timeoutResult = success();
+        timeoutResult.putInt("onStartCommandResult", Service.START_NOT_STICKY);
+        coordinator.applySuccessfulOperation(current, timeoutStart, timeoutResult);
+        clock.advance(101L);
+        int beforePurge = calls.size();
+        check(coordinator.purgeExpiredForeground() == 1,
+                "foreground deadline did not expire pending service");
+        check(calls.size() == beforePurge + 1
+                        && ComponentOperations.STOP_SERVICE.equals(
+                        calls.get(calls.size() - 1).getString(ComponentOperations.OPERATION, "")),
+                "foreground timeout did not stop Guest service");
+
+        check(coordinator.stopSession(current) == 2 && coordinator.recordCount() == 0,
                 "service state leaked after session stop");
         coordinator.close();
         System.out.println("PASS Runtime Service coordinator lifecycle self-test");
@@ -104,9 +145,13 @@ public final class RuntimeServiceCoordinatorSelfTest {
     }
 
     private static Bundle request(String operation) {
+        return request(operation, "com.example.SyncService");
+    }
+
+    private static Bundle request(String operation, String component) {
         Bundle request = new Bundle();
         request.putString(ComponentOperations.OPERATION, operation);
-        request.putString(RuntimeKeys.COMPONENT_CLASS, "com.example.SyncService");
+        request.putString(RuntimeKeys.COMPONENT_CLASS, component);
         return request;
     }
 
@@ -118,6 +163,13 @@ public final class RuntimeServiceCoordinatorSelfTest {
 
     private static void check(boolean value, String message) {
         if (!value) throw new AssertionError(message);
+    }
+
+    private static final class FakeClock implements Clock {
+        private long now;
+        FakeClock(long now) { this.now = now; }
+        @Override public long nowMillis() { return now; }
+        void advance(long value) { now += value; }
     }
 
     private static final class DeathToken extends Binder {

@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransport;
 import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderCursorTransport;
+import com.warden.controlledsandbox.domain.component.service.ForegroundServiceStateMachine;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -54,8 +55,7 @@ public final class GuestComponentRuntime {
                     return stopServiceStartId(componentClass,
                             request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
                 case ComponentOperations.SET_SERVICE_FOREGROUND:
-                    return setServiceForeground(componentClass,
-                            request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false));
+                    return setServiceForeground(componentClass, request);
                 case ComponentOperations.BIND_SERVICE:
                     return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID),
                             request.getString(ComponentOperations.ACTION, ""));
@@ -126,6 +126,20 @@ public final class GuestComponentRuntime {
     }
 
     private Bundle startService(String className, Bundle request, boolean foregroundRequested) throws Exception {
+        long foregroundNowMs = android.os.SystemClock.elapsedRealtime();
+        long foregroundTimeoutMs = request.getLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
+                ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS);
+        boolean backgroundAllowed = request.getBoolean(
+                RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true);
+        String exemptionReason = request.getString(
+                RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, "");
+        int declaredTypeMask = request.getInt(
+                RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0);
+        if (foregroundRequested) {
+            ForegroundServiceStateMachine validation = new ForegroundServiceStateMachine();
+            validation.requestStart(foregroundNowMs, foregroundTimeoutMs, backgroundAllowed,
+                    exemptionReason, declaredTypeMask);
+        }
         ServiceRecord record = getOrCreateService(className);
         String action = request.getString(ComponentOperations.ACTION, "");
         Intent intent = intent(action);
@@ -133,14 +147,22 @@ public final class GuestComponentRuntime {
         int recoveredStartId = request.getInt(RuntimeKeys.SERVICE_START_ID, -1);
         int startId = recovery && recoveredStartId > 0 ? recoveredStartId : nextStartId++;
         if (recovery) nextStartId = Math.max(nextStartId, startId + 1);
+        if (foregroundRequested) {
+            record.foregroundPolicy.requestStart(foregroundNowMs, foregroundTimeoutMs,
+                    backgroundAllowed, exemptionReason, declaredTypeMask);
+        }
         int flags = request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false)
                 ? Service.START_FLAG_REDELIVERY : 0;
-        int resultCode = record.service.onStartCommand(intent, flags, startId);
+        int resultCode;
+        try {
+            resultCode = record.service.onStartCommand(intent, flags, startId);
+        } catch (Throwable error) {
+            if (foregroundRequested) record.foregroundPolicy.terminate("SERVICE_START_CALLBACK_FAILED");
+            throw error;
+        }
         record.startCount++;
         record.lastStartId = startId;
         record.lastStartIntent = intent;
-        record.foreground = record.foreground || foregroundRequested
-                || request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false);
         Bundle out = success(recovery ? "SERVICE_RECOVERED" : "SERVICE_STARTED", className);
         out.putBoolean("created", record.createdNow);
         record.createdNow = false;
@@ -149,7 +171,7 @@ public final class GuestComponentRuntime {
         out.putInt("startCount", record.startCount);
         out.putInt("connectionCount", record.connections.size());
         out.putInt("onStartCommandResult", resultCode);
-        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
+        putForegroundSnapshot(out, record);
         out.putBoolean(RuntimeKeys.SERVICE_REDELIVERED,
                 request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false));
         RuntimeEventLog.event("GUEST_SERVICE_START", out);
@@ -160,12 +182,12 @@ public final class GuestComponentRuntime {
         ServiceRecord record = services.get(className);
         if (record == null) return success("SERVICE_NOT_RUNNING", className);
         record.startCount = 0;
-        record.foreground = false;
+        record.foregroundPolicy.terminate("SERVICE_STOPPED");
         boolean destroyed = settleService(className, record);
         Bundle out = success(destroyed ? "SERVICE_STOPPED" : "SERVICE_STOP_REQUESTED", className);
         out.putInt("connectionCount", record.connections.size());
         out.putBoolean("destroyed", destroyed);
-        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
+        putForegroundSnapshot(out, record);
         RuntimeEventLog.event("GUEST_SERVICE_STOP", out);
         return out;
     }
@@ -177,7 +199,7 @@ public final class GuestComponentRuntime {
         boolean stopped = startId == record.lastStartId;
         if (stopped) {
             record.startCount = 0;
-            record.foreground = false;
+            record.foregroundPolicy.terminate("SERVICE_STOPPED_BY_START_ID");
         }
         boolean destroyed = stopped && settleService(className, record);
         Bundle out = success(destroyed ? "SERVICE_STOPPED_BY_START_ID"
@@ -190,13 +212,32 @@ public final class GuestComponentRuntime {
         return out;
     }
 
-    private Bundle setServiceForeground(String className, boolean foreground) {
+    private Bundle setServiceForeground(String className, Bundle request) {
         ServiceRecord record = services.get(className);
         if (record == null) throw new IllegalArgumentException("SERVICE_NOT_RUNNING");
-        if (foreground && record.startCount == 0) throw new IllegalStateException("FOREGROUND_SERVICE_NOT_STARTED");
-        record.foreground = foreground;
+        boolean foreground = request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false);
+        if (foreground) {
+            if (record.startCount == 0) throw new IllegalStateException("FOREGROUND_SERVICE_NOT_STARTED");
+            try {
+                record.foregroundPolicy.promote(android.os.SystemClock.elapsedRealtime(),
+                        request.getInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0),
+                        request.getInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, -1),
+                        request.getString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, ""));
+            } catch (RuntimeException error) {
+                if (record.foregroundPolicy.snapshot().state()
+                        == ForegroundServiceStateMachine.State.TIMED_OUT) {
+                    record.startCount = 0;
+                    settleService(className, record);
+                }
+                throw error;
+            }
+        } else {
+            record.foregroundPolicy.demote(
+                    request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REMOVE_NOTIFICATION, true),
+                    "SERVICE_FOREGROUND_DEMOTED");
+        }
         Bundle out = success(foreground ? "SERVICE_FOREGROUND" : "SERVICE_BACKGROUND", className);
-        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, foreground);
+        putForegroundSnapshot(out, record);
         out.putInt("startCount", record.startCount);
         out.putInt("connectionCount", record.connections.size());
         RuntimeEventLog.event("GUEST_SERVICE_FOREGROUND", out);
@@ -225,7 +266,7 @@ public final class GuestComponentRuntime {
         out.putBoolean("created", record.createdNow);
         record.createdNow = false;
         out.putBoolean("rebound", rebound);
-        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
+        putForegroundSnapshot(out, record);
         if (binder != null) out.putBinder(RuntimeKeys.BINDER, binder);
         RuntimeEventLog.event("GUEST_SERVICE_BIND", out);
         return out;
@@ -243,7 +284,7 @@ public final class GuestComponentRuntime {
         out.putInt("connectionCount", record.connections.size());
         out.putBoolean("rebindRequested", record.rebindRequested);
         out.putBoolean("destroyed", destroyed);
-        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, record.foreground);
+        putForegroundSnapshot(out, record);
         RuntimeEventLog.event("GUEST_SERVICE_UNBIND", out);
         return out;
     }
@@ -285,7 +326,24 @@ public final class GuestComponentRuntime {
         record.connections.clear();
         record.lastBinder = null;
         record.lastStartIntent = null;
-        record.foreground = false;
+        record.foregroundPolicy.terminate("SERVICE_DESTROYED");
+    }
+
+    private static void putForegroundSnapshot(Bundle out, ServiceRecord record) {
+        ForegroundServiceStateMachine.Snapshot snapshot = record.foregroundPolicy.snapshot();
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, snapshot.state() == ForegroundServiceStateMachine.State.ACTIVE);
+        out.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED,
+                snapshot.state() == ForegroundServiceStateMachine.State.PENDING
+                        || snapshot.state() == ForegroundServiceStateMachine.State.ACTIVE);
+        out.putString(RuntimeKeys.SERVICE_FOREGROUND_STATE, snapshot.state().name());
+        out.putLong(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_AT_MS, snapshot.requestedAtMs());
+        out.putLong(RuntimeKeys.SERVICE_FOREGROUND_DEADLINE_MS, snapshot.promotionDeadlineMs());
+        out.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTED_AT_MS, snapshot.promotedAtMs());
+        out.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, snapshot.declaredTypeMask());
+        out.putInt(RuntimeKeys.SERVICE_FOREGROUND_ACTIVE_TYPE_MASK, snapshot.activeTypeMask());
+        out.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, snapshot.notificationId());
+        out.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, snapshot.notificationTag());
+        out.putString(RuntimeKeys.SERVICE_FOREGROUND_TERMINAL_REASON, snapshot.terminalReason());
     }
 
     private Bundle registerReceiver(String className, Bundle request) throws Exception {
@@ -680,7 +738,7 @@ public final class GuestComponentRuntime {
         int startCount;
         int lastStartId;
         Intent lastStartIntent;
-        boolean foreground;
+        final ForegroundServiceStateMachine foregroundPolicy = new ForegroundServiceStateMachine();
         IBinder lastBinder;
         boolean rebindRequested;
         boolean createdNow;

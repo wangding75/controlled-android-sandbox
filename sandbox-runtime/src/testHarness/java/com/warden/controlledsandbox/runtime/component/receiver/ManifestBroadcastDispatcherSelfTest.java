@@ -17,6 +17,7 @@ public final class ManifestBroadcastDispatcherSelfTest {
     public static void main(String[] args) throws Exception {
         testOrderedResultAndAbort();
         testFailurePolicies();
+        testChainBudgetAndTimeoutAccounting();
         System.out.println("PASS manifest broadcast dispatcher self-test");
     }
 
@@ -24,7 +25,7 @@ public final class ManifestBroadcastDispatcherSelfTest {
         List<BrokerManifestReceiverRuntime.Route> routes = routes();
         ManifestBroadcastDispatcher.DispatchReport report = new ManifestBroadcastDispatcher().dispatch(
                 routes, true, false, OrderedBroadcastState.initial(0, "start", Map.of()),
-                (route, state) -> {
+                (route, state, remaining) -> {
                     if (route.priority() == 300) {
                         return ManifestBroadcastDispatcher.DeliveryOutcome.success(
                                 new OrderedBroadcastState.ResultUpdate().resultCode(10)
@@ -52,7 +53,7 @@ public final class ManifestBroadcastDispatcherSelfTest {
         ManifestBroadcastDispatcher dispatcher = new ManifestBroadcastDispatcher();
         ManifestBroadcastDispatcher.DispatchReport continueReport = dispatcher.dispatch(routes, true, false,
                 OrderedBroadcastState.initial(0, "", Map.of()),
-                (route, state) -> route.priority() == 300
+                (route, state, remaining) -> route.priority() == 300
                         ? ManifestBroadcastDispatcher.DeliveryOutcome.failure("BROKEN")
                         : ManifestBroadcastDispatcher.DeliveryOutcome.success(
                                 new OrderedBroadcastState.ResultUpdate().resultCode(5)));
@@ -61,10 +62,41 @@ public final class ManifestBroadcastDispatcherSelfTest {
                 "ordered continue-on-failure");
         ManifestBroadcastDispatcher.DispatchReport stopReport = dispatcher.dispatch(routes, true, true,
                 OrderedBroadcastState.initial(0, "", Map.of()),
-                (route, state) -> ManifestBroadcastDispatcher.DeliveryOutcome.failure("BROKEN"));
+                (route, state, remaining) -> ManifestBroadcastDispatcher.DeliveryOutcome.failure("BROKEN"));
         require(stopReport.deliveredCount() == 0 && stopReport.failedCount() == 1
                         && stopReport.processedCount() == 1 && stopReport.finalState().aborted(),
                 "ordered stop-on-failure");
+    }
+
+
+    private static void testChainBudgetAndTimeoutAccounting() {
+        List<BrokerManifestReceiverRuntime.Route> routes = routes();
+        FakeClock clock = new FakeClock(100L);
+        ManifestBroadcastDispatcher dispatcher = new ManifestBroadcastDispatcher();
+        ManifestBroadcastDispatcher.DispatchReport budget = dispatcher.dispatch(
+                routes, true, false, OrderedBroadcastState.initial(0, "", Map.of()),
+                clock, 50L, (route, state, remaining) -> {
+                    clock.advance(60L);
+                    return ManifestBroadcastDispatcher.DeliveryOutcome.success(
+                            new OrderedBroadcastState.ResultUpdate().resultCode(1));
+                });
+        require(budget.deliveredCount() == 0 && budget.failedCount() == 1
+                        && budget.timedOutCount() == 1 && budget.skippedCount() == 2
+                        && "CHAIN_TIMEOUT".equals(budget.terminalReason())
+                        && "DEADLINE".equals(budget.abortSource()),
+                "chain-wide timeout budget was not enforced");
+
+        FakeClock timeoutClock = new FakeClock(1_000L);
+        ManifestBroadcastDispatcher.DispatchReport timeout = dispatcher.dispatch(
+                routes, true, true, OrderedBroadcastState.initial(0, "", Map.of()),
+                timeoutClock, 5_000L,
+                (route, state, remaining) -> ManifestBroadcastDispatcher.DeliveryOutcome.timeout(
+                        "ORDERED_RECEIVER_TIMEOUT"));
+        require(timeout.failedCount() == 1 && timeout.timedOutCount() == 1
+                        && timeout.skippedCount() == 2 && timeout.finalState().aborted()
+                        && "TIMEOUT_ABORT".equals(timeout.terminalReason())
+                        && "POLICY".equals(timeout.abortSource()),
+                "receiver timeout accounting and policy abort");
     }
 
     private static List<BrokerManifestReceiverRuntime.Route> routes() {
@@ -103,6 +135,14 @@ public final class ManifestBroadcastDispatcherSelfTest {
         bundle.putString(RuntimeKeys.APK_PATH, "/private/" + packageName + ".apk");
         bundle.putStringArrayList(RuntimeKeys.PERMISSIONS, new ArrayList<>());
         return bundle;
+    }
+
+
+    private static final class FakeClock implements com.warden.controlledsandbox.domain.port.Clock {
+        private long now;
+        FakeClock(long now) { this.now = now; }
+        @Override public long nowMillis() { return now; }
+        void advance(long value) { now += value; }
     }
 
     private static void require(boolean condition, String message) {

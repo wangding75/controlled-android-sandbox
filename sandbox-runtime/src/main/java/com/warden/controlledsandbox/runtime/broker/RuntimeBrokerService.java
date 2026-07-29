@@ -87,8 +87,8 @@ public final class RuntimeBrokerService extends Service {
             this::sessionById,
             (processSlot, request) -> callGuest(processSlot, guest -> guest.invokeComponent(request)));
     private final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
-    private final RuntimeServiceCoordinator serviceCoordinator = new RuntimeServiceCoordinator(
-            brokerState, (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
+    private final RuntimeServiceCoordinator serviceCoordinator = new RuntimeServiceCoordinator(brokerState,
+            (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)), clock);
     private final BrokerProviderRuntime providerRuntime = new BrokerProviderRuntime();
     private final BrokerCursorRuntime cursorRuntime = new BrokerCursorRuntime();
     private final BrokerFileRuntime fileRuntime = new BrokerFileRuntime();
@@ -326,7 +326,6 @@ public final class RuntimeBrokerService extends Service {
                             fileLease.callerSessionId(), fileLease.callerGeneration(),
                             fileLease.targetSessionId(), fileLease.targetGeneration(), now());
                 }
-
                 BrokerReceiverRuntime.Reservation receiverReservation = null;
                 BrokerProviderRuntime.Reservation providerReservation = null;
                 try {
@@ -1085,6 +1084,7 @@ public final class RuntimeBrokerService extends Service {
     private void purgeExpiredResources(long nowMs) {
         providerResources.purgeExpired(nowMs);
         receiverCoordinator.purgeExpired();
+        serviceCoordinator.purgeExpiredForeground();
     }
 
     private Bundle callGuest(int slot, GuestCall call) throws Exception {

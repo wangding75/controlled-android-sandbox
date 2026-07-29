@@ -5,6 +5,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Service;
 import android.os.Bundle;
+import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.SessionState;
 
@@ -12,7 +13,8 @@ public final class BrokerServiceRuntimeSelfTest {
     private BrokerServiceRuntimeSelfTest() { }
 
     public static void main(String[] args) {
-        BrokerServiceRuntime runtime = new BrokerServiceRuntime();
+        FakeClock clock = new FakeClock(1_000L);
+        BrokerServiceRuntime runtime = new BrokerServiceRuntime(clock);
         GuestSession first = session(1, 1);
         GuestSession otherUser = session(2, 1);
         Bundle otherStartResult = success("SERVICE_STARTED");
@@ -21,12 +23,28 @@ public final class BrokerServiceRuntimeSelfTest {
 
         Bundle start = request(ComponentOperations.START_FOREGROUND_SERVICE);
         start.putString(ComponentOperations.ACTION, "ACTION_SYNC");
+        start.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0b0110);
+        start.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS, 5_000L);
         Bundle startResult = success("SERVICE_STARTED");
         startResult.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
         runtime.applySuccessfulOperation(first, start, startResult);
         check("ACTIVE".equals(startResult.getString(RuntimeKeys.SERVICE_STATE)), "started service not active");
         check("REDELIVER_INTENT".equals(startResult.getString(RuntimeKeys.SERVICE_RESTART_MODE)), "restart mode missing");
-        check(startResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false), "foreground state missing");
+        check(!startResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, true)
+                        && "PENDING".equals(startResult.getString(RuntimeKeys.SERVICE_FOREGROUND_STATE, "")),
+                "foreground request must remain pending until promotion");
+
+        Bundle promote = request(ComponentOperations.SET_SERVICE_FOREGROUND);
+        promote.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, true);
+        promote.putInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0b0010);
+        promote.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, 17);
+        promote.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, "sync");
+        Bundle promoteResult = success("SERVICE_FOREGROUND");
+        runtime.applySuccessfulOperation(first, promote, promoteResult);
+        check(promoteResult.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false)
+                        && "ACTIVE".equals(promoteResult.getString(RuntimeKeys.SERVICE_FOREGROUND_STATE, ""))
+                        && promoteResult.getInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, 0) == 17,
+                "foreground state missing");
 
         Bundle secondStart = request(ComponentOperations.START_SERVICE);
         secondStart.putString(ComponentOperations.ACTION, "ACTION_LATEST");
@@ -50,9 +68,14 @@ public final class BrokerServiceRuntimeSelfTest {
         check(runtime.processDisconnected(first).size() == 1, "disconnect did not affect service");
         check(runtime.recovering(first).size() == 1, "redeliver service not marked for recovery");
         check("ACTION_LATEST".equals(runtime.recovering(first).get(0).lastStartAction()), "redelivery action lost");
+        check(runtime.recovering(first).get(0).recoverForeground(), "foreground recovery intent lost");
         check(runtime.recordCount() == 2, "second virtual user service was cross-contaminated");
         GuestSession second = session(1, 2);
+        clock.advance(100L);
         check(runtime.processRecovered(first, second).size() == 1, "service not recovered");
+        check(runtime.snapshot().stream().anyMatch(value -> value.instanceId().equals("u1:com.example")
+                        && value.foregroundSnapshot().state().name().equals("PENDING")),
+                "foreground recovery did not require a new promotion");
 
         Bundle rebound = request(ComponentOperations.BIND_SERVICE);
         rebound.putString(RuntimeKeys.CONNECTION_ID, "connection-2");
@@ -71,6 +94,33 @@ public final class BrokerServiceRuntimeSelfTest {
         runtime.applySuccessfulOperation(second, unbind, unbindResult);
         check("DESTROYED".equals(unbindResult.getString(RuntimeKeys.SERVICE_STATE)),
                 "service should settle after final owner disappears");
+
+        Bundle timeoutStart = request(ComponentOperations.START_FOREGROUND_SERVICE);
+        timeoutStart.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS, 100L);
+        Bundle timeoutStartResult = success("SERVICE_STARTED");
+        timeoutStartResult.putInt("onStartCommandResult", Service.START_NOT_STICKY);
+        runtime.applySuccessfulOperation(second, timeoutStart, timeoutStartResult);
+        clock.advance(100L);
+        check(runtime.expireForeground().size() == 1, "foreground promotion timeout was not expired");
+
+        var beforeDenied = runtime.snapshot().stream()
+                .filter(value -> value.instanceId().equals("u1:com.example"))
+                .findFirst().orElseThrow();
+        Bundle denied = request(ComponentOperations.START_FOREGROUND_SERVICE);
+        denied.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, false);
+        boolean deniedThrown = false;
+        try {
+            runtime.applySuccessfulOperation(second, denied, success("SERVICE_STARTED"));
+        } catch (SecurityException expected) {
+            deniedThrown = expected.getMessage().contains("BACKGROUND_START_NOT_ALLOWED");
+        }
+        check(deniedThrown, "background foreground-service start was not rejected");
+        var afterDenied = runtime.snapshot().stream()
+                .filter(value -> value.instanceId().equals("u1:com.example"))
+                .findFirst().orElseThrow();
+        check(afterDenied.state() == beforeDenied.state()
+                        && afterDenied.startCount() == beforeDenied.startCount(),
+                "rejected foreground start mutated Broker service state");
 
         Bundle restartResult = success("SERVICE_STARTED");
         restartResult.putInt("onStartCommandResult", Service.START_NOT_STICKY);
@@ -104,5 +154,12 @@ public final class BrokerServiceRuntimeSelfTest {
 
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+
+    private static final class FakeClock implements Clock {
+        private long now;
+        FakeClock(long now) { this.now = now; }
+        @Override public long nowMillis() { return now; }
+        void advance(long value) { now += value; }
     }
 }

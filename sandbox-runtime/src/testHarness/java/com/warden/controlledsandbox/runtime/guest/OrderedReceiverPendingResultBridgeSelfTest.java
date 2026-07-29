@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.RemoteException;
 import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
@@ -19,6 +20,8 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         clearAbortCapture();
         asynchronousFinishInterception();
         localTimeoutConsumesLateFinish();
+        completionBinderDeathCancelsAsyncBridge();
+        invalidResultExtrasAreRejected();
         System.out.println("PASS ordered Receiver PendingResult bridge self-test");
     }
 
@@ -144,7 +147,61 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         }
     }
 
-    private static Bundle request(CapturingCompletion completion, String token, long deadlineMs) {
+
+    private static void completionBinderDeathCancelsAsyncBridge() throws Throwable {
+        FakeClock clock = new FakeClock(700);
+        DeathAwareCompletion completion = new DeathAwareCompletion();
+        OrderedReceiverFinishInterceptor interceptor = new OrderedReceiverFinishInterceptor(clock);
+        try {
+            final BroadcastReceiver.PendingResult[] async = new BroadcastReceiver.PendingResult[1];
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) { async[0] = goAsync(); }
+            };
+            OrderedReceiverPendingResultBridge bridge = OrderedReceiverPendingResultBridge.install(
+                    receiver, request(completion, "death-token", 1_700), interceptor);
+            receiver.onReceive(new Context(), new Intent());
+            bridge.afterOnReceive();
+            IBinder token = finishToken(async[0]);
+            require(interceptor.pendingCount() == 1, "async bridge was not registered before Binder death");
+            completion.die();
+            require(interceptor.pendingCount() == 0, "Broker completion Binder death leaked async bridge");
+            require(interceptor.intercept("activity-manager", finishReceiverMethod(),
+                            new Object[]{token, 1, "late", new Bundle(), false, 0}).handled(),
+                    "late finish after Broker death escaped to Host AMS");
+        } finally {
+            interceptor.close();
+        }
+    }
+
+    private static void invalidResultExtrasAreRejected() throws Exception {
+        FakeClock clock = new FakeClock(900);
+        CapturingCompletion completion = new CapturingCompletion();
+        OrderedReceiverFinishInterceptor interceptor = new OrderedReceiverFinishInterceptor(clock);
+        try {
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) {
+                    Bundle invalid = new Bundle();
+                    invalid.putInt("notString", 3);
+                    setResultExtras(invalid);
+                }
+            };
+            OrderedReceiverPendingResultBridge bridge = OrderedReceiverPendingResultBridge.install(
+                    receiver, request(completion, "invalid-token", 1_900), interceptor);
+            receiver.onReceive(new Context(), new Intent());
+            boolean rejected = false;
+            try { bridge.afterOnReceive(); }
+            catch (IllegalArgumentException expected) {
+                rejected = expected.getMessage().contains("STRING_ONLY");
+                bridge.cancelLocal();
+            }
+            require(rejected && completion.calls == 0 && interceptor.pendingCount() == 0,
+                    "invalid ordered result extras were not rejected and cleaned");
+        } finally {
+            interceptor.close();
+        }
+    }
+
+    private static Bundle request(IOrderedReceiverCompletion completion, String token, long deadlineMs) {
         Bundle request = new Bundle();
         request.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, token);
         request.putLong(RuntimeKeys.ORDERED_RECEIVER_DEADLINE_MS, deadlineMs);
@@ -175,7 +232,7 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
                             Bundle resultExtras, boolean abort, int flags);
     }
 
-    private static final class CapturingCompletion extends IOrderedReceiverCompletion.Stub {
+    private static class CapturingCompletion extends IOrderedReceiverCompletion.Stub {
         int calls;
         Bundle last;
         @Override public Bundle complete(Bundle result) {
@@ -185,6 +242,24 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
             ack.putBoolean(RuntimeKeys.ORDERED_RECEIVER_ACCEPTED, true);
             ack.putString(RuntimeKeys.STATUS, "ORDERED_RECEIVER_COMPLETED");
             return ack;
+        }
+    }
+
+
+    private static final class DeathAwareCompletion extends CapturingCompletion {
+        private IBinder.DeathRecipient recipient;
+        @Override public void linkToDeath(IBinder.DeathRecipient value, int flags) throws RemoteException {
+            recipient = value;
+        }
+        @Override public boolean unlinkToDeath(IBinder.DeathRecipient value, int flags) {
+            if (recipient != value) return false;
+            recipient = null;
+            return true;
+        }
+        void die() {
+            IBinder.DeathRecipient value = recipient;
+            recipient = null;
+            if (value != null) value.binderDied();
         }
     }
 

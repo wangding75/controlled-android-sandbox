@@ -6,6 +6,7 @@ import android.os.RemoteException;
 
 import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -29,15 +30,22 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
 
     private final BrokerStateStore brokerState;
     private final GuestInvoker guestInvoker;
-    private final BrokerServiceRuntime runtime = new BrokerServiceRuntime();
+    private final Clock clock;
+    private final BrokerServiceRuntime runtime;
     private final Map<String, ConnectionLease> connections = new LinkedHashMap<>();
 
     public RuntimeServiceCoordinator(BrokerStateStore brokerState, GuestInvoker guestInvoker) {
-        if (brokerState == null || guestInvoker == null) {
+        this(brokerState, guestInvoker, System::currentTimeMillis);
+    }
+
+    public RuntimeServiceCoordinator(BrokerStateStore brokerState, GuestInvoker guestInvoker, Clock clock) {
+        if (brokerState == null || guestInvoker == null || clock == null) {
             throw new IllegalArgumentException("Service coordinator dependencies are required");
         }
         this.brokerState = brokerState;
         this.guestInvoker = guestInvoker;
+        this.clock = clock;
+        this.runtime = new BrokerServiceRuntime(clock);
     }
 
     public ServiceRuntimeRegistry.Snapshot applySuccessfulOperation(
@@ -65,13 +73,20 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
         List<ServiceRuntimeRegistry.Snapshot> recovering = runtime.recovering(stale);
         for (ServiceRuntimeRegistry.Snapshot service : recovering) {
             Bundle call = new Bundle(currentSpec);
-            call.putString(ComponentOperations.OPERATION, ComponentOperations.START_SERVICE);
+            call.putString(ComponentOperations.OPERATION, service.recoverForeground()
+                    ? ComponentOperations.START_FOREGROUND_SERVICE : ComponentOperations.START_SERVICE);
             call.putString(RuntimeKeys.COMPONENT_CLASS, service.component());
             call.putBoolean(RuntimeKeys.SERVICE_RECOVERY, true);
             call.putInt(RuntimeKeys.SERVICE_START_ID, service.lastStartId());
             boolean redeliver = service.restartMode() == ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT;
             call.putBoolean(RuntimeKeys.SERVICE_REDELIVERED, redeliver);
             call.putString(ComponentOperations.ACTION, redeliver ? service.lastStartAction() : "");
+            if (service.recoverForeground()) {
+                call.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true);
+                call.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, "PROCESS_RECOVERY");
+                call.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK,
+                        service.foregroundSnapshot().declaredTypeMask());
+            }
             Bundle result = guestInvoker.invoke(current.processSlot(), call);
             if (result == null || "FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
                 String reason = result == null ? "NO_RESULT"
@@ -80,6 +95,26 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
             }
         }
         return runtime.processRecovered(stale, current);
+    }
+
+
+    /** Expires services that failed to promote before their bounded foreground deadline. */
+    public int purgeExpiredForeground() {
+        List<ServiceRuntimeRegistry.Snapshot> expired = runtime.expireForeground();
+        for (ServiceRuntimeRegistry.Snapshot service : expired) {
+            Bundle base = brokerState.prepared(service.instanceId() + ":" + service.processName());
+            if (base == null) continue;
+            Bundle request = new Bundle(base);
+            request.putString(ComponentOperations.OPERATION, ComponentOperations.STOP_SERVICE);
+            request.putString(RuntimeKeys.COMPONENT_CLASS, service.component());
+            request.putString(RuntimeKeys.SERVICE_FOREGROUND_TERMINAL_REASON,
+                    "FOREGROUND_SERVICE_PROMOTION_TIMEOUT");
+            int slot = request.getInt(RuntimeKeys.PROCESS_SLOT, -1);
+            if (slot < 0) continue;
+            try { guestInvoker.invoke(slot, request); }
+            catch (Exception ignored) { }
+        }
+        return expired.size();
     }
 
     public int stopSession(GuestSession session) {

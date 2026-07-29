@@ -130,3 +130,17 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed APK ABI/native-library verification and artifact manifest.
 - BLOCKED — actual APK production in the current execution container because JDK 17, Android SDK and external dependency access are unavailable.
 - NEXT — run the locked build on a prepared workstation, then begin x86_64 Host + x86 Companion Emulator execution.
+
+## M5-T2 cross-width runtime source baseline
+
+- DONE — 32-bit Activity, Service, Receiver and Provider operations route through the Companion Runtime Broker.
+- DONE — bounded, SHA-256 verified Base/Split/native artifact transfer into Companion-private storage.
+- BLOCKED — dedicated Android isolated UID transport.
+- DEVICE — real four-ABI APK build and cross-package Binder execution.
+
+## M5-T3 ordered broadcast and foreground-service source baseline
+
+- DONE — ordered result propagation, receiver/policy abort distinction and bounded chain-wide deadline.
+- DONE — Guest PendingResult one-shot finish, Binder-death cleanup and bounded result payload validation.
+- DONE — pending foreground promotion, background-start policy, type-mask validation, notification ownership, demotion, timeout and process recovery.
+- DEVICE — Android AMS/SystemUI enforcement, hidden PendingResult compatibility and OEM behavior.

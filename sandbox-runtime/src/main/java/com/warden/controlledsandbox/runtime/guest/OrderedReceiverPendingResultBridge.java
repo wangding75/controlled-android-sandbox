@@ -3,7 +3,9 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.content.BroadcastReceiver;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.RemoteException;
 import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
+import com.warden.controlledsandbox.domain.component.receiver.OrderedBroadcastState;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -14,7 +16,9 @@ final class OrderedReceiverPendingResultBridge {
     private final BroadcastReceiver receiver;
     private final OrderedReceiverFinishInterceptor interceptor;
     private final IOrderedReceiverCompletion completion;
+    private final IBinder completionBinder;
     private final IBinder finishToken = new OrderedReceiverFinishToken();
+    private final IBinder.DeathRecipient completionDeath = this::completionBinderDied;
     private final String receiverToken;
     private final String packageName;
     private final int virtualUserId;
@@ -23,6 +27,7 @@ final class OrderedReceiverPendingResultBridge {
     private final String receiverClass;
     private final long deadlineMs;
     private final AtomicBoolean terminal = new AtomicBoolean();
+    private volatile boolean completionDeathLinked;
     private Object pendingResult;
 
     static OrderedReceiverPendingResultBridge install(
@@ -33,21 +38,31 @@ final class OrderedReceiverPendingResultBridge {
         }
         IBinder callbackBinder = request.getBinder(RuntimeKeys.ORDERED_RECEIVER_COMPLETION_BINDER);
         IOrderedReceiverCompletion completion = IOrderedReceiverCompletion.Stub.asInterface(callbackBinder);
-        if (completion == null) throw new IllegalStateException("ORDERED_RECEIVER_COMPLETION_MISSING");
+        if (completion == null || callbackBinder == null) {
+            throw new IllegalStateException("ORDERED_RECEIVER_COMPLETION_MISSING");
+        }
         OrderedReceiverPendingResultBridge bridge = new OrderedReceiverPendingResultBridge(
-                receiver, request, interceptor, completion);
-        bridge.installPendingResult(request);
-        interceptor.register(bridge.finishToken, bridge, bridge.deadlineMs);
-        return bridge;
+                receiver, request, interceptor, completion, callbackBinder);
+        bridge.linkCompletionDeath();
+        try {
+            bridge.installPendingResult(request);
+            interceptor.register(bridge.finishToken, bridge, bridge.deadlineMs);
+            return bridge;
+        } catch (Throwable error) {
+            bridge.cancelLocal();
+            if (error instanceof Exception exception) throw exception;
+            throw new IllegalStateException(error);
+        }
     }
 
     private OrderedReceiverPendingResultBridge(
             BroadcastReceiver receiver, Bundle request,
             OrderedReceiverFinishInterceptor interceptor,
-            IOrderedReceiverCompletion completion) {
+            IOrderedReceiverCompletion completion, IBinder completionBinder) {
         this.receiver = receiver;
         this.interceptor = interceptor;
         this.completion = completion;
+        this.completionBinder = completionBinder;
         this.receiverToken = required(request, RuntimeKeys.ORDERED_RECEIVER_TOKEN);
         this.packageName = required(request, RuntimeKeys.PACKAGE_NAME);
         this.virtualUserId = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
@@ -96,6 +111,7 @@ final class OrderedReceiverPendingResultBridge {
     void cancelLocal() {
         terminal.compareAndSet(false, true);
         interceptor.unregister(finishToken, this);
+        unlinkCompletionDeath();
     }
 
     private Bundle completeOnce(Bundle result) throws Exception {
@@ -105,6 +121,7 @@ final class OrderedReceiverPendingResultBridge {
             return duplicate;
         }
         interceptor.unregister(finishToken, this);
+        unlinkCompletionDeath();
         Bundle acknowledgement = completion.complete(result);
         if (acknowledgement == null) {
             Bundle failed = status("ORDERED_RECEIVER_COMPLETION_NULL_ACK");
@@ -112,6 +129,23 @@ final class OrderedReceiverPendingResultBridge {
             return failed;
         }
         return acknowledgement;
+    }
+
+    private void linkCompletionDeath() throws RemoteException {
+        completionBinder.linkToDeath(completionDeath, 0);
+        completionDeathLinked = true;
+    }
+
+    private void unlinkCompletionDeath() {
+        if (!completionDeathLinked) return;
+        completionDeathLinked = false;
+        try { completionBinder.unlinkToDeath(completionDeath, 0); }
+        catch (RuntimeException ignored) { }
+    }
+
+    private void completionBinderDied() {
+        completionDeathLinked = false;
+        if (terminal.compareAndSet(false, true)) interceptor.unregister(finishToken, this);
     }
 
     private void installPendingResult(Bundle request) throws Exception {
@@ -128,8 +162,10 @@ final class OrderedReceiverPendingResultBridge {
 
     private Object createPendingResult(Class<?> pendingType, int code, String data, Bundle extras)
             throws Exception {
-        for (Constructor<?> constructor : pendingType.getConstructors()) {
+        validateResultPayload(data, extras);
+        for (Constructor<?> constructor : pendingType.getDeclaredConstructors()) {
             Class<?>[] types = constructor.getParameterTypes();
+            constructor.setAccessible(true);
             if (types.length == 9) {
                 return constructor.newInstance(code, data, extras, 0, true, false,
                         finishToken, virtualUserId, 0);
@@ -143,6 +179,7 @@ final class OrderedReceiverPendingResultBridge {
     }
 
     private Bundle resultBundle(int code, String data, Bundle extras, boolean aborted) {
+        validateResultPayload(data, extras);
         Bundle result = new Bundle();
         result.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, receiverToken);
         result.putString(RuntimeKeys.PACKAGE_NAME, packageName);
@@ -156,6 +193,29 @@ final class OrderedReceiverPendingResultBridge {
                 extras == null ? new Bundle() : new Bundle(extras));
         result.putBoolean(RuntimeKeys.BROADCAST_ABORT, aborted);
         return result;
+    }
+
+    private static void validateResultPayload(String data, Bundle extras) {
+        String normalized = data == null ? "" : data;
+        if (normalized.length() > OrderedBroadcastState.MAX_RESULT_DATA_CHARS) {
+            throw new IllegalArgumentException("BROADCAST_RESULT_DATA_TOO_LARGE");
+        }
+        if (extras == null) return;
+        if (extras.keySet().size() > OrderedBroadcastState.MAX_EXTRA_ENTRIES) {
+            throw new IllegalArgumentException("BROADCAST_RESULT_EXTRAS_TOO_MANY");
+        }
+        for (String key : extras.keySet()) {
+            if (key == null || key.length() > OrderedBroadcastState.MAX_EXTRA_KEY_CHARS) {
+                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRA_KEY_INVALID");
+            }
+            Object value = extras.get(key);
+            if (!(value instanceof String)) {
+                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRAS_STRING_ONLY");
+            }
+            if (((String) value).length() > OrderedBroadcastState.MAX_EXTRA_VALUE_CHARS) {
+                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRA_VALUE_TOO_LARGE");
+            }
+        }
     }
 
     private Object invokeReceiver(String method) throws Exception {

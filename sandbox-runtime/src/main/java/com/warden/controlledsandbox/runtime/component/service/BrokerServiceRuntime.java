@@ -5,13 +5,23 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Service;
 import android.os.Bundle;
-import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.domain.component.service.ForegroundServiceStateMachine;
 import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
+import com.warden.controlledsandbox.domain.port.Clock;
+import com.warden.controlledsandbox.domain.session.GuestSession;
 import java.util.List;
 
 /** Broker-owned production state for started, bound, foreground, and recovering Guest services. */
 public final class BrokerServiceRuntime {
     private final ServiceRuntimeRegistry registry = new ServiceRuntimeRegistry();
+    private final Clock clock;
+
+    public BrokerServiceRuntime() { this(System::currentTimeMillis); }
+
+    public BrokerServiceRuntime(Clock clock) {
+        if (clock == null) throw new IllegalArgumentException("clock is required");
+        this.clock = clock;
+    }
 
     public synchronized ServiceRuntimeRegistry.Snapshot applySuccessfulOperation(
             GuestSession session, Bundle request, Bundle result) {
@@ -22,11 +32,17 @@ public final class BrokerServiceRuntime {
         ServiceRuntimeRegistry.Snapshot snapshot = null;
         String instance = instanceId(session);
         switch (operation) {
-            case ComponentOperations.START_SERVICE, ComponentOperations.START_FOREGROUND_SERVICE -> snapshot = registry.start(
+            case ComponentOperations.START_SERVICE -> snapshot = registry.start(
                     instance, component, session.processName(), restartMode(result), session.generation(),
-                    request.getString(ComponentOperations.ACTION, ""),
-                    ComponentOperations.START_FOREGROUND_SERVICE.equals(operation)
-                            || request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false));
+                    request.getString(ComponentOperations.ACTION, ""), false);
+            case ComponentOperations.START_FOREGROUND_SERVICE -> snapshot = registry.startForegroundRequested(
+                    instance, component, session.processName(), restartMode(result), session.generation(),
+                    request.getString(ComponentOperations.ACTION, ""), clock.nowMillis(),
+                    request.getLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
+                            ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS),
+                    request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true),
+                    request.getString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, ""),
+                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0));
             case ComponentOperations.STOP_SERVICE -> {
                 if (registry.find(instance, component) != null) {
                     snapshot = registry.stopStarted(instance, component, session.generation());
@@ -40,8 +56,16 @@ public final class BrokerServiceRuntime {
             }
             case ComponentOperations.SET_SERVICE_FOREGROUND -> {
                 if (registry.find(instance, component) != null) {
-                    snapshot = registry.setForeground(instance, component,
-                            request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false), session.generation());
+                    boolean foreground = request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false);
+                    snapshot = foreground
+                            ? registry.promoteForeground(instance, component, session.generation(),
+                                    clock.nowMillis(),
+                                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0),
+                                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, -1),
+                                    request.getString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, ""))
+                            : registry.demoteForeground(instance, component, session.generation(),
+                                    request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REMOVE_NOTIFICATION, true),
+                                    "SERVICE_FOREGROUND_DEMOTED");
                 }
             }
             case ComponentOperations.BIND_SERVICE -> snapshot = registry.bind(
@@ -77,7 +101,11 @@ public final class BrokerServiceRuntime {
 
     public synchronized List<ServiceRuntimeRegistry.Snapshot> processRecovered(GuestSession stale, GuestSession current) {
         return registry.completeProcessRecovery(instanceId(stale), stale.processName(),
-                stale.generation(), current.generation());
+                stale.generation(), current.generation(), clock.nowMillis());
+    }
+
+    public synchronized List<ServiceRuntimeRegistry.Snapshot> expireForeground() {
+        return registry.expireForeground(clock.nowMillis());
     }
 
     public synchronized int invalidate(GuestSession session) {
@@ -95,12 +123,26 @@ public final class BrokerServiceRuntime {
     }
 
     public static void addSnapshot(Bundle result, ServiceRuntimeRegistry.Snapshot snapshot) {
+        ForegroundServiceStateMachine.Snapshot foreground = snapshot.foregroundSnapshot();
         result.putString(RuntimeKeys.SERVICE_STATE, snapshot.state().name());
         result.putString(RuntimeKeys.SERVICE_RESTART_MODE, snapshot.restartMode().name());
         result.putInt(RuntimeKeys.SERVICE_START_COUNT, snapshot.startCount());
         result.putInt(RuntimeKeys.SERVICE_CONNECTION_COUNT, snapshot.connectionIds().size());
         result.putInt(RuntimeKeys.SERVICE_LAST_START_ID, snapshot.lastStartId());
         result.putBoolean(RuntimeKeys.SERVICE_FOREGROUND, snapshot.foreground());
+        result.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, snapshot.foregroundRequested());
+        result.putString(RuntimeKeys.SERVICE_FOREGROUND_STATE, foreground.state().name());
+        result.putLong(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_AT_MS, foreground.requestedAtMs());
+        result.putLong(RuntimeKeys.SERVICE_FOREGROUND_DEADLINE_MS, foreground.promotionDeadlineMs());
+        result.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTED_AT_MS, foreground.promotedAtMs());
+        result.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, foreground.declaredTypeMask());
+        result.putInt(RuntimeKeys.SERVICE_FOREGROUND_ACTIVE_TYPE_MASK, foreground.activeTypeMask());
+        result.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, foreground.notificationId());
+        result.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, foreground.notificationTag());
+        result.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED,
+                foreground.backgroundStartAllowed());
+        result.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, foreground.exemptionReason());
+        result.putString(RuntimeKeys.SERVICE_FOREGROUND_TERMINAL_REASON, foreground.terminalReason());
     }
 
     public static String instanceId(GuestSession session) {

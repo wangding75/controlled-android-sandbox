@@ -64,8 +64,24 @@ final class RuntimeClient implements AutoCloseable {
     Bundle stopService(SandboxRecord record) throws Exception { return stopService(record, 0); }
     Bundle stopService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.STOP_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
     Bundle startForegroundService(SandboxRecord record, int virtualUserId) throws Exception {
-        return component(record, virtualUserId, ComponentOperations.START_FOREGROUND_SERVICE,
+        return startForegroundService(record, virtualUserId, true, "", 0, 5_000L);
+    }
+
+    Bundle startForegroundService(SandboxRecord record, int virtualUserId,
+                                  boolean backgroundStartAllowed, String exemptionReason,
+                                  int declaredTypeMask, long promotionTimeoutMs) throws Exception {
+        Bundle request = componentRequest(record, virtualUserId,
+                ComponentOperations.START_FOREGROUND_SERVICE,
                 record.serviceClass, record.serviceProcess, "", "");
+        request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED,
+                backgroundStartAllowed);
+        request.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON,
+                exemptionReason == null ? "" : exemptionReason);
+        request.putLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
+                promotionTimeoutMs);
+        request.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK,
+                declaredTypeMask);
+        return invoke(record, virtualUserId, request);
     }
     Bundle stopServiceStartId(SandboxRecord record, int virtualUserId, int startId) throws Exception {
         Bundle request = componentRequest(record, virtualUserId, ComponentOperations.STOP_SERVICE_START_ID,
@@ -74,9 +90,20 @@ final class RuntimeClient implements AutoCloseable {
         return invoke(record, virtualUserId, request);
     }
     Bundle setServiceForeground(SandboxRecord record, int virtualUserId, boolean foreground) throws Exception {
+        return setServiceForeground(record, virtualUserId, foreground, 0, 1, "sandbox", true);
+    }
+
+    Bundle setServiceForeground(SandboxRecord record, int virtualUserId, boolean foreground,
+                                int typeMask, int notificationId, String notificationTag,
+                                boolean removeNotification) throws Exception {
         Bundle request = componentRequest(record, virtualUserId, ComponentOperations.SET_SERVICE_FOREGROUND,
                 record.serviceClass, record.serviceProcess, "", "");
         request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, foreground);
+        request.putInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, typeMask);
+        request.putInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, notificationId);
+        request.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG,
+                notificationTag == null ? "" : notificationTag);
+        request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REMOVE_NOTIFICATION, removeNotification);
         return invoke(record, virtualUserId, request);
     }
     BoundServiceLease bindService(SandboxRecord record, int virtualUserId, String connectionId) throws Exception {
