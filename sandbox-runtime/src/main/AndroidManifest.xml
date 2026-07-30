@@ -9,6 +9,10 @@
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService5" android:exported="false" android:process=":guest5" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService6" android:exported="false" android:process=":guest6" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService7" android:exported="false" android:process=":guest7" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService0" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService1" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService2" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService3" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity0" android:exported="false" android:process=":guest0" android:theme="@style/ControlledSandbox.Stub" />
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity1" android:exported="false" android:process=":guest1" android:theme="@style/ControlledSandbox.Stub" />
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity2" android:exported="false" android:process=":guest2" android:theme="@style/ControlledSandbox.Stub" />

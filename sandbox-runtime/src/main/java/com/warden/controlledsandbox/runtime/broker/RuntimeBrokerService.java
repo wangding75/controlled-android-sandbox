@@ -7,24 +7,8 @@ import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractFailure;
 import com.warden.controlledsandbox.runtime.component.activity.ActivityResultContractFailure;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity0;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity1;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity2;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity3;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity4;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity5;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity6;
-import com.warden.controlledsandbox.runtime.component.activity.StubActivity7;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService0;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService1;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService2;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService3;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService4;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService5;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService6;
-import com.warden.controlledsandbox.runtime.guest.GuestProcessService7;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -36,6 +20,8 @@ import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinator;
 import com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinator;
 import com.warden.controlledsandbox.runtime.status.BrokerRuntimeStatusSource;
+import com.warden.controlledsandbox.runtime.status.CombinedSessionMetricsRepository;
+import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
@@ -81,6 +67,10 @@ public final class RuntimeBrokerService extends Service {
     private RuntimeComponentRecoveryCoordinator componentRecoveryCoordinator;
     private final UriGrantRegistry uriGrants = new UriGrantRegistry();
     private final BrokerStateStore brokerState = new BrokerStateStore();
+    private final RuntimeIsolatedProcessCoordinator isolatedProcessCoordinator =
+            new RuntimeIsolatedProcessCoordinator(this, brokerState, clock, tokenGenerator,
+                    this::validateInput, this::makeSpec, () -> systemServiceCoordinator,
+                    this::sessionBundle);
     private final RuntimeReceiverCoordinator receiverCoordinator = new RuntimeReceiverCoordinator(
             sessions, brokerState, clock, tokenGenerator,
             this::prepareGuestInternal,
@@ -103,11 +93,18 @@ public final class RuntimeBrokerService extends Service {
                     (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
     private final RuntimeStatusDispatcher runtimeStatusDispatcher = new RuntimeStatusDispatcher(
             clock,
-            new BrokerRuntimeStatusSource(sessions, activityRuntime, serviceCoordinator, providerLifecycle,
+            new BrokerRuntimeStatusSource(
+                    new CombinedSessionMetricsRepository(sessions, isolatedProcessCoordinator.sessionMetrics()),
+                    activityRuntime, combinedServiceMetrics(), providerLifecycle,
                     providerRuntime, receiverCoordinator.lifecycle()),
             this::purgeExpiredResources,
             auditSink);
     private final ConcurrentMap<Integer, GuestConnection> guestConnections = new ConcurrentHashMap<>();
+    private ServiceMetricsSource combinedServiceMetrics() {
+        return () -> Math.addExact(serviceCoordinator.recordCount(),
+                isolatedProcessCoordinator.serviceMetrics().recordCount());
+    }
+
     @Override public void onCreate() {
         super.onCreate();
         activityRuntime.configureCheckpointStore(
@@ -143,7 +140,7 @@ public final class RuntimeBrokerService extends Service {
                 if (component.trim().isEmpty()) return failure("COMPONENT_MISSING", "No Guest Activity class supplied");
                 Bundle transaction = activityRuntime.launch(session, component, prepared, request);
                 issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
-                Intent launch = new Intent(RuntimeBrokerService.this, activityClassFor(session.processSlot()));
+                Intent launch = new Intent(RuntimeBrokerService.this, RuntimeStubComponents.activityClassFor(session.processSlot()));
                 launch.addFlags(transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, Intent.FLAG_ACTIVITY_NEW_TASK));
                 launch.putExtra(RuntimeKeys.ROUTE_TOKEN, issuedRouteToken);
                 launch.putExtra(RuntimeKeys.SESSION_ID, session.sessionId());
@@ -173,7 +170,9 @@ public final class RuntimeBrokerService extends Service {
             BrokerFileRuntime.CloseReservation fileCloseReservation = null;
             GuestSession fileTargetSession = null;
             try {
-                if (request == null) throw new IllegalArgumentException("request is required"); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
+                if (request == null) throw new IllegalArgumentException("request is required");
+                IsolatedProcessRoutePolicy.Match isolatedMatch = IsolatedProcessRoutePolicy.match(request);
+                if (isolatedMatch != null) return isolatedProcessCoordinator.invoke(request, isolatedMatch);
                 purgeExpiredResources();
                 String operation = request.getString(ComponentOperations.OPERATION, "");
                 ComponentOperations.requireKnownProviderOperation(operation);
@@ -619,7 +618,10 @@ public final class RuntimeBrokerService extends Service {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             RuntimeStatusRequest legacyRequest = new RuntimeStatusRequest(
                     RuntimeProtocol.CURRENT, "legacy-runtime-status");
-            return RuntimeStatusLegacyAdapter.toBundle(runtimeStatusDispatcher.dispatch(legacyRequest));
+            Bundle legacy = RuntimeStatusLegacyAdapter.toBundle(
+                    runtimeStatusDispatcher.dispatch(legacyRequest));
+            isolatedProcessCoordinator.addLegacyStatus(legacy);
+            return legacy;
         }
 
         @Override public void stopGuest(String packageName, int virtualUserId) {
@@ -729,6 +731,7 @@ public final class RuntimeBrokerService extends Service {
     private synchronized void stopGuestInternal(String packageName, int userId) {
         java.util.List<GuestSession> active = new ArrayList<>(sessions.getAll(packageName, userId));
         for (GuestSession session : active) stopSession(session);
+        isolatedProcessCoordinator.stopGuest(packageName, userId);
         receiverCoordinator.invalidateInstance(packageName, userId,
                 "ORDERED_RECEIVER_INSTANCE_STOPPED");
         providerResources.invalidateInstance(packageName, userId);
@@ -1077,6 +1080,7 @@ public final class RuntimeBrokerService extends Service {
         // Broker/Guest retained copies are still bounded by Lease TTL and Session/generation cleanup.
     }
 
+
     private void purgeExpiredResources() {
         purgeExpiredResources(now());
     }
@@ -1085,6 +1089,7 @@ public final class RuntimeBrokerService extends Service {
         providerResources.purgeExpired(nowMs);
         receiverCoordinator.purgeExpired();
         serviceCoordinator.purgeExpiredForeground();
+        isolatedProcessCoordinator.purgeExpiredForeground();
     }
 
     private Bundle callGuest(int slot, GuestCall call) throws Exception {
@@ -1105,7 +1110,7 @@ public final class RuntimeBrokerService extends Service {
             if (connection == null) {
                 connection = new GuestConnection(slot);
                 guestConnections.put(slot, connection);
-                Intent intent = new Intent(this, serviceClassFor(slot));
+                Intent intent = new Intent(this, RuntimeStubComponents.serviceClassFor(slot));
                 if (!bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
                     guestConnections.remove(slot);
                     throw new IllegalStateException("BIND_FAILED");
@@ -1179,6 +1184,7 @@ public final class RuntimeBrokerService extends Service {
         if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
         if (systemServiceCoordinator != null) systemServiceCoordinator.close();
         serviceCoordinator.close();
+        isolatedProcessCoordinator.close();
         super.onDestroy();
     }
 
@@ -1240,33 +1246,6 @@ public final class RuntimeBrokerService extends Service {
         out.putString(RuntimeKeys.ERROR_TYPE, type);
         out.putString(RuntimeKeys.ERROR_MESSAGE, message == null ? "" : message);
         return out;
-    }
-
-    private static Class<?> serviceClassFor(int slot) {
-        switch (slot) {
-            case 0: return GuestProcessService0.class;
-            case 1: return GuestProcessService1.class;
-            case 2: return GuestProcessService2.class;
-            case 3: return GuestProcessService3.class;
-            case 4: return GuestProcessService4.class;
-            case 5: return GuestProcessService5.class;
-            case 6: return GuestProcessService6.class;
-            case 7: return GuestProcessService7.class;
-            default: throw new IllegalArgumentException("Invalid process slot: " + slot);
-        }
-    }
-    private static Class<?> activityClassFor(int slot) {
-        switch (slot) {
-            case 0: return StubActivity0.class;
-            case 1: return StubActivity1.class;
-            case 2: return StubActivity2.class;
-            case 3: return StubActivity3.class;
-            case 4: return StubActivity4.class;
-            case 5: return StubActivity5.class;
-            case 6: return StubActivity6.class;
-            case 7: return StubActivity7.class;
-            default: throw new IllegalArgumentException("Invalid process slot: " + slot);
-        }
     }
 
     private static final class ObserverCaller {

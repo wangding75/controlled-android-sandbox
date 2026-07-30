@@ -18,8 +18,10 @@ public final class IsolatedComponentPolicySelfTest {
         IsolatedComponentPolicy.requireSupported(metadata, "com.example.NormalService");
         IsolatedComponentPolicy.requireSupported(metadata, "");
         expectFailure(() -> IsolatedComponentPolicy.requireSupported(metadata, "com.example.IsolatedService"));
+        IsolatedComponentPolicy.requireSupported(metadata, "com.example.IsolatedService", true);
+        IsolatedComponentPolicy.requireSupported(metadata, ".IsolatedService", true);
         check(metadata.isIsolatedComponent(".IsolatedService"), "relative isolated class lookup failed");
-        System.out.println("PASS isolatedProcess fail-closed policy self-test");
+        System.out.println("PASS isolatedProcess ordinary fail-closed and dedicated-transport policy self-test");
     }
 
     private static void expectFailure(Runnable action) {
@@ -30,7 +32,7 @@ public final class IsolatedComponentPolicySelfTest {
             }
             return;
         }
-        throw new AssertionError("isolated component must fail closed");
+        throw new AssertionError("isolated component must fail closed on ordinary transport");
     }
 
     private static void check(boolean condition, String message) {

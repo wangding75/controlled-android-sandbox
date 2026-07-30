@@ -160,3 +160,12 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — deterministic AVD runner, two-user 64/32-bit component suites and independent formal evidence gate.
 - BLOCKED — actual APK build and official Emulator execution in the current environment because JDK 17 and Android SDK/NDK/Emulator are unavailable.
 - DEVICE — first formal x86_64+x86 run, 20-minute stability, then ARM64/ARM32 and OEM validation.
+
+## M5-T6 dedicated isolated Service source baseline
+
+- DONE — four predeclared Android isolated Service workers and independent four-slot ownership.
+- DONE — typed Session/generation/slot/component/revision/capability Binder transport.
+- DONE — Service-only route, non-Service rejection, outer/payload identity equality and ordinary Broker Binder removal.
+- DONE — Binder-death recovery, generation advancement, package-stop cleanup and combined status metrics.
+- PARTIAL — production route is source-wired but real Guest APK/data/native access under isolated UID and SELinux is unverified.
+- DEVICE — locked Android build, isolated UID evidence, AMS lifecycle, restart/rebind and OEM validation.

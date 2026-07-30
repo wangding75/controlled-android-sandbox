@@ -354,13 +354,22 @@
       "id": "process.declared-isolated-planning",
       "evidence": [
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/process/ComponentProcessPlanner.java",
+        "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IIsolatedGuestProcess.aidl",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/IsolatedProcessRequest.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/IsolatedProcessResult.java",
+        "sandbox-runtime/src/main/AndroidManifest.xml",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessRoutePolicy.java",
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessRoutePolicySelfTest.java"
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/BaseIsolatedGuestProcessService.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/status/CombinedSessionMetricsRepository.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessArchitectureSelfTest.java",
+        "scripts/check-m5-t6-isolated-process.py"
       ],
       "sourceStatus": "complete",
-      "productionStatus": "blocked",
+      "productionStatus": "partial",
       "deviceStatus": "blocked",
-      "notes": "Manifest planning and production Broker preflight reject isolated components before ordinary Guest process allocation. A dedicated Android isolated-UID transport remains blocked until it is implemented against real platform UID/SELinux semantics."
+      "notes": "A dedicated Service-only isolated transport is production-wired through four predeclared android:isolatedProcess workers, an independent SessionRegistry, per-generation capability tokens, typed outer identity, platform PID/UID evidence and Binder-death recovery. Non-Service isolated components fail closed. Real APK/data-root accessibility, platform UID/SELinux behavior and Android AMS lifecycle remain blocked on the unavailable locked Android build/device environment."
     },
     {
       "id": "runtime.application",

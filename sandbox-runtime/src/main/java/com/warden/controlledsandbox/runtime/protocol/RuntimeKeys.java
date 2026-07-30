@@ -13,6 +13,13 @@ public final class RuntimeKeys {
     public static final String RUNTIME_BROKER_BINDER = "runtimeBrokerBinder";
     public static final String PROCESS_SLOT = "processSlot";
     public static final String PROCESS_NAME = "processName";
+    public static final String ISOLATED_PROCESS = "isolatedProcess";
+    public static final String ISOLATED_CAPABILITY_TOKEN = "isolatedCapabilityToken";
+    public static final String ISOLATED_PLATFORM_PID = "isolatedPlatformPid";
+    public static final String ISOLATED_PLATFORM_UID = "isolatedPlatformUid";
+    public static final String ISOLATED_SESSION_COUNT = "isolatedSessionCount";
+    public static final String ISOLATED_SLOT_CAPACITY = "isolatedSlotCapacity";
+    public static final String ISOLATED_SLOT_USED = "isolatedSlotUsed";
     public static final String APK_PATH = "apkPath";
     public static final String APK_SHA256 = "apkSha256";
     public static final String BASE_APK_SHA256 = "baseApkSha256";

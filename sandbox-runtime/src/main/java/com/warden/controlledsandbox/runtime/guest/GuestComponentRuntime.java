@@ -43,7 +43,8 @@ public final class GuestComponentRuntime {
         try {
             String operation = required(request, ComponentOperations.OPERATION);
             String componentClass = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
-            IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass);
+            IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass,
+                    request.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false));
             switch (operation) {
                 case ComponentOperations.START_SERVICE:
                     return startService(componentClass, request, false);

@@ -148,8 +148,14 @@ try:
     device = Counter(item.get("deviceStatus") for item in capabilities)
     if len(capabilities) != 113 or source != Counter({"complete": 113}):
         errors.append("M5-T5 must preserve 113 source-complete capabilities")
-    if production != Counter({"wired": 110, "blocked": 1, "not-applicable": 1, "partial": 1}):
+    baseline_production = Counter({"wired": 110, "blocked": 1, "not-applicable": 1, "partial": 1})
+    m5_t6_production = Counter({"wired": 110, "not-applicable": 1, "partial": 2})
+    if production not in (baseline_production, m5_t6_production):
         errors.append(f"M5-T5 production status changed unexpectedly: {dict(production)}")
+    if production == m5_t6_production:
+        isolated = next((item for item in capabilities if item.get("id") == "process.declared-isolated-planning"), {})
+        if isolated.get("productionStatus") != "partial" or not (ROOT / "scripts/check-m5-t6-isolated-process.py").is_file():
+            errors.append("only the gated M5-T6 isolated capability may advance the M5-T5 production counters")
     if device != Counter({"not-tested": 109, "not-applicable": 3, "blocked": 1}):
         errors.append(f"M5-T5 device status changed unexpectedly: {dict(device)}")
 except Exception as exc:

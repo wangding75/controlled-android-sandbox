@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "baseline": "M5-T6",
+  "baseCommit": "5a39ff249f52826d5dee7c878eaa362181e1fa64",
+  "sourceStatus": "pass",
+  "productionStatus": "partial",
+  "androidBuildStatus": "blocked-toolchain",
+  "isolatedSlotCount": 4,
+  "supportedComponentTypes": ["SERVICE"],
+  "rejectedComponentTypes": ["ACTIVITY", "RECEIVER", "PROVIDER"],
+  "deviceEvidence": {
+    "status": "blocked",
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "sourceControls": [
+    "four predeclared android isolatedProcess Service workers",
+    "independent four-slot isolated SessionRegistry",
+    "typed session generation slot process component and capability contract",
+    "outer and legacy payload identity equality enforcement",
+    "owning-application Binder caller enforcement",
+    "platform PID and UID evidence with host-UID rejection",
+    "ordinary Runtime Broker Binder removed from isolated Guest payload",
+    "Service-only route with non-Service fail-closed policy",
+    "Binder-death recovery generation advancement and resource cleanup",
+    "combined ordinary and isolated runtime status metrics"
+  ],
+  "environmentBlockers": [
+    "JDK 17 unavailable; current Java is 21",
+    "Android SDK/NDK/Emulator unavailable",
+    "external DNS/download access unavailable"
+  ],
+  "deviceQuestions": [
+    "whether an isolated worker can read the staged Guest APK and data roots under the current Host storage design",
+    "whether ApplicationInfo.uid remains the owning package UID inside the isolated process on all target Android releases",
+    "whether SELinux permits the planned native and class-loading paths",
+    "whether AMS restart and binding behavior preserves the generation and slot invariants"
+  ],
+  "remainingProductionIds": [
+    "process.declared-isolated-planning",
+    "native.four-abi-build-architecture"
+  ]
+}

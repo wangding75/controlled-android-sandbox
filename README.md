@@ -156,3 +156,7 @@ M5-T4 completes the source-wired Native network, dynamic-loader and Crash/ANR cl
 ## M5-T5 locked four-APK device-lab source baseline
 
 M5-T5 adds an independent 32-bit Fixture, freezes Host/Fixture64/Fixture32/Companion32 as one ABI-checked build set, and provides offline-first toolchain bootstrap plus a deterministic official-Emulator runner. Formal evidence requires both x86_64 and x86, two virtual users, complete 64/32-bit component commands, typed Companion32 bitness proof, runtime diagnostics and at least 1,200 seconds without controlled-sandbox crash or ANR evidence. The current environment has no locked JDK 17 or Android SDK/Emulator, so Android build and device evidence remain 0.
+
+## M5-T6 dedicated isolated Service source baseline
+
+M5-T6 adds four predeclared `android:isolatedProcess=true` Service workers, a separate four-slot Session registry, typed per-generation capability contracts, outer/payload identity enforcement, platform PID/UID evidence, Service-only routing and Binder-death recovery. Ordinary Guest capacity remains eight slots and isolated Activity/Receiver/Provider requests fail closed. Production status is partial and device evidence remains 0 because the locked Android build and Emulator environment is unavailable.

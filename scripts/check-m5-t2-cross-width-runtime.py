@@ -104,8 +104,11 @@ try:
         errors.append("runtime.native-abi-routing must be wired")
     if by_id.get("native.four-abi-build-architecture", {}).get("productionStatus") != "partial":
         errors.append("four ABI build architecture must remain partial until real build")
-    if by_id.get("process.declared-isolated-planning", {}).get("productionStatus") != "blocked":
-        errors.append("isolated process must remain blocked until dedicated UID transport")
+    isolated_status = by_id.get("process.declared-isolated-planning", {}).get("productionStatus")
+    if isolated_status not in {"blocked", "partial"}:
+        errors.append("isolated process may advance only from blocked to partial before device proof")
+    if isolated_status == "partial" and not (ROOT / "scripts/check-m5-t6-isolated-process.py").is_file():
+        errors.append("isolated process partial status requires the M5-T6 dedicated transport gate")
 except Exception as exc:
     errors.append(f"invalid capability matrix: {exc}")
 

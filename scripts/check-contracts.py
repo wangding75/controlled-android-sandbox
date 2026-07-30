@@ -26,6 +26,30 @@ for name in ['RuntimeStatusRequest', 'RuntimeStatusResult', 'RuntimeStatusSnapsh
     elif 'android.os.Bundle' in source.read_text(): errors.append(f'{name} must not depend on Bundle')
 
 
+isolated_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IIsolatedGuestProcess.aidl').read_text()
+for signature in [
+    'IsolatedProcessResult prepare(in IsolatedProcessRequest request);',
+    'IsolatedProcessResult invoke(in IsolatedProcessRequest request);',
+    'IsolatedProcessResult status(in IsolatedProcessRequest request);',
+    'void shutdown(String sessionId, long generation, String capabilityToken);',
+]:
+    if signature not in isolated_aidl:
+        errors.append(f'IIsolatedGuestProcess is missing {signature}')
+for name in ['IsolatedProcessRequest', 'IsolatedProcessResult']:
+    declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
+    source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
+    if not declaration.is_file(): errors.append(f'missing isolated parcelable declaration for {name}')
+    if not source.is_file(): errors.append(f'missing isolated Parcelable implementation for {name}')
+    else:
+        value = source.read_text()
+        for token in ['sessionId', 'generation', 'processSlot', 'processName', 'componentClass']:
+            if token not in value: errors.append(f'{name} is missing typed identity field {token}')
+# Bundle remains only as the bounded legacy component payload; route identity and capability are top-level.
+request_source = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/IsolatedProcessRequest.java').read_text()
+for token in ['String capabilityToken', 'Bundle payload', 'return new Bundle(payload)']:
+    if token not in request_source: errors.append(f'IsolatedProcessRequest missing guarded legacy payload evidence: {token}')
+
+
 package_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl').read_text()
 package_signatures = [
     'PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);',
