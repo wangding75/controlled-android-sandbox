@@ -26,6 +26,7 @@ python3 scripts/check-m5-t9-interaction-services.py
 python3 scripts/check-m5-t10-network-services.py
 python3 scripts/check-m5-t11-application-environment.py
 python3 scripts/check-m5-t12-webview-gms-oem-detection.py
+python3 scripts/check-m5-t13-policy-services.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

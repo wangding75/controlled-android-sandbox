@@ -209,3 +209,12 @@ projection and bounded renderer registry. Google and OEM identities use determin
 hooks and explicit availability lists. The Guest class loader and PackageManager apply configured hidden class/package
 policy, while non-HOST `/proc` sanitization requires the Native policy. This is Source PASS / Production PARTIAL only;
 Chromium, GMS, OEM and third-party detection behavior remains Android build and device-gated, with device evidence 0.
+
+## M5-T13 policy, accessibility, autofill, biometric, privacy and power source baseline
+
+M5-T13 adds a Package-Service-owned policy profile for DevicePolicy, Accessibility, Autofill, Biometric/Fingerprint,
+Sensor Privacy and Power/Vibrator services. Common query and bounded lifecycle paths are source-wired with explicit
+`BLOCKED`/`STATIC`/`HOST` behavior, quota enforcement, rollback and fail-closed Guest launch readiness. The source does
+not fabricate successful privileged policy changes or hardware authentication. Real Binder signatures, SystemUI,
+Accessibility/Autofill callbacks, TEE biometrics, Doze/WakeLock accounting and physical vibration remain Android build
+and device-gated; device evidence remains 0.

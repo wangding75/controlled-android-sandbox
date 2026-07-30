@@ -34,6 +34,14 @@ import com.warden.controlledsandbox.framework.service.WebViewUpdateServiceHook;
 import com.warden.controlledsandbox.framework.service.DeviceIdentifiersServiceHook;
 import com.warden.controlledsandbox.framework.service.GoogleServiceBrokerHook;
 import com.warden.controlledsandbox.framework.service.OemIdentifierServiceHook;
+import com.warden.controlledsandbox.framework.service.DevicePolicyManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.AccessibilityManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.AutofillManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.BiometricServiceHook;
+import com.warden.controlledsandbox.framework.service.SensorPrivacyServiceHook;
+import com.warden.controlledsandbox.framework.service.PowerManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.VibratorServiceHook;
+
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -136,6 +144,20 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> UsageStatsManagerServiceHook.install(hostServiceContext, identity));
         attempt("content", installed, failures, hooks,
                 () -> ContentServiceHook.install(identity));
+        attempt("devicePolicy", installed, failures, hooks,
+                () -> DevicePolicyManagerServiceHook.install(hostServiceContext, identity));
+        attempt("accessibility", installed, failures, hooks,
+                () -> AccessibilityManagerServiceHook.install(hostServiceContext, identity));
+        attempt("autofill", installed, failures, hooks,
+                () -> AutofillManagerServiceHook.install(hostServiceContext, identity));
+        attempt("biometric", installed, failures, hooks,
+                () -> BiometricServiceHook.install(identity));
+        attempt("sensorPrivacy", installed, failures, hooks,
+                () -> SensorPrivacyServiceHook.install(identity));
+        attempt("power", installed, failures, hooks,
+                () -> PowerManagerServiceHook.install(hostServiceContext, identity));
+        attempt("vibrator", installed, failures, hooks,
+                () -> VibratorServiceHook.install(hostServiceContext, identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,

@@ -24,6 +24,7 @@ import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -45,6 +46,7 @@ public final class PackageManagementService extends Service {
     private VirtualNetworkServiceStore networkServices;
     private ApplicationEnvironmentStore applicationEnvironment;
     private VirtualCompatibilityStore compatibility;
+    private VirtualPolicyServicesStore policyServices;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -144,6 +146,7 @@ public final class PackageManagementService extends Service {
         networkServices = new VirtualNetworkServiceStore(getFilesDir());
         applicationEnvironment = new ApplicationEnvironmentStore(getFilesDir());
         compatibility = new VirtualCompatibilityStore(getFilesDir());
+        policyServices = new VirtualPolicyServicesStore(getFilesDir());
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
@@ -157,6 +160,7 @@ public final class PackageManagementService extends Service {
         addWarning(warnings, networkServices == null ? "" : networkServices.maintenanceWarning());
         addWarning(warnings, applicationEnvironment == null ? "" : applicationEnvironment.maintenanceWarning());
         addWarning(warnings, compatibility == null ? "" : compatibility.maintenanceWarning());
+        addWarning(warnings, policyServices == null ? "" : policyServices.maintenanceWarning());
         return String.join(";", warnings);
     }
 
@@ -420,6 +424,7 @@ public final class PackageManagementService extends Service {
                 networkServices.deleteScopeBestEffort(scope);
                 applicationEnvironment.deleteScopeBestEffort(scope);
                 compatibility.deleteScopeBestEffort(scope);
+                policyServices.deleteScopeBestEffort(scope);
                 return PackageServiceResult.successCatalog("deleteInstance",
                         PackageServiceMapper.toSnapshot(catalog, combinedMaintenanceWarning()));
             });
@@ -609,6 +614,31 @@ public final class PackageManagementService extends Service {
                 VirtualSystemServiceStore.Scope scope=new VirtualSystemServiceStore.Scope(normalizedPackage,virtualUserId);
                 VirtualCompatibilityProfileSnapshot reset=compatibility.reset(scope);
                 systemServices.notifyCompatibilityProfileChanged(scope,reset.policyVersion()); return reset;
+            }
+        }
+        @Override public VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile(
+                String packageName, int virtualUserId) {
+            requireOwner(); synchronized (operationLock) {
+                String normalizedPackage=required(packageName,"packageName"); requirePackageInstance(normalizedPackage,virtualUserId);
+                return policyServices.getOrCreate(new VirtualSystemServiceStore.Scope(normalizedPackage,virtualUserId));
+            }
+        }
+        @Override public VirtualPolicyServicesProfileSnapshot setPolicyServicesProfile(
+                String packageName, int virtualUserId, VirtualPolicyServicesProfileSnapshot profile) {
+            requireOwner(); synchronized (operationLock) {
+                String normalizedPackage=required(packageName,"packageName"); requirePackageInstance(normalizedPackage,virtualUserId);
+                VirtualSystemServiceStore.Scope scope=new VirtualSystemServiceStore.Scope(normalizedPackage,virtualUserId);
+                VirtualPolicyServicesProfileSnapshot updated=policyServices.update(scope,profile);
+                systemServices.notifyPolicyServicesProfileChanged(scope,updated.policyVersion()); return updated;
+            }
+        }
+        @Override public VirtualPolicyServicesProfileSnapshot resetPolicyServicesProfile(
+                String packageName, int virtualUserId) {
+            requireOwner(); synchronized (operationLock) {
+                String normalizedPackage=required(packageName,"packageName"); requirePackageInstance(normalizedPackage,virtualUserId);
+                VirtualSystemServiceStore.Scope scope=new VirtualSystemServiceStore.Scope(normalizedPackage,virtualUserId);
+                VirtualPolicyServicesProfileSnapshot reset=policyServices.reset(scope);
+                systemServices.notifyPolicyServicesProfileChanged(scope,reset.policyVersion()); return reset;
             }
         }
 
@@ -893,6 +923,9 @@ public final class PackageManagementService extends Service {
         }
         @Override public VirtualCompatibilityProfileSnapshot getCompatibilityProfile() {
             requireCapability(); return compatibility.getOrCreate(scope);
+        }
+        @Override public VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile() {
+            requireCapability(); return policyServices.getOrCreate(scope);
         }
         @Override public java.util.List<VirtualShortcutSnapshot> listShortcuts() {
             requireCapability(); return applicationEnvironment.shortcuts(scope);

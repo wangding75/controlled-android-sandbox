@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
@@ -56,6 +57,10 @@ interface IPackageManagementSession {
     VirtualCompatibilityProfileSnapshot setCompatibilityProfile(String packageName, int virtualUserId,
             in VirtualCompatibilityProfileSnapshot profile);
     VirtualCompatibilityProfileSnapshot resetCompatibilityProfile(String packageName, int virtualUserId);
+    VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile(String packageName, int virtualUserId);
+    VirtualPolicyServicesProfileSnapshot setPolicyServicesProfile(String packageName, int virtualUserId,
+            in VirtualPolicyServicesProfileSnapshot profile);
+    VirtualPolicyServicesProfileSnapshot resetPolicyServicesProfile(String packageName, int virtualUserId);
     PackageServiceResult maintenanceStatus();
     void close();
 }

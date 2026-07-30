@@ -140,6 +140,8 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.applicationEnvironmentProfile());
             CompatibilityProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.compatibilityProfile(), nativePolicyConfigured);
+            PolicyServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
+                    virtualServices.policyServicesProfile());
             Application application = createApplication(spec, loader, guestContext);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"

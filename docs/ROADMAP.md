@@ -228,3 +228,14 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - Source status is PASS; production status is PARTIAL; Android build and device evidence remain blocked/0.
 - Next source candidate: power/media/biometric/accessibility/autofill and remaining system-service breadth, unless the
   locked Android build is available first.
+
+## M5-T13 policy, accessibility, autofill, biometric, privacy and power baseline
+
+- DONE — typed package/virtual-user policy-services profiles with BLOCKED/STATIC/HOST modes and Package-Service ownership.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime refresh.
+- DONE — source-wired DevicePolicy, Accessibility, Autofill, Biometric/Fingerprint, Sensor Privacy, Power and Vibrator hooks.
+- DONE — bounded listener/session/WakeLock/vibration ownership with rollback, expiry and Guest shutdown cleanup.
+- DONE — fail-closed Guest startup when a configured non-HOST policy domain lacks its required hook.
+- PARTIAL — real framework callbacks, privileged policy execution, hardware authentication, SystemUI and power accounting.
+- DEVICE — Android Binder signatures, AppOps/permissions, TEE/Keyguard, Doze, haptics and OEM validation.
+- NEXT — MediaSession/MediaRouter, SMS/communication and remaining system-environment services, unless the locked Android build is available first.

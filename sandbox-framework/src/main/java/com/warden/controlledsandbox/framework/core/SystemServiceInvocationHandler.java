@@ -24,6 +24,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final NetworkServiceInvocationInterceptor networkInterceptor;
     private final ApplicationEnvironmentInvocationInterceptor applicationEnvironmentInterceptor;
     private final CompatibilityInvocationInterceptor compatibilityInterceptor;
+    private final PolicyServicesInvocationInterceptor policyServicesInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -54,6 +55,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.compatibilityInterceptor = Set.of("webviewupdate", "deviceidentifiers", "gms", "oemidentifier").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new CompatibilityInvocationInterceptor(identity, this.serviceName) : null;
+        this.policyServicesInterceptor = Set.of("devicepolicy", "accessibility", "autofill",
+                "biometric", "fingerprint", "sensorprivacy", "power", "vibrator").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new PolicyServicesInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -62,6 +67,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
+        PolicyServicesInvocationInterceptor.Decision policyServicesCall = policyServicesInterceptor == null
+                ? PolicyServicesInvocationInterceptor.Decision.passThrough()
+                : policyServicesInterceptor.before(method, arguments);
+        if (policyServicesCall.handled()) return policyServicesCall.result();
         CompatibilityInvocationInterceptor.Decision compatibilityCall = compatibilityInterceptor == null
                 ? CompatibilityInvocationInterceptor.Decision.passThrough()
                 : compatibilityInterceptor.before(method, arguments);

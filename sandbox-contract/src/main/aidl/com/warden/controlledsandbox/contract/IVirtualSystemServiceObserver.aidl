@@ -11,6 +11,7 @@ interface IVirtualSystemServiceObserver {
     void onNetworkServiceProfileChanged(long policyVersion);
     void onApplicationEnvironmentProfileChanged(long policyVersion);
     void onCompatibilityProfileChanged(long policyVersion);
+    void onPolicyServicesProfileChanged(long policyVersion);
     void onApplicationEnvironmentDataChanged(String domain, String key);
     void onAlarm(in VirtualAlarmSnapshot alarm);
     boolean onJobStart(int guestJobId, in byte[] jobPayload,
