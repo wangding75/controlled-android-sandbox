@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingsProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -132,6 +133,16 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         boolean put = upper.contains("PUT") || upper.contains("INSERT") || upper.contains("UPDATE");
         boolean delete = upper.contains("DELETE") || upper.contains("REMOVE");
 
+        if (VirtualSettingsProfileSnapshot.NAMESPACE_SECURE.equals(namespace)) {
+            VirtualGoogleServicesProfileSnapshot google = null;
+            try { google = identity.virtualServices().compatibilityProfile().googleServices(); }
+            catch (IllegalStateException ignored) { }
+            String googleValue = googleIdentityValue(google, key);
+            if (googleValue != null) {
+                if (put || delete) throw new SecurityException("VIRTUAL_GOOGLE_IDENTITY_MUTATION_DENIED:" + key);
+                return resultBundle(key, googleValue);
+            }
+        }
         if (VirtualSettingsProfileSnapshot.NAMESPACE_SECURE.equals(namespace)
                 && "android_id".equalsIgnoreCase(key) && virtualAndroidId) {
             if (put || delete) throw new SecurityException("VIRTUAL_ANDROID_ID_MUTATION_DENIED");
@@ -168,6 +179,19 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
             return resultBundle(key, value == null ? null : value.value());
         }
         throw new UnsupportedOperationException("VIRTUAL_SETTINGS_OPERATION_UNSUPPORTED:" + operation);
+    }
+
+    private static String googleIdentityValue(VirtualGoogleServicesProfileSnapshot google, String key) {
+        if (google == null || VirtualLocationProfileSnapshot.MODE_HOST.equals(google.mode())) return null;
+        boolean blocked = VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(google.mode());
+        return switch (key.toLowerCase(Locale.ROOT)) {
+            case "advertising_id", "advertisingid" -> blocked ? "" : google.advertisingId();
+            case "limit_ad_tracking", "limitadtracking" -> google.limitAdTracking() ? "1" : "0";
+            case "app_set_id", "appsetid" -> blocked ? "" : google.appSetId();
+            case "gsf_id", "gsfid" -> blocked ? "" : google.gsfId();
+            case "firebase_installation_id", "firebaseinstallationid" -> blocked ? "" : google.installationId();
+            default -> null;
+        };
     }
 
     private static Object invokeOriginal(Object original, Method method, Object[] args) throws Throwable {

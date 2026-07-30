@@ -23,6 +23,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final InteractionServiceInvocationInterceptor interactionInterceptor;
     private final NetworkServiceInvocationInterceptor networkInterceptor;
     private final ApplicationEnvironmentInvocationInterceptor applicationEnvironmentInterceptor;
+    private final CompatibilityInvocationInterceptor compatibilityInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -50,6 +51,9 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "appwidget", "usagestats", "content").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new ApplicationEnvironmentInvocationInterceptor(identity, this.serviceName) : null;
+        this.compatibilityInterceptor = Set.of("webviewupdate", "deviceidentifiers", "gms", "oemidentifier").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new CompatibilityInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -58,6 +62,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
+        CompatibilityInvocationInterceptor.Decision compatibilityCall = compatibilityInterceptor == null
+                ? CompatibilityInvocationInterceptor.Decision.passThrough()
+                : compatibilityInterceptor.before(method, arguments);
+        if (compatibilityCall.handled()) return compatibilityCall.result();
         ApplicationEnvironmentInvocationInterceptor.Decision applicationEnvironmentCall =
                 applicationEnvironmentInterceptor == null
                         ? ApplicationEnvironmentInvocationInterceptor.Decision.passThrough()

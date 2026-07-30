@@ -9,14 +9,14 @@
       "name": "app",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 77,
+      "fileCount": 82,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "6c8e1e94c40c54650c0d0714ac8d39c77080532a74484ea87600f0925e084240"
+      "sourceDigestSha256": "08c9a3049127e923d9ad191aad10b6a9ca9383e3685c0a12d8a31343d0f9bc0c"
     },
     {
       "type": "library",
@@ -35,27 +35,27 @@
       "name": "sandbox-contract",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 167,
+      "fileCount": 177,
       "languages": [
         "AIDL",
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "15bd9afd80172190759cee42a97fbf93c97d80652c2f9ab9bfd20b648028dac5"
+      "sourceDigestSha256": "54333f29b29a936d0f5e866c33e4ea7c4d36c4d174c818179aefb813ac6a4b07"
     },
     {
       "type": "library",
       "name": "sandbox-framework",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 157,
+      "fileCount": 165,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "be9f132fb0ba886fea44bf8203dc43dd6864a8319ebfebe5d0f0f899f671b99d"
+      "sourceDigestSha256": "8884f3817dc1b587b20e05622d3fcbe3882fb921beef810cd73fc53a7a8711f1"
     },
     {
       "type": "library",
@@ -92,13 +92,13 @@
       "name": "sandbox-runtime",
       "version": "0.2.0-development",
       "license": "Apache-2.0",
-      "fileCount": 184,
+      "fileCount": 187,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "147f9967779808dfbe898329f2fd6d8fa1b01f14d03dadbcacf8e055436ee1f5"
+      "sourceDigestSha256": "588b6ed770ce5148cc7588eae8ef893ca63848236c6f45ac525a6f9587cf01fd"
     },
     {
       "type": "application",

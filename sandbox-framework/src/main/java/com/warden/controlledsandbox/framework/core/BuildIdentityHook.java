@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualOemProfileSnapshot;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -15,7 +16,10 @@ public final class BuildIdentityHook implements AutoCloseable {
 
     public static AutoCloseable install(GuestIdentity identity) throws Exception {
         VirtualDeviceIdentitySnapshot profile = identity.virtualServices().deviceServiceProfile().identity();
-        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return () -> { };
+        VirtualOemProfileSnapshot oem = null;
+        try { oem = identity.virtualServices().compatibilityProfile().oem(); } catch (IllegalStateException ignored) { }
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())
+                && (oem == null || VirtualLocationProfileSnapshot.MODE_HOST.equals(oem.mode()))) return () -> { };
         Class<?> build = Class.forName("android.os.Build");
         boolean blocked = VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode());
         List<RestoredField> changed = new ArrayList<>();
@@ -29,6 +33,15 @@ public final class BuildIdentityHook implements AutoCloseable {
             setIfPresent(build, "BOARD", blocked ? "" : profile.board(), changed);
             setIfPresent(build, "HARDWARE", blocked ? "" : profile.hardware(), changed);
             setIfPresent(build, "SERIAL", blocked ? "" : profile.serial(), changed);
+            if (oem != null && !VirtualLocationProfileSnapshot.MODE_HOST.equals(oem.mode())) {
+                boolean oemBlocked = VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(oem.mode());
+                setIfPresent(build, "DISPLAY", oemBlocked ? "" : value(oem, "ro.build.display.id", "controlled-sandbox"), changed);
+                setIfPresent(build, "ID", oemBlocked ? "" : value(oem, "ro.build.id", "CS1"), changed);
+                setIfPresent(build, "TYPE", oemBlocked ? "user" : value(oem, "ro.build.type", "user"), changed);
+                setIfPresent(build, "TAGS", oemBlocked ? "release-keys" : value(oem, "ro.build.tags", "release-keys"), changed);
+                setIfPresent(build, "USER", oemBlocked ? "android-build" : value(oem, "ro.build.user", "sandbox"), changed);
+                setIfPresent(build, "HOST", oemBlocked ? "localhost" : value(oem, "ro.build.host", "sandbox-builder"), changed);
+            }
             if (changed.isEmpty()) {
                 throw new IllegalStateException("No writable android.os.Build identity fields");
             }
@@ -38,6 +51,10 @@ public final class BuildIdentityHook implements AutoCloseable {
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException("Cannot project android.os.Build identity", error);
         }
+    }
+
+    private static String value(VirtualOemProfileSnapshot profile, String key, String fallback) {
+        String value = profile.property(key); return value == null || value.isEmpty() ? fallback : value;
     }
 
     private static void setIfPresent(Class<?> owner, String name, String value,

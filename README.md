@@ -200,3 +200,12 @@ LauncherApps, ShortcutManager, AppWidgetManager, UsageStatsManager and Settings/
 query/mutation paths are source-wired with `BLOCKED`/`STATIC`/`HOST` behavior and fail-closed Guest launch readiness.
 Real hidden Binder/object layouts, launcher/widget callbacks, UsageStats enforcement and Settings Provider behavior
 remain Android-build/device dependent; device evidence remains zero.
+
+## M5-T12 WebView, GMS, OEM and detection source baseline
+
+M5-T12 adds a Package-Service-owned compatibility profile for WebView, Google-service identity, OEM surfaces and
+bounded virtual-environment detection governance. WebView receives a per-package/user/process data suffix, provider
+projection and bounded renderer registry. Google and OEM identities use deterministic virtual values, optional Binder
+hooks and explicit availability lists. The Guest class loader and PackageManager apply configured hidden class/package
+policy, while non-HOST `/proc` sanitization requires the Native policy. This is Source PASS / Production PARTIAL only;
+Chromium, GMS, OEM and third-party detection behavior remains Android build and device-gated, with device evidence 0.

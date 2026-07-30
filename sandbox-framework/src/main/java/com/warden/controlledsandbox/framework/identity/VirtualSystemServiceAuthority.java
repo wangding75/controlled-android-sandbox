@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -71,6 +72,9 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     }
     default ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile() {
         throw new IllegalStateException("VIRTUAL_APPLICATION_ENVIRONMENT_PROFILE_NOT_AVAILABLE");
+    }
+    default VirtualCompatibilityProfileSnapshot compatibilityProfile() {
+        throw new IllegalStateException("VIRTUAL_COMPATIBILITY_PROFILE_NOT_AVAILABLE");
     }
     default List<VirtualShortcutSnapshot> shortcuts() { return List.of(); }
     default boolean replaceDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) { return false; }

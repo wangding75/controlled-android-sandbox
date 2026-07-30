@@ -91,7 +91,6 @@ public final class GuestRuntimeEnvironment {
             if (requiresNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
-            WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo());
             IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
@@ -99,6 +98,9 @@ public final class GuestRuntimeEnvironment {
             if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
                     new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
+            loader.configureDetection(virtualServices.compatibilityProfile().detection());
+            WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(
+                    spec, virtualServices.compatibilityProfile().webView());
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
                     spec, virtualServices.pendingIntents(), new GuestPendingIntentDispatcher(guestContext, spec));
             virtualServices.alarms().setRecoveredDelivery(alarm ->
@@ -136,6 +138,8 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.networkServiceProfile());
             ApplicationEnvironmentProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.applicationEnvironmentProfile());
+            CompatibilityProxyReadiness.require(frameworkHooks.report().installedServices(),
+                    virtualServices.compatibilityProfile(), nativePolicyConfigured);
             Application application = createApplication(spec, loader, guestContext);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
@@ -436,6 +440,7 @@ public final class GuestRuntimeEnvironment {
             if (jobServices != null) jobServices.close();
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
+            webViewProfile.renderers.close();
             virtualServices.close();
             frameworkCallRouter.close();
             frameworkHooks.close();

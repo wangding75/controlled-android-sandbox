@@ -16,6 +16,7 @@ import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -40,6 +41,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private volatile VirtualInteractionProfileSnapshot interactionProfile;
     private volatile VirtualNetworkServiceProfileSnapshot networkProfile;
     private volatile ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile;
+    private volatile VirtualCompatibilityProfileSnapshot compatibilityProfile;
     private volatile java.util.function.BiConsumer<String, String> applicationEnvironmentChangeListener = (domain, key) -> { };
     private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
@@ -65,6 +67,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         @Override public void onApplicationEnvironmentProfileChanged(long policyVersion) {
             ApplicationEnvironmentProfileSnapshot current = call(session::getApplicationEnvironmentProfile);
             if (current != null && current.policyVersion() >= policyVersion) applicationEnvironmentProfile = current;
+        }
+        @Override public void onCompatibilityProfileChanged(long policyVersion) {
+            VirtualCompatibilityProfileSnapshot current = call(session::getCompatibilityProfile);
+            if (current != null && current.policyVersion() >= policyVersion) compatibilityProfile = current;
         }
         @Override public void onApplicationEnvironmentDataChanged(String domain, String key) {
             applicationEnvironmentChangeListener.accept(domain == null ? "" : domain, key == null ? "" : key);
@@ -103,6 +109,8 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (applicationEnvironmentProfile == null) {
             throw new IllegalStateException("VIRTUAL_APPLICATION_ENVIRONMENT_PROFILE_MISSING");
         }
+        compatibilityProfile = call(this.session::getCompatibilityProfile);
+        if (compatibilityProfile == null) throw new IllegalStateException("VIRTUAL_COMPATIBILITY_PROFILE_MISSING");
     }
 
     @Override public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() { return deviceProfile; }
@@ -111,6 +119,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     @Override public ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile() {
         return applicationEnvironmentProfile;
     }
+    @Override public VirtualCompatibilityProfileSnapshot compatibilityProfile() { return compatibilityProfile; }
     @Override public List<VirtualShortcutSnapshot> shortcuts() {
         List<VirtualShortcutSnapshot> values = call(session::listShortcuts); return values == null ? List.of() : List.copyOf(values);
     }

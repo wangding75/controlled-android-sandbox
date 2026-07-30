@@ -218,3 +218,13 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed Guest startup when a configured non-HOST application-environment domain lacks a required hook.
 - PARTIAL — real hidden framework wrappers, launcher callbacks, RemoteViews/widget rendering, UsageStats enforcement and Settings Provider cache variants.
 - DEVICE — Android Binder signatures, System Launcher/SystemUI, AppOps, observer transport, sync adapters and OEM validation.
+
+## M5-T12 WebView, GMS, OEM and detection baseline
+
+- Added typed, durable per-package/virtual-user WebView, Google services, OEM and detection profiles.
+- Added WebView provider/data-directory projection and bounded renderer ownership.
+- Added deterministic Google/OEM identity, optional GMS/OEM Binder hooks and explicit fail-closed readiness.
+- Added policy-driven hidden package/class handling and native `/proc` policy requirement.
+- Source status is PASS; production status is PARTIAL; Android build and device evidence remain blocked/0.
+- Next source candidate: power/media/biometric/accessibility/autofill and remaining system-service breadth, unless the
+  locked Android build is available first.

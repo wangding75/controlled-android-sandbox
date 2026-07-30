@@ -30,6 +30,10 @@ import com.warden.controlledsandbox.framework.service.ShortcutManagerServiceHook
 import com.warden.controlledsandbox.framework.service.AppWidgetManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.UsageStatsManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.ContentServiceHook;
+import com.warden.controlledsandbox.framework.service.WebViewUpdateServiceHook;
+import com.warden.controlledsandbox.framework.service.DeviceIdentifiersServiceHook;
+import com.warden.controlledsandbox.framework.service.GoogleServiceBrokerHook;
+import com.warden.controlledsandbox.framework.service.OemIdentifierServiceHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -95,6 +99,14 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));
         attempt("settingsIdentity", installed, failures, hooks,
                 () -> SettingsProviderIdentityHook.install(guestContext, identity));
+        attempt("webViewUpdate", installed, failures, hooks,
+                () -> WebViewUpdateServiceHook.install(identity));
+        attempt("deviceIdentifiers", installed, failures, hooks,
+                () -> DeviceIdentifiersServiceHook.install(identity));
+        attempt("googleServiceBroker", installed, failures, hooks,
+                () -> GoogleServiceBrokerHook.install(identity));
+        attempt("oemIdentifiers", installed, failures, hooks,
+                () -> OemIdentifierServiceHook.install(identity));
         attempt("telephony", installed, failures, hooks,
                 () -> TelephonyServiceHook.installTelephony(hostServiceContext, identity));
         attempt("phoneSubInfo", installed, failures, hooks,

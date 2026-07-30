@@ -49,8 +49,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
 
     private Object virtualResult(String methodName, Class<?> returnType, Object[] args) {
         boolean guestTarget = containsGuestPackage(args);
-        boolean hostTarget = containsHostPackage(args);
-        if (hostTarget && !guestTarget) return hiddenHostResult(methodName, returnType);
+        boolean hiddenTarget = containsHiddenPackage(args);
+        if (hiddenTarget && !guestTarget) return hiddenHostResult(methodName, returnType);
         switch (methodName) {
             case "getApplicationInfo":
                 return guestTarget ? metadata.applicationInfo() : hiddenHostResult(methodName, returnType);
@@ -269,17 +269,26 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         }
     }
 
-    private boolean containsHostPackage(Object[] args) {
+    private boolean containsHiddenPackage(Object[] args) {
         if (args == null) return false;
+        java.util.Set<String> hidden = new java.util.LinkedHashSet<>();
+        hidden.add(identity.hostPackageName());
+        try {
+            com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot policy =
+                    identity.virtualServices().compatibilityProfile().detection();
+            if (!com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot.MODE_HOST.equals(policy.mode())) {
+                hidden.addAll(policy.hiddenPackageNames());
+                if (!policy.hideHostPackage()) hidden.remove(identity.hostPackageName());
+            }
+        } catch (IllegalStateException ignored) { }
         for (Object arg : args) {
-            if (identity.hostPackageName().equals(arg)) return true;
-            if (arg instanceof ComponentName
-                    && identity.hostPackageName().equals(((ComponentName) arg).getPackageName())) return true;
+            if (arg instanceof String && hidden.contains(arg)) return true;
+            if (arg instanceof ComponentName && hidden.contains(((ComponentName) arg).getPackageName())) return true;
             if (arg instanceof Intent) {
                 Intent intent = (Intent) arg;
-                if (identity.hostPackageName().equals(intent.getPackage())) return true;
+                if (hidden.contains(intent.getPackage())) return true;
                 ComponentName component = intent.getComponent();
-                if (component != null && identity.hostPackageName().equals(component.getPackageName())) return true;
+                if (component != null && hidden.contains(component.getPackageName())) return true;
             }
         }
         return false;

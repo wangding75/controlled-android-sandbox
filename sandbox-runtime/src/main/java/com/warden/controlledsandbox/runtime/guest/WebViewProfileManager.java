@@ -3,6 +3,8 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
+import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWebViewProfileSnapshot;
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
@@ -15,8 +17,12 @@ public final class WebViewProfileManager {
     private WebViewProfileManager() { }
 
     static synchronized Profile install(GuestPackageSpec spec) {
+        return install(spec, null);
+    }
+
+    static synchronized Profile install(GuestPackageSpec spec, VirtualWebViewProfileSnapshot policy) {
         Profile profile = plan(spec.packageName, spec.virtualUserId, spec.processName,
-                spec.processSlot, spec.dataRootFile());
+                spec.processSlot, spec.dataRootFile(), policy);
         if (!configuredKey.isEmpty()) {
             if (!configuredKey.equals(profile.key)) {
                 throw new IllegalStateException("WEBVIEW_PROFILE_PROCESS_REUSE:" + configuredKey + "->" + profile.key);
@@ -43,6 +49,11 @@ public final class WebViewProfileManager {
 
     static Profile plan(String packageName, int virtualUserId, String processName,
                         int processSlot, File instanceRoot) {
+        return plan(packageName, virtualUserId, processName, processSlot, instanceRoot, null);
+    }
+
+    static Profile plan(String packageName, int virtualUserId, String processName,
+                        int processSlot, File instanceRoot, VirtualWebViewProfileSnapshot policy) {
         requireName(packageName, "packageName");
         requireName(processName, "processName");
         if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
@@ -50,7 +61,12 @@ public final class WebViewProfileManager {
         Objects.requireNonNull(instanceRoot, "instanceRoot");
         String processPart = safe(processName);
         String key = virtualUserId + ":" + packageName + ":" + processName;
-        String suffix = "u" + virtualUserId + "_" + Integer.toUnsignedString(key.hashCode(), 36);
+        if (policy != null && VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(policy.mode())) {
+            throw new SecurityException("VIRTUAL_WEBVIEW_BLOCKED");
+        }
+        String suffix = policy != null && !VirtualLocationProfileSnapshot.MODE_HOST.equals(policy.mode())
+                ? policy.dataDirectorySuffix() + "_" + Integer.toUnsignedString(processName.hashCode(), 36)
+                : "u" + virtualUserId + "_" + Integer.toUnsignedString(key.hashCode(), 36);
         File root;
         try {
             root = new File(instanceRoot, "webview/" + processPart).getCanonicalFile();
@@ -61,8 +77,14 @@ public final class WebViewProfileManager {
         } catch (IOException error) {
             throw new IllegalStateException("WEBVIEW_PROFILE_PATH_FAILED", error);
         }
+        VirtualWebViewProfileSnapshot effective = policy == null
+                ? new VirtualWebViewProfileSnapshot(VirtualLocationProfileSnapshot.MODE_STATIC,
+                        "com.android.webview", "virtual", suffix, "sandbox_webview", true, true, false, 4)
+                : policy;
         return new Profile(key, suffix, root, new File(root, "cache"),
-                new File(root, "databases"), new File(root, "service-worker"), Build.VERSION.SDK_INT >= 28);
+                new File(root, "databases"), new File(root, "service-worker"), Build.VERSION.SDK_INT >= 28,
+                new WebViewRendererRegistry(effective), effective.rendererProcessPrefix(),
+                effective.maximumRendererProcesses());
     }
 
     private static void createDirectory(File directory) {
@@ -85,9 +107,13 @@ public final class WebViewProfileManager {
         final File databases;
         final File serviceWorker;
         final boolean suffixApplied;
+        final WebViewRendererRegistry renderers;
+        final String rendererProcessPrefix;
+        final int maximumRendererProcesses;
 
         Profile(String key, String suffix, File root, File cache, File databases,
-                File serviceWorker, boolean suffixApplied) {
+                File serviceWorker, boolean suffixApplied, WebViewRendererRegistry renderers,
+                String rendererProcessPrefix, int maximumRendererProcesses) {
             this.key = key;
             this.suffix = suffix;
             this.root = root;
@@ -95,6 +121,9 @@ public final class WebViewProfileManager {
             this.databases = databases;
             this.serviceWorker = serviceWorker;
             this.suffixApplied = suffixApplied;
+            this.renderers = renderers;
+            this.rendererProcessPrefix = rendererProcessPrefix;
+            this.maximumRendererProcesses = maximumRendererProcesses;
         }
 
         Bundle toBundle() {
@@ -106,6 +135,9 @@ public final class WebViewProfileManager {
             out.putString("webViewDatabaseRoot", databases.getAbsolutePath());
             out.putString("webViewServiceWorkerRoot", serviceWorker.getAbsolutePath());
             out.putBoolean("webViewSuffixApplied", suffixApplied);
+            out.putString("webViewRendererProcessPrefix", rendererProcessPrefix);
+            out.putInt("webViewMaximumRendererProcesses", maximumRendererProcesses);
+            out.putInt("webViewActiveRendererProcesses", renderers.activeCount());
             return out;
         }
     }
