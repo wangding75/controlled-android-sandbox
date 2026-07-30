@@ -12,6 +12,8 @@ import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
 import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
@@ -67,6 +69,46 @@ final class PackageServiceClient implements AutoCloseable {
     int createInstallSession(String expectedPackageName) throws Exception {
         return requireSuccess(requireSession().createInstallSession(
                 expectedPackageName == null ? "" : expectedPackageName)).intValue();
+    }
+
+    InstallSessionInfoSnapshot createInstallSession(InstallSessionParamsSnapshot params)
+            throws Exception {
+        PackageServiceResult result = requireSuccess(
+                requireSession().createInstallSessionWithParams(params));
+        if (result.installSession() == null) {
+            throw new IllegalStateException("Package service returned no install session");
+        }
+        return result.installSession();
+    }
+
+    InstallSessionInfoSnapshot installSessionInfo(int sessionId) throws Exception {
+        PackageServiceResult result = requireSuccess(requireSession().getInstallSessionInfo(sessionId));
+        if (result.installSession() == null) {
+            throw new IllegalStateException("Package service returned no install session");
+        }
+        return result.installSession();
+    }
+
+    List<InstallSessionInfoSnapshot> installSessions() throws Exception {
+        return requireSuccess(requireSession().listInstallSessions()).installSessions();
+    }
+
+    InstallSessionInfoSnapshot setInstallSessionProgress(int sessionId, float progress)
+            throws Exception {
+        PackageServiceResult result = requireSuccess(
+                requireSession().setInstallSessionProgress(sessionId, progress));
+        if (result.installSession() == null) {
+            throw new IllegalStateException("Package service returned no install session");
+        }
+        return result.installSession();
+    }
+
+    InstallSessionInfoSnapshot retryInstallSession(int sessionId) throws Exception {
+        PackageServiceResult result = requireSuccess(requireSession().retryInstallSession(sessionId));
+        if (result.installSession() == null) {
+            throw new IllegalStateException("Package service returned no install session");
+        }
+        return result.installSession();
     }
 
     String addInstallArtifact(int sessionId, Uri source) throws Exception {

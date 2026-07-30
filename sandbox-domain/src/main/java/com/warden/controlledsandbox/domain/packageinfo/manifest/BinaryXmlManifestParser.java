@@ -84,7 +84,24 @@ public final class BinaryXmlManifestParser {
                 model.targetSdk(element.intAttr("targetSdkVersion", 0));
             }
             case "uses-permission", "uses-permission-sdk-23" -> model.addPermission(element.stringAttr("name"));
-            case "uses-library" -> model.addSharedLibrary(element.stringAttr("name"));
+            case "uses-library" -> model.addSharedLibrary(new ManifestModel.SharedLibraryDependency(
+                    ManifestModel.SharedLibraryDependency.Kind.JAVA, element.stringAttr("name"),
+                    element.boolAttr("required", true), 0L, ""));
+            case "uses-native-library" -> model.addSharedLibrary(new ManifestModel.SharedLibraryDependency(
+                    ManifestModel.SharedLibraryDependency.Kind.NATIVE, element.stringAttr("name"),
+                    element.boolAttr("required", true), 0L, ""));
+            case "uses-sdk-library" -> model.addSharedLibrary(new ManifestModel.SharedLibraryDependency(
+                    ManifestModel.SharedLibraryDependency.Kind.SDK, element.stringAttr("name"), true,
+                    element.intAttr("versionMajor", 0), element.stringAttr("certDigest")));
+            case "uses-static-library" -> model.addSharedLibrary(new ManifestModel.SharedLibraryDependency(
+                    ManifestModel.SharedLibraryDependency.Kind.STATIC, element.stringAttr("name"), true,
+                    element.intAttr("version", 0), element.stringAttr("certDigest")));
+            case "library" -> model.addProvidedSharedLibrary(element.stringAttr("name"));
+            case "instrumentation" -> model.addInstrumentation(new ManifestModel.Instrumentation(
+                    model.resolveClassName(element.stringAttr("name")),
+                    element.stringAttr("targetPackage"), element.stringAttr("targetProcesses"),
+                    element.boolAttr("handleProfiling", false),
+                    element.boolAttr("functionalTest", false), element.boolAttr("enabled", true)));
             case "application" -> {
                 model.applicationClass(element.stringAttr("name"));
                 model.applicationPermission(element.stringAttr("permission"));

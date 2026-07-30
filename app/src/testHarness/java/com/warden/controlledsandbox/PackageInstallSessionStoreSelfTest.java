@@ -1,8 +1,11 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -16,38 +19,82 @@ public final class PackageInstallSessionStoreSelfTest {
             catch (IllegalArgumentException expected) { invalidPackageRejected = true; }
             require(invalidPackageRejected, "invalid expected package rejected");
 
-            int sessionId = store.create("com.example.target");
+            InstallSessionParamsSnapshot params = new InstallSessionParamsSnapshot(
+                    InstallSessionParamsSnapshot.MODE_INHERIT_EXISTING,
+                    "com.example.target", "com.example.installer", "Target App",
+                    4096L, 7, true, InstallSessionParamsSnapshot.USER_ACTION_REQUIRED);
+            int sessionId = store.create(params);
+            InstallSessionInfoSnapshot opened = store.info(sessionId);
+            require(InstallSessionInfoSnapshot.STATE_OPEN.equals(opened.state()), "session opens");
+            require(opened.params().rollbackEnabled(), "rollback parameter retained");
+            require(opened.params().installFlags() == 7, "install flags retained");
+            require(store.list().size() == 1, "active session listed");
+
             byte[] base = apkBytes("base");
             byte[] split = apkBytes("split");
             boolean nonZipRejected = false;
             try { store.addArtifact(sessionId, new ByteArrayInputStream("not-an-apk".getBytes())); }
             catch (IllegalArgumentException expected) { nonZipRejected = true; }
             require(nonZipRejected, "non-ZIP artifact rejected");
-            require(!new File(root, "install-sessions/" + sessionId + "/artifacts/artifact-000.apk").exists(),
+            require(!new File(root, "install-sessions/" + sessionId
+                            + "/artifacts/artifact-000.apk").exists(),
                     "failed artifact does not advance session");
 
             String baseDigest = store.addArtifact(sessionId, new ByteArrayInputStream(base));
             String splitDigest = store.addArtifact(sessionId, new ByteArrayInputStream(split));
             require(baseDigest.matches("[0-9a-f]{64}"), "base digest");
             require(splitDigest.matches("[0-9a-f]{64}"), "split digest");
+            InstallSessionInfoSnapshot staged = store.setProgress(sessionId, 0.75F);
+            require(staged.artifactCount() == 2, "artifact count retained");
+            require(staged.bytesStaged() == base.length + split.length, "staged bytes retained");
+            require(Math.abs(staged.progress() - 0.75F) < 0.001F, "explicit progress retained");
 
             PackageInstallSessionStore restarted = new PackageInstallSessionStore(root);
             PackageInstallSessionStore.PreparedSession sealed = restarted.seal(sessionId);
             require(sealed.id == sessionId, "session id retained");
-            require("com.example.target".equals(sealed.expectedPackageName), "expected package retained");
+            require("com.example.target".equals(sealed.expectedPackageName),
+                    "expected package retained");
+            require(sealed.params.rollbackEnabled(), "prepared params retained");
             require(sealed.artifacts.size() == 2, "all artifacts sealed");
+            InstallSessionInfoSnapshot sealedInfo = restarted.info(sessionId);
+            require(InstallSessionInfoSnapshot.STATE_SEALED.equals(sealedInfo.state()),
+                    "sealed state retained");
+            require(sealedInfo.attemptCount() == 1, "attempt count advanced");
             boolean sealedWriteRejected = false;
             try { restarted.addArtifact(sessionId, new ByteArrayInputStream(base)); }
             catch (IllegalStateException expected) { sealedWriteRejected = true; }
             require(sealedWriteRejected, "sealed session rejects writes");
-            restarted.reopenAfterFailure(sessionId);
+
+            restarted.markCommitting(sessionId);
+            restarted.markFailed(sessionId, "INSTALL_VALIDATION", "package mismatch");
+            InstallSessionInfoSnapshot failed = restarted.info(sessionId);
+            require(InstallSessionInfoSnapshot.STATE_FAILED.equals(failed.state()),
+                    "failed state retained");
+            require("INSTALL_VALIDATION".equals(failed.failureCode()), "failure code retained");
+            require("package mismatch".equals(failed.failureMessage()), "failure message retained");
+            boolean failedProgressRejected = false;
+            try { restarted.setProgress(sessionId, 0.5F); }
+            catch (IllegalStateException expected) { failedProgressRejected = true; }
+            require(failedProgressRejected, "failed session rejects progress mutation");
+
+            InstallSessionInfoSnapshot retried = restarted.retry(sessionId);
+            require(InstallSessionInfoSnapshot.STATE_OPEN.equals(retried.state()), "retry reopens");
+            require(retried.failureCode().isEmpty(), "retry clears failure");
+            require(retried.attemptCount() == 1, "retry preserves attempt history");
             restarted.addArtifact(sessionId, new ByteArrayInputStream(base));
+            require(restarted.info(sessionId).artifactCount() == 3, "retry accepts more artifacts");
+
+            int second = restarted.create(InstallSessionParamsSnapshot.fullInstall(""));
+            List<InstallSessionInfoSnapshot> sessions = restarted.list();
+            require(sessions.size() == 2 && sessions.get(0).sessionId() < sessions.get(1).sessionId(),
+                    "sessions listed deterministically");
+            restarted.abandon(second);
             restarted.abandon(sessionId);
             boolean missing = false;
-            try { restarted.seal(sessionId); }
+            try { restarted.info(sessionId); }
             catch (IllegalArgumentException expected) { missing = true; }
             require(missing, "abandoned session removed");
-            System.out.println("PASS persisted staged install session self-test");
+            System.out.println("PASS persisted staged install session self-test with PackageInstaller-style state");
         } finally {
             ApkImportManager.deleteTreeOrThrow(root);
         }
@@ -62,5 +109,7 @@ public final class PackageInstallSessionStoreSelfTest {
         }
         return bytes.toByteArray();
     }
-    private static void require(boolean value, String label) { if (!value) throw new AssertionError(label); }
+    private static void require(boolean value, String label) {
+        if (!value) throw new AssertionError(label);
+    }
 }

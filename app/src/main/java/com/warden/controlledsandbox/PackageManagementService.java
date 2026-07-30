@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
 
 /** Single cross-process authority for package metadata and immutable revision mutations. */
@@ -173,6 +174,34 @@ public final class PackageManagementService extends Service {
             return execute("createInstallSession", () -> PackageServiceResult.successInt(
                     "createInstallSession", lifecycle.createInstallSession(
                             expectedPackageName == null ? "" : expectedPackageName.trim())));
+        }
+
+        @Override public PackageServiceResult createInstallSessionWithParams(
+                InstallSessionParamsSnapshot params) {
+            return execute("createInstallSessionWithParams", () ->
+                    PackageServiceResult.successInstallSession("createInstallSessionWithParams",
+                            lifecycle.createInstallSession(params)));
+        }
+
+        @Override public PackageServiceResult getInstallSessionInfo(int sessionId) {
+            return execute("getInstallSessionInfo", () -> PackageServiceResult.successInstallSession(
+                    "getInstallSessionInfo", lifecycle.installSessionInfo(sessionId)));
+        }
+
+        @Override public PackageServiceResult listInstallSessions() {
+            return execute("listInstallSessions", () -> PackageServiceResult.successInstallSessions(
+                    "listInstallSessions", lifecycle.installSessions()));
+        }
+
+        @Override public PackageServiceResult setInstallSessionProgress(int sessionId, float progress) {
+            return execute("setInstallSessionProgress", () ->
+                    PackageServiceResult.successInstallSession("setInstallSessionProgress",
+                            lifecycle.setInstallSessionProgress(sessionId, progress)));
+        }
+
+        @Override public PackageServiceResult retryInstallSession(int sessionId) {
+            return execute("retryInstallSession", () -> PackageServiceResult.successInstallSession(
+                    "retryInstallSession", lifecycle.retryInstallSession(sessionId)));
         }
 
         @Override public PackageServiceResult addInstallArtifact(int sessionId, String sourceUri) {

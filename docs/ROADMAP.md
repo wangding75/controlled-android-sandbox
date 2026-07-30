@@ -169,3 +169,12 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — Binder-death recovery, generation advancement, package-stop cleanup and combined status metrics.
 - PARTIAL — production route is source-wired but real Guest APK/data/native access under isolated UID and SELinux is unverified.
 - DEVICE — locked Android build, isolated UID evidence, AMS lifecycle, restart/rebind and OEM validation.
+
+## M5-T7 PackageManager, PackageInstaller, Shared Library and Instrumentation baseline
+
+- DONE — typed Java/native/SDK/static shared-library requirements, required/optional semantics, version and certificate matching.
+- DONE — import-time and runtime-state deterministic resolution with required dependencies failing closed.
+- DONE — typed Instrumentation metadata and Guest PackageManager query projection.
+- DONE — persisted PackageInstaller-style OPEN/SEALED/COMMITTING/FAILED sessions, progress, failure evidence and retry.
+- PARTIAL — inherit-existing, rollback and nonzero install flags are represented but intentionally rejected at commit.
+- DEVICE — Android library catalog/ART loading, SharedLibraryInfo constructors, Instrumentation execution and PackageInstaller callbacks.

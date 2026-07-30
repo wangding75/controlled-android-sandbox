@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
+import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -41,9 +43,23 @@ final class GuestPackageMetadataMapper {
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {
             permissions.add(permission.name());
         }
+        List<VirtualPackageMetadata.SharedLibrary> sharedLibraryDetails = new ArrayList<>();
+        for (VirtualSharedLibrarySnapshot library : state.sharedLibraryDetails()) {
+            sharedLibraryDetails.add(new VirtualPackageMetadata.SharedLibrary(
+                    library.kind(), library.name(), library.required(), library.version(),
+                    library.certificateDigest(), library.resolved(), library.providerPackage()));
+        }
+        List<VirtualPackageMetadata.Instrumentation> instrumentations = new ArrayList<>();
+        for (VirtualInstrumentationSnapshot instrumentation : state.instrumentations()) {
+            instrumentations.add(new VirtualPackageMetadata.Instrumentation(
+                    instrumentation.className(), instrumentation.targetPackage(),
+                    instrumentation.targetProcesses(), instrumentation.handleProfiling(),
+                    instrumentation.functionalTest(), instrumentation.enabled()));
+        }
         return new VirtualPackageMetadata(state.packageName(), state.launchActivity(),
                 applicationInfo, components, state.versionName(), state.versionCode(),
                 state.signatureSha256(), state.firstInstallTime(), state.lastUpdateTime(),
-                state.installerPackageName(), state.sharedLibraries(), permissions, state.enabled());
+                state.installerPackageName(), state.sharedLibraries(), sharedLibraryDetails,
+                instrumentations, permissions, state.enabled());
     }
 }

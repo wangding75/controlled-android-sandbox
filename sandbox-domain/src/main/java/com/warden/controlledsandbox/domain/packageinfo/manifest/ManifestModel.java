@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 public final class ManifestModel {
@@ -22,6 +23,9 @@ public final class ManifestModel {
     private final List<Component> providers = new ArrayList<>();
     private final List<String> permissions = new ArrayList<>();
     private final List<String> sharedLibraries = new ArrayList<>();
+    private final List<SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
+    private final List<String> providedSharedLibraries = new ArrayList<>();
+    private final List<Instrumentation> instrumentations = new ArrayList<>();
 
     public String packageName() { return packageName; }
     public void packageName(String value) { packageName = value == null ? "" : value; }
@@ -36,7 +40,7 @@ public final class ManifestModel {
     public void usesSplit(String value) { usesSplit = normalize(value); }
     public boolean featureSplit() { return featureSplit; }
     public void featureSplit(boolean value) { featureSplit = value; }
-    public void applicationPermission(String value) { applicationPermission = value == null ? "" : value.trim(); }
+    public void applicationPermission(String value) { applicationPermission = normalize(value); }
     public int minSdk() { return minSdk; }
     public void minSdk(int value) { minSdk = value; }
     public int targetSdk() { return targetSdk; }
@@ -47,17 +51,67 @@ public final class ManifestModel {
     public List<Component> providers() { return Collections.unmodifiableList(providers); }
     public List<String> permissions() { return Collections.unmodifiableList(permissions); }
     public List<String> sharedLibraries() { return Collections.unmodifiableList(sharedLibraries); }
+    public List<SharedLibraryDependency> sharedLibraryDependencies() {
+        return Collections.unmodifiableList(sharedLibraryDependencies);
+    }
+    public List<String> providedSharedLibraries() {
+        return Collections.unmodifiableList(providedSharedLibraries);
+    }
+    public List<Instrumentation> instrumentations() {
+        return Collections.unmodifiableList(instrumentations);
+    }
 
     public void addActivity(Component component) { activities.add(component); }
     public void addService(Component component) { services.add(component); }
     public void addReceiver(Component component) { receivers.add(component); }
     public void addProvider(Component component) { providers.add(component); }
+
+    /** Backward-compatible shorthand for a required Java uses-library declaration. */
     public void addSharedLibrary(String library) {
-        if (library != null && !library.trim().isEmpty() && !sharedLibraries.contains(library.trim())) sharedLibraries.add(library.trim());
+        addSharedLibrary(new SharedLibraryDependency(
+                SharedLibraryDependency.Kind.JAVA, library, true, 0L, ""));
+    }
+
+    public void addSharedLibrary(SharedLibraryDependency dependency) {
+        if (dependency == null || dependency.name().isEmpty()) return;
+        String key = dependency.key();
+        for (SharedLibraryDependency existing : sharedLibraryDependencies) {
+            if (existing.key().equals(key)) {
+                if (!existing.equals(dependency)) {
+                    throw new IllegalArgumentException(
+                            "Conflicting shared-library declaration: " + dependency.name());
+                }
+                return;
+            }
+        }
+        sharedLibraryDependencies.add(dependency);
+        if (!sharedLibraries.contains(dependency.name())) sharedLibraries.add(dependency.name());
+    }
+
+    public void addProvidedSharedLibrary(String library) {
+        String normalized = normalize(library);
+        if (!normalized.isEmpty() && !providedSharedLibraries.contains(normalized)) {
+            providedSharedLibraries.add(normalized);
+        }
+    }
+
+    public void addInstrumentation(Instrumentation instrumentation) {
+        if (instrumentation == null) return;
+        for (Instrumentation existing : instrumentations) {
+            if (existing.className().equals(instrumentation.className())) {
+                if (!existing.equals(instrumentation)) {
+                    throw new IllegalArgumentException(
+                            "Conflicting instrumentation declaration: " + instrumentation.className());
+                }
+                return;
+            }
+        }
+        instrumentations.add(instrumentation);
     }
 
     public void addPermission(String permission) {
-        if (permission != null && !permission.trim().isEmpty() && !permissions.contains(permission)) permissions.add(permission);
+        String normalized = normalize(permission);
+        if (!normalized.isEmpty() && !permissions.contains(normalized)) permissions.add(normalized);
     }
 
     public String launcherActivity() {
@@ -76,6 +130,97 @@ public final class ManifestModel {
         if (raw.startsWith(".")) return packageName + raw;
         if (raw.indexOf('.') < 0 && !packageName.trim().isEmpty()) return packageName + "." + raw;
         return raw;
+    }
+
+    public static final class SharedLibraryDependency {
+        public enum Kind { JAVA, NATIVE, SDK, STATIC }
+
+        private final Kind kind;
+        private final String name;
+        private final boolean required;
+        private final long version;
+        private final String certificateDigest;
+
+        public SharedLibraryDependency(Kind kind, String name, boolean required,
+                                       long version, String certificateDigest) {
+            this.kind = kind == null ? Kind.JAVA : kind;
+            this.name = normalize(name);
+            if (this.name.isEmpty()) throw new IllegalArgumentException("shared library name is required");
+            if (version < 0) throw new IllegalArgumentException("shared library version is invalid");
+            this.required = required;
+            this.version = version;
+            String digest = normalize(certificateDigest).toLowerCase(Locale.ROOT).replace(":", "");
+            if (!digest.isEmpty() && !digest.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("shared library certificate digest is invalid");
+            }
+            this.certificateDigest = digest;
+        }
+
+        public Kind kind() { return kind; }
+        public String name() { return name; }
+        public boolean required() { return required; }
+        public long version() { return version; }
+        public String certificateDigest() { return certificateDigest; }
+        public String key() { return kind.name() + ":" + name; }
+
+        @Override public boolean equals(Object value) {
+            if (this == value) return true;
+            if (!(value instanceof SharedLibraryDependency)) return false;
+            SharedLibraryDependency other = (SharedLibraryDependency) value;
+            return kind == other.kind && name.equals(other.name) && required == other.required
+                    && version == other.version && certificateDigest.equals(other.certificateDigest);
+        }
+
+        @Override public int hashCode() {
+            return java.util.Objects.hash(kind, name, required, version, certificateDigest);
+        }
+    }
+
+    public static final class Instrumentation {
+        private final String className;
+        private final String targetPackage;
+        private final String targetProcesses;
+        private final boolean handleProfiling;
+        private final boolean functionalTest;
+        private final boolean enabled;
+
+        public Instrumentation(String className, String targetPackage, String targetProcesses,
+                               boolean handleProfiling, boolean functionalTest, boolean enabled) {
+            this.className = normalize(className);
+            this.targetPackage = normalize(targetPackage);
+            this.targetProcesses = normalize(targetProcesses);
+            if (this.className.isEmpty()) {
+                throw new IllegalArgumentException("instrumentation class name is required");
+            }
+            if (this.targetPackage.isEmpty()) {
+                throw new IllegalArgumentException("instrumentation target package is required");
+            }
+            this.handleProfiling = handleProfiling;
+            this.functionalTest = functionalTest;
+            this.enabled = enabled;
+        }
+
+        public String className() { return className; }
+        public String targetPackage() { return targetPackage; }
+        public String targetProcesses() { return targetProcesses; }
+        public boolean handleProfiling() { return handleProfiling; }
+        public boolean functionalTest() { return functionalTest; }
+        public boolean enabled() { return enabled; }
+
+        @Override public boolean equals(Object value) {
+            if (this == value) return true;
+            if (!(value instanceof Instrumentation)) return false;
+            Instrumentation other = (Instrumentation) value;
+            return handleProfiling == other.handleProfiling && functionalTest == other.functionalTest
+                    && enabled == other.enabled && className.equals(other.className)
+                    && targetPackage.equals(other.targetPackage)
+                    && targetProcesses.equals(other.targetProcesses);
+        }
+
+        @Override public int hashCode() {
+            return java.util.Objects.hash(className, targetPackage, targetProcesses,
+                    handleProfiling, functionalTest, enabled);
+        }
     }
 
     public static final class Component {

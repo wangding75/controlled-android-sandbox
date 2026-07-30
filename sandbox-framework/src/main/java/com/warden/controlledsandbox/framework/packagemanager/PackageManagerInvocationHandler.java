@@ -86,6 +86,22 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return component(args, VirtualPackageMetadata.Type.SERVICE);
             case "getProviderInfo":
                 return component(args, VirtualPackageMetadata.Type.PROVIDER);
+            case "getInstrumentationInfo": {
+                ComponentName name = firstComponent(args);
+                if (name == null || !identity.packageName().equals(name.getPackageName())) {
+                    throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
+                }
+                return metadata.instrumentationInfo(name, firstLong(args, 0L));
+            }
+            case "queryInstrumentation":
+                return metadata.adaptCollection(metadata.queryInstrumentation(
+                        firstString(args), firstLong(args, 0L)), returnType);
+            case "getSystemSharedLibraryNames":
+                return metadata.resolvedSharedLibraryNames().toArray(new String[0]);
+            case "getSharedLibraries":
+                return metadata.adaptCollection(metadata.sharedLibraryInfoObjects(), returnType);
+            case "getDeclaredSharedLibraries":
+                return metadata.adaptCollection(Collections.emptyList(), returnType);
             case "resolveContentProvider": {
                 String authority = firstString(args);
                 return metadata.provider(authority, firstLong(args, 0L));
@@ -224,6 +240,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "getReceiverInfo":
             case "getServiceInfo":
             case "getProviderInfo":
+            case "getInstrumentationInfo":
                 throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
             case "isPackageAvailable": return false;
             case "checkPermission": return PackageManager.PERMISSION_DENIED;
@@ -238,6 +255,9 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "queryBroadcastReceivers":
             case "queryIntentServices":
             case "queryContentProviders":
+            case "queryInstrumentation":
+            case "getSharedLibraries":
+            case "getDeclaredSharedLibraries":
                 return metadata.adaptCollection(Collections.emptyList(), returnType);
             case "setApplicationEnabledSetting":
             case "setPackageStoppedState":

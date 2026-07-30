@@ -1,12 +1,18 @@
 package com.warden.controlledsandbox.contract;
 
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
     PackageServiceResult importApk(String uri);
     PackageServiceResult importApkFile(String sourcePath);
     PackageServiceResult createInstallSession(String expectedPackageName);
+    PackageServiceResult createInstallSessionWithParams(in InstallSessionParamsSnapshot params);
+    PackageServiceResult getInstallSessionInfo(int sessionId);
+    PackageServiceResult listInstallSessions();
+    PackageServiceResult setInstallSessionProgress(int sessionId, float progress);
+    PackageServiceResult retryInstallSession(int sessionId);
     PackageServiceResult addInstallArtifact(int sessionId, String sourceUri);
     PackageServiceResult commitInstallSession(int sessionId);
     PackageServiceResult abandonInstallSession(int sessionId);

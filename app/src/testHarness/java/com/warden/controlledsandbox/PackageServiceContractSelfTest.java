@@ -6,6 +6,10 @@ import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageInstanceSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
@@ -163,6 +167,54 @@ public final class PackageServiceContractSelfTest {
             hostlessGrantRejected = true;
         }
         require(hostlessGrantRejected, "hostless runtime grant rejected");
+
+        InstallSessionParamsSnapshot installParams = new InstallSessionParamsSnapshot(
+                InstallSessionParamsSnapshot.MODE_INHERIT_EXISTING, "com.example.fixture",
+                "com.example.installer", "Fixture update", 4096L, 3, true,
+                InstallSessionParamsSnapshot.USER_ACTION_REQUIRED);
+        InstallSessionInfoSnapshot installSession = new InstallSessionInfoSnapshot(
+                77, InstallSessionInfoSnapshot.STATE_FAILED, installParams, 2, 2048L,
+                0.75F, 1000L, 1200L, 2, "INSTALL_VALIDATION", "split mismatch");
+        Parcel installParcel = Parcel.obtain();
+        PackageServiceResult.successInstallSessions("listInstallSessions", List.of(installSession))
+                .writeToParcel(installParcel, 0);
+        installParcel.setDataPosition(0);
+        PackageServiceResult restoredInstall = PackageServiceResult.CREATOR
+                .createFromParcel(installParcel);
+        installParcel.recycle();
+        require(restoredInstall.installSessions().size() == 1
+                        && restoredInstall.installSessions().get(0).sessionId() == 77
+                        && restoredInstall.installSessions().get(0).params().rollbackEnabled()
+                        && "INSTALL_VALIDATION".equals(
+                                restoredInstall.installSessions().get(0).failureCode()),
+                "install session snapshots lost");
+
+        VirtualSharedLibrarySnapshot sharedLibrary = new VirtualSharedLibrarySnapshot(
+                "SDK", "com.example.sdk", true, 12L,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                true, "com.example.provider");
+        Parcel libraryParcel = Parcel.obtain();
+        sharedLibrary.writeToParcel(libraryParcel, 0); libraryParcel.setDataPosition(0);
+        VirtualSharedLibrarySnapshot restoredLibrary = VirtualSharedLibrarySnapshot.CREATOR
+                .createFromParcel(libraryParcel);
+        libraryParcel.recycle();
+        require(restoredLibrary.required() && restoredLibrary.resolved()
+                        && restoredLibrary.version() == 12L
+                        && "com.example.provider".equals(restoredLibrary.providerPackage()),
+                "shared library snapshot lost");
+
+        VirtualInstrumentationSnapshot instrumentation = new VirtualInstrumentationSnapshot(
+                "com.example.fixture.TestRunner", "com.example.fixture", ":test",
+                true, false, true);
+        Parcel instrumentationParcel = Parcel.obtain();
+        instrumentation.writeToParcel(instrumentationParcel, 0);
+        instrumentationParcel.setDataPosition(0);
+        VirtualInstrumentationSnapshot restoredInstrumentation =
+                VirtualInstrumentationSnapshot.CREATOR.createFromParcel(instrumentationParcel);
+        instrumentationParcel.recycle();
+        require(restoredInstrumentation.handleProfiling()
+                        && "com.example.fixture".equals(restoredInstrumentation.targetPackage()),
+                "instrumentation snapshot lost");
 
         VirtualAccountSnapshot account = new VirtualAccountSnapshot(
                 "alice", "mail", "secret", List.of("access"), List.of("token"));

@@ -94,6 +94,37 @@ public final class VirtualPackageQuerySelfTest {
         require(metadata.sharedLibraries().contains("org.apache.http.legacy"),
                 "shared library metadata is exposed");
 
+        VirtualPackageMetadata extended = new VirtualPackageMetadata("guest.pkg",
+                "guest.pkg.ViewActivity", application, metadata.components(), "2.3", 23L,
+                repeat('a'), 100L, 200L, "com.warden.virtualinstaller",
+                List.of("org.apache.http.legacy", "guest.sdk"),
+                List.of(
+                        new VirtualPackageMetadata.SharedLibrary("JAVA",
+                                "org.apache.http.legacy", true, 0L, "", true, "android"),
+                        new VirtualPackageMetadata.SharedLibrary("SDK", "guest.sdk", true, 12L,
+                                repeat('b'), true, "guest.provider")),
+                List.of(new VirtualPackageMetadata.Instrumentation(
+                        "guest.pkg.TestRunner", "guest.pkg", ":test", true, false, true)),
+                List.of("android.permission.INTERNET"), true);
+        PackageInfo instrumented = extended.packageInfo(0x00000010L);
+        require(instrumented.instrumentation != null && instrumented.instrumentation.length == 1,
+                "PackageInfo exposes instrumentation");
+        require("guest.pkg.TestRunner".equals(instrumented.instrumentation[0].name)
+                        && instrumented.instrumentation[0].handleProfiling,
+                "instrumentation metadata retained");
+        require(extended.instrumentationInfo(
+                        new ComponentName("guest.pkg", "guest.pkg.TestRunner"), 0L) != null,
+                "getInstrumentationInfo metadata available");
+        require(extended.queryInstrumentation("guest.pkg", 0L).size() == 1,
+                "queryInstrumentation target filtering");
+        require(extended.queryInstrumentation("other.pkg", 0L).isEmpty(),
+                "queryInstrumentation isolates target package");
+        require(extended.resolvedSharedLibraryNames().equals(
+                        List.of("org.apache.http.legacy", "guest.sdk")),
+                "resolved shared library names retained");
+        require(extended.sharedLibraryInfoObjects().size() == 2,
+                "SharedLibraryInfo objects created through version-tolerant factory");
+
         VirtualPackageMetadata disabledPackage = new VirtualPackageMetadata("guest.pkg",
                 "guest.pkg.ViewActivity", application, metadata.components(), "2.3", 23L,
                 repeat('a'), 100L, 200L, "com.warden.virtualinstaller",

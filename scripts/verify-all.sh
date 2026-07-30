@@ -20,6 +20,7 @@ python3 scripts/check-m5-t3-broadcast-fgs.py
 python3 scripts/check-m5-t4-native-diagnostics.py
 python3 scripts/check-m5-t5-device-lab.py
 python3 scripts/check-m5-t6-isolated-process.py
+python3 scripts/check-m5-t7-package-surface.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

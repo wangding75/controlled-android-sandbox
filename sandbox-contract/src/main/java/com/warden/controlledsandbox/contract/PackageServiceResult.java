@@ -18,6 +18,8 @@ public final class PackageServiceResult implements Parcelable {
     private final RuntimePermissionRequestSnapshot permissionRequest;
     private final ArrayList<RuntimePermissionRequestSnapshot> permissionRequests;
     private final ArrayList<PermissionAuditSnapshot> permissionAudit;
+    private final InstallSessionInfoSnapshot installSession;
+    private final ArrayList<InstallSessionInfoSnapshot> installSessions;
     private final int intValue;
     private final String textValue;
 
@@ -27,6 +29,8 @@ public final class PackageServiceResult implements Parcelable {
                                  RuntimePermissionRequestSnapshot permissionRequest,
                                  List<RuntimePermissionRequestSnapshot> permissionRequests,
                                  List<PermissionAuditSnapshot> permissionAudit,
+                                 InstallSessionInfoSnapshot installSession,
+                                 List<InstallSessionInfoSnapshot> installSessions,
                                  int intValue, String textValue) {
         this.successful = successful;
         this.operation = value(operation);
@@ -38,6 +42,8 @@ public final class PackageServiceResult implements Parcelable {
         this.permissionRequest = permissionRequest;
         this.permissionRequests = new ArrayList<>(permissionRequests == null ? List.of() : permissionRequests);
         this.permissionAudit = new ArrayList<>(permissionAudit == null ? List.of() : permissionAudit);
+        this.installSession = installSession;
+        this.installSessions = new ArrayList<>(installSessions == null ? List.of() : installSessions);
         this.intValue = intValue;
         this.textValue = value(textValue);
     }
@@ -50,44 +56,65 @@ public final class PackageServiceResult implements Parcelable {
                 in.readParcelable(RuntimePermissionRequestSnapshot.class.getClassLoader()),
                 in.createTypedArrayList(RuntimePermissionRequestSnapshot.CREATOR),
                 in.createTypedArrayList(PermissionAuditSnapshot.CREATOR),
+                in.readParcelable(InstallSessionInfoSnapshot.class.getClassLoader()),
+                in.createTypedArrayList(InstallSessionInfoSnapshot.CREATOR),
                 in.readInt(), in.readString());
     }
 
     public static PackageServiceResult successCatalog(String operation, PackageCatalogSnapshot catalog) {
-        return value(true, operation, catalog, null, null, null, null, null, 0, "");
+        return value(true, operation, catalog, null, null, null, null, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult successRecord(String operation, PackageRecordSnapshot record) {
-        return value(true, operation, null, record, null, null, null, null, 0, "");
+        return value(true, operation, null, record, null, null, null, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult successPackageState(String operation,
                                                            VirtualPackageStateSnapshot packageState) {
-        return value(true, operation, null, null, packageState, null, null, null, 0, "");
+        return value(true, operation, null, null, packageState, null, null, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult successPermissionRequest(String operation,
                                                                  RuntimePermissionRequestSnapshot request,
                                                                  VirtualPackageStateSnapshot packageState) {
-        return value(true, operation, null, null, packageState, request, null, null, 0, "");
+        return value(true, operation, null, null, packageState, request, null, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult successPermissionRequests(String operation,
                                                                   List<RuntimePermissionRequestSnapshot> requests) {
-        return value(true, operation, null, null, null, null, requests, null, 0, "");
+        return value(true, operation, null, null, null, null, requests, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult successPermissionAudit(String operation,
                                                                List<PermissionAuditSnapshot> audit) {
-        return value(true, operation, null, null, null, null, null, audit, 0, "");
+        return value(true, operation, null, null, null, null, null, audit,
+                null, null, 0, "");
+    }
+    public static PackageServiceResult successInstallSession(String operation,
+                                                              InstallSessionInfoSnapshot session) {
+        return value(true, operation, null, null, null, null, null, null,
+                session, null, 0, "");
+    }
+    public static PackageServiceResult successInstallSessions(String operation,
+                                                               List<InstallSessionInfoSnapshot> sessions) {
+        return value(true, operation, null, null, null, null, null, null,
+                null, sessions, 0, "");
     }
     public static PackageServiceResult successInt(String operation, int value) {
-        return value(true, operation, null, null, null, null, null, null, value, "");
+        return value(true, operation, null, null, null, null, null, null,
+                null, null, value, "");
     }
     public static PackageServiceResult successText(String operation, String text) {
-        return value(true, operation, null, null, null, null, null, null, 0, text);
+        return value(true, operation, null, null, null, null, null, null,
+                null, null, 0, text);
     }
     public static PackageServiceResult success(String operation) {
-        return value(true, operation, null, null, null, null, null, null, 0, "");
+        return value(true, operation, null, null, null, null, null, null,
+                null, null, 0, "");
     }
     public static PackageServiceResult failure(String operation, String errorCode, String errorMessage) {
         return new PackageServiceResult(false, operation, errorCode, errorMessage,
-                null, null, null, null, null, null, 0, "");
+                null, null, null, null, null, null, null, null, 0, "");
     }
 
     private static PackageServiceResult value(boolean successful, String operation,
@@ -97,9 +124,12 @@ public final class PackageServiceResult implements Parcelable {
                                                RuntimePermissionRequestSnapshot permissionRequest,
                                                List<RuntimePermissionRequestSnapshot> requests,
                                                List<PermissionAuditSnapshot> audit,
+                                               InstallSessionInfoSnapshot installSession,
+                                               List<InstallSessionInfoSnapshot> installSessions,
                                                int intValue, String textValue) {
         return new PackageServiceResult(successful, operation, "", "", catalog, record,
-                packageState, permissionRequest, requests, audit, intValue, textValue);
+                packageState, permissionRequest, requests, audit, installSession,
+                installSessions, intValue, textValue);
     }
 
     public boolean successful() { return successful; }
@@ -116,6 +146,10 @@ public final class PackageServiceResult implements Parcelable {
     public List<PermissionAuditSnapshot> permissionAudit() {
         return Collections.unmodifiableList(permissionAudit);
     }
+    public InstallSessionInfoSnapshot installSession() { return installSession; }
+    public List<InstallSessionInfoSnapshot> installSessions() {
+        return Collections.unmodifiableList(installSessions);
+    }
     public int intValue() { return intValue; }
     public String textValue() { return textValue; }
 
@@ -124,7 +158,8 @@ public final class PackageServiceResult implements Parcelable {
         out.writeString(errorMessage); out.writeParcelable(catalog, flags);
         out.writeParcelable(record, flags); out.writeParcelable(packageState, flags);
         out.writeParcelable(permissionRequest, flags); out.writeTypedList(permissionRequests);
-        out.writeTypedList(permissionAudit); out.writeInt(intValue); out.writeString(textValue);
+        out.writeTypedList(permissionAudit); out.writeParcelable(installSession, flags);
+        out.writeTypedList(installSessions); out.writeInt(intValue); out.writeString(textValue);
     }
     @Override public int describeContents() { return 0; }
 

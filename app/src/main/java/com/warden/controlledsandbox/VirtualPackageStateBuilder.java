@@ -5,8 +5,11 @@ import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
+import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import android.content.Context;
+import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
 import java.io.File;
@@ -74,13 +77,39 @@ final class VirtualPackageStateBuilder {
         for (Map.Entry<String, String> item : effectiveAppOps.entrySet()) {
             appOps.add(new PackageAppOpSnapshot(item.getKey(), item.getValue()));
         }
+
+        SharedLibraryResolver resolver = new SharedLibraryResolver(availableLibraries(catalog));
+        SharedLibraryResolver.Resolution libraryResolution = resolver.resolve(set.sharedLibraryDependencies);
+        libraryResolution.requireSuccessful();
+        List<VirtualSharedLibrarySnapshot> librarySnapshots = new ArrayList<>();
+        for (ManifestModel.SharedLibraryDependency dependency : set.sharedLibraryDependencies) {
+            SharedLibraryResolver.AvailableLibrary match = null;
+            for (SharedLibraryResolver.AvailableLibrary candidate : libraryResolution.resolved()) {
+                if (candidate.kind() == dependency.kind() && candidate.name().equals(dependency.name())) {
+                    match = candidate;
+                    break;
+                }
+            }
+            librarySnapshots.add(new VirtualSharedLibrarySnapshot(dependency.kind().name(),
+                    dependency.name(), dependency.required(), dependency.version(),
+                    dependency.certificateDigest(), match != null,
+                    match == null ? "" : match.providerPackage()));
+        }
+        List<VirtualInstrumentationSnapshot> instrumentationSnapshots = new ArrayList<>();
+        for (ManifestModel.Instrumentation instrumentation : set.instrumentations) {
+            instrumentationSnapshots.add(new VirtualInstrumentationSnapshot(
+                    instrumentation.className(), instrumentation.targetPackage(),
+                    instrumentation.targetProcesses(), instrumentation.handleProfiling(),
+                    instrumentation.functionalTest(), instrumentation.enabled()));
+        }
         return new VirtualPackageStateSnapshot(record.packageName, virtualUserId,
                 record.label, record.versionName, record.versionCode,
                 record.signatureSha256, record.sha256, set.launcherActivity,
                 set.applicationClass, effectivePackageEnabled(policy.packageState()),
                 record.firstInstallAt, record.lastUpdateAt,
                 "com.warden.virtualinstaller", record.splitNames(),
-                new ArrayList<>(set.sharedLibraries), components, permissions, appOps);
+                new ArrayList<>(set.sharedLibraries), librarySnapshots, instrumentationSnapshots,
+                components, permissions, appOps);
     }
 
     static boolean effectivePackageEnabled(String state) {
@@ -152,8 +181,70 @@ final class VirtualPackageStateBuilder {
             set.activities.addAll(manifest.activities()); set.services.addAll(manifest.services());
             set.receivers.addAll(manifest.receivers()); set.providers.addAll(manifest.providers());
             set.permissions.addAll(manifest.permissions()); set.sharedLibraries.addAll(manifest.sharedLibraries());
+            set.sharedLibraryDependencies.addAll(manifest.sharedLibraryDependencies());
+            set.providedSharedLibraries.addAll(manifest.providedSharedLibraries());
+            set.instrumentations.addAll(manifest.instrumentations());
         }
         return set;
+    }
+
+    private List<SharedLibraryResolver.AvailableLibrary> availableLibraries(
+            SandboxCatalogState catalog) throws Exception {
+        List<SharedLibraryResolver.AvailableLibrary> available = baseAvailableLibraries();
+        if (catalog != null) {
+            for (SandboxRecord installed : catalog.records()) {
+                ManifestSet installedSet = manifestsByRevision.get(installed.sha256);
+                if (installedSet == null) {
+                    installedSet = parse(installed);
+                    manifestsByRevision.put(installed.sha256, installedSet);
+                }
+                appendProvidedLibraries(available, installedSet, installed.packageName);
+            }
+        }
+        return available;
+    }
+
+    static void requireInstallableSharedLibraries(SandboxRecord candidate,
+                                                   SandboxCatalogState current) throws Exception {
+        if (candidate == null) throw new IllegalArgumentException("candidate is required");
+        ManifestSet candidateSet = parse(candidate);
+        List<SharedLibraryResolver.AvailableLibrary> available = baseAvailableLibraries();
+        if (current != null) {
+            for (SandboxRecord installed : current.records()) {
+                if (candidate.packageName.equals(installed.packageName)) continue;
+                appendProvidedLibraries(available, parse(installed), installed.packageName);
+            }
+        }
+        appendProvidedLibraries(available, candidateSet, candidate.packageName);
+        new SharedLibraryResolver(available).resolve(candidateSet.sharedLibraryDependencies)
+                .requireSuccessful();
+    }
+
+    private static List<SharedLibraryResolver.AvailableLibrary> baseAvailableLibraries() {
+        List<SharedLibraryResolver.AvailableLibrary> available = new ArrayList<>();
+        for (String name : List.of("org.apache.http.legacy", "android.test.base",
+                "android.test.mock", "android.test.runner", "android.ext.shared",
+                "android.ext.services")) {
+            available.add(new SharedLibraryResolver.AvailableLibrary(
+                    ManifestModel.SharedLibraryDependency.Kind.JAVA, name, 0L, "", "android"));
+        }
+        for (String name : List.of("libandroid.so", "libc.so", "libdl.so", "libEGL.so",
+                "libGLESv2.so", "libGLESv3.so", "libjnigraphics.so", "liblog.so",
+                "libm.so", "libOpenMAXAL.so", "libOpenSLES.so", "libvulkan.so", "libz.so")) {
+            available.add(new SharedLibraryResolver.AvailableLibrary(
+                    ManifestModel.SharedLibraryDependency.Kind.NATIVE, name, 0L, "", "android"));
+        }
+        return available;
+    }
+
+    private static void appendProvidedLibraries(
+            List<SharedLibraryResolver.AvailableLibrary> available, ManifestSet set,
+            String providerPackage) {
+        for (String provided : set.providedSharedLibraries) {
+            available.add(new SharedLibraryResolver.AvailableLibrary(
+                    ManifestModel.SharedLibraryDependency.Kind.JAVA, provided, 0L, "",
+                    providerPackage));
+        }
     }
 
     private static void append(List<VirtualComponentSnapshot> output, String packageName,
@@ -202,6 +293,9 @@ final class VirtualPackageStateBuilder {
         final List<ManifestModel.Component> providers = new ArrayList<>();
         final Set<String> permissions = new LinkedHashSet<>();
         final Set<String> sharedLibraries = new LinkedHashSet<>();
+        final List<ManifestModel.SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
+        final Set<String> providedSharedLibraries = new LinkedHashSet<>();
+        final List<ManifestModel.Instrumentation> instrumentations = new ArrayList<>();
         List<ManifestModel.Component> allComponents() {
             List<ManifestModel.Component> values = new ArrayList<>();
             values.addAll(activities); values.addAll(services); values.addAll(receivers); values.addAll(providers);

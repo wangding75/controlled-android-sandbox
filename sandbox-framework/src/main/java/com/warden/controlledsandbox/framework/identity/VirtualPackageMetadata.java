@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ComponentInfo;
+import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
@@ -65,6 +66,70 @@ public final class VirtualPackageMetadata {
         public Set<String> categories() { return categories; }
         public List<DataRule> data() { return data; }
         boolean defaultCategory() { return categories.contains("android.intent.category.DEFAULT"); }
+    }
+
+    public static final class SharedLibrary {
+        private final String kind;
+        private final String name;
+        private final boolean required;
+        private final long version;
+        private final String certificateDigest;
+        private final boolean resolved;
+        private final String providerPackage;
+
+        public SharedLibrary(String kind, String name, boolean required, long version,
+                             String certificateDigest, boolean resolved, String providerPackage) {
+            this.kind = requireText(kind, "kind").toUpperCase(Locale.ROOT);
+            if (!Set.of("JAVA", "NATIVE", "SDK", "STATIC").contains(this.kind)) {
+                throw new IllegalArgumentException("unsupported shared library kind " + kind);
+            }
+            this.name = requireText(name, "name");
+            if (version < 0) throw new IllegalArgumentException("shared library version is invalid");
+            this.version = version;
+            this.required = required;
+            String digest = value(certificateDigest).toLowerCase(Locale.ROOT).replace(":", "");
+            if (!digest.isEmpty() && !digest.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("shared library certificate digest is invalid");
+            }
+            this.certificateDigest = digest;
+            this.resolved = resolved;
+            this.providerPackage = value(providerPackage);
+            if (resolved && this.providerPackage.isEmpty()) {
+                throw new IllegalArgumentException("resolved shared library requires provider package");
+            }
+        }
+        public String kind() { return kind; }
+        public String name() { return name; }
+        public boolean required() { return required; }
+        public long version() { return version; }
+        public String certificateDigest() { return certificateDigest; }
+        public boolean resolved() { return resolved; }
+        public String providerPackage() { return providerPackage; }
+    }
+
+    public static final class Instrumentation {
+        private final String className;
+        private final String targetPackage;
+        private final String targetProcesses;
+        private final boolean handleProfiling;
+        private final boolean functionalTest;
+        private final boolean enabled;
+
+        public Instrumentation(String className, String targetPackage, String targetProcesses,
+                               boolean handleProfiling, boolean functionalTest, boolean enabled) {
+            this.className = requireText(className, "className");
+            this.targetPackage = requireText(targetPackage, "targetPackage");
+            this.targetProcesses = value(targetProcesses);
+            this.handleProfiling = handleProfiling;
+            this.functionalTest = functionalTest;
+            this.enabled = enabled;
+        }
+        public String className() { return className; }
+        public String targetPackage() { return targetPackage; }
+        public String targetProcesses() { return targetProcesses; }
+        public boolean handleProfiling() { return handleProfiling; }
+        public boolean functionalTest() { return functionalTest; }
+        public boolean enabled() { return enabled; }
     }
 
     public static final class Component {
@@ -136,6 +201,9 @@ public final class VirtualPackageMetadata {
     private final long lastUpdateTime;
     private final String installerPackageName;
     private final List<String> sharedLibraries;
+    private final List<SharedLibrary> sharedLibraryDetails;
+    private final List<Instrumentation> instrumentations;
+    private final Map<String, Instrumentation> instrumentationsByClass;
     private final List<String> requestedPermissions;
     private final boolean enabled;
 
@@ -151,6 +219,19 @@ public final class VirtualPackageMetadata {
                                   long firstInstallTime, long lastUpdateTime,
                                   String installerPackageName, List<String> sharedLibraries,
                                   List<String> requestedPermissions, boolean enabled) {
+        this(packageName, launcherActivity, applicationInfo, components, versionName, versionCode,
+                signatureSha256, firstInstallTime, lastUpdateTime, installerPackageName,
+                sharedLibraries, List.of(), List.of(), requestedPermissions, enabled);
+    }
+
+    public VirtualPackageMetadata(String packageName, String launcherActivity,
+                                  ApplicationInfo applicationInfo, List<Component> components,
+                                  String versionName, long versionCode, String signatureSha256,
+                                  long firstInstallTime, long lastUpdateTime,
+                                  String installerPackageName, List<String> sharedLibraries,
+                                  List<SharedLibrary> sharedLibraryDetails,
+                                  List<Instrumentation> instrumentations,
+                                  List<String> requestedPermissions, boolean enabled) {
         this.packageName = requireText(packageName, "packageName");
         this.launcherActivity = value(launcherActivity);
         this.applicationInfo = new ApplicationInfo(applicationInfo);
@@ -161,6 +242,18 @@ public final class VirtualPackageMetadata {
         this.lastUpdateTime = Math.max(this.firstInstallTime, lastUpdateTime);
         this.installerPackageName = value(installerPackageName);
         this.sharedLibraries = immutableList(sharedLibraries);
+        this.sharedLibraryDetails = Collections.unmodifiableList(
+                new ArrayList<>(sharedLibraryDetails == null ? List.of() : sharedLibraryDetails));
+        this.instrumentations = Collections.unmodifiableList(
+                new ArrayList<>(instrumentations == null ? List.of() : instrumentations));
+        Map<String, Instrumentation> instrumentationMap = new LinkedHashMap<>();
+        for (Instrumentation instrumentation : this.instrumentations) {
+            if (instrumentationMap.put(instrumentation.className(), instrumentation) != null) {
+                throw new IllegalArgumentException("Duplicate instrumentation "
+                        + instrumentation.className());
+            }
+        }
+        this.instrumentationsByClass = Collections.unmodifiableMap(instrumentationMap);
         this.requestedPermissions = immutableList(requestedPermissions);
         this.enabled = enabled;
         List<Component> copy = new ArrayList<>(components == null ? List.of() : components);
@@ -190,6 +283,15 @@ public final class VirtualPackageMetadata {
     public List<Component> components() { return components; }
     public String installerPackageName() { return installerPackageName; }
     public List<String> sharedLibraries() { return sharedLibraries; }
+    public List<SharedLibrary> sharedLibraryDetails() { return sharedLibraryDetails; }
+    public List<Instrumentation> instrumentations() { return instrumentations; }
+    public List<String> resolvedSharedLibraryNames() {
+        List<String> names = new ArrayList<>();
+        for (SharedLibrary library : sharedLibraryDetails) {
+            if (library.resolved() && !names.contains(library.name())) names.add(library.name());
+        }
+        return Collections.unmodifiableList(names);
+    }
     public String signatureSha256() { return signatureSha256; }
     public boolean enabled() { return enabled; }
 
@@ -217,6 +319,7 @@ public final class VirtualPackageMetadata {
         if ((flags & 0x00000002L) != 0) info.receivers = activityInfos(Type.RECEIVER, flags);
         if ((flags & 0x00000004L) != 0) info.services = serviceInfos(flags);
         if ((flags & 0x00000008L) != 0) info.providers = providerInfos(flags);
+        if ((flags & 0x00000010L) != 0) info.instrumentation = instrumentationInfos(flags);
         if ((flags & 0x00001000L) != 0) info.requestedPermissions = requestedPermissions.toArray(new String[0]);
         return info;
     }
@@ -268,6 +371,39 @@ public final class VirtualPackageMetadata {
         return out;
     }
 
+    public InstrumentationInfo instrumentationInfo(ComponentName name, long flags) {
+        if (name == null || !packageName.equals(name.getPackageName())) return null;
+        Instrumentation instrumentation = instrumentationsByClass.get(normalizeClass(name.getClassName()));
+        return instrumentation == null || !instrumentationVisible(instrumentation, flags)
+                ? null : toInstrumentationInfo(instrumentation);
+    }
+
+    public List<InstrumentationInfo> queryInstrumentation(String targetPackage, long flags) {
+        String target = value(targetPackage);
+        List<InstrumentationInfo> result = new ArrayList<>();
+        for (Instrumentation instrumentation : instrumentations) {
+            if (!target.isEmpty() && !target.equals(instrumentation.targetPackage())) continue;
+            if (instrumentationVisible(instrumentation, flags)) {
+                result.add(toInstrumentationInfo(instrumentation));
+            }
+        }
+        result.sort(Comparator.comparing(item -> item.name));
+        return Collections.unmodifiableList(result);
+    }
+
+    public List<Object> sharedLibraryInfoObjects() {
+        List<Object> result = new ArrayList<>();
+        for (SharedLibrary library : sharedLibraryDetails) {
+            if (!library.resolved()) continue;
+            Object value = SharedLibraryInfoFactory.create(library);
+            if (value == null) {
+                throw new IllegalStateException("SHARED_LIBRARY_INFO_UNAVAILABLE:" + library.name());
+            }
+            result.add(value);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
     public boolean ownsAuthority(String authority) { return providersByAuthority.containsKey(value(authority)); }
 
     public ProviderInfo provider(String authority) { return provider(authority, 0L); }
@@ -292,6 +428,31 @@ public final class VirtualPackageMetadata {
             }
         }
         throw new IllegalStateException("Unsupported package query return type " + returnType.getName());
+    }
+
+    private InstrumentationInfo[] instrumentationInfos(long flags) {
+        List<InstrumentationInfo> values = queryInstrumentation("", flags);
+        return values.toArray(new InstrumentationInfo[0]);
+    }
+
+    private boolean instrumentationVisible(Instrumentation instrumentation, long flags) {
+        return (enabled && instrumentation.enabled()) || (flags & MATCH_DISABLED_COMPONENTS) != 0;
+    }
+
+    private InstrumentationInfo toInstrumentationInfo(Instrumentation instrumentation) {
+        InstrumentationInfo info = new InstrumentationInfo();
+        info.packageName = packageName;
+        info.name = instrumentation.className();
+        info.targetPackage = instrumentation.targetPackage();
+        info.targetProcesses = instrumentation.targetProcesses();
+        info.handleProfiling = instrumentation.handleProfiling();
+        info.functionalTest = instrumentation.functionalTest();
+        info.enabled = instrumentation.enabled();
+        info.sourceDir = applicationInfo.sourceDir;
+        info.publicSourceDir = applicationInfo.publicSourceDir;
+        info.dataDir = applicationInfo.dataDir;
+        info.nativeLibraryDir = applicationInfo.nativeLibraryDir;
+        return info;
     }
 
     private ActivityInfo[] activityInfos(Type type, long flags) {

@@ -16,6 +16,7 @@ import com.warden.controlledsandbox.domain.identity.VirtualPathPolicy;
 import com.warden.controlledsandbox.domain.identity.VirtualUidAllocator;
 import com.warden.controlledsandbox.domain.identity.VirtualUidRegistry;
 import com.warden.controlledsandbox.domain.packageinfo.PackageUpgradePolicy;
+import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
 import com.warden.controlledsandbox.domain.persistence.PersistentStateException;
@@ -34,6 +35,7 @@ import com.warden.controlledsandbox.domain.session.SessionState;
 public final class SelfTest {
     public static void main(String[] args) throws Exception {
         testManifestParser();
+        testSharedLibraryResolution();
         testSlotPool();
         testLaunchPolicy();
         testSessionRegistry();
@@ -62,6 +64,10 @@ public final class SelfTest {
                 .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
                 .start("uses-sdk", BinaryXmlFixtureBuilder.integer("minSdkVersion", 26), BinaryXmlFixtureBuilder.integer("targetSdkVersion", 35)).end("uses-sdk")
                 .start("uses-permission", BinaryXmlFixtureBuilder.text("name", "android.permission.INTERNET")).end("uses-permission")
+                .start("uses-library", BinaryXmlFixtureBuilder.text("name", "org.apache.http.legacy"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-library")
+                .start("uses-native-library", BinaryXmlFixtureBuilder.text("name", "libguest_optional.so"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-native-library")
+                .start("uses-sdk-library", BinaryXmlFixtureBuilder.text("name", "com.example.sdk"), BinaryXmlFixtureBuilder.integer("versionMajor", 3), BinaryXmlFixtureBuilder.text("certDigest", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).end("uses-sdk-library")
+                .start("instrumentation", BinaryXmlFixtureBuilder.text("name", ".GuestInstrumentation"), BinaryXmlFixtureBuilder.text("targetPackage", "com.example.guest"), BinaryXmlFixtureBuilder.text("targetProcesses", ":remote"), BinaryXmlFixtureBuilder.bool("handleProfiling", true), BinaryXmlFixtureBuilder.bool("functionalTest", true)).end("instrumentation")
                 .start("application", BinaryXmlFixtureBuilder.text("name", ".GuestApp"), BinaryXmlFixtureBuilder.text("permission", "com.example.APP_COMPONENT"))
                 .start("activity", BinaryXmlFixtureBuilder.text("name", ".MainActivity"), BinaryXmlFixtureBuilder.bool("exported", true))
                 .start("intent-filter")
@@ -88,6 +94,18 @@ public final class SelfTest {
         require("com.example.guest.MainActivity".equals(model.launcherActivity()), "launcher activity");
         require(model.isolatedProcessCount() == 1, "isolated process");
         require(model.permissions().contains("android.permission.INTERNET"), "permission");
+        require(model.sharedLibraryDependencies().size() == 3, "typed shared-library declarations");
+        require(!model.sharedLibraryDependencies().get(0).required(), "optional Java shared library");
+        require(model.sharedLibraryDependencies().get(1).kind() == ManifestModel.SharedLibraryDependency.Kind.NATIVE,
+                "native shared library kind");
+        require(model.sharedLibraryDependencies().get(2).version() == 3L
+                        && model.sharedLibraryDependencies().get(2).certificateDigest().length() == 64,
+                "SDK shared library version and certificate");
+        require(model.instrumentations().size() == 1
+                        && "com.example.guest.GuestInstrumentation".equals(model.instrumentations().get(0).className())
+                        && model.instrumentations().get(0).handleProfiling()
+                        && model.instrumentations().get(0).functionalTest(),
+                "instrumentation declaration");
         require(model.receivers().get(0).actions().contains("com.example.TEST"), "receiver action");
         require(model.receivers().get(0).intentFilters().size() == 1, "receiver intent filter");
         ManifestModel.IntentFilter receiverFilter = model.receivers().get(0).intentFilters().get(0);
@@ -105,6 +123,38 @@ public final class SelfTest {
         require("com.example.APP_COMPONENT".equals(model.receivers().get(1).permission()),
                 "application permission inheritance");
         require("com.example.guest.data".equals(model.providers().get(0).authorities()), "provider authority");
+    }
+
+    private static void testSharedLibraryResolution() {
+        String digest = "b".repeat(64);
+        SharedLibraryResolver resolver = new SharedLibraryResolver(java.util.List.of(
+                new SharedLibraryResolver.AvailableLibrary(
+                        ManifestModel.SharedLibraryDependency.Kind.JAVA,
+                        "org.apache.http.legacy", 0, "", "android"),
+                new SharedLibraryResolver.AvailableLibrary(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", 3, digest, "com.example.provider")));
+        SharedLibraryResolver.Resolution success = resolver.resolve(java.util.List.of(
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.JAVA,
+                        "org.apache.http.legacy", true, 0, ""),
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.NATIVE,
+                        "liboptional.so", false, 0, ""),
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", true, 3, digest)));
+        require(success.successful(), "required shared libraries resolve");
+        require(success.resolved().size() == 2 && success.missingOptional().size() == 1,
+                "optional shared library is recorded without blocking");
+
+        SharedLibraryResolver.Resolution failure = resolver.resolve(java.util.List.of(
+                new ManifestModel.SharedLibraryDependency(
+                        ManifestModel.SharedLibraryDependency.Kind.SDK,
+                        "com.example.sdk", true, 4, digest)));
+        require(!failure.successful() && failure.missingRequired().size() == 1
+                        && failure.errors().get(0).contains("version mismatch"),
+                "required shared library version mismatch fails closed");
     }
 
     private static void testSlotPool() {

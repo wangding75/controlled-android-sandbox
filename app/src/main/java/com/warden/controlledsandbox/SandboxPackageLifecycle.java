@@ -2,6 +2,8 @@ package com.warden.controlledsandbox;
 
 import android.content.Context;
 import android.net.Uri;
+import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -54,6 +56,29 @@ final class SandboxPackageLifecycle {
         return installSessions.create(expectedPackageName);
     }
 
+    synchronized InstallSessionInfoSnapshot createInstallSession(
+            InstallSessionParamsSnapshot params) throws Exception {
+        int sessionId = installSessions.create(params);
+        return installSessions.info(sessionId);
+    }
+
+    synchronized InstallSessionInfoSnapshot installSessionInfo(int sessionId) throws Exception {
+        return installSessions.info(sessionId);
+    }
+
+    synchronized List<InstallSessionInfoSnapshot> installSessions() throws Exception {
+        return installSessions.list();
+    }
+
+    synchronized InstallSessionInfoSnapshot setInstallSessionProgress(
+            int sessionId, float progress) throws Exception {
+        return installSessions.setProgress(sessionId, progress);
+    }
+
+    synchronized InstallSessionInfoSnapshot retryInstallSession(int sessionId) throws Exception {
+        return installSessions.retry(sessionId);
+    }
+
     synchronized String addInstallArtifact(int sessionId, Uri source) throws Exception {
         if (source == null) throw new IllegalArgumentException("source URI is required");
         return installSessions.addArtifact(sessionId,
@@ -62,9 +87,11 @@ final class SandboxPackageLifecycle {
 
     synchronized SandboxRecord commitInstallSession(int sessionId) throws Exception {
         PackageInstallSessionStore.PreparedSession prepared = installSessions.seal(sessionId);
-        SandboxCatalogState current = catalogRepository.load();
         SandboxRecord committed;
         try {
+            requireSupportedCommitParams(prepared.params);
+            installSessions.markCommitting(sessionId);
+            SandboxCatalogState current = catalogRepository.load();
             SandboxRecord imported = importer.importApkFiles(prepared.artifacts, current.records());
             if (!prepared.expectedPackageName.isEmpty()
                     && !prepared.expectedPackageName.equals(imported.packageName)) {
@@ -73,8 +100,11 @@ final class SandboxPackageLifecycle {
             }
             committed = commitImported(current, imported);
         } catch (Exception error) {
-            try { installSessions.reopenAfterFailure(sessionId); }
-            catch (Exception reopenFailure) { error.addSuppressed(reopenFailure); }
+            try {
+                installSessions.markFailed(sessionId, failureCode(error), error.getMessage());
+            } catch (Exception stateFailure) {
+                error.addSuppressed(stateFailure);
+            }
             throw error;
         }
         try {
@@ -84,6 +114,25 @@ final class SandboxPackageLifecycle {
                     + cleanupFailure.getMessage();
         }
         return committed;
+    }
+
+    private static void requireSupportedCommitParams(InstallSessionParamsSnapshot params) {
+        if (!InstallSessionParamsSnapshot.MODE_FULL.equals(params.mode())) {
+            throw new IllegalArgumentException("INSTALL_SESSION_INHERIT_EXISTING_UNSUPPORTED");
+        }
+        if (params.rollbackEnabled()) {
+            throw new IllegalArgumentException("INSTALL_SESSION_ROLLBACK_UNSUPPORTED");
+        }
+        if (params.installFlags() != 0) {
+            throw new IllegalArgumentException("INSTALL_SESSION_FLAGS_UNSUPPORTED");
+        }
+    }
+
+    private static String failureCode(Exception error) {
+        if (error instanceof SecurityException) return "INSTALL_SESSION_SECURITY_FAILURE";
+        if (error instanceof IllegalArgumentException) return "INSTALL_SESSION_VALIDATION_FAILURE";
+        if (error instanceof IllegalStateException) return "INSTALL_SESSION_STATE_FAILURE";
+        return "INSTALL_SESSION_COMMIT_FAILURE";
     }
 
     synchronized void abandonInstallSession(int sessionId) throws Exception {
@@ -212,6 +261,16 @@ final class SandboxPackageLifecycle {
 
     private SandboxRecord commitImported(SandboxCatalogState current,
                                          SandboxRecord imported) throws Exception {
+        try {
+            VirtualPackageStateBuilder.requireInstallableSharedLibraries(imported, current);
+        } catch (Exception error) {
+            try {
+                deletePublishedRevisionIfUnreferenced(current, imported);
+            } catch (Exception cleanupFailure) {
+                error.addSuppressed(cleanupFailure);
+            }
+            throw error;
+        }
         SandboxCatalogState next = current.withImported(imported, System.currentTimeMillis());
         try {
             catalogRepository.save(next);

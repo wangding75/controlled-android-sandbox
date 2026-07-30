@@ -160,3 +160,7 @@ M5-T5 adds an independent 32-bit Fixture, freezes Host/Fixture64/Fixture32/Compa
 ## M5-T6 dedicated isolated Service source baseline
 
 M5-T6 adds four predeclared `android:isolatedProcess=true` Service workers, a separate four-slot Session registry, typed per-generation capability contracts, outer/payload identity enforcement, platform PID/UID evidence, Service-only routing and Binder-death recovery. Ordinary Guest capacity remains eight slots and isolated Activity/Receiver/Provider requests fail closed. Production status is partial and device evidence remains 0 because the locked Android build and Emulator environment is unavailable.
+
+## M5-T7 package surface source baseline
+
+M5-T7 expands the clean-room package surface with typed Java/native/SDK/static shared-library requirements, deterministic required/optional resolution, revision-bound instrumentation metadata and PackageManager queries. Binder-owned install sessions now persist typed parameters, progress, staged bytes, commit attempts, bounded failure evidence and explicit retry. Unsupported inherit-existing, rollback and nonzero install-flag commits fail closed. Real Android PackageInstaller callbacks, SharedLibraryInfo constructors, ART loading and Instrumentation execution remain device-gated; device evidence remains 0.

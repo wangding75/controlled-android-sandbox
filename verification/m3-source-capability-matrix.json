@@ -469,11 +469,14 @@
         "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java",
         "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
         "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
-        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java"
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SharedLibraryInfoFactory.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
-      "deviceStatus": "not-tested"
+      "deviceStatus": "not-tested",
+      "notes": "Guest PackageManager projects typed instrumentation declarations, resolved shared-library objects, stable installer/signing identity and component/query metadata without Host fallback. Exact Android SharedLibraryInfo constructors, Binder overloads and instrumentation execution remain device-deferred."
     },
     {
       "id": "framework.activity-task-manager",
@@ -660,12 +663,16 @@
         "app/src/main/java/com/warden/controlledsandbox/MainActivity.java",
         "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageManagementSession.aidl",
         "app/src/testHarness/java/com/warden/controlledsandbox/PackageInstallSessionStoreSelfTest.java",
-        "scripts/check-split-install-sessions.py"
+        "scripts/check-split-install-sessions.py",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/InstallSessionParamsSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/InstallSessionInfoSnapshot.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Persisted Binder-owned staged sessions support multi-select import, seal/retry/abandon, bounded artifact copying and stale cleanup. Android document-provider grants and process-death behavior remain untested."
+      "notes": "Binder-owned sessions persist typed FULL/INHERIT parameters, staged byte/progress state, OPEN/SEALED/COMMITTING/FAILED transitions, bounded failure evidence and explicit retry. Unsupported inherit-existing, rollback and nonzero install-flag commit semantics fail closed; Android PackageInstaller callbacks and process/device behavior remain untested."
     },
     {
       "id": "package.split-manifest-model",
@@ -718,12 +725,16 @@
         "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
         "app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java",
         "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
-        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java"
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/ManifestModel.java",
+        "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/SharedLibraryResolver.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualSharedLibrarySnapshot.java",
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SharedLibraryInfoFactory.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "uses-library names are retained in package and runtime metadata. Library resolution, required/optional semantics, native shared-library namespaces and device availability checks are not implemented."
+      "notes": "Java, native, SDK and static uses-library declarations retain required/version/certificate fields. Imports and runtime state use an injected deterministic catalog; required absence or version/certificate mismatch fails closed while optional misses remain visible. Platform and OEM library catalogs and ART loading remain device-deferred."
     },
     {
       "id": "package.runtime-permission-catalog",
@@ -844,12 +855,14 @@
         "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
         "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
-        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java"
+        "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualInstrumentationSnapshot.java",
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "First-install time survives upgrades, last-update time advances, a stable virtual installer identity is exposed, component PackageInfo flags are honored and declared shared-library names remain in the revision snapshot."
+      "notes": "Stable install/update/installer/signing metadata, typed instrumentation declarations and resolved shared-library details are revision-bound and exposed through Guest PackageManager query paths. Actual instrumentation launch and platform object compatibility remain device-deferred."
     },
     {
       "id": "package.query-target-isolation",
