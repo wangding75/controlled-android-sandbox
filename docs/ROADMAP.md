@@ -239,3 +239,15 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PARTIAL — real framework callbacks, privileged policy execution, hardware authentication, SystemUI and power accounting.
 - DEVICE — Android Binder signatures, AppOps/permissions, TEE/Keyguard, Doze, haptics and OEM validation.
 - NEXT — MediaSession/MediaRouter, SMS/communication and remaining system-environment services, unless the locked Android build is available first.
+
+## M5-T14 media, communication and archival system-environment baseline
+
+- DONE — typed package/virtual-user MediaSession, MediaRouter, Audio, Messaging, Backup and DropBox profiles.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime refresh.
+- DONE — source-wired MediaSession, MediaRouter, SMS, Backup and DropBox hooks plus integration with the existing Audio hook.
+- DONE — bounded session/client/focus/SMS/DropBox state with cleanup, quotas and default failure closure.
+- DONE — static SMS handling never reaches the Host carrier service or claims delivery evidence.
+- DONE — fail-closed Guest startup when a configured non-HOST media/communication domain lacks its required hook.
+- PARTIAL — real media objects/callbacks, physical audio routing, carrier messaging, Backup transport and DropBox entries.
+- DEVICE — Android Binder signatures, SystemUI, AppOps/roles, hardware/carrier behavior, SELinux and OEM validation.
+- NEXT — remaining NFC/USB/printing/companion-device/media-projection and OEM system-service breadth, unless the locked Android build is available first.

@@ -25,6 +25,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final ApplicationEnvironmentInvocationInterceptor applicationEnvironmentInterceptor;
     private final CompatibilityInvocationInterceptor compatibilityInterceptor;
     private final PolicyServicesInvocationInterceptor policyServicesInterceptor;
+    private final MediaCommunicationInvocationInterceptor mediaCommunicationInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -59,6 +60,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "biometric", "fingerprint", "sensorprivacy", "power", "vibrator").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new PolicyServicesInvocationInterceptor(identity, this.serviceName) : null;
+        this.mediaCommunicationInterceptor = Set.of("mediasession", "mediarouter", "audio",
+                "isms", "isms2", "backup", "dropbox").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new MediaCommunicationInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -71,6 +76,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 ? PolicyServicesInvocationInterceptor.Decision.passThrough()
                 : policyServicesInterceptor.before(method, arguments);
         if (policyServicesCall.handled()) return policyServicesCall.result();
+        MediaCommunicationInvocationInterceptor.Decision mediaCommunicationCall =
+                mediaCommunicationInterceptor == null
+                        ? MediaCommunicationInvocationInterceptor.Decision.passThrough()
+                        : mediaCommunicationInterceptor.before(method, arguments);
+        if (mediaCommunicationCall.handled()) return mediaCommunicationCall.result();
         CompatibilityInvocationInterceptor.Decision compatibilityCall = compatibilityInterceptor == null
                 ? CompatibilityInvocationInterceptor.Decision.passThrough()
                 : compatibilityInterceptor.before(method, arguments);

@@ -218,3 +218,11 @@ Sensor Privacy and Power/Vibrator services. Common query and bounded lifecycle p
 not fabricate successful privileged policy changes or hardware authentication. Real Binder signatures, SystemUI,
 Accessibility/Autofill callbacks, TEE biometrics, Doze/WakeLock accounting and physical vibration remain Android build
 and device-gated; device evidence remains 0.
+
+## M5-T14 media, communication and archival system-environment source baseline
+
+M5-T14 adds repository-owned typed profiles and reversible source hooks for MediaSession, MediaRouter, Audio routing
+and focus, SMS messaging, Backup and DropBox. Profiles are isolated by package and virtual user, persisted by Package
+Service with optimistic versions, CRC and corrupt-state quarantine, and delivered to revision-bound Runtime sessions.
+Media/router/focus ownership, SMS quota records and DropBox writes are bounded. Static SMS never calls the Host carrier
+service. Source status is PASS; production status is PARTIAL; Android build and device evidence remain blocked/0.

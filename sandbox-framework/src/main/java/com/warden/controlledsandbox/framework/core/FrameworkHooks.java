@@ -41,6 +41,11 @@ import com.warden.controlledsandbox.framework.service.BiometricServiceHook;
 import com.warden.controlledsandbox.framework.service.SensorPrivacyServiceHook;
 import com.warden.controlledsandbox.framework.service.PowerManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.VibratorServiceHook;
+import com.warden.controlledsandbox.framework.service.MediaSessionManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.MediaRouterServiceHook;
+import com.warden.controlledsandbox.framework.service.SmsServiceHook;
+import com.warden.controlledsandbox.framework.service.BackupManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.DropBoxManagerServiceHook;
 
 
 import android.content.Context;
@@ -158,6 +163,16 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> PowerManagerServiceHook.install(hostServiceContext, identity));
         attempt("vibrator", installed, failures, hooks,
                 () -> VibratorServiceHook.install(hostServiceContext, identity));
+        attempt("mediaSession", installed, failures, hooks,
+                () -> MediaSessionManagerServiceHook.install(identity));
+        attempt("mediaRouter", installed, failures, hooks,
+                () -> MediaRouterServiceHook.install(identity));
+        attempt("sms", installed, failures, hooks,
+                () -> SmsServiceHook.install(identity));
+        attempt("backup", installed, failures, hooks,
+                () -> BackupManagerServiceHook.install(identity));
+        attempt("dropBox", installed, failures, hooks,
+                () -> DropBoxManagerServiceHook.install(identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,

@@ -13,6 +13,7 @@ import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapsho
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -68,6 +69,7 @@ interface IVirtualSystemServiceSession {
     ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile();
     VirtualCompatibilityProfileSnapshot getCompatibilityProfile();
     VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile();
+    VirtualMediaCommunicationProfileSnapshot getMediaCommunicationProfile();
 
     List<VirtualShortcutSnapshot> listShortcuts();
     boolean replaceDynamicShortcuts(in List<VirtualShortcutSnapshot> shortcuts);

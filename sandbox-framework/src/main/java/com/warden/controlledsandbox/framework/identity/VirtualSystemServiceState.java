@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapsho
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -35,6 +36,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     private final ApplicationEnvironmentProfileSnapshot localApplicationEnvironmentProfile;
     private final VirtualCompatibilityProfileSnapshot localCompatibilityProfile;
     private final VirtualPolicyServicesProfileSnapshot localPolicyServicesProfile;
+    private final VirtualMediaCommunicationProfileSnapshot localMediaCommunicationProfile;
     private final ClipboardState clipboard;
     private final AccountState accounts;
     private final PendingIntentState pendingIntents;
@@ -81,6 +83,17 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile,
             VirtualCompatibilityProfileSnapshot compatibilityProfile,
             VirtualPolicyServicesProfileSnapshot policyServicesProfile) {
+        this(deviceProfile, interactionProfile, networkProfile, applicationEnvironmentProfile,
+                compatibilityProfile, policyServicesProfile, null);
+    }
+
+    public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile,
+            VirtualInteractionProfileSnapshot interactionProfile,
+            VirtualNetworkServiceProfileSnapshot networkProfile,
+            ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile,
+            VirtualCompatibilityProfileSnapshot compatibilityProfile,
+            VirtualPolicyServicesProfileSnapshot policyServicesProfile,
+            VirtualMediaCommunicationProfileSnapshot mediaCommunicationProfile) {
         this.authority = null;
         this.localDeviceProfile = java.util.Objects.requireNonNull(deviceProfile, "deviceProfile");
         this.localInteractionProfile = interactionProfile;
@@ -88,6 +101,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         this.localApplicationEnvironmentProfile = applicationEnvironmentProfile;
         this.localCompatibilityProfile = compatibilityProfile;
         this.localPolicyServicesProfile = policyServicesProfile;
+        this.localMediaCommunicationProfile = mediaCommunicationProfile;
         clipboard = new ClipboardState(null);
         accounts = new AccountState(null);
         pendingIntents = new PendingIntentState(null);
@@ -104,6 +118,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         this.localApplicationEnvironmentProfile = null;
         this.localCompatibilityProfile = null;
         this.localPolicyServicesProfile = null;
+        this.localMediaCommunicationProfile = null;
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
         pendingIntents = new PendingIntentState(authority);
@@ -148,6 +163,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         if (authority != null) return authority.policyServicesProfile();
         if (localPolicyServicesProfile != null) return localPolicyServicesProfile;
         throw new IllegalStateException("VIRTUAL_POLICY_SERVICES_PROFILE_AUTHORITY_REQUIRED");
+    }
+    public VirtualMediaCommunicationProfileSnapshot mediaCommunicationProfile() {
+        if (authority != null) return authority.mediaCommunicationProfile();
+        if (localMediaCommunicationProfile != null) return localMediaCommunicationProfile;
+        throw new IllegalStateException("VIRTUAL_MEDIA_COMMUNICATION_PROFILE_AUTHORITY_REQUIRED");
     }
     public VirtualSystemServiceAuthority authority() {
         if (authority == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_AUTHORITY_REQUIRED");
