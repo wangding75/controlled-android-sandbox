@@ -6,6 +6,7 @@ cd "$ROOT"
 ./scripts/self-test.sh
 python3 scripts/check-build-environment.py
 python3 tools/baseline_manifest.py
+python3 tools/reference_sources.py verify
 ./scripts/check-wrapper-bootstrap.sh
 ./scripts/test-wrapper-bootstrap.sh
 python3 scripts/check-architecture.py

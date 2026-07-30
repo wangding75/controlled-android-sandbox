@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": "NewBlackbox",
+  "repository": "https://github.com/ALEX5402/NewBlackbox",
+  "snapshotType": "GitHub source archive uploaded by project owner",
+  "archive": "ref/archives/NewBlackbox-main.zip",
+  "archiveSha256": "a0776a70d4e5dcf8ebabfb6abed3e4806ac18d2619cca6fd3e6a8303a4371242",
+  "archiveCommentCommit": "89b59836c66f173756a4ae258cf379a957649820",
+  "archiveRoot": "NewBlackbox-main",
+  "archiveSizeBytes": 7189163,
+  "extractedTree": "ref/upstream/NewBlackbox",
+  "fileCount": 790,
+  "uncompressedFileBytes": 9414757,
+  "importedOn": "2026-07-30",
+  "buildStatus": "not executed; reference-only source",
+  "productBuildInclusion": false,
+  "declaredLicense": "Apache-2.0",
+  "rootLicensePresent": true,
+  "licensePaths": [
+    "LICENSE"
+  ],
+  "restrictionNoticePaths": [],
+  "cleanRoomPolicy": "Read-only behavior and architecture reference. Do not copy source into product modules.",
+  "treeHashManifest": "ref/manifests/newblackbox-tree-sha256.txt"
+}

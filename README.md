@@ -1,6 +1,6 @@
 # Controlled Sandbox — Clean-room Development 0.3
 
-A from-scratch Android application-virtualization research project. Production source is intentionally separated into domain, Binder contract, framework adapter, native policy, runtime, product app and test-fixture modules. No code from VirtualApp, NewBlackbox, Twoyi or their forks is included.
+A from-scratch Android application-virtualization research project. Production source is intentionally separated into domain, Binder contract, framework adapter, native policy, runtime, product app and test-fixture modules. Product modules contain no VirtualApp, NewBlackbox, Twoyi or fork source. Immutable VirtualApp and NewBlackbox snapshots are preserved only under `ref/` for clean-room architecture and behavior comparison and are excluded from the build.
 
 ## Implemented in the current development snapshot
 
@@ -38,6 +38,10 @@ The following remain device-gated or incomplete:
 - A 20-minute zero-crash/zero-ANR Emulator report.
 
 See `docs/M3_GATE.md` and `docs/TEST_REPORT.md`.
+
+## Reference-source baseline
+
+`ref/` preserves the exact uploaded public NewBlackbox and VirtualApp source archives, extracted trees, source URLs, archive commit comments and per-file SHA-256 manifests. These files are reference-only and are not Gradle modules. NewBlackbox declares Apache-2.0 at its root. The uploaded VirtualApp root archive contains no root license and its README states commercial authorization restrictions, so it must not be copied into product modules or publicly redistributed without separate rights review. See `ref/README.md` and run `python3 tools/reference_sources.py verify`.
 
 ## Local verification
 

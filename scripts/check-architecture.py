@@ -6,6 +6,7 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+REFERENCE_ROOT = ROOT / 'ref'
 MODULES = {
     'sandbox-domain': {'forbidden': ('android.', 'com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.framework', 'com.warden.controlledsandbox.nativebridge', 'com.warden.controlledsandbox.app')},
     'sandbox-framework': {'forbidden': ('com.warden.controlledsandbox.runtime', 'com.warden.controlledsandbox.app')},
@@ -104,7 +105,7 @@ for source in DOMAIN_PACKAGE_ROOT.rglob('*.java'):
             )
 
 # Prevent a foreign import from shadowing a same-package top-level type.
-java_sources = list(ROOT.rglob('*.java'))
+java_sources = [source for source in ROOT.rglob('*.java') if REFERENCE_ROOT not in source.parents]
 package_types: dict[str, set[str]] = {}
 source_meta: list[tuple[Path, str, str]] = []
 for source in java_sources:

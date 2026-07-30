@@ -7,3 +7,7 @@
 *.jpg binary
 *.jpeg binary
 *.webp binary
+# Immutable upstream source snapshots: tracked for provenance, excluded from product build.
+ref/upstream/** binary linguist-vendored
+ref/archives/*.zip binary
+ref/manifests/*-tree-sha256.txt text eol=lf

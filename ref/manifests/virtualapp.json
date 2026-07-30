@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "project": "VirtualApp",
+  "repository": "https://github.com/asLody/VirtualApp",
+  "snapshotType": "GitHub source archive uploaded by project owner",
+  "archive": "ref/archives/VirtualApp-master.zip",
+  "archiveSha256": "e3c3e5797b2800b62cc2664930bed3d48a058bb64627e596f21d8468f284ddcb",
+  "archiveCommentCommit": "c84bf5e9f487966b4b8967898075efa76392b808",
+  "archiveRoot": "VirtualApp-master",
+  "archiveSizeBytes": 3431288,
+  "extractedTree": "ref/upstream/VirtualApp",
+  "fileCount": 932,
+  "uncompressedFileBytes": 6892628,
+  "importedOn": "2026-07-30",
+  "buildStatus": "not executed; reference-only source",
+  "productBuildInclusion": false,
+  "declaredLicense": "UNRESOLVED_FOR_ROOT_ARCHIVE",
+  "rootLicensePresent": false,
+  "licensePaths": [
+    "VirtualApp/lib/src/main/jni/HookZz/LICENSE"
+  ],
+  "restrictionNoticePaths": [
+    "README.md",
+    "README_eng.md"
+  ],
+  "cleanRoomPolicy": "Read-only behavior and architecture reference. Do not copy source into product modules.",
+  "treeHashManifest": "ref/manifests/virtualapp-tree-sha256.txt"
+}

@@ -50,13 +50,24 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prefix", default="controlled-sandbox/")
+    parser.add_argument(
+        "--exclude-prefix",
+        action="append",
+        default=[],
+        help="Repository-relative path prefix to omit; may be supplied more than once.",
+    )
     args = parser.parse_args()
 
     root = args.root.resolve()
     output = args.output.resolve()
     prefix = args.prefix.strip("/") + "/"
     epoch = source_date_epoch(root)
-    files = repository_files(root)
+    excluded = tuple(prefix.strip("/") + "/" for prefix in args.exclude_prefix if prefix.strip("/"))
+    files = [
+        relative
+        for relative in repository_files(root)
+        if not any(relative == prefix[:-1] or relative.startswith(prefix) for prefix in excluded)
+    ]
     output.parent.mkdir(parents=True, exist_ok=True)
     output.unlink(missing_ok=True)
 
