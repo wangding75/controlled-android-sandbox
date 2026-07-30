@@ -24,6 +24,7 @@ python3 scripts/check-m5-t7-package-surface.py
 python3 scripts/check-m5-t8-device-services.py
 python3 scripts/check-m5-t9-interaction-services.py
 python3 scripts/check-m5-t10-network-services.py
+python3 scripts/check-m5-t11-application-environment.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

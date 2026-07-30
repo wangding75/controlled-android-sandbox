@@ -22,6 +22,11 @@ import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
+import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
@@ -37,6 +42,7 @@ public final class PackageManagementService extends Service {
     private VirtualDeviceServiceStore deviceServices;
     private VirtualInteractionStore interactions;
     private VirtualNetworkServiceStore networkServices;
+    private ApplicationEnvironmentStore applicationEnvironment;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -134,6 +140,7 @@ public final class PackageManagementService extends Service {
         deviceServices = new VirtualDeviceServiceStore(getFilesDir());
         interactions = new VirtualInteractionStore(getFilesDir());
         networkServices = new VirtualNetworkServiceStore(getFilesDir());
+        applicationEnvironment = new ApplicationEnvironmentStore(getFilesDir());
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
@@ -145,6 +152,7 @@ public final class PackageManagementService extends Service {
         addWarning(warnings, deviceServices == null ? "" : deviceServices.maintenanceWarning());
         addWarning(warnings, interactions == null ? "" : interactions.maintenanceWarning());
         addWarning(warnings, networkServices == null ? "" : networkServices.maintenanceWarning());
+        addWarning(warnings, applicationEnvironment == null ? "" : applicationEnvironment.maintenanceWarning());
         return String.join(";", warnings);
     }
 
@@ -406,6 +414,7 @@ public final class PackageManagementService extends Service {
                 deviceServices.deleteScopeBestEffort(scope);
                 interactions.deleteScopeBestEffort(scope);
                 networkServices.deleteScopeBestEffort(scope);
+                applicationEnvironment.deleteScopeBestEffort(scope);
                 return PackageServiceResult.successCatalog("deleteInstance",
                         PackageServiceMapper.toSnapshot(catalog, combinedMaintenanceWarning()));
             });
@@ -527,6 +536,47 @@ public final class PackageManagementService extends Service {
                         new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
                 VirtualNetworkServiceProfileSnapshot reset = networkServices.reset(scope);
                 systemServices.notifyNetworkProfileChanged(scope, reset.policyVersion());
+                return reset;
+            }
+        }
+
+        @Override public ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                return applicationEnvironment.getOrCreate(
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+            }
+        }
+
+        @Override public ApplicationEnvironmentProfileSnapshot setApplicationEnvironmentProfile(
+                String packageName, int virtualUserId,
+                ApplicationEnvironmentProfileSnapshot profile) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                ApplicationEnvironmentProfileSnapshot updated =
+                        applicationEnvironment.update(scope, profile);
+                systemServices.notifyApplicationEnvironmentProfileChanged(scope, updated.policyVersion());
+                return updated;
+            }
+        }
+
+        @Override public ApplicationEnvironmentProfileSnapshot resetApplicationEnvironmentProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                ApplicationEnvironmentProfileSnapshot reset = applicationEnvironment.reset(scope);
+                systemServices.notifyApplicationEnvironmentProfileChanged(scope, reset.policyVersion());
                 return reset;
             }
         }
@@ -806,6 +856,81 @@ public final class PackageManagementService extends Service {
         }
         @Override public VirtualNetworkServiceProfileSnapshot getNetworkServiceProfile() {
             requireCapability(); return networkServices.getOrCreate(scope);
+        }
+        @Override public ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile() {
+            requireCapability(); return applicationEnvironment.getOrCreate(scope);
+        }
+        @Override public java.util.List<VirtualShortcutSnapshot> listShortcuts() {
+            requireCapability(); return applicationEnvironment.shortcuts(scope);
+        }
+        @Override public boolean replaceDynamicShortcuts(java.util.List<VirtualShortcutSnapshot> shortcuts) {
+            requireCapability(); boolean changed = applicationEnvironment.replaceDynamicShortcuts(scope, shortcuts);
+            if (changed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "SHORTCUT", "*");
+            return changed;
+        }
+        @Override public boolean addDynamicShortcuts(java.util.List<VirtualShortcutSnapshot> shortcuts) {
+            requireCapability(); boolean changed = applicationEnvironment.addDynamicShortcuts(scope, shortcuts);
+            if (changed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "SHORTCUT", "*");
+            return changed;
+        }
+        @Override public void removeShortcuts(java.util.List<String> shortcutIds) {
+            requireCapability(); applicationEnvironment.removeShortcuts(scope, shortcutIds);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "SHORTCUT", "*");
+        }
+        @Override public void setShortcutsEnabled(java.util.List<String> shortcutIds,
+                boolean enabled, String disabledMessage) {
+            requireCapability(); applicationEnvironment.setShortcutsEnabled(scope, shortcutIds, enabled, disabledMessage);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "SHORTCUT", "*");
+        }
+        @Override public void reportShortcutUsed(String shortcutId) {
+            requireCapability(); applicationEnvironment.reportShortcutUsed(scope, shortcutId);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "SHORTCUT", shortcutId);
+        }
+        @Override public int allocateAppWidgetId(int hostId) {
+            requireCapability(); int id = applicationEnvironment.allocateAppWidgetId(scope, hostId);
+            if (id > 0) systemServices.notifyApplicationEnvironmentDataChanged(scope, "APP_WIDGET", String.valueOf(id));
+            return id;
+        }
+        @Override public boolean deleteAppWidgetId(int appWidgetId) {
+            requireCapability(); boolean removed = applicationEnvironment.deleteAppWidgetId(scope, appWidgetId);
+            if (removed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "APP_WIDGET", String.valueOf(appWidgetId));
+            return removed;
+        }
+        @Override public java.util.List<VirtualWidgetSnapshot> listAppWidgets(int hostId) {
+            requireCapability(); return applicationEnvironment.appWidgets(scope, hostId);
+        }
+        @Override public boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass) {
+            requireCapability(); boolean bound = applicationEnvironment.bindAppWidget(scope, appWidgetId,
+                    providerPackage, providerClass);
+            if (bound) systemServices.notifyApplicationEnvironmentDataChanged(scope, "APP_WIDGET", String.valueOf(appWidgetId));
+            return bound;
+        }
+        @Override public void updateAppWidget(VirtualWidgetSnapshot appWidget) {
+            requireCapability(); applicationEnvironment.updateAppWidget(scope, appWidget);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "APP_WIDGET", String.valueOf(appWidget.appWidgetId()));
+        }
+        @Override public void reportUsageEvent(VirtualUsageEventSnapshot event) {
+            requireCapability(); applicationEnvironment.reportUsageEvent(scope, event);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "USAGE", String.valueOf(event.eventType()));
+        }
+        @Override public java.util.List<VirtualUsageEventSnapshot> queryUsageEvents(
+                long beginMs, long endMs, int limit) {
+            requireCapability(); return applicationEnvironment.usageEvents(scope, beginMs, endMs, limit);
+        }
+        @Override public VirtualSettingSnapshot getSetting(String namespace, String key) {
+            requireCapability(); return applicationEnvironment.setting(scope, namespace, key);
+        }
+        @Override public void putSetting(VirtualSettingSnapshot setting) {
+            requireCapability(); applicationEnvironment.putSetting(scope, setting);
+            systemServices.notifyApplicationEnvironmentDataChanged(scope, "SETTINGS", setting.storageKey());
+        }
+        @Override public boolean deleteSetting(String namespace, String key) {
+            requireCapability(); boolean removed = applicationEnvironment.deleteSetting(scope, namespace, key);
+            if (removed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "SETTINGS", namespace + ":" + key);
+            return removed;
+        }
+        @Override public java.util.List<VirtualSettingSnapshot> listSettings(String namespace) {
+            requireCapability(); return applicationEnvironment.settings(scope, namespace);
         }
         @Override public void close() { requireCapability(); closeInternal(); }
         @Override public void binderDied() { closeInternal(); }

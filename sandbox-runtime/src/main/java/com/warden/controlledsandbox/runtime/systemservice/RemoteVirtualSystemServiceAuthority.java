@@ -15,6 +15,11 @@ import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
+import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +39,8 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private volatile VirtualDeviceServiceProfileSnapshot deviceProfile;
     private volatile VirtualInteractionProfileSnapshot interactionProfile;
     private volatile VirtualNetworkServiceProfileSnapshot networkProfile;
+    private volatile ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile;
+    private volatile java.util.function.BiConsumer<String, String> applicationEnvironmentChangeListener = (domain, key) -> { };
     private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
         @Override public boolean onStart(int guestJobId, Object jobPayload,
@@ -54,6 +61,13 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         @Override public void onNetworkServiceProfileChanged(long policyVersion) {
             VirtualNetworkServiceProfileSnapshot current = call(session::getNetworkServiceProfile);
             if (current != null && current.policyVersion() >= policyVersion) networkProfile = current;
+        }
+        @Override public void onApplicationEnvironmentProfileChanged(long policyVersion) {
+            ApplicationEnvironmentProfileSnapshot current = call(session::getApplicationEnvironmentProfile);
+            if (current != null && current.policyVersion() >= policyVersion) applicationEnvironmentProfile = current;
+        }
+        @Override public void onApplicationEnvironmentDataChanged(String domain, String key) {
+            applicationEnvironmentChangeListener.accept(domain == null ? "" : domain, key == null ? "" : key);
         }
         @Override public void onAlarm(VirtualAlarmSnapshot alarm) {
             if (alarm == null) return;
@@ -85,11 +99,72 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (interactionProfile == null) throw new IllegalStateException("VIRTUAL_INTERACTION_PROFILE_MISSING");
         networkProfile = call(this.session::getNetworkServiceProfile);
         if (networkProfile == null) throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_MISSING");
+        applicationEnvironmentProfile = call(this.session::getApplicationEnvironmentProfile);
+        if (applicationEnvironmentProfile == null) {
+            throw new IllegalStateException("VIRTUAL_APPLICATION_ENVIRONMENT_PROFILE_MISSING");
+        }
     }
 
     @Override public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() { return deviceProfile; }
     @Override public VirtualInteractionProfileSnapshot interactionProfile() { return interactionProfile; }
     @Override public VirtualNetworkServiceProfileSnapshot networkServiceProfile() { return networkProfile; }
+    @Override public ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile() {
+        return applicationEnvironmentProfile;
+    }
+    @Override public List<VirtualShortcutSnapshot> shortcuts() {
+        List<VirtualShortcutSnapshot> values = call(session::listShortcuts); return values == null ? List.of() : List.copyOf(values);
+    }
+    @Override public boolean replaceDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) {
+        return call(() -> session.replaceDynamicShortcuts(shortcuts));
+    }
+    @Override public boolean addDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) {
+        return call(() -> session.addDynamicShortcuts(shortcuts));
+    }
+    @Override public void removeShortcuts(List<String> shortcutIds) {
+        call(() -> { session.removeShortcuts(shortcutIds); return null; });
+    }
+    @Override public void setShortcutsEnabled(List<String> shortcutIds, boolean enabled, String disabledMessage) {
+        call(() -> { session.setShortcutsEnabled(shortcutIds, enabled, safe(disabledMessage)); return null; });
+    }
+    @Override public void reportShortcutUsed(String shortcutId) {
+        call(() -> { session.reportShortcutUsed(shortcutId); return null; });
+    }
+    @Override public int allocateAppWidgetId(int hostId) { return call(() -> session.allocateAppWidgetId(hostId)); }
+    @Override public boolean deleteAppWidgetId(int appWidgetId) { return call(() -> session.deleteAppWidgetId(appWidgetId)); }
+    @Override public List<VirtualWidgetSnapshot> appWidgets(int hostId) {
+        List<VirtualWidgetSnapshot> values = call(() -> session.listAppWidgets(hostId));
+        return values == null ? List.of() : List.copyOf(values);
+    }
+    @Override public boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass) {
+        return call(() -> session.bindAppWidgetId(appWidgetId, safe(providerPackage), safe(providerClass)));
+    }
+    @Override public void updateAppWidget(VirtualWidgetSnapshot appWidget) {
+        call(() -> { session.updateAppWidget(appWidget); return null; });
+    }
+    @Override public void reportUsageEvent(VirtualUsageEventSnapshot event) {
+        call(() -> { session.reportUsageEvent(event); return null; });
+    }
+    @Override public List<VirtualUsageEventSnapshot> usageEvents(long beginMs, long endMs, int limit) {
+        List<VirtualUsageEventSnapshot> values = call(() -> session.queryUsageEvents(beginMs, endMs, limit));
+        return values == null ? List.of() : List.copyOf(values);
+    }
+    @Override public VirtualSettingSnapshot setting(String namespace, String key) {
+        return call(() -> session.getSetting(namespace, key));
+    }
+    @Override public void putSetting(VirtualSettingSnapshot setting) {
+        call(() -> { session.putSetting(setting); return null; });
+    }
+    @Override public boolean deleteSetting(String namespace, String key) {
+        return call(() -> session.deleteSetting(namespace, key));
+    }
+    @Override public List<VirtualSettingSnapshot> settings(String namespace) {
+        List<VirtualSettingSnapshot> values = call(() -> session.listSettings(namespace));
+        return values == null ? List.of() : List.copyOf(values);
+    }
+    @Override public void setApplicationEnvironmentChangeListener(
+            java.util.function.BiConsumer<String, String> listener) {
+        applicationEnvironmentChangeListener = listener == null ? (domain, key) -> { } : listener;
+    }
 
     @Override public Object clipboard() { return unmarshal(call(session::getClipboard)); }
     @Override public void setClipboard(Object value) { call(() -> { session.setClipboard(marshal(value)); return null; }); }

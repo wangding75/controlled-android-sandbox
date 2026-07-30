@@ -208,3 +208,13 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed Guest startup when a configured non-HOST network domain lacks a required hook.
 - PARTIAL — real hidden framework objects, callback Binder/PendingIntent transport, resolver/netd/private-DNS and PAC behavior.
 - DEVICE — VPN consent/TUN/routing, per-UID enforcement, SELinux, Doze, captive portal, SystemUI and OEM network validation.
+
+## M5-T11 User, launcher, shortcut, widget, usage and settings baseline
+
+- DONE — typed package/virtual-user application-environment profiles with BLOCKED/STATIC/HOST modes and Package-Service ownership.
+- DONE — bounded atomic shortcut, widget, usage-event and Secure/System/Global settings persistence with CRC, quarantine and optimistic updates.
+- DONE — source-wired UserManager, LauncherApps, ShortcutManager, AppWidgetManager, UsageStatsManager and ContentService/Settings projection.
+- DONE — callback/observer ownership, package visibility, shortcut/widget quotas and cross-package usage denial.
+- DONE — fail-closed Guest startup when a configured non-HOST application-environment domain lacks a required hook.
+- PARTIAL — real hidden framework wrappers, launcher callbacks, RemoteViews/widget rendering, UsageStats enforcement and Settings Provider cache variants.
+- DEVICE — Android Binder signatures, System Launcher/SystemUI, AppOps, observer transport, sync adapters and OEM validation.

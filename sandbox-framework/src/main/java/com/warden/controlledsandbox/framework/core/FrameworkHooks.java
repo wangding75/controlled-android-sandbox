@@ -24,6 +24,12 @@ import com.warden.controlledsandbox.framework.service.DisplayManagerHook;
 import com.warden.controlledsandbox.framework.service.ConnectivityServiceHook;
 import com.warden.controlledsandbox.framework.service.DnsResolverServiceHook;
 import com.warden.controlledsandbox.framework.service.VpnManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.UserManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.LauncherAppsServiceHook;
+import com.warden.controlledsandbox.framework.service.ShortcutManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.AppWidgetManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.UsageStatsManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.ContentServiceHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -106,6 +112,18 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> DnsResolverServiceHook.install(identity));
         attempt("vpn", installed, failures, hooks,
                 () -> VpnManagerServiceHook.install(hostServiceContext, identity));
+        attempt("userManager", installed, failures, hooks,
+                () -> UserManagerServiceHook.install(hostServiceContext, identity));
+        attempt("launcherApps", installed, failures, hooks,
+                () -> LauncherAppsServiceHook.install(hostServiceContext, identity));
+        attempt("shortcut", installed, failures, hooks,
+                () -> ShortcutManagerServiceHook.install(hostServiceContext, identity));
+        attempt("appWidget", installed, failures, hooks,
+                () -> AppWidgetManagerServiceHook.install(hostServiceContext, identity));
+        attempt("usageStats", installed, failures, hooks,
+                () -> UsageStatsManagerServiceHook.install(hostServiceContext, identity));
+        attempt("content", installed, failures, hooks,
+                () -> ContentServiceHook.install(identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,

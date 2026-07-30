@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.io.File;
@@ -260,6 +261,22 @@ final class PackageServiceClient implements AutoCloseable {
     VirtualNetworkServiceProfileSnapshot resetNetworkServiceProfile(
             String packageName, int virtualUserId) throws Exception {
         return requireSession().resetNetworkServiceProfile(packageName, virtualUserId);
+    }
+
+    ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().getApplicationEnvironmentProfile(packageName, virtualUserId);
+    }
+
+    ApplicationEnvironmentProfileSnapshot setApplicationEnvironmentProfile(
+            String packageName, int virtualUserId,
+            ApplicationEnvironmentProfileSnapshot profile) throws Exception {
+        return requireSession().setApplicationEnvironmentProfile(packageName, virtualUserId, profile);
+    }
+
+    ApplicationEnvironmentProfileSnapshot resetApplicationEnvironmentProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().resetApplicationEnvironmentProfile(packageName, virtualUserId);
     }
 
     String maintenanceWarning() throws Exception {

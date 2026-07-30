@@ -3,6 +3,11 @@ package com.warden.controlledsandbox.framework.identity;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
+import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import java.util.List;
 
 /** Optional cross-process authority backing Guest-visible virtual system-service state. */
@@ -64,6 +69,28 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     default VirtualNetworkServiceProfileSnapshot networkServiceProfile() {
         throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_NOT_AVAILABLE");
     }
+    default ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile() {
+        throw new IllegalStateException("VIRTUAL_APPLICATION_ENVIRONMENT_PROFILE_NOT_AVAILABLE");
+    }
+    default List<VirtualShortcutSnapshot> shortcuts() { return List.of(); }
+    default boolean replaceDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) { return false; }
+    default boolean addDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) { return false; }
+    default void removeShortcuts(List<String> shortcutIds) { }
+    default void setShortcutsEnabled(List<String> shortcutIds, boolean enabled, String disabledMessage) { }
+    default void reportShortcutUsed(String shortcutId) { }
+    default int allocateAppWidgetId(int hostId) { return 0; }
+    default boolean deleteAppWidgetId(int appWidgetId) { return false; }
+    default List<VirtualWidgetSnapshot> appWidgets(int hostId) { return List.of(); }
+    default boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass) { return false; }
+    default void updateAppWidget(VirtualWidgetSnapshot appWidget) { }
+    default void reportUsageEvent(VirtualUsageEventSnapshot event) { }
+    default List<VirtualUsageEventSnapshot> usageEvents(long beginMs, long endMs, int limit) { return List.of(); }
+    default VirtualSettingSnapshot setting(String namespace, String key) { return null; }
+    default void putSetting(VirtualSettingSnapshot setting) { }
+    default boolean deleteSetting(String namespace, String key) { return false; }
+    default List<VirtualSettingSnapshot> settings(String namespace) { return List.of(); }
+    default void setApplicationEnvironmentChangeListener(
+            java.util.function.BiConsumer<String, String> listener) { }
 
     Object clipboard();
     void setClipboard(Object value);

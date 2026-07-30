@@ -10,6 +10,11 @@ import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
+import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
+import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 
 interface IVirtualSystemServiceSession {
     byte[] getClipboard();
@@ -58,6 +63,28 @@ interface IVirtualSystemServiceSession {
     VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile();
     VirtualInteractionProfileSnapshot getInteractionProfile();
     VirtualNetworkServiceProfileSnapshot getNetworkServiceProfile();
+    ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile();
+
+    List<VirtualShortcutSnapshot> listShortcuts();
+    boolean replaceDynamicShortcuts(in List<VirtualShortcutSnapshot> shortcuts);
+    boolean addDynamicShortcuts(in List<VirtualShortcutSnapshot> shortcuts);
+    void removeShortcuts(in List<String> shortcutIds);
+    void setShortcutsEnabled(in List<String> shortcutIds, boolean enabled, String disabledMessage);
+    void reportShortcutUsed(String shortcutId);
+
+    int allocateAppWidgetId(int hostId);
+    boolean deleteAppWidgetId(int appWidgetId);
+    List<VirtualWidgetSnapshot> listAppWidgets(int hostId);
+    boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass);
+    void updateAppWidget(in VirtualWidgetSnapshot appWidget);
+
+    void reportUsageEvent(in VirtualUsageEventSnapshot event);
+    List<VirtualUsageEventSnapshot> queryUsageEvents(long beginMs, long endMs, int limit);
+
+    VirtualSettingSnapshot getSetting(String namespace, String key);
+    void putSetting(in VirtualSettingSnapshot setting);
+    boolean deleteSetting(String namespace, String key);
+    List<VirtualSettingSnapshot> listSettings(String namespace);
 
     void close();
 }

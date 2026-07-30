@@ -22,6 +22,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final DeviceServiceInvocationInterceptor deviceServiceInterceptor;
     private final InteractionServiceInvocationInterceptor interactionInterceptor;
     private final NetworkServiceInvocationInterceptor networkInterceptor;
+    private final ApplicationEnvironmentInvocationInterceptor applicationEnvironmentInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -45,6 +46,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.networkInterceptor = Set.of("connectivity", "dnsresolver", "vpn").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new NetworkServiceInvocationInterceptor(identity, this.serviceName) : null;
+        this.applicationEnvironmentInterceptor = Set.of("usermanager", "launcherapps", "shortcut",
+                "appwidget", "usagestats", "content").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new ApplicationEnvironmentInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -53,6 +58,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
+        ApplicationEnvironmentInvocationInterceptor.Decision applicationEnvironmentCall =
+                applicationEnvironmentInterceptor == null
+                        ? ApplicationEnvironmentInvocationInterceptor.Decision.passThrough()
+                        : applicationEnvironmentInterceptor.before(method, arguments);
+        if (applicationEnvironmentCall.handled()) return applicationEnvironmentCall.result();
         NetworkServiceInvocationInterceptor.Decision networkCall = networkInterceptor == null
                 ? NetworkServiceInvocationInterceptor.Decision.passThrough()
                 : networkInterceptor.before(method, arguments);

@@ -9,6 +9,8 @@ interface IVirtualSystemServiceObserver {
     void onDeviceServiceProfileChanged(long policyVersion);
     void onInteractionProfileChanged(long policyVersion);
     void onNetworkServiceProfileChanged(long policyVersion);
+    void onApplicationEnvironmentProfileChanged(long policyVersion);
+    void onApplicationEnvironmentDataChanged(String domain, String key);
     void onAlarm(in VirtualAlarmSnapshot alarm);
     boolean onJobStart(int guestJobId, in byte[] jobPayload,
             in VirtualJobParametersSnapshot parameters, IVirtualJobExecution execution);

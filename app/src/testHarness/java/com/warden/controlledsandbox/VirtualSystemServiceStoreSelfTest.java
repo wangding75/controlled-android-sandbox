@@ -510,6 +510,8 @@ public final class VirtualSystemServiceStoreSelfTest {
                 }
                 @Override public void onInteractionProfileChanged(long policyVersion) { }
                 @Override public void onNetworkServiceProfileChanged(long policyVersion) { }
+                @Override public void onApplicationEnvironmentProfileChanged(long policyVersion) { }
+                @Override public void onApplicationEnvironmentDataChanged(String domain, String key) { }
                 @Override public void onAlarm(com.warden.controlledsandbox.contract.VirtualAlarmSnapshot alarm) { alarmEvents.incrementAndGet(); }
                 @Override public boolean onJobStart(int guestJobId, byte[] payload,
                                                     VirtualJobParametersSnapshot parameters,

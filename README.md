@@ -192,3 +192,11 @@ properties, legacy network information, proxy state and deterministic DNS record
 and enforces explicit mutation, callback and VPN-session limits. Missing required non-HOST Connectivity/DNS/VPN hooks
 block Guest startup. Real Android network object layouts, resolver/netd integration, callback Binder transport, TUN
 routing and OEM behavior remain device-gated; device evidence remains 0.
+
+## M5-T11 User, launcher, shortcut, widget, usage and settings source baseline
+
+M5-T11 adds repository-owned, package/virtual-user-isolated profiles and bounded durable data for UserManager,
+LauncherApps, ShortcutManager, AppWidgetManager, UsageStatsManager and Settings/ContentService. Common framework
+query/mutation paths are source-wired with `BLOCKED`/`STATIC`/`HOST` behavior and fail-closed Guest launch readiness.
+Real hidden Binder/object layouts, launcher/widget callbacks, UsageStats enforcement and Settings Provider behavior
+remain Android-build/device dependent; device evidence remains zero.
