@@ -13,6 +13,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,6 +31,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private final ConcurrentMap<String, Runnable> alarmDeliveries = new ConcurrentHashMap<>();
     private volatile Runnable clipboardListener = () -> { };
     private volatile VirtualDeviceServiceProfileSnapshot deviceProfile;
+    private volatile VirtualInteractionProfileSnapshot interactionProfile;
     private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
         @Override public boolean onStart(int guestJobId, Object jobPayload,
@@ -42,6 +44,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         @Override public void onDeviceServiceProfileChanged(long policyVersion) {
             VirtualDeviceServiceProfileSnapshot current = call(session::getDeviceServiceProfile);
             if (current != null && current.policyVersion() >= policyVersion) deviceProfile = current;
+        }
+        @Override public void onInteractionProfileChanged(long policyVersion) {
+            VirtualInteractionProfileSnapshot current = call(session::getInteractionProfile);
+            if (current != null && current.policyVersion() >= policyVersion) interactionProfile = current;
         }
         @Override public void onAlarm(VirtualAlarmSnapshot alarm) {
             if (alarm == null) return;
@@ -69,9 +75,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         call(() -> { this.session.registerObserver(observer); return null; });
         deviceProfile = call(this.session::getDeviceServiceProfile);
         if (deviceProfile == null) throw new IllegalStateException("VIRTUAL_DEVICE_PROFILE_MISSING");
+        interactionProfile = call(this.session::getInteractionProfile);
+        if (interactionProfile == null) throw new IllegalStateException("VIRTUAL_INTERACTION_PROFILE_MISSING");
     }
 
     @Override public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() { return deviceProfile; }
+    @Override public VirtualInteractionProfileSnapshot interactionProfile() { return interactionProfile; }
 
     @Override public Object clipboard() { return unmarshal(call(session::getClipboard)); }
     @Override public void setClipboard(Object value) { call(() -> { session.setClipboard(marshal(value)); return null; }); }

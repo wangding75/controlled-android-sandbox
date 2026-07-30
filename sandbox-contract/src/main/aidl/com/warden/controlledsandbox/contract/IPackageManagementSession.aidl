@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.contract;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
@@ -36,6 +37,10 @@ interface IPackageManagementSession {
     VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(String packageName, int virtualUserId,
             in VirtualDeviceServiceProfileSnapshot profile);
     VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(String packageName, int virtualUserId);
+    VirtualInteractionProfileSnapshot getInteractionProfile(String packageName, int virtualUserId);
+    VirtualInteractionProfileSnapshot setInteractionProfile(String packageName, int virtualUserId,
+            in VirtualInteractionProfileSnapshot profile);
+    VirtualInteractionProfileSnapshot resetInteractionProfile(String packageName, int virtualUserId);
     PackageServiceResult maintenanceStatus();
     void close();
 }

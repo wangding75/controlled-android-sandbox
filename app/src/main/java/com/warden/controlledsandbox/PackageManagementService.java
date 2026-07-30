@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
@@ -33,6 +34,7 @@ public final class PackageManagementService extends Service {
     private HostPermissionStateResolver hostPermissions;
     private VirtualSystemServiceStore systemServices;
     private VirtualDeviceServiceStore deviceServices;
+    private VirtualInteractionStore interactions;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -128,6 +130,7 @@ public final class PackageManagementService extends Service {
         hostPermissions = new HostPermissionStateResolver(this);
         systemServices = new VirtualSystemServiceStore(getFilesDir());
         deviceServices = new VirtualDeviceServiceStore(getFilesDir());
+        interactions = new VirtualInteractionStore(getFilesDir());
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
@@ -137,6 +140,7 @@ public final class PackageManagementService extends Service {
         addWarning(warnings, lifecycle == null ? "" : lifecycle.maintenanceWarning());
         addWarning(warnings, systemServices == null ? "" : systemServices.maintenanceWarning());
         addWarning(warnings, deviceServices == null ? "" : deviceServices.maintenanceWarning());
+        addWarning(warnings, interactions == null ? "" : interactions.maintenanceWarning());
         return String.join(";", warnings);
     }
 
@@ -396,6 +400,7 @@ public final class PackageManagementService extends Service {
                         new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
                 systemServices.deleteScopeBestEffort(scope);
                 deviceServices.deleteScopeBestEffort(scope);
+                interactions.deleteScopeBestEffort(scope);
                 return PackageServiceResult.successCatalog("deleteInstance",
                         PackageServiceMapper.toSnapshot(catalog, combinedMaintenanceWarning()));
             });
@@ -437,6 +442,46 @@ public final class PackageManagementService extends Service {
                         new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
                 VirtualDeviceServiceProfileSnapshot reset = deviceServices.reset(scope);
                 systemServices.notifyDeviceProfileChanged(scope, reset.policyVersion());
+                return reset;
+            }
+        }
+
+        @Override public VirtualInteractionProfileSnapshot getInteractionProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                return interactions.getOrCreate(
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+            }
+        }
+
+        @Override public VirtualInteractionProfileSnapshot setInteractionProfile(
+                String packageName, int virtualUserId,
+                VirtualInteractionProfileSnapshot profile) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                VirtualInteractionProfileSnapshot updated = interactions.update(scope, profile);
+                systemServices.notifyInteractionProfileChanged(scope, updated.policyVersion());
+                return updated;
+            }
+        }
+
+        @Override public VirtualInteractionProfileSnapshot resetInteractionProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                VirtualInteractionProfileSnapshot reset = interactions.reset(scope);
+                systemServices.notifyInteractionProfileChanged(scope, reset.policyVersion());
                 return reset;
             }
         }
@@ -710,6 +755,9 @@ public final class PackageManagementService extends Service {
         }
         @Override public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile() {
             requireCapability(); return deviceServices.getOrCreate(scope);
+        }
+        @Override public VirtualInteractionProfileSnapshot getInteractionProfile() {
+            requireCapability(); return interactions.getOrCreate(scope);
         }
         @Override public void close() { requireCapability(); closeInternal(); }
         @Override public void binderDied() { closeInternal(); }

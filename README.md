@@ -174,3 +174,12 @@ deny unsupported mutations and block Guest startup when a configured non-HOST ho
 Settings identity, multi-SIM subscriptions, Wi-Fi scanning, Bluetooth metadata and Sensor catalogs are covered in
 Host/static evidence. Hidden Android signatures, device-identifiers/GMS, BLE callback transport and native Sensor
 event queues remain device-gated; device evidence remains 0.
+
+## M5-T9 Window, ActivityClient, Input/IME and Display source baseline
+
+M5-T9 adds Package-Service-owned, package/virtual-user interaction profiles and generation-scoped ownership ledgers for
+Window/WindowSession, ActivityClient, InputMethodManager and DisplayManager. Static policy projects display metrics,
+hides Host IME catalogs, rewrites interaction identity only for the duration of a Host call, enforces window/input/
+display limits and fails Guest startup when a required non-HOST hook is absent. Real Window/Surface/InputChannel,
+ActivityClient transaction, keyboard rendering, virtual-display surface and OEM behavior remain device-gated;
+device evidence remains 0.

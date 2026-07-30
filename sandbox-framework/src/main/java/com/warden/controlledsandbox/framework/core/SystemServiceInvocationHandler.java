@@ -20,6 +20,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final CapabilityServiceInterceptor capabilityInterceptor;
     private final VirtualSystemServiceInterceptor virtualServiceInterceptor;
     private final DeviceServiceInvocationInterceptor deviceServiceInterceptor;
+    private final InteractionServiceInvocationInterceptor interactionInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -36,6 +37,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.deviceServiceInterceptor = Set.of("location", "telephony", "phonesubinfo",
                 "telephonyregistry", "subscription", "wifi", "wifiscanner", "bluetooth", "sensor")
                 .contains(this.serviceName) ? new DeviceServiceInvocationInterceptor(identity, this.serviceName) : null;
+        this.interactionInterceptor = Set.of("window", "windowSession", "activityClient",
+                "inputMethod", "display").stream().map(String::toLowerCase)
+                .anyMatch(value -> value.equals(this.serviceName.toLowerCase(java.util.Locale.ROOT)))
+                ? new InteractionServiceInvocationInterceptor(identity, this.serviceName, delegate) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -52,13 +57,23 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             return deviceCall.result();
         }
         Object[] rewritten = arguments == null ? null : arguments.clone();
+        InteractionServiceInvocationInterceptor.Call interactionCall = interactionInterceptor == null
+                ? InteractionServiceInvocationInterceptor.Call.passThrough()
+                : interactionInterceptor.before(method, rewritten);
+        if (interactionCall.handled()) {
+            try { return interactionCall.result(); }
+            finally { interactionCall.close(); }
+        }
         VirtualSystemServiceInterceptor.Call virtualCall = virtualServiceInterceptor == null
                 ? VirtualSystemServiceInterceptor.Call.passThrough()
                 : virtualServiceInterceptor.before(method, rewritten);
-        if (virtualCall.handled()) return virtualCall.result();
+        if (virtualCall.handled()) {
+            try { return virtualCall.result(); }
+            finally { interactionCall.close(); }
+        }
         if (virtualCall.direct()) {
-            try { return virtualCall.invokeDirect(delegate, method); }
-            finally { virtualCall.close(); }
+            try { return interactionCall.after(virtualCall.invokeDirect(delegate, method)); }
+            finally { virtualCall.close(); interactionCall.close(); }
         }
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
         try {
@@ -68,13 +83,16 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
                 }
                 Object identityRewritten = IdentityObjectRewriter.rewriteResult(result, identity);
-                return virtualCall.rewriteResult(identityRewritten);
+                Object interactionRewritten = interactionCall.after(identityRewritten);
+                return virtualCall.rewriteResult(interactionRewritten);
             } catch (InvocationTargetException error) {
                 Throwable cause = error.getCause();
+                interactionCall.onFailure();
                 virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, cause);
                 throw cause;
             } catch (Throwable error) {
+                interactionCall.onFailure();
                 virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, error);
                 throw error;
@@ -82,6 +100,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         } finally {
             scope.close();
             virtualCall.close();
+            interactionCall.close();
         }
     }
 

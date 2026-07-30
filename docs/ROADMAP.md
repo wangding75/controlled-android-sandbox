@@ -187,3 +187,13 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed Guest startup when a configured non-HOST domain cannot install its required framework hooks.
 - PARTIAL — device-identifiers policy/GMS identity, BLE callback transport and native Sensor event delivery.
 - DEVICE — Android hidden fields/constructors/Binder signatures, real callbacks, permission behavior and OEM validation.
+
+## M5-T9 Window, ActivityClient, Input/IME and Display baseline
+
+- DONE — typed package/virtual-user interaction profiles with BLOCKED/STATIC/HOST modes and Package-Service ownership.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime observer refresh.
+- DONE — WindowSession/window-token, input-client, Activity lifecycle and virtual-display generation-scoped ownership ledgers.
+- DONE — source-wired WindowManager/WindowSession, ActivityClient, InputMethodManager and DisplayManager projection with reversible identity rewriting.
+- DONE — fail-closed Guest startup when a configured non-HOST interaction domain lacks a required hook.
+- PARTIAL — real Surface/InputChannel/Insets, ActivityClient transaction matrix, IME rendering/InputConnection and virtual-display surfaces.
+- DEVICE — Android hidden Binder signatures, SystemUI, multi-window/PiP, keyboard, display callbacks and OEM validation.

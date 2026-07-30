@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.framework.identity;
 
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class VirtualSystemServiceState implements AutoCloseable {
     private final VirtualSystemServiceAuthority authority;
     private final VirtualDeviceServiceProfileSnapshot localDeviceProfile;
+    private final VirtualInteractionProfileSnapshot localInteractionProfile;
     private final ClipboardState clipboard;
     private final AccountState accounts;
     private final PendingIntentState pendingIntents;
@@ -35,8 +37,14 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     public VirtualSystemServiceState() { this((VirtualSystemServiceAuthority) null); }
 
     public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile) {
+        this(deviceProfile, null);
+    }
+
+    public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile,
+            VirtualInteractionProfileSnapshot interactionProfile) {
         this.authority = null;
         this.localDeviceProfile = java.util.Objects.requireNonNull(deviceProfile, "deviceProfile");
+        this.localInteractionProfile = interactionProfile;
         clipboard = new ClipboardState(null);
         accounts = new AccountState(null);
         pendingIntents = new PendingIntentState(null);
@@ -48,6 +56,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     public VirtualSystemServiceState(VirtualSystemServiceAuthority authority) {
         this.authority = authority;
         this.localDeviceProfile = null;
+        this.localInteractionProfile = null;
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
         pendingIntents = new PendingIntentState(authority);
@@ -67,6 +76,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         if (authority != null) return authority.deviceServiceProfile();
         if (localDeviceProfile != null) return localDeviceProfile;
         throw new IllegalStateException("VIRTUAL_DEVICE_PROFILE_AUTHORITY_REQUIRED");
+    }
+    public VirtualInteractionProfileSnapshot interactionProfile() {
+        if (authority != null) return authority.interactionProfile();
+        if (localInteractionProfile != null) return localInteractionProfile;
+        throw new IllegalStateException("VIRTUAL_INTERACTION_PROFILE_AUTHORITY_REQUIRED");
     }
 
     @Override public void close() {

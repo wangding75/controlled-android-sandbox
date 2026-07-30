@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 
 interface IVirtualSystemServiceSession {
     byte[] getClipboard();
@@ -54,6 +55,7 @@ interface IVirtualSystemServiceSession {
     int[] listNamespaceGuestIds(String namespace);
 
     VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile();
+    VirtualInteractionProfileSnapshot getInteractionProfile();
 
     void close();
 }

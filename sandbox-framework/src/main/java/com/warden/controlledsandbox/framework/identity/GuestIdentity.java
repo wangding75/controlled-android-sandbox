@@ -27,6 +27,7 @@ public final class GuestIdentity {
     private final CapabilityAuditSink capabilityAudit;
     private final CapabilityLeaseRegistry capabilityLeases;
     private final VirtualSystemServiceState virtualServices;
+    private final GuestInteractionState interactions;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
                          Set<String> requestedPermissions) {
@@ -142,6 +143,7 @@ public final class GuestIdentity {
         this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
         this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
         this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
+        this.interactions = new GuestInteractionState();
     }
 
     public String packageName() { return packageName; }
@@ -161,4 +163,5 @@ public final class GuestIdentity {
     public CapabilityAuditSink capabilityAudit() { return capabilityAudit; }
     public CapabilityLeaseRegistry capabilityLeases() { return capabilityLeases; }
     public VirtualSystemServiceState virtualServices() { return virtualServices; }
+    public GuestInteractionState interactions() { return interactions; }
 }

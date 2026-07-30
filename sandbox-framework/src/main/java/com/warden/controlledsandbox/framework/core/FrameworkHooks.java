@@ -17,6 +17,10 @@ import com.warden.controlledsandbox.framework.service.TelephonyServiceHook;
 import com.warden.controlledsandbox.framework.service.WifiServiceHook;
 import com.warden.controlledsandbox.framework.service.BluetoothServiceHook;
 import com.warden.controlledsandbox.framework.service.SensorServiceHook;
+import com.warden.controlledsandbox.framework.service.WindowManagerHook;
+import com.warden.controlledsandbox.framework.service.ActivityClientHook;
+import com.warden.controlledsandbox.framework.service.InputMethodManagerHook;
+import com.warden.controlledsandbox.framework.service.DisplayManagerHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -52,10 +56,17 @@ public final class FrameworkHooks implements AutoCloseable {
             FrameworkCallInterceptor callInterceptor) {
         List<AutoCloseable> hooks = new ArrayList<>();
         hooks.add(identity.virtualServices());
+        hooks.add(identity.interactions());
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
         attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(guestContext, identity));
         installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);
+        attempt("activityClient", installed, failures, hooks, () -> ActivityClientHook.install(identity));
+        attempt("window", installed, failures, hooks, () -> WindowManagerHook.install(identity));
+        attempt("inputMethod", installed, failures, hooks,
+                () -> InputMethodManagerHook.install(hostServiceContext, identity));
+        attempt("display", installed, failures, hooks,
+                () -> DisplayManagerHook.install(hostServiceContext, identity));
         attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(guestContext, identity));
         attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(guestContext, identity));
         FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);

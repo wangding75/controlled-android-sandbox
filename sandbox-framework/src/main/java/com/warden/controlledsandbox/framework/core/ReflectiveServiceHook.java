@@ -67,6 +67,11 @@ public final class ReflectiveServiceHook implements AutoCloseable {
 
     public static ReflectiveServiceHook singleton(String ownerClassName, String singletonFieldName,
                                            GuestIdentity identity) throws Exception {
+        return singleton(ownerClassName, singletonFieldName, identity, "");
+    }
+
+    public static ReflectiveServiceHook singleton(String ownerClassName, String singletonFieldName,
+                                           GuestIdentity identity, String serviceName) throws Exception {
         Class<?> owner = Class.forName(ownerClassName);
         Field singletonField = findField(owner, singletonFieldName);
         singletonField.setAccessible(true);
@@ -80,7 +85,7 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             get.setAccessible(true);
             original = get.invoke(singleton);
         }
-        return replace(singleton, instance, original, identity, "");
+        return replace(singleton, instance, original, identity, serviceName);
     }
 
     static ReflectiveServiceHook replaceField(Object owner, String fieldName, GuestIdentity identity) throws Exception {

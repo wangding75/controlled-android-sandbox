@@ -508,6 +508,7 @@ public final class VirtualSystemServiceStoreSelfTest {
                 @Override public void onDeviceServiceProfileChanged(long policyVersion) {
                     deviceProfileVersion.set(Math.toIntExact(policyVersion));
                 }
+                @Override public void onInteractionProfileChanged(long policyVersion) { }
                 @Override public void onAlarm(com.warden.controlledsandbox.contract.VirtualAlarmSnapshot alarm) { alarmEvents.incrementAndGet(); }
                 @Override public boolean onJobStart(int guestJobId, byte[] payload,
                                                     VirtualJobParametersSnapshot parameters,
