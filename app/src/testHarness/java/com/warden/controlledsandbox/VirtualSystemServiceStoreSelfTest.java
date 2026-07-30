@@ -36,14 +36,18 @@ public final class VirtualSystemServiceStoreSelfTest {
         AtomicInteger firstAlarmEvents = new AtomicInteger();
         AtomicInteger secondAlarmEvents = new AtomicInteger();
         AtomicInteger replacementAlarmEvents = new AtomicInteger();
+        AtomicInteger firstDeviceProfileEvents = new AtomicInteger();
+        AtomicInteger secondDeviceProfileEvents = new AtomicInteger();
+        AtomicInteger replacementDeviceProfileEvents = new AtomicInteger();
         AtomicInteger jobEvents = new AtomicInteger();
         AtomicInteger deliveredJobId = new AtomicInteger(-1);
         TestClient first = new TestClient(owner, "guest.pkg", 1L, firstClipboardEvents, firstAlarmEvents,
-                jobEvents, deliveredJobId, true);
+                firstDeviceProfileEvents, jobEvents, deliveredJobId, true);
         TestClient second = new TestClient(owner, "guest.pkg:remote", 2L, secondClipboardEvents, secondAlarmEvents,
-                new AtomicInteger(), new AtomicInteger(-1), false);
+                secondDeviceProfileEvents, new AtomicInteger(), new AtomicInteger(-1), false);
         TestClient isolated = new TestClient(other, "guest.pkg", 1L,
-                new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger(-1), false);
+                new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), new AtomicInteger(),
+                new AtomicInteger(-1), false);
         store.register(first); store.register(second); store.register(isolated);
 
         store.setClipboard(owner, new byte[]{1, 2, 3});
@@ -53,14 +57,20 @@ public final class VirtualSystemServiceStoreSelfTest {
         require(firstClipboardEvents.get() == 1 && secondClipboardEvents.get() == 1,
                 "all unique sessions in one scope must receive clipboard changes");
         TestClient replacementFirst = new TestClient(owner, "guest.pkg", 1L,
-                replacementClipboardEvents, replacementAlarmEvents, new AtomicInteger(),
-                new AtomicInteger(-1), false);
+                replacementClipboardEvents, replacementAlarmEvents, replacementDeviceProfileEvents,
+                new AtomicInteger(), new AtomicInteger(-1), false);
         store.register(replacementFirst);
         store.setClipboard(owner, new byte[]{3, 2, 1});
         Thread.sleep(100L);
         require(firstClipboardEvents.get() == 1 && replacementClipboardEvents.get() == 1
                         && secondClipboardEvents.get() == 2,
                 "reconnecting the same Generation must replace the stale observer");
+        store.notifyDeviceProfileChanged(owner, 7L);
+        Thread.sleep(100L);
+        require(firstDeviceProfileEvents.get() == 0
+                        && replacementDeviceProfileEvents.get() == 7
+                        && secondDeviceProfileEvents.get() == 7,
+                "device profile invalidation reaches only active observers in the matching scope");
         boolean oversizedClipboardRejected = false;
         try { store.setClipboard(owner, new byte[512 * 1024 + 1]); }
         catch (IllegalArgumentException expected) { oversizedClipboardRejected = true; }
@@ -485,9 +495,19 @@ public final class VirtualSystemServiceStoreSelfTest {
         TestClient(VirtualSystemServiceStore.Scope scope, String processName, long generation,
                    AtomicInteger clipboardEvents, AtomicInteger alarmEvents,
                    AtomicInteger jobEvents, AtomicInteger deliveredJobId, boolean acceptJobs) {
+            this(scope, processName, generation, clipboardEvents, alarmEvents, new AtomicInteger(),
+                    jobEvents, deliveredJobId, acceptJobs);
+        }
+        TestClient(VirtualSystemServiceStore.Scope scope, String processName, long generation,
+                   AtomicInteger clipboardEvents, AtomicInteger alarmEvents,
+                   AtomicInteger deviceProfileVersion, AtomicInteger jobEvents,
+                   AtomicInteger deliveredJobId, boolean acceptJobs) {
             this.scope = scope; this.processName = processName; this.generation = generation;
             observer = new IVirtualSystemServiceObserver.Stub() {
                 @Override public void onClipboardChanged() { clipboardEvents.incrementAndGet(); }
+                @Override public void onDeviceServiceProfileChanged(long policyVersion) {
+                    deviceProfileVersion.set(Math.toIntExact(policyVersion));
+                }
                 @Override public void onAlarm(com.warden.controlledsandbox.contract.VirtualAlarmSnapshot alarm) { alarmEvents.incrementAndGet(); }
                 @Override public boolean onJobStart(int guestJobId, byte[] payload,
                                                     VirtualJobParametersSnapshot parameters,

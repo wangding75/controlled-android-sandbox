@@ -178,3 +178,12 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — persisted PackageInstaller-style OPEN/SEALED/COMMITTING/FAILED sessions, progress, failure evidence and retry.
 - PARTIAL — inherit-existing, rollback and nonzero install flags are represented but intentionally rejected at commit.
 - DEVICE — Android library catalog/ART loading, SharedLibraryInfo constructors, Instrumentation execution and PackageInstaller callbacks.
+
+## M5-T8 Location, device identity, Telephony, Wi-Fi, Bluetooth and Sensor baseline
+
+- DONE — typed, revision-bound per-package/per-virtual-user profiles with BLOCKED/STATIC/HOST modes.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime observer refresh.
+- DONE — source-wired Location, Build/Android ID, Telephony/Registry/Subscription, Wi-Fi/Scanner, Bluetooth and Sensor catalog projection.
+- DONE — fail-closed Guest startup when a configured non-HOST domain cannot install its required framework hooks.
+- PARTIAL — device-identifiers policy/GMS identity, BLE callback transport and native Sensor event delivery.
+- DEVICE — Android hidden fields/constructors/Binder signatures, real callbacks, permission behavior and OEM validation.

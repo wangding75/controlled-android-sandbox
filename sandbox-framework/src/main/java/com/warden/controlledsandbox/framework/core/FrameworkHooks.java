@@ -13,6 +13,10 @@ import com.warden.controlledsandbox.framework.service.AudioCaptureServiceHook;
 import com.warden.controlledsandbox.framework.service.AlarmManagerHook;
 import com.warden.controlledsandbox.framework.service.ClipboardManagerHook;
 import com.warden.controlledsandbox.framework.service.AccountManagerHook;
+import com.warden.controlledsandbox.framework.service.TelephonyServiceHook;
+import com.warden.controlledsandbox.framework.service.WifiServiceHook;
+import com.warden.controlledsandbox.framework.service.BluetoothServiceHook;
+import com.warden.controlledsandbox.framework.service.SensorServiceHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -67,6 +71,24 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(guestContext, identity));
         attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, () -> LocationServiceHook.install(hostServiceContext, identity));
+        attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));
+        attempt("settingsIdentity", installed, failures, hooks,
+                () -> SettingsProviderIdentityHook.install(guestContext, identity));
+        attempt("telephony", installed, failures, hooks,
+                () -> TelephonyServiceHook.installTelephony(hostServiceContext, identity));
+        attempt("phoneSubInfo", installed, failures, hooks,
+                () -> TelephonyServiceHook.installSubscriberInfo(hostServiceContext, identity));
+        attempt("telephonyRegistry", installed, failures, hooks,
+                () -> TelephonyServiceHook.installRegistry(hostServiceContext, identity));
+        attempt("subscription", installed, failures, hooks,
+                () -> TelephonyServiceHook.installSubscription(hostServiceContext, identity));
+        attempt("wifi", installed, failures, hooks, () -> WifiServiceHook.install(hostServiceContext, identity));
+        attempt("wifiScanner", installed, failures, hooks,
+                () -> WifiServiceHook.installScanner(hostServiceContext, identity));
+        attempt("bluetooth", installed, failures, hooks,
+                () -> BluetoothServiceHook.install(hostServiceContext, identity));
+        attempt("sensorCatalog", installed, failures, hooks,
+                () -> SensorServiceHook.install(hostServiceContext, identity));
         attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
         return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
     }

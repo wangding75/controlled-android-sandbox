@@ -19,6 +19,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final String serviceName;
     private final CapabilityServiceInterceptor capabilityInterceptor;
     private final VirtualSystemServiceInterceptor virtualServiceInterceptor;
+    private final DeviceServiceInvocationInterceptor deviceServiceInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -32,6 +33,9 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 ? new CapabilityServiceInterceptor(identity, this.serviceName) : null;
         this.virtualServiceInterceptor = Set.of("alarm", "clipboard", "account", "notification", "jobscheduler")
                 .contains(this.serviceName) ? new VirtualSystemServiceInterceptor(identity, this.serviceName) : null;
+        this.deviceServiceInterceptor = Set.of("location", "telephony", "phonesubinfo",
+                "telephonyregistry", "subscription", "wifi", "wifiscanner", "bluetooth", "sensor")
+                .contains(this.serviceName) ? new DeviceServiceInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -40,6 +44,13 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
+        DeviceServiceInvocationInterceptor.Decision deviceCall = deviceServiceInterceptor == null
+                ? DeviceServiceInvocationInterceptor.Decision.passThrough()
+                : deviceServiceInterceptor.before(method, arguments);
+        if (deviceCall.handled()) {
+            if (capabilityInterceptor != null) capabilityInterceptor.afterVirtualSuccess(capabilityCall, arguments);
+            return deviceCall.result();
+        }
         Object[] rewritten = arguments == null ? null : arguments.clone();
         VirtualSystemServiceInterceptor.Call virtualCall = virtualServiceInterceptor == null
                 ? VirtualSystemServiceInterceptor.Call.passThrough()

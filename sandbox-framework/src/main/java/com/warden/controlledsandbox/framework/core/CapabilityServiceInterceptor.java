@@ -84,6 +84,16 @@ public final class CapabilityServiceInterceptor {
         return cleanup == null ? null : new Registration(candidate, cleanup);
     }
 
+    public void afterVirtualSuccess(Call call, Object[] arguments) {
+        if (call == null || call == Call.NONE) return;
+        if (call.cleanup) {
+            boolean released = releaseTracked(call.token, arguments);
+            audit(call.capability, call.operation, "RELEASE_CALLED", released ? "TRACKED" : "UNTRACKED");
+            return;
+        }
+        audit(call.capability, call.operation, "ALLOWED_VIRTUAL", "");
+    }
+
     public void afterFailure(Call call, Throwable error) {
         if (call == null || call == Call.NONE) return;
         audit(call.capability, call.operation, "DELEGATE_FAILED",

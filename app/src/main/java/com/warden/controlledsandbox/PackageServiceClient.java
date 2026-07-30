@@ -17,6 +17,7 @@ import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.RuntimePermissionRequestSnapshot;
 import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
+import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.io.File;
@@ -209,6 +210,22 @@ final class PackageServiceClient implements AutoCloseable {
                 requireSession().deleteInstance(packageName, virtualUserId)).catalog();
         if (snapshot == null) throw new IllegalStateException("Package service returned no catalog");
         return PackageServiceMapper.fromSnapshot(snapshot);
+    }
+
+    VirtualDeviceServiceProfileSnapshot deviceServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().getDeviceServiceProfile(packageName, virtualUserId);
+    }
+
+    VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(
+            String packageName, int virtualUserId,
+            VirtualDeviceServiceProfileSnapshot profile) throws Exception {
+        return requireSession().setDeviceServiceProfile(packageName, virtualUserId, profile);
+    }
+
+    VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().resetDeviceServiceProfile(packageName, virtualUserId);
     }
 
     String maintenanceWarning() throws Exception {

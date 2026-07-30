@@ -1095,6 +1095,23 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (reschedule) scheduleFuture(scope, alarm);
         }
     }
+    void notifyDeviceProfileChanged(Scope scope, long policyVersion) {
+        if (scope == null || policyVersion < 1L) return;
+        scheduler.execute(() -> {
+            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
+            synchronized (VirtualSystemServiceStore.this) {
+                for (Client client : new ArrayList<>(clients)) {
+                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
+                        observers.add(client.observer());
+                    }
+                }
+            }
+            for (IVirtualSystemServiceObserver observer : observers) {
+                try { observer.onDeviceServiceProfileChanged(policyVersion); } catch (Exception ignored) { }
+            }
+        });
+    }
+
     private void notifyClipboard(Scope scope) {
         List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
         synchronized (this) {

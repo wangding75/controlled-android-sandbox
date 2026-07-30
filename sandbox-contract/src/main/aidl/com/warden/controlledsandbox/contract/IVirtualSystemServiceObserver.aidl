@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 
 interface IVirtualSystemServiceObserver {
     void onClipboardChanged();
+    void onDeviceServiceProfileChanged(long policyVersion);
     void onAlarm(in VirtualAlarmSnapshot alarm);
     boolean onJobStart(int guestJobId, in byte[] jobPayload,
             in VirtualJobParametersSnapshot parameters, IVirtualJobExecution execution);

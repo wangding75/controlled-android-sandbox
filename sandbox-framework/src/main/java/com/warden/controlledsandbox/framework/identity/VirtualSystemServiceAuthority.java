@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.identity;
 
+import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import java.util.List;
 
 /** Optional cross-process authority backing Guest-visible virtual system-service state. */
@@ -50,6 +51,10 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
         boolean onStart(int guestJobId, Object jobPayload, JobParametersRecord parameters,
                         JobExecution execution);
         boolean onStop(int guestJobId, JobParametersRecord parameters);
+    }
+
+    default VirtualDeviceServiceProfileSnapshot deviceServiceProfile() {
+        throw new IllegalStateException("VIRTUAL_DEVICE_PROFILE_NOT_AVAILABLE");
     }
 
     Object clipboard();

@@ -164,3 +164,13 @@ M5-T6 adds four predeclared `android:isolatedProcess=true` Service workers, a se
 ## M5-T7 package surface source baseline
 
 M5-T7 expands the clean-room package surface with typed Java/native/SDK/static shared-library requirements, deterministic required/optional resolution, revision-bound instrumentation metadata and PackageManager queries. Binder-owned install sessions now persist typed parameters, progress, staged bytes, commit attempts, bounded failure evidence and explicit retry. Unsupported inherit-existing, rollback and nonzero install-flag commits fail closed. Real Android PackageInstaller callbacks, SharedLibraryInfo constructors, ART loading and Instrumentation execution remain device-gated; device evidence remains 0.
+
+## M5-T8 device-service virtualization source baseline
+
+M5-T8 adds Package-Service-owned, revision-bound virtual profiles for Location, device identity, Telephony,
+Wi-Fi, Bluetooth and Sensor domains. Every profile uses explicit BLOCKED/STATIC/HOST modes, bounded atomic
+persistence, optimistic versioning and Runtime observer refresh. Framework source paths project common queries,
+deny unsupported mutations and block Guest startup when a configured non-HOST hook is unavailable. Build and
+Settings identity, multi-SIM subscriptions, Wi-Fi scanning, Bluetooth metadata and Sensor catalogs are covered in
+Host/static evidence. Hidden Android signatures, device-identifiers/GMS, BLE callback transport and native Sensor
+event queues remain device-gated; device evidence remains 0.

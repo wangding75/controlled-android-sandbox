@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "stage": "M5-T8",
+  "sourceStatus": "pass",
+  "productionStatus": "partial",
+  "androidBuildStatus": "blocked-toolchain",
+  "baseCommit": "2638c8b58520fc2bd84ccc6dd80661a5b3104c53",
+  "capabilityCount": 113,
+  "sourceComplete": 113,
+  "production": {
+    "wired": 110,
+    "partial": 2,
+    "notApplicable": 1
+  },
+  "deviceEvidence": {
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "deviceServices": {
+    "isolationKey": ["packageName", "virtualUserId", "packageRevision"],
+    "modes": ["BLOCKED", "STATIC", "HOST"],
+    "persistence": {
+      "atomic": true,
+      "bounded": true,
+      "crcVerified": true,
+      "corruptStateQuarantine": true,
+      "optimisticVersioning": true
+    },
+    "location": {
+      "source": "complete-for-stage",
+      "production": "wired-source",
+      "device": "not-tested",
+      "deferred": ["PendingIntent delivery", "periodic timing", "GNSS object/signature matrix"]
+    },
+    "deviceIdentity": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["device_identifiers Binder", "Advertising ID/GMS", "OEM hidden fields"]
+    },
+    "telephony": {
+      "source": "complete-for-stage",
+      "production": "wired-source",
+      "device": "not-tested",
+      "deferred": ["real radio/cell objects", "API/OEM Binder signatures"]
+    },
+    "wifi": {
+      "source": "complete-for-stage",
+      "production": "wired-source",
+      "device": "not-tested",
+      "deferred": ["real network transport", "API/OEM object constructors"]
+    },
+    "bluetooth": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["BLE callback transport", "real connections", "API/OEM Binder signatures"]
+    },
+    "sensors": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["SystemSensorManager native event queue", "real SensorEvent delivery"]
+    }
+  }
+}

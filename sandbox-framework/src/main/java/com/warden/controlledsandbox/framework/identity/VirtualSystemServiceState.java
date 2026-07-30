@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.identity;
 
+import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -23,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Guest-visible state for system services that must not expose host-owned data. */
 public final class VirtualSystemServiceState implements AutoCloseable {
     private final VirtualSystemServiceAuthority authority;
+    private final VirtualDeviceServiceProfileSnapshot localDeviceProfile;
     private final ClipboardState clipboard;
     private final AccountState accounts;
     private final PendingIntentState pendingIntents;
@@ -30,10 +32,22 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     private final NotificationState notifications;
     private final JobState jobs;
 
-    public VirtualSystemServiceState() { this(null); }
+    public VirtualSystemServiceState() { this((VirtualSystemServiceAuthority) null); }
+
+    public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile) {
+        this.authority = null;
+        this.localDeviceProfile = java.util.Objects.requireNonNull(deviceProfile, "deviceProfile");
+        clipboard = new ClipboardState(null);
+        accounts = new AccountState(null);
+        pendingIntents = new PendingIntentState(null);
+        alarms = new AlarmState(null);
+        notifications = new NotificationState(null);
+        jobs = new JobState(null);
+    }
 
     public VirtualSystemServiceState(VirtualSystemServiceAuthority authority) {
         this.authority = authority;
+        this.localDeviceProfile = null;
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
         pendingIntents = new PendingIntentState(authority);
@@ -49,6 +63,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     public NotificationState notifications() { return notifications; }
     public JobState jobs() { return jobs; }
     public boolean binderOwned() { return authority != null; }
+    public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() {
+        if (authority != null) return authority.deviceServiceProfile();
+        if (localDeviceProfile != null) return localDeviceProfile;
+        throw new IllegalStateException("VIRTUAL_DEVICE_PROFILE_AUTHORITY_REQUIRED");
+    }
 
     @Override public void close() {
         alarms.close();

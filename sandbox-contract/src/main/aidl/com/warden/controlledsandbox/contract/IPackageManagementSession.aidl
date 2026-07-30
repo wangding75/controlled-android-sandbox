@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.contract;
 
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
+import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
@@ -31,6 +32,10 @@ interface IPackageManagementSession {
     PackageServiceResult createClone(String packageName);
     PackageServiceResult updateInstanceStatus(String packageName, int virtualUserId, String status);
     PackageServiceResult deleteInstance(String packageName, int virtualUserId);
+    VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(String packageName, int virtualUserId);
+    VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(String packageName, int virtualUserId,
+            in VirtualDeviceServiceProfileSnapshot profile);
+    VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(String packageName, int virtualUserId);
     PackageServiceResult maintenanceStatus();
     void close();
 }

@@ -19,6 +19,7 @@ import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
@@ -31,6 +32,7 @@ public final class PackageManagementService extends Service {
     private VirtualPackageStateBuilder packageStateBuilder;
     private HostPermissionStateResolver hostPermissions;
     private VirtualSystemServiceStore systemServices;
+    private VirtualDeviceServiceStore deviceServices;
 
     private final IPackageService.Stub binder = new IPackageService.Stub() {
         @Override public IPackageManagementSession openManagementSession(IBinder clientToken) {
@@ -125,16 +127,21 @@ public final class PackageManagementService extends Service {
         packageStateBuilder = new VirtualPackageStateBuilder(this);
         hostPermissions = new HostPermissionStateResolver(this);
         systemServices = new VirtualSystemServiceStore(getFilesDir());
+        deviceServices = new VirtualDeviceServiceStore(getFilesDir());
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
 
     private String combinedMaintenanceWarning() {
-        String lifecycleWarning = lifecycle == null ? "" : lifecycle.maintenanceWarning();
-        String serviceWarning = systemServices == null ? "" : systemServices.maintenanceWarning();
-        if (lifecycleWarning == null || lifecycleWarning.trim().isEmpty()) return serviceWarning == null ? "" : serviceWarning;
-        if (serviceWarning == null || serviceWarning.trim().isEmpty()) return lifecycleWarning;
-        return lifecycleWarning + ";" + serviceWarning;
+        java.util.ArrayList<String> warnings = new java.util.ArrayList<>();
+        addWarning(warnings, lifecycle == null ? "" : lifecycle.maintenanceWarning());
+        addWarning(warnings, systemServices == null ? "" : systemServices.maintenanceWarning());
+        addWarning(warnings, deviceServices == null ? "" : deviceServices.maintenanceWarning());
+        return String.join(";", warnings);
+    }
+
+    private static void addWarning(java.util.List<String> warnings, String value) {
+        if (value != null && !value.trim().isEmpty()) warnings.add(value.trim());
     }
 
     @Override public void onDestroy() {
@@ -385,11 +392,53 @@ public final class PackageManagementService extends Service {
             return execute("deleteInstance", () -> {
                 String normalizedPackage = required(packageName, "packageName");
                 var catalog = lifecycle.deleteInstance(normalizedPackage, virtualUserId);
-                systemServices.deleteScopeBestEffort(
-                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                systemServices.deleteScopeBestEffort(scope);
+                deviceServices.deleteScopeBestEffort(scope);
                 return PackageServiceResult.successCatalog("deleteInstance",
                         PackageServiceMapper.toSnapshot(catalog, combinedMaintenanceWarning()));
             });
+        }
+
+        @Override public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                return deviceServices.getOrCreate(
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+            }
+        }
+
+        @Override public VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(
+                String packageName, int virtualUserId,
+                VirtualDeviceServiceProfileSnapshot profile) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                VirtualDeviceServiceProfileSnapshot updated = deviceServices.update(scope, profile);
+                systemServices.notifyDeviceProfileChanged(scope, updated.policyVersion());
+                return updated;
+            }
+        }
+
+        @Override public VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(
+                String packageName, int virtualUserId) {
+            requireOwner();
+            synchronized (operationLock) {
+                String normalizedPackage = required(packageName, "packageName");
+                requirePackageInstance(normalizedPackage, virtualUserId);
+                VirtualSystemServiceStore.Scope scope =
+                        new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
+                VirtualDeviceServiceProfileSnapshot reset = deviceServices.reset(scope);
+                systemServices.notifyDeviceProfileChanged(scope, reset.policyVersion());
+                return reset;
+            }
         }
 
         @Override public PackageServiceResult maintenanceStatus() {
@@ -403,6 +452,14 @@ public final class PackageManagementService extends Service {
         }
 
         @Override public void binderDied() { closeInternal(); }
+
+        private void requirePackageInstance(String packageName, int virtualUserId) {
+            try {
+                lifecycle.packagePolicy(packageName, virtualUserId);
+            } catch (Exception error) {
+                throw new IllegalStateException("VIRTUAL_PACKAGE_INSTANCE_REQUIRED", error);
+            }
+        }
 
         private PackageServiceResult packageStateResult(String operation,
                                                         SandboxPackagePolicyView view,
@@ -650,6 +707,9 @@ public final class PackageManagementService extends Service {
         }
         @Override public int[] listNamespaceGuestIds(String namespace) {
             requireCapability(); return systemServices.namespaceGuestIds(scope, namespace);
+        }
+        @Override public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile() {
+            requireCapability(); return deviceServices.getOrCreate(scope);
         }
         @Override public void close() { requireCapability(); closeInternal(); }
         @Override public void binderDied() { closeInternal(); }
