@@ -12,6 +12,8 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeBrokerOperationAdapter;
 import com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerFileRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerObserverRuntime;
@@ -33,6 +35,8 @@ import com.warden.controlledsandbox.contract.IGuestProcess;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.domain.port.AuditSink;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
@@ -75,10 +79,12 @@ public final class RuntimeBrokerService extends Service {
             sessions, brokerState, clock, tokenGenerator,
             this::prepareGuestInternal,
             this::sessionById,
-            (processSlot, request) -> callGuest(processSlot, guest -> guest.invokeComponent(request)));
+            (processSlot, request) -> callGuest(processSlot, guest -> guestOperation(
+                    guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)));
     private final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
     private final RuntimeServiceCoordinator serviceCoordinator = new RuntimeServiceCoordinator(brokerState,
-            (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)), clock);
+            (slot, request) -> callGuest(slot, guest -> guestOperation(
+                    guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)), clock);
     private final BrokerProviderRuntime providerRuntime = new BrokerProviderRuntime();
     private final BrokerCursorRuntime cursorRuntime = new BrokerCursorRuntime();
     private final BrokerFileRuntime fileRuntime = new BrokerFileRuntime();
@@ -90,7 +96,8 @@ public final class RuntimeBrokerService extends Service {
                     this::sessionById,
                     session -> brokerState.prepared(processKey(session.packageName(),
                             session.virtualUserId(), session.processName())),
-                    (slot, request) -> callGuest(slot, guest -> guest.invokeComponent(request)));
+                    (slot, request) -> callGuest(slot, guest -> guestOperation(
+                            guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)));
     private final RuntimeStatusDispatcher runtimeStatusDispatcher = new RuntimeStatusDispatcher(
             clock,
             new BrokerRuntimeStatusSource(
@@ -120,6 +127,10 @@ public final class RuntimeBrokerService extends Service {
                 providerResources, systemServiceCoordinator);
     }
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
+        @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+            return RuntimeBrokerOperationAdapter.execute(this, request);
+        }
         @Override public Bundle prepareGuest(Bundle request) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return RuntimeBrokerService.this.prepareGuestInternal(request);
@@ -341,7 +352,8 @@ public final class RuntimeBrokerService extends Service {
                             && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
                         result = receiverCoordinator.dispatchDynamicBroadcast(request, activeSession);
                     } else {
-                        result = callGuest(session.processSlot(), guest -> guest.invokeComponent(call));
+                        result = callGuest(session.processSlot(), guest -> guestOperation(
+                                guest, RuntimeOperationRequest.INVOKE_COMPONENT, call));
                     }
                     if (ComponentOperations.PROVIDER_APPLY_BATCH.equals(operation)) {
                         if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
@@ -672,7 +684,8 @@ public final class RuntimeBrokerService extends Service {
             systemServiceCoordinator.attach(session, spec);
             Bundle guestResult;
             try {
-                guestResult = callGuest(session.processSlot(), guest -> guest.prepareGuest(spec));
+                guestResult = callGuest(session.processSlot(), guest -> guestOperation(
+                        guest, RuntimeOperationRequest.PREPARE_GUEST, spec));
             } catch (Throwable error) {
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
@@ -716,6 +729,12 @@ public final class RuntimeBrokerService extends Service {
         } catch (Throwable error) {
             return failure(error);
         }
+    }
+
+    private static Bundle guestOperation(IGuestProcess guest, String operation, Bundle payload)
+            throws Exception {
+        return RuntimeOperationTransport.toLegacyBundle(
+                RuntimeOperationTransport.execute(guest, operation, payload));
     }
 
     private void stopMismatchedRevisionSessions(String packageName, int userId,

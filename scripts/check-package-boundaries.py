@@ -127,6 +127,7 @@ APP_ALLOWED_RUNTIME = {
     'com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService',
     'com.warden.controlledsandbox.runtime.protocol.RuntimeKeys',
     'com.warden.controlledsandbox.runtime.protocol.ComponentOperations',
+    'com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport',
     'com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics',
 }
 for source in (ROOT / 'app/src').rglob('*.java'):

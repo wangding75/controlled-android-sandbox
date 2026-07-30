@@ -293,7 +293,15 @@ final class DeviceServiceInvocationInterceptor {
             return Decision.handled(sensor == null ? null
                     : FrameworkDeviceObjectFactory.sensor(method.getReturnType(), sensor));
         }
-        if (containsAny(name, "registerlistener", "registersensor", "enablesensor")) {
+        if (InvocationMethodMatcher.named(name, "unregisterListener", "disableSensor", "flush")
+                || InvocationMethodMatcher.startsWith(name, "unregisterListener", "disableSensor")) {
+            Object listener = callback(arguments);
+            if (listener != null) identity.capabilityLeases().release(
+                    listener, identity.capabilityAudit(), "EXPLICIT_SENSOR_RELEASE");
+            return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (InvocationMethodMatcher.named(name, "registerListener", "registerSensor", "enableSensor")
+                || InvocationMethodMatcher.startsWith(name, "registerListener", "registerSensor", "enableSensor")) {
             Object listener = callback(arguments);
             if (listener == null) return Decision.handled(falseValue(method.getReturnType()));
             VirtualSensorSnapshot sensor = profile.sensorForType(type);
@@ -301,12 +309,6 @@ final class DeviceServiceInvocationInterceptor {
             if (sensor == null) return Decision.handled(falseValue(method.getReturnType()));
             invokeCallback(listener, new String[]{"onSensorChanged", "dispatchSensorEvent"}, sensor.values());
             identity.capabilityLeases().register("sensor", listener, () -> { });
-            return Decision.handled(successValue(method.getReturnType()));
-        }
-        if (containsAny(name, "unregisterlistener", "disablesensor", "flush")) {
-            Object listener = callback(arguments);
-            if (listener != null) identity.capabilityLeases().release(
-                    listener, identity.capabilityAudit(), "EXPLICIT_SENSOR_RELEASE");
             return Decision.handled(successValue(method.getReturnType()));
         }
         return failUnsupported("sensor", method);

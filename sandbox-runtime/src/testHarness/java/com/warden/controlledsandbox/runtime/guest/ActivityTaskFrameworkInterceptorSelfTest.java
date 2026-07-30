@@ -13,6 +13,8 @@ import com.warden.controlledsandbox.contract.ActivityTaskSnapshot;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.SandboxError;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
@@ -189,6 +191,7 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
                     "guest.pkg.MainActivity", "guest.pkg.DetailActivity", 9L, 3L);
         }
 
+        @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) { return null; }
         @Override public Bundle prepareGuest(Bundle request) { return null; }
         @Override public Bundle launchActivity(Bundle request) { return null; }
         @Override public Bundle invokeComponent(Bundle request) { return null; }

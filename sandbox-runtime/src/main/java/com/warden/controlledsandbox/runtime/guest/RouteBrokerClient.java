@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -11,6 +12,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.ActivityResultRequest;
 import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
@@ -23,19 +25,19 @@ public final class RouteBrokerClient {
     private RouteBrokerClient() { }
 
     public static void consume(Activity activity, String token, String sessionId, long generation, Callback callback) {
-        call(activity, broker -> broker.consumeRoute(token, sessionId, generation), callback);
+        call(activity, broker -> execute(broker, RuntimeOperationRequest.CONSUME_ROUTE, routeRequest(token, sessionId, generation)), callback);
     }
 
     public static void event(Activity activity, Bundle request, Callback callback) {
-        call(activity, broker -> broker.activityEvent(request), callback);
+        call(activity, broker -> execute(broker, RuntimeOperationRequest.ACTIVITY_EVENT, request), callback);
     }
 
     public static void launchActivity(Context context, Bundle request, Callback callback) {
-        call(context, broker -> broker.launchActivity(request), callback);
+        call(context, broker -> execute(broker, RuntimeOperationRequest.LAUNCH_ACTIVITY, request), callback);
     }
 
     public static void invokeComponent(Context context, Bundle request, Callback callback) {
-        call(context, broker -> broker.invokeComponent(request), callback);
+        call(context, broker -> execute(broker, RuntimeOperationRequest.INVOKE_COMPONENT, request), callback);
     }
 
     public static void activityResultOperation(
@@ -140,6 +142,22 @@ public final class RouteBrokerClient {
         failed.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
         failed.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
         return failed;
+    }
+
+    private static Bundle execute(IRuntimeBroker broker, String operation, Bundle payload)
+            throws Exception {
+        return RuntimeOperationTransport.toLegacyBundle(
+                RuntimeOperationTransport.execute(broker, operation, payload));
+    }
+
+    private static Bundle routeRequest(String token, String sessionId, long generation) {
+        Bundle request = new Bundle();
+        request.putInt(RuntimeKeys.PROTOCOL,
+                com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT);
+        request.putString(RuntimeKeys.ROUTE_TOKEN, token);
+        request.putString(RuntimeKeys.SESSION_ID, sessionId);
+        request.putLong(RuntimeKeys.GENERATION, generation);
+        return request;
     }
 
     private interface RemoteCall { Bundle invoke(IRuntimeBroker broker) throws Exception; }

@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 errors = []
 aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl').read_text()
 required = [
+    'RuntimeOperationResult executeV2(in RuntimeOperationRequest request);',
     'RuntimeStatusResult runtimeStatusV2(in RuntimeStatusRequest request);',
     'Bundle runtimeStatus();',
     'PackageServiceResult requestRuntimePermission(String sessionId, long generation,',
@@ -17,6 +18,34 @@ for signature in required:
         errors.append(f'IRuntimeBroker is missing {signature}')
 if re.search(r'Bundle\s+runtimeStatusV2\s*\(', aidl):
     errors.append('runtimeStatusV2 must not use Bundle')
+if re.search(r'Bundle\s+executeV2\s*\(', aidl):
+    errors.append('executeV2 must not return Bundle')
+
+guest_aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl').read_text()
+if 'RuntimeOperationResult executeV2(in RuntimeOperationRequest request);' not in guest_aidl:
+    errors.append('IGuestProcess is missing typed executeV2')
+if re.search(r'Bundle\s+executeV2\s*\(', guest_aidl):
+    errors.append('IGuestProcess executeV2 must not return Bundle')
+
+for name in ['RuntimeOperationRequest', 'RuntimeOperationResult']:
+    declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
+    source = ROOT / f'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/{name}.java'
+    if not declaration.is_file(): errors.append(f'missing AIDL parcelable declaration for {name}')
+    if not source.is_file(): errors.append(f'missing Java Parcelable implementation for {name}')
+    else:
+        value = source.read_text()
+        required_fields = ['protocolVersion', 'requestId', 'operation']
+        if name == 'RuntimeOperationRequest':
+            required_fields += ['packageName', 'virtualUserId', 'sessionId', 'generation']
+        else:
+            required_fields += ['success', 'status', 'SandboxError']
+        for token in required_fields:
+            if token not in value: errors.append(f'{name} is missing typed transport field {token}')
+
+operation_request = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/RuntimeOperationRequest.java').read_text()
+for token in ['Bundle payload', 'return new Bundle(payload)', 'OPERATIONS']:
+    if token not in operation_request:
+        errors.append(f'RuntimeOperationRequest missing bounded legacy payload evidence: {token}')
 
 for name in ['RuntimeStatusRequest', 'RuntimeStatusResult', 'RuntimeStatusSnapshot', 'SandboxError']:
     declaration = ROOT / f'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/{name}.aidl'
@@ -139,6 +168,32 @@ if 'RuntimeStatusResult.success(' not in dispatcher:
     errors.append('runtime status dispatcher must build a typed RuntimeStatusResult')
 if 'runtimeStatusDispatcher.dispatch(request)' not in service:
     errors.append('broker Binder must delegate typed status to RuntimeStatusDispatcher')
+
+
+broker_adapter = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeBrokerOperationAdapter.java').read_text()
+for evidence in ['broker.prepareGuest(payload)', 'broker.launchActivity(payload)', 'RuntimeOperationTransport.fromLegacy']:
+    if evidence not in broker_adapter:
+        errors.append(f'RuntimeBrokerOperationAdapter missing evidence: {evidence}')
+
+transport = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransport.java').read_text()
+for evidence in ['executeV2(request)', 'requestId()', 'operation()', 'RUNTIME_OPERATION_CORRELATION_MISMATCH']:
+    if evidence not in transport:
+        errors.append(f'RuntimeOperationTransport missing evidence: {evidence}')
+for rel in [
+    'app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java',
+    'app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java',
+    'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/RouteBrokerClient.java',
+]:
+    value = (ROOT / rel).read_text()
+    if 'RuntimeOperationTransport' not in value:
+        errors.append(f'{rel} must use RuntimeOperationTransport')
+legacy_pattern = re.compile(r'\b(?:broker|guest|requireBroker\(\))\.(?:prepareGuest|launchActivity|invokeComponent|grantUriPermission|revokeUriPermission|consumeRoute|activityEvent|sessionStatus)\s*\(')
+for root in [ROOT / 'app/src/main/java', ROOT / 'sandbox-runtime/src/main/java']:
+    for source in root.rglob('*.java'):
+        if source.name in {'RuntimeBrokerService.java', 'BaseGuestProcessService.java', 'RuntimeBrokerOperationAdapter.java'}:
+            continue
+        if legacy_pattern.search(source.read_text()):
+            errors.append(f'internal runtime caller still uses legacy Bundle path: {source.relative_to(ROOT)}')
 
 if errors:
     print('FAIL typed contract checks', file=sys.stderr)

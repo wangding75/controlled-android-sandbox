@@ -47,8 +47,9 @@ if "## M5-T2 cross-width runtime source baseline" not in readme:
 
 for needle in (
     "INativeCompanionArtifactService", "stageArtifact", "prepareWorkspace",
-    "requireBroker().prepareGuest", "requireBroker().launchActivity",
-    "requireBroker().invokeComponent", "requireBroker().stopGuest",
+    "RuntimeOperationTransport.execute(requireBroker()",
+    "RuntimeOperationRequest.PREPARE_GUEST", "RuntimeOperationRequest.LAUNCH_ACTIVITY",
+    "RuntimeOperationRequest.INVOKE_COMPONENT", "requireBroker().stopGuest",
     "resetControlBinding", "resetArtifactBinding", "resetBrokerBinding",
 ):
     if needle not in client:

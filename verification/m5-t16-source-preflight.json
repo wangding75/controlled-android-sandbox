@@ -1,0 +1,27 @@
+{
+  "iteration": "M5-T16",
+  "scope": "global source closure audit and VA/NBB residual-gap convergence",
+  "sourceStatus": "PASS",
+  "productionStatus": "PARTIAL",
+  "androidBuildStatus": "BLOCKED_JDK17_UNAVAILABLE",
+  "deviceEvidenceCount": 0,
+  "evidence": {
+    "typedRuntimeOperationContracts": 2,
+    "typedRuntimeExecuteEndpoints": 2,
+    "internalLegacyRuntimeCalls": 0,
+    "legacyBundleCompatibilityDeclarations": 12,
+    "methodClassifierRegressionsClosed": 2,
+    "falseCoverageDomainsClosed": 1,
+    "frameworkHookCount": 58,
+    "productionClassesOver500Lines": 14,
+    "remainingSourceFeasibleCandidates": 6,
+    "referenceFilesModified": 0,
+    "frozenCapabilityCategories": 113
+  },
+  "deferred": [
+    "removal of compatibility Bundle methods after external caller migration",
+    "large-class decomposition requiring dedicated low-risk iterations",
+    "SearchManager, StorageStats, GraphicsStats, ContextHub, PersistentDataBlock and SystemUpdate source domains",
+    "real Android Binder signatures, hidden objects and device behavior"
+  ]
+}

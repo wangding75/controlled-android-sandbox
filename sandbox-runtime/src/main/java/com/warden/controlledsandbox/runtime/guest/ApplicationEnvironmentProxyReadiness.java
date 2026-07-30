@@ -17,6 +17,9 @@ final class ApplicationEnvironmentProxyReadiness {
         }
         List<String> missing = new ArrayList<>();
         requireDomain(profile.user().mode(), installed, missing, "userManager");
+        if (!profile.user().applicationRestrictionKeys().isEmpty()) {
+            requireDomain(profile.user().mode(), installed, missing, "restrictions");
+        }
         requireDomain(profile.launcher().mode(), installed, missing, "launcherApps");
         requireDomain(profile.shortcut().mode(), installed, missing, "shortcut");
         requireDomain(profile.appWidget().mode(), installed, missing, "appWidget");

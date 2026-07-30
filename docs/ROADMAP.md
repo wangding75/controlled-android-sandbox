@@ -264,3 +264,10 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PARTIAL — real platform parcelables/callbacks, system UI, physical peripherals, capture pipeline and OEM objects.
 - DEVICE — Android Binder signatures, permissions/AppOps, hardware/HAL, SELinux, SystemUI and OEM validation.
 - NEXT — remaining service breadth and source-hardening review, unless the locked Android build becomes available first.
+
+## M5-T16 global source-closure baseline
+
+- Typed Runtime operation transport and internal caller migration: source PASS.
+- Sensor/Content inverse-method classification and RestrictionsManager entry point: source PASS.
+- Residual source gaps and large-class debt: inventoried, not misreported as complete.
+- Real Android build and device evidence: pending locked JDK 17, SDK/NDK and device execution.

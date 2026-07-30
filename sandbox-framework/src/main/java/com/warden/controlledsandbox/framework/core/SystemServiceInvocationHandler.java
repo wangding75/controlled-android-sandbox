@@ -50,8 +50,8 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.networkInterceptor = Set.of("connectivity", "dnsresolver", "vpn").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new NetworkServiceInvocationInterceptor(identity, this.serviceName) : null;
-        this.applicationEnvironmentInterceptor = Set.of("usermanager", "launcherapps", "shortcut",
-                "appwidget", "usagestats", "content").contains(
+        this.applicationEnvironmentInterceptor = Set.of("usermanager", "restrictions", "launcherapps",
+                "shortcut", "appwidget", "usagestats", "content").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new ApplicationEnvironmentInvocationInterceptor(identity, this.serviceName) : null;
         this.compatibilityInterceptor = Set.of("webviewupdate", "deviceidentifiers", "gms", "oemidentifier").contains(

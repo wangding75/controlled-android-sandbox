@@ -67,7 +67,8 @@ for token in (permission, 'NativeCompanionArtifactService',
 client = text('app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java')
 runtime = text('app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java')
 for token in ('INativeCompanionArtifactService', 'ParcelFileDescriptor.open',
-              'prepareGuest', 'launchActivity', 'invokeComponent', 'stopGuest'):
+              'RuntimeOperationRequest.PREPARE_GUEST', 'RuntimeOperationRequest.LAUNCH_ACTIVITY',
+              'RuntimeOperationRequest.INVOKE_COMPONENT', 'stopGuest'):
     if token not in client:
         errors.append(f'Companion runtime client is missing {token}')
 if 'NATIVE_COMPANION_CROSS_WIDTH_EXECUTION_NOT_WIRED' in runtime:

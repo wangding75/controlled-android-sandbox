@@ -10,11 +10,13 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
@@ -50,14 +52,14 @@ final class RuntimeClient implements AutoCloseable {
         Bundle request = request(record, virtualUserId, record.launchProcess);
         return companionRoute(record)
                 ? nativeCompanion.prepare(record, virtualUserId, request)
-                : requireBroker().prepareGuest(request);
+                : execute(RuntimeOperationRequest.PREPARE_GUEST, request);
     }
     Bundle launch(SandboxRecord record) throws Exception { return launch(record, 0); }
     Bundle launch(SandboxRecord record, int virtualUserId) throws Exception {
         Bundle request = request(record, virtualUserId, record.launchProcess);
         return companionRoute(record)
                 ? nativeCompanion.launchActivity(record, virtualUserId, request)
-                : requireBroker().launchActivity(request);
+                : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
     }
     Bundle startService(SandboxRecord record) throws Exception { return startService(record, 0); }
     Bundle startService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.START_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
@@ -159,7 +161,12 @@ final class RuntimeClient implements AutoCloseable {
     private Bundle invoke(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
         return companionRoute(record)
                 ? nativeCompanion.invokeComponent(record, virtualUserId, request)
-                : requireBroker().invokeComponent(request);
+                : execute(RuntimeOperationRequest.INVOKE_COMPONENT, request);
+    }
+
+    private Bundle execute(String operation, Bundle request) throws Exception {
+        return RuntimeOperationTransport.toLegacyBundle(
+                RuntimeOperationTransport.execute(requireBroker(), operation, request));
     }
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {

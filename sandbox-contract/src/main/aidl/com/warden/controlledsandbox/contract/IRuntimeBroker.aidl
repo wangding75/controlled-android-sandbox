@@ -7,7 +7,10 @@ import com.warden.controlledsandbox.contract.ActivityResultResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 interface IRuntimeBroker {
+    RuntimeOperationResult executeV2(in RuntimeOperationRequest request);
     Bundle prepareGuest(in Bundle request);
     Bundle launchActivity(in Bundle request);
     Bundle invokeComponent(in Bundle request);

@@ -25,6 +25,7 @@ import com.warden.controlledsandbox.framework.service.ConnectivityServiceHook;
 import com.warden.controlledsandbox.framework.service.DnsResolverServiceHook;
 import com.warden.controlledsandbox.framework.service.VpnManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.UserManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.RestrictionsManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.LauncherAppsServiceHook;
 import com.warden.controlledsandbox.framework.service.ShortcutManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.AppWidgetManagerServiceHook;
@@ -145,6 +146,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> VpnManagerServiceHook.install(hostServiceContext, identity));
         attempt("userManager", installed, failures, hooks,
                 () -> UserManagerServiceHook.install(hostServiceContext, identity));
+        attempt("restrictions", installed, failures, hooks,
+                () -> RestrictionsManagerServiceHook.install(identity));
         attempt("launcherApps", installed, failures, hooks,
                 () -> LauncherAppsServiceHook.install(hostServiceContext, identity));
         attempt("shortcut", installed, failures, hooks,

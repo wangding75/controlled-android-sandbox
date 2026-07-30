@@ -234,3 +234,7 @@ and configured OEM system-service profiles. It source-wires reversible service h
 sessions, transactional OEM hook installation and fail-closed Guest readiness without exposing Host peripheral state.
 Source status is PASS; production remains PARTIAL; the locked Android build and all physical-device evidence remain
 blocked by the unavailable JDK 17/Android toolchain.
+
+## M5-T16 global source-closure baseline
+
+M5-T16 adds typed V2 Runtime operations, migrates repository-owned callers away from direct Bundle IPC, fixes inverse method-name collisions, and closes the RestrictionsManager false-coverage gap. Legacy Bundle methods remain compatibility adapters. The source audit records remaining service and large-class debt separately from Android/device evidence.

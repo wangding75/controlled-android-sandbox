@@ -1,0 +1,189 @@
+{
+  "iteration": "M5-T16",
+  "sourceStatus": "PASS",
+  "productionStatus": "PARTIAL",
+  "deviceEvidenceCount": 0,
+  "typedRuntimeTransport": {
+    "brokerExecuteV2": true,
+    "guestExecuteV2": true,
+    "legacyCompatibilityDeclarations": 12,
+    "legacyCompatibilityDetails": [
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle prepareGuest(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle launchActivity(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle invokeComponent(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle grantUriPermission(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle revokeUriPermission(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle consumeRoute(String token, String sessionId, long generation);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle activityEvent(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle sessionStatus(String packageName, int virtualUserId);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle runtimeStatus();",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle prepareGuest(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle invokeComponent(in Bundle request);",
+      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle runtimeStatus();"
+    ],
+    "internalLegacyDirectCalls": []
+  },
+  "methodClassification": {
+    "exactFirstMatcher": true,
+    "sensorUnregisterRegression": true,
+    "contentObserverUnregisterRegression": true
+  },
+  "falseCoverageClosed": {
+    "restrictionsManagerHook": true,
+    "restrictionsRuntimeProjection": true,
+    "restrictionsReadiness": true
+  },
+  "frameworkHookCount": 58,
+  "frameworkHooks": [
+    "packageManager",
+    "activityClient",
+    "window",
+    "inputMethod",
+    "display",
+    "appOps",
+    "permission",
+    "notification",
+    "jobScheduler",
+    "alarm",
+    "clipboard",
+    "account",
+    "storage",
+    "camera",
+    "location",
+    "deviceIdentity",
+    "settingsIdentity",
+    "webViewUpdate",
+    "deviceIdentifiers",
+    "googleServiceBroker",
+    "oemIdentifiers",
+    "telephony",
+    "phoneSubInfo",
+    "telephonyRegistry",
+    "subscription",
+    "wifi",
+    "wifiScanner",
+    "connectivity",
+    "dnsResolver",
+    "vpn",
+    "userManager",
+    "restrictions",
+    "launcherApps",
+    "shortcut",
+    "appWidget",
+    "usageStats",
+    "content",
+    "devicePolicy",
+    "accessibility",
+    "autofill",
+    "biometric",
+    "sensorPrivacy",
+    "power",
+    "vibrator",
+    "mediaSession",
+    "mediaRouter",
+    "sms",
+    "backup",
+    "dropBox",
+    "nfc",
+    "usb",
+    "print",
+    "companionDevice",
+    "mediaProjection",
+    "oemSystemServices",
+    "bluetooth",
+    "sensorCatalog",
+    "audioCapture"
+  ],
+  "productionClassesOver500Lines": [
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+      "lines": 1741
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+      "lines": 1655
+    },
+    {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+      "lines": 1368
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+      "lines": 1139
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+      "lines": 877
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+      "lines": 804
+    },
+    {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+      "lines": 781
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java",
+      "lines": 641
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+      "lines": 629
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+      "lines": 598
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+      "lines": 597
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+      "lines": 580
+    },
+    {
+      "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+      "lines": 557
+    },
+    {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+      "lines": 536
+    }
+  ],
+  "remainingSourceFeasibleCandidates": [
+    {
+      "domain": "SearchManager",
+      "sourceFeasible": true,
+      "deviceDependency": "searchable metadata and platform object layout"
+    },
+    {
+      "domain": "StorageStats",
+      "sourceFeasible": true,
+      "deviceDependency": "storage attribution and quota enforcement"
+    },
+    {
+      "domain": "GraphicsStats",
+      "sourceFeasible": true,
+      "deviceDependency": "graphics service callback and buffer objects"
+    },
+    {
+      "domain": "ContextHub",
+      "sourceFeasible": true,
+      "deviceDependency": "physical nanoapp and hardware callback behavior"
+    },
+    {
+      "domain": "PersistentDataBlock",
+      "sourceFeasible": true,
+      "deviceDependency": "privileged hardware-backed storage"
+    },
+    {
+      "domain": "SystemUpdate",
+      "sourceFeasible": true,
+      "deviceDependency": "privileged update engine behavior"
+    }
+  ],
+  "referenceFilesModified": 0,
+  "frozenCapabilityCategories": 113
+}

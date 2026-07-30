@@ -50,6 +50,7 @@ final class ApplicationEnvironmentInvocationInterceptor {
         }
         return switch (service) {
             case "usermanager" -> user(method, arguments, profile.user());
+            case "restrictions" -> restrictions(method, arguments, profile.user());
             case "launcherapps" -> launcher(method, arguments, profile.launcher());
             case "shortcut" -> shortcut(method, arguments, profile.shortcut());
             case "appwidget" -> appWidget(method, arguments, profile.appWidget());
@@ -108,6 +109,29 @@ final class ApplicationEnvironmentInvocationInterceptor {
             throw new SecurityException("VIRTUAL_USER_MUTATION_DENIED:" + method.getName());
         }
         return failUnsupported("user", method);
+    }
+
+    private Decision restrictions(Method method, Object[] arguments, VirtualUserProfileSnapshot profile) {
+        String name = normalize(method.getName());
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return Decision.passThrough();
+        if (VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())) {
+            if (isCleanup(name)) return Decision.handled(successValue(method.getReturnType()));
+            if (startsAny(name, "get", "has", "is")) {
+                return Decision.handled(emptyValue(method.getReturnType()));
+            }
+            throw new SecurityException("VIRTUAL_RESTRICTIONS_MANAGER_BLOCKED:" + method.getName());
+        }
+        if (containsAny(name, "getapplicationrestrictions", "getapplicationrestrictionsperadmin")) {
+            return Decision.handled(applicationRestrictionsBundle(profile));
+        }
+        if (containsAny(name, "hasrestrictionsprovider")) return Decision.handled(falseValue(method.getReturnType()));
+        if (containsAny(name, "createlocalapprovalintent")) {
+            return Decision.handled(nullValue(method.getReturnType()));
+        }
+        if (startsAny(name, "requestpermission", "notifypermissionresponse", "set", "put", "remove", "clear")) {
+            throw new SecurityException("VIRTUAL_RESTRICTIONS_MUTATION_DENIED:" + method.getName());
+        }
+        return failUnsupported("restrictions", method);
     }
 
     private Decision launcher(Method method, Object[] arguments, VirtualLauncherProfileSnapshot profile) {
@@ -338,18 +362,20 @@ final class ApplicationEnvironmentInvocationInterceptor {
         String name = normalize(method.getName());
         if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return Decision.passThrough();
         requireStatic(profile.mode(), "content", name);
-        if (containsAny(name, "registercontentobserver")) {
+        if (InvocationMethodMatcher.named(name, "unregisterContentObserver")
+                || InvocationMethodMatcher.startsWith(name, "unregisterContentObserver")) {
+            Object observer = callback(arguments);
+            if (observer != null) contentObservers.remove(observer);
+            return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (InvocationMethodMatcher.named(name, "registerContentObserver")
+                || InvocationMethodMatcher.startsWith(name, "registerContentObserver")) {
             Object observer = callback(arguments);
             if (observer == null) throw new IllegalArgumentException("VIRTUAL_CONTENT_OBSERVER_REQUIRED");
             if (contentObservers.size() >= 256 && !contentObservers.contains(observer)) {
                 throw new IllegalStateException("VIRTUAL_CONTENT_OBSERVER_LIMIT_EXCEEDED");
             }
             contentObservers.add(observer);
-            return Decision.handled(successValue(method.getReturnType()));
-        }
-        if (containsAny(name, "unregistercontentobserver")) {
-            Object observer = callback(arguments);
-            if (observer != null) contentObservers.remove(observer);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "notifychange")) {

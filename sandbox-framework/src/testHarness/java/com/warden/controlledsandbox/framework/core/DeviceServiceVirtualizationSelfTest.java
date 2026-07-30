@@ -117,6 +117,8 @@ public final class DeviceServiceVirtualizationSelfTest {
         require(listener.events == 1 && listener.last.length == 3 && listener.last[2] == 9.80665f,
                 "virtual sensor sample delivered");
         api.unregisterListener(listener);
+        require(identity.capabilityLeases().activeCount("sensor") == 0,
+                "unregister sensor listener releases rather than re-registers the lease");
         require(delegate.calls == 0, "sensor virtual path does not call delegate");
     }
 

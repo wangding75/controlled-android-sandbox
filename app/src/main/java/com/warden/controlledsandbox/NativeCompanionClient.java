@@ -10,12 +10,14 @@ import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.INativeAbiCompanion;
 import com.warden.controlledsandbox.contract.INativeCompanionArtifactService;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import java.io.File;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -107,15 +109,23 @@ final class NativeCompanionClient implements AutoCloseable {
     }
 
     Bundle prepare(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
-        return requireBroker().prepareGuest(stageRequest(record, virtualUserId, request));
+        return execute(RuntimeOperationRequest.PREPARE_GUEST,
+                stageRequest(record, virtualUserId, request));
     }
 
     Bundle launchActivity(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
-        return requireBroker().launchActivity(stageRequest(record, virtualUserId, request));
+        return execute(RuntimeOperationRequest.LAUNCH_ACTIVITY,
+                stageRequest(record, virtualUserId, request));
     }
 
     Bundle invokeComponent(SandboxRecord record, int virtualUserId, Bundle request) throws Exception {
-        return requireBroker().invokeComponent(stageRequest(record, virtualUserId, request));
+        return execute(RuntimeOperationRequest.INVOKE_COMPONENT,
+                stageRequest(record, virtualUserId, request));
+    }
+
+    private Bundle execute(String operation, Bundle request) throws Exception {
+        return RuntimeOperationTransport.toLegacyBundle(
+                RuntimeOperationTransport.execute(requireBroker(), operation, request));
     }
 
     void stopGuest(SandboxRecord record, int virtualUserId) throws Exception {

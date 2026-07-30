@@ -40,6 +40,15 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         require(user.isUserUnlocked(), "virtual user unlocked");
         require(user.getUserRestrictions().getBoolean("no_install_unknown_sources", false), "user restriction");
 
+        RestrictionsApi restrictions = proxy(RestrictionsApi.class, identity, "restrictions");
+        require("true".equals(restrictions.getApplicationRestrictions("guest.pkg").getString("managed")),
+                "application restriction projection");
+        require(!restrictions.hasRestrictionsProvider(), "host restrictions provider hidden");
+        boolean restrictionsMutationDenied = false;
+        try { restrictions.requestPermission("guest.pkg", "camera", "request", new Bundle()); }
+        catch (SecurityException expected) { restrictionsMutationDenied = true; }
+        require(restrictionsMutationDenied, "restrictions mutation denied");
+
         LauncherApi launcher = proxy(LauncherApi.class, identity, "launcherApps");
         require(launcher.isPackageEnabled("guest.pkg", null), "launcher package visibility");
         require(launcher.getLauncherActivities("guest.pkg", null).size() == 1, "launcher activity projection");
@@ -76,6 +85,9 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         content.notifyChange("content://settings/secure/theme_mode", null, 3);
         require(changes.get() == 1, "content observer delivery");
         content.unregisterContentObserver(observer);
+        content.notifyChange("content://settings/secure/theme_mode", null, 3);
+        require(changes.get() == 1,
+                "unregister content observer removes rather than re-registers the callback");
         require(content.getSyncAdapterTypes().isEmpty(), "sync adapters fail closed");
 
         FakeAuthority hostAuthority = new FakeAuthority(profile(VirtualLocationProfileSnapshot.MODE_HOST));
@@ -137,6 +149,11 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         public int getUserHandle() { return 77; }
         public boolean isUserUnlocked() { return false; }
         public Bundle getUserRestrictions() { return new Bundle(); }
+    }
+    interface RestrictionsApi {
+        Bundle getApplicationRestrictions(String packageName);
+        boolean hasRestrictionsProvider();
+        void requestPermission(String packageName, String requestType, String requestId, Bundle request);
     }
     interface LauncherApi {
         boolean isPackageEnabled(String packageName, Object user);
