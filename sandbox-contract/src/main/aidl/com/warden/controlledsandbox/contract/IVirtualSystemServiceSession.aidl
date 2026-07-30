@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 
 interface IVirtualSystemServiceSession {
     byte[] getClipboard();
@@ -56,6 +57,7 @@ interface IVirtualSystemServiceSession {
 
     VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile();
     VirtualInteractionProfileSnapshot getInteractionProfile();
+    VirtualNetworkServiceProfileSnapshot getNetworkServiceProfile();
 
     void close();
 }

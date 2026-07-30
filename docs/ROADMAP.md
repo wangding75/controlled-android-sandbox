@@ -197,3 +197,14 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed Guest startup when a configured non-HOST interaction domain lacks a required hook.
 - PARTIAL — real Surface/InputChannel/Insets, ActivityClient transaction matrix, IME rendering/InputConnection and virtual-display surfaces.
 - DEVICE — Android hidden Binder signatures, SystemUI, multi-window/PiP, keyboard, display callbacks and OEM validation.
+
+## M5-T10 Connectivity, DNS, Proxy/VPN and Java network-services baseline
+
+- DONE — typed package/virtual-user network profiles with BLOCKED/STATIC/HOST modes and Package-Service ownership.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime observer refresh.
+- DONE — source-wired Connectivity active/all network, capabilities/link properties, NetworkInfo, metering/background and proxy projection.
+- DONE — deterministic DNS records/NXDOMAIN, raw-query denial and resolver policy source surface.
+- DONE — bounded Connectivity callback and VPN-session ownership with explicit release and generation cleanup.
+- DONE — fail-closed Guest startup when a configured non-HOST network domain lacks a required hook.
+- PARTIAL — real hidden framework objects, callback Binder/PendingIntent transport, resolver/netd/private-DNS and PAC behavior.
+- DEVICE — VPN consent/TUN/routing, per-UID enforcement, SELinux, Doze, captive portal, SystemUI and OEM network validation.

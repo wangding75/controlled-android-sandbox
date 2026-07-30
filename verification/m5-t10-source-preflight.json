@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "stage": "M5-T10",
+  "sourceStatus": "pass",
+  "productionStatus": "partial",
+  "androidBuildStatus": "blocked-toolchain",
+  "baseCommit": "48922688c1691b430674c2d3ba4190509d74d87b",
+  "capabilityCount": 113,
+  "sourceComplete": 113,
+  "production": {
+    "wired": 110,
+    "partial": 2,
+    "notApplicable": 1
+  },
+  "deviceEvidence": {
+    "verifiedCapabilities": 0,
+    "emulatorRuns": 0,
+    "physicalDeviceRuns": 0,
+    "stabilityMinutes": 0
+  },
+  "networkServices": {
+    "isolationKey": ["packageName", "virtualUserId"],
+    "modes": ["BLOCKED", "STATIC", "HOST"],
+    "persistence": {
+      "atomic": true,
+      "bounded": true,
+      "crcVerified": true,
+      "corruptStateQuarantine": true,
+      "optimisticVersioning": true
+    },
+    "connectivity": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["real Binder signatures", "hidden network object layouts", "callback/PendingIntent transport"]
+    },
+    "dns": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["resolver/netd integration", "private DNS", "captive portal and validation"]
+    },
+    "proxy": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["real ProxyInfo layouts", "PAC execution", "WebView proxy interaction"]
+    },
+    "vpn": {
+      "source": "complete-for-stage",
+      "production": "partial",
+      "device": "not-tested",
+      "deferred": ["VpnService consent", "TUN descriptors and packet routing", "always-on/lockdown enforcement"]
+    }
+  }
+}

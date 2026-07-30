@@ -21,6 +21,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final VirtualSystemServiceInterceptor virtualServiceInterceptor;
     private final DeviceServiceInvocationInterceptor deviceServiceInterceptor;
     private final InteractionServiceInvocationInterceptor interactionInterceptor;
+    private final NetworkServiceInvocationInterceptor networkInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -41,6 +42,9 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "inputMethod", "display").stream().map(String::toLowerCase)
                 .anyMatch(value -> value.equals(this.serviceName.toLowerCase(java.util.Locale.ROOT)))
                 ? new InteractionServiceInvocationInterceptor(identity, this.serviceName, delegate) : null;
+        this.networkInterceptor = Set.of("connectivity", "dnsresolver", "vpn").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new NetworkServiceInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -49,6 +53,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
+        NetworkServiceInvocationInterceptor.Decision networkCall = networkInterceptor == null
+                ? NetworkServiceInvocationInterceptor.Decision.passThrough()
+                : networkInterceptor.before(method, arguments);
+        if (networkCall.handled()) return networkCall.result();
         DeviceServiceInvocationInterceptor.Decision deviceCall = deviceServiceInterceptor == null
                 ? DeviceServiceInvocationInterceptor.Decision.passThrough()
                 : deviceServiceInterceptor.before(method, arguments);

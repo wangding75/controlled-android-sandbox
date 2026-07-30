@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.framework.identity;
 
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import java.util.List;
 
 /** Optional cross-process authority backing Guest-visible virtual system-service state. */
@@ -59,6 +60,9 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     }
     default VirtualInteractionProfileSnapshot interactionProfile() {
         throw new IllegalStateException("VIRTUAL_INTERACTION_PROFILE_NOT_AVAILABLE");
+    }
+    default VirtualNetworkServiceProfileSnapshot networkServiceProfile() {
+        throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_NOT_AVAILABLE");
     }
 
     Object clipboard();

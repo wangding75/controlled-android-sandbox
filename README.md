@@ -183,3 +183,12 @@ hides Host IME catalogs, rewrites interaction identity only for the duration of 
 display limits and fails Guest startup when a required non-HOST hook is absent. Real Window/Surface/InputChannel,
 ActivityClient transaction, keyboard rendering, virtual-display surface and OEM behavior remain device-gated;
 device evidence remains 0.
+
+## M5-T10 Connectivity, DNS, Proxy/VPN and Java network-services source baseline
+
+M5-T10 adds Package-Service-owned, package/virtual-user network-service profiles and generation-scoped ownership
+ledgers for Connectivity callbacks and VPN sessions. Static policy projects active/all networks, capabilities, link
+properties, legacy network information, proxy state and deterministic DNS records without using Host network identity,
+and enforces explicit mutation, callback and VPN-session limits. Missing required non-HOST Connectivity/DNS/VPN hooks
+block Guest startup. Real Android network object layouts, resolver/netd integration, callback Binder transport, TUN
+routing and OEM behavior remain device-gated; device evidence remains 0.

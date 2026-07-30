@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.framework.identity;
 
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -27,6 +28,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     private final VirtualSystemServiceAuthority authority;
     private final VirtualDeviceServiceProfileSnapshot localDeviceProfile;
     private final VirtualInteractionProfileSnapshot localInteractionProfile;
+    private final VirtualNetworkServiceProfileSnapshot localNetworkProfile;
     private final ClipboardState clipboard;
     private final AccountState accounts;
     private final PendingIntentState pendingIntents;
@@ -37,14 +39,21 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     public VirtualSystemServiceState() { this((VirtualSystemServiceAuthority) null); }
 
     public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile) {
-        this(deviceProfile, null);
+        this(deviceProfile, null, null);
     }
 
     public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile,
             VirtualInteractionProfileSnapshot interactionProfile) {
+        this(deviceProfile, interactionProfile, null);
+    }
+
+    public VirtualSystemServiceState(VirtualDeviceServiceProfileSnapshot deviceProfile,
+            VirtualInteractionProfileSnapshot interactionProfile,
+            VirtualNetworkServiceProfileSnapshot networkProfile) {
         this.authority = null;
         this.localDeviceProfile = java.util.Objects.requireNonNull(deviceProfile, "deviceProfile");
         this.localInteractionProfile = interactionProfile;
+        this.localNetworkProfile = networkProfile;
         clipboard = new ClipboardState(null);
         accounts = new AccountState(null);
         pendingIntents = new PendingIntentState(null);
@@ -57,6 +66,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         this.authority = authority;
         this.localDeviceProfile = null;
         this.localInteractionProfile = null;
+        this.localNetworkProfile = null;
         clipboard = new ClipboardState(authority);
         accounts = new AccountState(authority);
         pendingIntents = new PendingIntentState(authority);
@@ -81,6 +91,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         if (authority != null) return authority.interactionProfile();
         if (localInteractionProfile != null) return localInteractionProfile;
         throw new IllegalStateException("VIRTUAL_INTERACTION_PROFILE_AUTHORITY_REQUIRED");
+    }
+    public VirtualNetworkServiceProfileSnapshot networkServiceProfile() {
+        if (authority != null) return authority.networkServiceProfile();
+        if (localNetworkProfile != null) return localNetworkProfile;
+        throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_AUTHORITY_REQUIRED");
     }
 
     @Override public void close() {

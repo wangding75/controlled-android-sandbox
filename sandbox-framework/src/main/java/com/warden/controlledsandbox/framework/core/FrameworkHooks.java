@@ -21,6 +21,9 @@ import com.warden.controlledsandbox.framework.service.WindowManagerHook;
 import com.warden.controlledsandbox.framework.service.ActivityClientHook;
 import com.warden.controlledsandbox.framework.service.InputMethodManagerHook;
 import com.warden.controlledsandbox.framework.service.DisplayManagerHook;
+import com.warden.controlledsandbox.framework.service.ConnectivityServiceHook;
+import com.warden.controlledsandbox.framework.service.DnsResolverServiceHook;
+import com.warden.controlledsandbox.framework.service.VpnManagerServiceHook;
 
 import android.content.Context;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
@@ -57,6 +60,7 @@ public final class FrameworkHooks implements AutoCloseable {
         List<AutoCloseable> hooks = new ArrayList<>();
         hooks.add(identity.virtualServices());
         hooks.add(identity.interactions());
+        hooks.add(identity.networks());
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
         attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(guestContext, identity));
@@ -96,6 +100,12 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("wifi", installed, failures, hooks, () -> WifiServiceHook.install(hostServiceContext, identity));
         attempt("wifiScanner", installed, failures, hooks,
                 () -> WifiServiceHook.installScanner(hostServiceContext, identity));
+        attempt("connectivity", installed, failures, hooks,
+                () -> ConnectivityServiceHook.install(hostServiceContext, identity));
+        attempt("dnsResolver", installed, failures, hooks,
+                () -> DnsResolverServiceHook.install(identity));
+        attempt("vpn", installed, failures, hooks,
+                () -> VpnManagerServiceHook.install(hostServiceContext, identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,
