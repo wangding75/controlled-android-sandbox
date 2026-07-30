@@ -46,6 +46,12 @@ import com.warden.controlledsandbox.framework.service.MediaRouterServiceHook;
 import com.warden.controlledsandbox.framework.service.SmsServiceHook;
 import com.warden.controlledsandbox.framework.service.BackupManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.DropBoxManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.NfcServiceHook;
+import com.warden.controlledsandbox.framework.service.UsbServiceHook;
+import com.warden.controlledsandbox.framework.service.PrintManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.CompanionDeviceManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.MediaProjectionManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.OemSystemServicesHook;
 
 
 import android.content.Context;
@@ -173,6 +179,18 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> BackupManagerServiceHook.install(identity));
         attempt("dropBox", installed, failures, hooks,
                 () -> DropBoxManagerServiceHook.install(identity));
+        attempt("nfc", installed, failures, hooks,
+                () -> NfcServiceHook.install(identity));
+        attempt("usb", installed, failures, hooks,
+                () -> UsbServiceHook.install(identity));
+        attempt("print", installed, failures, hooks,
+                () -> PrintManagerServiceHook.install(identity));
+        attempt("companionDevice", installed, failures, hooks,
+                () -> CompanionDeviceManagerServiceHook.install(identity));
+        attempt("mediaProjection", installed, failures, hooks,
+                () -> MediaProjectionManagerServiceHook.install(identity));
+        attempt("oemSystemServices", installed, failures, hooks,
+                () -> OemSystemServicesHook.install(identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,

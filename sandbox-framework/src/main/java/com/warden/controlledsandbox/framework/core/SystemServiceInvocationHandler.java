@@ -26,6 +26,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final CompatibilityInvocationInterceptor compatibilityInterceptor;
     private final PolicyServicesInvocationInterceptor policyServicesInterceptor;
     private final MediaCommunicationInvocationInterceptor mediaCommunicationInterceptor;
+    private final PeripheralServicesInvocationInterceptor peripheralServicesInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -64,6 +65,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "isms", "isms2", "backup", "dropbox").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new MediaCommunicationInvocationInterceptor(identity, this.serviceName) : null;
+        this.peripheralServicesInterceptor = Set.of("nfc", "usb", "print",
+                "companiondevice", "mediaprojection", "camera", "oemsystem").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new PeripheralServicesInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -81,6 +86,16 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                         ? MediaCommunicationInvocationInterceptor.Decision.passThrough()
                         : mediaCommunicationInterceptor.before(method, arguments);
         if (mediaCommunicationCall.handled()) return mediaCommunicationCall.result();
+        PeripheralServicesInvocationInterceptor.Decision peripheralCall =
+                peripheralServicesInterceptor == null
+                        ? PeripheralServicesInvocationInterceptor.Decision.passThrough()
+                        : peripheralServicesInterceptor.before(method, arguments);
+        if (peripheralCall.handled()) {
+            if (capabilityInterceptor != null) {
+                capabilityInterceptor.afterVirtualSuccess(capabilityCall, arguments);
+            }
+            return peripheralCall.result();
+        }
         CompatibilityInvocationInterceptor.Decision compatibilityCall = compatibilityInterceptor == null
                 ? CompatibilityInvocationInterceptor.Decision.passThrough()
                 : compatibilityInterceptor.before(method, arguments);

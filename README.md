@@ -226,3 +226,11 @@ and focus, SMS messaging, Backup and DropBox. Profiles are isolated by package a
 Service with optimistic versions, CRC and corrupt-state quarantine, and delivered to revision-bound Runtime sessions.
 Media/router/focus ownership, SMS quota records and DropBox writes are bounded. Static SMS never calls the Host carrier
 service. Source status is PASS; production status is PARTIAL; Android build and device evidence remain blocked/0.
+
+## M5-T15 peripheral and external system-services source baseline
+
+M5-T15 adds typed, durable per-package/per-virtual-user NFC, USB, Printing, Companion Device, MediaProjection, Camera
+and configured OEM system-service profiles. It source-wires reversible service hooks, bounded generation-local
+sessions, transactional OEM hook installation and fail-closed Guest readiness without exposing Host peripheral state.
+Source status is PASS; production remains PARTIAL; the locked Android build and all physical-device evidence remain
+blocked by the unavailable JDK 17/Android toolchain.

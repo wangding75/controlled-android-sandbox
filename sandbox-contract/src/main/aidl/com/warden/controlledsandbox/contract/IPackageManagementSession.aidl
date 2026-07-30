@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapsh
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
@@ -66,6 +67,10 @@ interface IPackageManagementSession {
     VirtualMediaCommunicationProfileSnapshot setMediaCommunicationProfile(String packageName, int virtualUserId,
             in VirtualMediaCommunicationProfileSnapshot profile);
     VirtualMediaCommunicationProfileSnapshot resetMediaCommunicationProfile(String packageName, int virtualUserId);
+    VirtualPeripheralServicesProfileSnapshot getPeripheralServicesProfile(String packageName, int virtualUserId);
+    VirtualPeripheralServicesProfileSnapshot setPeripheralServicesProfile(String packageName, int virtualUserId,
+            in VirtualPeripheralServicesProfileSnapshot profile);
+    VirtualPeripheralServicesProfileSnapshot resetPeripheralServicesProfile(String packageName, int virtualUserId);
     PackageServiceResult maintenanceStatus();
     void close();
 }

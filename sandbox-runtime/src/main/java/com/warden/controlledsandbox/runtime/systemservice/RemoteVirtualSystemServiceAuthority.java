@@ -19,6 +19,7 @@ import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapsh
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -46,6 +47,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private volatile VirtualCompatibilityProfileSnapshot compatibilityProfile;
     private volatile VirtualPolicyServicesProfileSnapshot policyServicesProfile;
     private volatile VirtualMediaCommunicationProfileSnapshot mediaCommunicationProfile;
+    private volatile VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile;
     private volatile java.util.function.BiConsumer<String, String> applicationEnvironmentChangeListener = (domain, key) -> { };
     private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
@@ -83,6 +85,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         @Override public void onMediaCommunicationProfileChanged(long policyVersion) {
             VirtualMediaCommunicationProfileSnapshot current = call(session::getMediaCommunicationProfile);
             if (current != null && current.policyVersion() >= policyVersion) mediaCommunicationProfile = current;
+        }
+        @Override public void onPeripheralServicesProfileChanged(long policyVersion) {
+            VirtualPeripheralServicesProfileSnapshot current = call(session::getPeripheralServicesProfile);
+            if (current != null && current.policyVersion() >= policyVersion) peripheralServicesProfile = current;
         }
         @Override public void onApplicationEnvironmentDataChanged(String domain, String key) {
             applicationEnvironmentChangeListener.accept(domain == null ? "" : domain, key == null ? "" : key);
@@ -129,6 +135,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (mediaCommunicationProfile == null) {
             throw new IllegalStateException("VIRTUAL_MEDIA_COMMUNICATION_PROFILE_MISSING");
         }
+        peripheralServicesProfile = call(this.session::getPeripheralServicesProfile);
+        if (peripheralServicesProfile == null) {
+            throw new IllegalStateException("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_MISSING");
+        }
     }
 
     @Override public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() { return deviceProfile; }
@@ -141,6 +151,9 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     @Override public VirtualPolicyServicesProfileSnapshot policyServicesProfile() { return policyServicesProfile; }
     @Override public VirtualMediaCommunicationProfileSnapshot mediaCommunicationProfile() {
         return mediaCommunicationProfile;
+    }
+    @Override public VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile() {
+        return peripheralServicesProfile;
     }
     @Override public List<VirtualShortcutSnapshot> shortcuts() {
         List<VirtualShortcutSnapshot> values = call(session::listShortcuts); return values == null ? List.of() : List.copyOf(values);

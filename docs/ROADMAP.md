@@ -251,3 +251,16 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PARTIAL — real media objects/callbacks, physical audio routing, carrier messaging, Backup transport and DropBox entries.
 - DEVICE — Android Binder signatures, SystemUI, AppOps/roles, hardware/carrier behavior, SELinux and OEM validation.
 - NEXT — remaining NFC/USB/printing/companion-device/media-projection and OEM system-service breadth, unless the locked Android build is available first.
+
+## M5-T15 peripheral and external system-services baseline
+
+- DONE — typed package/virtual-user NFC, USB, Printing, Companion Device, MediaProjection, Camera and OEM profiles.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime refresh.
+- DONE — source-wired NFC, USB, PrintManager, CompanionDeviceManager, MediaProjection and configured OEM hooks; Camera
+  consumes the new profile through the existing protected camera hook.
+- DONE — bounded reader/device/job/observer/projection/camera/OEM ownership with explicit cleanup and failure closure.
+- DONE — transactional all-or-nothing OEM service installation and independent association/disassociation handling.
+- DONE — fail-closed Guest startup when a configured non-HOST peripheral domain lacks its required hook.
+- PARTIAL — real platform parcelables/callbacks, system UI, physical peripherals, capture pipeline and OEM objects.
+- DEVICE — Android Binder signatures, permissions/AppOps, hardware/HAL, SELinux, SystemUI and OEM validation.
+- NEXT — remaining service breadth and source-hardening review, unless the locked Android build becomes available first.
