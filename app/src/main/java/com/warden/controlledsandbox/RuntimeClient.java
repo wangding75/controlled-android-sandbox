@@ -1,9 +1,7 @@
 package com.warden.controlledsandbox;
 
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -17,28 +15,24 @@ import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
+import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 final class RuntimeClient implements AutoCloseable {
     private final Context context;
-    private final CountDownLatch connected = new CountDownLatch(1);
-    private volatile IRuntimeBroker broker;
+    private final RebindableServiceConnector<IRuntimeBroker> brokerConnection;
     private final PackageServiceClient packageService;
     private final NativeCompanionClient nativeCompanion;
-    private final ServiceConnection connection = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder service) { broker = IRuntimeBroker.Stub.asInterface(service); connected.countDown(); }
-        @Override public void onServiceDisconnected(ComponentName name) { broker = null; }
-    };
 
     RuntimeClient(Context context) {
         this.context = context.getApplicationContext();
         this.packageService = new PackageServiceClient(this.context);
         this.nativeCompanion = new NativeCompanionClient(this.context);
-        if (!this.context.bindService(new Intent(this.context, RuntimeBrokerService.class), connection, Context.BIND_AUTO_CREATE)) connected.countDown();
+        this.brokerConnection = new RebindableServiceConnector<>(this.context,
+                new Intent(this.context, RuntimeBrokerService.class),
+                IRuntimeBroker.Stub::asInterface, ignored -> { }, "Runtime broker");
     }
 
     RuntimeStatusResult status() throws Exception {
@@ -249,14 +243,12 @@ final class RuntimeClient implements AutoCloseable {
     }
 
     private IRuntimeBroker requireBroker() throws Exception {
-        if (!connected.await(10, TimeUnit.SECONDS) || broker == null) throw new IllegalStateException("Runtime broker is unavailable");
-        return broker;
+        return brokerConnection.require();
     }
 
     @Override public void close() {
-        try { context.unbindService(connection); } catch (Exception ignored) { }
+        brokerConnection.close();
         nativeCompanion.close();
         packageService.close();
-        broker = null;
     }
 }

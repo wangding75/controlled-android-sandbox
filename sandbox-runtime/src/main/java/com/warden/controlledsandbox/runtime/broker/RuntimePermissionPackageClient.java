@@ -3,14 +3,11 @@ package com.warden.controlledsandbox.runtime.broker;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Binder;
-import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 
 /** Runtime-Broker-only client for the Package Service permission capability. */
 final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
@@ -18,31 +15,16 @@ final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
             "com.warden.controlledsandbox.PackageManagementService";
     private final Context context;
     private final Binder clientToken = new Binder();
-    private final CountDownLatch connected = new CountDownLatch(1);
-    private volatile IRuntimePermissionSession session;
-    private volatile Exception connectionFailure;
-    private final ServiceConnection connection = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            try {
-                IPackageService root = IPackageService.Stub.asInterface(service);
-                session = root == null ? null : root.openRuntimePermissionSession(clientToken);
-            } catch (Exception error) {
-                connectionFailure = error;
-                session = null;
-            } finally {
-                connected.countDown();
-            }
-        }
-        @Override public void onServiceDisconnected(ComponentName name) { session = null; }
-    };
+    private final RebindableServiceConnector<IRuntimePermissionSession> sessionConnection;
 
     RuntimePermissionPackageClient(Context context) {
         this.context = context.getApplicationContext();
         Intent service = new Intent().setComponent(new ComponentName(
                 RuntimePeerPolicy.hostPackageFor(this.context), PACKAGE_SERVICE_CLASS));
-        if (!this.context.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
-            connected.countDown();
-        }
+        this.sessionConnection = new RebindableServiceConnector<>(this.context, service, binder -> {
+            IPackageService root = IPackageService.Stub.asInterface(binder);
+            return root == null ? null : root.openRuntimePermissionSession(clientToken);
+        }, IRuntimePermissionSession::close, "Runtime permission package service");
     }
 
     @Override public PackageServiceResult request(String packageName, int virtualUserId, String permission,
@@ -61,11 +43,7 @@ final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
     }
 
     private IRuntimePermissionSession requireSession() throws Exception {
-        if (!connected.await(10, TimeUnit.SECONDS) || session == null) {
-            throw new IllegalStateException("Runtime permission package service is unavailable",
-                    connectionFailure);
-        }
-        return session;
+        return sessionConnection.require();
     }
 
     private static PackageServiceResult requireSuccess(PackageServiceResult result) {
@@ -77,11 +55,6 @@ final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
     }
 
     @Override public void close() {
-        IRuntimePermissionSession current = session;
-        if (current != null) {
-            try { current.close(); } catch (Exception ignored) { }
-        }
-        try { context.unbindService(connection); } catch (Exception ignored) { }
-        session = null;
+        sessionConnection.close();
     }
 }

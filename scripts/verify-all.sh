@@ -31,6 +31,7 @@ python3 scripts/check-m5-t14-media-communication.py
 python3 scripts/check-m5-t15-peripheral-services.py
 python3 scripts/check-m5-t16-source-closure.py
 python3 scripts/check-m5-t17-privileged-services.py
+python3 scripts/check-m5-t18-architecture-quality.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

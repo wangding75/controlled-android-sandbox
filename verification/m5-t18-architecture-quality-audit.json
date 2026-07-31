@@ -1,0 +1,132 @@
+{
+  "iteration": "M5-T18",
+  "sourceStatus": "PASS",
+  "productionStatus": "PARTIAL",
+  "deviceEvidenceCount": 0,
+  "architectureGovernance": {
+    "rebindableConnectorClients": 5,
+    "expectedConnectorClients": 5,
+    "clients": [
+      "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
+      "app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",
+      "app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java",
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionPackageClient.java",
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeVirtualSystemServicePackageClient.java"
+    ],
+    "legacyServiceConnectionPatterns": {
+      "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java": 0,
+      "app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java": 0,
+      "app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java": 0,
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePermissionPackageClient.java": 0,
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeVirtualSystemServicePackageClient.java": 0
+    },
+    "binderDeathAndBackoffSelfTest": true,
+    "accountAuthorityExtracted": true,
+    "largeProductionClassesOver500": 14,
+    "largeClasses": [
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "lines": 1741
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "lines": 1654
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "lines": 1368
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+        "lines": 1191
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "lines": 877
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "lines": 827
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "lines": 781
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java",
+        "lines": 647
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "lines": 629
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "lines": 598
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "lines": 597
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+        "lines": 580
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+        "lines": 536
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "lines": 508
+      }
+    ]
+  },
+  "secretPersistence": {
+    "schemaVersion": 6,
+    "cipher": "AES/GCM/NoPadding",
+    "encryptedPasswordField": true,
+    "encryptedTokenField": true,
+    "legacyPlaintextMigration": true,
+    "androidKeystoreUsed": false,
+    "keyStorage": "app-private per-install file key"
+  },
+  "ipcDebt": {
+    "legacyBundleCompatibilityDeclarations": 12,
+    "legacyBundleCompatibilityMethods": [
+      "IRuntimeBroker.prepareGuest",
+      "IRuntimeBroker.launchActivity",
+      "IRuntimeBroker.invokeComponent",
+      "IRuntimeBroker.grantUriPermission",
+      "IRuntimeBroker.revokeUriPermission",
+      "IRuntimeBroker.consumeRoute",
+      "IRuntimeBroker.activityEvent",
+      "IRuntimeBroker.sessionStatus",
+      "IRuntimeBroker.runtimeStatus",
+      "IGuestProcess.prepareGuest",
+      "IGuestProcess.invokeComponent",
+      "IGuestProcess.runtimeStatus"
+    ],
+    "internalV2TransportPreserved": true
+  },
+  "methodClassification": {
+    "launcherUnregisterRegression": true,
+    "graphicsSaveBufferRegression": true,
+    "exactFirstMatcherUsed": true
+  },
+  "ci": {
+    "workflowPresent": true,
+    "lockedJdk": 17,
+    "executedOnGithub": false,
+    "androidInstrumentationEntrypoints": 1,
+    "instrumentationExecuted": false
+  },
+  "referenceFilesModified": 0,
+  "frozenCapabilityCategories": 113,
+  "deviceBoundaries": [
+    "Android Keystore key protection and migration",
+    "real Binder disconnect/rebind timing under Android process death",
+    "Gradle/AGP Android build and generated AIDL compatibility",
+    "instrumentation, emulator and physical-device execution"
+  ]
+}

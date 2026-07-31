@@ -22,6 +22,7 @@ import org.json.JSONObject;
 
 public final class VirtualSystemServiceStoreSelfTest {
     public static void main(String[] args) throws Exception {
+        accountSecretEncryptionLifecycle();
         persistenceEnvelopeAndCorruptionLifecycle();
         alarmRecoveryAndRepeatingLifecycle();
         notificationOwnershipLifecycle();
@@ -421,6 +422,45 @@ public final class VirtualSystemServiceStoreSelfTest {
         reloaded.close();
     }
 
+    private static void accountSecretEncryptionLifecycle() throws Exception {
+        java.io.File root = Files.createTempDirectory("virtual-system-secret").toFile();
+        java.io.File stateFile = new java.io.File(root, "sandbox-system-services.json");
+        java.io.File keyFile = new java.io.File(root, "sandbox-system-services.secrets.key");
+        VirtualSystemServiceStore.Scope scope = new VirtualSystemServiceStore.Scope("secret.pkg", 9);
+        VirtualSystemServiceStore store = new VirtualSystemServiceStore(root);
+        require(store.addAccount(scope, "alice", "mail", "plain-password"),
+                "encrypted account must be added");
+        store.setToken(scope, "alice", "mail", "access", "plain-token");
+        store.close();
+
+        require(keyFile.isFile() && keyFile.length() == VirtualSecretCipher.KEY_BYTES,
+                "per-install secret key must be persisted with fixed size");
+        JSONObject envelope = new JSONObject(Files.readString(stateFile.toPath(), StandardCharsets.UTF_8));
+        JSONObject payload = new JSONObject(envelope.getString("payload"));
+        JSONObject account = payload.getJSONArray("scopes").getJSONObject(0)
+                .getJSONArray("accounts").getJSONObject(0);
+        require(!account.keySet().contains("password") && !account.keySet().contains("tokens"),
+                "schema 6 must not persist plaintext secret fields");
+        require(account.getString("passwordEncrypted").startsWith(VirtualSecretCipher.PREFIX)
+                        && account.getJSONObject("tokensEncrypted").getString("access")
+                                .startsWith(VirtualSecretCipher.PREFIX),
+                "passwords and tokens must use authenticated ciphertext");
+
+        VirtualSystemServiceStore recovered = new VirtualSystemServiceStore(root);
+        require("plain-password".equals(recovered.password(scope, "alice", "mail"))
+                        && "plain-token".equals(recovered.token(scope, "alice", "mail", "access")),
+                "encrypted secrets must round-trip with the same installation key");
+        recovered.close();
+
+        java.io.File foreignRoot = Files.createTempDirectory("virtual-system-secret-foreign").toFile();
+        Files.copy(stateFile.toPath(), new java.io.File(foreignRoot, stateFile.getName()).toPath());
+        VirtualSystemServiceStore foreign = new VirtualSystemServiceStore(foreignRoot);
+        require(foreign.accounts(scope, "").isEmpty()
+                        && foreign.maintenanceWarning().contains("DECRYPTION_FAILED"),
+                "encrypted store without its installation key must fail closed");
+        foreign.close();
+    }
+
     private static void persistenceEnvelopeAndCorruptionLifecycle() throws Exception {
         java.io.File root = Files.createTempDirectory("virtual-system-store-envelope").toFile();
         java.io.File stateFile = new java.io.File(root, "sandbox-system-services.json");
@@ -440,19 +480,33 @@ public final class VirtualSystemServiceStoreSelfTest {
                 "checksummed store must restore valid state");
         recovered.close();
 
-        Map<VirtualSystemServiceStore.Scope, VirtualSystemServiceStore.ScopeState> legacyStates =
-                new LinkedHashMap<>();
-        VirtualSystemServiceStore.ScopeState legacyState = new VirtualSystemServiceStore.ScopeState();
-        legacyState.clipboard = new byte[]{7, 1};
-        legacyStates.put(scope, legacyState);
-        String legacyPayload = VirtualSystemServiceStoreCodec.encode(
-                legacyStates, 0x51000000, 0x52000000, 1L);
+        JSONObject legacyAccount = new JSONObject().put("name", "legacy")
+                .put("type", "mail").put("password", "legacy-password")
+                .put("tokens", new JSONObject().put("access", "legacy-token"));
+        JSONObject legacyScope = new JSONObject().put("packageName", scope.packageName())
+                .put("virtualUserId", scope.virtualUserId())
+                .put("clipboard", java.util.Base64.getEncoder().encodeToString(new byte[]{7, 1}))
+                .put("accounts", new org.json.JSONArray().put(legacyAccount));
+        String legacyPayload = new JSONObject().put("schemaVersion", 5)
+                .put("nextNotificationHostId", 0x51000000)
+                .put("nextJobHostId", 0x52000000)
+                .put("nextPendingIntentToken", 1L)
+                .put("scopes", new org.json.JSONArray().put(legacyScope)).toString();
         Files.writeString(stateFile.toPath(), legacyPayload, StandardCharsets.UTF_8);
         VirtualSystemServiceStore legacyRecovered = new VirtualSystemServiceStore(root);
-        require(java.util.Arrays.equals(new byte[]{7, 1}, legacyRecovered.clipboard(scope)),
-                "legacy raw schema 1-5 payload must remain readable");
-        legacyRecovered.setClipboard(scope, new byte[]{7, 2});
+        require(java.util.Arrays.equals(new byte[]{7, 1}, legacyRecovered.clipboard(scope))
+                        && "legacy-password".equals(legacyRecovered.password(scope, "legacy", "mail"))
+                        && "legacy-token".equals(legacyRecovered.token(scope, "legacy", "mail", "access")),
+                "legacy raw schema 1-5 payload must remain readable and migrate secrets");
         legacyRecovered.close();
+        JSONObject migratedEnvelope = new JSONObject(Files.readString(stateFile.toPath(), StandardCharsets.UTF_8));
+        JSONObject migratedPayload = new JSONObject(migratedEnvelope.getString("payload"));
+        JSONObject migratedAccount = migratedPayload.getJSONArray("scopes").getJSONObject(0)
+                .getJSONArray("accounts").getJSONObject(0);
+        require(migratedPayload.optInt("schemaVersion", -1) == 6
+                        && migratedAccount.keySet().contains("passwordEncrypted")
+                        && !migratedAccount.keySet().contains("password"),
+                "legacy account secrets must be rewritten to encrypted schema immediately");
 
         String validEnvelope = Files.readString(stateFile.toPath(), StandardCharsets.UTF_8);
         JSONObject corruptObject = new JSONObject(validEnvelope).put("crc32", "0");

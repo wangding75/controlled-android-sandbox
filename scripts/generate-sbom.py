@@ -3,10 +3,16 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'verification/sbom.json'
+APP_GRADLE = (ROOT / 'app/build.gradle').read_text(encoding='utf-8')
+VERSION_MATCH = re.search(r"versionName\s+['\"]([^'\"]+)['\"]", APP_GRADLE)
+if VERSION_MATCH is None:
+    raise SystemExit('app/build.gradle has no versionName')
+PROJECT_VERSION = VERSION_MATCH.group(1)
 MODULES = ['app', 'sandbox-domain', 'sandbox-contract', 'sandbox-framework', 'sandbox-native', 'sandbox-companion32', 'sandbox-runtime', 'fixture-basic']
 components = []
 for module in MODULES:
@@ -23,7 +29,7 @@ for module in MODULES:
     components.append({
         'type': 'application' if module in {'app', 'fixture-basic'} else 'library',
         'name': module,
-        'version': '0.2.0-development',
+        'version': PROJECT_VERSION,
         'license': 'Apache-2.0',
         'fileCount': len(files),
         'languages': sorted(languages),
@@ -33,7 +39,7 @@ document = {
     'bomFormat': 'ControlledSandbox-SBOM',
     'specVersion': '1.0',
     'project': 'controlled-sandbox-cleanroom',
-    'version': '0.2.0-development',
+    'version': PROJECT_VERSION,
     'components': components,
     'externalRuntimeDependencies': [
         {'name':'Android platform APIs','scope':'provided'},

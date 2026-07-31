@@ -220,7 +220,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         final Map<Integer, JobRecord> jobs = new LinkedHashMap<>();
     }
 
-    static final int SCHEMA = 5;
+    static final int SCHEMA = 6;
     static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     static final int MAX_ACCOUNTS_PER_SCOPE = 64;
     static final int MAX_TOKENS_PER_ACCOUNT = 32;
@@ -237,6 +237,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private static final long RETRY_WITHOUT_CLIENT_MS = 30_000L;
     private static final long JOB_EXECUTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
     private final VirtualSystemServiceStorePersistence persistence;
+    private final VirtualSecretCipher secretCipher;
+    private final VirtualAccountAuthority accountAuthority = new VirtualAccountAuthority();
     private volatile String maintenanceWarning = "";
     private final Map<Scope, ScopeState> states = new LinkedHashMap<>();
     private final Set<Client> clients = new LinkedHashSet<>();
@@ -251,6 +253,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     });
 
     VirtualSystemServiceStore(File filesDir) {
+        secretCipher = new VirtualSecretCipher(
+                new File(filesDir, "sandbox-system-services.secrets.key"));
         persistence = new VirtualSystemServiceStorePersistence(
                 new File(filesDir, "sandbox-system-services.json"));
         load();
@@ -312,66 +316,42 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     synchronized List<VirtualAccountSnapshot> accounts(Scope scope, String requestedType) {
-        String type = normalize(requestedType);
-        List<VirtualAccountSnapshot> out = new ArrayList<>();
-        for (Map.Entry<AccountKey, AccountRecord> item : state(scope).accounts.entrySet()) {
-            if (!type.isEmpty() && !type.equals(item.getKey().type)) continue;
-            List<String> tokenTypes = new ArrayList<>(item.getValue().tokens.keySet());
-            List<String> tokens = new ArrayList<>();
-            for (String tokenType : tokenTypes) tokens.add(item.getValue().tokens.get(tokenType));
-            out.add(new VirtualAccountSnapshot(item.getKey().name, item.getKey().type,
-                    item.getValue().password, tokenTypes, tokens));
-        }
-        out.sort(Comparator.comparing(VirtualAccountSnapshot::type).thenComparing(VirtualAccountSnapshot::name));
-        return Collections.unmodifiableList(out);
+        return accountAuthority.snapshots(state(scope), requestedType);
     }
     synchronized boolean addAccount(Scope scope, String name, String type, String password) {
-        AccountKey key = accountKey(name, type); ScopeState state = state(scope);
-        if (state.accounts.containsKey(key)) return false;
-        if (state.accounts.size() >= MAX_ACCOUNTS_PER_SCOPE) {
-            throw new IllegalStateException("VIRTUAL_ACCOUNT_LIMIT_EXCEEDED");
-        }
         MutationSnapshot before = snapshotMutation(scope);
-        state.accounts.put(key, new AccountRecord(password));
-        persistOrRestore(scope, before); return true;
+        boolean added = accountAuthority.add(state(scope), name, type, password);
+        if (added) persistOrRestore(scope, before);
+        return added;
     }
     synchronized boolean removeAccount(Scope scope, String name, String type) {
         MutationSnapshot before = snapshotMutation(scope);
-        boolean removed = state(scope).accounts.remove(accountKey(name, type)) != null;
-        if (removed) persistOrRestore(scope, before); return removed;
+        boolean removed = accountAuthority.remove(state(scope), name, type);
+        if (removed) persistOrRestore(scope, before);
+        return removed;
     }
     synchronized void setPassword(Scope scope, String name, String type, String password) {
         MutationSnapshot before = snapshotMutation(scope);
-        requireAccount(scope, name, type).password = safe(password);
+        accountAuthority.setPassword(state(scope), name, type, password);
         persistOrRestore(scope, before);
     }
     synchronized String password(Scope scope, String name, String type) {
-        AccountRecord record = state(scope).accounts.get(accountKey(name, type));
-        return record == null ? null : record.password;
+        return accountAuthority.password(state(scope), name, type);
     }
-    synchronized void setToken(Scope scope, String name, String type, String tokenType, String token) {
-        AccountRecord record = requireAccount(scope, name, type);
-        String normalizedType = normalizeRequired(tokenType, "tokenType");
-        if (!record.tokens.containsKey(normalizedType)
-                && record.tokens.size() >= MAX_TOKENS_PER_ACCOUNT) {
-            throw new IllegalStateException("VIRTUAL_ACCOUNT_TOKEN_LIMIT_EXCEEDED");
-        }
+    synchronized void setToken(Scope scope, String name, String type,
+            String tokenType, String token) {
         MutationSnapshot before = snapshotMutation(scope);
-        record.tokens.put(normalizedType, safe(token));
+        accountAuthority.setToken(state(scope), name, type, tokenType, token);
         persistOrRestore(scope, before);
     }
     synchronized String token(Scope scope, String name, String type, String tokenType) {
-        AccountRecord record = state(scope).accounts.get(accountKey(name, type));
-        return record == null ? null : record.tokens.get(normalize(tokenType));
+        return accountAuthority.token(state(scope), name, type, tokenType);
     }
     synchronized void invalidateToken(Scope scope, String accountType, String token) {
         MutationSnapshot before = snapshotMutation(scope);
-        String normalizedType = normalize(accountType); boolean changed = false;
-        for (Map.Entry<AccountKey, AccountRecord> item : state(scope).accounts.entrySet()) {
-            if (!normalizedType.isEmpty() && !normalizedType.equals(item.getKey().type)) continue;
-            changed |= item.getValue().tokens.values().removeIf(value -> java.util.Objects.equals(value, token));
+        if (accountAuthority.invalidateToken(state(scope), accountType, token)) {
+            persistOrRestore(scope, before);
         }
-        if (changed) persistOrRestore(scope, before);
     }
 
 
@@ -1372,10 +1352,6 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         int seed = switch (normalized) { case "notification" -> 0x51000000; case "job" -> 0x52000000; default -> 0x53000000; };
         return state(scope).namespaces.computeIfAbsent(normalized, ignored -> new NamespaceState(seed));
     }
-    private AccountRecord requireAccount(Scope scope, String name, String type) {
-        AccountRecord record = state(scope).accounts.get(accountKey(name, type));
-        if (record == null) throw new IllegalArgumentException("VIRTUAL_ACCOUNT_NOT_FOUND"); return record;
-    }
     static AccountKey accountKey(String name, String type) {
         return new AccountKey(required(name, "name"), required(type, "type"));
     }
@@ -1385,14 +1361,19 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             String payload = persistence.readPayload();
             if (payload == null) return;
             VirtualSystemServiceStoreCodec.Decoded decoded =
-                    VirtualSystemServiceStoreCodec.decode(payload);
+                    VirtualSystemServiceStoreCodec.decode(payload, secretCipher);
             states.clear();
             states.putAll(decoded.states());
             nextNotificationHostId = decoded.nextNotificationHostId();
             nextJobHostId = decoded.nextJobHostId();
             nextPendingIntentToken = decoded.nextPendingIntentToken();
             removeStaleReservations();
+            if (decoded.requiresSecretMigration()) persist();
         } catch (RuntimeException error) {
+            states.clear();
+            nextNotificationHostId = 0x51000000;
+            nextJobHostId = 0x52000000;
+            nextPendingIntentToken = 1L;
             persistence.quarantine();
             maintenanceWarning = error.getMessage() == null
                     ? "VIRTUAL_SYSTEM_SERVICE_STORE_CORRUPT"
@@ -1401,7 +1382,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     private synchronized void persist() {
         persistence.writePayload(VirtualSystemServiceStoreCodec.encode(
-                states, nextNotificationHostId, nextJobHostId, nextPendingIntentToken));
+                states, nextNotificationHostId, nextJobHostId, nextPendingIntentToken, secretCipher));
     }
 
 

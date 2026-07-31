@@ -50,9 +50,16 @@ require(
     "jobs(scope, processName, generation, packageRevision)")
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "static final int SCHEMA = 5", "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
+    "static final int SCHEMA =", "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
     "VirtualJobSnapshot.BACKOFF_LINEAR", "1L <<", "job.failureCount = Math.min",
     "job.periodic", "safeAdd(now, job.intervalMs)", "minimumLatencyMs", "overrideDeadlineMs")
+try:
+    store_schema = int(store.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
+    if store_schema < 5:
+        errors.append(f"VirtualSystemServiceStore schema regressed below 5: {store_schema}")
+except Exception:
+    errors.append("VirtualSystemServiceStore schema is not parseable")
+
 for forbidden in ["new Bundle(", "android.os.Bundle"]:
     if forbidden in snapshot:
         errors.append(f"Job contract contains forbidden untyped payload: {forbidden}")

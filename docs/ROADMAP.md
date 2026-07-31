@@ -281,3 +281,15 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - DONE — fail-closed Guest startup when a configured non-HOST privileged-service domain lacks its required hook.
 - PARTIAL — real hidden framework objects, graphics buffers, callbacks and privileged service execution.
 - DEVICE — Android Binder signatures, ContextHub hardware, persistent partition/FRP behavior, update engine, SELinux and OEM validation.
+
+## M5-T18 architecture-quality baseline
+
+- DONE — shared Binder reconnection/death/backoff state machine across five production client classes.
+- DONE — AES-GCM schema-6 virtual-account secret persistence with legacy plaintext migration and fail-closed quarantine.
+- DONE — dedicated virtual-account authority extracted from the central system-service store.
+- DONE — direct regressions for Launcher unregister/register and GraphicsStats add/save-buffer classification collisions.
+- DONE — locked JDK-17 source-gate CI workflow, device-stage instrumentation smoke entry and explicit source version update.
+- PARTIAL — fourteen production Java classes remain above 500 lines.
+- PARTIAL — twelve legacy Bundle AIDL compatibility methods remain, although internal primary routing is typed V2.
+- DEVICE — Android Keystore, real Binder death timing, generated AIDL, Gradle/AGP, emulator and physical-device evidence.
+- NEXT — freeze the offline source baseline and move to the locked Android build/device acceptance stage; only device-discovered defects should reopen feature code.

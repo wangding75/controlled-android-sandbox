@@ -133,6 +133,9 @@ final class PrivilegedServicesInvocationInterceptor {
             VirtualGraphicsStatsProfileSnapshot profile) {
         String name = normalize(method.getName());
         if (host(profile.mode())) return Decision.passThrough();
+        if (containsAny(name, "addtosavebuffer", "rotatebuffer")) {
+            throw new SecurityException("VIRTUAL_GRAPHICS_BUFFER_MUTATION_DENIED");
+        }
         if (containsAny(name, "savebuffer", "releasebuffer", "close", "destroy")) {
             removeIdentity(graphicsBuffers, arguments);
             return Decision.handled(successValue(method.getReturnType()));
@@ -156,9 +159,6 @@ final class PrivilegedServicesInvocationInterceptor {
             if (!profile.exposeStats()) return Decision.handled(emptyValue(method.getReturnType()));
             return Decision.handled(PrivilegedInvocationValues.graphicsStats(method.getReturnType(),
                     profile.totalFrames(), profile.jankyFrames(), profile.lastResetTimeMs()));
-        }
-        if (containsAny(name, "addtosavebuffer", "rotatebuffer")) {
-            throw new SecurityException("VIRTUAL_GRAPHICS_BUFFER_MUTATION_DENIED");
         }
         return unsupported("graphics_stats", method);
     }

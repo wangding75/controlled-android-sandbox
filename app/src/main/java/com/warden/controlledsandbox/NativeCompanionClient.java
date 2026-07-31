@@ -3,9 +3,7 @@ package com.warden.controlledsandbox;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.INativeAbiCompanion;
 import com.warden.controlledsandbox.contract.INativeCompanionArtifactService;
@@ -18,14 +16,13 @@ import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
+import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import java.io.File;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 /** Signature-protected client for the independent 32-bit Runtime Broker and artifact workspace. */
 final class NativeCompanionClient implements AutoCloseable {
@@ -38,60 +35,26 @@ final class NativeCompanionClient implements AutoCloseable {
     private static final String RUNTIME_BROKER_SERVICE =
             "com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService";
     private static final int PROTOCOL = 1;
-    private static final long BIND_TIMEOUT_SECONDS = 10L;
     private static final int MAX_NATIVE_LIBRARIES = 256;
 
     private final Context context;
     private final SecureRandom random = new SecureRandom();
-    private volatile CountDownLatch controlConnected = new CountDownLatch(1);
-    private volatile CountDownLatch artifactConnected = new CountDownLatch(1);
-    private volatile CountDownLatch brokerConnected = new CountDownLatch(1);
     private final Set<String> stagedRevisions = new HashSet<>();
-    private volatile INativeAbiCompanion control;
-    private volatile INativeCompanionArtifactService artifacts;
-    private volatile IRuntimeBroker broker;
-    private volatile boolean controlBound;
-    private volatile boolean artifactBound;
-    private volatile boolean brokerBound;
-
-    private final ServiceConnection controlConnection = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            control = INativeAbiCompanion.Stub.asInterface(service);
-            controlConnected.countDown();
-        }
-        @Override public void onServiceDisconnected(ComponentName name) { resetControlBinding(); }
-        @Override public void onBindingDied(ComponentName name) { resetControlBinding(); }
-        @Override public void onNullBinding(ComponentName name) {
-            control = null; controlBound = false; controlConnected.countDown();
-        }
-    };
-
-    private final ServiceConnection artifactConnection = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            artifacts = INativeCompanionArtifactService.Stub.asInterface(service);
-            artifactConnected.countDown();
-        }
-        @Override public void onServiceDisconnected(ComponentName name) { resetArtifactBinding(); }
-        @Override public void onBindingDied(ComponentName name) { resetArtifactBinding(); }
-        @Override public void onNullBinding(ComponentName name) {
-            artifacts = null; artifactBound = false; artifactConnected.countDown();
-        }
-    };
-
-    private final ServiceConnection brokerConnection = new ServiceConnection() {
-        @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            broker = IRuntimeBroker.Stub.asInterface(service);
-            brokerConnected.countDown();
-        }
-        @Override public void onServiceDisconnected(ComponentName name) { resetBrokerBinding(); }
-        @Override public void onBindingDied(ComponentName name) { resetBrokerBinding(); }
-        @Override public void onNullBinding(ComponentName name) {
-            broker = null; brokerBound = false; brokerConnected.countDown();
-        }
-    };
+    private final RebindableServiceConnector<INativeAbiCompanion> controlConnection;
+    private final RebindableServiceConnector<INativeCompanionArtifactService> artifactConnection;
+    private final RebindableServiceConnector<IRuntimeBroker> brokerConnection;
 
     NativeCompanionClient(Context context) {
         this.context = context.getApplicationContext();
+        this.controlConnection = new RebindableServiceConnector<>(this.context,
+                companionIntent(CONTROL_SERVICE), INativeAbiCompanion.Stub::asInterface,
+                ignored -> { }, "Native companion control");
+        this.artifactConnection = new RebindableServiceConnector<>(this.context,
+                companionIntent(ARTIFACT_SERVICE), INativeCompanionArtifactService.Stub::asInterface,
+                ignored -> { }, "Native companion artifact service");
+        this.brokerConnection = new RebindableServiceConnector<>(this.context,
+                companionIntent(RUNTIME_BROKER_SERVICE), IRuntimeBroker.Stub::asInterface,
+                ignored -> { }, "Native companion Runtime broker");
     }
 
     NativeCompanionResult probe(SandboxRecord record, int virtualUserId) throws Exception {
@@ -249,80 +212,19 @@ final class NativeCompanionClient implements AutoCloseable {
     }
 
     private INativeAbiCompanion requireControl() throws Exception {
-        INativeAbiCompanion current = control;
-        if (current != null) return current;
-        CountDownLatch latch;
-        synchronized (this) {
-            if (control == null && !controlBound) {
-                controlConnected = new CountDownLatch(1);
-                controlBound = bind(CONTROL_SERVICE, controlConnection);
-                if (!controlBound) controlConnected.countDown();
-            }
-            latch = controlConnected;
-        }
-        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || control == null) {
-            throw new IllegalStateException("NATIVE_COMPANION_CONTROL_UNAVAILABLE:" + companionPackage());
-        }
-        return control;
+        return controlConnection.require();
     }
 
     private INativeCompanionArtifactService requireArtifacts() throws Exception {
-        INativeCompanionArtifactService current = artifacts;
-        if (current != null) return current;
-        CountDownLatch latch;
-        synchronized (this) {
-            if (artifacts == null && !artifactBound) {
-                artifactConnected = new CountDownLatch(1);
-                artifactBound = bind(ARTIFACT_SERVICE, artifactConnection);
-                if (!artifactBound) artifactConnected.countDown();
-            }
-            latch = artifactConnected;
-        }
-        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || artifacts == null) {
-            throw new IllegalStateException("NATIVE_COMPANION_ARTIFACT_UNAVAILABLE:" + companionPackage());
-        }
-        return artifacts;
+        return artifactConnection.require();
     }
 
     private IRuntimeBroker requireBroker() throws Exception {
-        IRuntimeBroker current = broker;
-        if (current != null) return current;
-        CountDownLatch latch;
-        synchronized (this) {
-            if (broker == null && !brokerBound) {
-                brokerConnected = new CountDownLatch(1);
-                brokerBound = bind(RUNTIME_BROKER_SERVICE, brokerConnection);
-                if (!brokerBound) brokerConnected.countDown();
-            }
-            latch = brokerConnected;
-        }
-        if (!latch.await(BIND_TIMEOUT_SECONDS, TimeUnit.SECONDS) || broker == null) {
-            throw new IllegalStateException("NATIVE_COMPANION_BROKER_UNAVAILABLE:" + companionPackage());
-        }
-        return broker;
+        return brokerConnection.require();
     }
 
-    private synchronized void resetControlBinding() {
-        control = null;
-        controlBound = false;
-        controlConnected = new CountDownLatch(1);
-    }
-
-    private synchronized void resetArtifactBinding() {
-        artifacts = null;
-        artifactBound = false;
-        artifactConnected = new CountDownLatch(1);
-    }
-
-    private synchronized void resetBrokerBinding() {
-        broker = null;
-        brokerBound = false;
-        brokerConnected = new CountDownLatch(1);
-    }
-
-    private boolean bind(String className, ServiceConnection connection) {
-        Intent intent = new Intent().setComponent(new ComponentName(companionPackage(), className));
-        return context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+    private Intent companionIntent(String className) {
+        return new Intent().setComponent(new ComponentName(companionPackage(), className));
     }
 
     private byte[] nonce() {
@@ -346,15 +248,9 @@ final class NativeCompanionClient implements AutoCloseable {
     }
 
     @Override public void close() {
-        if (brokerBound) try { context.unbindService(brokerConnection); } catch (RuntimeException ignored) { }
-        if (artifactBound) try { context.unbindService(artifactConnection); } catch (RuntimeException ignored) { }
-        if (controlBound) try { context.unbindService(controlConnection); } catch (RuntimeException ignored) { }
-        brokerBound = false;
-        artifactBound = false;
-        controlBound = false;
-        broker = null;
-        artifacts = null;
-        control = null;
+        brokerConnection.close();
+        artifactConnection.close();
+        controlConnection.close();
         stagedRevisions.clear();
     }
 }

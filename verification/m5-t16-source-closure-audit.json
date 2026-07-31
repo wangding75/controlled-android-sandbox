@@ -107,7 +107,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-      "lines": 1673
+      "lines": 1654
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
@@ -131,7 +131,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java",
-      "lines": 641
+      "lines": 647
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",

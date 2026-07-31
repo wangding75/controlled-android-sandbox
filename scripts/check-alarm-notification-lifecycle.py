@@ -42,11 +42,18 @@ if "Bundle" in session or "Bundle" in observer:
 
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "static final int SCHEMA = 5", "MAX_ALARMS_PER_SCOPE",
+    "static final int SCHEMA =", "MAX_ALARMS_PER_SCOPE",
     "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_NOTIFICATION_CHANNELS_PER_SCOPE",
     "requirePendingIntent(scope, revision, pendingIntentTokenId)",
     "RETRY_WITHOUT_CLIENT_MS", "alarm.deliveryCount++", "pruneNotificationRevisionLocked",
     "validateNotificationReferences", "persistOrRestore", "optionalIdentity")
+try:
+    store_schema = int(store.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
+    if store_schema < 5:
+        errors.append(f"VirtualSystemServiceStore schema regressed below 5: {store_schema}")
+except Exception:
+    errors.append("VirtualSystemServiceStore schema is not parseable")
+
 require(
     "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
     "systemServices.scheduleAlarm(scope, processName, generation", "packageRevision, candidate",

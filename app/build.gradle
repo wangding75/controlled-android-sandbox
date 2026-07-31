@@ -9,8 +9,9 @@ android {
         applicationId 'com.warden.controlledsandbox'
         minSdk rootProject.ext.controlledMinSdk
         targetSdk rootProject.ext.controlledTargetSdk
-        versionCode 2
-        versionName '0.2.0-development'
+        versionCode 18
+        versionName '0.5.18-source'
+        testInstrumentationRunner 'com.warden.controlledsandbox.SourceBaselineInstrumentation'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
     }
 

@@ -57,6 +57,10 @@ public final class PrivilegedServicesVirtualizationSelfTest {
             quota = expected.getMessage().contains("LIMIT");
         }
         require(quota, "graphics buffer quota enforced");
+        boolean saveMutationDenied = false;
+        try { api.addToSaveBuffer(first); }
+        catch (SecurityException expected) { saveMutationDenied = true; }
+        require(saveMutationDenied, "add-to-save-buffer must not be misclassified as cleanup");
         api.saveBufferForProcess(first);
         api.requestBufferForProcess(new Object());
     }
@@ -188,6 +192,7 @@ public final class PrivilegedServicesVirtualizationSelfTest {
     interface GraphicsApi {
         Bundle getStats();
         void requestBufferForProcess(Object token);
+        void addToSaveBuffer(Object token);
         void saveBufferForProcess(Object token);
     }
     interface ContextHubApi {
@@ -223,6 +228,7 @@ public final class PrivilegedServicesVirtualizationSelfTest {
     static final class GraphicsDelegate implements GraphicsApi {
         public Bundle getStats() { return new Bundle(); }
         public void requestBufferForProcess(Object token) { throw new AssertionError("delegate"); }
+        public void addToSaveBuffer(Object token) { throw new AssertionError("delegate"); }
         public void saveBufferForProcess(Object token) { throw new AssertionError("delegate"); }
     }
     static final class ContextHubDelegate implements ContextHubApi {

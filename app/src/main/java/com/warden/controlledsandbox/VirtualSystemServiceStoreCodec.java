@@ -21,11 +21,12 @@ final class VirtualSystemServiceStoreCodec {
             Map<Scope, ScopeState> states,
             int nextNotificationHostId,
             int nextJobHostId,
-            long nextPendingIntentToken) { }
+            long nextPendingIntentToken,
+            boolean requiresSecretMigration) { }
 
     private VirtualSystemServiceStoreCodec() { }
 
-    static Decoded decode(String payload) {
+    static Decoded decode(String payload, VirtualSecretCipher secretCipher) {
         try {
             JSONObject root = new JSONObject(payload);
             int schema = root.optInt("schemaVersion", -1);
@@ -38,7 +39,8 @@ final class VirtualSystemServiceStoreCodec {
             Map<Scope, ScopeState> states = new LinkedHashMap<>();
             JSONArray scopes = root.optJSONArray("scopes");
             if (scopes == null) {
-                return new Decoded(states, nextNotificationHostId, nextJobHostId, nextPendingIntentToken);
+                return new Decoded(states, nextNotificationHostId, nextJobHostId,
+                        nextPendingIntentToken, schema < 6);
             }
             requireArrayLimit(scopes, MAX_SCOPES, "scope");
             for (int i = 0; i < scopes.length(); i++) {
@@ -54,15 +56,24 @@ final class VirtualSystemServiceStoreCodec {
                     JSONObject account = accounts.getJSONObject(j);
                     AccountKey key = accountKey(account.getString("name"), account.getString("type"));
                     if (state.accounts.containsKey(key)) throw new IllegalStateException("Duplicate virtual account");
-                    AccountRecord record = new AccountRecord(account.optString("password", ""));
-                    JSONObject tokens = account.optJSONObject("tokens");
+                    String password = schema >= 6
+                            ? secretCipher.decrypt(secretAad(scope, key, "password", ""),
+                                    account.getString("passwordEncrypted"))
+                            : account.optString("password", "");
+                    AccountRecord record = new AccountRecord(password);
+                    JSONObject tokens = account.optJSONObject(schema >= 6
+                            ? "tokensEncrypted" : "tokens");
                     if (tokens != null) {
                         if (tokens.keySet().size() > MAX_TOKENS_PER_ACCOUNT) {
                             throw new IllegalStateException("Virtual account token limit exceeded");
                         }
                         for (String tokenType : tokens.keySet()) {
-                            record.tokens.put(required(tokenType, "tokenType"),
-                                    tokens.optString(tokenType, ""));
+                            String normalizedType = required(tokenType, "tokenType");
+                            String tokenValue = schema >= 6
+                                    ? secretCipher.decrypt(secretAad(scope, key, "token", normalizedType),
+                                            tokens.getString(tokenType))
+                                    : tokens.optString(tokenType, "");
+                            record.tokens.put(normalizedType, tokenValue);
                         }
                     }
                     state.accounts.put(key, record);
@@ -196,14 +207,17 @@ final class VirtualSystemServiceStoreCodec {
                 }
                 states.put(scope, state);
             }
-            return new Decoded(states, nextNotificationHostId, nextJobHostId, nextPendingIntentToken);
+            return new Decoded(states, nextNotificationHostId, nextJobHostId,
+                    nextPendingIntentToken, schema < 6);
         } catch (Exception error) {
-            throw new IllegalStateException("Cannot decode virtual system-service store", error);
+            String detail = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
+            throw new IllegalStateException("Cannot decode virtual system-service store: " + detail, error);
         }
     }
 
     static String encode(Map<Scope, ScopeState> states, int nextNotificationHostId,
-                         int nextJobHostId, long nextPendingIntentToken) {
+                         int nextJobHostId, long nextPendingIntentToken,
+                         VirtualSecretCipher secretCipher) {
         try {
             if (states.size() > MAX_SCOPES) throw new IllegalStateException("Virtual scope limit exceeded");
             JSONObject root = new JSONObject().put("schemaVersion", SCHEMA)
@@ -222,11 +236,16 @@ final class VirtualSystemServiceStoreCodec {
                 for (Map.Entry<AccountKey, AccountRecord> account : state.accounts.entrySet()) {
                     JSONObject tokens = new JSONObject();
                     for (Map.Entry<String, String> token : account.getValue().tokens.entrySet()) {
-                        tokens.put(token.getKey(), token.getValue());
+                        tokens.put(token.getKey(), secretCipher.encrypt(
+                                secretAad(scope, account.getKey(), "token", token.getKey()),
+                                token.getValue()));
                     }
                     accounts.put(new JSONObject().put("name", account.getKey().name())
-                            .put("type", account.getKey().type()).put("password", account.getValue().password)
-                            .put("tokens", tokens));
+                            .put("type", account.getKey().type())
+                            .put("passwordEncrypted", secretCipher.encrypt(
+                                    secretAad(scope, account.getKey(), "password", ""),
+                                    account.getValue().password))
+                            .put("tokensEncrypted", tokens));
                 }
                 item.put("accounts", accounts);
                 JSONArray pending = new JSONArray();
@@ -362,4 +381,9 @@ final class VirtualSystemServiceStoreCodec {
         }
         return boundedPayload(Base64.getDecoder().decode(value.getBytes(StandardCharsets.UTF_8)), "storePayload");
     }
+    private static String secretAad(Scope scope, AccountKey account, String field, String qualifier) {
+        return "scope=" + scope.key() + "|account=" + account.type() + ":" + account.name()
+                + "|field=" + field + "|qualifier=" + (qualifier == null ? "" : qualifier);
+    }
+
 }

@@ -55,6 +55,8 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         Object listener = new Object();
         launcher.registerCallback("guest.pkg", listener);
         launcher.unregisterCallback("guest.pkg", listener);
+        launcher.registerCallback("guest.pkg", new Object());
+        launcher.registerCallback("guest.pkg", new Object());
 
         ShortcutApi shortcuts = proxy(ShortcutApi.class, identity, "shortcut");
         require(shortcuts.setDynamicShortcuts("guest.pkg", List.of(new FakeShortcut("compose", "Compose")), 3),

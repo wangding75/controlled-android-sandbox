@@ -247,3 +247,7 @@ by Package Service, atomically persisted and delivered to revision-bound Runtime
 project deterministic queries, bound graphics/hub ownership and fail closed for unsupported privileged mutations.
 Real graphics buffers, ContextHub hardware/callbacks, privileged persistent storage and the system-update engine remain
 Android-build/device dependent; source status is PASS, production status is PARTIAL and device evidence remains 0.
+
+## M5-T18 architecture-quality source baseline
+
+M5-T18 hardens the offline source baseline without adding capability claims. Five Binder-client surfaces now share a death-aware, retrying connector; virtual-account passwords and tokens migrate to AES-GCM schema-6 persistence; account responsibility is extracted from the central system-service store; and known inverse/sub-string dispatch collisions have direct regressions. A locked JDK-17 CI workflow and a device-stage instrumentation smoke entry are defined. Twelve legacy Bundle AIDL methods and fourteen production classes above 500 lines remain explicitly recorded. The encryption key is app-private rather than Android Keystore-backed, the CI workflow has not executed remotely in this environment, and Android build/device evidence remains 0.

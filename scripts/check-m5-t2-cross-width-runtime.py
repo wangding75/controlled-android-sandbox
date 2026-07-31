@@ -50,10 +50,18 @@ for needle in (
     "RuntimeOperationTransport.execute(requireBroker()",
     "RuntimeOperationRequest.PREPARE_GUEST", "RuntimeOperationRequest.LAUNCH_ACTIVITY",
     "RuntimeOperationRequest.INVOKE_COMPONENT", "requireBroker().stopGuest",
-    "resetControlBinding", "resetArtifactBinding", "resetBrokerBinding",
 ):
     if needle not in client:
         errors.append(f"companion client missing production route: {needle}")
+legacy_reset = all(needle in client for needle in (
+    "resetControlBinding", "resetArtifactBinding", "resetBrokerBinding"))
+rebindable_reset = all(needle in client for needle in (
+    "RebindableServiceConnector<INativeAbiCompanion>",
+    "RebindableServiceConnector<INativeCompanionArtifactService>",
+    "RebindableServiceConnector<IRuntimeBroker>",
+    "brokerConnection.close()", "artifactConnection.close()", "controlConnection.close()"))
+if not legacy_reset and not rebindable_reset:
+    errors.append("companion client lacks either legacy reset helpers or rebindable connector cleanup")
 if "NATIVE_COMPANION_CROSS_WIDTH_EXECUTION_NOT_WIRED" in runtime_client + client:
     errors.append("obsolete cross-width execution blocker remains in production route")
 for needle in ("companionRoute(record)", "nativeCompanion.prepare", "nativeCompanion.launchActivity", "nativeCompanion.invokeComponent"):

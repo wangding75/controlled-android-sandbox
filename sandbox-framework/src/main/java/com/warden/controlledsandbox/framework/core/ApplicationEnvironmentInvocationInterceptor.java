@@ -158,7 +158,17 @@ final class ApplicationEnvironmentInvocationInterceptor {
             Object activity = FrameworkApplicationEnvironmentObjectFactory.launcherActivity(method.getReturnType(), identity);
             return Decision.handled(activity);
         }
-        if (containsAny(name, "registercallback", "addcallback", "registerpackagelistener")) {
+        if (InvocationMethodMatcher.named(name, "unregisterCallback", "removeCallback",
+                "unregisterPackageListener")
+                || InvocationMethodMatcher.startsWith(name, "unregisterCallback",
+                        "removeCallback", "unregisterPackageListener")) {
+            removeListener(arguments);
+            return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (InvocationMethodMatcher.named(name, "registerCallback", "addCallback",
+                "registerPackageListener")
+                || InvocationMethodMatcher.startsWith(name, "registerCallback",
+                        "addCallback", "registerPackageListener")) {
             if (!profile.allowPackageCallbacks()) return Decision.handled(falseValue(method.getReturnType()));
             Object callback = callback(arguments);
             if (callback == null) throw new IllegalArgumentException("VIRTUAL_LAUNCHER_CALLBACK_REQUIRED");
@@ -166,10 +176,6 @@ final class ApplicationEnvironmentInvocationInterceptor {
                 throw new IllegalStateException("VIRTUAL_LAUNCHER_LISTENER_LIMIT_EXCEEDED");
             }
             listeners.add(callback);
-            return Decision.handled(successValue(method.getReturnType()));
-        }
-        if (containsAny(name, "unregistercallback", "removecallback", "unregisterpackagelistener")) {
-            removeListener(arguments);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "startmainactivity", "startappdetailsactivity", "startsessiondetailsactivity")) {
