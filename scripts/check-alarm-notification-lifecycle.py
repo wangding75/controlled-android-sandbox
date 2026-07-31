@@ -55,7 +55,7 @@ except Exception:
     errors.append("VirtualSystemServiceStore schema is not parseable")
 
 require(
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+    "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
     "systemServices.scheduleAlarm(scope, processName, generation", "packageRevision, candidate",
     "systemServices.notifications(scope, packageRevision)",
     "systemServices.notificationChannels(scope, packageRevision)")

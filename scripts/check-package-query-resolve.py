@@ -64,7 +64,7 @@ require(
     'VirtualIntentDataSnapshot', 'VirtualIntentFilterSnapshot',
     'effectiveComponentEnabled(', '"com.warden.virtualinstaller"', 'record.firstInstallAt', 'record.lastUpdateAt')
 require(
-    'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java',
+    'app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java',
     'setPackageEnabledSetting', 'setComponentEnabledSetting', 'declaresComponent(', 'lifecycle.setComponentState(')
 require(
     'app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java',

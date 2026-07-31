@@ -73,7 +73,7 @@ if 'nextPolicies.removeIf' not in state:
     errors.append('SandboxCatalogState must atomically remove instance policy during deletion')
 
 require(
-    'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java',
+    'app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java',
     'VirtualPackageStateBuilder',
     'lifecycle.packagePolicy(',
     'lifecycle.setPermissionDecision(',

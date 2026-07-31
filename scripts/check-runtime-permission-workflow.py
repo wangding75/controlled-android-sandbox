@@ -91,12 +91,16 @@ service = require(
     'openRuntimePermissionSession',
     'clientToken.linkToDeath',
     'callerVerifier.requireRuntimeBrokerCaller()',
+)
+permission_session = require(
+    'app/src/main/java/com/warden/controlledsandbox/PackageRuntimePermissionSession.java',
     'RUNTIME_PERMISSION_HOST_RESULT_MISMATCH',
     'RUNTIME_PERMISSION_PENDING_REQUEST_REQUIRED',
     'hostPermissions.resolve(',
+    'callerVerifier.requireRuntimeBrokerCaller()',
 )
-if 'lifecycle.requestRuntimePermission(' not in service:
-    errors.append('Package Service must persist a runtime permission request before resolution')
+if 'lifecycle.requestRuntimePermission(' not in permission_session:
+    errors.append('Runtime permission capability must persist a request before resolution')
 
 require(
     'app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java',

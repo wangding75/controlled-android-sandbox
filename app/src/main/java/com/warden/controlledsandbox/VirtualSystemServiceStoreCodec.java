@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox;
 
+import static com.warden.controlledsandbox.VirtualSystemServiceRecords.*;
 import static com.warden.controlledsandbox.VirtualSystemServiceStore.*;
 
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;

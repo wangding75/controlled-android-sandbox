@@ -14,6 +14,7 @@ import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeBrokerOperationAdapter;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeBrokerOperationHandler;
 import com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerFileRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerObserverRuntime;
@@ -25,10 +26,7 @@ import com.warden.controlledsandbox.runtime.status.BrokerRuntimeStatusSource;
 import com.warden.controlledsandbox.runtime.status.CombinedSessionMetricsRepository;
 import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
 import android.app.Service;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IGuestProcess;
@@ -54,12 +52,8 @@ import com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcher;
 import com.warden.controlledsandbox.runtime.status.RuntimeStatusLegacyAdapter;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
-public final class RuntimeBrokerService extends Service {
+public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
     private static final int SLOT_COUNT = 8;
     private final Clock clock = new SystemMonotonicClock();
     private final TokenGenerator tokenGenerator = new UuidTokenGenerator();
@@ -106,7 +100,7 @@ public final class RuntimeBrokerService extends Service {
                     providerRuntime, receiverCoordinator.lifecycle()),
             this::purgeExpiredResources,
             auditSink);
-    private final ConcurrentMap<Integer, GuestConnection> guestConnections = new ConcurrentHashMap<>();
+    private RuntimeGuestConnectionPool guestConnections;
     private ServiceMetricsSource combinedServiceMetrics() {
         return () -> Math.addExact(serviceCoordinator.recordCount(),
                 isolatedProcessCoordinator.serviceMetrics().recordCount());
@@ -114,6 +108,7 @@ public final class RuntimeBrokerService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
+        guestConnections = new RuntimeGuestConnectionPool(this, this::handleGuestDisconnect);
         activityRuntime.configureCheckpointStore(
                 new File(new File(getFilesDir(), "runtime"), "activity-tasks.checkpoint").toPath());
         File registryFile = new File(new File(getFilesDir(), "runtime"), "virtual-uids.registry");
@@ -129,454 +124,7 @@ public final class RuntimeBrokerService extends Service {
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            return RuntimeBrokerOperationAdapter.execute(this, request);
-        }
-        @Override public Bundle prepareGuest(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            return RuntimeBrokerService.this.prepareGuestInternal(request);
-        }
-        @Override public Bundle launchActivity(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
-            Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
-            if (!isPrepared(prepared)) return prepared;
-            String issuedRouteToken = "";
-            try {
-                String packageName = prepared.getString(RuntimeKeys.PACKAGE_NAME, "");
-                int userId = prepared.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
-                String processName = processName(prepared, packageName);
-                GuestSession session = sessions.get(packageName, userId, processName);
-                if (session == null) return failure("SESSION_NOT_FOUND", "Prepared session disappeared");
-                String component = request == null ? "" : request.getString(RuntimeKeys.COMPONENT_CLASS, "");
-                if (component.trim().isEmpty()) component = prepared.getString(RuntimeKeys.COMPONENT_CLASS, "");
-                if (component.trim().isEmpty()) return failure("COMPONENT_MISSING", "No Guest Activity class supplied");
-                Bundle transaction = activityRuntime.launch(session, component, prepared, request);
-                issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
-                Intent launch = new Intent(RuntimeBrokerService.this, RuntimeStubComponents.activityClassFor(session.processSlot()));
-                launch.addFlags(transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, Intent.FLAG_ACTIVITY_NEW_TASK));
-                launch.putExtra(RuntimeKeys.ROUTE_TOKEN, issuedRouteToken);
-                launch.putExtra(RuntimeKeys.SESSION_ID, session.sessionId());
-                launch.putExtra(RuntimeKeys.GENERATION, session.generation());
-                launch.putExtra(RuntimeKeys.ACTIVITY_TOKEN,
-                        transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
-                startActivity(launch);
-                Bundle out = sessionBundle(session, "LAUNCH_REQUESTED");
-                out.putAll(transaction);
-                return out;
-            } catch (Throwable error) {
-                if (!issuedRouteToken.isEmpty()) activityRuntime.launchFailed(issuedRouteToken);
-                return failure(error);
-            }
-        }
-        @Override public Bundle invokeComponent(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            BrokerProviderRuntime.OperationRoute providerRoute = null;
-            boolean providerAuditFinalized = false;
-            UriGrantRegistry.Authorization uriGrantAuthorization = null;
-            UriGrantRegistry.AuthorizationResult uriGrantAuthorizationResult = null;
-            BrokerCursorRuntime.QueryReservation cursorQueryReservation = null;
-            BrokerCursorRuntime.PageReservation cursorPageReservation = null;
-            BrokerCursorRuntime.TerminalReservation cursorTerminalReservation = null;
-            GuestSession cursorTargetSession = null;
-            BrokerFileRuntime.OpenReservation fileOpenReservation = null;
-            BrokerFileRuntime.CloseReservation fileCloseReservation = null;
-            GuestSession fileTargetSession = null;
-            try {
-                if (request == null) throw new IllegalArgumentException("request is required");
-                IsolatedProcessRoutePolicy.Match isolatedMatch = IsolatedProcessRoutePolicy.match(request);
-                if (isolatedMatch != null) return isolatedProcessCoordinator.invoke(request, isolatedMatch);
-                purgeExpiredResources();
-                String operation = request.getString(ComponentOperations.OPERATION, "");
-                ComponentOperations.requireKnownProviderOperation(operation);
-                ComponentOperations.requireKnownServiceOperation(operation);
-                String requestedPackage = required(request, RuntimeKeys.PACKAGE_NAME);
-                int requestedUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
-                if (requestedUser < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
-                if (ComponentOperations.PROVIDER_OBSERVER_UNREGISTER.equals(operation)) {
-                    return unregisterProviderObserver(request, requestedPackage, requestedUser);
-                }
-                if (ComponentOperations.PROVIDER_NOTIFY_CHANGE.equals(operation)) {
-                    return notifyProviderObservers(request, requestedPackage, requestedUser);
-                }
-                GuestSession session;
-                BrokerCursorRuntime.Lease cursorLease = null;
-                BrokerFileRuntime.Lease fileLease = null;
-                if (ComponentOperations.isProviderTransactionOperation(operation)) {
-                    String callerInstance = providerRuntime.requireCallerInstance(request, requestedPackage, requestedUser,
-                            RuntimeBrokerService.this::sessionById);
-                    String requestedTarget = ownerKey(requestedPackage, requestedUser);
-                    uriGrantAuthorization = beginUriGrantAuthorization(request, callerInstance, requestedTarget);
-                    UriGrantRegistry.Authorization authorization = uriGrantAuthorization;
-                    providerRoute = providerRuntime.routeOperation(request, operation, callerInstance,
-                            requestedUser, requestedTarget, authorization == null ? null : authorization::allows, now());
-                    if ("URI_GRANT".equals(providerRoute.permissionBasis())) {
-                        if (authorization == null) throw new SecurityException("URI_GRANT_CALLER_SESSION_REQUIRED");
-                        uriGrantAuthorizationResult = authorization.commit(now());
-                    }
-                    ProviderAuthorityRegistry.Entry target = providerRoute.entry();
-                    session = sessionById(target.sessionId(), target.generation());
-                    requireProviderTargetSession(session, target);
-                } else if (isProviderCursorOperation(operation)) {
-                    cursorLease = cursorRuntime.require(required(request, RuntimeKeys.CURSOR_TOKEN), now());
-                    validateCursorRequestIdentity(request, requestedPackage, requestedUser, cursorLease);
-                    session = sessionById(cursorLease.targetSessionId(), cursorLease.targetGeneration());
-                    requireCursorTargetSession(session, cursorLease);
-                } else if (ComponentOperations.isProviderFileLeaseOperation(operation)) {
-                    fileLease = fileRuntime.require(required(request, RuntimeKeys.FILE_TOKEN), now());
-                    validateFileRequestIdentity(request, requestedPackage, requestedUser, fileLease);
-                    session = sessionById(fileLease.targetSessionId(), fileLease.targetGeneration());
-                    requireFileTargetSession(session, fileLease);
-                } else {
-                    String processName = processName(request, requestedPackage);
-                    session = sessions.get(requestedPackage, requestedUser, processName);
-                    if (session == null || (session.state() != SessionState.READY
-                            && session.state() != SessionState.ACTIVE)) {
-                        Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
-                        if (!isPrepared(prepared)) return prepared;
-                        session = sessions.get(requestedPackage, requestedUser, processName);
-                    }
-                }
-                if (ComponentOperations.SEND_BROADCAST.equals(operation)
-                        && !request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
-                        && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                    return receiverCoordinator.dispatchManifestBroadcast(request, session);
-                }
-                if ((ComponentOperations.SEND_IMPLICIT_BROADCAST.equals(operation)
-                        || ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
-                        || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false))
-                        && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
-                        && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                    return receiverCoordinator.dispatchImplicitManifestBroadcast(request, session,
-                            ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
-                                    || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false));
-                }
-                String packageName = session.packageName();
-                int userId = session.virtualUserId();
-                String processName = session.processName();
-                Bundle base = brokerState.prepared(processKey(packageName, userId, processName));
-                if (base == null) throw new IllegalStateException("PREPARED_SPEC_MISSING");
-                Bundle call = new Bundle(base);
-                call.putAll(request);
-                call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
-                call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
-                call.putString(RuntimeKeys.PROCESS_NAME, processName);
-                if (providerRoute != null) {
-                    call.putString(ComponentOperations.AUTHORITY, providerRoute.authority());
-                    call.putString(RuntimeKeys.COMPONENT_CLASS, providerRoute.entry().component());
-                    call.putString(RuntimeKeys.URI, providerRoute.uri());
-                }
-                final GuestSession activeSession = session;
-                cursorTargetSession = activeSession;
-                fileTargetSession = activeSession;
-                ProviderAccess providerAccess = providerRoute != null
-                        ? providerAccess(providerRoute, request, activeSession) : null;
-                if (ComponentOperations.PROVIDER_OBSERVER_REGISTER.equals(operation)) {
-                    if (providerAccess == null) throw new IllegalStateException("PROVIDER_OBSERVER_ACCESS_MISSING");
-                    BrokerObserverRuntime.RegisterResult registration = observerRuntime.register(request,
-                            providerAccess.callerInstance, providerAccess.callerSessionId,
-                            providerAccess.callerGeneration, providerAccess.targetInstance,
-                            activeSession.sessionId(), activeSession.generation(), activeSession.virtualUserId(),
-                            providerRoute.authority(), providerAccess.uri);
-                    Bundle out = new Bundle();
-                    out.putString(RuntimeKeys.STATUS, registration.created()
-                            ? "PROVIDER_OBSERVER_REGISTERED" : "PROVIDER_OBSERVER_ALREADY_REGISTERED");
-                    out.putString(RuntimeKeys.OBSERVER_ID, registration.entry().id());
-                    out.putString(ComponentOperations.AUTHORITY, registration.entry().authority());
-                    out.putString(RuntimeKeys.URI, registration.entry().uri());
-                    out.putBoolean(RuntimeKeys.OBSERVER_NOTIFY_DESCENDANTS,
-                            registration.entry().notifyDescendants());
-                    out.putBoolean(RuntimeKeys.OBSERVER_DELIVER_SELF,
-                            registration.entry().deliverSelfNotifications());
-                    if (uriGrantAuthorizationResult != null) {
-                        out.putBoolean(RuntimeKeys.URI_GRANT_CONSUMED_ONE_TIME,
-                                uriGrantAuthorizationResult.oneTimeConsumed());
-                    }
-                    providerRuntime.completeOperation(providerRoute, out, now());
-                    providerAuditFinalized = true;
-                    return out;
-                } else if (ComponentOperations.PROVIDER_QUERY.equals(operation)) {
-                    if (providerAccess == null) throw new IllegalStateException("PROVIDER_QUERY_ACCESS_MISSING");
-                    cursorQueryReservation = cursorRuntime.reserveQuery(providerAccess.callerInstance,
-                            providerAccess.callerSessionId, providerAccess.callerGeneration,
-                            providerAccess.targetInstance, activeSession.packageName(), activeSession.virtualUserId(),
-                            activeSession.processName(), activeSession.sessionId(), activeSession.generation(),
-                            providerAccess.uri, providerAccess.flags, now());
-                    call.putString(RuntimeKeys.CURSOR_TOKEN, cursorQueryReservation.token());
-                    call.putLong(RuntimeKeys.CURSOR_TTL_MS, BrokerCursorRuntime.LEASE_TTL_MS);
-                } else if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
-                    if (cursorLease == null) throw new IllegalStateException("CURSOR_LEASE_MISSING");
-                    cursorPageReservation = cursorRuntime.reservePage(cursorLease.token(),
-                            cursorLease.callerSessionId(), cursorLease.callerGeneration(),
-                            cursorLease.targetSessionId(), cursorLease.targetGeneration(),
-                            request.getInt(RuntimeKeys.CURSOR_OFFSET, -1),
-                            request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
-                            request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64), now());
-                } else if (ComponentOperations.PROVIDER_CURSOR_CLOSE.equals(operation)
-                        || ComponentOperations.PROVIDER_CURSOR_CANCEL.equals(operation)) {
-                    if (cursorLease == null) throw new IllegalStateException("CURSOR_LEASE_MISSING");
-                    cursorTerminalReservation = cursorRuntime.reserveTerminal(cursorLease.token(),
-                            cursorLease.callerSessionId(), cursorLease.callerGeneration(),
-                            cursorLease.targetSessionId(), cursorLease.targetGeneration(),
-                            request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1), now());
-                } else if (ComponentOperations.isProviderFileOpenOperation(operation)) {
-                    if (providerAccess == null) throw new IllegalStateException("PROVIDER_FILE_ACCESS_MISSING");
-                    String mode = ComponentOperations.PROVIDER_OPEN_TYPED_ASSET_FILE.equals(operation)
-                            ? "r" : required(request, RuntimeKeys.PROVIDER_FILE_MODE);
-                    String mimeType = request.getString(RuntimeKeys.PROVIDER_MIME_TYPE, "");
-                    fileOpenReservation = fileRuntime.reserveOpen(operation, providerAccess.callerInstance,
-                            providerAccess.callerSessionId, providerAccess.callerGeneration,
-                            providerAccess.targetInstance, activeSession.packageName(), activeSession.virtualUserId(),
-                            activeSession.processName(), activeSession.sessionId(), activeSession.generation(),
-                            providerAccess.uri, providerAccess.flags, mode, mimeType, now());
-                    call.putString(RuntimeKeys.FILE_TOKEN, fileOpenReservation.token());
-                    call.putLong(RuntimeKeys.FILE_TTL_MS, BrokerFileRuntime.LEASE_TTL_MS);
-                    call.putString(RuntimeKeys.PROVIDER_FILE_MODE, mode);
-                } else if (ComponentOperations.PROVIDER_FILE_CLOSE.equals(operation)) {
-                    if (fileLease == null) throw new IllegalStateException("PROVIDER_FILE_LEASE_MISSING");
-                    fileCloseReservation = fileRuntime.reserveClose(fileLease.token(),
-                            fileLease.callerSessionId(), fileLease.callerGeneration(),
-                            fileLease.targetSessionId(), fileLease.targetGeneration(), now());
-                }
-                BrokerReceiverRuntime.Reservation receiverReservation = null;
-                BrokerProviderRuntime.Reservation providerReservation = null;
-                try {
-                    if (ComponentOperations.REGISTER_RECEIVER.equals(operation)) {
-                        receiverReservation = receiverCoordinator.reserveRegistration(request, activeSession);
-                    } else if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
-                        receiverCoordinator.requireOwnedRegistration(request, activeSession);
-                    } else if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
-                        providerReservation = providerRuntime.reservePrepare(request, activeSession);
-                    }
-                    Bundle result;
-                    if (ComponentOperations.SEND_BROADCAST.equals(operation)
-                            && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
-                            && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
-                        result = receiverCoordinator.dispatchDynamicBroadcast(request, activeSession);
-                    } else {
-                        result = callGuest(session.processSlot(), guest -> guestOperation(
-                                guest, RuntimeOperationRequest.INVOKE_COMPONENT, call));
-                    }
-                    if (ComponentOperations.PROVIDER_APPLY_BATCH.equals(operation)) {
-                        if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
-                            if (result.getInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, Integer.MIN_VALUE)
-                                    == Integer.MIN_VALUE) {
-                                result.putInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, -1);
-                            }
-                        } else {
-                            try {
-                                ProviderBatchRuntime.validateResult(result,
-                                        request.getInt(RuntimeKeys.PROVIDER_BATCH_COUNT, -1));
-                            } catch (ProviderBatchRuntime.BatchException error) {
-                                throw new IllegalStateException(error.getMessage(), error);
-                            }
-                        }
-                    }
-                    result.putString(RuntimeKeys.SESSION_ID, activeSession.sessionId());
-                    result.putLong(RuntimeKeys.GENERATION, activeSession.generation());
-                    result.putInt(RuntimeKeys.PROCESS_SLOT, activeSession.processSlot());
-                    result.putString(RuntimeKeys.PROCESS_NAME, activeSession.processName());
-                    if (uriGrantAuthorizationResult != null) {
-                        result.putBoolean(RuntimeKeys.URI_GRANT_CONSUMED_ONE_TIME,
-                                uriGrantAuthorizationResult.oneTimeConsumed());
-                    }
-                    if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
-                        cursorRuntime.rollbackQuery(cursorQueryReservation);
-                        if (cursorPageReservation != null) {
-                            cursorRuntime.abort(cursorPageReservation.token());
-                            providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
-                        }
-                        if (cursorTerminalReservation != null) cursorRuntime.completeTerminal(cursorTerminalReservation);
-                        fileRuntime.rollbackOpen(fileOpenReservation);
-                        if (fileCloseReservation != null) {
-                            fileRuntime.abort(fileCloseReservation.token());
-                            providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
-                        }
-                        if (providerRoute != null) {
-                            providerRuntime.completeOperation(providerRoute, result, now());
-                            providerAuditFinalized = true;
-                        }
-                        receiverCoordinator.rollbackRegistration(receiverReservation);
-                        providerRuntime.rollbackPrepare(providerReservation);
-                    } else {
-                        serviceCoordinator.applySuccessfulOperation(activeSession, request, result);
-                        if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
-                            receiverCoordinator.commitUnregister(request, activeSession);
-                        }
-                        if (ComponentOperations.PROVIDER_QUERY.equals(operation)) {
-                            BrokerCursorRuntime.Lease committed = cursorRuntime.commitQuery(
-                                    cursorQueryReservation, result, now());
-                            result.putString(RuntimeKeys.CURSOR_OWNER_SESSION_ID, committed.callerSessionId());
-                            result.putLong(RuntimeKeys.CURSOR_OWNER_GENERATION, committed.callerGeneration());
-                            result.putLong(RuntimeKeys.CURSOR_EXPIRES_AT, committed.expiresAtMs());
-                        } else if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
-                            BrokerCursorRuntime.Lease committed = cursorRuntime.commitPage(
-                                    cursorPageReservation, result, now());
-                            result.putString(RuntimeKeys.CURSOR_OWNER_SESSION_ID, committed.callerSessionId());
-                            result.putLong(RuntimeKeys.CURSOR_OWNER_GENERATION, committed.callerGeneration());
-                        } else if (cursorTerminalReservation != null) {
-                            cursorRuntime.completeTerminal(cursorTerminalReservation);
-                        }
-                        if (fileOpenReservation != null) {
-                            BrokerFileRuntime.Lease committed = fileRuntime.commitOpen(
-                                    fileOpenReservation, result, now());
-                            result.putString(RuntimeKeys.FILE_OWNER_SESSION_ID, committed.callerSessionId());
-                            result.putLong(RuntimeKeys.FILE_OWNER_GENERATION, committed.callerGeneration());
-                            result.putLong(RuntimeKeys.FILE_EXPIRES_AT, committed.expiresAtMs());
-                        } else if (fileCloseReservation != null) {
-                            fileRuntime.completeClose(fileCloseReservation);
-                        }
-                        if (providerRoute != null) {
-                            providerRuntime.completeOperation(providerRoute, result, now());
-                            providerAuditFinalized = true;
-                        }
-                    }
-                    return result;
-                } catch (Throwable error) {
-                    receiverCoordinator.rollbackRegistration(receiverReservation);
-                    providerRuntime.rollbackPrepare(providerReservation);
-                    cursorRuntime.rollbackQuery(cursorQueryReservation);
-                    if (cursorPageReservation != null) {
-                        cursorRuntime.abort(cursorPageReservation.token());
-                        providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
-                    }
-                    if (cursorTerminalReservation != null) {
-                        try { cursorRuntime.completeTerminal(cursorTerminalReservation); } catch (RuntimeException ignored) { }
-                    }
-                    if (cursorQueryReservation != null && cursorTargetSession != null) {
-                        providerResources.closeCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
-                    }
-                    fileRuntime.rollbackOpen(fileOpenReservation);
-                    if (fileOpenReservation != null && fileTargetSession != null) {
-                        providerResources.closeFileBestEffort(fileTargetSession, fileOpenReservation.token());
-                    }
-                    if (fileCloseReservation != null) {
-                        fileRuntime.abort(fileCloseReservation.token());
-                        providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
-                    }
-                    if (providerRoute != null) {
-                        providerRuntime.failOperation(providerRoute, error, now());
-                        providerAuditFinalized = true;
-                    }
-                    throw error;
-                }
-            } catch (Throwable error) {
-                cursorRuntime.rollbackQuery(cursorQueryReservation);
-                if (cursorPageReservation != null) cursorRuntime.abort(cursorPageReservation.token());
-                fileRuntime.rollbackOpen(fileOpenReservation);
-                if (fileCloseReservation != null) fileRuntime.abort(fileCloseReservation.token());
-                if (providerRoute != null && !providerAuditFinalized) {
-                    providerRuntime.failOperation(providerRoute, error, now());
-                }
-                Bundle failed = failure(error);
-                ProviderBatchRuntime.BatchException batchError = findBatchException(error);
-                if (batchError != null) {
-                    failed.putInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, batchError.operationIndex());
-                }
-                return failed;
-            }
-        }
-
-        @Override public Bundle grantUriPermission(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            try {
-                if (request == null) throw new IllegalArgumentException("request is required");
-                String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
-                int ownerUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
-                String targetPackage = required(request, RuntimeKeys.TARGET_PACKAGE_NAME);
-                int targetUser = request.getInt(RuntimeKeys.TARGET_VIRTUAL_USER_ID, -1);
-                if (ownerUser < 0 || targetUser < 0) {
-                    throw new IllegalArgumentException("virtual user ids must be non-negative");
-                }
-                if (ownerUser != targetUser) throw new SecurityException("URI_GRANT_CROSS_USER_DENIED");
-                String uri = required(request, RuntimeKeys.URI);
-                ProviderAuthorityRegistry.Entry providerOwner = providerRuntime.requireGrantOwner(uri, ownerUser,
-                        ownerKey(ownerPackage, ownerUser));
-                GuestSession ownerSession = sessionById(providerOwner.sessionId(), providerOwner.generation());
-                if (ownerSession == null || (ownerSession.state() != SessionState.READY
-                        && ownerSession.state() != SessionState.ACTIVE)) {
-                    throw new IllegalStateException("URI_GRANT_OWNER_NOT_RUNNING");
-                }
-                String targetSessionId = required(request, RuntimeKeys.URI_GRANT_TARGET_SESSION_ID);
-                long targetGeneration = request.getLong(RuntimeKeys.URI_GRANT_TARGET_GENERATION, -1);
-                GuestSession targetSession = sessionById(targetSessionId, targetGeneration);
-                if (targetSession == null || (targetSession.state() != SessionState.READY
-                        && targetSession.state() != SessionState.ACTIVE)) {
-                    throw new SecurityException("URI_GRANT_TARGET_SESSION_NOT_READY");
-                }
-                if (!targetSession.packageName().equals(targetPackage)
-                        || targetSession.virtualUserId() != targetUser) {
-                    throw new SecurityException("URI_GRANT_TARGET_IDENTITY_MISMATCH");
-                }
-                int flags = request.getInt(RuntimeKeys.URI_FLAGS, 0);
-                long ttlMs = request.getLong(RuntimeKeys.URI_GRANT_TTL_MS, 60_000L);
-                boolean oneTime = request.getBoolean(RuntimeKeys.URI_GRANT_ONE_TIME, false);
-                UriGrantRegistry.Grant grant = uriGrants.grant(ownerKey(ownerPackage, ownerUser),
-                        ownerSession.sessionId(), ownerSession.generation(),
-                        ownerKey(targetPackage, targetUser), targetSession.sessionId(), targetSession.generation(),
-                        ownerUser, uri, flags, oneTime, now(), ttlMs);
-                Bundle out = new Bundle();
-                out.putString(RuntimeKeys.STATUS, "URI_PERMISSION_GRANTED");
-                out.putString(RuntimeKeys.URI_GRANT_ID, grant.id());
-                out.putLong(RuntimeKeys.URI_GRANT_EXPIRES_AT, grant.expiresAtMs());
-                out.putInt(RuntimeKeys.URI_FLAGS, grant.flags());
-                out.putBoolean(RuntimeKeys.URI_GRANT_ONE_TIME, grant.oneTime());
-                out.putString(RuntimeKeys.URI_GRANT_TARGET_SESSION_ID, grant.targetSessionId());
-                out.putLong(RuntimeKeys.URI_GRANT_TARGET_GENERATION, grant.targetGeneration());
-                return out;
-            } catch (Throwable error) {
-                return failure(error);
-            }
-        }
-
-        @Override public Bundle revokeUriPermission(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            try {
-                if (request == null) throw new IllegalArgumentException("request is required");
-                String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
-                int ownerUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
-                String grantId = required(request, RuntimeKeys.URI_GRANT_ID);
-                UriGrantRegistry.Grant grant = uriGrants.require(grantId, now());
-                GuestSession ownerSession = sessionById(grant.ownerSessionId(), grant.ownerGeneration());
-                if (ownerSession == null || (ownerSession.state() != SessionState.READY
-                        && ownerSession.state() != SessionState.ACTIVE)) {
-                    throw new SecurityException("URI_GRANT_OWNER_SESSION_NOT_READY");
-                }
-                boolean revoked = uriGrants.revoke(grantId, ownerKey(ownerPackage, ownerUser),
-                        ownerSession.sessionId(), ownerSession.generation(), now());
-                Bundle out = new Bundle();
-                out.putString(RuntimeKeys.STATUS, revoked ? "URI_PERMISSION_REVOKED" : "URI_PERMISSION_NOT_FOUND");
-                return out;
-            } catch (Throwable error) {
-                return failure(error);
-            }
-        }
-
-        @Override public Bundle consumeRoute(String token, String sessionId, long generation) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            try {
-                GuestSession current = findSession(sessionId, generation);
-                Bundle payload = activityRuntime.consume(token, current);
-                if (current.state() == SessionState.READY) {
-                    current = sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                            generation, SessionState.ACTIVE, now(), "");
-                }
-                payload.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
-                return payload;
-            } catch (Throwable error) {
-                activityRuntime.launchFailed(token);
-                return failure(error);
-            }
-        }
-
-        @Override public Bundle activityEvent(Bundle request) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            try {
-                if (request == null) throw new IllegalArgumentException("request is required");
-                GuestSession current = findSession(required(request, RuntimeKeys.SESSION_ID),
-                        request.getLong(RuntimeKeys.GENERATION, -1));
-                return activityRuntime.event(current, request);
-            } catch (Throwable error) {
-                return failure(error);
-            }
+            return RuntimeBrokerOperationAdapter.execute(RuntimeBrokerService.this, request);
         }
 
         @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request) {
@@ -601,12 +149,6 @@ public final class RuntimeBrokerService extends Service {
             }
         }
 
-        @Override public Bundle sessionStatus(String packageName, int virtualUserId) {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            GuestSession session = sessions.get(packageName, virtualUserId, packageName);
-            return session == null ? failure("SESSION_NOT_FOUND", "No active session") : sessionBundle(session, session.state().name());
-        }
-
         @Override public PackageServiceResult requestRuntimePermission(String sessionId,
                 long generation, String permission, int requestCode) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
@@ -626,21 +168,477 @@ public final class RuntimeBrokerService extends Service {
             return runtimeStatusDispatcher.dispatch(request);
         }
 
-        @Override public Bundle runtimeStatus() {
-            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
-            RuntimeStatusRequest legacyRequest = new RuntimeStatusRequest(
-                    RuntimeProtocol.CURRENT, "legacy-runtime-status");
-            Bundle legacy = RuntimeStatusLegacyAdapter.toBundle(
-                    runtimeStatusDispatcher.dispatch(legacyRequest));
-            isolatedProcessCoordinator.addLegacyStatus(legacy);
-            return legacy;
-        }
-
         @Override public void stopGuest(String packageName, int virtualUserId) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             RuntimeBrokerService.this.stopGuestInternal(packageName, virtualUserId);
         }
     };
+
+    @Override public Bundle prepareGuest(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        return RuntimeBrokerService.this.prepareGuestInternal(request);
+    }
+
+    @Override public Bundle launchActivity(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
+        Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
+        if (!isPrepared(prepared)) return prepared;
+        String issuedRouteToken = "";
+        try {
+            String packageName = prepared.getString(RuntimeKeys.PACKAGE_NAME, "");
+            int userId = prepared.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+            String processName = processName(prepared, packageName);
+            GuestSession session = sessions.get(packageName, userId, processName);
+            if (session == null) return failure("SESSION_NOT_FOUND", "Prepared session disappeared");
+            String component = request == null ? "" : request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+            if (component.trim().isEmpty()) component = prepared.getString(RuntimeKeys.COMPONENT_CLASS, "");
+            if (component.trim().isEmpty()) return failure("COMPONENT_MISSING", "No Guest Activity class supplied");
+            Bundle transaction = activityRuntime.launch(session, component, prepared, request);
+            issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
+            Intent launch = new Intent(RuntimeBrokerService.this, RuntimeStubComponents.activityClassFor(session.processSlot()));
+            launch.addFlags(transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, Intent.FLAG_ACTIVITY_NEW_TASK));
+            launch.putExtra(RuntimeKeys.ROUTE_TOKEN, issuedRouteToken);
+            launch.putExtra(RuntimeKeys.SESSION_ID, session.sessionId());
+            launch.putExtra(RuntimeKeys.GENERATION, session.generation());
+            launch.putExtra(RuntimeKeys.ACTIVITY_TOKEN,
+                    transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
+            startActivity(launch);
+            Bundle out = sessionBundle(session, "LAUNCH_REQUESTED");
+            out.putAll(transaction);
+            return out;
+        } catch (Throwable error) {
+            if (!issuedRouteToken.isEmpty()) activityRuntime.launchFailed(issuedRouteToken);
+            return failure(error);
+        }
+    }
+
+    @Override public Bundle invokeComponent(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        BrokerProviderRuntime.OperationRoute providerRoute = null;
+        boolean providerAuditFinalized = false;
+        UriGrantRegistry.Authorization uriGrantAuthorization = null;
+        UriGrantRegistry.AuthorizationResult uriGrantAuthorizationResult = null;
+        BrokerCursorRuntime.QueryReservation cursorQueryReservation = null;
+        BrokerCursorRuntime.PageReservation cursorPageReservation = null;
+        BrokerCursorRuntime.TerminalReservation cursorTerminalReservation = null;
+        GuestSession cursorTargetSession = null;
+        BrokerFileRuntime.OpenReservation fileOpenReservation = null;
+        BrokerFileRuntime.CloseReservation fileCloseReservation = null;
+        GuestSession fileTargetSession = null;
+        try {
+            if (request == null) throw new IllegalArgumentException("request is required");
+            IsolatedProcessRoutePolicy.Match isolatedMatch = IsolatedProcessRoutePolicy.match(request);
+            if (isolatedMatch != null) return isolatedProcessCoordinator.invoke(request, isolatedMatch);
+            purgeExpiredResources();
+            String operation = request.getString(ComponentOperations.OPERATION, "");
+            ComponentOperations.requireKnownProviderOperation(operation);
+            ComponentOperations.requireKnownServiceOperation(operation);
+            String requestedPackage = required(request, RuntimeKeys.PACKAGE_NAME);
+            int requestedUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+            if (requestedUser < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+            if (ComponentOperations.PROVIDER_OBSERVER_UNREGISTER.equals(operation)) {
+                return unregisterProviderObserver(request, requestedPackage, requestedUser);
+            }
+            if (ComponentOperations.PROVIDER_NOTIFY_CHANGE.equals(operation)) {
+                return notifyProviderObservers(request, requestedPackage, requestedUser);
+            }
+            GuestSession session;
+            BrokerCursorRuntime.Lease cursorLease = null;
+            BrokerFileRuntime.Lease fileLease = null;
+            if (ComponentOperations.isProviderTransactionOperation(operation)) {
+                String callerInstance = providerRuntime.requireCallerInstance(request, requestedPackage, requestedUser,
+                        RuntimeBrokerService.this::sessionById);
+                String requestedTarget = ownerKey(requestedPackage, requestedUser);
+                uriGrantAuthorization = beginUriGrantAuthorization(request, callerInstance, requestedTarget);
+                UriGrantRegistry.Authorization authorization = uriGrantAuthorization;
+                providerRoute = providerRuntime.routeOperation(request, operation, callerInstance,
+                        requestedUser, requestedTarget, authorization == null ? null : authorization::allows, now());
+                if ("URI_GRANT".equals(providerRoute.permissionBasis())) {
+                    if (authorization == null) throw new SecurityException("URI_GRANT_CALLER_SESSION_REQUIRED");
+                    uriGrantAuthorizationResult = authorization.commit(now());
+                }
+                ProviderAuthorityRegistry.Entry target = providerRoute.entry();
+                session = sessionById(target.sessionId(), target.generation());
+                requireProviderTargetSession(session, target);
+            } else if (isProviderCursorOperation(operation)) {
+                cursorLease = cursorRuntime.require(required(request, RuntimeKeys.CURSOR_TOKEN), now());
+                validateCursorRequestIdentity(request, requestedPackage, requestedUser, cursorLease);
+                session = sessionById(cursorLease.targetSessionId(), cursorLease.targetGeneration());
+                requireCursorTargetSession(session, cursorLease);
+            } else if (ComponentOperations.isProviderFileLeaseOperation(operation)) {
+                fileLease = fileRuntime.require(required(request, RuntimeKeys.FILE_TOKEN), now());
+                validateFileRequestIdentity(request, requestedPackage, requestedUser, fileLease);
+                session = sessionById(fileLease.targetSessionId(), fileLease.targetGeneration());
+                requireFileTargetSession(session, fileLease);
+            } else {
+                String processName = processName(request, requestedPackage);
+                session = sessions.get(requestedPackage, requestedUser, processName);
+                if (session == null || (session.state() != SessionState.READY
+                        && session.state() != SessionState.ACTIVE)) {
+                    Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
+                    if (!isPrepared(prepared)) return prepared;
+                    session = sessions.get(requestedPackage, requestedUser, processName);
+                }
+            }
+            if (ComponentOperations.SEND_BROADCAST.equals(operation)
+                    && !request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
+                    && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
+                return receiverCoordinator.dispatchManifestBroadcast(request, session);
+            }
+            if ((ComponentOperations.SEND_IMPLICIT_BROADCAST.equals(operation)
+                    || ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
+                    || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false))
+                    && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
+                    && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
+                return receiverCoordinator.dispatchImplicitManifestBroadcast(request, session,
+                        ComponentOperations.SEND_ORDERED_BROADCAST.equals(operation)
+                                || request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false));
+            }
+            String packageName = session.packageName();
+            int userId = session.virtualUserId();
+            String processName = session.processName();
+            Bundle base = brokerState.prepared(processKey(packageName, userId, processName));
+            if (base == null) throw new IllegalStateException("PREPARED_SPEC_MISSING");
+            Bundle call = new Bundle(base);
+            call.putAll(request);
+            call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
+            call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
+            call.putString(RuntimeKeys.PROCESS_NAME, processName);
+            if (providerRoute != null) {
+                call.putString(ComponentOperations.AUTHORITY, providerRoute.authority());
+                call.putString(RuntimeKeys.COMPONENT_CLASS, providerRoute.entry().component());
+                call.putString(RuntimeKeys.URI, providerRoute.uri());
+            }
+            final GuestSession activeSession = session;
+            cursorTargetSession = activeSession;
+            fileTargetSession = activeSession;
+            ProviderAccess providerAccess = providerRoute != null
+                    ? providerAccess(providerRoute, request, activeSession) : null;
+            if (ComponentOperations.PROVIDER_OBSERVER_REGISTER.equals(operation)) {
+                if (providerAccess == null) throw new IllegalStateException("PROVIDER_OBSERVER_ACCESS_MISSING");
+                BrokerObserverRuntime.RegisterResult registration = observerRuntime.register(request,
+                        providerAccess.callerInstance, providerAccess.callerSessionId,
+                        providerAccess.callerGeneration, providerAccess.targetInstance,
+                        activeSession.sessionId(), activeSession.generation(), activeSession.virtualUserId(),
+                        providerRoute.authority(), providerAccess.uri);
+                Bundle out = new Bundle();
+                out.putString(RuntimeKeys.STATUS, registration.created()
+                        ? "PROVIDER_OBSERVER_REGISTERED" : "PROVIDER_OBSERVER_ALREADY_REGISTERED");
+                out.putString(RuntimeKeys.OBSERVER_ID, registration.entry().id());
+                out.putString(ComponentOperations.AUTHORITY, registration.entry().authority());
+                out.putString(RuntimeKeys.URI, registration.entry().uri());
+                out.putBoolean(RuntimeKeys.OBSERVER_NOTIFY_DESCENDANTS,
+                        registration.entry().notifyDescendants());
+                out.putBoolean(RuntimeKeys.OBSERVER_DELIVER_SELF,
+                        registration.entry().deliverSelfNotifications());
+                if (uriGrantAuthorizationResult != null) {
+                    out.putBoolean(RuntimeKeys.URI_GRANT_CONSUMED_ONE_TIME,
+                            uriGrantAuthorizationResult.oneTimeConsumed());
+                }
+                providerRuntime.completeOperation(providerRoute, out, now());
+                providerAuditFinalized = true;
+                return out;
+            } else if (ComponentOperations.PROVIDER_QUERY.equals(operation)) {
+                if (providerAccess == null) throw new IllegalStateException("PROVIDER_QUERY_ACCESS_MISSING");
+                cursorQueryReservation = cursorRuntime.reserveQuery(providerAccess.callerInstance,
+                        providerAccess.callerSessionId, providerAccess.callerGeneration,
+                        providerAccess.targetInstance, activeSession.packageName(), activeSession.virtualUserId(),
+                        activeSession.processName(), activeSession.sessionId(), activeSession.generation(),
+                        providerAccess.uri, providerAccess.flags, now());
+                call.putString(RuntimeKeys.CURSOR_TOKEN, cursorQueryReservation.token());
+                call.putLong(RuntimeKeys.CURSOR_TTL_MS, BrokerCursorRuntime.LEASE_TTL_MS);
+            } else if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
+                if (cursorLease == null) throw new IllegalStateException("CURSOR_LEASE_MISSING");
+                cursorPageReservation = cursorRuntime.reservePage(cursorLease.token(),
+                        cursorLease.callerSessionId(), cursorLease.callerGeneration(),
+                        cursorLease.targetSessionId(), cursorLease.targetGeneration(),
+                        request.getInt(RuntimeKeys.CURSOR_OFFSET, -1),
+                        request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
+                        request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64), now());
+            } else if (ComponentOperations.PROVIDER_CURSOR_CLOSE.equals(operation)
+                    || ComponentOperations.PROVIDER_CURSOR_CANCEL.equals(operation)) {
+                if (cursorLease == null) throw new IllegalStateException("CURSOR_LEASE_MISSING");
+                cursorTerminalReservation = cursorRuntime.reserveTerminal(cursorLease.token(),
+                        cursorLease.callerSessionId(), cursorLease.callerGeneration(),
+                        cursorLease.targetSessionId(), cursorLease.targetGeneration(),
+                        request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1), now());
+            } else if (ComponentOperations.isProviderFileOpenOperation(operation)) {
+                if (providerAccess == null) throw new IllegalStateException("PROVIDER_FILE_ACCESS_MISSING");
+                String mode = ComponentOperations.PROVIDER_OPEN_TYPED_ASSET_FILE.equals(operation)
+                        ? "r" : required(request, RuntimeKeys.PROVIDER_FILE_MODE);
+                String mimeType = request.getString(RuntimeKeys.PROVIDER_MIME_TYPE, "");
+                fileOpenReservation = fileRuntime.reserveOpen(operation, providerAccess.callerInstance,
+                        providerAccess.callerSessionId, providerAccess.callerGeneration,
+                        providerAccess.targetInstance, activeSession.packageName(), activeSession.virtualUserId(),
+                        activeSession.processName(), activeSession.sessionId(), activeSession.generation(),
+                        providerAccess.uri, providerAccess.flags, mode, mimeType, now());
+                call.putString(RuntimeKeys.FILE_TOKEN, fileOpenReservation.token());
+                call.putLong(RuntimeKeys.FILE_TTL_MS, BrokerFileRuntime.LEASE_TTL_MS);
+                call.putString(RuntimeKeys.PROVIDER_FILE_MODE, mode);
+            } else if (ComponentOperations.PROVIDER_FILE_CLOSE.equals(operation)) {
+                if (fileLease == null) throw new IllegalStateException("PROVIDER_FILE_LEASE_MISSING");
+                fileCloseReservation = fileRuntime.reserveClose(fileLease.token(),
+                        fileLease.callerSessionId(), fileLease.callerGeneration(),
+                        fileLease.targetSessionId(), fileLease.targetGeneration(), now());
+            }
+            BrokerReceiverRuntime.Reservation receiverReservation = null;
+            BrokerProviderRuntime.Reservation providerReservation = null;
+            try {
+                if (ComponentOperations.REGISTER_RECEIVER.equals(operation)) {
+                    receiverReservation = receiverCoordinator.reserveRegistration(request, activeSession);
+                } else if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
+                    receiverCoordinator.requireOwnedRegistration(request, activeSession);
+                } else if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
+                    providerReservation = providerRuntime.reservePrepare(request, activeSession);
+                }
+                Bundle result;
+                if (ComponentOperations.SEND_BROADCAST.equals(operation)
+                        && request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim().isEmpty()
+                        && request.getString(RuntimeKeys.RECEIVER_ID, "").trim().isEmpty()) {
+                    result = receiverCoordinator.dispatchDynamicBroadcast(request, activeSession);
+                } else {
+                    result = callGuest(session.processSlot(), guest -> guestOperation(
+                            guest, RuntimeOperationRequest.INVOKE_COMPONENT, call));
+                }
+                if (ComponentOperations.PROVIDER_APPLY_BATCH.equals(operation)) {
+                    if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+                        if (result.getInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, Integer.MIN_VALUE)
+                                == Integer.MIN_VALUE) {
+                            result.putInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, -1);
+                        }
+                    } else {
+                        try {
+                            ProviderBatchRuntime.validateResult(result,
+                                    request.getInt(RuntimeKeys.PROVIDER_BATCH_COUNT, -1));
+                        } catch (ProviderBatchRuntime.BatchException error) {
+                            throw new IllegalStateException(error.getMessage(), error);
+                        }
+                    }
+                }
+                result.putString(RuntimeKeys.SESSION_ID, activeSession.sessionId());
+                result.putLong(RuntimeKeys.GENERATION, activeSession.generation());
+                result.putInt(RuntimeKeys.PROCESS_SLOT, activeSession.processSlot());
+                result.putString(RuntimeKeys.PROCESS_NAME, activeSession.processName());
+                if (uriGrantAuthorizationResult != null) {
+                    result.putBoolean(RuntimeKeys.URI_GRANT_CONSUMED_ONE_TIME,
+                            uriGrantAuthorizationResult.oneTimeConsumed());
+                }
+                if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+                    cursorRuntime.rollbackQuery(cursorQueryReservation);
+                    if (cursorPageReservation != null) {
+                        cursorRuntime.abort(cursorPageReservation.token());
+                        providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
+                    }
+                    if (cursorTerminalReservation != null) cursorRuntime.completeTerminal(cursorTerminalReservation);
+                    fileRuntime.rollbackOpen(fileOpenReservation);
+                    if (fileCloseReservation != null) {
+                        fileRuntime.abort(fileCloseReservation.token());
+                        providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
+                    }
+                    if (providerRoute != null) {
+                        providerRuntime.completeOperation(providerRoute, result, now());
+                        providerAuditFinalized = true;
+                    }
+                    receiverCoordinator.rollbackRegistration(receiverReservation);
+                    providerRuntime.rollbackPrepare(providerReservation);
+                } else {
+                    serviceCoordinator.applySuccessfulOperation(activeSession, request, result);
+                    if (ComponentOperations.UNREGISTER_RECEIVER.equals(operation)) {
+                        receiverCoordinator.commitUnregister(request, activeSession);
+                    }
+                    if (ComponentOperations.PROVIDER_QUERY.equals(operation)) {
+                        BrokerCursorRuntime.Lease committed = cursorRuntime.commitQuery(
+                                cursorQueryReservation, result, now());
+                        result.putString(RuntimeKeys.CURSOR_OWNER_SESSION_ID, committed.callerSessionId());
+                        result.putLong(RuntimeKeys.CURSOR_OWNER_GENERATION, committed.callerGeneration());
+                        result.putLong(RuntimeKeys.CURSOR_EXPIRES_AT, committed.expiresAtMs());
+                    } else if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
+                        BrokerCursorRuntime.Lease committed = cursorRuntime.commitPage(
+                                cursorPageReservation, result, now());
+                        result.putString(RuntimeKeys.CURSOR_OWNER_SESSION_ID, committed.callerSessionId());
+                        result.putLong(RuntimeKeys.CURSOR_OWNER_GENERATION, committed.callerGeneration());
+                    } else if (cursorTerminalReservation != null) {
+                        cursorRuntime.completeTerminal(cursorTerminalReservation);
+                    }
+                    if (fileOpenReservation != null) {
+                        BrokerFileRuntime.Lease committed = fileRuntime.commitOpen(
+                                fileOpenReservation, result, now());
+                        result.putString(RuntimeKeys.FILE_OWNER_SESSION_ID, committed.callerSessionId());
+                        result.putLong(RuntimeKeys.FILE_OWNER_GENERATION, committed.callerGeneration());
+                        result.putLong(RuntimeKeys.FILE_EXPIRES_AT, committed.expiresAtMs());
+                    } else if (fileCloseReservation != null) {
+                        fileRuntime.completeClose(fileCloseReservation);
+                    }
+                    if (providerRoute != null) {
+                        providerRuntime.completeOperation(providerRoute, result, now());
+                        providerAuditFinalized = true;
+                    }
+                }
+                return result;
+            } catch (Throwable error) {
+                receiverCoordinator.rollbackRegistration(receiverReservation);
+                providerRuntime.rollbackPrepare(providerReservation);
+                cursorRuntime.rollbackQuery(cursorQueryReservation);
+                if (cursorPageReservation != null) {
+                    cursorRuntime.abort(cursorPageReservation.token());
+                    providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
+                }
+                if (cursorTerminalReservation != null) {
+                    try { cursorRuntime.completeTerminal(cursorTerminalReservation); } catch (RuntimeException ignored) { }
+                }
+                if (cursorQueryReservation != null && cursorTargetSession != null) {
+                    providerResources.closeCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
+                }
+                fileRuntime.rollbackOpen(fileOpenReservation);
+                if (fileOpenReservation != null && fileTargetSession != null) {
+                    providerResources.closeFileBestEffort(fileTargetSession, fileOpenReservation.token());
+                }
+                if (fileCloseReservation != null) {
+                    fileRuntime.abort(fileCloseReservation.token());
+                    providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
+                }
+                if (providerRoute != null) {
+                    providerRuntime.failOperation(providerRoute, error, now());
+                    providerAuditFinalized = true;
+                }
+                throw error;
+            }
+        } catch (Throwable error) {
+            cursorRuntime.rollbackQuery(cursorQueryReservation);
+            if (cursorPageReservation != null) cursorRuntime.abort(cursorPageReservation.token());
+            fileRuntime.rollbackOpen(fileOpenReservation);
+            if (fileCloseReservation != null) fileRuntime.abort(fileCloseReservation.token());
+            if (providerRoute != null && !providerAuditFinalized) {
+                providerRuntime.failOperation(providerRoute, error, now());
+            }
+            Bundle failed = failure(error);
+            ProviderBatchRuntime.BatchException batchError = findBatchException(error);
+            if (batchError != null) {
+                failed.putInt(RuntimeKeys.PROVIDER_BATCH_FAILURE_INDEX, batchError.operationIndex());
+            }
+            return failed;
+        }
+    }
+
+    @Override public Bundle grantUriPermission(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        try {
+            if (request == null) throw new IllegalArgumentException("request is required");
+            String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
+            int ownerUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+            String targetPackage = required(request, RuntimeKeys.TARGET_PACKAGE_NAME);
+            int targetUser = request.getInt(RuntimeKeys.TARGET_VIRTUAL_USER_ID, -1);
+            if (ownerUser < 0 || targetUser < 0) {
+                throw new IllegalArgumentException("virtual user ids must be non-negative");
+            }
+            if (ownerUser != targetUser) throw new SecurityException("URI_GRANT_CROSS_USER_DENIED");
+            String uri = required(request, RuntimeKeys.URI);
+            ProviderAuthorityRegistry.Entry providerOwner = providerRuntime.requireGrantOwner(uri, ownerUser,
+                    ownerKey(ownerPackage, ownerUser));
+            GuestSession ownerSession = sessionById(providerOwner.sessionId(), providerOwner.generation());
+            if (ownerSession == null || (ownerSession.state() != SessionState.READY
+                    && ownerSession.state() != SessionState.ACTIVE)) {
+                throw new IllegalStateException("URI_GRANT_OWNER_NOT_RUNNING");
+            }
+            String targetSessionId = required(request, RuntimeKeys.URI_GRANT_TARGET_SESSION_ID);
+            long targetGeneration = request.getLong(RuntimeKeys.URI_GRANT_TARGET_GENERATION, -1);
+            GuestSession targetSession = sessionById(targetSessionId, targetGeneration);
+            if (targetSession == null || (targetSession.state() != SessionState.READY
+                    && targetSession.state() != SessionState.ACTIVE)) {
+                throw new SecurityException("URI_GRANT_TARGET_SESSION_NOT_READY");
+            }
+            if (!targetSession.packageName().equals(targetPackage)
+                    || targetSession.virtualUserId() != targetUser) {
+                throw new SecurityException("URI_GRANT_TARGET_IDENTITY_MISMATCH");
+            }
+            int flags = request.getInt(RuntimeKeys.URI_FLAGS, 0);
+            long ttlMs = request.getLong(RuntimeKeys.URI_GRANT_TTL_MS, 60_000L);
+            boolean oneTime = request.getBoolean(RuntimeKeys.URI_GRANT_ONE_TIME, false);
+            UriGrantRegistry.Grant grant = uriGrants.grant(ownerKey(ownerPackage, ownerUser),
+                    ownerSession.sessionId(), ownerSession.generation(),
+                    ownerKey(targetPackage, targetUser), targetSession.sessionId(), targetSession.generation(),
+                    ownerUser, uri, flags, oneTime, now(), ttlMs);
+            Bundle out = new Bundle();
+            out.putString(RuntimeKeys.STATUS, "URI_PERMISSION_GRANTED");
+            out.putString(RuntimeKeys.URI_GRANT_ID, grant.id());
+            out.putLong(RuntimeKeys.URI_GRANT_EXPIRES_AT, grant.expiresAtMs());
+            out.putInt(RuntimeKeys.URI_FLAGS, grant.flags());
+            out.putBoolean(RuntimeKeys.URI_GRANT_ONE_TIME, grant.oneTime());
+            out.putString(RuntimeKeys.URI_GRANT_TARGET_SESSION_ID, grant.targetSessionId());
+            out.putLong(RuntimeKeys.URI_GRANT_TARGET_GENERATION, grant.targetGeneration());
+            return out;
+        } catch (Throwable error) {
+            return failure(error);
+        }
+    }
+
+    @Override public Bundle revokeUriPermission(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        try {
+            if (request == null) throw new IllegalArgumentException("request is required");
+            String ownerPackage = required(request, RuntimeKeys.PACKAGE_NAME);
+            int ownerUser = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+            String grantId = required(request, RuntimeKeys.URI_GRANT_ID);
+            UriGrantRegistry.Grant grant = uriGrants.require(grantId, now());
+            GuestSession ownerSession = sessionById(grant.ownerSessionId(), grant.ownerGeneration());
+            if (ownerSession == null || (ownerSession.state() != SessionState.READY
+                    && ownerSession.state() != SessionState.ACTIVE)) {
+                throw new SecurityException("URI_GRANT_OWNER_SESSION_NOT_READY");
+            }
+            boolean revoked = uriGrants.revoke(grantId, ownerKey(ownerPackage, ownerUser),
+                    ownerSession.sessionId(), ownerSession.generation(), now());
+            Bundle out = new Bundle();
+            out.putString(RuntimeKeys.STATUS, revoked ? "URI_PERMISSION_REVOKED" : "URI_PERMISSION_NOT_FOUND");
+            return out;
+        } catch (Throwable error) {
+            return failure(error);
+        }
+    }
+
+    @Override public Bundle consumeRoute(String token, String sessionId, long generation) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        try {
+            GuestSession current = findSession(sessionId, generation);
+            Bundle payload = activityRuntime.consume(token, current);
+            if (current.state() == SessionState.READY) {
+                current = sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
+                        generation, SessionState.ACTIVE, now(), "");
+            }
+            payload.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
+            return payload;
+        } catch (Throwable error) {
+            activityRuntime.launchFailed(token);
+            return failure(error);
+        }
+    }
+
+    @Override public Bundle activityEvent(Bundle request) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        try {
+            if (request == null) throw new IllegalArgumentException("request is required");
+            GuestSession current = findSession(required(request, RuntimeKeys.SESSION_ID),
+                    request.getLong(RuntimeKeys.GENERATION, -1));
+            return activityRuntime.event(current, request);
+        } catch (Throwable error) {
+            return failure(error);
+        }
+    }
+
+    @Override public Bundle sessionStatus(String packageName, int virtualUserId) {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        GuestSession session = sessions.get(packageName, virtualUserId, packageName);
+        return session == null ? failure("SESSION_NOT_FOUND", "No active session") : sessionBundle(session, session.state().name());
+    }
+
+    @Override public Bundle runtimeStatus() {
+        CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        RuntimeStatusRequest legacyRequest = new RuntimeStatusRequest(
+                RuntimeProtocol.CURRENT, "legacy-runtime-status");
+        Bundle legacy = RuntimeStatusLegacyAdapter.toBundle(
+                runtimeStatusDispatcher.dispatch(legacyRequest));
+        isolatedProcessCoordinator.addLegacyStatus(legacy);
+        return legacy;
+    }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
     private synchronized Bundle prepareGuestInternal(Bundle request) {
@@ -1099,7 +1097,6 @@ public final class RuntimeBrokerService extends Service {
         // Broker/Guest retained copies are still bounded by Lease TTL and Session/generation cleanup.
     }
 
-
     private void purgeExpiredResources() {
         purgeExpiredResources(now());
     }
@@ -1111,70 +1108,30 @@ public final class RuntimeBrokerService extends Service {
         isolatedProcessCoordinator.purgeExpiredForeground();
     }
 
-    private Bundle callGuest(int slot, GuestCall call) throws Exception {
-        GuestConnection connection = requireGuestConnection(slot);
-        try {
-            return call.run(connection.requireGuest());
-        } catch (Exception error) {
-            if (!connection.isAlive()) handleGuestDisconnect(slot, connection, "BINDER_CALL_FAILED:" + error.getClass().getSimpleName());
-            throw error;
-        }
-    }
-
-    private GuestConnection requireGuestConnection(int slot) throws Exception {
-        GuestConnection connection;
-        synchronized (this) {
-            connection = guestConnections.get(slot);
-            if (connection != null && connection.isAlive()) return connection;
-            if (connection == null) {
-                connection = new GuestConnection(slot);
-                guestConnections.put(slot, connection);
-                Intent intent = new Intent(this, RuntimeStubComponents.serviceClassFor(slot));
-                if (!bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
-                    guestConnections.remove(slot);
-                    throw new IllegalStateException("BIND_FAILED");
-                }
-            }
-        }
-        if (!connection.await(10, TimeUnit.SECONDS) || !connection.isAlive()) {
-            handleGuestDisconnect(slot, connection, "BIND_TIMEOUT");
-            throw new IllegalStateException("BIND_TIMEOUT");
-        }
-        return connection;
+    private Bundle callGuest(int slot, RuntimeGuestConnectionPool.GuestCall call) throws Exception {
+        return guestConnections.call(slot, call);
     }
 
     private void releaseGuestConnection(int slot) {
-        GuestConnection connection;
-        synchronized (this) { connection = guestConnections.remove(slot); }
-        if (connection == null) return;
-        connection.closing = true;
-        connection.unlinkDeath();
-        try { unbindService(connection); } catch (Exception ignored) { }
+        guestConnections.release(slot);
     }
 
-    private void handleGuestDisconnect(int slot, GuestConnection source, String reason) {
-        GuestSession affected = null;
+    private void handleGuestDisconnect(int slot, String reason) {
+        GuestSession affected;
         synchronized (this) {
-            GuestConnection current = guestConnections.get(slot);
-            if (current != source) return;
-            guestConnections.remove(slot);
-            if (!source.closing) {
-                affected = sessions.markSlotDisconnected(slot, now(), reason);
-                if (affected != null) {
-                    activityRuntime.processDisconnected(affected);
-                    serviceCoordinator.disconnectSession(affected);
-                    receiverCoordinator.disconnectSession(affected,
-                            "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + reason);
-                    RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
-                            sessionBundle(affected, affected.state().name()));
-                }
+            affected = sessions.markSlotDisconnected(slot, now(), reason);
+            if (affected != null) {
+                activityRuntime.processDisconnected(affected);
+                serviceCoordinator.disconnectSession(affected);
+                receiverCoordinator.disconnectSession(affected,
+                        "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + reason);
+                RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
+                        sessionBundle(affected, affected.state().name()));
             }
         }
         if (affected != null) {
             providerResources.disconnectSession(affected);
         }
-        source.unlinkDeath();
-        try { unbindService(source); } catch (Exception ignored) { }
     }
 
     private GuestSession findSession(String sessionId, long generation) {
@@ -1196,9 +1153,7 @@ public final class RuntimeBrokerService extends Service {
             serviceCoordinator.stopSession(session);
             providerResources.stopSession(session);
         }
-        Integer[] slots;
-        synchronized (this) { slots = guestConnections.keySet().toArray(new Integer[0]); }
-        for (int slot : slots) releaseGuestConnection(slot);
+        if (guestConnections != null) guestConnections.close();
         receiverCoordinator.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
         if (runtimePermissionCoordinator != null) runtimePermissionCoordinator.close();
         if (systemServiceCoordinator != null) systemServiceCoordinator.close();
@@ -1296,73 +1251,4 @@ public final class RuntimeBrokerService extends Service {
         }
     }
 
-
-
-    private interface GuestCall { Bundle run(IGuestProcess guest) throws Exception; }
-
-    private final class GuestConnection implements ServiceConnection, IBinder.DeathRecipient {
-        final int slot;
-        final CountDownLatch connected = new CountDownLatch(1);
-        volatile IGuestProcess guest;
-        volatile IBinder binderToken;
-        volatile boolean closing;
-
-        GuestConnection(int slot) { this.slot = slot; }
-
-        @Override public void onServiceConnected(ComponentName name, IBinder service) {
-            binderToken = service;
-            guest = IGuestProcess.Stub.asInterface(service);
-            try { service.linkToDeath(this, 0); }
-            catch (Throwable error) {
-                guest = null;
-                binderToken = null;
-            } finally {
-                connected.countDown();
-            }
-        }
-
-        @Override public void onServiceDisconnected(ComponentName name) {
-            guest = null;
-            binderToken = null;
-            connected.countDown();
-            handleGuestDisconnect(slot, this, "SERVICE_DISCONNECTED");
-        }
-
-        @Override public void onBindingDied(ComponentName name) {
-            guest = null;
-            binderToken = null;
-            connected.countDown();
-            handleGuestDisconnect(slot, this, "BINDING_DIED");
-        }
-
-        @Override public void onNullBinding(ComponentName name) {
-            guest = null;
-            binderToken = null;
-            connected.countDown();
-            handleGuestDisconnect(slot, this, "NULL_BINDING");
-        }
-
-        @Override public void binderDied() {
-            guest = null;
-            binderToken = null;
-            handleGuestDisconnect(slot, this, "BINDER_DIED");
-        }
-
-        boolean await(long timeout, TimeUnit unit) throws InterruptedException { return connected.await(timeout, unit); }
-        boolean isAlive() {
-            IBinder token = binderToken;
-            return guest != null && token != null && token.isBinderAlive();
-        }
-        IGuestProcess requireGuest() {
-            IGuestProcess value = guest;
-            if (value == null || !isAlive()) throw new IllegalStateException("GUEST_BINDER_DEAD");
-            return value;
-        }
-        void unlinkDeath() {
-            IBinder token = binderToken;
-            if (token != null) {
-                try { token.unlinkToDeath(this, 0); } catch (Throwable ignored) { }
-            }
-        }
-    }
 }

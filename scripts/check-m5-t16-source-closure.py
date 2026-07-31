@@ -60,8 +60,8 @@ subprocess.run([sys.executable, str(ROOT / "scripts/audit-m5-t16-source-closure.
 audit = json.loads((ROOT / "verification/m5-t16-source-closure-audit.json").read_text())
 if audit["typedRuntimeTransport"]["internalLegacyDirectCalls"]:
     errors.append("repository-owned Runtime callers still use legacy Bundle methods")
-if audit["typedRuntimeTransport"]["legacyCompatibilityDeclarations"] != 12:
-    errors.append("legacy compatibility declaration inventory changed without review")
+if audit["typedRuntimeTransport"]["legacyCompatibilityDeclarations"] > 12:
+    errors.append("legacy compatibility declarations may only decrease after M5-T16")
 if not all(audit["methodClassification"].values()):
     errors.append("method-classification regression evidence incomplete")
 if not all(audit["falseCoverageClosed"].values()):

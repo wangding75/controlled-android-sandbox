@@ -8,16 +8,27 @@ final class InvocationMethodMatcher {
 
     static boolean named(String normalizedName, String... candidates) {
         if (normalizedName == null || candidates == null) return false;
+        String name = normalize(normalizedName);
         for (String candidate : candidates) {
-            if (normalizedName.equals(normalize(candidate))) return true;
+            if (name.equals(normalize(candidate))) return true;
         }
         return false;
     }
 
     static boolean startsWith(String normalizedName, String... prefixes) {
         if (normalizedName == null || prefixes == null) return false;
+        String name = normalize(normalizedName);
         for (String prefix : prefixes) {
-            if (normalizedName.startsWith(normalize(prefix))) return true;
+            if (name.startsWith(normalize(prefix))) return true;
+        }
+        return false;
+    }
+
+    static boolean containsAny(String normalizedName, String... fragments) {
+        if (normalizedName == null || fragments == null) return false;
+        String name = normalize(normalizedName);
+        for (String fragment : fragments) {
+            if (name.contains(normalize(fragment))) return true;
         }
         return false;
     }

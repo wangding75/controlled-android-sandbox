@@ -73,7 +73,7 @@ final class PeripheralInvocationValues {
 
     static boolean matchesPrefix(String method, List<String> prefixes) {
         for (String prefix : prefixes) {
-            if (method.startsWith(normalize(prefix))) return true;
+            if (InvocationMethodMatcher.startsWith(method, prefix)) return true;
         }
         return false;
     }

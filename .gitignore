@@ -9,3 +9,6 @@ captures/
 .gradle-reproducible/
 __pycache__/
 *.py[cod]
+
+# Local verification working logs (published separately as release artifacts)
+verification/*-working.txt

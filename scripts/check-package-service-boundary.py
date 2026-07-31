@@ -32,10 +32,14 @@ if 'IPackageManagementSession openManagementSession(in IBinder clientToken);' no
     errors.append('root package service must mint a Binder capability from a client death token')
 
 service_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java').read_text()
-for fragment in ['Binder.getCallingUid()', 'Binder.getCallingPid()', 'clientToken.linkToDeath',
-                 'guard.requireOwner', 'callerVerifier.requireMainProcessCaller()',
+management_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java').read_text()
+for fragment in ['Binder.getCallingUid()', 'Binder.getCallingPid()', 'clientToken.linkToDeath']:
+    if fragment not in service_source:
+        errors.append('missing package service capability-minting fragment: '+fragment)
+for fragment in ['guard.requireOwner', 'callerVerifier.requireMainProcessCaller()',
                  'synchronized (operationLock)']:
-    if fragment not in service_source: errors.append('missing package service security/serialization fragment: '+fragment)
+    if fragment not in management_source:
+        errors.append('missing package management session security/serialization fragment: '+fragment)
 verifier_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java').read_text()
 for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER',
                  'companionBrokerProcess', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
@@ -49,7 +53,7 @@ for path in [ROOT/'app/src/main/java/com/warden/controlledsandbox/MainActivity.j
     if 'PackageServiceClient' not in text: errors.append(f'{path.relative_to(ROOT)} is not wired to PackageServiceClient')
 
 for path in (ROOT/'app/src/main/java').rglob('*.java'):
-    if path.name == 'PackageManagementService.java': continue
+    if path.name in {'PackageManagementService.java', 'PackageServiceDependencies.java'}: continue
     if 'new SandboxPackageLifecycle' in path.read_text():
         errors.append(f'{path.relative_to(ROOT)} directly constructs SandboxPackageLifecycle')
 

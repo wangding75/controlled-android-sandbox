@@ -68,7 +68,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualDeviceServiceStor
         'put("bluetooth"', 'put("sensors"')
 require("app/src/main/java/com/warden/controlledsandbox/VirtualDeviceServiceStorePersistence.java",
         "AtomicMoveNotSupportedException", "CRC32", "quarantine", "MAX_FILE_BYTES")
-require("app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getDeviceServiceProfile", "setDeviceServiceProfile", "resetDeviceServiceProfile",
         "notifyDeviceProfileChanged")
 require("app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",

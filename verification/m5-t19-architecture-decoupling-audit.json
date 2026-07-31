@@ -1,0 +1,109 @@
+{
+  "iteration": "M5-T19",
+  "sourceStatus": "PASS",
+  "productionStatus": "PARTIAL",
+  "deviceEvidenceCount": 0,
+  "typeDebt": {
+    "legacyBundleAidlDeclarations": 0,
+    "legacyBundleAidlMethods": [],
+    "typedBrokerEndpoint": true,
+    "typedGuestEndpoint": true,
+    "internalBundlePayloadBoundary": true
+  },
+  "architecture": {
+    "largeProductionClassesOver500": 12,
+    "largeClasses": [
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "lines": 1512
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "lines": 1482
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "lines": 1254
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "lines": 878
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "lines": 827
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "lines": 781
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "lines": 629
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "lines": 598
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "lines": 597
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+        "lines": 580
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+        "lines": 536
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "lines": 508
+      }
+    ],
+    "lineCounts": {
+      "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java": 147,
+      "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java": 500,
+      "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java": 1482,
+      "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java": 1512,
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java": 1254,
+      "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java": 473
+    },
+    "extractedOwners": [
+      "PackageServiceDependencies",
+      "PackageManagementSession",
+      "PackageRuntimePermissionSession",
+      "PackageVirtualSystemServiceSession",
+      "PackageProfileAuthority",
+      "ActivityTaskCheckpointCoordinator",
+      "RuntimeGuestConnectionPool",
+      "VirtualSystemServiceRecords",
+      "ApplicationEnvironmentInvocationValues",
+      "ApplicationEnvironmentUsageValues"
+    ]
+  },
+  "methodRouting": {
+    "centralMatcher": "InvocationMethodMatcher",
+    "directSubstringRoutingCount": 0,
+    "directSubstringRoutingLocations": [],
+    "matcherSelfTest": true
+  },
+  "testGovernance": {
+    "metricType": "explicit critical-path regression ownership",
+    "criticalOwners": 12,
+    "mappedCriticalOwners": 12,
+    "lineCoverageClaimed": false,
+    "branchCoverageClaimed": false,
+    "jacocoExecuted": false
+  },
+  "referenceFilesModified": 0,
+  "referenceChanges": [],
+  "frozenCapabilityCategories": 113,
+  "deviceBoundaries": [
+    "Gradle/AGP generated AIDL and Android SDK/NDK compilation",
+    "JaCoCo line and branch coverage on the locked JDK-17 build",
+    "Android Keystore-backed key protection",
+    "instrumentation, Emulator, physical-device and third-party APK execution"
+  ]
+}

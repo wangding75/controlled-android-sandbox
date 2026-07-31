@@ -192,21 +192,12 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
         }
 
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) { return null; }
-        @Override public Bundle prepareGuest(Bundle request) { return null; }
-        @Override public Bundle launchActivity(Bundle request) { return null; }
-        @Override public Bundle invokeComponent(Bundle request) { return null; }
-        @Override public Bundle grantUriPermission(Bundle request) { return null; }
-        @Override public Bundle revokeUriPermission(Bundle request) { return null; }
-        @Override public Bundle consumeRoute(String token, String sessionId, long generation) { return null; }
-        @Override public Bundle activityEvent(Bundle request) { return null; }
         @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request) { return null; }
-        @Override public Bundle sessionStatus(String packageName, int virtualUserId) { return null; }
         @Override public PackageServiceResult requestRuntimePermission(String sessionId, long generation,
                 String permission, int requestCode) { return null; }
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
                 String permission, int requestCode, boolean hostGranted, String reason) { return null; }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { return null; }
-        @Override public Bundle runtimeStatus() { return null; }
         @Override public void stopGuest(String packageName, int virtualUserId) { }
     }
 

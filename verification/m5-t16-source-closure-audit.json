@@ -6,21 +6,8 @@
   "typedRuntimeTransport": {
     "brokerExecuteV2": true,
     "guestExecuteV2": true,
-    "legacyCompatibilityDeclarations": 12,
-    "legacyCompatibilityDetails": [
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle prepareGuest(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle launchActivity(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle invokeComponent(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle grantUriPermission(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle revokeUriPermission(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle consumeRoute(String token, String sessionId, long generation);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle activityEvent(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle sessionStatus(String packageName, int virtualUserId);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl:Bundle runtimeStatus();",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle prepareGuest(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle invokeComponent(in Bundle request);",
-      "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl:Bundle runtimeStatus();"
-    ],
+    "legacyCompatibilityDeclarations": 0,
+    "legacyCompatibilityDetails": [],
     "internalLegacyDirectCalls": []
   },
   "methodClassification": {
@@ -103,23 +90,19 @@
   "productionClassesOver500Lines": [
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
-      "lines": 1741
+      "lines": 1512
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-      "lines": 1654
+      "lines": 1482
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
-      "lines": 1368
-    },
-    {
-      "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
-      "lines": 1191
+      "lines": 1254
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-      "lines": 877
+      "lines": 878
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
@@ -128,10 +111,6 @@
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
       "lines": 781
-    },
-    {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java",
-      "lines": 647
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",

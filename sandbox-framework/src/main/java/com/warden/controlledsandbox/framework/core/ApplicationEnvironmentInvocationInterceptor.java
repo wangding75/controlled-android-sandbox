@@ -1,5 +1,8 @@
 package com.warden.controlledsandbox.framework.core;
 
+import static com.warden.controlledsandbox.framework.core.ApplicationEnvironmentInvocationValues.*;
+import static com.warden.controlledsandbox.framework.core.ApplicationEnvironmentUsageValues.*;
+
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
@@ -338,7 +341,7 @@ final class ApplicationEnvironmentInvocationInterceptor {
         if (!profile.enabled()) return Decision.handled(emptyValue(method.getReturnType()));
         if (containsAny(name, "reportevent", "reportshortcutusage", "reportchooserselection")) {
             if (!profile.allowReportEvents()) return Decision.handled(successValue(method.getReturnType()));
-            authority.reportUsageEvent(usageEvent(arguments));
+            authority.reportUsageEvent(usageEvent(arguments, identity));
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "queryevents", "queryeventsforself")) {
@@ -422,41 +425,6 @@ final class ApplicationEnvironmentInvocationInterceptor {
         contentObservers.removeAll(dead);
     }
 
-    private Object usageSummary(Class<?> returnType, List<VirtualUsageEventSnapshot> events) {
-        Map<String, long[]> summary = new LinkedHashMap<>();
-        for (VirtualUsageEventSnapshot event : events) {
-            long[] values = summary.computeIfAbsent(event.packageName(), ignored -> new long[]{0L, 0L, 0L});
-            values[0] = values[0] == 0L ? event.timestampMs() : Math.min(values[0], event.timestampMs());
-            values[1] = Math.max(values[1], event.timestampMs());
-            values[2]++;
-        }
-        List<Object> values = new ArrayList<>();
-        for (Map.Entry<String, long[]> item : summary.entrySet()) {
-            values.add(new UsageSummary(item.getKey(), item.getValue()[0], item.getValue()[1], item.getValue()[2]));
-        }
-        return FrameworkApplicationEnvironmentObjectFactory.collectionResult(returnType, values,
-                (type, value) -> value);
-    }
-
-    private VirtualUsageEventSnapshot usageEvent(Object[] arguments) {
-        long timestamp = System.currentTimeMillis();
-        int type = 0;
-        String packageName = identity.packageName();
-        String className = "";
-        String shortcutId = "";
-        if (arguments != null) for (Object value : arguments) {
-            if (value instanceof Long number && number >= 0L) timestamp = number;
-            else if (value instanceof Integer number && number >= 0) type = number;
-            else if (value instanceof String text) {
-                if (text.equals(identity.packageName()) || text.equals(identity.hostPackageName())) packageName = identity.packageName();
-                else if (text.contains(".") && className.isEmpty()) className = text;
-                else if (shortcutId.isEmpty()) shortcutId = text;
-            }
-        }
-        return new VirtualUsageEventSnapshot(timestamp, type, packageName, className,
-                identity.packageName(), "", shortcutId, 0);
-    }
-
     private List<VirtualShortcutSnapshot> shortcuts(Object[] arguments, boolean dynamic) {
         List<VirtualShortcutSnapshot> out = new ArrayList<>();
         for (Object value : flatten(arguments)) {
@@ -467,53 +435,10 @@ final class ApplicationEnvironmentInvocationInterceptor {
         return List.copyOf(out);
     }
 
-    private static Bundle restrictionsBundle(VirtualUserProfileSnapshot profile) {
-        Bundle out = new Bundle();
-        for (String key : profile.restrictions()) out.putBoolean(key, true);
-        return out;
-    }
-    private static Bundle applicationRestrictionsBundle(VirtualUserProfileSnapshot profile) {
-        Bundle out = new Bundle();
-        for (int index = 0; index < profile.applicationRestrictionKeys().size(); index++) {
-            out.putString(profile.applicationRestrictionKeys().get(index),
-                    profile.applicationRestrictionValues().get(index));
-        }
-        return out;
-    }
 
     private void removeListener(Object[] arguments) {
         Object callback = callback(arguments);
         if (callback != null) listeners.remove(callback);
-    }
-    private static Object callback(Object[] arguments) {
-        if (arguments == null) return null;
-        for (Object value : arguments) {
-            if (value == null || value instanceof String || value instanceof Number || value instanceof Boolean
-                    || value.getClass().isEnum() || value.getClass().isArray() || value instanceof Iterable<?>) continue;
-            return value;
-        }
-        return null;
-    }
-    private static Object firstCompatible(Object[] arguments, Class<?> type) {
-        if (arguments == null) return null;
-        for (Object value : arguments) if (value != null && type.isInstance(value)) return value;
-        return null;
-    }
-    private static List<Object> flatten(Object[] arguments) {
-        List<Object> out = new ArrayList<>();
-        if (arguments == null) return out;
-        for (Object value : arguments) {
-            if (value instanceof Iterable<?> iterable) iterable.forEach(out::add);
-            else if (value != null && value.getClass().isArray()) {
-                for (int index = 0; index < Array.getLength(value); index++) out.add(Array.get(value, index));
-            } else out.add(value);
-        }
-        return out;
-    }
-    private static List<String> stringList(Object[] arguments) {
-        List<String> out = new ArrayList<>();
-        for (Object value : flatten(arguments)) if (value instanceof String text && !text.isBlank()) out.add(text);
-        return List.copyOf(out);
     }
     private List<String> shortcutIds(Object[] arguments) {
         List<String> out = new ArrayList<>();
@@ -527,10 +452,6 @@ final class ApplicationEnvironmentInvocationInterceptor {
         List<String> values = shortcutIds(arguments);
         return values.isEmpty() ? "" : values.get(0);
     }
-    private static String disabledMessage(Object[] arguments) {
-        List<String> values = stringList(arguments);
-        return values.size() < 2 ? "" : values.get(values.size() - 1);
-    }
     private String packageArgument(Object[] arguments) {
         if (arguments == null) return "";
         for (Object value : arguments) if (value instanceof String text) {
@@ -539,107 +460,12 @@ final class ApplicationEnvironmentInvocationInterceptor {
         }
         return "";
     }
-    private static String firstRelevantString(Object[] arguments) {
-        if (arguments == null) return "";
-        for (Object value : arguments) if (value instanceof String text && !text.isBlank()) return text;
-        return "";
-    }
-    private static String[] component(Object[] arguments) {
-        if (arguments != null) for (Object value : arguments) {
-            if (value == null) continue;
-            try {
-                Method pkg = value.getClass().getMethod("getPackageName");
-                Method cls = value.getClass().getMethod("getClassName");
-                return new String[]{String.valueOf(pkg.invoke(value)), String.valueOf(cls.invoke(value))};
-            } catch (Throwable ignored) { }
-            try {
-                Method flatten = value.getClass().getMethod("flattenToString");
-                String text = String.valueOf(flatten.invoke(value));
-                int split = text.indexOf('/');
-                if (split > 0) return new String[]{text.substring(0, split), text.substring(split + 1)};
-            } catch (Throwable ignored) { }
-        }
-        return new String[]{"", ""};
-    }
-    private static long[] timeRange(Object[] arguments) {
-        List<Long> values = new ArrayList<>();
-        if (arguments != null) for (Object value : arguments) if (value instanceof Long number && number >= 0L) values.add(number);
-        long now = System.currentTimeMillis();
-        if (values.size() >= 2) return new long[]{values.get(values.size() - 2), values.get(values.size() - 1)};
-        return new long[]{Math.max(0L, now - 24L * 60L * 60L * 1000L), now};
-    }
-    private static int firstInt(Object[] arguments, int fallback) {
-        if (arguments != null) for (Object value : arguments) if (value instanceof Integer number) return number;
-        return fallback;
-    }
-    private static long firstLong(Object[] arguments, long fallback) {
-        if (arguments != null) for (Object value : arguments) if (value instanceof Long number) return number;
-        return fallback;
-    }
 
     private static Decision failUnsupported(String domain, Method method) {
         throw new UnsupportedOperationException("VIRTUAL_" + domain.toUpperCase(Locale.ROOT)
                 + "_OPERATION_UNSUPPORTED:" + method.getName());
     }
-    private static void requireStatic(String mode, String domain, String operation) {
-        if (VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(mode)) {
-            throw new SecurityException("VIRTUAL_" + domain.toUpperCase(Locale.ROOT) + "_BLOCKED:" + operation);
-        }
-        if (!VirtualLocationProfileSnapshot.MODE_STATIC.equals(mode)) {
-            throw new IllegalStateException("VIRTUAL_" + domain.toUpperCase(Locale.ROOT) + "_MODE_UNSUPPORTED:" + mode);
-        }
-    }
-    private static Object emptyValue(Class<?> type) {
-        if (type == void.class || type == Void.class) return null;
-        if (type == boolean.class || type == Boolean.class) return false;
-        if (type == int.class || type == Integer.class) return 0;
-        if (type == long.class || type == Long.class) return 0L;
-        if (type.isArray()) return Array.newInstance(type.getComponentType(), 0);
-        if (List.class.isAssignableFrom(type) || Iterable.class.isAssignableFrom(type) || type == Object.class) return List.of();
-        return null;
-    }
-    private static Object nullValue(Class<?> type) { return type.isPrimitive() ? emptyValue(type) : null; }
-    private static Object falseValue(Class<?> type) {
-        if (type == void.class || type == Void.class) return null;
-        if (type == boolean.class || type == Boolean.class) return false;
-        if (type == int.class || type == Integer.class) return 0;
-        if (type == long.class || type == Long.class) return 0L;
-        return null;
-    }
-    private static Object successValue(Class<?> type) {
-        if (type == void.class || type == Void.class) return null;
-        if (type == boolean.class || type == Boolean.class) return true;
-        if (type == int.class || type == Integer.class) return 0;
-        if (type == long.class || type == Long.class) return 0L;
-        return null;
-    }
-    private static Object booleanResult(Class<?> type, boolean value) {
-        if (type == void.class || type == Void.class) return null;
-        if (type == boolean.class || type == Boolean.class) return value;
-        if (type == int.class || type == Integer.class) return value ? 1 : 0;
-        return value ? successValue(type) : falseValue(type);
-    }
-    private static Object numeric(Class<?> type, long value) {
-        if (type == int.class || type == Integer.class) return Math.toIntExact(value);
-        if (type == long.class || type == Long.class) return value;
-        return value;
-    }
-    private static String normalize(String value) {
-        return value == null ? "" : value.replace("_", "").toLowerCase(Locale.ROOT);
-    }
-    private static boolean containsAny(String value, String... needles) {
-        for (String needle : needles) if (value.contains(normalize(needle))) return true;
-        return false;
-    }
-    private static boolean startsAny(String value, String... prefixes) {
-        for (String prefix : prefixes) if (value.startsWith(normalize(prefix))) return true;
-        return false;
-    }
-    private static boolean isCleanup(String name) {
-        return startsAny(name, "unregister", "remove", "close", "stop", "cancel", "release");
-    }
 
-    record UsageSummary(String packageName, long firstTimeStamp, long lastTimeStamp, long eventCount) { }
     record Decision(boolean handled, Object result) {
         static Decision passThrough() { return new Decision(false, null); }
         static Decision handled(Object result) { return new Decision(true, result); }

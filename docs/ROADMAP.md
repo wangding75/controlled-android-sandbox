@@ -293,3 +293,11 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PARTIAL — twelve legacy Bundle AIDL compatibility methods remain, although internal primary routing is typed V2.
 - DEVICE — Android Keystore, real Binder death timing, generated AIDL, Gradle/AGP, emulator and physical-device evidence.
 - NEXT — freeze the offline source baseline and move to the locked Android build/device acceptance stage; only device-discovered defects should reopen feature code.
+## M5-T19 architecture decoupling baseline
+
+- PASS — Broker and Guest top-level legacy Bundle AIDL declarations are zero; typed V2 is the only generic cross-process execution endpoint.
+- PASS — package capability sessions, Activity/Task checkpoint ownership, Guest connection ownership and virtual service records are separated from central Android service classes.
+- PASS — direct method-name substring/prefix/suffix routing is zero outside `InvocationMethodMatcher`.
+- PASS — twelve architecture-critical source owners map to executed Host regressions; no line/branch coverage percentage is claimed.
+- PARTIAL — twelve production classes remain above 500 lines.
+- BLOCKED — JaCoCo, AGP-generated AIDL, Android Keystore, Emulator and physical-device evidence require the locked JDK-17 Android environment.

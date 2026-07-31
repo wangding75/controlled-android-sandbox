@@ -181,7 +181,7 @@ require(
     "maximumOpenCameras",
 )
 require(
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+    "app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
     "getPeripheralServicesProfile",
     "setPeripheralServicesProfile",
     "resetPeripheralServicesProfile",

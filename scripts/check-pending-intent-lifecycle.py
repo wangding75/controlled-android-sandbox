@@ -40,7 +40,7 @@ try:
 except Exception:
     errors.append("VirtualSystemServiceStore schema is not parseable")
 
-service = require("app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+service = require("app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
                   "private final int virtualUid", "reservePendingIntent", "requireCapability()")
 registry = require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
                    "FLAG_MUTABLE", "FLAG_IMMUTABLE", "FLAG_NO_CREATE", "FLAG_CANCEL_CURRENT",

@@ -59,12 +59,19 @@ if "client.generation() == alarm.ownerGeneration" not in store:
 
 service = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
-    "VirtualSystemServiceStore systemServices", "openVirtualSystemServiceSession(",
-    "callerVerifier.requireRuntimeBrokerCaller()", "VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED", "class VirtualSystemServiceSession",
-    "systemServices.deleteScopeBestEffort", "combinedMaintenanceWarning()")
-for token in ["processName", "generation", "clientToken.linkToDeath", "systemServices.register(session)"]:
+    "PackageServiceDependencies", "PackageVirtualSystemServiceSession",
+    "openVirtualSystemServiceSession(", "dependencies.close()")
+virtual_session = require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
+    "VirtualSystemServiceStore.Client", "requireCapability()", "processName", "generation")
+for token in ("callerVerifier.requireRuntimeBrokerCaller()", "VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED",
+              "clientToken.linkToDeath(session, 0)", "systemServices.register(session)"):
     if token not in service:
         errors.append(f"PackageManagementService missing scoped capability evidence: {token}")
+dependencies = require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageServiceDependencies.java",
+    "VirtualSystemServiceStore systemServices", "deleteScopeBestEffort",
+    "maintenanceWarning()")
 
 require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceAuthority.java",

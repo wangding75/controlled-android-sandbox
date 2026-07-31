@@ -45,7 +45,7 @@ require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
     "session.reserveJob(snapshot)", "candidate.packageRevision()", "value.failureCount()")
 require(
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+    "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
     "reserveJob(VirtualJobSnapshot candidate)", "packageRevision, candidate",
     "jobs(scope, processName, generation, packageRevision)")
 store = require(

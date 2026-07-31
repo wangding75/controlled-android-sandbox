@@ -439,7 +439,8 @@ public final class VirtualSystemServiceInterceptor {
         if (!className.contains("NotificationChannel") && !className.contains("NotificationChannelGroup")) return;
         String id = VirtualSystemServiceState.stringMember(value, "mId", "id", "getId");
         if (id.isEmpty()) return;
-        String kind = className.contains("Group") || methodName.contains("group") ? "GROUP" : "CHANNEL";
+        String kind = InvocationMethodMatcher.containsAny(className, "Group")
+                || InvocationMethodMatcher.containsAny(methodName, "group") ? "GROUP" : "CHANNEL";
         String group = "CHANNEL".equals(kind)
                 ? VirtualSystemServiceState.stringMember(value, "mGroup", "group", "getGroup") : "";
         out.add(new ChannelDraft(kind, id, group, value));
@@ -612,7 +613,7 @@ public final class VirtualSystemServiceInterceptor {
     }
 
     private void rewriteChannelStrings(Object[] arguments, List<Restore> restores, String methodName) {
-        if (arguments == null || !(methodName.contains("channel") || methodName.contains("group"))) return;
+        if (arguments == null || !(InvocationMethodMatcher.containsAny(methodName, "channel", "group"))) return;
         for (int index = 0; index < arguments.length; index++) {
             Object value = arguments[index];
             if (!(value instanceof String string)) continue;

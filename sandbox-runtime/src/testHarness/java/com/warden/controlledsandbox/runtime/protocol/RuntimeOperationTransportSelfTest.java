@@ -92,23 +92,13 @@ public final class RuntimeOperationTransportSelfTest {
             result.putString(RuntimeKeys.STATUS, "REMOTE_OK");
             return RuntimeOperationResult.success(responseRequest, "REMOTE_OK", result);
         }
-
-        @Override public Bundle prepareGuest(Bundle request) { throw legacy(); }
-        @Override public Bundle launchActivity(Bundle request) { throw legacy(); }
-        @Override public Bundle invokeComponent(Bundle request) { throw legacy(); }
-        @Override public Bundle grantUriPermission(Bundle request) { throw legacy(); }
-        @Override public Bundle revokeUriPermission(Bundle request) { throw legacy(); }
-        @Override public Bundle consumeRoute(String token, String sessionId, long generation) { throw legacy(); }
-        @Override public Bundle activityEvent(Bundle request) { throw legacy(); }
         @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request) { throw legacy(); }
         @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request) { throw legacy(); }
-        @Override public Bundle sessionStatus(String packageName, int virtualUserId) { throw legacy(); }
         @Override public PackageServiceResult requestRuntimePermission(String sessionId, long generation,
                 String permission, int requestCode) { throw legacy(); }
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
                 String permission, int requestCode, boolean hostGranted, String reason) { throw legacy(); }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { throw legacy(); }
-        @Override public Bundle runtimeStatus() { throw legacy(); }
         @Override public void stopGuest(String packageName, int virtualUserId) { throw legacy(); }
 
         private static UnsupportedOperationException legacy() {

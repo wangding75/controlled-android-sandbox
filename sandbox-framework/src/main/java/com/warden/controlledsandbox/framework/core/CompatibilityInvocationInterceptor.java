@@ -55,9 +55,7 @@ final class CompatibilityInvocationInterceptor {
         Class<?> returnType = method.getReturnType();
         boolean blocked = VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode());
 
-        if (methodName.startsWith("enable")
-                || methodName.startsWith("change")
-                || methodName.startsWith("set")) {
+        if (InvocationMethodMatcher.startsWith(methodName, "enable", "change", "set")) {
             throw new SecurityException("VIRTUAL_WEBVIEW_MUTATION_DENIED:" + methodName);
         }
         if (methodName.equals("isMultiProcessEnabled")) {
@@ -67,9 +65,8 @@ final class CompatibilityInvocationInterceptor {
             return Decision.handled(
                     !blocked && profile.providerPackage().equals(firstString(args)));
         }
-        if (methodName.contains("CurrentWebViewPackage")
-                || methodName.contains("WebViewProvider")
-                || methodName.equals("waitForAndGetProvider")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "CurrentWebViewPackage", "WebViewProvider")
+                || InvocationMethodMatcher.named(methodName, "waitForAndGetProvider")) {
             if (blocked) {
                 return Decision.handled(defaultValue(returnType));
             }
@@ -79,9 +76,8 @@ final class CompatibilityInvocationInterceptor {
             return Decision.handled(
                     FrameworkCompatibilityObjectFactory.webViewValue(returnType, profile));
         }
-        if (methodName.contains("ValidWebViewPackages")
-                || methodName.contains("AllWebViewPackages")
-                || methodName.contains("WebViewPackages")) {
+        if (InvocationMethodMatcher.containsAny(methodName,
+                "ValidWebViewPackages", "AllWebViewPackages", "WebViewPackages")) {
             return webViewPackageCollection(returnType, profile, blocked);
         }
         return Decision.passThrough();
@@ -124,13 +120,13 @@ final class CompatibilityInvocationInterceptor {
         VirtualDeviceIdentitySnapshot device =
                 identity.virtualServices().deviceServiceProfile().identity();
         if (!VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(mode)) {
-            if (methodName.contains("serial")) {
+            if (InvocationMethodMatcher.containsAny(methodName, "serial")) {
                 value = device.serial();
-            } else if (methodName.contains("advert")) {
+            } else if (InvocationMethodMatcher.containsAny(methodName, "advert")) {
                 value = profile.googleServices().advertisingId();
-            } else if (methodName.contains("appset")) {
+            } else if (InvocationMethodMatcher.containsAny(methodName, "appset")) {
                 value = profile.googleServices().appSetId();
-            } else if (methodName.contains("gsf")) {
+            } else if (InvocationMethodMatcher.containsAny(methodName, "gsf")) {
                 value = profile.googleServices().gsfId();
             } else {
                 value = device.installationId();
@@ -157,27 +153,26 @@ final class CompatibilityInvocationInterceptor {
                 && profile.playServicesAvailable();
         Class<?> returnType = method.getReturnType();
 
-        if (methodName.contains("advert")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "advert")) {
             return Decision.handled(
                     returnType == String.class
                             ? available ? profile.advertisingId() : ""
                             : defaultValue(returnType));
         }
-        if (methodName.contains("appset")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "appset")) {
             return Decision.handled(
                     returnType == String.class
                             ? available ? profile.appSetId() : ""
                             : defaultValue(returnType));
         }
-        if (methodName.contains("accounttype")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "accounttype")) {
             return stringCollection(returnType, available, profile.visibleAccountTypes());
         }
-        if (methodName.contains("enabledapi") || methodName.contains("availableapi")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "enabledapi", "availableapi")) {
             return stringCollection(returnType, available, profile.enabledApis());
         }
-        if (methodName.contains("available")
-                || methodName.startsWith("is")
-                || methodName.contains("connected")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "available", "connected")
+                || InvocationMethodMatcher.startsWith(methodName, "is")) {
             if (returnType == boolean.class || returnType == Boolean.class) {
                 return Decision.handled(available);
             }
@@ -185,9 +180,8 @@ final class CompatibilityInvocationInterceptor {
                 return Decision.handled(available ? 0 : 1);
             }
         }
-        if (methodName.contains("token")
-                || methodName.contains("authenticate")
-                || methodName.equals("getservice")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "token", "authenticate")
+                || InvocationMethodMatcher.named(methodName, "getservice")) {
             if (!available) {
                 throw new SecurityException(
                         "VIRTUAL_GOOGLE_SERVICE_UNAVAILABLE:" + method.getName());
@@ -218,16 +212,13 @@ final class CompatibilityInvocationInterceptor {
         }
         String methodName = method.getName().toLowerCase(Locale.ROOT);
         boolean blocked = VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode());
-        if (methodName.startsWith("enforce") && method.getReturnType() == void.class) {
+        if (InvocationMethodMatcher.startsWith(methodName, "enforce") && method.getReturnType() == void.class) {
             return Decision.handled(null);
         }
-        if (methodName.contains("oaid")
-                || methodName.contains("vaid")
-                || methodName.contains("aaid")
-                || methodName.contains("attribution")) {
+        if (InvocationMethodMatcher.containsAny(methodName, "oaid", "vaid", "aaid", "attribution")) {
             return Decision.handled(blocked ? "" : profile.attributionId());
         }
-        if (methodName.startsWith("is")
+        if (InvocationMethodMatcher.startsWith(methodName, "is")
                 && (method.getReturnType() == boolean.class
                         || method.getReturnType() == Boolean.class)) {
             return Decision.handled(!blocked);

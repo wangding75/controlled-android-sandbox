@@ -174,7 +174,7 @@ require(
     "ATOMIC_MOVE",
 )
 require(
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+    "app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
     "getMediaCommunicationProfile",
     "setMediaCommunicationProfile",
     "resetMediaCommunicationProfile",

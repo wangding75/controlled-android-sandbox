@@ -2,82 +2,10 @@
   "schemaVersion": 1,
   "contracts": [
     {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl",
-      "signature": "Bundle prepareGuest(in Bundle request);",
-      "reason": "Legacy Guest bootstrap envelope retained for binary compatibility.",
-      "typedBoundary": "GuestSpec/RuntimeStatusResult and bounded Broker validation"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl",
-      "signature": "Bundle invokeComponent(in Bundle request);",
-      "reason": "Legacy multi-component dispatch envelope retained for binary compatibility.",
-      "typedBoundary": "Typed Provider/Activity/Job contracts and operation-specific validators"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl",
-      "signature": "Bundle runtimeStatus();",
-      "reason": "Legacy diagnostics compatibility endpoint.",
-      "typedBoundary": "RuntimeStatusResult runtimeStatusV2"
-    },
-    {
       "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IOrderedReceiverCompletion.aidl",
       "signature": "Bundle complete(in Bundle result);",
       "reason": "Android ordered-broadcast result compatibility envelope.",
       "typedBoundary": "OrderedReceiverTokenRegistry ownership and bounded result validation"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle prepareGuest(in Bundle request);",
-      "reason": "Legacy bootstrap compatibility endpoint.",
-      "typedBoundary": "Validated GuestSpec construction and Session/Generation binding"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle launchActivity(in Bundle request);",
-      "reason": "Legacy Activity launch compatibility endpoint.",
-      "typedBoundary": "ActivityTaskRequest/ActivityTaskResult and bounded route authority"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle invokeComponent(in Bundle request);",
-      "reason": "Legacy operation multiplexer retained while typed component contracts coexist.",
-      "typedBoundary": "Operation-specific identity and payload validators"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle grantUriPermission(in Bundle request);",
-      "reason": "Legacy URI grant request envelope.",
-      "typedBoundary": "UriGrantRegistry authorization bound to Session/Generation"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle revokeUriPermission(in Bundle request);",
-      "reason": "Legacy URI grant revoke envelope.",
-      "typedBoundary": "UriGrantRegistry authorization bound to Session/Generation"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle consumeRoute(String token, String sessionId, long generation);",
-      "reason": "Legacy one-time route payload return type.",
-      "typedBoundary": "One-time expiring token plus Session/Generation ownership"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle activityEvent(in Bundle request);",
-      "reason": "Legacy Activity lifecycle event envelope.",
-      "typedBoundary": "ActivityTask operation contracts and event validator"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle sessionStatus(String packageName, int virtualUserId);",
-      "reason": "Legacy management status compatibility endpoint.",
-      "typedBoundary": "PID/UID management caller policy and RuntimeStatusResult"
-    },
-    {
-      "path": "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
-      "signature": "Bundle runtimeStatus();",
-      "reason": "Legacy diagnostics compatibility endpoint.",
-      "typedBoundary": "RuntimeStatusResult runtimeStatusV2"
     }
   ]
 }

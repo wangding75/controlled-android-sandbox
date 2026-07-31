@@ -9,7 +9,6 @@ aidl = (ROOT / 'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/cont
 required = [
     'RuntimeOperationResult executeV2(in RuntimeOperationRequest request);',
     'RuntimeStatusResult runtimeStatusV2(in RuntimeStatusRequest request);',
-    'Bundle runtimeStatus();',
     'PackageServiceResult requestRuntimePermission(String sessionId, long generation,',
     'PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,',
 ]
@@ -162,8 +161,8 @@ if 'requireBroker().runtimeStatus()' in client:
 
 service = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java').read_text()
 dispatcher = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/status/RuntimeStatusDispatcher.java').read_text()
-if 'RuntimeStatusLegacyAdapter.toBundle' not in service:
-    errors.append('legacy runtimeStatus must be isolated behind RuntimeStatusLegacyAdapter')
+if re.search(r'Bundle\s+runtimeStatus\s*\(', aidl):
+    errors.append('legacy runtimeStatus Bundle endpoint must not return after typed-only migration')
 if 'RuntimeStatusResult.success(' not in dispatcher:
     errors.append('runtime status dispatcher must build a typed RuntimeStatusResult')
 if 'runtimeStatusDispatcher.dispatch(request)' not in service:

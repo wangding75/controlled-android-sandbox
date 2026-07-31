@@ -70,3 +70,6 @@ Status: **LOCAL PASS CANDIDATE / SOURCE 97.9% / PRODUCTION WIRING 95.7% / DEVICE
 The capability matrix contains 95 tracked entries. M4-T15 adds selected Activity launch-flag semantics, forward-result ownership, no-history and recent-task policy, running/recent task queries, owner-checked task mutations and an atomic CRC-protected Activity/Task checkpoint. Static Android compilation, Activity ledger tests, checkpoint corruption tests and Runtime Broker restart restoration tests pass.
 
 The checkpoint restores bounded Activity/task state but deliberately does not restore one-time route tokens, Binder-backed transport authority or pending result delivery. Android framework task-object projection, system Recents behavior, Window transitions, Emulator execution and real APK compatibility remain unverified.
+## M5-T19 source-quality verification
+
+M5-T19 adds direct tests for centralized method matching and a machine-readable critical-path test-ownership map. All static Android and Host regressions pass. The ownership map explicitly does not claim JaCoCo line or branch coverage. Real AGP, Android instrumentation, Emulator and physical-device evidence remain unavailable until the locked JDK-17/SDK/NDK environment is used.

@@ -1,7 +1,6 @@
 package com.warden.controlledsandbox.runtime.protocol;
 
 import android.os.Bundle;
-import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 
@@ -10,7 +9,7 @@ public final class RuntimeBrokerOperationAdapter {
     private RuntimeBrokerOperationAdapter() { }
 
     public static RuntimeOperationResult execute(
-            IRuntimeBroker broker,
+            RuntimeBrokerOperationHandler broker,
             RuntimeOperationRequest request) {
         if (broker == null) throw new IllegalArgumentException("broker is required");
         if (request == null) throw new IllegalArgumentException("request is required");

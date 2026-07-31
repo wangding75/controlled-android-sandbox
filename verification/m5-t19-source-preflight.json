@@ -1,0 +1,20 @@
+{
+  "iteration": "M5-T19",
+  "sourceStatus": "PASS",
+  "productionStatus": "PARTIAL",
+  "deviceEvidenceCount": 0,
+  "evidence": {
+    "legacyBundleAidlDeclarations": 0,
+    "largeProductionClassesOver500": 12,
+    "directSubstringRoutingCount": 0,
+    "criticalTestOwners": 12,
+    "mappedCriticalTestOwners": 12,
+    "referenceFilesModified": 0
+  },
+  "deviceBoundaries": [
+    "Gradle/AGP generated AIDL and Android SDK/NDK compilation",
+    "JaCoCo line and branch coverage on the locked JDK-17 build",
+    "Android Keystore-backed key protection",
+    "instrumentation, Emulator, physical-device and third-party APK execution"
+  ]
+}

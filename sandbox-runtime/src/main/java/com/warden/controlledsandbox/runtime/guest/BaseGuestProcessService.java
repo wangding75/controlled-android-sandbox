@@ -18,9 +18,9 @@ public abstract class BaseGuestProcessService extends Service {
             if (request == null) throw new IllegalArgumentException("request is required");
             try {
                 Bundle result = switch (request.operation()) {
-                    case RuntimeOperationRequest.PREPARE_GUEST -> prepareGuest(request.payload());
-                    case RuntimeOperationRequest.INVOKE_COMPONENT -> invokeComponent(request.payload());
-                    case RuntimeOperationRequest.GUEST_RUNTIME_STATUS -> runtimeStatus();
+                    case RuntimeOperationRequest.PREPARE_GUEST -> prepareGuestInternal(request.payload());
+                    case RuntimeOperationRequest.INVOKE_COMPONENT -> invokeComponentInternal(request.payload());
+                    case RuntimeOperationRequest.GUEST_RUNTIME_STATUS -> runtimeStatusInternal();
                     default -> throw new IllegalArgumentException(
                             "unsupported guest operation: " + request.operation());
                 };
@@ -29,23 +29,27 @@ public abstract class BaseGuestProcessService extends Service {
                 return RuntimeOperationTransport.failure(request, error);
             }
         }
-        @Override public Bundle prepareGuest(Bundle request) {
-            CallerGuard.requireSameApplication();
-            return GuestRuntimeEnvironment.prepare(BaseGuestProcessService.this, new GuestPackageSpec(request));
-        }
-        @Override public Bundle invokeComponent(Bundle request) {
-            CallerGuard.requireSameApplication();
-            GuestPackageSpec spec = new GuestPackageSpec(request);
-            return GuestRuntimeEnvironment.require(spec.sessionId, spec.generation).components.invoke(request);
-        }
-        @Override public Bundle runtimeStatus() {
-            CallerGuard.requireSameApplication();
-            return GuestRuntimeEnvironment.status();
-        }
+
+
+
         @Override public void shutdown(String sessionId, long generation) {
             CallerGuard.requireSameApplication();
             GuestRuntimeEnvironment.shutdown(sessionId, generation);
         }
     };
+    private Bundle prepareGuestInternal(Bundle request) {
+        return GuestRuntimeEnvironment.prepare(this, new GuestPackageSpec(request));
+    }
+
+    private Bundle invokeComponentInternal(Bundle request) {
+        GuestPackageSpec spec = new GuestPackageSpec(request);
+        return GuestRuntimeEnvironment.require(spec.sessionId, spec.generation)
+                .components.invoke(request);
+    }
+
+    private Bundle runtimeStatusInternal() {
+        return GuestRuntimeEnvironment.status();
+    }
+
     @Override public IBinder onBind(Intent intent) { return binder; }
 }

@@ -213,13 +213,13 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private Object appOpsDecision(Method method, Object[] arguments) {
         if (!targetsGuest(arguments)) return NoResult.VALUE;
         String methodName = method.getName();
-        if (!(methodName.contains("Operation") || methodName.contains("ProxyOp")
-                || methodName.contains("OpNoThrow") || methodName.contains("ProxyOperation"))) {
+        if (!(InvocationMethodMatcher.containsAny(methodName,
+                "Operation", "ProxyOp", "OpNoThrow", "ProxyOperation"))) {
             return NoResult.VALUE;
         }
         String opName = firstOperation(arguments);
         Class<?> result = method.getReturnType();
-        if (methodName.startsWith("finish") && result == void.class) return null;
+        if (InvocationMethodMatcher.startsWith(methodName, "finish") && result == void.class) return null;
         int mode = identity.appOpsPolicy().modeCode(opName);
         if (result == int.class || result == Integer.class) return mode;
         if (result == boolean.class || result == Boolean.class) return mode == 0;

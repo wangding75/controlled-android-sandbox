@@ -70,9 +70,11 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedService
 require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedServicesStoreCodec.java",
         "PRIVILEGED_SERVICES_SCOPE_DUPLICATE", "maximumSuggestionResults",
         "maximumBuffers", "maximumClients", "maximumDataBytes")
-require("app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getPrivilegedServicesProfile", "setPrivilegedServicesProfile",
-        "resetPrivilegedServicesProfile", "notifyPrivilegedServicesProfileChanged")
+        "resetPrivilegedServicesProfile")
+require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
+        "notifyPrivilegedServicesProfileChanged")
 require("app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",
         "privilegedServicesProfile", "setPrivilegedServicesProfile", "resetPrivilegedServicesProfile")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",

@@ -50,7 +50,7 @@ require("app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionSto
 require("app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
         "requireSupportedCommitParams", "INSTALL_SESSION_INHERIT_EXISTING_UNSUPPORTED",
         "INSTALL_SESSION_ROLLBACK_UNSUPPORTED", "requireInstallableSharedLibraries")
-require("app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+require("app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java",
         "createInstallSessionWithParams", "listInstallSessions", "retryInstallSession")
 require("app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java",
         "InstallSessionInfoSnapshot", "setInstallSessionProgress", "retryInstallSession")
