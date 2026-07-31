@@ -271,3 +271,13 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - Sensor/Content inverse-method classification and RestrictionsManager entry point: source PASS.
 - Residual source gaps and large-class debt: inventoried, not misreported as complete.
 - Real Android build and device evidence: pending locked JDK 17, SDK/NDK and device execution.
+
+## M5-T17 privileged environment-services baseline
+
+- DONE — typed package/virtual-user Search, StorageStats, GraphicsStats, ContextHub, PersistentDataBlock and SystemUpdate profiles.
+- DONE — bounded atomic persistence, CRC validation, corrupt-state quarantine, optimistic updates and Runtime refresh.
+- DONE — source-wired SearchManager, StorageStatsManager, GraphicsStats, ContextHub, PersistentDataBlock and SystemUpdate hooks.
+- DONE — deterministic queries, bounded graphics/hub ownership and explicit privileged-mutation failure closure.
+- DONE — fail-closed Guest startup when a configured non-HOST privileged-service domain lacks its required hook.
+- PARTIAL — real hidden framework objects, graphics buffers, callbacks and privileged service execution.
+- DEVICE — Android Binder signatures, ContextHub hardware, persistent partition/FRP behavior, update engine, SELinux and OEM validation.

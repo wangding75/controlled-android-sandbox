@@ -1233,6 +1233,24 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         });
     }
 
+    void notifyPrivilegedServicesProfileChanged(Scope scope, long policyVersion) {
+        if (scope == null || policyVersion < 1L) return;
+        scheduler.execute(() -> {
+            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
+            synchronized (VirtualSystemServiceStore.this) {
+                for (Client client : new ArrayList<>(clients)) {
+                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
+                        observers.add(client.observer());
+                    }
+                }
+            }
+            for (IVirtualSystemServiceObserver observer : observers) {
+                try { observer.onPrivilegedServicesProfileChanged(policyVersion); }
+                catch (Exception ignored) { }
+            }
+        });
+    }
+
     void notifyApplicationEnvironmentDataChanged(Scope scope, String domain, String key) {
         if (scope == null) return;
         String normalizedDomain = domain == null ? "" : domain;

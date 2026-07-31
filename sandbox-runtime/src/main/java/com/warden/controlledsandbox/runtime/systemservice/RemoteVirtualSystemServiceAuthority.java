@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPrivilegedServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -48,6 +49,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     private volatile VirtualPolicyServicesProfileSnapshot policyServicesProfile;
     private volatile VirtualMediaCommunicationProfileSnapshot mediaCommunicationProfile;
     private volatile VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile;
+    private volatile VirtualPrivilegedServicesProfileSnapshot privilegedServicesProfile;
     private volatile java.util.function.BiConsumer<String, String> applicationEnvironmentChangeListener = (domain, key) -> { };
     private volatile java.util.function.Function<AlarmRecord, Boolean> recoveredAlarmDelivery = value -> false;
     private volatile JobExecutionListener jobExecutionListener = new JobExecutionListener() {
@@ -89,6 +91,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         @Override public void onPeripheralServicesProfileChanged(long policyVersion) {
             VirtualPeripheralServicesProfileSnapshot current = call(session::getPeripheralServicesProfile);
             if (current != null && current.policyVersion() >= policyVersion) peripheralServicesProfile = current;
+        }
+        @Override public void onPrivilegedServicesProfileChanged(long policyVersion) {
+            VirtualPrivilegedServicesProfileSnapshot current = call(session::getPrivilegedServicesProfile);
+            if (current != null && current.policyVersion() >= policyVersion) privilegedServicesProfile = current;
         }
         @Override public void onApplicationEnvironmentDataChanged(String domain, String key) {
             applicationEnvironmentChangeListener.accept(domain == null ? "" : domain, key == null ? "" : key);
@@ -139,6 +145,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (peripheralServicesProfile == null) {
             throw new IllegalStateException("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_MISSING");
         }
+        privilegedServicesProfile = call(this.session::getPrivilegedServicesProfile);
+        if (privilegedServicesProfile == null) {
+            throw new IllegalStateException("VIRTUAL_PRIVILEGED_SERVICES_PROFILE_MISSING");
+        }
     }
 
     @Override public VirtualDeviceServiceProfileSnapshot deviceServiceProfile() { return deviceProfile; }
@@ -154,6 +164,9 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     @Override public VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile() {
         return peripheralServicesProfile;
+    }
+    @Override public VirtualPrivilegedServicesProfileSnapshot privilegedServicesProfile() {
+        return privilegedServicesProfile;
     }
     @Override public List<VirtualShortcutSnapshot> shortcuts() {
         List<VirtualShortcutSnapshot> values = call(session::listShortcuts); return values == null ? List.of() : List.copyOf(values);

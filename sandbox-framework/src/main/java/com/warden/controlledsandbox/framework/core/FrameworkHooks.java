@@ -53,6 +53,12 @@ import com.warden.controlledsandbox.framework.service.PrintManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.CompanionDeviceManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.MediaProjectionManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.OemSystemServicesHook;
+import com.warden.controlledsandbox.framework.service.SearchManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.StorageStatsManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.GraphicsStatsServiceHook;
+import com.warden.controlledsandbox.framework.service.ContextHubServiceHook;
+import com.warden.controlledsandbox.framework.service.PersistentDataBlockServiceHook;
+import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
 
 
 import android.content.Context;
@@ -194,6 +200,18 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> MediaProjectionManagerServiceHook.install(identity));
         attempt("oemSystemServices", installed, failures, hooks,
                 () -> OemSystemServicesHook.install(identity));
+        attempt("search", installed, failures, hooks,
+                () -> SearchManagerServiceHook.install(identity));
+        attempt("storageStats", installed, failures, hooks,
+                () -> StorageStatsManagerServiceHook.install(identity));
+        attempt("graphicsStats", installed, failures, hooks,
+                () -> GraphicsStatsServiceHook.install(identity));
+        attempt("contextHub", installed, failures, hooks,
+                () -> ContextHubServiceHook.install(identity));
+        attempt("persistentDataBlock", installed, failures, hooks,
+                () -> PersistentDataBlockServiceHook.install(identity));
+        attempt("systemUpdate", installed, failures, hooks,
+                () -> SystemUpdateServiceHook.install(identity));
         attempt("bluetooth", installed, failures, hooks,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks,

@@ -238,3 +238,12 @@ blocked by the unavailable JDK 17/Android toolchain.
 ## M5-T16 global source-closure baseline
 
 M5-T16 adds typed V2 Runtime operations, migrates repository-owned callers away from direct Bundle IPC, fixes inverse method-name collisions, and closes the RestrictionsManager false-coverage gap. Legacy Bundle methods remain compatibility adapters. The source audit records remaining service and large-class debt separately from Android/device evidence.
+
+## M5-T17 privileged environment-services source baseline
+
+M5-T17 closes the six source-feasible service gaps identified by the M5-T16 audit: SearchManager, StorageStats,
+GraphicsStats, ContextHub, PersistentDataBlock and SystemUpdate. Typed per-package/per-virtual-user profiles are owned
+by Package Service, atomically persisted and delivered to revision-bound Runtime sessions. Reversible Framework hooks
+project deterministic queries, bound graphics/hub ownership and fail closed for unsupported privileged mutations.
+Real graphics buffers, ContextHub hardware/callbacks, privileged persistent storage and the system-update engine remain
+Android-build/device dependent; source status is PASS, production status is PARTIAL and device evidence remains 0.

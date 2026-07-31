@@ -33,7 +33,7 @@
     "restrictionsRuntimeProjection": true,
     "restrictionsReadiness": true
   },
-  "frameworkHookCount": 58,
+  "frameworkHookCount": 64,
   "frameworkHooks": [
     "packageManager",
     "activityClient",
@@ -90,6 +90,12 @@
     "companionDevice",
     "mediaProjection",
     "oemSystemServices",
+    "search",
+    "storageStats",
+    "graphicsStats",
+    "contextHub",
+    "persistentDataBlock",
+    "systemUpdate",
     "bluetooth",
     "sensorCatalog",
     "audioCapture"
@@ -101,7 +107,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-      "lines": 1655
+      "lines": 1673
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
@@ -109,7 +115,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
-      "lines": 1139
+      "lines": 1191
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
@@ -117,7 +123,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
-      "lines": 804
+      "lines": 827
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
@@ -150,6 +156,10 @@
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
       "lines": 536
+    },
+    {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+      "lines": 508
     }
   ],
   "remainingSourceFeasibleCandidates": [

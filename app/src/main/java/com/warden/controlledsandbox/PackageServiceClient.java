@@ -24,6 +24,7 @@ import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot
 import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPrivilegedServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -362,6 +363,22 @@ final class PackageServiceClient implements AutoCloseable {
         PackageRecordSnapshot record = requireSuccess(raw).record();
         if (record == null) throw new IllegalStateException("Package service returned no package record");
         return PackageServiceMapper.fromSnapshot(record);
+    }
+
+    VirtualPrivilegedServicesProfileSnapshot privilegedServicesProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().getPrivilegedServicesProfile(packageName, virtualUserId);
+    }
+
+    VirtualPrivilegedServicesProfileSnapshot setPrivilegedServicesProfile(
+            String packageName, int virtualUserId,
+            VirtualPrivilegedServicesProfileSnapshot profile) throws Exception {
+        return requireSession().setPrivilegedServicesProfile(packageName, virtualUserId, profile);
+    }
+
+    VirtualPrivilegedServicesProfileSnapshot resetPrivilegedServicesProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return requireSession().resetPrivilegedServicesProfile(packageName, virtualUserId);
     }
 
     private IPackageManagementSession requireSession() throws Exception {

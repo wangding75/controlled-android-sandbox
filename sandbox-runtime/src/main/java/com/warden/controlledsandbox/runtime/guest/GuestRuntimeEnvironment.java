@@ -146,6 +146,8 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.mediaCommunicationProfile());
             PeripheralServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.peripheralServicesProfile());
+            PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
+                    virtualServices.privilegedServicesProfile());
             Application application = createApplication(spec, loader, guestContext);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"

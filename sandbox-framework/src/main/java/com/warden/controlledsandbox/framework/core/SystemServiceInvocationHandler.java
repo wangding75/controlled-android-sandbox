@@ -27,6 +27,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final PolicyServicesInvocationInterceptor policyServicesInterceptor;
     private final MediaCommunicationInvocationInterceptor mediaCommunicationInterceptor;
     private final PeripheralServicesInvocationInterceptor peripheralServicesInterceptor;
+    private final PrivilegedServicesInvocationInterceptor privilegedServicesInterceptor;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -69,6 +70,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "companiondevice", "mediaprojection", "camera", "oemsystem").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new PeripheralServicesInvocationInterceptor(identity, this.serviceName) : null;
+        this.privilegedServicesInterceptor = Set.of("search", "storagestats", "graphicsstats",
+                "contexthub", "persistentdatablock", "systemupdate").contains(
+                this.serviceName.toLowerCase(java.util.Locale.ROOT))
+                ? new PrivilegedServicesInvocationInterceptor(identity, this.serviceName) : null;
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
@@ -86,6 +91,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                         ? MediaCommunicationInvocationInterceptor.Decision.passThrough()
                         : mediaCommunicationInterceptor.before(method, arguments);
         if (mediaCommunicationCall.handled()) return mediaCommunicationCall.result();
+        PrivilegedServicesInvocationInterceptor.Decision privilegedCall =
+                privilegedServicesInterceptor == null
+                        ? PrivilegedServicesInvocationInterceptor.Decision.passThrough()
+                        : privilegedServicesInterceptor.before(method, arguments);
+        if (privilegedCall.handled()) return privilegedCall.result();
         PeripheralServicesInvocationInterceptor.Decision peripheralCall =
                 peripheralServicesInterceptor == null
                         ? PeripheralServicesInvocationInterceptor.Decision.passThrough()
