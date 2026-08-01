@@ -51,6 +51,8 @@ Product callers use a typed, death-linked `IPackageManagementSession` capability
 
 Receiver implementation ownership is delegated to `RuntimeReceiverCoordinator`, which owns dynamic registrations, Manifest routing, ordered-broadcast tokens and Receiver lifecycle cleanup. Runtime permission request/report orchestration is delegated to `RuntimePermissionCoordinator`, which depends on a narrow session view and `RuntimePermissionGateway`. UI code sends requests but does not mutate runtime state directly; the central Broker remains large but no longer contains Receiver dispatch policy.
 
+Production Binder clients share `RebindableServiceConnector`. A binding Attempt starts a monotonic timeout when `bindService` begins. If Android returns `true` but delivers no callback, the connector records `BIND_TIMEOUT`, clears the current Attempt, releases waiters, safely unbinds once and applies bounded exponential backoff. A late `onServiceConnected` callback is rejected by the Attempt epoch/current-owner recheck and its adapted capability is closed. Timeout, close and callback publication serialize through one connector lock.
+
 ## IPC contracts
 
 Binder contracts are migrating incrementally from string-keyed `Bundle` payloads to versioned Parcelable models. The first typed path is App → Broker runtime status:

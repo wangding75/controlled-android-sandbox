@@ -107,9 +107,22 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             }
 
             waiting.startIfNeeded();
+            if (waiting.completed()) continue;
+
             remaining = deadline - System.nanoTime();
-            if (remaining <= 0L || !waiting.latch.await(remaining, TimeUnit.NANOSECONDS)) {
+            long attemptRemaining = waiting.remainingNanos();
+            if (attemptRemaining <= 0L) {
+                if (timeoutAttempt(waiting)) throw unavailable();
+                continue;
+            }
+            if (remaining <= 0L) {
+                timeoutAttempt(waiting);
                 throw unavailable();
+            }
+            long waitNanos = Math.min(remaining, attemptRemaining);
+            if (!waiting.latch.await(waitNanos, TimeUnit.NANOSECONDS)) {
+                if (timeoutAttempt(waiting)) throw unavailable();
+                if (deadline - System.nanoTime() <= 0L) throw unavailable();
             }
         }
     }
@@ -187,22 +200,19 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         try {
             bound = context.bindService(intent, target.connection, Context.BIND_AUTO_CREATE);
         } catch (RuntimeException error) {
-            failAttempt(target.epoch, target, "BIND_EXCEPTION", error, false);
+            failAttempt(target.epoch, target, "BIND_EXCEPTION", error, true);
             return;
         }
         if (!bound) {
-            failAttempt(target.epoch, target, "BIND_REJECTED", null, false);
+            failAttempt(target.epoch, target, "BIND_REJECTED", null, true);
             return;
         }
         boolean staleBinding;
         synchronized (lock) {
-            staleBinding = closed || attempt != target;
-            if (!staleBinding) target.bound = true;
+            if (!target.unbindClaimed) target.bound = true;
+            staleBinding = closed || attempt != target || target.unbindClaimed;
         }
-        if (staleBinding) {
-            target.bound = true;
-            unbind(target);
-        }
+        if (staleBinding) unbind(target);
     }
 
     private void connected(long connectedEpoch, Attempt target, IBinder value) {
@@ -266,6 +276,18 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         if (shouldUnbind) unbind(staleAttempt);
     }
 
+    private boolean timeoutAttempt(Attempt target) {
+        synchronized (lock) {
+            if (closed || attempt != target || target.done) return false;
+            target.done = true;
+            attempt = null;
+            recordFailureLocked("BIND_TIMEOUT", null);
+            target.latch.countDown();
+        }
+        unbind(target);
+        return true;
+    }
+
     private void failAttempt(long failedEpoch, Attempt target, String reason,
             Throwable cause, boolean shouldUnbind) {
         T staleService = null;
@@ -317,10 +339,16 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     }
 
     private void unbind(Attempt target) {
-        if (target == null || target.connection == null || !target.bound) return;
-        try { context.unbindService(target.connection); }
+        ServiceConnection connection;
+        synchronized (lock) {
+            if (target == null || target.connection == null
+                    || !target.bound || target.unbindClaimed) return;
+            target.bound = false;
+            target.unbindClaimed = true;
+            connection = target.connection;
+        }
+        try { context.unbindService(connection); }
         catch (RuntimeException ignored) { }
-        target.bound = false;
     }
 
     private void closeService(T value) {
@@ -357,7 +385,9 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         ServiceConnection connection;
         boolean started;
         boolean bound;
+        boolean unbindClaimed;
         boolean done;
+        long deadlineNanos;
         IBinder.DeathRecipient deathRecipient;
 
         Attempt(long epoch) { this.epoch = epoch; }
@@ -366,11 +396,22 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             synchronized (lock) {
                 if (started || done || closed || attempt != this) return;
                 started = true;
+                deadlineNanos = safeAdd(System.nanoTime(),
+                        TimeUnit.MILLISECONDS.toNanos(timeoutMs));
             }
             start(this);
         }
 
-        boolean completed() { return done; }
+        long remainingNanos() {
+            synchronized (lock) {
+                if (!started || done) return done ? 0L : Long.MAX_VALUE;
+                return deadlineNanos - System.nanoTime();
+            }
+        }
+
+        boolean completed() {
+            synchronized (lock) { return done; }
+        }
     }
 
     private static final class StaleConnectionException extends Exception {

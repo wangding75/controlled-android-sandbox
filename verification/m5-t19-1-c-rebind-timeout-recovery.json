@@ -1,0 +1,25 @@
+{
+  "androidBinderEvidenceCount": 0,
+  "deviceEvidenceCount": 0,
+  "errors": [],
+  "finding": "P1-03 RebindableServiceConnector remains permanently binding when bindService returns true without a callback",
+  "regressions": [
+    "no callback timeout and later rebind",
+    "request timeout after retry backoff",
+    "late onServiceConnected after timeout",
+    "close while require is waiting",
+    "close after synchronous callback but before bindService return",
+    "10/20/40 ms bounded exponential retry sequence",
+    "existing Binder-death recovery"
+  ],
+  "sourceStatus": "PASS",
+  "task": "M5-T19.1-C",
+  "timeoutActions": [
+    "mark attempt complete",
+    "clear authoritative current attempt",
+    "record bounded retry failure",
+    "release all waiters",
+    "claim and unbind the Android ServiceConnection once"
+  ],
+  "timeoutFailure": "BIND_TIMEOUT"
+}

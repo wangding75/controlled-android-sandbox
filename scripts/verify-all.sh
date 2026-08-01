@@ -36,6 +36,7 @@ python3 scripts/check-critical-test-ownership.py
 python3 scripts/check-m5-t19-architecture-decoupling.py
 python3 scripts/check-m5-t19-1-a-native-trust-boundary.py
 python3 scripts/check-m5-t19-1-b-native-network-correctness.py
+python3 scripts/check-m5-t19-1-c-rebind-timeout-recovery.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py
