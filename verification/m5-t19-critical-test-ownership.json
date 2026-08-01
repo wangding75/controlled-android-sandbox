@@ -1,128 +1,180 @@
 {
   "gate": "critical-source-test-ownership",
-  "metricType": "explicit critical-path regression ownership",
+  "metricType": "executable direct critical-path regression ownership",
+  "generationMode": "live source and static-runner scan",
   "lineCoverageClaimed": false,
   "branchCoverageClaimed": false,
   "owners": [
     {
-      "owner": "PackageManagementService",
-      "tests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java"
-      ],
-      "expectedTests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageServiceContractSelfTest.java"
-      ]
+      "owner": "PackageManagementSession",
+      "production": "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/PackageSessionDirectOwnershipSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
-      "owner": "PackageManagementSession",
-      "tests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java"
-      ],
-      "expectedTests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java"
-      ]
+      "owner": "PackageRuntimePermissionSession",
+      "production": "app/src/main/java/com/warden/controlledsandbox/PackageRuntimePermissionSession.java",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/PackageSessionDirectOwnershipSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
+    },
+    {
+      "owner": "PackageVirtualSystemServiceSession",
+      "production": "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSessionSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "VirtualSystemServiceStore",
-      "tests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
-      ],
-      "expectedTests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
-      ]
+      "production": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
+    },
+    {
+      "owner": "VirtualSystemServicePager",
+      "production": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServicePager.java",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServicePagingSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "ActivityTaskLedger",
-      "tests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerConcurrencySelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerConcurrencySelfTest.java"
-      ]
-    },
-    {
-      "owner": "ActivityTaskCheckpointCoordinator",
-      "tests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStoreSelfTest.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStoreSelfTest.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java"
-      ]
-    },
-    {
-      "owner": "RuntimeBrokerService",
-      "tests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStoreSelfTest.java",
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerArchitecturePortsSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStoreSelfTest.java",
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerArchitecturePortsSelfTest.java"
-      ]
+      "production": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+      "test": "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "RuntimeGuestConnectionPool",
-      "tests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java",
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStoreSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java",
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/BrokerStateStoreSelfTest.java"
-      ]
+      "production": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPool.java",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPoolSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "RuntimeOperationTransport",
-      "tests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransportSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransportSelfTest.java"
-      ]
+      "production": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransport.java",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransportSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "InvocationMethodMatcher",
-      "tests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcherSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcherSelfTest.java"
-      ]
-    },
-    {
-      "owner": "ApplicationEnvironmentInvocationInterceptor",
-      "tests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentVirtualizationSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentVirtualizationSelfTest.java"
-      ]
-    },
-    {
-      "owner": "VirtualSecretCipher",
-      "tests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
-      ],
-      "expectedTests": [
-        "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java"
-      ]
+      "production": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcher.java",
+      "test": "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcherSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     },
     {
       "owner": "RebindableServiceConnector",
-      "tests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java"
-      ],
-      "expectedTests": [
-        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java"
-      ]
+      "production": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnector.java",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
+    },
+    {
+      "owner": "BrokerObserverRuntime",
+      "production": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntime.java",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntimeSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
+    },
+    {
+      "owner": "OrderedReceiverPendingResultBridge",
+      "production": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridge.java",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridgeSelfTest.java",
+      "directReference": true,
+      "mainEntryPoint": true,
+      "staticRunnerExecutions": 1,
+      "status": "PASS"
     }
   ],
   "ownerCount": 12,
-  "mappedOwnerCount": 12
+  "mappedOwnerCount": 12,
+  "directOwnerCount": 12,
+  "executedOwnerCount": 12,
+  "p1RegressionEvidence": [
+    {
+      "issue": "P1-01",
+      "test": "sandbox-native/src/test/cpp/native_syscall_boundary_self_test.cpp",
+      "tokens": {
+        "SYS_openat": true,
+        "SYS_connect": true,
+        "SYS_sendto": true
+      },
+      "status": "PASS"
+    },
+    {
+      "issue": "P1-02",
+      "test": "sandbox-native/src/test/cpp/native_network_interceptors_self_test.cpp",
+      "tokens": {
+        "controlled_recvfrom": true,
+        "controlled_getpeername": true,
+        "controlled_dup": true
+      },
+      "status": "PASS"
+    },
+    {
+      "issue": "P1-03",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java",
+      "tokens": {
+        "BIND_TIMEOUT": true,
+        "late callback": true
+      },
+      "status": "PASS"
+    },
+    {
+      "issue": "P1-04",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntimeSelfTest.java",
+      "tokens": {
+        "ImmediateDeathObserver": true,
+        "testImmediateDeathDuringRegistration": true
+      },
+      "status": "PASS"
+    },
+    {
+      "issue": "P1-05",
+      "test": "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServicePagingSelfTest.java",
+      "tokens": {
+        "PAGING_REQUIRED": true,
+        "VirtualSystemServicePager": true
+      },
+      "status": "PASS"
+    },
+    {
+      "issue": "P1-06",
+      "test": "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPoolSelfTest.java",
+      "tokens": {
+        "RuntimeGuestConnectionPool": true,
+        "BINDER_DIED": true
+      },
+      "status": "PASS"
+    }
+  ],
+  "inputDigestSha256": "820578459f9b56baf43d86e461b4b82794141bfd6d97b1e8d7ebf830b259f7c1"
 }
