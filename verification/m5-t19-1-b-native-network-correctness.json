@@ -1,0 +1,33 @@
+{
+  "coveredAliases": [
+    "send",
+    "sendto",
+    "sendmsg",
+    "recv",
+    "recvfrom",
+    "recvmsg",
+    "read",
+    "write",
+    "accept",
+    "accept4",
+    "dup",
+    "dup2",
+    "dup3",
+    "fcntl",
+    "fcntl64"
+  ],
+  "deniedDatagramConsumed": false,
+  "deniedStreamBytesConsumed": false,
+  "deviceEvidenceCount": 0,
+  "directSyscallBoundary": "OUT_OF_SCOPE_DENIED_BY_DEFAULT_FOR_UNTRUSTED_NATIVE",
+  "errors": [],
+  "finding": "P1-02 Native receive/peer buffer disclosure and socket alias gaps",
+  "maximumIovecs": 1024,
+  "receiveLockStripes": 64,
+  "rejectedAcceptBacklogEntryConsumed": true,
+  "sourceStatus": "PASS",
+  "task": "M5-T19.1-B",
+  "temporaryControlBudgetBytes": 1048576,
+  "temporaryReceiveBudgetBytes": 8388608,
+  "trackedDupAliasesShareReceiveMutex": true
+}

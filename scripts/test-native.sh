@@ -41,6 +41,20 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 "$OUT/native_network_self_test"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_network_interceptors.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \
+  "$ROOT/sandbox-native/src/test/cpp/native_network_interceptors_self_test.cpp" \
+  -ldl -o "$OUT/native_network_interceptors_self_test"
+"$OUT/native_network_interceptors_self_test"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_audio_self_test.cpp" \
   -o "$OUT/native_audio_self_test"
@@ -69,6 +83,7 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_network_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \
@@ -103,6 +118,10 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
   -o "$OUT/native_network.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_network_interceptors.cpp" \
+  -o "$OUT/native_network_interceptors.o"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \

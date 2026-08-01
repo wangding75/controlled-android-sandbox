@@ -9,6 +9,7 @@ add_library(controlled_sandbox_native32 SHARED
     ${SHARED_NATIVE_ROOT}/native_procfs.cpp
     ${SHARED_NATIVE_ROOT}/native_loader.cpp
     ${SHARED_NATIVE_ROOT}/native_network.cpp
+    ${SHARED_NATIVE_ROOT}/native_network_interceptors.cpp
     ${SHARED_NATIVE_ROOT}/native_audio.cpp
     ${SHARED_NATIVE_ROOT}/native_interceptors.cpp
     ${SHARED_NATIVE_ROOT}/native_hook.cpp

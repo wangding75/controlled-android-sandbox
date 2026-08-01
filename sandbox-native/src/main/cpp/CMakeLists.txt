@@ -6,6 +6,7 @@ add_library(controlled_sandbox_native SHARED
     native_file_system.cpp
     native_procfs.cpp
     native_network.cpp
+    native_network_interceptors.cpp
     native_audio.cpp
     native_loader.cpp
     native_interceptors.cpp

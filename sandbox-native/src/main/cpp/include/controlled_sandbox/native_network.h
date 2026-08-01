@@ -4,6 +4,8 @@
 #include <net/if.h>
 #include <sys/socket.h>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
 
 namespace controlled_sandbox {
@@ -28,6 +30,21 @@ struct NativeNetworkStatus {
 
 /** Removes process-local virtual socket state before the descriptor is closed. */
 void native_unregister_socket(int socket_fd) noexcept;
+
+/** Returns true when a descriptor belongs to the Guest socket registry. */
+[[nodiscard]] bool native_is_tracked_socket(int socket_fd) noexcept;
+
+/** Returns the shared receive mutex for a tracked socket and all of its dup aliases. */
+[[nodiscard]] std::shared_ptr<std::mutex> native_socket_io_mutex(int socket_fd) noexcept;
+
+/**
+ * Replaces target descriptor ownership after dup/dup2/dup3/fcntl duplication.
+ * A non-socket source clears stale target socket state.
+ */
+[[nodiscard]] bool native_rebind_duplicated_descriptor(int source_fd, int target_fd) noexcept;
+
+/** Copies listener socket ownership to an accepted descriptor. */
+[[nodiscard]] bool native_adopt_accepted_socket(int listener_fd, int accepted_fd) noexcept;
 
 /** Projects a Guest bind address to a Host-safe address. */
 int native_project_bind_address(const sockaddr* requested, socklen_t requested_length,

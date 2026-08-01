@@ -266,11 +266,13 @@ NativeHookStatus NativeHookRuntime::status() const {
 }
 
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 45> targets{
+    static constexpr std::array<std::string_view, 56> targets{
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
             "renameat2", "readlink", "readlinkat", "getdents64", "mmap",
-            "socket", "close", "bind", "connect", "sendto", "recvfrom", "getsockname",
+            "socket", "close", "dup", "dup2", "dup3", "fcntl", "fcntl64", "bind", "connect",
+            "send", "sendto", "sendmsg", "recv", "recvfrom", "recvmsg", "read", "write",
+            "accept", "accept4", "getsockname",
             "getpeername", "setsockopt", "getsockopt", "if_nametoindex", "if_indextoname",
             "getaddrinfo", "getnameinfo", "gethostname", "uname",
             "getifaddrs", "freeifaddrs", "AAudioStream_requestStart",

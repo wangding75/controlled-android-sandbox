@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -29,6 +30,7 @@ struct VirtualSocketState {
     int protocol{};
     std::uint64_t policy_revision{};
     std::string bound_interface;
+    std::shared_ptr<std::mutex> io_mutex;
 };
 
 std::mutex projected_mutex;
@@ -219,7 +221,8 @@ bool native_register_socket(int socket_fd, int domain, int type, int protocol) n
         if (!policy.configured) return false;
         std::lock_guard lock(sockets_mutex);
         if (sockets.size() >= MAX_TRACKED_SOCKETS && sockets.find(socket_fd) == sockets.end()) return false;
-        sockets[socket_fd] = VirtualSocketState{domain, type, protocol, policy.revision, {}};
+        sockets[socket_fd] = VirtualSocketState{
+                domain, type, protocol, policy.revision, {}, std::make_shared<std::mutex>()};
         return true;
     } catch (...) {
         return false;
@@ -229,6 +232,58 @@ bool native_register_socket(int socket_fd, int domain, int type, int protocol) n
 void native_unregister_socket(int socket_fd) noexcept {
     std::lock_guard lock(sockets_mutex);
     sockets.erase(socket_fd);
+}
+
+bool native_is_tracked_socket(int socket_fd) noexcept {
+    std::lock_guard lock(sockets_mutex);
+    return sockets.find(socket_fd) != sockets.end();
+}
+
+std::shared_ptr<std::mutex> native_socket_io_mutex(int socket_fd) noexcept {
+    try {
+        std::lock_guard lock(sockets_mutex);
+        const auto found = sockets.find(socket_fd);
+        return found == sockets.end() ? nullptr : found->second.io_mutex;
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+bool native_rebind_duplicated_descriptor(int source_fd, int target_fd) noexcept {
+    if (target_fd < 0) return false;
+    if (source_fd == target_fd) return true;
+    try {
+        std::lock_guard lock(sockets_mutex);
+        const auto source = sockets.find(source_fd);
+        sockets.erase(target_fd);
+        if (source == sockets.end()) return true;
+        if (sockets.size() >= MAX_TRACKED_SOCKETS) return false;
+        return sockets.emplace(target_fd, source->second).second;
+    } catch (...) {
+        try {
+            std::lock_guard lock(sockets_mutex);
+            sockets.erase(target_fd);
+        } catch (...) { }
+        return false;
+    }
+}
+
+bool native_adopt_accepted_socket(int listener_fd, int accepted_fd) noexcept {
+    if (accepted_fd < 0) return false;
+    try {
+        std::lock_guard lock(sockets_mutex);
+        const auto listener = sockets.find(listener_fd);
+        if (listener == sockets.end()) return false;
+        if (sockets.size() >= MAX_TRACKED_SOCKETS && sockets.find(accepted_fd) == sockets.end()) {
+            return false;
+        }
+        VirtualSocketState accepted = listener->second;
+        accepted.io_mutex = std::make_shared<std::mutex>();
+        sockets[accepted_fd] = std::move(accepted);
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 int native_project_bind_address(const sockaddr* requested, socklen_t requested_length,

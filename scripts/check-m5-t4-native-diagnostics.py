@@ -27,8 +27,10 @@ require("docs/comparisons/M5_T4_VA_NBB_COMPARISON.md", "VirtualApp", "NewBlackbo
 require("README.md", "## M5-T4 native network, loader and diagnostics source baseline")
 require("docs/ROADMAP.md", "## M5-T4 native network, loader and diagnostics source baseline")
 
-require("sandbox-native/src/main/cpp/native_interceptors.cpp",
+require("sandbox-native/src/main/cpp/native_network_interceptors.cpp",
         "controlled_socket", "controlled_bind", "controlled_sendto", "controlled_recvfrom",
+        "controlled_sendmsg", "controlled_recvmsg", "controlled_accept4", "controlled_dup3")
+require("sandbox-native/src/main/cpp/native_interceptors.cpp",
         "controlled_setsockopt", "controlled_if_nametoindex", "validate_android_dlext")
 require("sandbox-native/src/main/cpp/native_network.cpp",
         "MAX_TRACKED_SOCKETS", "project_bind_address", "virtual_if_nametoindex",

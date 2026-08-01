@@ -90,7 +90,8 @@ if 'controlled_sandbox_native32' not in native_policy:
 
 cmake = text('sandbox-companion32/src/main/cpp/CMakeLists.txt')
 for token in ('controlled_sandbox_native32', 'native_policy_jni.cpp', 'native_hook.cpp',
-              'native_loader.cpp', 'native_network.cpp', 'native_audio.cpp'):
+              'native_loader.cpp', 'native_network.cpp', 'native_network_interceptors.cpp',
+              'native_audio.cpp'):
     if token not in cmake:
         errors.append(f'Companion native target is missing {token}')
 

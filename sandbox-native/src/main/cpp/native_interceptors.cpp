@@ -4,6 +4,7 @@
 #include "controlled_sandbox/native_policy.h"
 #include "controlled_sandbox/native_loader.h"
 #include "controlled_sandbox/native_network.h"
+#include "controlled_sandbox/native_network_interceptors.h"
 #include "controlled_sandbox/native_audio.h"
 
 #include <arpa/inet.h>
@@ -105,16 +106,8 @@ using Getdents64Fn = ssize_t (*)(int, void*, std::size_t);
 using MmapFn = void* (*)(void*, std::size_t, int, int, int, off_t);
 using ReadlinkFn = ssize_t (*)(const char*, char*, size_t);
 using ReadlinkAtFn = ssize_t (*)(int, const char*, char*, size_t);
-using SocketFn = int (*)(int, int, int);
-using BindFn = int (*)(int, const sockaddr*, socklen_t);
-using ConnectFn = int (*)(int, const sockaddr*, socklen_t);
-using SendToFn = ssize_t (*)(int, const void*, size_t, int, const sockaddr*, socklen_t);
-using RecvFromFn = ssize_t (*)(int, void*, size_t, int, sockaddr*, socklen_t*);
-using GetSockNameFn = int (*)(int, sockaddr*, socklen_t*);
-using GetPeerNameFn = int (*)(int, sockaddr*, socklen_t*);
 using SetSockOptFn = int (*)(int, int, int, const void*, socklen_t);
 using GetSockOptFn = int (*)(int, int, int, void*, socklen_t*);
-using CloseFn = int (*)(int);
 using IfNameToIndexFn = unsigned int (*)(const char*);
 using IfIndexToNameFn = char* (*)(unsigned int, char*);
 using GetAddrInfoFn = int (*)(const char*, const char*, const addrinfo*, addrinfo**);
@@ -147,16 +140,8 @@ std::atomic<Getdents64Fn> real_getdents64{nullptr};
 std::atomic<MmapFn> real_mmap{nullptr};
 std::atomic<ReadlinkFn> real_readlink{nullptr};
 std::atomic<ReadlinkAtFn> real_readlinkat{nullptr};
-std::atomic<SocketFn> real_socket{nullptr};
-std::atomic<BindFn> real_bind{nullptr};
-std::atomic<ConnectFn> real_connect{nullptr};
-std::atomic<SendToFn> real_sendto{nullptr};
-std::atomic<RecvFromFn> real_recvfrom{nullptr};
-std::atomic<GetSockNameFn> real_getsockname{nullptr};
-std::atomic<GetPeerNameFn> real_getpeername{nullptr};
 std::atomic<SetSockOptFn> real_setsockopt{nullptr};
 std::atomic<GetSockOptFn> real_getsockopt{nullptr};
-std::atomic<CloseFn> real_close{nullptr};
 std::atomic<IfNameToIndexFn> real_if_nametoindex{nullptr};
 std::atomic<IfIndexToNameFn> real_if_indextoname{nullptr};
 std::atomic<GetAddrInfoFn> real_getaddrinfo{nullptr};
@@ -538,83 +523,6 @@ extern "C" ssize_t controlled_readlinkat(int directory, const char* path, char* 
     }, buffer, size);
 }
 
-extern "C" int controlled_socket(int domain, int type, int protocol) {
-    SocketFn function = require_real(real_socket, "socket");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (domain != AF_INET && domain != AF_INET6 && domain != AF_UNIX) { errno = EAFNOSUPPORT; return -1; }
-    const int socket_fd = function(domain, type, protocol);
-    if (socket_fd < 0) return socket_fd;
-    if (!native_register_socket(socket_fd, domain, type, protocol)) {
-        CloseFn close_function = require_real(real_close, "close");
-        if (close_function != nullptr) (void) close_function(socket_fd);
-        errno = EMFILE;
-        return -1;
-    }
-    return socket_fd;
-}
-
-extern "C" int controlled_close(int descriptor) {
-    CloseFn function = require_real(real_close, "close");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    native_unregister_socket(descriptor);
-    return function(descriptor);
-}
-
-extern "C" int controlled_bind(int socket_fd, const sockaddr* address, socklen_t length) {
-    BindFn function = require_real(real_bind, "bind");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    sockaddr_storage projected{};
-    socklen_t projected_length = 0;
-    if (native_project_bind_address(address, length, &projected, &projected_length) != 0) return -1;
-    return function(socket_fd, reinterpret_cast<const sockaddr*>(&projected), projected_length);
-}
-
-extern "C" int controlled_connect(int socket_fd, const sockaddr* address, socklen_t length) {
-    ConnectFn function = require_real(real_connect, "connect");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (!native_socket_destination_allowed(socket_fd, address, length)) { errno = EACCES; return -1; }
-    return function(socket_fd, address, length);
-}
-
-extern "C" ssize_t controlled_sendto(int socket_fd, const void* buffer, size_t length, int flags,
-                                      const sockaddr* destination, socklen_t destination_length) {
-    SendToFn function = require_real(real_sendto, "sendto");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    if (destination != nullptr
-            && !native_socket_destination_allowed(socket_fd, destination, destination_length)) {
-        errno = EACCES;
-        return -1;
-    }
-    return function(socket_fd, buffer, length, flags, destination, destination_length);
-}
-
-extern "C" ssize_t controlled_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
-                                        sockaddr* source, socklen_t* source_length) {
-    RecvFromFn function = require_real(real_recvfrom, "recvfrom");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    const ssize_t received = function(socket_fd, buffer, length, flags, source, source_length);
-    if (received < 0 || source == nullptr || source_length == nullptr) return received;
-    if (!native_socket_address_allowed(source, *source_length)) { errno = EACCES; return -1; }
-    return received;
-}
-
-extern "C" int controlled_getsockname(int socket_fd, sockaddr* address, socklen_t* length) {
-    GetSockNameFn function = require_real(real_getsockname, "getsockname");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    const int status = function(socket_fd, address, length);
-    if (status == 0 && address != nullptr && length != nullptr) native_project_local_address(address, *length);
-    return status;
-}
-
-extern "C" int controlled_getpeername(int socket_fd, sockaddr* address, socklen_t* length) {
-    GetPeerNameFn function = require_real(real_getpeername, "getpeername");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
-    const int status = function(socket_fd, address, length);
-    if (status != 0 || address == nullptr || length == nullptr) return status;
-    if (!native_socket_address_allowed(address, *length)) { errno = EACCES; return -1; }
-    return 0;
-}
-
 extern "C" int controlled_setsockopt(int socket_fd, int level, int option_name,
                                       const void* option_value, socklen_t option_length) {
     bool handled = false;
@@ -845,10 +753,23 @@ void* replacement_for(std::string_view name) {
     if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);
     if (name == "socket") return reinterpret_cast<void*>(&controlled_socket);
     if (name == "close") return reinterpret_cast<void*>(&controlled_close);
+    if (name == "dup") return reinterpret_cast<void*>(&controlled_dup);
+    if (name == "dup2") return reinterpret_cast<void*>(&controlled_dup2);
+    if (name == "dup3") return reinterpret_cast<void*>(&controlled_dup3);
+    if (name == "fcntl") return reinterpret_cast<void*>(&controlled_fcntl);
+    if (name == "fcntl64") return reinterpret_cast<void*>(&controlled_fcntl);
     if (name == "bind") return reinterpret_cast<void*>(&controlled_bind);
     if (name == "connect") return reinterpret_cast<void*>(&controlled_connect);
+    if (name == "send") return reinterpret_cast<void*>(&controlled_send);
     if (name == "sendto") return reinterpret_cast<void*>(&controlled_sendto);
+    if (name == "sendmsg") return reinterpret_cast<void*>(&controlled_sendmsg);
+    if (name == "recv") return reinterpret_cast<void*>(&controlled_recv);
     if (name == "recvfrom") return reinterpret_cast<void*>(&controlled_recvfrom);
+    if (name == "recvmsg") return reinterpret_cast<void*>(&controlled_recvmsg);
+    if (name == "read") return reinterpret_cast<void*>(&controlled_read);
+    if (name == "write") return reinterpret_cast<void*>(&controlled_write);
+    if (name == "accept") return reinterpret_cast<void*>(&controlled_accept);
+    if (name == "accept4") return reinterpret_cast<void*>(&controlled_accept4);
     if (name == "getsockname") return reinterpret_cast<void*>(&controlled_getsockname);
     if (name == "getpeername") return reinterpret_cast<void*>(&controlled_getpeername);
     if (name == "setsockopt") return reinterpret_cast<void*>(&controlled_setsockopt);
