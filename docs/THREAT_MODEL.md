@@ -18,7 +18,8 @@
 - Session IDs, monotonic generations and one-time expiring route tokens.
 - Per-process Guest class loader with parent-first platform/sandbox namespaces.
 - Provider authority ownership, Cursor lease ownership and URI grant expiry/revocation.
-- Native rebinding is scoped to modules loaded from the configured Guest native directory.
+- Native rebinding is scoped to modules loaded from the configured Guest native directory and is classified as best-effort compatibility, not security isolation.
+- Packaged ELF/native payloads are denied by default unless the install authority persists an explicit trusted-Native decision; the decision is rechecked at package-authority, Broker and Guest startup boundaries.
 - Framework hooks are independently installed, diagnosed and rolled back in reverse order.
 - Release packaging rejects missing Emulator evidence.
 
@@ -26,7 +27,9 @@
 
 - Hidden Android framework fields and Binder signatures are only statically compiled against local API stubs.
 - AMS/ATMS do not yet virtualize every Intent, task, result and callback path.
-- Native PLT/GOT changes have host tests but no Android linker/RELRO evidence.
+- Direct syscalls and inline assembly bypass Native PLT/GOT interception. Explicitly trusted Native Guests therefore remain outside a hostile-code security guarantee.
+- APK-time ELF scanning cannot prove the absence of downloaded, generated or custom-loaded native code; arbitrary untrusted Native execution requires a separate UID/isolated execution architecture.
+- Native PLT/GOT changes have Host tests but no Android linker/RELRO evidence.
 - WebView profile isolation has source tests but no Renderer/GPU/utility-process evidence.
 - Guest bytecode and native code remain untrusted code inside host-owned proxy processes; this is containment, not a hardware security boundary.
 - OEM framework differences, anti-virtualization checks, packed applications and broad third-party compatibility are untested.

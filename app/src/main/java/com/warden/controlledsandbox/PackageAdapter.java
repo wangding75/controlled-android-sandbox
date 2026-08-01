@@ -41,7 +41,10 @@ final class PackageAdapter extends BaseAdapter {
         if (instance.lastRuntimeAt > 0) status += " · " + DateFormat.getDateTimeInstance().format(new Date(instance.lastRuntimeAt));
         ((TextView) view.findViewById(R.id.status)).setText(status);
         Button prepare = view.findViewById(R.id.probe); prepare.setOnClickListener(v -> listener.onPrepare(item));
-        Button launch = view.findViewById(R.id.launch); launch.setEnabled(!record.launchActivity.trim().isEmpty()); launch.setOnClickListener(v -> listener.onLaunch(item));
+        Button launch = view.findViewById(R.id.launch);
+        launch.setEnabled(!record.launchActivity.trim().isEmpty()
+                && NativeGuestExecutionPolicy.isRuntimeAllowed(record));
+        launch.setOnClickListener(v -> listener.onLaunch(item));
         Button components = view.findViewById(R.id.components); components.setOnClickListener(v -> listener.onComponentTest(item));
         Button clone = view.findViewById(R.id.clone); clone.setOnClickListener(v -> listener.onClone(item));
         Button delete = view.findViewById(R.id.delete); delete.setOnClickListener(v -> listener.onDelete(item));

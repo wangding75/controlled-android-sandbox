@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.contract.NativeGuestPolicyContract;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeBrokerOperationAdapter;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeBrokerOperationHandler;
@@ -872,6 +873,17 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             File nativeFile = new File(nativeDir).getCanonicalFile();
             if (!nativeFile.toPath().startsWith(privateRoot.toPath())) throw new SecurityException("Native library path is outside app-private storage");
         }
+        boolean containsNativeCode = input.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT,
+                !nativeDir.trim().isEmpty());
+        String nativeTrust = NativeGuestPolicyContract.normalizeTrust(
+                input.getString(RuntimeKeys.NATIVE_GUEST_TRUST, ""));
+        String nativeMode = input.getString(RuntimeKeys.NATIVE_EXECUTION_MODE,
+                NativeGuestPolicyContract.executionMode(containsNativeCode));
+        NativeGuestPolicyContract.requireAllowed(
+                containsNativeCode, nativeTrust, nativeMode, nativeDir);
+        input.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, containsNativeCode);
+        input.putString(RuntimeKeys.NATIVE_GUEST_TRUST, nativeTrust);
+        input.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, nativeMode);
     }
 
     private static ArrayList<String> optionalStringList(Bundle input, String key) {

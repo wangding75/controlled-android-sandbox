@@ -24,6 +24,9 @@ struct NativeHookStatus {
 /**
  * Installs PLT/GOT rebinding only in libraries loaded from the Guest native directory.
  * The host process and Android system libraries are deliberately excluded.
+ *
+ * This is a best-effort compatibility and redirection mechanism, not a security boundary.
+ * Guest code can bypass imported libc symbols with direct syscalls or inline assembly.
  */
 class NativeHookRuntime final {
 public:

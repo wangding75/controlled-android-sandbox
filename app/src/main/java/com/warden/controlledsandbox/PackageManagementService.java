@@ -84,13 +84,24 @@ public final class PackageManagementService extends Service {
             synchronized (dependencies.operationLock) {
                 boolean installed = false;
                 try {
-                    for (SandboxInstance instance : dependencies.lifecycle.load().instances()) {
+                    SandboxCatalogState state = dependencies.lifecycle.load();
+                    for (SandboxInstance instance : state.instances()) {
                         if (normalizedPackage.equals(instance.packageName)
                                 && virtualUserId == instance.virtualUserId) {
                             installed = true;
                             break;
                         }
                     }
+                    SandboxRecord authoritative = state.findRecord(normalizedPackage);
+                    if (authoritative == null) {
+                        throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_PACKAGE_NOT_INSTALLED");
+                    }
+                    if (!authoritative.sha256.equals(packageRevision)) {
+                        throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_REVISION_MISMATCH");
+                    }
+                    NativeGuestExecutionPolicy.requireRuntimeAllowed(authoritative);
+                } catch (SecurityException error) {
+                    throw error;
                 } catch (Exception error) {
                     throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_SCOPE_LOOKUP_FAILED", error);
                 }

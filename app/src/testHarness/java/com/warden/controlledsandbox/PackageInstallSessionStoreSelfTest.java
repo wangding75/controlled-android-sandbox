@@ -22,12 +22,15 @@ public final class PackageInstallSessionStoreSelfTest {
             InstallSessionParamsSnapshot params = new InstallSessionParamsSnapshot(
                     InstallSessionParamsSnapshot.MODE_INHERIT_EXISTING,
                     "com.example.target", "com.example.installer", "Target App",
-                    4096L, 7, true, InstallSessionParamsSnapshot.USER_ACTION_REQUIRED);
+                    4096L, 7, true, InstallSessionParamsSnapshot.USER_ACTION_REQUIRED,
+                    InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED);
             int sessionId = store.create(params);
             InstallSessionInfoSnapshot opened = store.info(sessionId);
             require(InstallSessionInfoSnapshot.STATE_OPEN.equals(opened.state()), "session opens");
             require(opened.params().rollbackEnabled(), "rollback parameter retained");
             require(opened.params().installFlags() == 7, "install flags retained");
+            require(InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED.equals(
+                            opened.params().nativeGuestTrust()), "native trust retained");
             require(store.list().size() == 1, "active session listed");
 
             byte[] base = apkBytes("base");
@@ -55,6 +58,8 @@ public final class PackageInstallSessionStoreSelfTest {
             require("com.example.target".equals(sealed.expectedPackageName),
                     "expected package retained");
             require(sealed.params.rollbackEnabled(), "prepared params retained");
+            require(InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED.equals(
+                            sealed.params.nativeGuestTrust()), "prepared native trust retained");
             require(sealed.artifacts.size() == 2, "all artifacts sealed");
             InstallSessionInfoSnapshot sealedInfo = restarted.info(sessionId);
             require(InstallSessionInfoSnapshot.STATE_SEALED.equals(sealedInfo.state()),

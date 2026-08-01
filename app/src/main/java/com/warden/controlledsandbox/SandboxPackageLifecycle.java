@@ -92,7 +92,8 @@ final class SandboxPackageLifecycle {
             requireSupportedCommitParams(prepared.params);
             installSessions.markCommitting(sessionId);
             SandboxCatalogState current = catalogRepository.load();
-            SandboxRecord imported = importer.importApkFiles(prepared.artifacts, current.records());
+            SandboxRecord imported = importer.importApkFiles(prepared.artifacts, current.records(),
+                    prepared.params.nativeGuestTrust());
             if (!prepared.expectedPackageName.isEmpty()
                     && !prepared.expectedPackageName.equals(imported.packageName)) {
                 deletePublishedRevisionIfUnreferenced(current, imported);
@@ -129,6 +130,7 @@ final class SandboxPackageLifecycle {
     }
 
     private static String failureCode(Exception error) {
+        if (error instanceof NativeGuestPolicyException policyError) return policyError.code();
         if (error instanceof SecurityException) return "INSTALL_SESSION_SECURITY_FAILURE";
         if (error instanceof IllegalArgumentException) return "INSTALL_SESSION_VALIDATION_FAILURE";
         if (error instanceof IllegalStateException) return "INSTALL_SESSION_STATE_FAILURE";

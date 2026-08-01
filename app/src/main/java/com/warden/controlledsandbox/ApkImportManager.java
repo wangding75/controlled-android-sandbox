@@ -50,20 +50,41 @@ final class ApkImportManager {
     }
 
     SandboxRecord importApk(Uri uri, List<SandboxRecord> trustedRecords) throws Exception {
+        return importApk(uri, trustedRecords,
+                com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot
+                        .NATIVE_GUEST_TRUST_UNTRUSTED);
+    }
+
+    SandboxRecord importApk(Uri uri, List<SandboxRecord> trustedRecords,
+                            String nativeGuestTrust) throws Exception {
         File staging = createInputStagingFile();
         try {
             copyAndHash(uri, staging);
-            return importApkFiles(List.of(staging), trustedRecords);
+            return importApkFiles(List.of(staging), trustedRecords, nativeGuestTrust);
         } finally {
             if (staging.exists()) staging.delete();
         }
     }
 
     SandboxRecord importApkFile(File source, List<SandboxRecord> trustedRecords) throws Exception {
-        return importApkFiles(List.of(source), trustedRecords);
+        return importApkFile(source, trustedRecords,
+                com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot
+                        .NATIVE_GUEST_TRUST_UNTRUSTED);
+    }
+
+    SandboxRecord importApkFile(File source, List<SandboxRecord> trustedRecords,
+                                String nativeGuestTrust) throws Exception {
+        return importApkFiles(List.of(source), trustedRecords, nativeGuestTrust);
     }
 
     SandboxRecord importApkFiles(List<File> sources, List<SandboxRecord> trustedRecords) throws Exception {
+        return importApkFiles(sources, trustedRecords,
+                com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot
+                        .NATIVE_GUEST_TRUST_UNTRUSTED);
+    }
+
+    SandboxRecord importApkFiles(List<File> sources, List<SandboxRecord> trustedRecords,
+                                 String nativeGuestTrust) throws Exception {
         if (sources == null || sources.isEmpty()) throw new IllegalArgumentException("At least one APK artifact is required");
         if (sources.size() > MAX_ARTIFACTS) throw new IllegalArgumentException("Install contains too many APK artifacts");
         if (trustedRecords == null) throw new IllegalArgumentException("trustedRecords are required");
@@ -75,7 +96,7 @@ final class ApkImportManager {
         if (!transactionDir.mkdirs()) throw new IllegalStateException("Cannot create install transaction");
         try {
             List<InspectedArtifact> artifacts = stageAndInspect(sources, transactionDir);
-            return finishImport(transactionDir, artifacts, trustedRecords);
+            return finishImport(transactionDir, artifacts, trustedRecords, nativeGuestTrust);
         } catch (Exception error) {
             try { deleteTreeOrThrow(transactionDir); }
             catch (Exception cleanupFailure) { error.addSuppressed(cleanupFailure); }
@@ -104,7 +125,8 @@ final class ApkImportManager {
     }
 
     private SandboxRecord finishImport(File transactionDir, List<InspectedArtifact> artifacts,
-                                       List<SandboxRecord> trustedRecords) throws Exception {
+                                       List<SandboxRecord> trustedRecords,
+                                       String nativeGuestTrust) throws Exception {
         InspectedArtifact base = baseArtifact(artifacts);
         String packageName = base.manifest.packageName();
         SandboxRecord previousRecord = existingRecord(packageName, trustedRecords);
@@ -136,6 +158,8 @@ final class ApkImportManager {
         }
         deleteTreeOrThrow(incoming);
 
+        boolean containsNativeCode = containsNativeCode(stagedRecords);
+        NativeGuestExecutionPolicy.requireInstallAllowed(containsNativeCode, nativeGuestTrust);
         File stagedNativeDir = new File(transactionDir, "lib");
         String selectedAbi = extractNativeLibraries(stagedRecords, stagedNativeDir);
         File revisionsRoot = storageLayout.revisionsDirectory(packageName);
@@ -177,17 +201,19 @@ final class ApkImportManager {
         ManifestModel.Component receiver = firstEnabled(merged.receivers);
         ManifestModel.Component provider = firstEnabled(merged.providers);
 
+        long importedAt = System.currentTimeMillis();
         return new SandboxRecord(packageName, label, version, base.versionCode,
                 base.signatureSha256, apk.getAbsolutePath(),
                 selectedAbi.isEmpty() ? "" : nativeDir.getAbsolutePath(), selectedAbi,
+                containsNativeCode, NativeGuestExecutionPolicy.normalizeTrust(nativeGuestTrust),
                 merged.launcherActivity, processName(packageName, activity),
                 base.manifest.applicationClass(), className(service), processName(packageName, service),
                 className(receiver), processName(packageName, receiver), firstAction(receiver),
                 className(provider), processName(packageName, provider),
                 provider == null ? "" : provider.authorities(),
                 String.join(",", merged.permissions), String.join(",", merged.sharedLibraries),
-                revisionSha256, base.sha256, published, System.currentTimeMillis(),
-                "NOT_TESTED", 0);
+                revisionSha256, base.sha256, published, importedAt,
+                importedAt, importedAt, "NOT_TESTED", 0);
     }
 
     private InspectedArtifact inspect(File file, String sha256) throws Exception {
@@ -248,6 +274,37 @@ final class ApkImportManager {
                         + artifact.manifest.configForSplit());
             }
         }
+    }
+
+    static boolean containsNativeCode(List<PackageArtifactRecord> artifacts) throws Exception {
+        if (artifacts == null) throw new IllegalArgumentException("artifacts are required");
+        for (PackageArtifactRecord artifact : artifacts) {
+            try (ZipFile zip = new ZipFile(artifact.path)) {
+                int entries = 0;
+                var enumeration = zip.entries();
+                while (enumeration.hasMoreElements()) {
+                    ZipEntry entry = enumeration.nextElement();
+                    if (++entries > MAX_ZIP_ENTRIES) {
+                        throw new IllegalArgumentException("APK has too many ZIP entries");
+                    }
+                    String name = entry.getName();
+                    if (entry.isDirectory()) continue;
+                    if (name.startsWith("lib/") && name.endsWith(".so")) {
+                        String[] parts = name.split("/");
+                        if (parts.length == 3 && !parts[1].isEmpty() && !parts[2].isEmpty()) return true;
+                    }
+                    try (InputStream input = zip.getInputStream(entry)) {
+                        if (hasElfMagic(input)) return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasElfMagic(InputStream input) throws java.io.IOException {
+        return input.read() == 0x7f && input.read() == 'E'
+                && input.read() == 'L' && input.read() == 'F';
     }
 
     private String extractNativeLibraries(List<PackageArtifactRecord> artifacts, File outputDir)

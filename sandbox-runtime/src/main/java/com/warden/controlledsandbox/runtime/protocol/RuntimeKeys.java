@@ -34,6 +34,9 @@ public final class RuntimeKeys {
     public static final String PACKAGE_REVISION = "packageRevision";
     public static final String NATIVE_LIBRARY_DIR = "nativeLibraryDir";
     public static final String NATIVE_ABI = "nativeAbi";
+    public static final String NATIVE_CODE_PRESENT = "nativeCodePresent";
+    public static final String NATIVE_GUEST_TRUST = "nativeGuestTrust";
+    public static final String NATIVE_EXECUTION_MODE = "nativeExecutionMode";
     public static final String APPLICATION_CLASS = "applicationClass";
     public static final String COMPONENT_CLASS = "componentClass";
     public static final String DATA_ROOT = "dataRoot";

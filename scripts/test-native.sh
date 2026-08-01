@@ -21,6 +21,14 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/test/cpp/native_syscall_boundary_self_test.cpp" \
+  -o "$OUT/native_syscall_boundary_self_test"
+"$OUT/native_syscall_boundary_self_test"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_procfs_self_test.cpp" \
   -o "$OUT/native_procfs_self_test"

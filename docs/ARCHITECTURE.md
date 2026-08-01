@@ -136,7 +136,7 @@ Activity/task, notification, job and storage adapters remain bounded source impl
 
 ## Native boundary
 
-`sandbox-native` provides:
+`sandbox-native` provides Guest-module-scoped PLT/GOT replacement for selected imported libc/loader/network/audio symbols, plus:
 
 - canonical mapping of Guest private/external paths into the instance root;
 - traversal and malformed-path rejection;
@@ -144,7 +144,7 @@ Activity/task, notification, job and storage adapters remain bounded source impl
 - IPv4 CIDR allow/deny rules with deny precedence;
 - JNI configuration/query APIs.
 
-It does not yet patch arbitrary Guest ELF imports or intercept every libc call. That distinction is enforced in the milestone documentation.
+Imported-symbol rebinding is a best-effort compatibility and redirection layer. Direct `syscall(SYS_*)`, inline assembly and a custom loader can bypass it. The package authority therefore denies packaged ELF/native payloads by default and only admits a Native Guest when an install session records `EXPLICITLY_TRUSTED`. That trust decision and the `BEST_EFFORT_COMPATIBILITY` execution label are persisted and rechecked by RuntimeClient, Runtime Broker, Guest specification parsing and Package Service before Guest startup. Legacy Native records fail closed. This policy does not turn same-UID execution into a hostile-code security boundary; arbitrary untrusted Native code requires a different UID/isolated execution design with Broker-only Host file/network access.
 
 ## Diagnostics
 

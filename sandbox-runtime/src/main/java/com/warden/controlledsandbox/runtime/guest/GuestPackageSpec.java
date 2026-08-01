@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.contract.NativeGuestPolicyContract;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,6 +30,9 @@ public final class GuestPackageSpec {
     final String packageRevision;
     final String nativeLibraryDir;
     final String nativeAbi;
+    final boolean containsNativeCode;
+    final String nativeGuestTrust;
+    final String nativeExecutionMode;
     final String applicationClass;
     public final String componentClass;
     final String dataRoot;
@@ -68,7 +72,15 @@ public final class GuestPackageSpec {
         packageRevision = required(bundle, RuntimeKeys.PACKAGE_REVISION);
         nativeLibraryDir = bundle.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
         nativeAbi = bundle.getString(RuntimeKeys.NATIVE_ABI, "");
+        containsNativeCode = bundle.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT,
+                !nativeLibraryDir.trim().isEmpty());
+        nativeGuestTrust = NativeGuestPolicyContract.normalizeTrust(
+                bundle.getString(RuntimeKeys.NATIVE_GUEST_TRUST, ""));
+        nativeExecutionMode = bundle.getString(RuntimeKeys.NATIVE_EXECUTION_MODE,
+                NativeGuestPolicyContract.executionMode(containsNativeCode));
         validateNativeAbi(nativeLibraryDir, nativeAbi);
+        NativeGuestPolicyContract.requireAllowed(
+                containsNativeCode, nativeGuestTrust, nativeExecutionMode, nativeLibraryDir);
         applicationClass = bundle.getString(RuntimeKeys.APPLICATION_CLASS, "");
         componentClass = bundle.getString(RuntimeKeys.COMPONENT_CLASS, "");
         dataRoot = required(bundle, RuntimeKeys.DATA_ROOT);
@@ -103,6 +115,9 @@ public final class GuestPackageSpec {
         out.putString(RuntimeKeys.BASE_APK_SHA256, baseApkSha256);
         out.putLong(RuntimeKeys.APK_VERSION_CODE, apkVersionCode); out.putString(RuntimeKeys.PACKAGE_REVISION, packageRevision);
         out.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, nativeLibraryDir); out.putString(RuntimeKeys.NATIVE_ABI, nativeAbi);
+        out.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, containsNativeCode);
+        out.putString(RuntimeKeys.NATIVE_GUEST_TRUST, nativeGuestTrust);
+        out.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, nativeExecutionMode);
         out.putString(RuntimeKeys.APPLICATION_CLASS, applicationClass);
         out.putString(RuntimeKeys.COMPONENT_CLASS, componentClass); out.putString(RuntimeKeys.DATA_ROOT, dataRoot);
         out.putStringArrayList(RuntimeKeys.PERMISSIONS, new ArrayList<>(permissions));

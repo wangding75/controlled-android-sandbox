@@ -164,6 +164,7 @@ final class RuntimeClient implements AutoCloseable {
     }
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {
+        NativeGuestExecutionPolicy.requireRuntimeAllowed(record);
         VirtualPackageStateSnapshot packageState = packageService.virtualPackageState(
                 record.packageName, virtualUserId);
         if (!record.sha256.equals(packageState.apkSha256())) {
@@ -200,6 +201,9 @@ final class RuntimeClient implements AutoCloseable {
         request.putLong(RuntimeKeys.APK_VERSION_CODE, record.versionCode);
         request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, record.nativeLibraryDir);
         request.putString(RuntimeKeys.NATIVE_ABI, record.nativeAbi);
+        request.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, record.containsNativeCode);
+        request.putString(RuntimeKeys.NATIVE_GUEST_TRUST, record.nativeGuestTrust);
+        request.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, record.nativeExecutionMode());
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.launchActivity);
         ArrayList<String> permissions = new ArrayList<>();

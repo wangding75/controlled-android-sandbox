@@ -1,0 +1,28 @@
+{
+  "admissionChecks": [
+    "APK artifact scan",
+    "install authority",
+    "RuntimeClient",
+    "Runtime Broker",
+    "Guest specification",
+    "Package Service authoritative record"
+  ],
+  "deviceEvidenceCount": 0,
+  "directSyscallBypassEliminatedByHooks": false,
+  "errors": [],
+  "finding": "P1-01 direct syscall bypass of PLT/GOT isolation",
+  "productPolicy": "DENY_PACKAGED_NATIVE_BY_DEFAULT",
+  "regressions": [
+    "SYS_openat bypass characterization",
+    "SYS_connect bypass characterization",
+    "SYS_sendto bypass characterization",
+    "untrusted packaged ELF denial",
+    "legacy native record fail-closed",
+    "explicit trusted native admission"
+  ],
+  "remainingStrongIsolationWork": "different UID/isolated execution plus Broker-only Host file/network access",
+  "sourceStatus": "PASS",
+  "strongIsolationClaimed": false,
+  "task": "M5-T19.1-A",
+  "trustedNativeExecutionMode": "BEST_EFFORT_COMPATIBILITY"
+}

@@ -9,6 +9,7 @@ import android.os.Bundle;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
 import java.nio.file.Files;
 
@@ -31,11 +32,24 @@ public final class GuestContextBoundarySelfTest {
             request.putString(RuntimeKeys.PACKAGE_REVISION, "v1:sha256:" + "a".repeat(64));
             request.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, new File(root, "lib").getAbsolutePath());
             request.putString(RuntimeKeys.NATIVE_ABI, "x86_64");
+            request.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, true);
+            request.putString(RuntimeKeys.NATIVE_GUEST_TRUST,
+                    InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED);
+            request.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, "BEST_EFFORT_COMPATIBILITY");
             request.putString(RuntimeKeys.DATA_ROOT, new File(root, "instance").getAbsolutePath());
             request.putParcelable(RuntimeKeys.PACKAGE_STATE, new VirtualPackageStateSnapshot(
                     "com.example.guest", 3, "Guest", "1", 1L, "b".repeat(64),
                     "a".repeat(64), "com.example.guest.MainActivity", "", true,
                     java.util.List.of(), java.util.List.of(), java.util.List.of()));
+            boolean untrustedNativeDenied = false;
+            try { new GuestPackageSpec(request); }
+            catch (SecurityException expected) {
+                untrustedNativeDenied = String.valueOf(expected.getMessage())
+                        .contains("UNTRUSTED_NATIVE_GUEST_DENIED");
+            }
+            require(untrustedNativeDenied, "Guest spec rejects untrusted native payload");
+            request.putString(RuntimeKeys.NATIVE_GUEST_TRUST,
+                    InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED);
             GuestPackageSpec spec = new GuestPackageSpec(request);
             Context host = new Context();
             Resources resources = new Resources(new AssetManager(),

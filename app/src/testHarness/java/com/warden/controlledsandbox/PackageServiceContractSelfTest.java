@@ -171,7 +171,8 @@ public final class PackageServiceContractSelfTest {
         InstallSessionParamsSnapshot installParams = new InstallSessionParamsSnapshot(
                 InstallSessionParamsSnapshot.MODE_INHERIT_EXISTING, "com.example.fixture",
                 "com.example.installer", "Fixture update", 4096L, 3, true,
-                InstallSessionParamsSnapshot.USER_ACTION_REQUIRED);
+                InstallSessionParamsSnapshot.USER_ACTION_REQUIRED,
+                InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED);
         InstallSessionInfoSnapshot installSession = new InstallSessionInfoSnapshot(
                 77, InstallSessionInfoSnapshot.STATE_FAILED, installParams, 2, 2048L,
                 0.75F, 1000L, 1200L, 2, "INSTALL_VALIDATION", "split mismatch");
@@ -185,6 +186,8 @@ public final class PackageServiceContractSelfTest {
         require(restoredInstall.installSessions().size() == 1
                         && restoredInstall.installSessions().get(0).sessionId() == 77
                         && restoredInstall.installSessions().get(0).params().rollbackEnabled()
+                        && InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED.equals(
+                                restoredInstall.installSessions().get(0).params().nativeGuestTrust())
                         && "INSTALL_VALIDATION".equals(
                                 restoredInstall.installSessions().get(0).failureCode()),
                 "install session snapshots lost");

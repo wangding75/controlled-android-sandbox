@@ -480,8 +480,9 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
             try {
                 return action.run();
             } catch (Throwable error) {
-                return PackageServiceResult.failure(operation,
-                        error.getClass().getSimpleName(), String.valueOf(error.getMessage()));
+                String code = error instanceof NativeGuestPolicyException policyError
+                        ? policyError.code() : error.getClass().getSimpleName();
+                return PackageServiceResult.failure(operation, code, String.valueOf(error.getMessage()));
             }
         }
     }
@@ -495,6 +496,5 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         guard.close();
         try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
     }
-
 
 }

@@ -26,7 +26,7 @@ final class PackageInstallSessionStore {
     static final String STATE_SEALED = InstallSessionInfoSnapshot.STATE_SEALED;
     static final String STATE_COMMITTING = InstallSessionInfoSnapshot.STATE_COMMITTING;
     static final String STATE_FAILED = InstallSessionInfoSnapshot.STATE_FAILED;
-    private static final int STATE_SCHEMA = 2;
+    private static final int STATE_SCHEMA = 3;
     private static final long MAX_ARTIFACT_BYTES = 1536L * 1024 * 1024;
     private static final long MAX_INSTALL_BYTES = 3L * 1024 * 1024 * 1024;
     private static final int MAX_ARTIFACTS = 256;
@@ -221,7 +221,7 @@ final class PackageInstallSessionStore {
         int storedId = parseInt(values.getProperty("id"), "id");
         if (storedId != id) throw new SecurityException("INSTALL_SESSION_ID_MISMATCH");
         int schema = parseIntDefault(values.getProperty("schema"), 1, "schema");
-        if (schema != 1 && schema != STATE_SCHEMA) {
+        if (schema < 1 || schema > STATE_SCHEMA) {
             throw new SecurityException("INSTALL_SESSION_SCHEMA_UNSUPPORTED");
         }
         String sessionState = values.getProperty("state", "");
@@ -257,7 +257,10 @@ final class PackageInstallSessionStore {
                     parseInt(values.getProperty("installFlags"), "installFlags"),
                     parseBoolean(values.getProperty("rollbackEnabled"), "rollbackEnabled"),
                     values.getProperty("requireUserAction",
-                            InstallSessionParamsSnapshot.USER_ACTION_UNSPECIFIED));
+                            InstallSessionParamsSnapshot.USER_ACTION_UNSPECIFIED),
+                    schema >= 3 ? values.getProperty("nativeGuestTrust",
+                            InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED)
+                            : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED);
             bytes = parseLong(values.getProperty("bytesStaged"), "bytesStaged");
             progress = Float.intBitsToFloat(parseInt(values.getProperty("progressBits"), "progressBits"));
             createdAt = parseLong(values.getProperty("createdAt"), "createdAt");
@@ -323,6 +326,7 @@ final class PackageInstallSessionStore {
                 + "installFlags=" + session.params.installFlags() + "\n"
                 + "rollbackEnabled=" + session.params.rollbackEnabled() + "\n"
                 + "requireUserAction=" + session.params.requireUserAction() + "\n"
+                + "nativeGuestTrust=" + session.params.nativeGuestTrust() + "\n"
                 + "artifactCount=" + session.artifactCount + "\n"
                 + "bytesStaged=" + session.bytesStaged + "\n"
                 + "progressBits=" + Float.floatToIntBits(session.progress) + "\n"
@@ -441,7 +445,8 @@ final class PackageInstallSessionStore {
         return new InstallSessionParamsSnapshot(params.mode(),
                 validateExpectedPackage(params.expectedPackageName()),
                 params.installerPackageName(), params.appLabel(), params.sizeBytes(),
-                params.installFlags(), params.rollbackEnabled(), params.requireUserAction());
+                params.installFlags(), params.rollbackEnabled(), params.requireUserAction(),
+                params.nativeGuestTrust());
     }
 
     private static float inferredProgress(InstallSessionParamsSnapshot params, long bytes, float current) {

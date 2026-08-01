@@ -98,7 +98,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
-      "lines": 1254
+      "lines": 1266
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
@@ -114,7 +114,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
-      "lines": 629
+      "lines": 686
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
@@ -126,7 +126,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
-      "lines": 580
+      "lines": 585
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
@@ -139,6 +139,10 @@
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
       "lines": 508
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+      "lines": 502
     }
   ],
   "remainingSourceFeasibleCandidates": [

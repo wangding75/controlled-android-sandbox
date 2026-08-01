@@ -16,6 +16,9 @@ public final class PackageRecordSnapshot implements Parcelable {
     private final String apkPath;
     private final String nativeLibraryDir;
     private final String nativeAbi;
+    private final boolean containsNativeCode;
+    private final String nativeGuestTrust;
+    private final String nativeExecutionMode;
     private final String launchActivity;
     private final String launchProcess;
     private final String applicationClass;
@@ -85,11 +88,49 @@ public final class PackageRecordSnapshot implements Parcelable {
                                  String apkSha256, String baseApkSha256,
                                  List<PackageArtifactSnapshot> artifacts, long importedAt,
                                  String lastProbeStatus, long lastProbeAt) {
+        this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
+                nativeLibraryDir, nativeAbi, !value(nativeLibraryDir).isEmpty(),
+                InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED,
+                NativeGuestPolicyContract.executionMode(!value(nativeLibraryDir).isEmpty()),
+                launchActivity, launchProcess, applicationClass, serviceClass, serviceProcess,
+                receiverClass, receiverProcess, receiverAction, providerClass, providerProcess,
+                providerAuthority, permissions, sharedLibraries, apkSha256, baseApkSha256,
+                artifacts, importedAt, lastProbeStatus, lastProbeAt);
+    }
+
+    public PackageRecordSnapshot(String packageName, String label, String versionName,
+                                 long versionCode, String signatureSha256, String apkPath,
+                                 String nativeLibraryDir, String nativeAbi,
+                                 boolean containsNativeCode, String nativeGuestTrust,
+                                 String nativeExecutionMode, String launchActivity,
+                                 String launchProcess, String applicationClass,
+                                 String serviceClass, String serviceProcess,
+                                 String receiverClass, String receiverProcess,
+                                 String receiverAction, String providerClass,
+                                 String providerProcess, String providerAuthority,
+                                 String permissions, String sharedLibraries,
+                                 String apkSha256, String baseApkSha256,
+                                 List<PackageArtifactSnapshot> artifacts, long importedAt,
+                                 String lastProbeStatus, long lastProbeAt) {
         this.packageName = required(packageName, "packageName");
         this.label = value(label); this.versionName = value(versionName); this.versionCode = versionCode;
         this.signatureSha256 = required(signatureSha256, "signatureSha256");
         this.apkPath = required(apkPath, "apkPath"); this.nativeLibraryDir = value(nativeLibraryDir);
         this.nativeAbi = nativeAbi(nativeAbi, this.nativeLibraryDir);
+        this.containsNativeCode = containsNativeCode;
+        if (!containsNativeCode && !this.nativeLibraryDir.isEmpty()) {
+            throw new IllegalArgumentException("nativeLibraryDir requires containsNativeCode");
+        }
+        try {
+            this.nativeGuestTrust = NativeGuestPolicyContract.normalizeTrust(nativeGuestTrust);
+            this.nativeExecutionMode = value(nativeExecutionMode).isEmpty()
+                    ? NativeGuestPolicyContract.executionMode(containsNativeCode)
+                    : value(nativeExecutionMode).toUpperCase(java.util.Locale.ROOT);
+            NativeGuestPolicyContract.validateMetadata(containsNativeCode,
+                    this.nativeExecutionMode, this.nativeLibraryDir);
+        } catch (SecurityException error) {
+            throw new IllegalArgumentException("Invalid native Guest metadata", error);
+        }
         this.launchActivity = value(launchActivity); this.launchProcess = value(launchProcess);
         this.applicationClass = value(applicationClass); this.serviceClass = value(serviceClass);
         this.serviceProcess = value(serviceProcess); this.receiverClass = value(receiverClass);
@@ -106,10 +147,11 @@ public final class PackageRecordSnapshot implements Parcelable {
 
     private PackageRecordSnapshot(Parcel in) {
         this(in.readString(), in.readString(), in.readString(), in.readLong(), in.readString(),
+                in.readString(), in.readString(), in.readString(), in.readInt() != 0,
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
                 in.readString(), in.readString(), in.readString(), in.readString(), in.readString(),
-                in.readString(), in.readString(), in.readString(), in.createTypedArrayList(PackageArtifactSnapshot.CREATOR),
+                in.readString(), in.readString(), in.createTypedArrayList(PackageArtifactSnapshot.CREATOR),
                 in.readLong(), in.readString(), in.readLong());
     }
 
@@ -117,6 +159,9 @@ public final class PackageRecordSnapshot implements Parcelable {
     public String versionName() { return versionName; } public long versionCode() { return versionCode; }
     public String signatureSha256() { return signatureSha256; } public String apkPath() { return apkPath; }
     public String nativeLibraryDir() { return nativeLibraryDir; } public String nativeAbi() { return nativeAbi; }
+    public boolean containsNativeCode() { return containsNativeCode; }
+    public String nativeGuestTrust() { return nativeGuestTrust; }
+    public String nativeExecutionMode() { return nativeExecutionMode; }
     public String launchActivity() { return launchActivity; } public String launchProcess() { return launchProcess; }
     public String applicationClass() { return applicationClass; }
     public String serviceClass() { return serviceClass; } public String serviceProcess() { return serviceProcess; }
@@ -132,6 +177,7 @@ public final class PackageRecordSnapshot implements Parcelable {
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeString(packageName); out.writeString(label); out.writeString(versionName); out.writeLong(versionCode);
         out.writeString(signatureSha256); out.writeString(apkPath); out.writeString(nativeLibraryDir); out.writeString(nativeAbi);
+        out.writeInt(containsNativeCode ? 1 : 0); out.writeString(nativeGuestTrust); out.writeString(nativeExecutionMode);
         out.writeString(launchActivity); out.writeString(launchProcess); out.writeString(applicationClass);
         out.writeString(serviceClass); out.writeString(serviceProcess); out.writeString(receiverClass);
         out.writeString(receiverProcess); out.writeString(receiverAction); out.writeString(providerClass);

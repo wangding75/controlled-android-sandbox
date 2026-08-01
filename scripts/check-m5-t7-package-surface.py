@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -44,9 +45,12 @@ require("sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IP
         "setInstallSessionProgress", "retryInstallSession")
 require("sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/PackageServiceResult.java",
         "InstallSessionInfoSnapshot installSession", "successInstallSessions", "installSessions()")
-require("app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+install_store = require("app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
         "STATE_COMMITTING", "STATE_FAILED", "markFailed", "retry(", "setProgress(",
-        "bytesStaged", "failureCodeB64", "STATE_SCHEMA = 2")
+        "bytesStaged", "failureCodeB64", "STATE_SCHEMA")
+schema_match = re.search(r"STATE_SCHEMA\s*=\s*(\d+)", install_store)
+if schema_match is None or int(schema_match.group(1)) < 2:
+    errors.append("install-session schema must retain M5-T7 fields at schema 2 or newer")
 require("app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
         "requireSupportedCommitParams", "INSTALL_SESSION_INHERIT_EXISTING_UNSUPPORTED",
         "INSTALL_SESSION_ROLLBACK_UNSUPPORTED", "requireInstallableSharedLibraries")

@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONArray;
@@ -15,6 +16,8 @@ final class SandboxRecord {
     final String apkPath;
     final String nativeLibraryDir;
     final String nativeAbi;
+    final boolean containsNativeCode;
+    final String nativeGuestTrust;
     final String launchActivity;
     final String launchProcess;
     final String applicationClass;
@@ -115,14 +118,57 @@ final class SandboxRecord {
                   List<PackageArtifactRecord> artifacts, long importedAt,
                   long firstInstallAt, long lastUpdateAt,
                   String lastProbeStatus, long lastProbeAt) {
+        this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
+                nativeLibraryDir, nativeAbi, !value(nativeLibraryDir).isEmpty(),
+                InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED,
+                launchActivity, launchProcess, applicationClass, serviceClass, serviceProcess,
+                receiverClass, receiverProcess, receiverAction, providerClass, providerProcess,
+                providerAuthority, permissions, sharedLibraries, revisionSha256, baseApkSha256,
+                artifacts, importedAt, firstInstallAt, lastUpdateAt, lastProbeStatus, lastProbeAt);
+    }
+
+    SandboxRecord(String packageName, String label, String versionName, long versionCode,
+                  String signatureSha256, String apkPath, String nativeLibraryDir, String nativeAbi,
+                  boolean containsNativeCode, String nativeGuestTrust,
+                  String launchActivity, String launchProcess, String applicationClass,
+                  String serviceClass, String serviceProcess, String receiverClass,
+                  String receiverProcess, String receiverAction, String providerClass,
+                  String providerProcess, String providerAuthority, String permissions,
+                  String sharedLibraries, String revisionSha256, String baseApkSha256,
+                  List<PackageArtifactRecord> artifacts, long importedAt,
+                  String lastProbeStatus, long lastProbeAt) {
+        this(packageName, label, versionName, versionCode, signatureSha256, apkPath,
+                nativeLibraryDir, nativeAbi, containsNativeCode, nativeGuestTrust,
+                launchActivity, launchProcess, applicationClass, serviceClass, serviceProcess,
+                receiverClass, receiverProcess, receiverAction, providerClass, providerProcess,
+                providerAuthority, permissions, sharedLibraries, revisionSha256, baseApkSha256,
+                artifacts, importedAt, importedAt, importedAt, lastProbeStatus, lastProbeAt);
+    }
+
+    SandboxRecord(String packageName, String label, String versionName, long versionCode,
+                  String signatureSha256, String apkPath, String nativeLibraryDir, String nativeAbi,
+                  boolean containsNativeCode, String nativeGuestTrust,
+                  String launchActivity, String launchProcess, String applicationClass,
+                  String serviceClass, String serviceProcess, String receiverClass,
+                  String receiverProcess, String receiverAction, String providerClass,
+                  String providerProcess, String providerAuthority, String permissions,
+                  String sharedLibraries, String revisionSha256, String baseApkSha256,
+                  List<PackageArtifactRecord> artifacts, long importedAt,
+                  long firstInstallAt, long lastUpdateAt,
+                  String lastProbeStatus, long lastProbeAt) {
         this.packageName = packageName;
         this.label = label;
         this.versionName = versionName;
         this.versionCode = versionCode;
         this.signatureSha256 = signatureSha256;
         this.apkPath = apkPath;
-        this.nativeLibraryDir = nativeLibraryDir == null ? "" : nativeLibraryDir;
+        this.nativeLibraryDir = value(nativeLibraryDir);
         this.nativeAbi = normalizeNativeAbi(nativeAbi, this.nativeLibraryDir);
+        this.containsNativeCode = containsNativeCode;
+        if (!containsNativeCode && !this.nativeLibraryDir.isEmpty()) {
+            throw new IllegalArgumentException("nativeLibraryDir requires containsNativeCode");
+        }
+        this.nativeGuestTrust = NativeGuestExecutionPolicy.normalizeTrust(nativeGuestTrust);
         this.launchActivity = launchActivity;
         this.launchProcess = processOrMain(launchProcess, packageName);
         this.applicationClass = applicationClass;
@@ -134,8 +180,8 @@ final class SandboxRecord {
         this.providerClass = providerClass;
         this.providerProcess = processOrMain(providerProcess, packageName);
         this.providerAuthority = providerAuthority;
-        this.permissions = permissions == null ? "" : permissions;
-        this.sharedLibraries = sharedLibraries == null ? "" : sharedLibraries;
+        this.permissions = value(permissions);
+        this.sharedLibraries = value(sharedLibraries);
         this.sha256 = revisionSha256;
         this.baseApkSha256 = baseApkSha256;
         ArrayList<PackageArtifactRecord> copy = new ArrayList<>(artifacts == null ? List.of() : artifacts);
@@ -151,6 +197,10 @@ final class SandboxRecord {
         this.lastProbeAt = lastProbeAt;
     }
 
+    String nativeExecutionMode() {
+        return NativeGuestExecutionPolicy.executionMode(containsNativeCode);
+    }
+
     SandboxRecord withStoragePaths(String newApkPath, String newNativeLibraryDir) {
         List<PackageArtifactRecord> moved = new ArrayList<>();
         for (PackageArtifactRecord artifact : artifacts) {
@@ -163,21 +213,21 @@ final class SandboxRecord {
     SandboxRecord withStorage(String newApkPath, String newNativeLibraryDir,
                               List<PackageArtifactRecord> newArtifacts) {
         return new SandboxRecord(packageName, label, versionName, versionCode,
-                signatureSha256, newApkPath, newNativeLibraryDir, nativeAbi, launchActivity,
-                launchProcess, applicationClass, serviceClass, serviceProcess,
-                receiverClass, receiverProcess, receiverAction, providerClass,
-                providerProcess, providerAuthority, permissions, sharedLibraries, sha256,
-                baseApkSha256, newArtifacts, importedAt, firstInstallAt, lastUpdateAt,
-                lastProbeStatus, lastProbeAt);
+                signatureSha256, newApkPath, newNativeLibraryDir, nativeAbi,
+                containsNativeCode, nativeGuestTrust, launchActivity, launchProcess,
+                applicationClass, serviceClass, serviceProcess, receiverClass, receiverProcess,
+                receiverAction, providerClass, providerProcess, providerAuthority, permissions,
+                sharedLibraries, sha256, baseApkSha256, newArtifacts, importedAt, firstInstallAt,
+                lastUpdateAt, lastProbeStatus, lastProbeAt);
     }
 
     SandboxRecord withInstallTimes(long firstInstallAt, long lastUpdateAt) {
         return new SandboxRecord(packageName, label, versionName, versionCode, signatureSha256,
-                apkPath, nativeLibraryDir, nativeAbi, launchActivity, launchProcess, applicationClass,
-                serviceClass, serviceProcess, receiverClass, receiverProcess, receiverAction,
-                providerClass, providerProcess, providerAuthority, permissions, sharedLibraries,
-                sha256, baseApkSha256, artifacts, importedAt, firstInstallAt, lastUpdateAt,
-                lastProbeStatus, lastProbeAt);
+                apkPath, nativeLibraryDir, nativeAbi, containsNativeCode, nativeGuestTrust,
+                launchActivity, launchProcess, applicationClass, serviceClass, serviceProcess,
+                receiverClass, receiverProcess, receiverAction, providerClass, providerProcess,
+                providerAuthority, permissions, sharedLibraries, sha256, baseApkSha256, artifacts,
+                importedAt, firstInstallAt, lastUpdateAt, lastProbeStatus, lastProbeAt);
     }
 
     List<String> splitApkPaths() {
@@ -198,7 +248,8 @@ final class SandboxRecord {
         return new JSONObject().put("packageName", packageName).put("label", label).put("versionName", versionName)
                 .put("versionCode", versionCode).put("signatureSha256", signatureSha256)
                 .put("apkPath", apkPath).put("nativeLibraryDir", nativeLibraryDir).put("nativeAbi", nativeAbi)
-                .put("launchActivity", launchActivity)
+                .put("containsNativeCode", containsNativeCode).put("nativeGuestTrust", nativeGuestTrust)
+                .put("nativeExecutionMode", nativeExecutionMode()).put("launchActivity", launchActivity)
                 .put("launchProcess", launchProcess).put("applicationClass", applicationClass)
                 .put("serviceClass", serviceClass).put("serviceProcess", serviceProcess)
                 .put("receiverClass", receiverClass).put("receiverProcess", receiverProcess)
@@ -216,6 +267,7 @@ final class SandboxRecord {
         String apkPath = o.getString("apkPath");
         String revisionSha = o.optString("sha256");
         String baseSha = o.optString("baseApkSha256", revisionSha);
+        String nativeLibraryDir = o.optString("nativeLibraryDir");
         List<PackageArtifactRecord> artifacts = new ArrayList<>();
         JSONArray artifactArray = o.optJSONArray("artifacts");
         if (artifactArray != null) {
@@ -224,26 +276,28 @@ final class SandboxRecord {
             }
         }
         if (artifacts.isEmpty()) artifacts.add(PackageArtifactRecord.legacyBase(apkPath, baseSha));
+        boolean containsNativeCode = o.keySet().contains("containsNativeCode")
+                ? o.optBoolean("containsNativeCode", false) : !nativeLibraryDir.trim().isEmpty();
         return new SandboxRecord(packageName, o.optString("label"), o.optString("versionName"),
                 o.optLong("versionCode"), o.optString("signatureSha256"), apkPath,
-                o.optString("nativeLibraryDir"), o.optString("nativeAbi"), o.optString("launchActivity"),
-                o.optString("launchProcess", packageName), o.optString("applicationClass"),
-                o.optString("serviceClass"), o.optString("serviceProcess", packageName),
-                o.optString("receiverClass"), o.optString("receiverProcess", packageName),
-                o.optString("receiverAction"), o.optString("providerClass"),
-                o.optString("providerProcess", packageName), o.optString("providerAuthority"),
-                o.optString("permissions"), o.optString("sharedLibraries"), revisionSha,
-                baseSha, artifacts, o.optLong("importedAt"),
-                o.optLong("firstInstallAt", o.optLong("importedAt")),
+                nativeLibraryDir, o.optString("nativeAbi"), containsNativeCode,
+                o.optString("nativeGuestTrust",
+                        InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED),
+                o.optString("launchActivity"), o.optString("launchProcess", packageName),
+                o.optString("applicationClass"), o.optString("serviceClass"),
+                o.optString("serviceProcess", packageName), o.optString("receiverClass"),
+                o.optString("receiverProcess", packageName), o.optString("receiverAction"),
+                o.optString("providerClass"), o.optString("providerProcess", packageName),
+                o.optString("providerAuthority"), o.optString("permissions"),
+                o.optString("sharedLibraries"), revisionSha, baseSha, artifacts,
+                o.optLong("importedAt"), o.optLong("firstInstallAt", o.optLong("importedAt")),
                 o.optLong("lastUpdateAt", o.optLong("importedAt")),
                 o.optString("lastProbeStatus", "NOT_TESTED"), o.optLong("lastProbeAt"));
     }
 
     private static String normalizeNativeAbi(String nativeAbi, String nativeLibraryDir) {
-        String value = nativeAbi == null ? "" : nativeAbi.trim();
-        if (nativeLibraryDir != null && !nativeLibraryDir.trim().isEmpty() && value.isEmpty()) {
-            return "legacy-unknown";
-        }
+        String value = value(nativeAbi);
+        if (!nativeLibraryDir.isEmpty() && value.isEmpty()) return "legacy-unknown";
         if (!value.isEmpty() && !value.equals("arm64-v8a") && !value.equals("armeabi-v7a")
                 && !value.equals("x86_64") && !value.equals("x86") && !value.equals("legacy-unknown")) {
             throw new IllegalArgumentException("Unsupported native ABI: " + value);
@@ -254,4 +308,6 @@ final class SandboxRecord {
     private static String processOrMain(String processName, String packageName) {
         return processName == null || processName.trim().isEmpty() ? packageName : processName;
     }
+
+    private static String value(String value) { return value == null ? "" : value.trim(); }
 }
