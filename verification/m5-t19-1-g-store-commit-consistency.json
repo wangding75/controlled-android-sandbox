@@ -1,0 +1,11 @@
+{
+  "gate": "m5-t19-1-g-store-commit-consistency",
+  "sourceStatus": "PASS",
+  "storeLines": 1415,
+  "existingStoreLineLimit": 1500,
+  "closedMutationContract": "VIRTUAL_SYSTEM_SERVICE_STORE_CLOSED",
+  "observerDeliveryContract": "best-effort-after-durable-commit",
+  "directTest": "VirtualSystemServiceStoreCommitConsistencySelfTest",
+  "staticRunnerExecutions": 1,
+  "inputDigestSha256": "ab5e2f12546f017e2945408734957846877ddae182e0a455c76139e59cdcf856"
+}

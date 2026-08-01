@@ -50,7 +50,12 @@ store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
     '"sandbox-system-services.json"', "class VirtualSystemServiceStore",
     "ownerProcessName", "ownerGeneration", "deleteScopeBestEffort",
-    "VirtualSystemServiceLimits", "ensureNamespace", "notifyClipboard")
+    "VirtualSystemServiceLimits", "ensureNamespace",
+    'observerDispatcher.dispatch("CLIPBOARD"')
+require(
+    "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceObserverDispatcher.java",
+    "Best-effort observer delivery", "scheduler.execute",
+    "VIRTUAL_OBSERVER_DISPATCH_FAILED")
 require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
     "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_PENDING_INTENTS_PER_SCOPE",

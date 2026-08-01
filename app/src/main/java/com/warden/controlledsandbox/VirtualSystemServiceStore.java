@@ -63,12 +63,18 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private long nextPendingIntentToken = 1L;
     private int nextNotificationHostId = 0x51000000;
     private int nextJobHostId = 0x52000000;
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
-        Thread thread = new Thread(runnable, "sandbox-system-service-authority");
-        thread.setDaemon(true); return thread;
-    });
+    private final ScheduledExecutorService scheduler;
+    private final VirtualSystemServiceObserverDispatcher observerDispatcher;
+    private boolean closed;
 
     VirtualSystemServiceStore(File filesDir) {
+        this(filesDir, newScheduler());
+    }
+
+    VirtualSystemServiceStore(File filesDir, ScheduledExecutorService scheduler) {
+        this.scheduler = java.util.Objects.requireNonNull(scheduler, "scheduler");
+        observerDispatcher = new VirtualSystemServiceObserverDispatcher(
+                scheduler, this::observersForScope, this::recordObserverDispatchFailure);
         secretCipher = new VirtualSecretCipher(
                 new File(filesDir, "sandbox-system-services.secrets.key"));
         persistence = new VirtualSystemServiceStorePersistence(
@@ -80,20 +86,29 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             }
         }
     }
+    private static ScheduledExecutorService newScheduler() {
+        return Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "sandbox-system-service-authority");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
     void register(Client client) {
         List<Client> replaced;
         synchronized (this) {
+            requireOpenForMutation();
             replaced = clientRegistry.register(client);
             scheduleClientAlarms(client);
         }
         rescheduleExecutions(replaced);
     }
     void reserveClientRegistration(Client client) {
-        synchronized (this) { clientRegistry.reserve(client); }
+        synchronized (this) { requireOpenForMutation(); clientRegistry.reserve(client); }
     }
     void commitClientRegistration(Client client) {
         List<Client> replaced;
         synchronized (this) {
+            requireOpenForMutation();
             replaced = clientRegistry.commit(client);
             scheduleClientAlarms(client);
         }
@@ -102,6 +117,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     void unregister(Client client) {
         List<JobExecution> stale = new ArrayList<>();
         synchronized (this) {
+            if (closed) return;
             clientRegistry.remove(client);
             collectExecutions(client, stale);
         }
@@ -134,13 +150,15 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         MutationSnapshot before = snapshotMutation(scope);
         state(scope).clipboard = boundedPayload(payload, "clipboard");
         persistOrRestore(scope, before);
-        scheduler.execute(() -> notifyClipboard(scope));
+        observerDispatcher.dispatch("CLIPBOARD", scope,
+                IVirtualSystemServiceObserver::onClipboardChanged);
     }
     synchronized void clearClipboard(Scope scope) {
         MutationSnapshot before = snapshotMutation(scope);
         state(scope).clipboard = new byte[0];
         persistOrRestore(scope, before);
-        scheduler.execute(() -> notifyClipboard(scope));
+        observerDispatcher.dispatch("CLIPBOARD", scope,
+                IVirtualSystemServiceObserver::onClipboardChanged);
     }
 
     synchronized List<VirtualAccountSnapshot> accounts(Scope scope, String requestedType) {
@@ -806,6 +824,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     void deleteScopeBestEffort(Scope scope) {
         List<JobExecution> active = new ArrayList<>();
         synchronized (this) {
+            if (closed) return;
             for (JobExecution execution : activeJobExecutions.values()) {
                 if (execution.scope.equals(scope)) active.add(execution);
             }
@@ -819,6 +838,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             }
         }
         synchronized (this) {
+            if (closed) return;
             ScopeState removed = states.remove(scope);
             if (removed == null) return;
             for (AlarmRecord alarm : removed.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
@@ -922,193 +942,69 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
     }
     void notifyDeviceProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onDeviceServiceProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("DEVICE_PROFILE", scope,
+                observer -> observer.onDeviceServiceProfileChanged(policyVersion));
     }
-
     void notifyInteractionProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onInteractionProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("INTERACTION_PROFILE", scope,
+                observer -> observer.onInteractionProfileChanged(policyVersion));
     }
-
     void notifyNetworkProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onNetworkServiceProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("NETWORK_PROFILE", scope,
+                observer -> observer.onNetworkServiceProfileChanged(policyVersion));
     }
-
     void notifyApplicationEnvironmentProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onApplicationEnvironmentProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("APPLICATION_ENVIRONMENT_PROFILE", scope,
+                observer -> observer.onApplicationEnvironmentProfileChanged(policyVersion));
     }
-
     void notifyCompatibilityProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onCompatibilityProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("COMPATIBILITY_PROFILE", scope,
+                observer -> observer.onCompatibilityProfileChanged(policyVersion));
     }
-
     void notifyPolicyServicesProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onPolicyServicesProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("POLICY_SERVICES_PROFILE", scope,
+                observer -> observer.onPolicyServicesProfileChanged(policyVersion));
     }
-
     void notifyMediaCommunicationProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onMediaCommunicationProfileChanged(policyVersion); } catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("MEDIA_COMMUNICATION_PROFILE", scope,
+                observer -> observer.onMediaCommunicationProfileChanged(policyVersion));
     }
-
-
     void notifyPeripheralServicesProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onPeripheralServicesProfileChanged(policyVersion); }
-                catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("PERIPHERAL_SERVICES_PROFILE", scope,
+                observer -> observer.onPeripheralServicesProfileChanged(policyVersion));
     }
-
     void notifyPrivilegedServicesProfileChanged(Scope scope, long policyVersion) {
-        if (scope == null || policyVersion < 1L) return;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onPrivilegedServicesProfileChanged(policyVersion); }
-                catch (Exception ignored) { }
-            }
-        });
+        if (policyVersion < 1L) return;
+        observerDispatcher.dispatch("PRIVILEGED_SERVICES_PROFILE", scope,
+                observer -> observer.onPrivilegedServicesProfileChanged(policyVersion));
     }
-
     void notifyApplicationEnvironmentDataChanged(Scope scope, String domain, String key) {
-        if (scope == null) return;
         String normalizedDomain = domain == null ? "" : domain;
         String normalizedKey = key == null ? "" : key;
-        scheduler.execute(() -> {
-            List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-            synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : clientRegistry.snapshot()) {
-                    if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                        observers.add(client.observer());
-                    }
-                }
-            }
-            for (IVirtualSystemServiceObserver observer : observers) {
-                try { observer.onApplicationEnvironmentDataChanged(normalizedDomain, normalizedKey); }
-                catch (Exception ignored) { }
-            }
-        });
+        observerDispatcher.dispatch("APPLICATION_ENVIRONMENT_DATA", scope,
+                observer -> observer.onApplicationEnvironmentDataChanged(
+                        normalizedDomain, normalizedKey));
     }
-
-    private void notifyClipboard(Scope scope) {
+    private synchronized List<IVirtualSystemServiceObserver> observersForScope(Scope scope) {
+        if (closed) return List.of();
         List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
-        synchronized (this) {
-            for (Client client : clientRegistry.snapshot()) {
-                if (client.active() && client.scope().equals(scope) && client.observer() != null) {
-                    observers.add(client.observer());
-                }
+        for (Client client : clientRegistry.snapshot()) {
+            if (client.active() && client.scope().equals(scope) && client.observer() != null) {
+                observers.add(client.observer());
             }
         }
-        for (IVirtualSystemServiceObserver observer : observers) {
-            try { observer.onClipboardChanged(); } catch (Exception ignored) { }
-        }
+        return observers;
+    }
+    private synchronized void recordObserverDispatchFailure(String warning) {
+        if (!closed) maintenanceWarning = warning;
     }
 
     private ScopeState snapshotScope(Scope scope) {
@@ -1170,6 +1066,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return copy;
     }
     private MutationSnapshot snapshotMutation(Scope scope) {
+        requireOpenForMutation();
         return new MutationSnapshot(snapshotScope(scope), nextPendingIntentToken,
                 nextNotificationHostId, nextJobHostId);
     }
@@ -1192,11 +1089,27 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             int nextNotificationHostId,
             int nextJobHostId) { }
 
-    private ScopeState state(Scope scope) { return states.computeIfAbsent(scope, ignored -> new ScopeState()); }
+    private void requireOpenForMutation() {
+        if (closed) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_STORE_CLOSED");
+    }
+    private ScopeState state(Scope scope) {
+        ScopeState existing = states.get(scope);
+        if (existing != null) return existing;
+        requireOpenForMutation();
+        ScopeState created = new ScopeState();
+        states.put(scope, created);
+        return created;
+    }
     private NamespaceState namespace(Scope scope, String namespace) {
         String normalized = normalizeRequired(namespace, "namespace");
+        ScopeState owner = state(scope);
+        NamespaceState existing = owner.namespaces.get(normalized);
+        if (existing != null) return existing;
+        requireOpenForMutation();
         int seed = switch (normalized) { case "notification" -> 0x51000000; case "job" -> 0x52000000; default -> 0x53000000; };
-        return state(scope).namespaces.computeIfAbsent(normalized, ignored -> new NamespaceState(seed));
+        NamespaceState created = new NamespaceState(seed);
+        owner.namespaces.put(normalized, created);
+        return created;
     }
     static AccountKey accountKey(String name, String type) {
         return new AccountKey(required(name, "name"), required(type, "type"));
@@ -1458,6 +1371,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     @Override public synchronized void close() {
+        if (closed) return;
+        closed = true;
         for (ScopeState state : states.values()) for (AlarmRecord alarm : state.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
         for (JobExecution execution : new ArrayList<>(activeJobExecutions.values())) execution.invalidateLocked();
         clientRegistry.clear(); scheduler.shutdownNow();
