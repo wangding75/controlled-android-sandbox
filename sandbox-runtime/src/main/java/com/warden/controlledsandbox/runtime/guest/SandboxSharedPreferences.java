@@ -33,6 +33,7 @@ public final class SandboxSharedPreferences implements SharedPreferences {
     private static final byte STRING_SET = 6;
     private final File file;
     private final Map<String, Object> values = new LinkedHashMap<>();
+    private boolean active = true;
     private final Set<OnSharedPreferenceChangeListener> listeners = new CopyOnWriteArraySet<>();
 
     SandboxSharedPreferences(File file) {
@@ -40,22 +41,33 @@ public final class SandboxSharedPreferences implements SharedPreferences {
         load();
     }
 
-    @Override public synchronized Map<String, ?> getAll() { return Collections.unmodifiableMap(copyValues(values)); }
-    @Override public synchronized String getString(String key, String defValue) { Object v = values.get(key); return v instanceof String ? (String) v : defValue; }
+    @Override public synchronized Map<String, ?> getAll() { requireActive(); return Collections.unmodifiableMap(copyValues(values)); }
+    @Override public synchronized String getString(String key, String defValue) { requireActive(); Object v = values.get(key); return v instanceof String ? (String) v : defValue; }
     @Override public synchronized Set<String> getStringSet(String key, Set<String> defValues) {
+        requireActive();
         Object value = values.get(key);
         if (!(value instanceof Set<?>)) return defValues;
         @SuppressWarnings("unchecked") Set<String> strings = (Set<String>) value;
         return Collections.unmodifiableSet(new HashSet<>(strings));
     }
-    @Override public synchronized int getInt(String key, int defValue) { Object v = values.get(key); return v instanceof Integer ? (Integer) v : defValue; }
-    @Override public synchronized long getLong(String key, long defValue) { Object v = values.get(key); return v instanceof Long ? (Long) v : defValue; }
-    @Override public synchronized float getFloat(String key, float defValue) { Object v = values.get(key); return v instanceof Float ? (Float) v : defValue; }
-    @Override public synchronized boolean getBoolean(String key, boolean defValue) { Object v = values.get(key); return v instanceof Boolean ? (Boolean) v : defValue; }
-    @Override public synchronized boolean contains(String key) { return values.containsKey(key); }
-    @Override public Editor edit() { return new EditorImpl(); }
-    @Override public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) { if (listener != null) listeners.add(listener); }
-    @Override public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) { listeners.remove(listener); }
+    @Override public synchronized int getInt(String key, int defValue) { requireActive(); Object v = values.get(key); return v instanceof Integer ? (Integer) v : defValue; }
+    @Override public synchronized long getLong(String key, long defValue) { requireActive(); Object v = values.get(key); return v instanceof Long ? (Long) v : defValue; }
+    @Override public synchronized float getFloat(String key, float defValue) { requireActive(); Object v = values.get(key); return v instanceof Float ? (Float) v : defValue; }
+    @Override public synchronized boolean getBoolean(String key, boolean defValue) { requireActive(); Object v = values.get(key); return v instanceof Boolean ? (Boolean) v : defValue; }
+    @Override public synchronized boolean contains(String key) { requireActive(); return values.containsKey(key); }
+    @Override public synchronized Editor edit() { requireActive(); return new EditorImpl(); }
+    @Override public synchronized void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) { requireActive(); if (listener != null) listeners.add(listener); }
+    @Override public synchronized void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) { requireActive(); listeners.remove(listener); }
+
+    synchronized void invalidateAfterMove() {
+        active = false;
+        values.clear();
+        listeners.clear();
+    }
+
+    private void requireActive() {
+        if (!active) throw new IllegalStateException("SHARED_PREFERENCES_MOVED");
+    }
 
     private void load() {
         synchronized (this) {
@@ -95,6 +107,7 @@ public final class SandboxSharedPreferences implements SharedPreferences {
     }
 
     private synchronized boolean persist(Map<String, Object> replacement) {
+        requireActive();
         File parent = file.getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) return false;
         File temporary = new File(parent, file.getName() + ".tmp");
@@ -180,6 +193,7 @@ public final class SandboxSharedPreferences implements SharedPreferences {
             List<String> changed = new ArrayList<>();
             boolean success;
             synchronized (SandboxSharedPreferences.this) {
+                requireActive();
                 Map<String, Object> next = copyValues(values);
                 if (clear) {
                     changed.addAll(next.keySet());

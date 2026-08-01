@@ -281,3 +281,15 @@ an unresolved entry fails with `LEGACY_NAME_INDEX_AMBIGUOUS` instead of disappea
 Known SQLite and SharedPreferences companion files move with the main artifact. Deleted hashed
 artifacts release stale claims. The codec applies to SharedPreferences, databases, normal files,
 `getDir` and external-file types.
+
+## Guest credential/device protected storage
+
+A Guest instance exposes two internal storage domains: `<instance>/data` for credential-protected
+storage and `<instance>/device_protected` for device-protected storage. Both domains share Guest
+identity, capability state, application identity and the collision-free logical-name registry.
+External storage remains common to both domains.
+
+Cross-domain database and SharedPreferences movement is serialized by an instance-scoped OS lock.
+Destination artifacts are never replaced. Database sidecars and the SharedPreferences temporary
+file move before the main artifact; failure rolls completed moves back in reverse order. Only
+Contexts with the same package name, virtual user and canonical instance root may participate.

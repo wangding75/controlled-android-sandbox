@@ -10,10 +10,11 @@ errors: list[str] = []
 context_path = ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java'
 loader_path = ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java'
 context_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java'
+storage_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextStorageTransferSelfTest.java'
 loader_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoaderSelfTest.java'
 compiler_path = ROOT / 'tools/static_android_compile.py'
 
-for path in [context_path, loader_path, context_test_path, loader_test_path, compiler_path]:
+for path in [context_path, loader_path, context_test_path, storage_test_path, loader_test_path, compiler_path]:
     if not path.is_file():
         errors.append(f'missing required Guest boundary file: {path.relative_to(ROOT)}')
 
@@ -21,6 +22,7 @@ if not errors:
     context = context_path.read_text(encoding='utf-8')
     loader = loader_path.read_text(encoding='utf-8')
     context_test = context_test_path.read_text(encoding='utf-8')
+    storage_test = storage_test_path.read_text(encoding='utf-8')
     loader_test = loader_test_path.read_text(encoding='utf-8')
     compiler = compiler_path.read_text(encoding='utf-8')
 
@@ -31,16 +33,16 @@ if not errors:
         '@Override public SQLiteDatabase openOrCreateDatabase(': 'database creation is not redirected',
         '@Override public boolean deleteDatabase(String name)': 'database deletion is not redirected',
         '@Override public boolean moveDatabaseFrom(Context sourceContext, String name)':
-            'cross-Context database movement is not fail-closed',
+            'cross-Context database movement is not implemented',
         '@Override public boolean moveSharedPreferencesFrom(Context sourceContext, String name)':
-            'cross-Context preference movement is not fail-closed',
+            'cross-Context preference movement is not implemented',
         '@Override public File getExternalFilesDir(String type)': 'external files are not redirected',
         '@Override public File getExternalCacheDir()': 'external cache is not redirected',
         '@Override public File getObbDir()': 'OBB storage is not redirected',
         '@Override public Context createPackageContext(String packageName, int flags)':
             'cross-package Context acquisition is not fail-closed',
         '@Override public Context createDeviceProtectedStorageContext()':
-            'device-protected storage behavior is not explicit',
+            'device-protected storage context is not implemented',
         'return new ApplicationInfo(applicationInfo);': 'ApplicationInfo is not returned defensively',
     }
     for fragment, message in required_context_fragments.items():
@@ -76,7 +78,11 @@ if not errors:
     if 'openOrCreateDatabase("guest.db"' not in context_test:
         errors.append('Guest Context test does not execute redirected database creation')
     if 'moveDatabaseFrom(host, "guest.db")' not in context_test:
-        errors.append('Guest Context test does not verify cross-Context database move denial')
+        errors.append('Guest Context test does not verify host database move denial')
+    for token in ['moveSharedPreferencesFrom(credential', 'moveDatabaseFrom(credential',
+                  'createDeviceProtectedStorageContext', 'testPartialMoveRollback']:
+        if token not in storage_test:
+            errors.append(f'Guest storage transfer test missing {token}')
     for namespace in forbidden_parent_first:
         if namespace not in loader_test:
             errors.append(f'Guest class-loader test does not cover denied namespace {namespace}')
@@ -84,6 +90,7 @@ if not errors:
     required_test_classes = [
         'com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest',
         'com.warden.controlledsandbox.runtime.guest.GuestContextBoundarySelfTest',
+        'com.warden.controlledsandbox.runtime.guest.GuestContextStorageTransferSelfTest',
     ]
     for class_name in required_test_classes:
         if compiler.count("'" + class_name + "'") != 1:

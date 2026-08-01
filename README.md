@@ -331,3 +331,12 @@ an unresolved old file. Unique legacy files are discovered and migrated by `file
 Deleted hashed artifacts release their registry claim. Registry corruption and physical-name conflicts
 fail closed. Android filesystem and device
 evidence remain 0.
+
+## M5-T19.1-K Guest protected-storage Contexts
+
+`GuestContext` now implements credential- and device-protected internal storage as separate
+instance-scoped roots. `moveDatabaseFrom` moves the database plus journal/WAL/SHM companions, and
+`moveSharedPreferencesFrom` moves the CSPF file plus its temporary companion. Moves are serialized
+with JVM and OS file locks, refuse destination overwrite, move the main artifact last and roll back
+partial companion transfers. The source must be the same Guest package, virtual user and canonical
+instance root; Host or foreign Guest Contexts are rejected.

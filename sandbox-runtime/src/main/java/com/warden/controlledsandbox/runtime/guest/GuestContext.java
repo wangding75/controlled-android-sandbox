@@ -26,6 +26,7 @@ import java.util.Map;
  * callers never receive the host base Context through the normal Context API.</p>
  */
 public final class GuestContext extends ContextWrapper {
+    private static final Object PREFERENCE_LOCK_TIE = new Object();
     private final GuestPackageSpec spec;
     private final ClassLoader classLoader;
     private final Resources resources;
@@ -36,22 +37,33 @@ public final class GuestContext extends ContextWrapper {
     private final ApplicationInfo applicationInfo;
     private final GuestCapabilityGate capabilityGate;
     private final GuestStorageNameCodec storageNames;
-    private volatile Application application;
+    private final SharedState sharedState;
+    private final boolean deviceProtected;
     private final Map<String, SharedPreferences> preferences = new HashMap<>();
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
+        this(host, spec, classLoader, resources, assets, false,
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions())));
+    }
+
+    private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                         Resources resources, AssetManager assets, boolean deviceProtected,
+                         SharedState sharedState) {
         super(host);
         this.spec = spec;
         this.classLoader = classLoader;
         this.resources = resources;
         this.assets = assets;
+        this.deviceProtected = deviceProtected;
+        this.sharedState = sharedState;
         this.instanceRoot = ensureDirectory(spec.dataRootFile());
-        this.dataRoot = ensureDirectory(new File(instanceRoot, "data"));
+        this.dataRoot = ensureDirectory(new File(instanceRoot,
+                deviceProtected ? "device_protected" : "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot);
         this.applicationInfo = new ApplicationInfo(host.getApplicationInfo());
-        this.capabilityGate = new GuestCapabilityGate(spec.packageState.permissions());
+        this.capabilityGate = sharedState.capabilityGate;
         applicationInfo.packageName = spec.packageName;
         applicationInfo.sourceDir = spec.apkPath;
         applicationInfo.publicSourceDir = spec.apkPath;
@@ -73,7 +85,7 @@ public final class GuestContext extends ContextWrapper {
         ensureDirectory(new File(externalRoot, "media"));
     }
 
-    void application(Application value) { application = value; }
+    void application(Application value) { sharedState.application = value; }
     void updatePermissionState(java.util.List<com.warden.controlledsandbox.contract.VirtualPermissionSnapshot> permissions) {
         capabilityGate.replace(permissions);
     }
@@ -81,7 +93,9 @@ public final class GuestContext extends ContextWrapper {
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     @Override public Context getBaseContext() { return this; }
     @Override public String getPackageName() { return spec.packageName; }
-    @Override public Context getApplicationContext() { return application == null ? this : application; }
+    @Override public Context getApplicationContext() {
+        return sharedState.application == null ? this : sharedState.application;
+    }
     @Override public ClassLoader getClassLoader() { return classLoader; }
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
@@ -109,7 +123,21 @@ public final class GuestContext extends ContextWrapper {
         return SQLiteDatabase.openOrCreateDatabase(getDatabasePath(name), factory, errorHandler);
     }
     @Override public boolean moveDatabaseFrom(Context sourceContext, String name) {
-        throw new UnsupportedOperationException("CROSS_CONTEXT_GUEST_DATABASE_MOVE_NOT_IMPLEMENTED");
+        GuestContext source = compatibleStorageSource(sourceContext);
+        File sourceParent = ensureDirectory(new File(source.dataRoot, "databases"));
+        File targetParent = ensureDirectory(new File(dataRoot, "databases"));
+        File sourceFile = source.storageNames.resolve(sourceParent,
+                "database", name, "", "", "-journal", "-wal", "-shm");
+        if (!sourceFile.isFile()) return false;
+        File targetFile = storageNames.resolve(targetParent,
+                "database", name, "", "", "-journal", "-wal", "-shm");
+        boolean moved = GuestStorageTransferCoordinator.move(instanceRoot, sourceFile, targetFile,
+                "-journal", "-wal", "-shm");
+        if (moved) {
+            source.storageNames.release(sourceParent, "database", name,
+                    "", "", "-journal", "-wal", "-shm");
+        }
+        return moved;
     }
     @Override public boolean deleteDatabase(String name) {
         File parent = ensureDirectory(new File(dataRoot, "databases"));
@@ -143,7 +171,34 @@ public final class GuestContext extends ContextWrapper {
         return deleted;
     }
     @Override public boolean moveSharedPreferencesFrom(Context sourceContext, String name) {
-        throw new UnsupportedOperationException("CROSS_CONTEXT_GUEST_PREFERENCES_MOVE_NOT_IMPLEMENTED");
+        GuestContext source = compatibleStorageSource(sourceContext);
+        File sourceParent = ensureDirectory(new File(source.dataRoot, "shared_prefs"));
+        File targetParent = ensureDirectory(new File(dataRoot, "shared_prefs"));
+        File sourceFile = source.storageNames.resolve(sourceParent,
+                "shared_preferences", name, "", ".cspf", ".tmp");
+        if (!sourceFile.isFile()) return false;
+        File targetFile = storageNames.resolve(targetParent,
+                "shared_preferences", name, "", ".cspf", ".tmp");
+        SandboxSharedPreferences sourceCached = source.cachedPreferences(name);
+        SandboxSharedPreferences targetCached = cachedPreferences(name);
+        boolean moved = withPreferenceLocks(sourceCached, targetCached, () -> {
+            boolean result = GuestStorageTransferCoordinator.move(
+                    instanceRoot, sourceFile, targetFile, ".tmp");
+            if (result) {
+                if (sourceCached != null) sourceCached.invalidateAfterMove();
+                if (targetCached != null && targetCached != sourceCached) {
+                    targetCached.invalidateAfterMove();
+                }
+            }
+            return result;
+        });
+        if (moved) {
+            source.removeCachedPreferences(name);
+            removeCachedPreferences(name);
+            source.storageNames.release(sourceParent, "shared_preferences", name,
+                    "", ".cspf", ".tmp");
+        }
+        return moved;
     }
     @Override public FileInputStream openFileInput(String name) throws FileNotFoundException {
         return new FileInputStream(getFileStreamPath(name));
@@ -204,13 +259,67 @@ public final class GuestContext extends ContextWrapper {
         return this;
     }
 
-    @Override public Context createCredentialProtectedStorageContext() { return this; }
-
-    @Override public Context createDeviceProtectedStorageContext() {
-        throw new UnsupportedOperationException("DEVICE_PROTECTED_GUEST_STORAGE_NOT_IMPLEMENTED");
+    @Override public Context createCredentialProtectedStorageContext() {
+        return deviceProtected ? storageContext(false) : this;
     }
 
-    @Override public boolean isDeviceProtectedStorage() { return false; }
+    @Override public Context createDeviceProtectedStorageContext() {
+        return deviceProtected ? this : storageContext(true);
+    }
+
+    @Override public boolean isDeviceProtectedStorage() { return deviceProtected; }
+
+    private GuestContext storageContext(boolean targetDeviceProtected) {
+        return new GuestContext(super.getBaseContext(), spec, classLoader, resources, assets,
+                targetDeviceProtected, sharedState);
+    }
+
+    private synchronized SandboxSharedPreferences cachedPreferences(String name) {
+        SharedPreferences value = preferences.get(name);
+        return value instanceof SandboxSharedPreferences ? (SandboxSharedPreferences) value : null;
+    }
+
+    private synchronized void removeCachedPreferences(String name) { preferences.remove(name); }
+
+    private static boolean withPreferenceLocks(SandboxSharedPreferences first,
+                                               SandboxSharedPreferences second,
+                                               BooleanOperation operation) {
+        if (first == null && second == null) return operation.run();
+        if (first == null) synchronized (second) { return operation.run(); }
+        if (second == null || first == second) synchronized (first) { return operation.run(); }
+        int firstHash = System.identityHashCode(first);
+        int secondHash = System.identityHashCode(second);
+        if (firstHash == secondHash) {
+            synchronized (PREFERENCE_LOCK_TIE) {
+                synchronized (first) {
+                    synchronized (second) { return operation.run(); }
+                }
+            }
+        }
+        SandboxSharedPreferences low = firstHash < secondHash ? first : second;
+        SandboxSharedPreferences high = low == first ? second : first;
+        synchronized (low) {
+            synchronized (high) { return operation.run(); }
+        }
+    }
+
+    private GuestContext compatibleStorageSource(Context sourceContext) {
+        if (!(sourceContext instanceof GuestContext)) {
+            throw new SecurityException(GuestStorageTransferCoordinator.IDENTITY_MISMATCH
+                    + ":source is not a GuestContext");
+        }
+        GuestContext source = (GuestContext) sourceContext;
+        try {
+            if (!spec.packageName.equals(source.spec.packageName)
+                    || spec.virtualUserId != source.spec.virtualUserId
+                    || !instanceRoot.getCanonicalFile().equals(source.instanceRoot.getCanonicalFile())) {
+                throw new SecurityException(GuestStorageTransferCoordinator.IDENTITY_MISMATCH);
+            }
+        } catch (java.io.IOException error) {
+            throw new SecurityException(GuestStorageTransferCoordinator.IDENTITY_MISMATCH, error);
+        }
+        return source;
+    }
 
     private File scopedExternalDirectory(String category, String type) {
         File categoryRoot = ensureDirectory(new File(externalRoot, category));
@@ -218,6 +327,14 @@ public final class GuestContext extends ContextWrapper {
                 ? categoryRoot
                 : ensureDirectory(storageNames.resolve(categoryRoot,
                         "external_" + category, type, "", ""));
+    }
+
+    private interface BooleanOperation { boolean run(); }
+
+    private static final class SharedState {
+        final GuestCapabilityGate capabilityGate;
+        volatile Application application;
+        SharedState(GuestCapabilityGate capabilityGate) { this.capabilityGate = capabilityGate; }
     }
 
     private static File ensureDirectory(File file) {

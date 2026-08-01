@@ -86,16 +86,25 @@ public final class GuestContextBoundarySelfTest {
             require(denied, "host package context denied");
             boolean databaseMoveDenied = false;
             try { context.moveDatabaseFrom(host, "guest.db"); }
-            catch (UnsupportedOperationException expected) { databaseMoveDenied = true; }
-            require(databaseMoveDenied, "cross-Context database move fails closed");
+            catch (SecurityException expected) {
+                databaseMoveDenied = String.valueOf(expected.getMessage())
+                        .contains(GuestStorageTransferCoordinator.IDENTITY_MISMATCH);
+            }
+            require(databaseMoveDenied, "host database move source fails closed");
             boolean preferencesMoveDenied = false;
             try { context.moveSharedPreferencesFrom(host, "guest"); }
-            catch (UnsupportedOperationException expected) { preferencesMoveDenied = true; }
-            require(preferencesMoveDenied, "cross-Context preferences move fails closed");
-            boolean deviceProtectedDenied = false;
-            try { context.createDeviceProtectedStorageContext(); }
-            catch (UnsupportedOperationException expected) { deviceProtectedDenied = true; }
-            require(deviceProtectedDenied, "unsupported device-protected context fails closed");
+            catch (SecurityException expected) {
+                preferencesMoveDenied = String.valueOf(expected.getMessage())
+                        .contains(GuestStorageTransferCoordinator.IDENTITY_MISMATCH);
+            }
+            require(preferencesMoveDenied, "host preferences move source fails closed");
+            Context deviceContext = context.createDeviceProtectedStorageContext();
+            require(deviceContext instanceof GuestContext
+                            && deviceContext.isDeviceProtectedStorage(),
+                    "device-protected Guest context is available");
+            require(!deviceContext.getDataDir().getCanonicalFile().equals(
+                            context.getDataDir().getCanonicalFile()),
+                    "device-protected data root is distinct");
 
             ApplicationInfo first = context.getApplicationInfo();
             first.packageName = "mutated";
