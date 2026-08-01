@@ -51,6 +51,7 @@ python3 scripts/check-m5-t19-1-h-guest-pool-reconnect.py
 python3 scripts/check-m5-t19-1-i-guest-storage-name-codec.py
 python3 scripts/check-m5-t19-1-j-review-remediation.py
 python3 scripts/check-m5-t19-1-k-guest-storage-context.py
+python3 scripts/check-m5-t19-1-l-system-service-capability-recovery.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

@@ -33,12 +33,15 @@ try:
     report = json.loads(read("build/verification/m5-t19-critical-test-ownership.json"))
     if report.get("generationMode") != "live source reachability and current execution receipt":
         errors.append("ownership report is not generated from the live source tree")
-    for field in ("ownerCount", "mappedOwnerCount", "directOwnerCount", "executedOwnerCount"):
-        if report.get(field) != 12:
-            errors.append(f"ownership report {field} must be 12")
+    owner_count = report.get("ownerCount", 0)
+    if owner_count < 12:
+        errors.append("ownership report must retain at least the original twelve critical owners")
+    for field in ("mappedOwnerCount", "directOwnerCount", "executedOwnerCount"):
+        if report.get(field) != owner_count:
+            errors.append(f"ownership report {field} must equal ownerCount")
     owners = report.get("owners", [])
-    if len(owners) != 12 or any(item.get("status") != "PASS" for item in owners):
-        errors.append("all twelve critical owners must have direct executable tests")
+    if len(owners) != owner_count or any(item.get("status") != "PASS" for item in owners):
+        errors.append("every critical owner must have a direct executable test")
     required = {
         "PackageManagementSession",
         "PackageRuntimePermissionSession",

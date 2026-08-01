@@ -101,7 +101,8 @@ for token in ["cancelAllNotifications", "cancelAllJobs"]:
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeSystemServiceCoordinator.java",
     "class RuntimeSystemServiceCoordinator", "guest.processName()",
-    "RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER", "removed.session().close()")
+    "RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER", "closeCapability(removed)",
+    "capability.session().close()")
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeVirtualSystemServicePackageClient.java",
     "openVirtualSystemServiceSession", "String processName", "generation")

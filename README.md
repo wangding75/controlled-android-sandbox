@@ -340,3 +340,9 @@ instance-scoped roots. `moveDatabaseFrom` moves the database plus journal/WAL/SH
 with JVM and OS file locks, refuse destination overwrite, move the main artifact last and roll back
 partial companion transfers. The source must be the same Guest package, virtual user and canonical
 instance root; Host or foreign Guest Contexts are rejected.
+
+### M5-T19.1-L system-service capability recovery
+
+A cached virtual system-service session that is already dead is evicted and reopened during the same
+Guest attach. Concurrent attach callers share the replacement, while a newly opened dead capability
+is rejected before publication.

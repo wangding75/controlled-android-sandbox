@@ -98,8 +98,9 @@ require("scripts/check-critical-test-ownership.py",
         "lineCoverageClaimed", "branchCoverageClaimed", "critical source test ownership")
 try:
     ownership = json.loads(text("build/verification/m5-t19-critical-test-ownership.json"))
-    if ownership.get("ownerCount") != 12 or ownership.get("mappedOwnerCount") != 12:
-        errors.append("M5-T19 must map all twelve critical source owners")
+    owner_count = ownership.get("ownerCount", 0)
+    if owner_count < 12 or ownership.get("mappedOwnerCount") != owner_count:
+        errors.append("M5-T19 must retain the original twelve owners and directly map every added critical owner")
     if ownership.get("lineCoverageClaimed") is not False or ownership.get("branchCoverageClaimed") is not False:
         errors.append("critical ownership gate must not claim line/branch coverage")
 except Exception as exc:
