@@ -268,3 +268,15 @@ The Guest import set now covers `send/sendmsg/recv/recvmsg/read/write/accept/acc
 ## M5-T19.1-C Binder binding-timeout recovery fix
 
 M5-T19.1-C fixes the shared Binder connector when `bindService` returns `true` but no callback arrives. Each active binding Attempt now has a monotonic deadline. Timeout records `BIND_TIMEOUT`, clears the authoritative Attempt, releases all waiters, safely unbinds the connection once and preserves bounded exponential retry. A subsequent `require()` can create a fresh binding. Late `onServiceConnected` callbacks are rejected by the Attempt epoch check and their adapted capabilities are closed; timeout and `close()` cannot double-unbind the same connection. Host regressions cover initial no-callback timeout, timeout after retry backoff, late callback, close concurrency and 10/20/40 ms bounded retry. Android Binder, Emulator and device evidence remain 0.
+
+## M5-T19.1-D Binder death-registration atomicity fix
+
+M5-T19.1-D replaces four independent `linkToDeath` sequences with one two-phase
+`DeathRegistrationHelper`. Broker observer callbacks, active virtual Job executions,
+Package virtual-system-service sessions and ordered-Receiver completions now reserve their
+authoritative registry entry before linking, then recheck that the same entry remains current and
+that the Binder is alive before publishing success. A death delivered synchronously from
+`linkToDeath` therefore removes the reservation instead of being followed by a stale insert.
+Link failure, immediate death and explicit close share idempotent rollback/unlink ownership.
+Deterministic Host regressions invoke the death recipient inside `linkToDeath`; no sleep-based
+ordering is used. Real Binder-driver and device timing evidence remains 0.

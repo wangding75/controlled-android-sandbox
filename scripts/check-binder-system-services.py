@@ -50,8 +50,12 @@ store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
     '"sandbox-system-services.json"', "class VirtualSystemServiceStore",
     "ownerProcessName", "ownerGeneration", "deleteScopeBestEffort",
-    "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_PENDING_INTENTS_PER_SCOPE", "MAX_ALARMS_PER_SCOPE",
-    "MAX_NAMESPACE_MAPPINGS", "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_JOBS_PER_SCOPE", "ensureNamespace", "notifyClipboard", "RETRY_WITHOUT_CLIENT_MS")
+    "VirtualSystemServiceLimits", "ensureNamespace", "notifyClipboard")
+require(
+    "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
+    "MAX_PAYLOAD_BYTES", "MAX_ACCOUNTS_PER_SCOPE", "MAX_PENDING_INTENTS_PER_SCOPE",
+    "MAX_ALARMS_PER_SCOPE", "MAX_NAMESPACE_MAPPINGS", "MAX_NOTIFICATIONS_PER_SCOPE",
+    "MAX_JOBS_PER_SCOPE", "RETRY_WITHOUT_CLIENT_MS")
 if "client.processName().equals(alarm.ownerProcessName)" not in store:
     errors.append("alarm delivery must be bound to the owning virtual process")
 if "client.generation() == alarm.ownerGeneration" not in store:
@@ -65,7 +69,9 @@ virtual_session = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
     "VirtualSystemServiceStore.Client", "requireCapability()", "processName", "generation")
 for token in ("callerVerifier.requireRuntimeBrokerCaller()", "VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED",
-              "clientToken.linkToDeath(session, 0)", "systemServices.register(session)"):
+              "systemServices.reserveClientRegistration(session)",
+              "session.linkClientDeathAfterReservation()",
+              "systemServices.commitClientRegistration(session)"):
     if token not in service:
         errors.append(f"PackageManagementService missing scoped capability evidence: {token}")
 dependencies = require(

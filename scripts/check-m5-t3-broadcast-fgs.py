@@ -43,7 +43,10 @@ require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/comp
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java",
         "BROADCAST_CHAIN_TIMEOUT_MS", "BROADCAST_TIMED_OUT_COUNT", "BROADCAST_TERMINAL_REASON")
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridge.java",
-        "linkToDeath", "unlinkToDeath", "validateResultPayload", "completionBinderDied")
+        "DeathRegistrationHelper", "linkAfterReservation", "completionDeath.close",
+        "validateResultPayload", "completionBinderDied")
+require("sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/internal/DeathRegistrationHelper.java",
+        "binder.linkToDeath", "binder.unlinkToDeath")
 
 for rel, tokens in {
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/service/BrokerServiceRuntimeSelfTest.java":

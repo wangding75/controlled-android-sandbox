@@ -195,3 +195,22 @@ The Guest runtime reconstructs version-adapted `JobParameters`, invokes the decl
 `RuntimeServiceCoordinator` owns Broker-side started, bound, foreground and recovery state. `RuntimeBrokerService` supplies only the generic component route and Guest Binder invocation. Bound clients may attach a Binder token; the coordinator links it to death, performs best-effort Guest unbind and removes authoritative connection ownership.
 
 Guest process death clears connection and foreground state. `START_NOT_STICKY` records are destroyed, while sticky and redeliver records enter `RECOVERING`. The new Guest generation must successfully recreate every recoverable Service before ownership moves to that generation. Redelivery carries only the bounded latest action, not an unrestricted host Intent object.
+
+## Binder death-registration linearization
+
+Binder-owned registries use a two-phase registration boundary:
+
+```text
+reserve authoritative record
+  → linkToDeath
+  → recheck same record + Binder liveness
+  → publish success
+```
+
+`DeathRegistrationHelper` owns the link state and single unlink transition. The registry owner
+must insert its reservation before linking and must remove it on any failed recheck. This ordering
+is used by Provider observers, active virtual Job executions, virtual-system-service sessions and
+ordered-Receiver completion leases. If a test Binder invokes its death recipient synchronously
+inside `linkToDeath`, the callback can already find and remove the reserved record; the caller then
+observes a failed recheck and cannot publish a dead capability. This source-level linearization does
+not substitute for Android Binder-driver, process-death or OEM device evidence.

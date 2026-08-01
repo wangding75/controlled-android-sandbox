@@ -64,7 +64,9 @@ codec = require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemSer
 if '.put("password",' in codec or '.put("tokens",' in codec:
     errors.append("schema 6 codec persists plaintext account secrets")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-        "SCHEMA = 6", "VirtualSecretCipher", "VirtualAccountAuthority")
+        "VirtualSecretCipher", "VirtualAccountAuthority", "VirtualSystemServiceLimits")
+require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
+        "SCHEMA = 6", "MAX_PAYLOAD_BYTES", "MAX_JOBS_PER_SCOPE")
 require("app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
         "schema 6 must not persist plaintext secret fields",
         "legacy account secrets must be rewritten to encrypted schema immediately",

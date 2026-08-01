@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
+import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import com.warden.controlledsandbox.domain.component.receiver.OrderedBroadcastState;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.lang.reflect.Constructor;
@@ -16,9 +17,8 @@ final class OrderedReceiverPendingResultBridge {
     private final BroadcastReceiver receiver;
     private final OrderedReceiverFinishInterceptor interceptor;
     private final IOrderedReceiverCompletion completion;
-    private final IBinder completionBinder;
     private final IBinder finishToken = new OrderedReceiverFinishToken();
-    private final IBinder.DeathRecipient completionDeath = this::completionBinderDied;
+    private final DeathRegistrationHelper completionDeath;
     private final String receiverToken;
     private final String packageName;
     private final int virtualUserId;
@@ -27,7 +27,6 @@ final class OrderedReceiverPendingResultBridge {
     private final String receiverClass;
     private final long deadlineMs;
     private final AtomicBoolean terminal = new AtomicBoolean();
-    private volatile boolean completionDeathLinked;
     private Object pendingResult;
 
     static OrderedReceiverPendingResultBridge install(
@@ -43,10 +42,12 @@ final class OrderedReceiverPendingResultBridge {
         }
         OrderedReceiverPendingResultBridge bridge = new OrderedReceiverPendingResultBridge(
                 receiver, request, interceptor, completion, callbackBinder);
-        bridge.linkCompletionDeath();
         try {
             bridge.installPendingResult(request);
             interceptor.register(bridge.finishToken, bridge, bridge.deadlineMs);
+            if (!bridge.linkCompletionDeathAfterReservation()) {
+                throw new IllegalStateException("ORDERED_RECEIVER_COMPLETION_DEAD_DURING_LINK");
+            }
             return bridge;
         } catch (Throwable error) {
             bridge.cancelLocal();
@@ -62,7 +63,8 @@ final class OrderedReceiverPendingResultBridge {
         this.receiver = receiver;
         this.interceptor = interceptor;
         this.completion = completion;
-        this.completionBinder = completionBinder;
+        this.completionDeath = new DeathRegistrationHelper(
+                completionBinder, this::completionBinderDied);
         this.receiverToken = required(request, RuntimeKeys.ORDERED_RECEIVER_TOKEN);
         this.packageName = required(request, RuntimeKeys.PACKAGE_NAME);
         this.virtualUserId = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
@@ -131,20 +133,20 @@ final class OrderedReceiverPendingResultBridge {
         return acknowledgement;
     }
 
-    private void linkCompletionDeath() throws RemoteException {
-        completionBinder.linkToDeath(completionDeath, 0);
-        completionDeathLinked = true;
+    private boolean linkCompletionDeathAfterReservation() throws RemoteException {
+        boolean linked = completionDeath.linkAfterReservation();
+        if (!linked || !completionDeath.linkedAndAlive()) {
+            interceptor.unregister(finishToken, this);
+            return false;
+        }
+        return true;
     }
 
     private void unlinkCompletionDeath() {
-        if (!completionDeathLinked) return;
-        completionDeathLinked = false;
-        try { completionBinder.unlinkToDeath(completionDeath, 0); }
-        catch (RuntimeException ignored) { }
+        completionDeath.close();
     }
 
     private void completionBinderDied() {
-        completionDeathLinked = false;
         if (terminal.compareAndSet(false, true)) interceptor.unregister(finishToken, this);
     }
 

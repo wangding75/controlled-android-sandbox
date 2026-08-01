@@ -279,7 +279,8 @@
           "category": "death-cleanup",
           "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntime.java",
           "tokens": [
-            "linkToDeath",
+            "DeathRegistrationHelper",
+            "linkAfterReservation",
             "removeDead"
           ]
         },

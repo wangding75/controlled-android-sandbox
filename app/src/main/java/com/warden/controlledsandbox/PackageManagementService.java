@@ -111,11 +111,17 @@ public final class PackageManagementService extends Service {
                     dependencies, Binder.getCallingUid(), clientToken,
                     new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId), virtualUid,
                     PackageServiceDependencies.required(processName, "processName"), generation, PackageServiceDependencies.required(packageRevision, "packageRevision"));
-            try { clientToken.linkToDeath(session, 0); }
-            catch (Exception error) {
+            dependencies.systemServices.reserveClientRegistration(session);
+            try {
+                if (!session.linkClientDeathAfterReservation()) {
+                    throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_DEAD_DURING_LINK");
+                }
+                dependencies.systemServices.commitClientRegistration(session);
+            } catch (Exception error) {
+                session.binderDied();
+                if (error instanceof SecurityException securityException) throw securityException;
                 throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_DEAD", error);
             }
-            dependencies.systemServices.register(session);
             return session;
         }
 

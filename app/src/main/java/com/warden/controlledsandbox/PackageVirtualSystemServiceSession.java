@@ -34,6 +34,7 @@ import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
+import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import java.io.File;
 
 import static com.warden.controlledsandbox.PackageServiceDependencies.required;
@@ -52,12 +53,12 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     private final VirtualPrivilegedServicesStore privilegedServices;
 
     private final int ownerUid;
-    private final IBinder clientToken;
     private final VirtualSystemServiceStore.Scope scope;
     private final int virtualUid;
     private final String processName;
     private final long generation;
     private final String packageRevision;
+    private final DeathRegistrationHelper deathRegistration;
     private volatile boolean active = true;
     private volatile IVirtualSystemServiceObserver observer;
 
@@ -77,9 +78,19 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         peripheralServices = dependencies.peripheralServices;
         privilegedServices = dependencies.privilegedServices;
         if (generation < 1L || virtualUid < 0) throw new IllegalArgumentException("virtual identity is invalid");
-        this.ownerUid = ownerUid; this.clientToken = clientToken;
+        this.ownerUid = ownerUid;
         this.scope = scope; this.virtualUid = virtualUid; this.processName = required(processName, "processName");
         this.generation = generation; this.packageRevision = required(packageRevision, "packageRevision");
+        deathRegistration = new DeathRegistrationHelper(clientToken, this::binderDied);
+    }
+
+    boolean linkClientDeathAfterReservation() throws android.os.RemoteException {
+        boolean linked = deathRegistration.linkAfterReservation();
+        if (!linked || !active || !deathRegistration.linkedAndAlive()) {
+            closeInternal();
+            return false;
+        }
+        return true;
     }
     @Override public byte[] getClipboard() { requireCapability(); return systemServices.clipboard(scope); }
     @Override public void setClipboard(byte[] payload) { requireCapability(); systemServices.setClipboard(scope, payload); }
@@ -293,9 +304,11 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
         }
     }
-    private void closeInternal() {
-        if (!active) return; active = false; observer = null;
+    private synchronized void closeInternal() {
+        if (!active) return;
+        active = false;
+        observer = null;
         systemServices.unregister(this);
-        try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
+        deathRegistration.close();
     }
 }

@@ -26,7 +26,10 @@ require("sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/Vi
  "implements Parcelable", "forGuest", "withStopReason", "dispatchToken")
 store=require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
  "VirtualJobSnapshot.DISPATCHING", "startJob(", "stopJob(", "JOB_EXECUTION_TIMEOUT_MS",
- "activeJobExecutions", "linkToDeath", "onJobStart", "onJobStop", "finishHostJob")
+ "activeJobExecutions", "DeathRegistrationHelper", "linkAfterReservation",
+ "onJobStart", "onJobStop", "finishHostJob")
+require("sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/internal/DeathRegistrationHelper.java",
+ "binder.linkToDeath", "binder.unlinkToDeath")
 for forbidden in ["dispatchJob(", "onJobReady", "synchronized void finishJob("]:
  if forbidden in store: errors.append(f"obsolete M4-T12 Job path remains: {forbidden}")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualJobService.java",
@@ -44,10 +47,14 @@ require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/syst
  "onJobStart", "onJobStop", "IVirtualJobExecution", "JobExecutionListener")
 require("app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServiceStoreSelfTest.java",
  "Guest jobFinished must complete the trusted host callback", "unacknowledged job must remain SCHEDULED")
+require("app/src/testHarness/java/com/warden/controlledsandbox/VirtualJobDeathRegistrationSelfTest.java",
+ "job callback that died inside linkToDeath was published",
+ "immediately dead job callback leaked active execution registry entry")
 require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestJobServiceBridgeSelfTest.java",
  "Guest JobParameters must expose Guest job ID", "jobFinished must be one-shot")
 runner=text("tools/static_android_compile.py")
-for t in ["VirtualSystemServiceStoreSelfTest","GuestJobServiceBridgeSelfTest"]:
+for t in ["VirtualSystemServiceStoreSelfTest","VirtualJobDeathRegistrationSelfTest",
+          "GuestJobServiceBridgeSelfTest"]:
  if runner.count(t)<1: errors.append(f"static compiler does not execute {t}")
 matrix=ROOT/"verification/m3-source-capability-matrix.json"
 if matrix.is_file():

@@ -10,6 +10,7 @@ public final class BrokerObserverRuntimeSelfTest {
         testRegistrationDeliveryAndIsolation();
         testOwnershipAndLifecycle();
         testCallbackFailureAndTargetDeath();
+        testImmediateDeathDuringRegistration();
         testConcurrentIdempotentRegistration();
         System.out.println("PASS BrokerObserverRuntimeSelfTest");
     }
@@ -96,6 +97,22 @@ public final class BrokerObserverRuntimeSelfTest {
                 "target Provider session cleanup failed");
     }
 
+
+    private static void testImmediateDeathDuringRegistration() {
+        BrokerObserverRuntime runtime = new BrokerObserverRuntime();
+        ImmediateDeathObserver callback = new ImmediateDeathObserver();
+        boolean rejected = false;
+        try {
+            runtime.register(request("observer-immediate-death", callback, true, false),
+                    "u0:caller", "caller-session", 1, "u0:provider",
+                    "provider-session", 4, 0, "pkg.data", "content://pkg.data/items");
+        } catch (IllegalStateException expected) {
+            rejected = expected.getMessage().contains("DEAD_DURING_LINK");
+        }
+        check(rejected, "observer that died inside linkToDeath was published");
+        check(runtime.size() == 0, "immediately dead observer leaked into authority registry");
+    }
+
     private static void testConcurrentIdempotentRegistration() {
         BrokerObserverRuntime runtime = new BrokerObserverRuntime();
         RecordingObserver callback = new RecordingObserver();
@@ -140,6 +157,21 @@ public final class BrokerObserverRuntimeSelfTest {
 
     private static void check(boolean condition, String message) {
         if (!condition) throw new AssertionError(message);
+    }
+
+    private static final class ImmediateDeathObserver extends RecordingObserver {
+        private boolean alive = true;
+
+        @Override public boolean isBinderAlive() { return alive; }
+
+        @Override public void linkToDeath(android.os.IBinder.DeathRecipient recipient, int flags) {
+            alive = false;
+            recipient.binderDied();
+        }
+
+        @Override public boolean unlinkToDeath(android.os.IBinder.DeathRecipient recipient, int flags) {
+            return true;
+        }
     }
 
     private static final class FailingObserver extends RecordingObserver {

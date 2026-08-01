@@ -30,11 +30,12 @@ require("sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/Vi
         "parcelable VirtualPendingIntentSnapshot")
 
 store = require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-                "static final int SCHEMA =", "MAX_PENDING_INTENTS_PER_SCOPE",
                 "VIRTUAL_PENDING_INTENT_CREATOR_UID_MISMATCH", "nextPendingIntentToken",
                 "packageRevision", "filterIdentity", "persistOrRestore")
+limits = require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
+                 "static final int SCHEMA =", "MAX_PENDING_INTENTS_PER_SCOPE")
 try:
-    store_schema = int(store.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
+    store_schema = int(limits.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
     if store_schema < 5:
         errors.append(f"VirtualSystemServiceStore schema regressed below 5: {store_schema}")
 except Exception:

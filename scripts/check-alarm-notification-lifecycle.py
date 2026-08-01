@@ -42,13 +42,16 @@ if "Bundle" in session or "Bundle" in observer:
 
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+    "requirePendingIntent(scope, revision, pendingIntentTokenId)",
+    "alarm.deliveryCount++", "pruneNotificationRevisionLocked",
+    "validateNotificationReferences", "persistOrRestore", "optionalIdentity")
+limits = require(
+    "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
     "static final int SCHEMA =", "MAX_ALARMS_PER_SCOPE",
     "MAX_NOTIFICATIONS_PER_SCOPE", "MAX_NOTIFICATION_CHANNELS_PER_SCOPE",
-    "requirePendingIntent(scope, revision, pendingIntentTokenId)",
-    "RETRY_WITHOUT_CLIENT_MS", "alarm.deliveryCount++", "pruneNotificationRevisionLocked",
-    "validateNotificationReferences", "persistOrRestore", "optionalIdentity")
+    "RETRY_WITHOUT_CLIENT_MS")
 try:
-    store_schema = int(store.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
+    store_schema = int(limits.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
     if store_schema < 5:
         errors.append(f"VirtualSystemServiceStore schema regressed below 5: {store_schema}")
 except Exception:

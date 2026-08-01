@@ -32,7 +32,7 @@ final class VirtualAccountAuthority {
             String type, String password) {
         VirtualSystemServiceRecords.AccountKey key = VirtualSystemServiceStore.accountKey(name, type);
         if (state.accounts.containsKey(key)) return false;
-        if (state.accounts.size() >= VirtualSystemServiceStore.MAX_ACCOUNTS_PER_SCOPE) {
+        if (state.accounts.size() >= VirtualSystemServiceLimits.MAX_ACCOUNTS_PER_SCOPE) {
             throw new IllegalStateException("VIRTUAL_ACCOUNT_LIMIT_EXCEEDED");
         }
         state.accounts.put(key, new VirtualSystemServiceRecords.AccountRecord(password));
@@ -59,7 +59,7 @@ final class VirtualAccountAuthority {
         VirtualSystemServiceRecords.AccountRecord record = require(state, name, type);
         String normalizedType = VirtualSystemServiceStore.normalizeRequired(tokenType, "tokenType");
         if (!record.tokens.containsKey(normalizedType)
-                && record.tokens.size() >= VirtualSystemServiceStore.MAX_TOKENS_PER_ACCOUNT) {
+                && record.tokens.size() >= VirtualSystemServiceLimits.MAX_TOKENS_PER_ACCOUNT) {
             throw new IllegalStateException("VIRTUAL_ACCOUNT_TOKEN_LIMIT_EXCEEDED");
         }
         record.tokens.put(normalizedType, VirtualSystemServiceStore.safe(token));

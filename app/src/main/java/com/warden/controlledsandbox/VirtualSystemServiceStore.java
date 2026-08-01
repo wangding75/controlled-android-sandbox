@@ -1,8 +1,10 @@
 package com.warden.controlledsandbox;
 
 import static com.warden.controlledsandbox.VirtualSystemServiceRecords.*;
+import static com.warden.controlledsandbox.VirtualSystemServiceLimits.*;
 
 import com.warden.controlledsandbox.contract.IHostJobCallback;
+import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
@@ -48,28 +50,13 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         }
         String key() { return packageName + "#u" + virtualUserId; }
     }
-    static final int SCHEMA = 6;
-    static final int MAX_PAYLOAD_BYTES = 512 * 1024;
-    static final int MAX_ACCOUNTS_PER_SCOPE = 64;
-    static final int MAX_TOKENS_PER_ACCOUNT = 32;
-    static final int MAX_PENDING_INTENTS_PER_SCOPE = 512;
-    static final int MAX_ALARMS_PER_SCOPE = 256;
-    static final int MAX_NAMESPACE_MAPPINGS = 4096;
-    static final int MAX_NOTIFICATIONS_PER_SCOPE = 1024;
-    static final int MAX_NOTIFICATION_CHANNELS_PER_SCOPE = 512;
-    static final int MAX_JOBS_PER_SCOPE = 512;
-    static final int MAX_KEY_CHARS = 512;
-    static final int MAX_SECRET_CHARS = 16 * 1024;
-    static final int MAX_SCOPES = 256;
-    static final int MAX_NAMESPACES_PER_SCOPE = 32;
-    private static final long RETRY_WITHOUT_CLIENT_MS = 30_000L;
-    private static final long JOB_EXECUTION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
     private final VirtualSystemServiceStorePersistence persistence;
     private final VirtualSecretCipher secretCipher;
     private final VirtualAccountAuthority accountAuthority = new VirtualAccountAuthority();
     private volatile String maintenanceWarning = "";
     private final Map<Scope, ScopeState> states = new LinkedHashMap<>();
-    private final Set<Client> clients = new LinkedHashSet<>();
+    private final VirtualSystemServiceClientRegistry clientRegistry =
+            new VirtualSystemServiceClientRegistry();
     private final Map<Integer, JobExecution> activeJobExecutions = new LinkedHashMap<>();
     private final AtomicLong nextJobDispatchToken = new AtomicLong(1L);
     private long nextPendingIntentToken = 1L;
@@ -92,31 +79,43 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             }
         }
     }
-
     void register(Client client) {
-        List<JobExecution> stale = new ArrayList<>();
+        List<Client> replaced;
         synchronized (this) {
-            clients.removeIf(existing -> {
-                boolean replace = existing != client && existing.scope().equals(client.scope())
-                        && existing.processName().equals(client.processName())
-                        && existing.generation() == client.generation();
-                if (replace) collectExecutions(existing, stale);
-                return replace;
-            });
-            clients.add(client);
-            for (AlarmRecord alarm : state(client.scope()).alarms.values()) {
-                if (alarm.future == null || alarm.future.isCancelled() || alarm.future.isDone()) {
-                    scheduleFuture(client.scope(), alarm);
-                }
-            }
+            replaced = clientRegistry.register(client);
+            scheduleClientAlarms(client);
         }
-        for (JobExecution execution : stale) rescheduleExecution(execution);
+        rescheduleExecutions(replaced);
+    }
+    void reserveClientRegistration(Client client) {
+        synchronized (this) { clientRegistry.reserve(client); }
+    }
+    void commitClientRegistration(Client client) {
+        List<Client> replaced;
+        synchronized (this) {
+            replaced = clientRegistry.commit(client);
+            scheduleClientAlarms(client);
+        }
+        rescheduleExecutions(replaced);
     }
     void unregister(Client client) {
         List<JobExecution> stale = new ArrayList<>();
         synchronized (this) {
-            clients.remove(client); collectExecutions(client, stale);
+            clientRegistry.remove(client);
+            collectExecutions(client, stale);
         }
+        for (JobExecution execution : stale) rescheduleExecution(execution);
+    }
+    private void scheduleClientAlarms(Client client) {
+        for (AlarmRecord alarm : state(client.scope()).alarms.values()) {
+            if (alarm.future == null || alarm.future.isCancelled() || alarm.future.isDone()) {
+                scheduleFuture(client.scope(), alarm);
+            }
+        }
+    }
+    private void rescheduleExecutions(List<Client> replaced) {
+        List<JobExecution> stale = new ArrayList<>();
+        for (Client client : replaced) collectExecutions(client, stale);
         for (JobExecution execution : stale) rescheduleExecution(execution);
     }
     private void rescheduleExecution(JobExecution execution) {
@@ -621,13 +620,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             long token = positiveToken();
             execution = new JobExecution(located.scope, located.job, client, ownerUid,
                     parameters.forGuest(located.job.guestId, token), hostCallback, token);
-            try { hostCallback.asBinder().linkToDeath(execution, 0); }
-            catch (RemoteException error) {
-                MutationSnapshot compensation = snapshotMutation(located.scope);
-                located.job.state = VirtualJobSnapshot.SCHEDULED;
-                located.job.updatedAtMs = System.currentTimeMillis();
+            activeJobExecutions.put(located.job.hostId, execution);
+            try {
+                boolean linked = execution.deathRegistration.linkAfterReservation();
+                if (!linked || activeJobExecutions.get(located.job.hostId) != execution
+                        || !execution.deathRegistration.linkedAndAlive()) {
+                    execution.rollbackDeathLinkLocked();
+                    return false;
+                }
+            } catch (RemoteException error) {
                 try {
-                    persistOrRestore(located.scope, compensation);
+                    execution.rollbackDeathLinkLocked();
                 } catch (RuntimeException persistenceFailure) {
                     persistenceFailure.addSuppressed(error);
                     maintenanceWarning = "VIRTUAL_JOB_LINK_DEATH_ROLLBACK_FAILED:"
@@ -635,8 +638,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
                     throw persistenceFailure;
                 }
                 return false;
+            } catch (RuntimeException | Error error) {
+                execution.rollbackDeathLinkLocked();
+                throw error;
             }
-            activeJobExecutions.put(located.job.hostId, execution);
         }
         boolean accepted;
         try {
@@ -701,7 +706,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     private synchronized Client matchingClient(Scope scope, JobRecord job) {
         Client match = null;
-        for (Client client : new ArrayList<>(clients)) {
+        for (Client client : clientRegistry.snapshot()) {
             if (!client.active() || client.observer() == null || !client.scope().equals(scope)
                     || !client.processName().equals(job.ownerProcessName)
                     || client.generation() != job.ownerGeneration) continue;
@@ -722,12 +727,14 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private final class JobExecution extends IVirtualJobExecution.Stub implements IBinder.DeathRecipient {
         final Scope scope; final JobRecord job; final Client client; final int ownerUid;
         final VirtualJobParametersSnapshot parameters; final IHostJobCallback hostCallback;
-        final long token; volatile boolean active = true; volatile ScheduledFuture<?> timeout;
+        final long token; final DeathRegistrationHelper deathRegistration;
+        volatile boolean active = true; volatile ScheduledFuture<?> timeout;
         JobExecution(Scope scope, JobRecord job, Client client, int ownerUid,
                      VirtualJobParametersSnapshot parameters, IHostJobCallback hostCallback,
                      long token) {
             this.scope = scope; this.job = job; this.client = client; this.ownerUid = ownerUid;
             this.parameters = parameters; this.hostCallback = hostCallback; this.token = token;
+            deathRegistration = new DeathRegistrationHelper(hostCallback.asBinder(), this::binderDied);
         }
         @Override public int guestJobId() { return job.guestId; }
         @Override public long generation() { return job.ownerGeneration; }
@@ -746,6 +753,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         void rejectStart() { complete(true, false); }
         void timeout() { complete(true, true); }
         void cancelWithoutHost(boolean reschedule) { complete(reschedule, false); }
+        void rollbackDeathLinkLocked() {
+            if (!active || activeJobExecutions.get(job.hostId) != this) return;
+            MutationSnapshot compensation = snapshotMutation(scope);
+            job.state = VirtualJobSnapshot.SCHEDULED;
+            job.updatedAtMs = System.currentTimeMillis();
+            try {
+                persistOrRestore(scope, compensation);
+            } finally {
+                invalidateLocked();
+            }
+        }
         void complete(boolean needsReschedule, boolean notifyHost) {
             boolean callHost = false;
             synchronized (VirtualSystemServiceStore.this) {
@@ -779,7 +797,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             if (!active) return; active = false;
             activeJobExecutions.remove(job.hostId, this);
             ScheduledFuture<?> value = timeout; if (value != null) value.cancel(false);
-            try { hostCallback.asBinder().unlinkToDeath(this, 0); } catch (RuntimeException ignored) { }
+            deathRegistration.close();
         }
     }
 
@@ -856,7 +874,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         synchronized (this) {
             alarm = state(scope).alarms.get(alarmId);
             if (alarm == null) return;
-            for (Client client : new ArrayList<>(clients)) {
+            for (Client client : clientRegistry.snapshot()) {
                 if (client.active() && client.scope().equals(scope)
                         && client.processName().equals(alarm.ownerProcessName)
                         && client.generation() == alarm.ownerGeneration
@@ -908,7 +926,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -925,7 +943,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -942,7 +960,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -959,7 +977,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -976,7 +994,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -993,7 +1011,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -1010,7 +1028,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -1028,7 +1046,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -1046,7 +1064,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -1066,7 +1084,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         scheduler.execute(() -> {
             List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
             synchronized (VirtualSystemServiceStore.this) {
-                for (Client client : new ArrayList<>(clients)) {
+                for (Client client : clientRegistry.snapshot()) {
                     if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                         observers.add(client.observer());
                     }
@@ -1082,7 +1100,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private void notifyClipboard(Scope scope) {
         List<IVirtualSystemServiceObserver> observers = new ArrayList<>();
         synchronized (this) {
-            for (Client client : new ArrayList<>(clients)) {
+            for (Client client : clientRegistry.snapshot()) {
                 if (client.active() && client.scope().equals(scope) && client.observer() != null) {
                     observers.add(client.observer());
                 }
@@ -1442,7 +1460,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     @Override public synchronized void close() {
         for (ScopeState state : states.values()) for (AlarmRecord alarm : state.alarms.values()) if (alarm.future != null) alarm.future.cancel(false);
         for (JobExecution execution : new ArrayList<>(activeJobExecutions.values())) execution.invalidateLocked();
-        clients.clear(); scheduler.shutdownNow();
+        clientRegistry.clear(); scheduler.shutdownNow();
     }
     static byte[] boundedPayload(byte[] value, String name) {
         byte[] copy = value == null ? new byte[0] : value.clone();

@@ -2,6 +2,7 @@ package com.warden.controlledsandbox;
 
 import static com.warden.controlledsandbox.VirtualSystemServiceRecords.*;
 import static com.warden.controlledsandbox.VirtualSystemServiceStore.*;
+import static com.warden.controlledsandbox.VirtualSystemServiceLimits.*;
 
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;

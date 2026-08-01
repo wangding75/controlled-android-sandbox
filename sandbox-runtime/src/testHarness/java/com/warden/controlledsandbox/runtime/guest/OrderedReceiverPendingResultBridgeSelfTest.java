@@ -21,6 +21,7 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         asynchronousFinishInterception();
         localTimeoutConsumesLateFinish();
         completionBinderDeathCancelsAsyncBridge();
+        immediateCompletionDeathDuringLinkRollsBackReservation();
         invalidResultExtrasAreRejected();
         System.out.println("PASS ordered Receiver PendingResult bridge self-test");
     }
@@ -173,6 +174,30 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         }
     }
 
+
+    private static void immediateCompletionDeathDuringLinkRollsBackReservation() throws Exception {
+        FakeClock clock = new FakeClock(800);
+        ImmediateDeathCompletion completion = new ImmediateDeathCompletion();
+        OrderedReceiverFinishInterceptor interceptor = new OrderedReceiverFinishInterceptor(clock);
+        try {
+            BroadcastReceiver receiver = new BroadcastReceiver() {
+                @Override public void onReceive(Context context, Intent intent) { }
+            };
+            boolean rejected = false;
+            try {
+                OrderedReceiverPendingResultBridge.install(receiver,
+                        request(completion, "immediate-death-token", 1_800), interceptor);
+            } catch (IllegalStateException expected) {
+                rejected = expected.getMessage().contains("DEAD_DURING_LINK");
+            }
+            require(rejected, "completion that died inside linkToDeath was published");
+            require(interceptor.pendingCount() == 0,
+                    "immediately dead completion leaked ordered Receiver finish token");
+        } finally {
+            interceptor.close();
+        }
+    }
+
     private static void invalidResultExtrasAreRejected() throws Exception {
         FakeClock clock = new FakeClock(900);
         CapturingCompletion completion = new CapturingCompletion();
@@ -245,6 +270,21 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         }
     }
 
+
+    private static final class ImmediateDeathCompletion extends CapturingCompletion {
+        private boolean alive = true;
+
+        @Override public boolean isBinderAlive() { return alive; }
+
+        @Override public void linkToDeath(IBinder.DeathRecipient value, int flags) {
+            alive = false;
+            value.binderDied();
+        }
+
+        @Override public boolean unlinkToDeath(IBinder.DeathRecipient value, int flags) {
+            return true;
+        }
+    }
 
     private static final class DeathAwareCompletion extends CapturingCompletion {
         private IBinder.DeathRecipient recipient;

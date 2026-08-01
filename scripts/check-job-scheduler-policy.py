@@ -50,11 +50,14 @@ require(
     "jobs(scope, processName, generation, packageRevision)")
 store = require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-    "static final int SCHEMA =", "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
+    "pruneJobRevisionLocked", "retryDelay(JobRecord job)",
     "VirtualJobSnapshot.BACKOFF_LINEAR", "1L <<", "job.failureCount = Math.min",
     "job.periodic", "safeAdd(now, job.intervalMs)", "minimumLatencyMs", "overrideDeadlineMs")
+limits = require(
+    "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceLimits.java",
+    "static final int SCHEMA =", "MAX_JOBS_PER_SCOPE")
 try:
-    store_schema = int(store.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
+    store_schema = int(limits.split("static final int SCHEMA =", 1)[1].split(";", 1)[0].strip())
     if store_schema < 5:
         errors.append(f"VirtualSystemServiceStore schema regressed below 5: {store_schema}")
 except Exception:

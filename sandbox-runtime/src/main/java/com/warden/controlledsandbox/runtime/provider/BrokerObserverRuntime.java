@@ -5,6 +5,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IProviderObserver;
+import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import com.warden.controlledsandbox.domain.component.provider.ProviderObserverRegistry;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,13 +49,12 @@ public final class BrokerObserverRuntime {
     private static final class CallbackRecord {
         private final IProviderObserver callback;
         private final IBinder binder;
-        private final IBinder.DeathRecipient deathRecipient;
+        private final DeathRegistrationHelper deathRegistration;
 
-        private CallbackRecord(IProviderObserver callback, IBinder binder,
-                               IBinder.DeathRecipient deathRecipient) {
+        private CallbackRecord(IProviderObserver callback, IBinder binder, Runnable deathAction) {
             this.callback = callback;
             this.binder = binder;
-            this.deathRecipient = deathRecipient;
+            this.deathRegistration = new DeathRegistrationHelper(binder, deathAction);
         }
     }
 
@@ -89,14 +89,22 @@ public final class BrokerObserverRuntime {
             return new RegisterResult(registration.entry(), false);
         }
 
-        IBinder.DeathRecipient deathRecipient = () -> removeDead(id, binder);
+        CallbackRecord record = new CallbackRecord(callback, binder, () -> removeDead(id, binder));
+        callbacks.put(id, record);
         try {
-            binder.linkToDeath(deathRecipient, 0);
-        } catch (Throwable error) {
-            registry.unregister(id, callerInstance, callerSessionId, callerGeneration);
+            boolean linked = record.deathRegistration.linkAfterReservation();
+            if (!linked || callbacks.get(id) != record
+                    || !record.deathRegistration.linkedAndAlive()) {
+                removeDead(id, binder);
+                throw new IllegalStateException("PROVIDER_OBSERVER_CALLBACK_DEAD_DURING_LINK");
+            }
+        } catch (android.os.RemoteException error) {
+            removeDead(id, binder);
             throw new IllegalStateException("PROVIDER_OBSERVER_DEATH_LINK_FAILED", error);
+        } catch (RuntimeException | Error error) {
+            removeDead(id, binder);
+            throw error;
         }
-        callbacks.put(id, new CallbackRecord(callback, binder, deathRecipient));
         return new RegisterResult(registration.entry(), true);
     }
 
@@ -169,8 +177,7 @@ public final class BrokerObserverRuntime {
     private void unlink(String id) {
         CallbackRecord record = callbacks.remove(id);
         if (record == null) return;
-        try { record.binder.unlinkToDeath(record.deathRecipient, 0); }
-        catch (Throwable ignored) { }
+        record.deathRegistration.close();
     }
 
     private List<String> idsForSession(String sessionId, long generation) {
