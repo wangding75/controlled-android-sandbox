@@ -245,3 +245,18 @@ Legacy collection methods are compatibility adapters with a 32-item/128-KiB ceil
 return the complete collection or throw `PAGING_REQUIRED`; offloaded binary values are never silently
 lost. Account collection pages use `VirtualAccountSummary(name,type)`. Passwords and tokens do not
 cross Binder during enumeration and remain behind `getPassword` and `peekAuthToken`.
+
+## Guest process connection replacement
+
+`RuntimeGuestConnectionPool` treats each slot entry as either an in-flight binding or a live Guest
+capability. A caller that finds a completed but dead cached Binder removes that exact entry under the
+pool lock and installs one replacement `GuestConnection`; other callers observe the replacement as
+binding and wait on the same latch. Retirement has single unbind and disconnect-notification ownership.
+Late callbacks from an old connection are rejected by slot-entry identity, so they cannot publish or
+remove the replacement.
+
+The pool retries only when death is detected before the `GuestCall` is invoked. Once an operation has
+been dispatched, a Binder failure is reported and the call is not replayed because the remote side may
+already have committed effects. `DEAD_BINDER`, `DISCONNECTED`, `BIND_REJECTED` and `BIND_TIMEOUT` are
+separate recovery diagnostics. These are source/Host-stub state-machine guarantees, not Android Binder
+or device validation.

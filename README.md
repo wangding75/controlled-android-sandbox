@@ -300,3 +300,14 @@ and authentication tokens remain available solely through their dedicated checke
 regressions cover item/byte boundaries, token tampering and stale revisions, large binary recovery,
 legacy rejection and credential-free account enumeration. Generated AIDL, Android Binder-driver,
 Emulator and physical-device evidence remain 0.
+
+## M5-T19.1-H Guest Binder reconnect correctness fix
+
+M5-T19.1-H makes `RuntimeGuestConnectionPool` recover a cached dead Guest Binder inside the same
+request before the operation is dispatched. The stale connection is removed atomically, unlinked and
+unbound once, while concurrent callers share the single replacement binding already published in the
+slot map. A delayed death callback from the retired Binder is identity-checked and cannot remove the
+replacement. Pre-dispatch death may retry once because the Guest operation has not run; a Binder that
+dies after operation dispatch is never replayed, avoiding duplicate side effects. Failure reasons remain
+explicit (`DEAD_BINDER`, `BINDER_DIED`, `DISCONNECTED`, `BIND_REJECTED`, `BIND_TIMEOUT`). Android Binder-driver and
+device evidence remain 0.

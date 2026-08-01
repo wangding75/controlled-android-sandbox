@@ -1,0 +1,19 @@
+{
+  "androidBinderEvidenceCount": 0,
+  "concurrentCallers": 10,
+  "deviceEvidenceCount": 0,
+  "errors": [],
+  "failureReasons": [
+    "DEAD_BINDER",
+    "BINDER_DIED",
+    "DISCONNECTED",
+    "BIND_REJECTED",
+    "BIND_TIMEOUT"
+  ],
+  "finding": "P2-02 current request did not reconnect after cached Guest Binder death",
+  "inputDigestSha256": "b9b4fc0e4f3131917cc74184f4e2f0481fc1d324da95e3fc74200a3c622f36d7",
+  "reconnectContract": "same-request-before-dispatch",
+  "remoteCallReplay": false,
+  "sourceStatus": "PASS",
+  "task": "M5-T19.1-H"
+}
