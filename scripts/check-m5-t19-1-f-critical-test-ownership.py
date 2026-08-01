@@ -20,8 +20,8 @@ def read(rel: str) -> str:
 script = read("scripts/check-critical-test-ownership.py")
 for token in (
     "strip_comments_and_literals",
-    "direct_reference",
-    "staticRunnerExecutions",
+    "reachable_reference",
+    "runtimeExecutionReceipt",
     "inputDigestSha256",
     "--self-test",
     "P1_REGRESSIONS",
@@ -30,8 +30,8 @@ for token in (
         errors.append(f"critical ownership gate missing {token}")
 
 try:
-    report = json.loads(read("verification/m5-t19-critical-test-ownership.json"))
-    if report.get("generationMode") != "live source and static-runner scan":
+    report = json.loads(read("build/verification/m5-t19-critical-test-ownership.json"))
+    if report.get("generationMode") != "live source reachability and current execution receipt":
         errors.append("ownership report is not generated from the live source tree")
     for field in ("ownerCount", "mappedOwnerCount", "directOwnerCount", "executedOwnerCount"):
         if report.get(field) != 12:

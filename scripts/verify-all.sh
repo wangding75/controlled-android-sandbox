@@ -2,6 +2,10 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
+mkdir -p build/verification
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git diff --binary HEAD > build/verification/verify-all-before.patch
+fi
 
 ./scripts/self-test.sh
 python3 scripts/check-build-environment.py
@@ -32,6 +36,7 @@ python3 scripts/check-m5-t15-peripheral-services.py
 python3 scripts/check-m5-t16-source-closure.py
 python3 scripts/check-m5-t17-privileged-services.py
 python3 scripts/check-m5-t18-architecture-quality.py
+python3 tools/static_android_compile.py
 python3 scripts/check-critical-test-ownership.py --self-test
 python3 scripts/check-critical-test-ownership.py
 python3 scripts/check-m5-t19-architecture-decoupling.py
@@ -44,6 +49,7 @@ python3 scripts/check-m5-t19-1-f-critical-test-ownership.py
 python3 scripts/check-m5-t19-1-g-store-commit-consistency.py
 python3 scripts/check-m5-t19-1-h-guest-pool-reconnect.py
 python3 scripts/check-m5-t19-1-i-guest-storage-name-codec.py
+python3 scripts/check-m5-t19-1-j-review-remediation.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py
@@ -73,7 +79,6 @@ python3 scripts/check-native-network-audio.py
 python3 scripts/check-native-abi-companion.py
 python3 scripts/generate-sbom.py
 python3 scripts/check-m3-source-progress.py
-python3 tools/static_android_compile.py
 ./scripts/test-native.sh
 ./scripts/test-m3-gate.sh
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -103,5 +108,10 @@ for p in Path('scripts').glob('*.ps1'):
     if stack: raise SystemExit(f'{p}: unclosed delimiter')
     print('PASS structural PowerShell check', p)
 PY
+
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git diff --binary HEAD > build/verification/verify-all-after.patch
+  cmp build/verification/verify-all-before.patch build/verification/verify-all-after.patch
+fi
 
 echo 'PASS all locally executable verification gates'

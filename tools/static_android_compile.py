@@ -1,5 +1,5 @@
 from pathlib import Path
-import subprocess, shutil, textwrap, sys
+import hashlib, json, re, subprocess, shutil, textwrap, sys
 root = Path(__file__).resolve().parents[1]
 build = root / 'build' / 'static-android-compile'
 stubs = build / 'stubs'
@@ -434,3 +434,20 @@ for main_class in [
     run=subprocess.run(['java','-ea','-cp',str(classes),main_class], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print(run.stdout, end='')
     if run.returncode: sys.exit(run.returncode)
+
+
+# This receipt is emitted only after every declared Host self-test above completed successfully.
+runner_source = Path(__file__).read_text(encoding="utf-8")
+executed_tests = sorted(set(re.findall(
+    r"['\"](com\.warden\.controlledsandbox\.[^'\"]+SelfTest)['\"]",
+    runner_source,
+)))
+receipt_dir = build / "verification"
+receipt_dir.mkdir(parents=True, exist_ok=True)
+(receipt_dir / "static-android-test-execution.json").write_text(json.dumps({
+    "runner": str(Path(__file__).relative_to(root)),
+    "completed": True,
+    "executedTests": executed_tests,
+    "executedTestCount": len(executed_tests),
+    "runnerSha256": hashlib.sha256(runner_source.encode("utf-8")).hexdigest(),
+}, indent=2) + "\n", encoding="utf-8")

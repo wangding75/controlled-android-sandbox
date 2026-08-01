@@ -112,11 +112,15 @@ public final class GuestContext extends ContextWrapper {
         throw new UnsupportedOperationException("CROSS_CONTEXT_GUEST_DATABASE_MOVE_NOT_IMPLEMENTED");
     }
     @Override public boolean deleteDatabase(String name) {
-        return SQLiteDatabase.deleteDatabase(getDatabasePath(name));
+        File parent = ensureDirectory(new File(dataRoot, "databases"));
+        File database = getDatabasePath(name);
+        boolean deleted = SQLiteDatabase.deleteDatabase(database);
+        storageNames.release(parent, "database", name, "", "", "-journal", "-wal", "-shm");
+        return deleted;
     }
     @Override public String[] databaseList() {
         return storageNames.listExisting(ensureDirectory(new File(dataRoot, "databases")),
-                "database");
+                "database", "", "", "-journal", "-wal", "-shm");
     }
     @Override public synchronized SharedPreferences getSharedPreferences(String name, int mode) {
         SharedPreferences existing = preferences.get(name);
@@ -132,7 +136,11 @@ public final class GuestContext extends ContextWrapper {
         File file = storageNames.resolve(ensureDirectory(new File(dataRoot, "shared_prefs")),
                 "shared_preferences", name, "", ".cspf", ".tmp");
         File temporary = new File(file.getParentFile(), file.getName() + ".tmp");
-        return (!file.exists() || file.delete()) && (!temporary.exists() || temporary.delete());
+        boolean deleted = (!file.exists() || file.delete())
+                && (!temporary.exists() || temporary.delete());
+        storageNames.release(file.getParentFile(), "shared_preferences", name,
+                "", ".cspf", ".tmp");
+        return deleted;
     }
     @Override public boolean moveSharedPreferencesFrom(Context sourceContext, String name) {
         throw new UnsupportedOperationException("CROSS_CONTEXT_GUEST_PREFERENCES_MOVE_NOT_IMPLEMENTED");
@@ -146,9 +154,14 @@ public final class GuestContext extends ContextWrapper {
     @Override public File getFileStreamPath(String name) {
         return storageNames.resolve(getFilesDir(), "file", name, "", "");
     }
-    @Override public boolean deleteFile(String name) { return getFileStreamPath(name).delete(); }
+    @Override public boolean deleteFile(String name) {
+        File file = getFileStreamPath(name);
+        boolean deleted = !file.exists() || file.delete();
+        storageNames.release(getFilesDir(), "file", name, "", "");
+        return deleted;
+    }
     @Override public String[] fileList() {
-        return storageNames.listExisting(getFilesDir(), "file");
+        return storageNames.listExisting(getFilesDir(), "file", "", "");
     }
     @Override public File getDir(String name, int mode) {
         return ensureDirectory(storageNames.resolve(dataRoot, "dir", name, "app_", ""));

@@ -1,12 +1,13 @@
 # M5-T19.1-I Guest storage-name collision correctness
 
 - Finding: P2-03 lossy `safeName()` mapping silently merged different logical storage names.
-- Source fix: PASS.
-- Shared codec used by SharedPreferences, databases, files, getDir and external types: PASS.
-- Reversible UTF-8 Base64URL mapping for normal names: PASS.
+- Reversible UTF-8 Base64URL mapping for bounded names: PASS.
 - Bounded SHA-256 form plus persistent owner claim for long names: PASS.
-- CRC-protected registry and restart stability: PASS.
-- Legacy file, preferences, database, directory and external-type migration: PASS.
-- Legacy collision fail-closed error `LEGACY_NAME_COLLISION_AMBIGUOUS`: PASS.
-- Spaces, question mark, slash, Unicode, emoji, dot names and long names: PASS.
-- Android filesystem/device evidence: 0.
+- Cross-instance transaction uses JVM lock, OS file lock, reload/merge and unique temporary file: PASS.
+- Reversible names do not create permanent registry claims: PASS.
+- Unique legacy file and database enumeration migration: PASS.
+- Legacy collision fail-closed: ambiguous legacy access fails immediately with `LEGACY_NAME_COLLISION_AMBIGUOUS`: PASS.
+- Ambiguous legacy enumeration fails with `LEGACY_NAME_INDEX_AMBIGUOUS`: PASS.
+- Deleted hashed artifacts release stale claims: PASS.
+- SharedPreferences, databases, files, getDir and external types use one codec: PASS.
+- Android multi-process/filesystem/device evidence: 0.

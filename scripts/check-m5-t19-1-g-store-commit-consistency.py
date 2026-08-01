@@ -68,7 +68,8 @@ report = {
     "staticRunnerExecutions": runner.count("VirtualSystemServiceStoreCommitConsistencySelfTest"),
     "inputDigestSha256": digest.hexdigest(),
 }
-(ROOT / "verification/m5-t19-1-g-store-commit-consistency.json").write_text(
+(ROOT / "build/verification").mkdir(parents=True, exist_ok=True)
+(ROOT / "build/verification/m5-t19-1-g-store-commit-consistency.json").write_text(
         json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
 if errors:

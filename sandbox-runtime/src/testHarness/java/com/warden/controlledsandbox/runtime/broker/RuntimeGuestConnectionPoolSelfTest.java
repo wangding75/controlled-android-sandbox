@@ -27,6 +27,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         testDelayedDeathReconnectsWithinCurrentRequest();
         testBinderDeathCallbackDisconnectsAndRebinds();
         testConcurrentCallersShareOneReconnect();
+        testConnectionIsNotPublishedBeforeDeathLinkCompletes();
         testBindTimeoutHasDistinctReasonAndRecovers();
         testDisconnectedHasDistinctReason();
         System.out.println("PASS RuntimeGuestConnectionPool direct ownership self-test");
@@ -132,6 +133,39 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         require(service.unbindCount == 2, "pool close did not release the shared replacement bind");
     }
 
+
+    private static void testConnectionIsNotPublishedBeforeDeathLinkCompletes() throws Exception {
+        TestService service = new TestService();
+        service.asyncConnect = true;
+        service.guest.blockDeathLink();
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> { }, 2_000L);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch firstDispatched = new CountDownLatch(1);
+        CountDownLatch secondDispatched = new CountDownLatch(1);
+        Future<String> first = executor.submit(() -> pool.call(5, guest -> {
+            firstDispatched.countDown();
+            return resultFor(guest, service.guest, "first-linked");
+        }).getString("result"));
+        require(service.guest.awaitDeathLinkEntered(), "death registration did not enter barrier");
+        Future<String> second = executor.submit(() -> pool.call(5, guest -> {
+            secondDispatched.countDown();
+            return resultFor(guest, service.guest, "second-linked");
+        }).getString("result"));
+        require(!firstDispatched.await(100, TimeUnit.MILLISECONDS),
+                "first call dispatched before death registration completed");
+        require(!secondDispatched.await(100, TimeUnit.MILLISECONDS),
+                "second call observed Binder before death registration completed");
+        service.guest.releaseDeathLink();
+        require("first-linked".equals(first.get(5, TimeUnit.SECONDS)),
+                "first caller did not resume after death registration");
+        require("second-linked".equals(second.get(5, TimeUnit.SECONDS)),
+                "second caller did not share the published connection");
+        require(service.bindCount == 1, "death-link barrier caused duplicate binding");
+        executor.shutdownNow();
+        pool.close();
+    }
+
     private static void testBindTimeoutHasDistinctReasonAndRecovers() throws Exception {
         TestService service = new TestService();
         service.callbackMode = CallbackMode.NONE;
@@ -189,6 +223,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile CallbackMode callbackMode = CallbackMode.CONNECT;
         private volatile int bindCount;
         private volatile int unbindCount;
+        private volatile boolean asyncConnect;
         private volatile CountDownLatch blockedBindEntered;
         private volatile CountDownLatch blockedBindRelease;
 
@@ -226,8 +261,17 @@ public final class RuntimeGuestConnectionPoolSelfTest {
                 }
             }
             if (callbackMode == CallbackMode.CONNECT) {
-                connection.onServiceConnected(new ComponentName(
-                        "com.warden.controlledsandbox", "Guest" + bindCount), guest);
+                ComponentName component = new ComponentName(
+                        "com.warden.controlledsandbox", "Guest" + bindCount);
+                if (asyncConnect) {
+                    Thread callback = new Thread(
+                            () -> connection.onServiceConnected(component, guest),
+                            "guest-connect-callback");
+                    callback.setDaemon(true);
+                    callback.start();
+                } else {
+                    connection.onServiceConnected(component, guest);
+                }
             } else if (callbackMode == CallbackMode.NULL_BINDING) {
                 connection.onNullBinding(new ComponentName(
                         "com.warden.controlledsandbox", "Guest" + bindCount));
@@ -244,6 +288,23 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private IBinder.DeathRecipient recipient;
         private IBinder.DeathRecipient delayedRecipient;
         private volatile boolean alive = true;
+        private volatile CountDownLatch deathLinkEntered;
+        private volatile CountDownLatch deathLinkRelease;
+
+        void blockDeathLink() {
+            deathLinkEntered = new CountDownLatch(1);
+            deathLinkRelease = new CountDownLatch(1);
+        }
+
+        boolean awaitDeathLinkEntered() throws InterruptedException {
+            CountDownLatch latch = deathLinkEntered;
+            return latch != null && latch.await(5, TimeUnit.SECONDS);
+        }
+
+        void releaseDeathLink() {
+            CountDownLatch latch = deathLinkRelease;
+            if (latch != null) latch.countDown();
+        }
 
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
             return null;
@@ -253,10 +314,32 @@ public final class RuntimeGuestConnectionPoolSelfTest {
 
         @Override public boolean isBinderAlive() { return alive; }
 
-        @Override public synchronized void linkToDeath(IBinder.DeathRecipient value, int flags)
+        @Override public void linkToDeath(IBinder.DeathRecipient value, int flags)
                 throws RemoteException {
-            if (!alive) throw new RemoteException("dead");
-            recipient = value;
+            CountDownLatch entered;
+            CountDownLatch release;
+            synchronized (this) {
+                if (!alive) throw new RemoteException("dead");
+                entered = deathLinkEntered;
+                release = deathLinkRelease;
+            }
+            if (entered != null && release != null) {
+                entered.countDown();
+                try {
+                    if (!release.await(5, TimeUnit.SECONDS)) {
+                        throw new RemoteException("death-link barrier timed out");
+                    }
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new RemoteException("death-link barrier interrupted");
+                }
+            }
+            synchronized (this) {
+                if (!alive) throw new RemoteException("dead");
+                recipient = value;
+                deathLinkEntered = null;
+                deathLinkRelease = null;
+            }
         }
 
         @Override public synchronized boolean unlinkToDeath(IBinder.DeathRecipient value, int flags) {

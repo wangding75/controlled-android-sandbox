@@ -11,6 +11,13 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -22,14 +29,20 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.CRC32;
 
-/** Collision-free logical-name to Guest-storage path mapping with fail-closed legacy migration. */
+/** Collision-free logical-name mapping with cross-process transactional metadata. */
 final class GuestStorageNameCodec {
     static final String LEGACY_COLLISION = "LEGACY_NAME_COLLISION_AMBIGUOUS";
+    static final String LEGACY_INDEX_AMBIGUOUS = "LEGACY_NAME_INDEX_AMBIGUOUS";
     static final String PHYSICAL_COLLISION = "STORAGE_NAME_PHYSICAL_COLLISION";
 
     private static final int MAGIC = 0x43534E52; // CSNR
@@ -39,11 +52,13 @@ final class GuestStorageNameCodec {
     private static final int MAX_LOGICAL_NAME_BYTES = 64 * 1024;
     private static final int MAX_REVERSIBLE_COMPONENT_LENGTH = 180;
     private static final String REGISTRY_NAME = ".guest-storage-name-registry";
+    private static final String LOCK_NAME = REGISTRY_NAME + ".lock";
+    private static final ConcurrentHashMap<String, Object> JVM_LOCKS = new ConcurrentHashMap<>();
 
     private final File root;
     private final File registryFile;
-    private final Map<Key, String> physicalClaims = new HashMap<>();
-    private final Map<Key, String> legacyClaims = new HashMap<>();
+    private final File lockFile;
+    private final Object jvmLock;
 
     GuestStorageNameCodec(File root) {
         try {
@@ -51,81 +66,208 @@ final class GuestStorageNameCodec {
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_ROOT_INVALID", error);
         }
+        if (!this.root.isDirectory() && !this.root.mkdirs() && !this.root.isDirectory()) {
+            throw new IllegalStateException("Cannot create directory " + this.root);
+        }
         this.registryFile = new File(this.root, REGISTRY_NAME);
-        load();
+        this.lockFile = new File(this.root, LOCK_NAME);
+        this.jvmLock = JVM_LOCKS.computeIfAbsent(this.root.getAbsolutePath(), ignored -> new Object());
+        // Validate durable metadata under the same locks used by every mutation.
+        withRegistry(registry -> null);
     }
 
-    synchronized File resolve(File parent, String namespace, String logicalName,
-                              String prefix, String suffix, String... companionSuffixes) {
+    File resolve(File parent, String namespace, String logicalName,
+                 String prefix, String suffix, String... companionSuffixes) {
         String logical = validateLogicalName(logicalName);
         File canonicalParent = canonicalParent(parent);
+        String normalizedPrefix = nullToEmpty(prefix);
+        String normalizedSuffix = nullToEmpty(suffix);
+        List<String> companions = normalizedCompanions(companionSuffixes);
+        String encoded = encode(logical);
+        String physicalName = normalizedPrefix + encoded + normalizedSuffix;
         String scope = scope(namespace, canonicalParent);
-        String physicalName = nullToEmpty(prefix) + encode(logical) + nullToEmpty(suffix);
         Key physicalKey = new Key(scope, physicalName);
-        boolean physicalAdded = claim(physicalClaims, physicalKey, logical, PHYSICAL_COLLISION);
-        boolean legacyAdded = false;
-        boolean registryPersisted = false;
-        Key legacyKey = null;
-        try {
-            boolean changed = physicalAdded;
-            String legacyName = legacyPhysicalName(logical, prefix, suffix);
-            List<String> companions = normalizedCompanions(companionSuffixes);
-            if (legacyName != null) {
-                legacyKey = new Key(scope, legacyName);
-                String legacyOwner = legacyClaims.get(legacyKey);
-                if (legacyOwner != null && !legacyOwner.equals(logical)) {
+        return withRegistry(registry -> {
+            rejectUnsafePriorLegacyClaim(registry, scope, logical, normalizedPrefix, normalizedSuffix);
+            if (encoded.startsWith("v2h_")) {
+                registry.dirty |= claim(
+                        registry.physicalClaims, physicalKey, logical, PHYSICAL_COLLISION);
+            }
+            String legacyName = legacyPhysicalName(logical, normalizedPrefix, normalizedSuffix);
+            if (legacyName != null && hasAnyArtifact(canonicalParent, legacyName, companions)) {
+                if (!isProvablyUniqueLegacyLogical(logical)) {
                     throw new IllegalStateException(LEGACY_COLLISION + ":" + legacyName);
                 }
-                if (hasAnyArtifact(canonicalParent, legacyName, companions)) {
-                    if (legacyOwner == null) {
-                        legacyClaims.put(legacyKey, logical);
-                        legacyAdded = true;
-                        changed = true;
-                    }
-                    // Persist the unique legacy claim before moving any artifact. A crash can be
-                    // retried idempotently, while a later colliding logical name remains fail-closed.
-                    if (changed) {
-                        persist();
-                        registryPersisted = true;
-                        changed = false;
-                    }
-                    migrateArtifacts(canonicalParent, legacyName, physicalName, companions);
-                }
-            }
-            if (changed) {
-                persist();
-                registryPersisted = true;
+                Key legacyKey = new Key(scope, legacyName);
+                registry.dirty |= claim(
+                        registry.legacyClaims, legacyKey, logical, LEGACY_COLLISION);
+                // The migration owner must be durable before moving any data.
+                persistIfDirty(registry);
+                migrateArtifacts(canonicalParent, legacyName, physicalName, companions);
             }
             return new File(canonicalParent, physicalName);
-        } catch (RuntimeException error) {
-            // If the registry update itself failed, restore the in-memory view to the last durable
-            // state. Once a claim was durably written, keep it across migration failures so retry
-            // remains idempotent and colliding legacy names remain blocked.
-            if (!registryPersisted) {
-                if (physicalAdded) physicalClaims.remove(physicalKey);
-                if (legacyAdded && legacyKey != null) legacyClaims.remove(legacyKey);
+        });
+    }
+
+    String[] listExisting(File parent, String namespace,
+                          String prefix, String suffix, String... companionSuffixes) {
+        File canonicalParent = canonicalParent(parent);
+        String normalizedPrefix = nullToEmpty(prefix);
+        String normalizedSuffix = nullToEmpty(suffix);
+        List<String> companions = normalizedCompanions(companionSuffixes);
+        String scope = scope(namespace, canonicalParent);
+        return withRegistry(registry -> {
+            rejectUnsafeLegacyClaimsForListing(registry, scope);
+            TreeSet<String> logicalNames = new TreeSet<>();
+            Set<String> mainNames = mainArtifactNames(canonicalParent, companions);
+            for (String physicalName : mainNames) {
+                String encoded = removeAffixes(physicalName, normalizedPrefix, normalizedSuffix);
+                if (encoded == null) {
+                    continue;
+                }
+                if (encoded.startsWith("v2_")) {
+                    logicalNames.add(decodeReversible(encoded));
+                    continue;
+                }
+                if (encoded.startsWith("v2h_")) {
+                    String owner = registry.physicalClaims.get(new Key(scope, physicalName));
+                    if (owner == null) {
+                        throw new IllegalStateException("STORAGE_NAME_HASH_OWNER_MISSING:" + physicalName);
+                    }
+                    logicalNames.add(owner);
+                    continue;
+                }
+                String logical = uniqueLegacyLogical(encoded);
+                if (logical == null) {
+                    throw new IllegalStateException(LEGACY_INDEX_AMBIGUOUS + ":" + physicalName);
+                }
+                Key legacyKey = new Key(scope, physicalName);
+                registry.dirty |= claim(
+                        registry.legacyClaims, legacyKey, logical, LEGACY_COLLISION);
+                String targetName = normalizedPrefix + encode(logical) + normalizedSuffix;
+                persistIfDirty(registry);
+                migrateArtifacts(canonicalParent, physicalName, targetName, companions);
+                logicalNames.add(logical);
             }
-            throw error;
+            pruneMissingHashClaims(registry, scope, canonicalParent, companions);
+            return logicalNames.toArray(new String[0]);
+        });
+    }
+
+    void release(File parent, String namespace, String logicalName,
+                 String prefix, String suffix, String... companionSuffixes) {
+        String logical = validateLogicalName(logicalName);
+        File canonicalParent = canonicalParent(parent);
+        String normalizedPrefix = nullToEmpty(prefix);
+        String normalizedSuffix = nullToEmpty(suffix);
+        List<String> companions = normalizedCompanions(companionSuffixes);
+        String encoded = encode(logical);
+        if (!encoded.startsWith("v2h_")) {
+            return;
+        }
+        String physicalName = normalizedPrefix + encoded + normalizedSuffix;
+        String scope = scope(namespace, canonicalParent);
+        withRegistry(registry -> {
+            if (!hasAnyArtifact(canonicalParent, physicalName, companions)) {
+                String removed = registry.physicalClaims.remove(new Key(scope, physicalName));
+                registry.dirty |= removed != null;
+            }
+            return null;
+        });
+    }
+
+
+    private void rejectUnsafeLegacyClaimsForListing(Registry registry, String scope) {
+        for (Map.Entry<Key, String> entry : registry.legacyClaims.entrySet()) {
+            if (entry.getKey().scope.equals(scope)
+                    && !isProvablyUniqueLegacyLogical(entry.getValue())) {
+                throw new IllegalStateException(
+                        LEGACY_INDEX_AMBIGUOUS + ":" + entry.getKey().physicalName);
+            }
         }
     }
 
-    synchronized String[] listExisting(File parent, String namespace) {
-        File canonicalParent = canonicalParent(parent);
-        String scope = scope(namespace, canonicalParent);
-        List<String> logicalNames = new ArrayList<>();
-        for (Map.Entry<Key, String> entry : physicalClaims.entrySet()) {
-            if (!entry.getKey().scope.equals(scope)) {
+    private void rejectUnsafePriorLegacyClaim(Registry registry, String scope, String logical,
+                                               String prefix, String suffix) {
+        String legacyName = legacyPhysicalName(logical, prefix, suffix);
+        if (legacyName == null) {
+            return;
+        }
+        String owner = registry.legacyClaims.get(new Key(scope, legacyName));
+        if (owner != null && !owner.equals(logical)) {
+            throw new IllegalStateException(LEGACY_COLLISION + ":" + legacyName);
+        }
+        if (owner != null && !isProvablyUniqueLegacyLogical(logical)) {
+            // Older builds used first-access-wins. Do not continue trusting that ambiguous claim.
+            throw new IllegalStateException(LEGACY_COLLISION + ":" + legacyName);
+        }
+    }
+
+    private void pruneMissingHashClaims(Registry registry, String scope, File parent,
+                                        List<String> companions) {
+        List<Key> remove = new ArrayList<>();
+        for (Key key : registry.physicalClaims.keySet()) {
+            if (key.scope.equals(scope) && !hasAnyArtifact(parent, key.physicalName, companions)) {
+                remove.add(key);
+            }
+        }
+        for (Key key : remove) {
+            registry.physicalClaims.remove(key);
+            registry.dirty = true;
+        }
+    }
+
+    private Set<String> mainArtifactNames(File parent, List<String> companions) {
+        Set<String> names = new HashSet<>();
+        File[] files = parent.listFiles();
+        if (files == null) {
+            return names;
+        }
+        for (File file : files) {
+            String name = file.getName();
+            if (name.equals(REGISTRY_NAME) || name.equals(LOCK_NAME)
+                    || name.startsWith(REGISTRY_NAME + ".tmp.")) {
                 continue;
             }
-            if (new File(canonicalParent, entry.getKey().physicalName).exists()) {
-                logicalNames.add(entry.getValue());
+            boolean companion = false;
+            for (String companionSuffix : companions) {
+                if (name.endsWith(companionSuffix)) {
+                    companion = true;
+                    break;
+                }
+            }
+            if (!companion) {
+                names.add(name);
             }
         }
-        Collections.sort(logicalNames);
-        return logicalNames.toArray(new String[0]);
+        return names;
     }
 
-    private boolean claim(Map<Key, String> claims, Key key, String logical, String errorCode) {
+    private static String removeAffixes(String value, String prefix, String suffix) {
+        if (!value.startsWith(prefix) || !value.endsWith(suffix)
+                || value.length() < prefix.length() + suffix.length()) {
+            return null;
+        }
+        return value.substring(prefix.length(), value.length() - suffix.length());
+    }
+
+    private static String uniqueLegacyLogical(String legacyCore) {
+        if (!isProvablyUniqueLegacyLogical(legacyCore)) {
+            return null;
+        }
+        return legacyCore;
+    }
+
+    private static boolean isProvablyUniqueLegacyLogical(String logical) {
+        if (logical == null || logical.isEmpty() || logical.equals(".") || logical.equals("..")) {
+            return false;
+        }
+        // The old mapper replaced every unsupported character with '_'. Any underscore therefore
+        // has multiple possible preimages and cannot be assigned without external migration metadata.
+        return logical.matches("[A-Za-z0-9.-]+");
+    }
+
+    private static boolean claim(Map<Key, String> claims, Key key, String logical, String errorCode) {
         String owner = claims.get(key);
         if (owner != null && !owner.equals(logical)) {
             throw new IllegalStateException(errorCode + ":" + key.physicalName);
@@ -150,15 +292,20 @@ final class GuestStorageNameCodec {
             if (target.exists()) {
                 throw new IllegalStateException("LEGACY_AND_V2_BOTH_EXIST:" + source.getName());
             }
+            move(source, target, "LEGACY_NAME_MIGRATION_FAILED");
+        }
+        syncDirectory(parent);
+    }
+
+    private static void move(File source, File target, String code) {
+        try {
             try {
-                try {
-                    Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException unsupported) {
-                    Files.move(source.toPath(), target.toPath());
-                }
-            } catch (IOException error) {
-                throw new IllegalStateException("LEGACY_NAME_MIGRATION_FAILED:" + source.getName(), error);
+                Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                Files.move(source.toPath(), target.toPath());
             }
+        } catch (IOException error) {
+            throw new IllegalStateException(code + ":" + source.getName(), error);
         }
     }
 
@@ -179,8 +326,7 @@ final class GuestStorageNameCodec {
             File value = parent.getCanonicalFile();
             String rootPath = root.getPath();
             String valuePath = value.getPath();
-            if (!valuePath.equals(rootPath)
-                    && !valuePath.startsWith(rootPath + File.separator)) {
+            if (!valuePath.equals(rootPath) && !valuePath.startsWith(rootPath + File.separator)) {
                 throw new SecurityException("GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE");
             }
             if (!value.isDirectory() && !value.mkdirs() && !value.isDirectory()) {
@@ -220,6 +366,23 @@ final class GuestStorageNameCodec {
         return "v2h_" + hex(sha256(bytes));
     }
 
+    private static String decodeReversible(String encoded) {
+        try {
+            byte[] bytes = Base64.getUrlDecoder().decode(encoded.substring(3));
+            CharBuffer decoded = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes));
+            String logical = decoded.toString();
+            if (!encode(logical).equals(encoded)) {
+                throw new IllegalArgumentException("non-canonical storage name");
+            }
+            return validateLogicalName(logical);
+        } catch (IllegalArgumentException | CharacterCodingException error) {
+            throw new IllegalStateException("STORAGE_NAME_REVERSIBLE_DECODE_FAILED:" + encoded, error);
+        }
+    }
+
     private static String legacyPhysicalName(String logical, String prefix, String suffix) {
         if (logical.trim().isEmpty()) {
             return null;
@@ -228,7 +391,7 @@ final class GuestStorageNameCodec {
         if (safe.equals(".") || safe.equals("..")) {
             return null;
         }
-        return nullToEmpty(prefix) + safe + nullToEmpty(suffix);
+        return prefix + safe + suffix;
     }
 
     private static List<String> normalizedCompanions(String[] values) {
@@ -245,9 +408,39 @@ final class GuestStorageNameCodec {
         return result;
     }
 
-    private void load() {
+    private <T> T withRegistry(RegistryAction<T> action) {
+        synchronized (jvmLock) {
+            try (RandomAccessFile rawLock = new RandomAccessFile(lockFile, "rw");
+                 FileChannel channel = rawLock.getChannel();
+                 FileLock ignored = channel.lock()) {
+                Registry registry = loadRegistry();
+                removeObsoleteReversibleClaims(registry);
+                T result = action.run(registry);
+                persistIfDirty(registry);
+                return result;
+            } catch (IOException error) {
+                throw new IllegalStateException("GUEST_STORAGE_NAME_REGISTRY_LOCK_FAILED", error);
+            }
+        }
+    }
+
+    private void removeObsoleteReversibleClaims(Registry registry) {
+        List<Key> remove = new ArrayList<>();
+        for (Map.Entry<Key, String> entry : registry.physicalClaims.entrySet()) {
+            if (!encode(entry.getValue()).startsWith("v2h_")) {
+                remove.add(entry.getKey());
+            }
+        }
+        for (Key key : remove) {
+            registry.physicalClaims.remove(key);
+            registry.dirty = true;
+        }
+    }
+
+    private Registry loadRegistry() {
+        Registry registry = new Registry();
         if (!registryFile.isFile()) {
-            return;
+            return registry;
         }
         try {
             long length = registryFile.length();
@@ -269,17 +462,18 @@ final class GuestStorageNameCodec {
                 if (input.read() != -1 || crc32(payload) != expectedCrc) {
                     throw new IOException("registry checksum mismatch");
                 }
-                readClaims(payload);
+                readClaims(payload, registry);
             }
+            return registry;
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_NAME_REGISTRY_CORRUPT", error);
         }
     }
 
-    private void readClaims(byte[] payload) throws IOException {
+    private void readClaims(byte[] payload, Registry registry) throws IOException {
         try (DataInputStream input = new DataInputStream(new ByteArrayInputStream(payload))) {
-            readClaimMap(input, physicalClaims);
-            readClaimMap(input, legacyClaims);
+            readClaimMap(input, registry.physicalClaims);
+            readClaimMap(input, registry.legacyClaims);
             if (input.read() != -1) {
                 throw new IOException("trailing registry payload");
             }
@@ -302,10 +496,18 @@ final class GuestStorageNameCodec {
         }
     }
 
-    private void persist() {
+    private void persistIfDirty(Registry registry) {
+        if (!registry.dirty) {
+            return;
+        }
+        persist(registry);
+        registry.dirty = false;
+    }
+
+    private void persist(Registry registry) {
+        File temporary = new File(root, REGISTRY_NAME + ".tmp." + UUID.randomUUID());
         try {
-            byte[] payload = writePayload();
-            File temporary = new File(root, REGISTRY_NAME + ".tmp");
+            byte[] payload = writePayload(registry);
             try (FileOutputStream raw = new FileOutputStream(temporary);
                  DataOutputStream output = new DataOutputStream(new BufferedOutputStream(raw))) {
                 output.writeInt(MAGIC);
@@ -323,16 +525,21 @@ final class GuestStorageNameCodec {
                 Files.move(temporary.toPath(), registryFile.toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
             }
+            syncDirectory(root);
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_NAME_REGISTRY_WRITE_FAILED", error);
+        } finally {
+            if (temporary.exists() && !temporary.delete()) {
+                temporary.deleteOnExit();
+            }
         }
     }
 
-    private byte[] writePayload() throws IOException {
+    private byte[] writePayload(Registry registry) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream output = new DataOutputStream(bytes)) {
-            writeClaimMap(output, physicalClaims);
-            writeClaimMap(output, legacyClaims);
+            writeClaimMap(output, registry.physicalClaims);
+            writeClaimMap(output, registry.legacyClaims);
         }
         byte[] payload = bytes.toByteArray();
         if (payload.length > MAX_REGISTRY_BYTES) {
@@ -373,6 +580,15 @@ final class GuestStorageNameCodec {
         return new String(bytes, StandardCharsets.UTF_8);
     }
 
+    private static void syncDirectory(File directory) {
+        try (FileChannel channel = FileChannel.open(directory.toPath())) {
+            channel.force(true);
+        } catch (IOException | UnsupportedOperationException ignored) {
+            // Some Android filesystems do not expose directory channels. Atomic replacement and
+            // file fsync remain enforced; device durability is reported separately.
+        }
+    }
+
     private static byte[] sha256(byte[] bytes) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(bytes);
@@ -398,6 +614,16 @@ final class GuestStorageNameCodec {
 
     private static String nullToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private interface RegistryAction<T> {
+        T run(Registry registry);
+    }
+
+    private static final class Registry {
+        final Map<Key, String> physicalClaims = new HashMap<>();
+        final Map<Key, String> legacyClaims = new HashMap<>();
+        boolean dirty;
     }
 
     private static final class Key {

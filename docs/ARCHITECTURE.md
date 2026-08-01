@@ -253,7 +253,8 @@ capability. A caller that finds a completed but dead cached Binder removes that 
 pool lock and installs one replacement `GuestConnection`; other callers observe the replacement as
 binding and wait on the same latch. Retirement has single unbind and disconnect-notification ownership.
 Late callbacks from an old connection are rejected by slot-entry identity, so they cannot publish or
-remove the replacement.
+remove the replacement. A newly connected Binder remains an in-flight capability until death
+registration succeeds and a reserve/link/recheck step atomically publishes it.
 
 The pool retries only when death is detected before the `GuestCall` is invoked. Once an operation has
 been dispatched, a Binder failure is reported and the call is not replayed because the remote side may
@@ -267,13 +268,16 @@ Guest-visible storage APIs route through `GuestStorageNameCodec`. The mapping sc
 namespace and the canonical parent directory. Names with bounded encoded length use `v2_` plus
 unpadded UTF-8 Base64URL, which is reversible and collision-free. Longer names use
 `v2h_<sha256>`; a persisted physical-name claim records the full logical name and rejects any
-conflicting owner. The registry is length-bounded, CRC-checked, written through a synced temporary
-file and replaced atomically when the filesystem supports it.
+conflicting owner. Only hashed names and legacy migration metadata enter the registry; reversible names decode directly
+from the physical component. Registry transactions are serialized by a per-root JVM lock and an OS
+file lock, reload and merge the latest file, use unique temporary files, fsync the payload and request
+parent-directory durability after replacement.
 
-For compatibility, the codec computes the former underscore-mapped path. When a legacy artifact is
-present, it durably reserves that legacy path for one logical name before moving the main artifact
-and known companions such as SQLite journal/WAL/SHM files or the SharedPreferences temporary file.
-A later logical name with the same former path fails with `LEGACY_NAME_COLLISION_AMBIGUOUS`, including
-after process restart. This deliberately prefers explicit operator resolution over silent data
-sharing. The codec applies to SharedPreferences, databases, normal files, `getDir` and external-file
-types; `fileList` and `databaseList` reconstruct registered logical names.
+For compatibility, the codec computes the former underscore-mapped path. Automatic migration is
+allowed only when the old mapping has one provable logical owner. An underscore or replacement-derived
+component has multiple possible preimages and fails from the first access with
+`LEGACY_NAME_COLLISION_AMBIGUOUS`. Enumeration discovers and migrates uniquely decodable old files;
+an unresolved entry fails with `LEGACY_NAME_INDEX_AMBIGUOUS` instead of disappearing from the list.
+Known SQLite and SharedPreferences companion files move with the main artifact. Deleted hashed
+artifacts release stale claims. The codec applies to SharedPreferences, databases, normal files,
+`getDir` and external-file types.

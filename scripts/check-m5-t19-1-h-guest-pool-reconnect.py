@@ -32,6 +32,10 @@ pool = require(
     "The Guest call may already have produced side effects. Do not replay it.",
     "claimUnbind()",
     "claimDisconnectNotification()",
+    "service.linkToDeath(this, 0)",
+    "&& service.isBinderAlive()",
+    "binderToken = service",
+    "guest = candidate",
     'throw new IllegalStateException("BIND_REJECTED", error)',
     'throw new IllegalStateException("BIND_TIMEOUT")',
 )
@@ -43,6 +47,9 @@ test = require(
     "testDelayedDeathReconnectsWithinCurrentRequest",
     "testBinderDeathCallbackDisconnectsAndRebinds",
     "testConcurrentCallersShareOneReconnect",
+    "testConnectionIsNotPublishedBeforeDeathLinkCompletes",
+    "awaitDeathLinkEntered",
+    "second call observed Binder before death registration completed",
     "testBindTimeoutHasDistinctReasonAndRecovers",
     "testDisconnectedHasDistinctReason",
     "dieWithoutCallback",
@@ -54,6 +61,7 @@ for call in (
     "testDelayedDeathReconnectsWithinCurrentRequest();",
     "testBinderDeathCallbackDisconnectsAndRebinds();",
     "testConcurrentCallersShareOneReconnect();",
+    "testConnectionIsNotPublishedBeforeDeathLinkCompletes();",
     "testBindTimeoutHasDistinctReasonAndRecovers();",
     "testDisconnectedHasDistinctReason();",
 ):
@@ -92,7 +100,8 @@ report = {
     "inputDigestSha256": digest.hexdigest(),
     "errors": errors,
 }
-(ROOT / "verification/m5-t19-1-h-guest-pool-reconnect.json").write_text(
+(ROOT / "build/verification").mkdir(parents=True, exist_ok=True)
+(ROOT / "build/verification/m5-t19-1-h-guest-pool-reconnect.json").write_text(
     json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 if errors:
     print("FAIL M5-T19.1-H Guest pool reconnect", file=sys.stderr)

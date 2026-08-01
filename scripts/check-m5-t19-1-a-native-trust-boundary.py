@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT / "verification/m5-t19-1-a-native-trust-boundary.json"
+REPORT = ROOT / "build/verification/m5-t19-1-a-native-trust-boundary.json"
 errors: list[str] = []
 
 

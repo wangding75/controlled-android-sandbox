@@ -97,7 +97,7 @@ for root in ("app/src/main/java", "sandbox-runtime/src/main/java", "sandbox-fram
 require("scripts/check-critical-test-ownership.py",
         "lineCoverageClaimed", "branchCoverageClaimed", "critical source test ownership")
 try:
-    ownership = json.loads(text("verification/m5-t19-critical-test-ownership.json"))
+    ownership = json.loads(text("build/verification/m5-t19-critical-test-ownership.json"))
     if ownership.get("ownerCount") != 12 or ownership.get("mappedOwnerCount") != 12:
         errors.append("M5-T19 must map all twelve critical source owners")
     if ownership.get("lineCoverageClaimed") is not False or ownership.get("branchCoverageClaimed") is not False:

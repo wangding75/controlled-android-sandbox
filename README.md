@@ -305,9 +305,9 @@ Emulator and physical-device evidence remain 0.
 
 M5-T19.1-H makes `RuntimeGuestConnectionPool` recover a cached dead Guest Binder inside the same
 request before the operation is dispatched. The stale connection is removed atomically, unlinked and
-unbound once, while concurrent callers share the single replacement binding already published in the
-slot map. A delayed death callback from the retired Binder is identity-checked and cannot remove the
-replacement. Pre-dispatch death may retry once because the Guest operation has not run; a Binder that
+unbound once, while concurrent callers share one in-flight replacement. A replacement Binder is not
+published as live until `linkToDeath` succeeds and the slot identity and Binder liveness are rechecked.
+A delayed death callback from the retired Binder is identity-checked and cannot remove the replacement. Pre-dispatch death may retry once because the Guest operation has not run; a Binder that
 dies after operation dispatch is never replayed, avoiding duplicate side effects. Failure reasons remain
 explicit (`DEAD_BINDER`, `BINDER_DIED`, `DISCONNECTED`, `BIND_REJECTED`, `BIND_TIMEOUT`). Android Binder-driver and
 device evidence remain 0.
@@ -320,8 +320,14 @@ use a bounded `v2h_<sha256>` component whose logical owner is recorded in a CRC-
 SharedPreferences, databases, normal files, `getDir` and external-file types now use the same codec,
 and list APIs return logical names rather than encoded path components.
 
-Legacy underscore paths are migrated only after a durable namespace/path claim is recorded. If a
-second logical name resolves to the same legacy physical path, access fails with
-`LEGACY_NAME_COLLISION_AMBIGUOUS`; the two names are never silently attached to one file or directory.
-Registry corruption and physical-name claim conflicts fail closed. Android filesystem and device
+Registry metadata is used only for hashed long names and proven legacy migrations. Every metadata
+transaction holds both a per-root JVM lock and an OS file lock, reloads the latest durable state, and
+uses a unique synced temporary file. Reversible short names require no persistent claim.
+
+Legacy underscore paths are migrated only when their logical owner is provably unique. Any underscore
+or replacement-derived path is ambiguous from the first access and fails with
+`LEGACY_NAME_COLLISION_AMBIGUOUS`; list APIs fail with `LEGACY_NAME_INDEX_AMBIGUOUS` rather than hiding
+an unresolved old file. Unique legacy files are discovered and migrated by `fileList`/`databaseList`.
+Deleted hashed artifacts release their registry claim. Registry corruption and physical-name conflicts
+fail closed. Android filesystem and device
 evidence remain 0.

@@ -67,7 +67,7 @@ def direct_method_routing() -> list[str]:
                     matches.append(f"{path.relative_to(ROOT)}:{number}")
     return matches
 
-ownership = json.loads(read("verification/m5-t19-critical-test-ownership.json"))
+ownership = json.loads(read("build/verification/m5-t19-critical-test-ownership.json"))
 large = large_classes()
 report = {
     "iteration": "M5-T19",

@@ -209,32 +209,40 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            boolean current;
-            synchronized (RuntimeGuestConnectionPool.this) {
-                current = connections.get(slot) == this && !closing;
-                if (current) {
-                    binderToken = service;
-                    guest = IGuestProcess.Stub.asInterface(service);
-                }
-            }
-            if (!current) {
-                markFailure("DISCONNECTED");
-                connected.countDown();
-                return;
-            }
+            IGuestProcess candidate = IGuestProcess.Stub.asInterface(service);
+            boolean linked = false;
+            boolean published = false;
             try {
+                // A connection is not usable until death registration has succeeded. Publishing the
+                // Binder before this point lets another caller dispatch into an unowned capability.
                 service.linkToDeath(this, 0);
-                if (!service.isBinderAlive()) {
-                    markFailure("DEAD_BINDER");
-                    guest = null;
-                    binderToken = null;
+                linked = true;
+                synchronized (RuntimeGuestConnectionPool.this) {
+                    if (connections.get(slot) == this
+                            && !closing
+                            && failureReason == null
+                            && service.isBinderAlive()) {
+                        binderToken = service;
+                        guest = candidate;
+                        published = true;
+                    } else if (failureReason == null) {
+                        markFailure(service.isBinderAlive() ? "DISCONNECTED" : "DEAD_BINDER");
+                    }
                 }
             } catch (Throwable error) {
                 markFailure("DEAD_BINDER");
-                guest = null;
-                binderToken = null;
             } finally {
+                if (!published && linked) {
+                    try {
+                        service.unlinkToDeath(this, 0);
+                    } catch (Throwable ignored) {
+                        // The candidate may have died while registration was being rolled back.
+                    }
+                }
                 connected.countDown();
+            }
+            if (!published) {
+                disconnect(this, failureReasonOr("DISCONNECTED"));
             }
         }
 
