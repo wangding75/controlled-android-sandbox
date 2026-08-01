@@ -260,3 +260,20 @@ been dispatched, a Binder failure is reported and the call is not replayed becau
 already have committed effects. `DEAD_BINDER`, `DISCONNECTED`, `BIND_REJECTED` and `BIND_TIMEOUT` are
 separate recovery diagnostics. These are source/Host-stub state-machine guarantees, not Android Binder
 or device validation.
+
+## Guest storage logical-name mapping
+
+Guest-visible storage APIs route through `GuestStorageNameCodec`. The mapping scope includes the API
+namespace and the canonical parent directory. Names with bounded encoded length use `v2_` plus
+unpadded UTF-8 Base64URL, which is reversible and collision-free. Longer names use
+`v2h_<sha256>`; a persisted physical-name claim records the full logical name and rejects any
+conflicting owner. The registry is length-bounded, CRC-checked, written through a synced temporary
+file and replaced atomically when the filesystem supports it.
+
+For compatibility, the codec computes the former underscore-mapped path. When a legacy artifact is
+present, it durably reserves that legacy path for one logical name before moving the main artifact
+and known companions such as SQLite journal/WAL/SHM files or the SharedPreferences temporary file.
+A later logical name with the same former path fails with `LEGACY_NAME_COLLISION_AMBIGUOUS`, including
+after process restart. This deliberately prefers explicit operator resolution over silent data
+sharing. The codec applies to SharedPreferences, databases, normal files, `getDir` and external-file
+types; `fileList` and `databaseList` reconstruct registered logical names.

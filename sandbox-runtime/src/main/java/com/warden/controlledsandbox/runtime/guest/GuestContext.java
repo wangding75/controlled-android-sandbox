@@ -35,6 +35,7 @@ public final class GuestContext extends ContextWrapper {
     private final File externalRoot;
     private final ApplicationInfo applicationInfo;
     private final GuestCapabilityGate capabilityGate;
+    private final GuestStorageNameCodec storageNames;
     private volatile Application application;
     private final Map<String, SharedPreferences> preferences = new HashMap<>();
 
@@ -48,6 +49,7 @@ public final class GuestContext extends ContextWrapper {
         this.instanceRoot = ensureDirectory(spec.dataRootFile());
         this.dataRoot = ensureDirectory(new File(instanceRoot, "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
+        this.storageNames = new GuestStorageNameCodec(instanceRoot);
         this.applicationInfo = new ApplicationInfo(host.getApplicationInfo());
         this.capabilityGate = new GuestCapabilityGate(spec.packageState.permissions());
         applicationInfo.packageName = spec.packageName;
@@ -94,7 +96,8 @@ public final class GuestContext extends ContextWrapper {
     @Override public File getCodeCacheDir() { return ensureDirectory(new File(dataRoot, "code_cache")); }
     @Override public File getNoBackupFilesDir() { return ensureDirectory(new File(dataRoot, "no_backup")); }
     @Override public File getDatabasePath(String name) {
-        return new File(ensureDirectory(new File(dataRoot, "databases")), safeName(name));
+        return storageNames.resolve(ensureDirectory(new File(dataRoot, "databases")),
+                "database", name, "", "", "-journal", "-wal", "-shm");
     }
     @Override public SQLiteDatabase openOrCreateDatabase(
             String name, int mode, SQLiteDatabase.CursorFactory factory) {
@@ -112,22 +115,22 @@ public final class GuestContext extends ContextWrapper {
         return SQLiteDatabase.deleteDatabase(getDatabasePath(name));
     }
     @Override public String[] databaseList() {
-        String[] databases = ensureDirectory(new File(dataRoot, "databases")).list();
-        return databases == null ? new String[0] : databases;
+        return storageNames.listExisting(ensureDirectory(new File(dataRoot, "databases")),
+                "database");
     }
     @Override public synchronized SharedPreferences getSharedPreferences(String name, int mode) {
-        String safe = safeName(name);
-        SharedPreferences existing = preferences.get(safe);
+        SharedPreferences existing = preferences.get(name);
         if (existing != null) return existing;
-        SharedPreferences created = new SandboxSharedPreferences(
-                new File(ensureDirectory(new File(dataRoot, "shared_prefs")), safe + ".cspf"));
-        preferences.put(safe, created);
+        File file = storageNames.resolve(ensureDirectory(new File(dataRoot, "shared_prefs")),
+                "shared_preferences", name, "", ".cspf", ".tmp");
+        SharedPreferences created = new SandboxSharedPreferences(file);
+        preferences.put(name, created);
         return created;
     }
     @Override public synchronized boolean deleteSharedPreferences(String name) {
-        String safe = safeName(name);
-        preferences.remove(safe);
-        File file = new File(ensureDirectory(new File(dataRoot, "shared_prefs")), safe + ".cspf");
+        preferences.remove(name);
+        File file = storageNames.resolve(ensureDirectory(new File(dataRoot, "shared_prefs")),
+                "shared_preferences", name, "", ".cspf", ".tmp");
         File temporary = new File(file.getParentFile(), file.getName() + ".tmp");
         return (!file.exists() || file.delete()) && (!temporary.exists() || temporary.delete());
     }
@@ -140,14 +143,15 @@ public final class GuestContext extends ContextWrapper {
     @Override public FileOutputStream openFileOutput(String name, int mode) throws FileNotFoundException {
         return new FileOutputStream(getFileStreamPath(name), (mode & Context.MODE_APPEND) != 0);
     }
-    @Override public File getFileStreamPath(String name) { return new File(getFilesDir(), safeName(name)); }
+    @Override public File getFileStreamPath(String name) {
+        return storageNames.resolve(getFilesDir(), "file", name, "", "");
+    }
     @Override public boolean deleteFile(String name) { return getFileStreamPath(name).delete(); }
     @Override public String[] fileList() {
-        String[] files = getFilesDir().list();
-        return files == null ? new String[0] : files;
+        return storageNames.listExisting(getFilesDir(), "file");
     }
     @Override public File getDir(String name, int mode) {
-        return ensureDirectory(new File(dataRoot, "app_" + safeName(name)));
+        return ensureDirectory(storageNames.resolve(dataRoot, "dir", name, "app_", ""));
     }
     @Override public File getExternalFilesDir(String type) {
         return scopedExternalDirectory("files", type);
@@ -197,8 +201,10 @@ public final class GuestContext extends ContextWrapper {
 
     private File scopedExternalDirectory(String category, String type) {
         File categoryRoot = ensureDirectory(new File(externalRoot, category));
-        return type == null || type.trim().isEmpty()
-                ? categoryRoot : ensureDirectory(new File(categoryRoot, safeName(type)));
+        return type == null || type.isEmpty()
+                ? categoryRoot
+                : ensureDirectory(storageNames.resolve(categoryRoot,
+                        "external_" + category, type, "", ""));
     }
 
     private static File ensureDirectory(File file) {
@@ -208,10 +214,4 @@ public final class GuestContext extends ContextWrapper {
         return file;
     }
 
-    private static String safeName(String value) {
-        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("name is required");
-        String safe = value.replaceAll("[^A-Za-z0-9._-]", "_");
-        if (safe.equals(".") || safe.equals("..")) throw new IllegalArgumentException("unsafe name");
-        return safe;
-    }
 }

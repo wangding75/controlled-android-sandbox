@@ -311,3 +311,17 @@ replacement. Pre-dispatch death may retry once because the Guest operation has n
 dies after operation dispatch is never replayed, avoiding duplicate side effects. Failure reasons remain
 explicit (`DEAD_BINDER`, `BINDER_DIED`, `DISCONNECTED`, `BIND_REJECTED`, `BIND_TIMEOUT`). Android Binder-driver and
 device evidence remain 0.
+
+## M5-T19.1-I Guest storage-name collision fix
+
+M5-T19.1-I replaces the lossy `replaceAll(..., "_")` path mapping with one shared
+`GuestStorageNameCodec`. Short logical names use reversible UTF-8 Base64URL components; long names
+use a bounded `v2h_<sha256>` component whose logical owner is recorded in a CRC-protected registry.
+SharedPreferences, databases, normal files, `getDir` and external-file types now use the same codec,
+and list APIs return logical names rather than encoded path components.
+
+Legacy underscore paths are migrated only after a durable namespace/path claim is recorded. If a
+second logical name resolves to the same legacy physical path, access fails with
+`LEGACY_NAME_COLLISION_AMBIGUOUS`; the two names are never silently attached to one file or directory.
+Registry corruption and physical-name claim conflicts fail closed. Android filesystem and device
+evidence remain 0.

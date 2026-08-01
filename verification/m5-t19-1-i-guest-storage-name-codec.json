@@ -1,0 +1,19 @@
+{
+  "androidFilesystemEvidenceCount": 0,
+  "coveredSurfaces": [
+    "shared_preferences",
+    "database",
+    "file",
+    "getDir",
+    "external_files_type"
+  ],
+  "deviceEvidenceCount": 0,
+  "errors": [],
+  "finding": "P2-03 lossy GuestContext safeName mapping caused silent storage aliasing",
+  "inputDigestSha256": "122a0a76099b6e5abbe006c74072f25718ccd2325bb6eddd76c520f12b7ea478",
+  "legacyCollisionError": "LEGACY_NAME_COLLISION_AMBIGUOUS",
+  "longEncoding": "v2h_sha256_with_persistent_owner_claim",
+  "normalEncoding": "v2_base64url_utf8",
+  "sourceStatus": "PASS",
+  "task": "M5-T19.1-I"
+}
