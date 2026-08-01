@@ -214,3 +214,34 @@ ordered-Receiver completion leases. If a test Binder invokes its death recipient
 inside `linkToDeath`, the callback can already find and remove the reserved record; the caller then
 observes a failed recheck and cannot publish a dead capability. This source-level linearization does
 not substitute for Android Binder-driver, process-death or OEM device evidence.
+
+## Binder collection pagination and binary payload transport
+
+The scoped `IVirtualSystemServiceSession` exposes typed page operations for Account, PendingIntent,
+Alarm, Notification/Channel, Job, Shortcut, AppWidget and Settings collections. A
+`VirtualPageRequest` carries `maxItems`, `maxBytes` and an opaque continuation token. The Host applies
+both limits before returning and reserves transaction headroom below the platform Binder ceiling.
+All page operations are appended after the original AIDL method sequence, preserving the transaction
+IDs of every pre-existing method for mixed-version compatibility.
+A single item that cannot fit after binary offload fails explicitly with
+`ITEM_EXCEEDS_BINDER_BUDGET`.
+
+Continuation tokens are process-local capabilities protected with HMAC-SHA256. Their authenticated
+state binds the collection/query, virtual package/user/process/generation scope, snapshot revision,
+offset and monotonic expiration. The Host recalculates a stable field-level revision for every
+page request. Mutation, token tampering, cross-collection use and cross-scope use are rejected rather
+than producing mixed snapshots.
+
+Binary fields larger than 64 KiB are replaced by an empty field in the typed page item and a
+`VirtualPageBlob` descriptor. The descriptor identifies the page item and field and includes byte
+length, SHA-256 and a random session-scoped grant token. The client opens the token through
+`openPageBlob`, reads a read-only `ParcelFileDescriptor`, verifies length/digest and reconstructs the
+typed item. Grants are bounded by count, total bytes and a two-minute lifetime, are consumed after
+one successful open, and are destroyed when the scoped session closes. Active grants are never
+silently evicted. A page stops at the 64-grant window and resumes after the client consumes its
+handles.
+
+Legacy collection methods are compatibility adapters with a 32-item/128-KiB ceiling. They either
+return the complete collection or throw `PAGING_REQUIRED`; offloaded binary values are never silently
+lost. Account collection pages use `VirtualAccountSummary(name,type)`. Passwords and tokens do not
+cross Binder during enumeration and remain behind `getPassword` and `peekAuthToken`.

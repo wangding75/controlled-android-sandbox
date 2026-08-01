@@ -280,3 +280,23 @@ that the Binder is alive before publishing success. A death delivered synchronou
 Link failure, immediate death and explicit close share idempotent rollback/unlink ownership.
 Deterministic Host regressions invoke the death recipient inside `linkToDeath`; no sleep-based
 ordering is used. Real Binder-driver and device timing evidence remains 0.
+
+## M5-T19.1-E Binder collection pagination and credential minimization fix
+
+M5-T19.1-E replaces unbounded virtual Account, PendingIntent, Alarm, Notification/Channel, Job,
+Shortcut, AppWidget and Settings collection transfers with typed pages. Every request supplies both
+an item limit and a serialized-byte budget. Continuation tokens are HMAC protected and bound to the
+collection, scoped capability, immutable snapshot revision, offset and monotonic expiry. A changed
+collection rejects an old token with `PAGE_TOKEN_STALE`; tokens cannot be replayed across a virtual
+package/user/process scope or another collection. New AIDL methods are appended after the complete
+legacy method sequence, preserving all pre-existing Binder transaction IDs.
+
+Legacy `list*` methods remain only as bounded compatibility adapters. They return a complete small
+collection or fail with `PAGING_REQUIRED`; they never silently truncate. Binary fields above 64 KiB
+are omitted from the Binder page and exposed through a session-scoped, one-time
+`ParcelFileDescriptor` grant with length and SHA-256 metadata. Active grants are never silently
+evicted; a page stops at the 64-grant window and resumes with its continuation token. Account enumeration now returns only `name` and `type`; password
+and authentication tokens remain available solely through their dedicated checked methods. Host
+regressions cover item/byte boundaries, token tampering and stale revisions, large binary recovery,
+legacy rejection and credential-free account enumeration. Generated AIDL, Android Binder-driver,
+Emulator and physical-device evidence remain 0.

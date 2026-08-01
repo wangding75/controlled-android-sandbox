@@ -9,6 +9,7 @@ import java.util.Objects;
 /** Immutable dependency graph shared by package-service Binder capabilities. */
 final class PackageServiceDependencies implements AutoCloseable {
     final Object operationLock = new Object();
+    final File filesDir;
     final SandboxPackageLifecycle lifecycle;
     final PackageCallerVerifier callerVerifier;
     final VirtualPackageStateBuilder packageStateBuilder;
@@ -27,7 +28,7 @@ final class PackageServiceDependencies implements AutoCloseable {
     static PackageServiceDependencies create(Service service, File filesDir) {
         Objects.requireNonNull(service, "service");
         Objects.requireNonNull(filesDir, "filesDir");
-        return new PackageServiceDependencies(
+        return new PackageServiceDependencies(filesDir,
                 new SandboxPackageLifecycle(service),
                 new PackageCallerVerifier(service),
                 new VirtualPackageStateBuilder(service),
@@ -59,6 +60,28 @@ final class PackageServiceDependencies implements AutoCloseable {
             VirtualMediaCommunicationStore mediaCommunication,
             VirtualPeripheralServicesStore peripheralServices,
             VirtualPrivilegedServicesStore privilegedServices) {
+        this(new File(System.getProperty("java.io.tmpdir"), "controlled-sandbox-tests"),
+                lifecycle, callerVerifier, packageStateBuilder, hostPermissions, systemServices,
+                deviceServices, interactions, networkServices, applicationEnvironment, compatibility,
+                policyServices, mediaCommunication, peripheralServices, privilegedServices);
+    }
+
+    PackageServiceDependencies(File filesDir,
+            SandboxPackageLifecycle lifecycle,
+            PackageCallerVerifier callerVerifier,
+            VirtualPackageStateBuilder packageStateBuilder,
+            HostPermissionStateResolver hostPermissions,
+            VirtualSystemServiceStore systemServices,
+            VirtualDeviceServiceStore deviceServices,
+            VirtualInteractionStore interactions,
+            VirtualNetworkServiceStore networkServices,
+            ApplicationEnvironmentStore applicationEnvironment,
+            VirtualCompatibilityStore compatibility,
+            VirtualPolicyServicesStore policyServices,
+            VirtualMediaCommunicationStore mediaCommunication,
+            VirtualPeripheralServicesStore peripheralServices,
+            VirtualPrivilegedServicesStore privilegedServices) {
+        this.filesDir = Objects.requireNonNull(filesDir, "filesDir");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.callerVerifier = Objects.requireNonNull(callerVerifier, "callerVerifier");
         this.packageStateBuilder = Objects.requireNonNull(packageStateBuilder, "packageStateBuilder");

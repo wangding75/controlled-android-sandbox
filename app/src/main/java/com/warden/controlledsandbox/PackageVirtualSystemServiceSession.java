@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Process;
+import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
 import com.warden.controlledsandbox.contract.IPackageService;
@@ -13,6 +14,17 @@ import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAccountPage;
+import com.warden.controlledsandbox.contract.VirtualAccountSummary;
+import com.warden.controlledsandbox.contract.VirtualAlarmPage;
+import com.warden.controlledsandbox.contract.VirtualJobPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationPage;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentPage;
+import com.warden.controlledsandbox.contract.VirtualSettingPage;
+import com.warden.controlledsandbox.contract.VirtualShortcutPage;
+import com.warden.controlledsandbox.contract.VirtualWidgetPage;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
@@ -59,6 +71,8 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     private final long generation;
     private final String packageRevision;
     private final DeathRegistrationHelper deathRegistration;
+    private final VirtualSystemServicePager pager;
+    private final String pagingScopeKey;
     private volatile boolean active = true;
     private volatile IVirtualSystemServiceObserver observer;
 
@@ -82,6 +96,9 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         this.scope = scope; this.virtualUid = virtualUid; this.processName = required(processName, "processName");
         this.generation = generation; this.packageRevision = required(packageRevision, "packageRevision");
         deathRegistration = new DeathRegistrationHelper(clientToken, this::binderDied);
+        pager = new VirtualSystemServicePager(dependencies.filesDir);
+        pagingScopeKey = scope.key() + "|vuid=" + virtualUid + "|process=" + this.processName
+                + "|generation=" + generation + "|revision=" + this.packageRevision;
     }
 
     boolean linkClientDeathAfterReservation() throws android.os.RemoteException {
@@ -98,8 +115,24 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public void registerObserver(IVirtualSystemServiceObserver value) {
         requireCapability(); observer = value;
     }
+    @Override public VirtualAccountPage listAccountsPage(String type, VirtualPageRequest request) {
+        requireCapability();
+        String normalized = VirtualSystemServiceStore.normalize(type);
+        VirtualSystemServicePager.PageSlice<VirtualAccountSummary> page = pager.page(
+                "ACCOUNT:" + normalized, pagingScopeKey, systemServices.accountSummaries(scope, normalized),
+                request, null);
+        return new VirtualAccountPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualAccountSnapshot> listAccounts(String type) {
-        requireCapability(); return systemServices.accounts(scope, type);
+        VirtualAccountPage page = listAccountsPage(type, legacyRequest());
+        if (!page.nextPageToken().isEmpty() || !page.blobs().isEmpty()) {
+            throw new IllegalStateException("PAGING_REQUIRED");
+        }
+        java.util.ArrayList<VirtualAccountSnapshot> out = new java.util.ArrayList<>();
+        for (VirtualAccountSummary value : page.items()) {
+            out.add(new VirtualAccountSnapshot(value.name(), value.type(), "", java.util.List.of(), java.util.List.of()));
+        }
+        return java.util.List.copyOf(out);
     }
     @Override public boolean addAccount(String name, String type, String password) {
         requireCapability(); return systemServices.addAccount(scope, name, type, password);
@@ -134,8 +167,18 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public boolean cancelPendingIntent(String tokenId) {
         requireCapability(); return systemServices.cancelPendingIntent(scope, packageRevision, tokenId);
     }
+    @Override public VirtualPendingIntentPage listPendingIntentsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualPendingIntentSnapshot> page = pager.page(
+                "PENDING_INTENT", pagingScopeKey,
+                systemServices.pendingIntents(scope, processName, generation, packageRevision),
+                request, VirtualSystemServicePageAdapters.PENDING_INTENT);
+        return new VirtualPendingIntentPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualPendingIntentSnapshot> listPendingIntents() {
-        requireCapability(); return systemServices.pendingIntents(scope, processName, generation, packageRevision);
+        requireCapability(); return pager.legacy(pager.page("PENDING_INTENT", pagingScopeKey,
+                systemServices.pendingIntents(scope, processName, generation, packageRevision),
+                legacyRequest(), VirtualSystemServicePageAdapters.PENDING_INTENT));
     }
     @Override public void scheduleAlarm(VirtualAlarmSnapshot candidate) {
         requireCapability(); systemServices.scheduleAlarm(scope, processName, generation,
@@ -144,8 +187,18 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public boolean cancelAlarm(String alarmId) {
         requireCapability(); return systemServices.cancelAlarm(scope, packageRevision, alarmId);
     }
+    @Override public VirtualAlarmPage listAlarmsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualAlarmSnapshot> page = pager.page(
+                "ALARM", pagingScopeKey,
+                systemServices.alarms(scope, processName, generation, packageRevision),
+                request, VirtualSystemServicePageAdapters.ALARM);
+        return new VirtualAlarmPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualAlarmSnapshot> listAlarms() {
-        requireCapability(); return systemServices.alarms(scope, processName, generation, packageRevision);
+        requireCapability(); return pager.legacy(pager.page("ALARM", pagingScopeKey,
+                systemServices.alarms(scope, processName, generation, packageRevision),
+                legacyRequest(), VirtualSystemServicePageAdapters.ALARM));
     }
     @Override public VirtualNotificationSnapshot reserveNotification(VirtualNotificationSnapshot candidate) {
         requireCapability(); return systemServices.reserveNotification(scope, generation, packageRevision, candidate);
@@ -156,8 +209,17 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public boolean removeNotification(int guestId, String guestTag) {
         requireCapability(); return systemServices.removeNotification(scope, packageRevision, guestId, guestTag);
     }
+    @Override public VirtualNotificationPage listNotificationsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualNotificationSnapshot> page = pager.page(
+                "NOTIFICATION", pagingScopeKey, systemServices.notifications(scope, packageRevision),
+                request, VirtualSystemServicePageAdapters.NOTIFICATION);
+        return new VirtualNotificationPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualNotificationSnapshot> listNotifications() {
-        requireCapability(); return systemServices.notifications(scope, packageRevision);
+        requireCapability(); return pager.legacy(pager.page("NOTIFICATION", pagingScopeKey,
+                systemServices.notifications(scope, packageRevision), legacyRequest(),
+                VirtualSystemServicePageAdapters.NOTIFICATION));
     }
     @Override public void upsertNotificationChannel(VirtualNotificationChannelSnapshot value) {
         requireCapability(); systemServices.upsertNotificationChannel(scope, packageRevision, value);
@@ -165,8 +227,19 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public boolean removeNotificationChannel(String kind, String id) {
         requireCapability(); return systemServices.removeNotificationChannel(scope, packageRevision, kind, id);
     }
+    @Override public VirtualNotificationChannelPage listNotificationChannelsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualNotificationChannelSnapshot> page = pager.page(
+                "NOTIFICATION_CHANNEL", pagingScopeKey,
+                systemServices.notificationChannels(scope, packageRevision), request,
+                VirtualSystemServicePageAdapters.CHANNEL);
+        return new VirtualNotificationChannelPage(page.items(), page.blobs(),
+                page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualNotificationChannelSnapshot> listNotificationChannels() {
-        requireCapability(); return systemServices.notificationChannels(scope, packageRevision);
+        requireCapability(); return pager.legacy(pager.page("NOTIFICATION_CHANNEL", pagingScopeKey,
+                systemServices.notificationChannels(scope, packageRevision), legacyRequest(),
+                VirtualSystemServicePageAdapters.CHANNEL));
     }
     @Override public VirtualJobSnapshot reserveJob(VirtualJobSnapshot candidate) {
         requireCapability(); return systemServices.reserveJob(scope, processName, generation,
@@ -174,8 +247,17 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     }
     @Override public void commitJob(int guestId) { requireCapability(); systemServices.commitJob(scope, guestId); }
     @Override public boolean removeJob(int guestId) { requireCapability(); return systemServices.removeJob(scope, guestId); }
+    @Override public VirtualJobPage listJobsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualJobSnapshot> page = pager.page(
+                "JOB", pagingScopeKey, systemServices.jobs(scope, processName, generation, packageRevision),
+                request, VirtualSystemServicePageAdapters.JOB);
+        return new VirtualJobPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualJobSnapshot> listJobs() {
-        requireCapability(); return systemServices.jobs(scope, processName, generation, packageRevision);
+        requireCapability(); return pager.legacy(pager.page("JOB", pagingScopeKey,
+                systemServices.jobs(scope, processName, generation, packageRevision), legacyRequest(),
+                VirtualSystemServicePageAdapters.JOB));
     }
     @Override public int ensureNamespace(String namespace, int guestId) {
         requireCapability(); return systemServices.ensureNamespace(scope, namespace, guestId);
@@ -219,8 +301,15 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public VirtualPrivilegedServicesProfileSnapshot getPrivilegedServicesProfile() {
         requireCapability(); return privilegedServices.getOrCreate(scope);
     }
+    @Override public VirtualShortcutPage listShortcutsPage(VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualShortcutSnapshot> page = pager.page(
+                "SHORTCUT", pagingScopeKey, applicationEnvironment.shortcuts(scope), request, null);
+        return new VirtualShortcutPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualShortcutSnapshot> listShortcuts() {
-        requireCapability(); return applicationEnvironment.shortcuts(scope);
+        requireCapability(); return pager.legacy(pager.page("SHORTCUT", pagingScopeKey,
+                applicationEnvironment.shortcuts(scope), legacyRequest(), null));
     }
     @Override public boolean replaceDynamicShortcuts(java.util.List<VirtualShortcutSnapshot> shortcuts) {
         requireCapability(); boolean changed = applicationEnvironment.replaceDynamicShortcuts(scope, shortcuts);
@@ -255,8 +344,17 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         if (removed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "APP_WIDGET", String.valueOf(appWidgetId));
         return removed;
     }
+    @Override public VirtualWidgetPage listAppWidgetsPage(int hostId, VirtualPageRequest request) {
+        requireCapability();
+        VirtualSystemServicePager.PageSlice<VirtualWidgetSnapshot> page = pager.page(
+                "APP_WIDGET:" + hostId, pagingScopeKey, applicationEnvironment.appWidgets(scope, hostId),
+                request, VirtualSystemServicePageAdapters.WIDGET);
+        return new VirtualWidgetPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualWidgetSnapshot> listAppWidgets(int hostId) {
-        requireCapability(); return applicationEnvironment.appWidgets(scope, hostId);
+        requireCapability(); return pager.legacy(pager.page("APP_WIDGET:" + hostId, pagingScopeKey,
+                applicationEnvironment.appWidgets(scope, hostId), legacyRequest(),
+                VirtualSystemServicePageAdapters.WIDGET));
     }
     @Override public boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass) {
         requireCapability(); boolean bound = applicationEnvironment.bindAppWidget(scope, appWidgetId,
@@ -288,8 +386,22 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         if (removed) systemServices.notifyApplicationEnvironmentDataChanged(scope, "SETTINGS", namespace + ":" + key);
         return removed;
     }
+    @Override public VirtualSettingPage listSettingsPage(String namespace, VirtualPageRequest request) {
+        requireCapability();
+        String normalized = namespace == null ? "" : namespace.trim();
+        VirtualSystemServicePager.PageSlice<VirtualSettingSnapshot> page = pager.page(
+                "SETTING:" + normalized, pagingScopeKey, applicationEnvironment.settings(scope, normalized),
+                request, null);
+        return new VirtualSettingPage(page.items(), page.blobs(), page.nextPageToken(), page.snapshotRevision());
+    }
     @Override public java.util.List<VirtualSettingSnapshot> listSettings(String namespace) {
-        requireCapability(); return applicationEnvironment.settings(scope, namespace);
+        requireCapability();
+        String normalized = namespace == null ? "" : namespace.trim();
+        return pager.legacy(pager.page("SETTING:" + normalized, pagingScopeKey,
+                applicationEnvironment.settings(scope, normalized), legacyRequest(), null));
+    }
+    @Override public ParcelFileDescriptor openPageBlob(String blobToken) {
+        requireCapability(); return pager.openBlob(pagingScopeKey, blobToken);
     }
     @Override public void close() { requireCapability(); closeInternal(); }
     @Override public void binderDied() { closeInternal(); }
@@ -310,5 +422,11 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         observer = null;
         systemServices.unregister(this);
         deathRegistration.close();
+        pager.close();
+    }
+
+    private static VirtualPageRequest legacyRequest() {
+        return new VirtualPageRequest(VirtualSystemServicePager.LEGACY_MAX_ITEMS,
+                VirtualSystemServicePager.LEGACY_MAX_BYTES, "");
     }
 }

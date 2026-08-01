@@ -6,6 +6,18 @@ import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAccountPage;
+import com.warden.controlledsandbox.contract.VirtualAccountSummary;
+import com.warden.controlledsandbox.contract.VirtualAlarmPage;
+import com.warden.controlledsandbox.contract.VirtualJobPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationPage;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
+import com.warden.controlledsandbox.contract.VirtualPageView;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentPage;
+import com.warden.controlledsandbox.contract.VirtualSettingPage;
+import com.warden.controlledsandbox.contract.VirtualShortcutPage;
+import com.warden.controlledsandbox.contract.VirtualWidgetPage;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
@@ -37,6 +49,9 @@ import java.util.concurrent.ConcurrentMap;
 /** Guest-side adapter for a scoped Binder-owned virtual system-service capability. */
 public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemServiceAuthority {
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
+    private static final int PAGE_MAX_ITEMS = 64;
+    private static final int PAGE_MAX_BYTES = 224 * 1024;
+    private static final int MAX_PAGE_COUNT = 4096;
     private final IVirtualSystemServiceSession session;
     private final ClassLoader classLoader;
     private final ConcurrentMap<String, Runnable> alarmDeliveries = new ConcurrentHashMap<>();
@@ -169,7 +184,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return privilegedServicesProfile;
     }
     @Override public List<VirtualShortcutSnapshot> shortcuts() {
-        List<VirtualShortcutSnapshot> values = call(session::listShortcuts); return values == null ? List.of() : List.copyOf(values);
+        return collectPages(session::listShortcutsPage, VirtualPageView::items);
     }
     @Override public boolean replaceDynamicShortcuts(List<VirtualShortcutSnapshot> shortcuts) {
         return call(() -> session.replaceDynamicShortcuts(shortcuts));
@@ -189,8 +204,8 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     @Override public int allocateAppWidgetId(int hostId) { return call(() -> session.allocateAppWidgetId(hostId)); }
     @Override public boolean deleteAppWidgetId(int appWidgetId) { return call(() -> session.deleteAppWidgetId(appWidgetId)); }
     @Override public List<VirtualWidgetSnapshot> appWidgets(int hostId) {
-        List<VirtualWidgetSnapshot> values = call(() -> session.listAppWidgets(hostId));
-        return values == null ? List.of() : List.copyOf(values);
+        return collectPages(request -> session.listAppWidgetsPage(hostId, request),
+                page -> RemoteVirtualPageHydrator.widgets(session, page));
     }
     @Override public boolean bindAppWidgetId(int appWidgetId, String providerPackage, String providerClass) {
         return call(() -> session.bindAppWidgetId(appWidgetId, safe(providerPackage), safe(providerClass)));
@@ -215,8 +230,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return call(() -> session.deleteSetting(namespace, key));
     }
     @Override public List<VirtualSettingSnapshot> settings(String namespace) {
-        List<VirtualSettingSnapshot> values = call(() -> session.listSettings(namespace));
-        return values == null ? List.of() : List.copyOf(values);
+        return collectPages(request -> session.listSettingsPage(namespace, request), VirtualPageView::items);
     }
     @Override public void setApplicationEnvironmentChangeListener(
             java.util.function.BiConsumer<String, String> listener) {
@@ -231,15 +245,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
 
     @Override public List<AccountRecord> accounts(String requestedType) {
-        List<VirtualAccountSnapshot> snapshots = call(() -> session.listAccounts(requestedType == null ? "" : requestedType));
-        List<AccountRecord> result = new ArrayList<>();
-        if (snapshots != null) for (VirtualAccountSnapshot snapshot : snapshots) {
-            Map<String, String> tokens = new LinkedHashMap<>();
-            for (int index = 0; index < snapshot.tokenTypes().size(); index++) {
-                tokens.put(snapshot.tokenTypes().get(index), snapshot.tokens().get(index));
-            }
-            result.add(new AccountRecord(snapshot.name(), snapshot.type(), snapshot.password(),
-                    Collections.unmodifiableMap(tokens)));
+        String type = requestedType == null ? "" : requestedType;
+        List<VirtualAccountSummary> summaries = collectPages(
+                request -> session.listAccountsPage(type, request), VirtualPageView::items);
+        List<AccountRecord> result = new ArrayList<>(summaries.size());
+        for (VirtualAccountSummary summary : summaries) {
+            result.add(new AccountRecord(summary.name(), summary.type(), "", Map.of()));
         }
         return Collections.unmodifiableList(result);
     }
@@ -283,9 +294,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return call(() -> session.cancelPendingIntent(tokenId));
     }
     @Override public List<PendingIntentRecord> pendingIntents() {
-        List<VirtualPendingIntentSnapshot> values = call(session::listPendingIntents);
-        List<PendingIntentRecord> out = new ArrayList<>();
-        if (values != null) for (VirtualPendingIntentSnapshot value : values) out.add(pendingIntent(value));
+        List<VirtualPendingIntentSnapshot> values = collectPages(session::listPendingIntentsPage,
+                page -> RemoteVirtualPageHydrator.pendingIntents(session, page));
+        List<PendingIntentRecord> out = new ArrayList<>(values.size());
+        for (VirtualPendingIntentSnapshot value : values) out.add(pendingIntent(value));
         return Collections.unmodifiableList(out);
     }
 
@@ -309,9 +321,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         if (removed) alarmDeliveries.remove(alarmId); return removed;
     }
     @Override public List<AlarmRecord> alarms() {
-        List<VirtualAlarmSnapshot> snapshots = call(session::listAlarms);
-        List<AlarmRecord> result = new ArrayList<>();
-        if (snapshots != null) for (VirtualAlarmSnapshot snapshot : snapshots) result.add(alarm(snapshot));
+        List<VirtualAlarmSnapshot> snapshots = collectPages(session::listAlarmsPage,
+                page -> RemoteVirtualPageHydrator.alarms(session, page));
+        List<AlarmRecord> result = new ArrayList<>(snapshots.size());
+        for (VirtualAlarmSnapshot snapshot : snapshots) result.add(alarm(snapshot));
         return Collections.unmodifiableList(result);
     }
     @Override public void setRecoveredAlarmDelivery(java.util.function.Function<AlarmRecord, Boolean> delivery) {
@@ -328,9 +341,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return call(() -> session.removeNotification(guestId, safe(guestTag)));
     }
     @Override public List<NotificationRecord> notifications() {
-        List<VirtualNotificationSnapshot> values = call(session::listNotifications);
-        List<NotificationRecord> out = new ArrayList<>();
-        if (values != null) for (VirtualNotificationSnapshot value : values) out.add(notification(value));
+        List<VirtualNotificationSnapshot> values = collectPages(session::listNotificationsPage,
+                page -> RemoteVirtualPageHydrator.notifications(session, page));
+        List<NotificationRecord> out = new ArrayList<>(values.size());
+        for (VirtualNotificationSnapshot value : values) out.add(notification(value));
         return Collections.unmodifiableList(out);
     }
     @Override public void upsertNotificationChannel(NotificationChannelRecord value) {
@@ -342,9 +356,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return call(() -> session.removeNotificationChannel(kind, id));
     }
     @Override public List<NotificationChannelRecord> notificationChannels() {
-        List<VirtualNotificationChannelSnapshot> values = call(session::listNotificationChannels);
-        List<NotificationChannelRecord> out = new ArrayList<>();
-        if (values != null) for (VirtualNotificationChannelSnapshot value : values) {
+        List<VirtualNotificationChannelSnapshot> values = collectPages(session::listNotificationChannelsPage,
+                page -> RemoteVirtualPageHydrator.channels(session, page));
+        List<NotificationChannelRecord> out = new ArrayList<>(values.size());
+        for (VirtualNotificationChannelSnapshot value : values) {
             out.add(new NotificationChannelRecord(value.kind(), value.id(), value.groupId(),
                     value.packageRevision(), unmarshal(value.payload()), value.updatedAtMs()));
         }
@@ -366,9 +381,10 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     @Override public void commitJob(int guestId) { call(() -> { session.commitJob(guestId); return null; }); }
     @Override public boolean removeJob(int guestId) { return call(() -> session.removeJob(guestId)); }
     @Override public List<JobRecord> jobs() {
-        List<VirtualJobSnapshot> values = call(session::listJobs);
-        List<JobRecord> out = new ArrayList<>();
-        if (values != null) for (VirtualJobSnapshot value : values) out.add(job(value));
+        List<VirtualJobSnapshot> values = collectPages(session::listJobsPage,
+                page -> RemoteVirtualPageHydrator.jobs(session, page));
+        List<JobRecord> out = new ArrayList<>(values.size());
+        for (VirtualJobSnapshot value : values) out.add(job(value));
         return Collections.unmodifiableList(out);
     }
     @Override public void setJobExecutionListener(JobExecutionListener listener) {
@@ -497,6 +513,31 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
             return parcel.readParcelable(classLoader);
         } finally { parcel.recycle(); }
     }
+    private <T extends Parcelable, P extends VirtualPageView<T>> List<T> collectPages(
+            PageFetcher<P> fetcher, PageHydrator<T, P> hydrator) {
+        ArrayList<T> out = new ArrayList<>();
+        String token = "";
+        long revision = -1L;
+        for (int pageCount = 0; pageCount < MAX_PAGE_COUNT; pageCount++) {
+            String currentToken = token;
+            P page = call(() -> fetcher.fetch(
+                    new VirtualPageRequest(PAGE_MAX_ITEMS, PAGE_MAX_BYTES, currentToken)));
+            if (page == null) throw new IllegalStateException("VIRTUAL_PAGE_MISSING");
+            if (revision < 0L) revision = page.snapshotRevision();
+            else if (revision != page.snapshotRevision()) throw new IllegalStateException("VIRTUAL_PAGE_REVISION_CHANGED");
+            List<T> hydrated = call(() -> hydrator.hydrate(page));
+            if (hydrated == null || hydrated.size() != page.items().size()) {
+                throw new IllegalStateException("VIRTUAL_PAGE_HYDRATION_INVALID");
+            }
+            out.addAll(hydrated);
+            String next = page.nextPageToken();
+            if (next == null || next.isEmpty()) return Collections.unmodifiableList(out);
+            if (next.equals(token)) throw new IllegalStateException("VIRTUAL_PAGE_TOKEN_DID_NOT_ADVANCE");
+            token = next;
+        }
+        throw new IllegalStateException("VIRTUAL_PAGE_COUNT_EXCEEDED");
+    }
+
     private <T> T call(RemoteCall<T> operation) {
         if (closed) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_SESSION_CLOSED");
         try { return operation.run(); }
@@ -504,5 +545,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         catch (Exception error) { throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_REMOTE_FAILURE", error); }
     }
     private static String safe(String value) { return value == null ? "" : value.trim(); }
+    @FunctionalInterface private interface PageFetcher<P> { P fetch(VirtualPageRequest request) throws Exception; }
+    @FunctionalInterface private interface PageHydrator<T, P> { List<T> hydrate(P page) throws Exception; }
     @FunctionalInterface private interface RemoteCall<T> { T run() throws Exception; }
 }

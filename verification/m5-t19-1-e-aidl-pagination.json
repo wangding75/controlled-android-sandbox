@@ -1,0 +1,26 @@
+{
+  "accountSummaryFields": [
+    "name",
+    "type"
+  ],
+  "androidBinderEvidenceCount": 0,
+  "androidGeneratedAidlEvidenceCount": 0,
+  "binaryOffloadThreshold": 65536,
+  "blobGrantSemantics": "ONE_TIME_NO_SILENT_EVICTION",
+  "deviceEvidenceCount": 0,
+  "errors": [],
+  "findings": [
+    "P1-05 unbounded AIDL collection transactions",
+    "P2-11 account enumeration transfers credentials"
+  ],
+  "hardMaximumBytes": 262144,
+  "hardMaximumItems": 128,
+  "legacyMaximumBytes": 131072,
+  "legacyMaximumItems": 32,
+  "legacyTransactionIdsPreserved": true,
+  "maximumActiveBlobGrants": 64,
+  "pagedCollections": 9,
+  "runtimeRequestBytes": 229376,
+  "sourceStatus": "PASS",
+  "task": "M5-T19.1-E"
+}

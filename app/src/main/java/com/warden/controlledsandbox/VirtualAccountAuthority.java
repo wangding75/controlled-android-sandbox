@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAccountSummary;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -10,6 +11,19 @@ import java.util.Objects;
 
 /** Bounded account and token operations separated from the system-service lifecycle authority. */
 final class VirtualAccountAuthority {
+    List<VirtualAccountSummary> summaries(VirtualSystemServiceRecords.ScopeState state,
+            String requestedType) {
+        String type = VirtualSystemServiceStore.normalize(requestedType);
+        List<VirtualAccountSummary> out = new ArrayList<>();
+        for (VirtualSystemServiceRecords.AccountKey key : state.accounts.keySet()) {
+            if (!type.isEmpty() && !type.equals(key.type())) continue;
+            out.add(new VirtualAccountSummary(key.name(), key.type()));
+        }
+        out.sort(Comparator.comparing(VirtualAccountSummary::type)
+                .thenComparing(VirtualAccountSummary::name));
+        return Collections.unmodifiableList(out);
+    }
+
     List<VirtualAccountSnapshot> snapshots(VirtualSystemServiceRecords.ScopeState state,
             String requestedType) {
         String type = VirtualSystemServiceStore.normalize(requestedType);

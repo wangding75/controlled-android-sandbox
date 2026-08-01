@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
+import com.warden.controlledsandbox.contract.VirtualAccountSummary;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
@@ -143,8 +144,9 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
 
     synchronized List<VirtualAccountSnapshot> accounts(Scope scope, String requestedType) {
-        return accountAuthority.snapshots(state(scope), requestedType);
-    }
+        return accountAuthority.snapshots(state(scope), requestedType); }
+    synchronized List<VirtualAccountSummary> accountSummaries(Scope scope, String requestedType) {
+        return accountAuthority.summaries(state(scope), requestedType); }
     synchronized boolean addAccount(Scope scope, String name, String type, String password) {
         MutationSnapshot before = snapshotMutation(scope);
         boolean added = accountAuthority.add(state(scope), name, type, password);
@@ -163,8 +165,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         persistOrRestore(scope, before);
     }
     synchronized String password(Scope scope, String name, String type) {
-        return accountAuthority.password(state(scope), name, type);
-    }
+        return accountAuthority.password(state(scope), name, type); }
     synchronized void setToken(Scope scope, String name, String type,
             String tokenType, String token) {
         MutationSnapshot before = snapshotMutation(scope);
@@ -172,8 +173,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         persistOrRestore(scope, before);
     }
     synchronized String token(Scope scope, String name, String type, String tokenType) {
-        return accountAuthority.token(state(scope), name, type, tokenType);
-    }
+        return accountAuthority.token(state(scope), name, type, tokenType); }
     synchronized void invalidateToken(Scope scope, String accountType, String token) {
         MutationSnapshot before = snapshotMutation(scope);
         if (accountAuthority.invalidateToken(state(scope), accountType, token)) {

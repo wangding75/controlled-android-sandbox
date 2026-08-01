@@ -1,6 +1,17 @@
 package com.warden.controlledsandbox.contract;
 
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
+import android.os.ParcelFileDescriptor;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
+import com.warden.controlledsandbox.contract.VirtualAccountPage;
+import com.warden.controlledsandbox.contract.VirtualPendingIntentPage;
+import com.warden.controlledsandbox.contract.VirtualAlarmPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationPage;
+import com.warden.controlledsandbox.contract.VirtualNotificationChannelPage;
+import com.warden.controlledsandbox.contract.VirtualJobPage;
+import com.warden.controlledsandbox.contract.VirtualShortcutPage;
+import com.warden.controlledsandbox.contract.VirtualWidgetPage;
+import com.warden.controlledsandbox.contract.VirtualSettingPage;
 import com.warden.controlledsandbox.contract.VirtualAccountSnapshot;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
@@ -97,4 +108,17 @@ interface IVirtualSystemServiceSession {
     List<VirtualSettingSnapshot> listSettings(String namespace);
 
     void close();
+
+    // Appended in M5-T19.1-E. Keep every pre-existing method above in its original order so
+    // generated Binder transaction IDs remain compatible with older Host/Runtime components.
+    VirtualAccountPage listAccountsPage(String type, in VirtualPageRequest request);
+    VirtualPendingIntentPage listPendingIntentsPage(in VirtualPageRequest request);
+    VirtualAlarmPage listAlarmsPage(in VirtualPageRequest request);
+    VirtualNotificationPage listNotificationsPage(in VirtualPageRequest request);
+    VirtualNotificationChannelPage listNotificationChannelsPage(in VirtualPageRequest request);
+    VirtualJobPage listJobsPage(in VirtualPageRequest request);
+    VirtualShortcutPage listShortcutsPage(in VirtualPageRequest request);
+    VirtualWidgetPage listAppWidgetsPage(int hostId, in VirtualPageRequest request);
+    VirtualSettingPage listSettingsPage(String namespace, in VirtualPageRequest request);
+    ParcelFileDescriptor openPageBlob(String blobToken);
 }
