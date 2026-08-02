@@ -18,6 +18,7 @@ public final class OneTimeRouteStoreSelfTest {
         testOneTimeConsumeAndDefensiveCopies();
         testOwnerAndKindMismatchDoNotBurnToken();
         testExpiryAndCapacityRecovery();
+        testWallClockChangesDoNotAffectTtl();
         testGenerationRevocation();
         testConcurrentConsumeAllowsExactlyOneWinner();
         testBounds();
@@ -102,6 +103,27 @@ public final class OneTimeRouteStoreSelfTest {
                 Map.of(),
                 Duration.ofSeconds(1));
         check(!second.value().equals(first.value()), "new route should receive a fresh token");
+    }
+
+    private static void testWallClockChangesDoNotAffectTtl() {
+        MutableClock wallClock = new MutableClock(10_000L);
+        MutableElapsedClock elapsedClock = new MutableElapsedClock(500L);
+        OneTimeRouteStore store = new OneTimeRouteStore(
+                wallClock, elapsedClock::nowMillis, 8, 1024, Duration.ofMinutes(1));
+        RouteOwner owner = owner(8);
+
+        RouteToken forwardJump = store.put(
+                owner, RouteKind.ACTIVITY_LAUNCH, new byte[] {1}, Map.of(), Duration.ofSeconds(1));
+        wallClock.advance(Duration.ofDays(30));
+        check(store.consume(forwardJump.value(), owner, RouteKind.ACTIVITY_LAUNCH).isPresent(),
+                "wall-clock forward jump expired a monotonic route");
+
+        RouteToken backwardJump = store.put(
+                owner, RouteKind.NEW_INTENT, new byte[] {2}, Map.of(), Duration.ofSeconds(1));
+        wallClock.advance(Duration.ofDays(-60));
+        elapsedClock.advance(Duration.ofMillis(1_001));
+        check(store.consume(backwardJump.value(), owner, RouteKind.NEW_INTENT).isEmpty(),
+                "wall-clock backward jump extended a monotonic route");
     }
 
     private static void testGenerationRevocation() {
@@ -222,6 +244,22 @@ public final class OneTimeRouteStoreSelfTest {
     private static void check(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static final class MutableElapsedClock {
+        private long nowMillis;
+
+        private MutableElapsedClock(long nowMillis) {
+            this.nowMillis = nowMillis;
+        }
+
+        private long nowMillis() {
+            return nowMillis;
+        }
+
+        private void advance(Duration duration) {
+            nowMillis = Math.addExact(nowMillis, duration.toMillis());
         }
     }
 

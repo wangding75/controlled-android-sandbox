@@ -41,6 +41,7 @@ public final class RoutePayload {
         return createdAtMillis;
     }
 
+    /** Diagnostic wall-clock timestamp only; expiry enforcement uses monotonic elapsed time. */
     public long expiresAtMillis() {
         return expiresAtMillis;
     }

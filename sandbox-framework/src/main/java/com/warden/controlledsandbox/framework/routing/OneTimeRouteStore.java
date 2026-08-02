@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.routing;
 
+import android.os.SystemClock;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Iterator;
@@ -8,6 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.LongSupplier;
 
 /**
  * Broker-owned bounded storage for payloads referenced by opaque one-time route tokens.
@@ -26,22 +28,37 @@ public final class OneTimeRouteStore {
     private static final int MAX_METADATA_VALUE_LENGTH = 4096;
     private static final int MAX_METADATA_CHARACTERS = 32_768;
 
-    private final Clock clock;
+    private final Clock wallClock;
+    private final LongSupplier elapsedRealtimeMillis;
     private final int maxEntries;
     private final int maxPayloadBytes;
     private final Duration maxTtl;
     private final LinkedHashMap<String, StoredRoute> routes = new LinkedHashMap<>();
 
     public OneTimeRouteStore() {
-        this(Clock.systemUTC(), DEFAULT_MAX_ENTRIES, DEFAULT_MAX_PAYLOAD_BYTES, DEFAULT_MAX_TTL);
+        this(Clock.systemUTC(), SystemClock::elapsedRealtime,
+                DEFAULT_MAX_ENTRIES, DEFAULT_MAX_PAYLOAD_BYTES, DEFAULT_MAX_TTL);
     }
 
+    /** Test/backward-compatible constructor. The supplied Clock drives both diagnostic wall time and TTL time. */
     public OneTimeRouteStore(
             Clock clock,
             int maxEntries,
             int maxPayloadBytes,
             Duration maxTtl) {
-        this.clock = Objects.requireNonNull(clock, "clock");
+        this(clock, Objects.requireNonNull(clock, "clock")::millis,
+                maxEntries, maxPayloadBytes, maxTtl);
+    }
+
+    public OneTimeRouteStore(
+            Clock wallClock,
+            LongSupplier elapsedRealtimeMillis,
+            int maxEntries,
+            int maxPayloadBytes,
+            Duration maxTtl) {
+        this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
+        this.elapsedRealtimeMillis = Objects.requireNonNull(
+                elapsedRealtimeMillis, "elapsedRealtimeMillis");
         if (maxEntries < 1) {
             throw new IllegalArgumentException("maxEntries must be positive");
         }
@@ -71,21 +88,24 @@ public final class OneTimeRouteStore {
         }
         Map<String, String> metadataCopy = validateMetadata(metadata);
         Duration normalizedTtl = validateTtl(ttl);
-        long now = clock.millis();
-        purgeExpiredAt(now);
+        long wallNow = wallClock.millis();
+        long elapsedNow = elapsedRealtimeMillis.getAsLong();
+        purgeExpiredAt(elapsedNow);
         if (routes.size() >= maxEntries) {
             throw new IllegalStateException("route store capacity exhausted");
         }
-        long expiresAt = Math.addExact(now, normalizedTtl.toMillis());
+        long expiresAtWall = Math.addExact(wallNow, normalizedTtl.toMillis());
+        long expiresAtElapsed = Math.addExact(elapsedNow, normalizedTtl.toMillis());
         String token = nextUniqueToken();
         routes.put(token, new StoredRoute(
                 kind,
                 owner,
-                now,
-                expiresAt,
+                wallNow,
+                expiresAtWall,
+                expiresAtElapsed,
                 metadataCopy,
                 payloadCopy));
-        return new RouteToken(token, expiresAt);
+        return new RouteToken(token, expiresAtWall);
     }
 
     /**
@@ -98,12 +118,12 @@ public final class OneTimeRouteStore {
         String normalizedToken = requireText(token, "token");
         Objects.requireNonNull(expectedOwner, "expectedOwner");
         Objects.requireNonNull(expectedKind, "expectedKind");
-        long now = clock.millis();
+        long elapsedNow = elapsedRealtimeMillis.getAsLong();
         StoredRoute route = routes.get(normalizedToken);
         if (route == null) {
             return Optional.empty();
         }
-        if (route.expiresAtMillis <= now) {
+        if (route.expiresAtElapsedMillis <= elapsedNow) {
             routes.remove(normalizedToken);
             return Optional.empty();
         }
@@ -165,19 +185,19 @@ public final class OneTimeRouteStore {
     }
 
     public synchronized int purgeExpired() {
-        return purgeExpiredAt(clock.millis());
+        return purgeExpiredAt(elapsedRealtimeMillis.getAsLong());
     }
 
     public synchronized int size() {
-        purgeExpiredAt(clock.millis());
+        purgeExpiredAt(elapsedRealtimeMillis.getAsLong());
         return routes.size();
     }
 
-    private int purgeExpiredAt(long now) {
+    private int purgeExpiredAt(long elapsedNow) {
         int removed = 0;
         Iterator<Map.Entry<String, StoredRoute>> iterator = routes.entrySet().iterator();
         while (iterator.hasNext()) {
-            if (iterator.next().getValue().expiresAtMillis <= now) {
+            if (iterator.next().getValue().expiresAtElapsedMillis <= elapsedNow) {
                 iterator.remove();
                 removed++;
             }
@@ -247,6 +267,7 @@ public final class OneTimeRouteStore {
         private final RouteOwner owner;
         private final long createdAtMillis;
         private final long expiresAtMillis;
+        private final long expiresAtElapsedMillis;
         private final Map<String, String> metadata;
         private final byte[] bytes;
 
@@ -255,12 +276,14 @@ public final class OneTimeRouteStore {
                 RouteOwner owner,
                 long createdAtMillis,
                 long expiresAtMillis,
+                long expiresAtElapsedMillis,
                 Map<String, String> metadata,
                 byte[] bytes) {
             this.kind = kind;
             this.owner = owner;
             this.createdAtMillis = createdAtMillis;
             this.expiresAtMillis = expiresAtMillis;
+            this.expiresAtElapsedMillis = expiresAtElapsedMillis;
             this.metadata = metadata;
             this.bytes = bytes;
         }
