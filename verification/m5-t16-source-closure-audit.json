@@ -98,19 +98,19 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
-      "lines": 1266
+      "lines": 1294
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-      "lines": 878
+      "lines": 879
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
-      "lines": 827
+      "lines": 828
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
-      "lines": 781
+      "lines": 791
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
@@ -142,7 +142,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
-      "lines": 536
+      "lines": 548
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
