@@ -9,26 +9,26 @@
       "name": "app",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 128,
+      "fileCount": 129,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "e9d78b37066a867eadeb18392ba76e7595ef4abb4e74776e35115784e83766f0"
+      "sourceDigestSha256": "87f19f0971e992bca477064a41094f308b37dc122138544634b3debd60f753dd"
     },
     {
       "type": "library",
       "name": "sandbox-domain",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 54,
+      "fileCount": 55,
       "languages": [
         "Gradle",
         "Java"
       ],
-      "sourceDigestSha256": "cf9b94a8282ab1a431e83407c956d5b12c1db123f4d9d9ef79eb1a0cddda9f31"
+      "sourceDigestSha256": "986112dc871e16407a0d98d8311cd796ec30512050345cae77a77bd3647a3bbc"
     },
     {
       "type": "library",
@@ -49,13 +49,13 @@
       "name": "sandbox-framework",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 205,
+      "fileCount": 206,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "4aa067354304522474939d2dbc83ff98742a0da49e0a69179b29aae4659ac76e"
+      "sourceDigestSha256": "4b8287523f7fee31dc634194b4a3e913dc6b51a85287694583421e80d8712e10"
     },
     {
       "type": "library",
@@ -77,7 +77,7 @@
       "name": "sandbox-companion32",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 12,
+      "fileCount": 13,
       "languages": [
         "C++",
         "Gradle",
@@ -85,20 +85,20 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "a26377e8205bd9de60402290b90ddb73c8a916fe9bf4f419010e616cf9b93cb5"
+      "sourceDigestSha256": "d25a5a36429bc733169a96d9d142180db4fe21c639d3b120a4b67a89f48c8c67"
     },
     {
       "type": "library",
       "name": "sandbox-runtime",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 210,
+      "fileCount": 211,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "45ee6c960160ae529f9558432437467744005d0401468fdb459b9dc31712fb6b"
+      "sourceDigestSha256": "be9b239ddac6d1482e237b43d977807aae879aeededb3fa6d343bd2706100c1a"
     },
     {
       "type": "application",
