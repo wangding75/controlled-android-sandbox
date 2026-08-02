@@ -76,12 +76,14 @@ public final class ProviderCursorTransport {
                 try {
                     out.putAll(pageInternal(lease.token(), sessionId, generation, 0, 0, pageSize));
                 } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                     removeAndClose(lease.token());
                     throw error;
                 }
             }
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (!cursors.containsValue(cursor)) closeQuietly(cursor);
             throw error;
         }
@@ -176,6 +178,7 @@ public final class ProviderCursorTransport {
             out.putLong(RuntimeKeys.CURSOR_NEXT_SEQUENCE, committed.nextSequence());
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if ("CURSOR_CELL_LIMIT_EXCEEDED".equals(error.getMessage())
                     || "CURSOR_ROW_EXCEEDS_PAGE_LIMIT".equals(error.getMessage())
                     || error instanceof ArithmeticException) {
@@ -254,7 +257,7 @@ public final class ProviderCursorTransport {
 
     private static void closeQuietly(Cursor cursor) {
         if (cursor == null) return;
-        try { cursor.close(); } catch (Throwable ignored) { }
+        try { cursor.close(); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
     }
 
     private long now() { return clock.getAsLong(); }

@@ -186,6 +186,7 @@ public final class GuestRuntimeEnvironment {
             stagedSession = null;
             return ready;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (stagedSession != null) stagedSession.shutdown();
             else {
                 if (stagedHooks != null) stagedHooks.close();

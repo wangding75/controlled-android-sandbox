@@ -284,6 +284,7 @@ public final class RuntimeReceiverCoordinator {
         try {
             result = guestInvoker.invoke(deliveryTarget.processSlot(), call);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (orderedLease != null) {
                 ordered.cancel(orderedLease,
                         "ORDERED_RECEIVER_GUEST_CALL_FAILED:" + error.getClass().getSimpleName());

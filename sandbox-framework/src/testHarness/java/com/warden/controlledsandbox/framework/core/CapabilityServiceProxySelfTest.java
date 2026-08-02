@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.framework.core;
 
 import android.content.pm.ApplicationInfo;
 import com.warden.controlledsandbox.framework.capability.CapabilityAuditEvent;
+import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
 import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
@@ -21,6 +22,7 @@ public final class CapabilityServiceProxySelfTest {
         testComplexLocationSignatureTracksListener();
         testCameraDeviceRevoked();
         testLeaseCapacityAndReplacementCleanup();
+        testFatalCleanupEscapes();
         System.out.println("PASS capability service proxy and revocation self-test");
     }
 
@@ -103,6 +105,17 @@ public final class CapabilityServiceProxySelfTest {
         require(bounded && cleanups.get() == 2,
                 "capacity overflow cleans the rejected resource and fails closed");
         leases.close();
+    }
+
+
+    private static void testFatalCleanupEscapes() {
+        CapabilityLeaseRegistry leases = new CapabilityLeaseRegistry();
+        Object token = new Object();
+        leases.register("camera", token, () -> { throw new AssertionError("fatal-cleanup"); });
+        boolean escaped = false;
+        try { leases.release(token, CapabilityAuditSink.NO_OP, "TEST"); }
+        catch (AssertionError expected) { escaped = true; }
+        require(escaped, "capability cleanup converted Error into audit-only failure");
     }
 
     @SuppressWarnings("unchecked")

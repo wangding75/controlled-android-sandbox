@@ -337,6 +337,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
                 Constructor<?> constructor = type.getDeclaredConstructor(String.class, String.class);
                 constructor.setAccessible(true); return constructor.newInstance(name, accountType);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
                 throw new IllegalStateException("VIRTUAL_ACCOUNT_RECONSTRUCTION_UNSUPPORTED:" + type.getName(), error);
             }
         }
@@ -800,11 +801,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         for (String name : new String[]{field, alternateField}) {
             try { Field found = findField(value.getClass(), name); found.setAccessible(true);
                 Object result = found.get(value); if (result != null) return String.valueOf(result); }
-            catch (Throwable ignored) { }
+            catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         try { Method found = value.getClass().getMethod(method); found.setAccessible(true);
             Object result = found.invoke(value); return result == null ? "" : String.valueOf(result); }
-        catch (Throwable ignored) { return ""; }
+        catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); return ""; }
     }
     public static Field findField(Class<?> type, String... names) throws NoSuchFieldException {
         Class<?> cursor = type;
@@ -818,7 +819,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         if (target == null) return false;
         for (String name : names) {
             try { Method method = target.getClass().getMethod(name); method.setAccessible(true); method.invoke(target); return true; }
-            catch (Throwable ignored) { }
+            catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         return false;
     }

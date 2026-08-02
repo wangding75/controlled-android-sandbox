@@ -230,12 +230,14 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
                     }
                 }
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 markFailure("DEAD_BINDER");
             } finally {
                 if (!published && linked) {
                     try {
                         service.unlinkToDeath(this, 0);
                     } catch (Throwable ignored) {
+                        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
                         // The candidate may have died while registration was being rolled back.
                     }
                 }
@@ -328,6 +330,7 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
                 try {
                     token.unlinkToDeath(this, 0);
                 } catch (Throwable ignored) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
                     // Binder may already be dead.
                 }
             }

@@ -134,7 +134,7 @@ public final class RuntimeDiagnostics {
                 record("UNCAUGHT_EXCEPTION", null,
                         "thread=" + thread.getName() + " type=" + error.getClass().getName()
                                 + " message=" + String.valueOf(error.getMessage()));
-            } catch (Throwable ignored) { }
+            } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             if (previous != null) previous.uncaughtException(thread, error);
         });
     }
@@ -153,6 +153,7 @@ public final class RuntimeDiagnostics {
                     Thread.currentThread().interrupt();
                     return;
                 } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                     record("WATCHDOG_FAILURE", null, error.getClass().getName() + ":" + error.getMessage());
                     return;
                 }
@@ -238,6 +239,7 @@ public final class RuntimeDiagnostics {
                     output.getFD().sync();
                 }
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 Log.e(TAG, "Diagnostics write failed: " + error);
             }
         }

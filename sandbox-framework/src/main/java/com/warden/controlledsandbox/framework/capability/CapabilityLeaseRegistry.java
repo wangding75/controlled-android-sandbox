@@ -64,6 +64,7 @@ public final class CapabilityLeaseRegistry implements AutoCloseable {
             audit.record(new CapabilityAuditEvent(lease.id, lease.capability, "resource",
                     "cleanup", "RELEASED", reason));
         } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
             audit.record(new CapabilityAuditEvent(lease.id, lease.capability, "resource",
                     "cleanup", "CLEANUP_FAILED", reason + ":" + error.getClass().getSimpleName()));
         }

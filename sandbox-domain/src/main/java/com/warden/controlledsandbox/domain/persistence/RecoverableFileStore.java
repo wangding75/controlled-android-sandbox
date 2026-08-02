@@ -46,6 +46,7 @@ public final class RecoverableFileStore {
                 trusted = readUtf8(primary);
                 decoded = decoder.decode(trusted);
             } catch (Throwable error) {
+                FatalErrorPolicy.rethrowIfFatal(error);
                 primaryFailure = error;
             }
             if (primaryFailure == null) {
@@ -65,6 +66,7 @@ public final class RecoverableFileStore {
                 writePath(primary, recovered);
                 return decoded;
             } catch (Throwable backupFailure) {
+                FatalErrorPolicy.rethrowIfFatal(backupFailure);
                 PersistentStateException failure = new PersistentStateException(
                         "Persisted state is corrupt and no trusted backup can be recovered: " + primary,
                         primaryFailure == null ? backupFailure : primaryFailure);

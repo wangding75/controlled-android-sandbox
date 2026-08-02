@@ -149,7 +149,7 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
             Method method = Intent.class.getMethod("getExtras");
             Object value = method.invoke(intent);
             if (value instanceof Bundle) target.putAll((Bundle) value);
-        } catch (Throwable ignored) { }
+        } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
     }
 
     private static void copyExtras(Intent source, Intent target) {
@@ -157,7 +157,7 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
             Method method = Intent.class.getMethod("getExtras");
             Object value = method.invoke(source);
             if (value instanceof Bundle) Intent.class.getMethod("putExtras", Bundle.class).invoke(target, value);
-        } catch (Throwable ignored) { }
+        } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
     }
 
     private static String clipDescription(Intent intent) {

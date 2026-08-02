@@ -289,7 +289,7 @@ public final class VirtualSystemServiceInterceptor {
                 Field field = findField(job.getClass(), "jobId", "mJobId");
                 if (field != null) { field.setAccessible(true); field.set(job, guestId); }
                 filtered.add(job);
-            } catch (Throwable ignored) { }
+            } catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         return filtered;
     }
@@ -414,6 +414,7 @@ public final class VirtualSystemServiceInterceptor {
                     .newInstance(identity.hostPackageName(), "com.warden.controlledsandbox.VirtualJobService");
             field.set(job, replacement); restores.add(() -> field.set(job, original));
         } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
             throw new SecurityException("VIRTUAL_JOB_SERVICE_REWRITE_FAILED", error);
         }
     }
@@ -803,7 +804,7 @@ public final class VirtualSystemServiceInterceptor {
     private static Object invoke(Object target, String methodName) {
         if (target == null) return null;
         try { Method method = target.getClass().getMethod(methodName); method.setAccessible(true); return method.invoke(target); }
-        catch (Throwable ignored) { return null; }
+        catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); return null; }
     }
     private static Object defaultValue(Class<?> type) {
         if (type == void.class) return null;

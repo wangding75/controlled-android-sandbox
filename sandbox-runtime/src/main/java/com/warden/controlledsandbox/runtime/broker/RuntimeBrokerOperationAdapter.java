@@ -35,6 +35,7 @@ final class RuntimeBrokerOperationAdapter {
             };
             return RuntimeOperationTransport.fromLegacy(request, result);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return RuntimeOperationTransport.failure(request, error);
         }
     }

@@ -133,6 +133,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 GuestSession current = findSession(request.sessionId(), request.generation());
                 return activityRuntime.taskOperation(current, request);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return ActivityTaskContractFailure.from(request, error);
             }
         }
@@ -144,6 +145,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 GuestSession current = findSession(request.sessionId(), request.generation());
                 return activityRuntime.resultOperation(current, request);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return ActivityResultContractFailure.from(request, error);
             }
         }
@@ -206,6 +208,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             out.putAll(transaction);
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (!issuedRouteToken.isEmpty()) activityRuntime.launchFailed(issuedRouteToken);
             return failure(error);
         }
@@ -475,6 +478,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 }
                 return result;
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 receiverCoordinator.rollbackRegistration(receiverReservation);
                 providerRuntime.rollbackPrepare(providerReservation);
                 cursorRuntime.rollbackQuery(cursorQueryReservation);
@@ -503,6 +507,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 throw error;
             }
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             cursorRuntime.rollbackQuery(cursorQueryReservation);
             if (cursorPageReservation != null) cursorRuntime.abort(cursorPageReservation.token());
             fileRuntime.rollbackOpen(fileOpenReservation);
@@ -567,6 +572,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             out.putLong(RuntimeKeys.URI_GRANT_TARGET_GENERATION, grant.targetGeneration());
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
@@ -590,6 +596,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             out.putString(RuntimeKeys.STATUS, revoked ? "URI_PERMISSION_REVOKED" : "URI_PERMISSION_NOT_FOUND");
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
@@ -606,6 +613,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             payload.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
             return payload;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             activityRuntime.launchFailed(token);
             return failure(error);
         }
@@ -619,6 +627,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                     request.getLong(RuntimeKeys.GENERATION, -1));
             return activityRuntime.event(current, request);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
@@ -684,6 +693,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 guestResult = callGuest(session.processSlot(), guest -> guestOperation(
                         guest, RuntimeOperationRequest.PREPARE_GUEST, spec));
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 if (staleRecovery != null) {
                     activityRuntime.invalidate(staleRecovery);
                     serviceCoordinator.invalidate(staleRecovery);
@@ -724,6 +734,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             out.putString("sessionState", ready.state().name());
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
@@ -773,6 +784,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                         session.generation(), SessionState.STOPPED, now(), "");
             }
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             GuestSession current = sessions.get(original.packageName(), original.virtualUserId(), original.processName());
             if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
                 sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),

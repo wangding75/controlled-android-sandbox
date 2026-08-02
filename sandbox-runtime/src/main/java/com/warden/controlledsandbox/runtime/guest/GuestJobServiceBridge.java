@@ -176,7 +176,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         if (!mainHandler.post(() -> {
             try { result.set(action.get()); }
-            catch (Throwable error) { failure.set(error); }
+            catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); failure.set(error); }
             finally { latch.countDown(); }
         })) throw new IllegalStateException("GUEST_JOB_MAIN_HANDLER_REJECTED");
         try {
@@ -202,7 +202,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
             try {
                 Field field = cursor.getDeclaredField(name); field.setAccessible(true); field.set(target, value); return;
             } catch (NoSuchFieldException ignored) { }
-            catch (Throwable ignored) { return; }
+            catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); return; }
         }
     }
     private void event(String name, int guestJobId, String className, String detail) {
@@ -263,6 +263,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
                 Field field = type.getDeclaredField("TRANSACTION_jobFinished");
                 field.setAccessible(true); return field.getInt(null);
             } catch (Throwable ignored) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
                 // API 26+ has dequeueWork/completeWork before jobFinished.
                 return 5;
             }
@@ -287,7 +288,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
                     JobParameters parameters = (JobParameters) constructor.newInstance(arguments);
                     applyStopReason(parameters, value);
                     return parameters;
-                } catch (Throwable error) { last = error; }
+                } catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); last = error; }
             }
             throw new IllegalStateException("GUEST_JOB_PARAMETERS_CONSTRUCTOR_UNSUPPORTED", last);
         }
@@ -306,7 +307,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
                     if (method.getParameterCount() == 1) {
                         method.invoke(parameters, value.stopReason()); return;
                     }
-                } catch (Throwable ignored) { }
+                } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
             setField(parameters, value.stopReason(), "mStopReason", "stopReason");
             setField(parameters, value.internalStopReason(), "mInternalStopReason", "internalStopReason");
@@ -361,7 +362,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
             for (String name : names) for (Class<?> cursor = target.getClass(); cursor != null; cursor = cursor.getSuperclass()) {
                 try { Field field = cursor.getDeclaredField(name); field.setAccessible(true); field.set(target, value); return; }
                 catch (NoSuchFieldException ignored) { }
-                catch (Throwable ignored) { return; }
+                catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); return; }
             }
         }
     }

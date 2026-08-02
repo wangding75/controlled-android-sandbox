@@ -151,6 +151,7 @@ public final class ProviderBatchRuntime {
                 throw new BatchException(error.operationIndex(),
                         "PROVIDER_BATCH_CUSTOM_EXECUTION_FAILED", error);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 throw new BatchException(-1, "PROVIDER_BATCH_CUSTOM_EXECUTION_FAILED", error);
             }
         }
@@ -163,6 +164,7 @@ public final class ProviderBatchRuntime {
         } catch (OperationApplicationException error) {
             throw new BatchException(-1, "PROVIDER_BATCH_APPLICATION_FAILED", error);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new BatchException(-1, "PROVIDER_BATCH_EXECUTION_FAILED", error);
         }
     }
@@ -218,6 +220,7 @@ public final class ProviderBatchRuntime {
         } catch (BatchException error) {
             throw error;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new BatchException(operation.index(), "PROVIDER_BATCH_BUILD_FAILED", error);
         }
     }

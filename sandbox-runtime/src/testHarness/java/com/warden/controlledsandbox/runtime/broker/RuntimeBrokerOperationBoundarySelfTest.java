@@ -25,10 +25,18 @@ public final class RuntimeBrokerOperationBoundarySelfTest {
         require("PREPARED".equals(result.status()), "adapter status mismatch");
         require("guest.pkg".equals(result.payload().getString(RuntimeKeys.PACKAGE_NAME)),
                 "adapter payload mismatch");
+        boolean fatalEscaped = false;
+        try { RuntimeBrokerOperationAdapter.execute(new FatalHandler(), request); }
+        catch (AssertionError expected) { fatalEscaped = true; }
+        require(fatalEscaped, "Runtime boundary converted Error into ordinary failure");
         System.out.println("PASS internal Runtime Broker Bundle boundary self-test");
     }
 
-    private static final class FakeHandler implements RuntimeBrokerOperationHandler {
+    private static final class FatalHandler extends FakeHandler {
+        @Override public Bundle prepareGuest(Bundle request) { throw new AssertionError("fatal-runtime-boundary"); }
+    }
+
+    private static class FakeHandler implements RuntimeBrokerOperationHandler {
         @Override public Bundle prepareGuest(Bundle request) {
             Bundle result = new Bundle(request);
             result.putString(RuntimeKeys.STATUS, "PREPARED");

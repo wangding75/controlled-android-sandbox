@@ -43,6 +43,7 @@ public final class SelfTest {
         testRouteTable();
         testVirtualPathPolicy();
         testRecoverableFileStore();
+        testRecoverableFileStoreFatalBoundary();
         testVirtualUidAllocator();
         testPackageUpgradePolicy();
         testActivityTaskRegistry();
@@ -874,6 +875,16 @@ public final class SelfTest {
     private static TokenGenerator testTokens() {
         java.util.concurrent.atomic.AtomicLong sequence = new java.util.concurrent.atomic.AtomicLong();
         return purpose -> purpose + "-test-" + sequence.incrementAndGet();
+    }
+
+    private static void testRecoverableFileStoreFatalBoundary() throws Exception {
+        java.nio.file.Path root = java.nio.file.Files.createTempDirectory("fatal-store");
+        RecoverableFileStore store = new RecoverableFileStore(root.resolve("state.json"));
+        store.write("ok");
+        boolean escaped = false;
+        try { store.read(value -> { throw new AssertionError("fatal-persistence"); }, ""); }
+        catch (AssertionError expected) { escaped = true; }
+        require(escaped, "persistence boundary converted Error into corruption recovery");
     }
 
     private static void require(boolean condition, String name) {

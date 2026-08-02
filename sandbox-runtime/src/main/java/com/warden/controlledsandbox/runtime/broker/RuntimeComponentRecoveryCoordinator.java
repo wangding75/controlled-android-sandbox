@@ -46,6 +46,7 @@ final class RuntimeComponentRecoveryCoordinator {
             providers.recoverSession(stale, current);
             systemServices.stop(stale);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             cleanup(stale, current);
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException("COMPONENT_RECOVERY_FAILED", error);

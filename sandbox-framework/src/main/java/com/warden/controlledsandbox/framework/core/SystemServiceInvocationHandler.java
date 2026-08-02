@@ -162,6 +162,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, cause);
                 throw cause;
             } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
                 interactionCall.onFailure();
                 virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, error);
@@ -264,7 +265,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 try {
                     field.setAccessible(true);
                     if (matchesGuest(field.get(value), visited, depth + 1)) return true;
-                } catch (Throwable ignored) { }
+                } catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
             cursor = cursor.getSuperclass();
         }

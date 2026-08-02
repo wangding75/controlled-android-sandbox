@@ -35,6 +35,7 @@ public final class ActivityFieldBridge {
         } catch (RuntimeException error) {
             throw error;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new IllegalStateException("ACTIVITY_FRAMEWORK_TOKEN_READ_FAILED", error);
         }
     }
@@ -101,6 +102,7 @@ public final class ActivityFieldBridge {
                     applied++;
                 }
             } catch (Throwable failure) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(failure);
                 rollback(writes, applied);
                 throw failure;
             }
@@ -108,6 +110,7 @@ public final class ActivityFieldBridge {
         } catch (RuntimeException error) {
             throw error;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new IllegalStateException("ACTIVITY_FIELD_BRIDGE_FAILED", error);
         }
     }
@@ -115,7 +118,7 @@ public final class ActivityFieldBridge {
     private static void rollback(List<Write> writes, int applied) {
         for (int index = applied - 1; index >= 0; index--) {
             Write write = writes.get(index);
-            try { write.field.set(write.target, write.previous); } catch (Throwable ignored) { }
+            try { write.field.set(write.target, write.previous); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
     }
 

@@ -133,6 +133,7 @@ final class PackageRuntimePermissionSession extends IRuntimePermissionSession.St
         synchronized (operationLock) {
             try { return action.run(); }
             catch (Throwable error) {
+                FatalErrorPolicy.rethrowIfFatal(error);
                 return PackageServiceResult.failure(operation, error.getClass().getSimpleName(),
                         String.valueOf(error.getMessage()));
             }

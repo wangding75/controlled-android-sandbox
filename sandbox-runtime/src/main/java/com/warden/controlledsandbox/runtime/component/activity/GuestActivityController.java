@@ -60,6 +60,7 @@ public final class GuestActivityController {
             result.putStringArrayList("bridgeOptionalMissing", new java.util.ArrayList<>(bridge.optionalMissingFields()));
             addActivityRecord(result, "CREATED");
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             emitBestEffort("DESTROYED", new Bundle());
             result.putString(RuntimeKeys.STATUS, "FAILED");
             result.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
@@ -181,7 +182,7 @@ public final class GuestActivityController {
     }
 
     private void emitBestEffort(String event, Bundle details) {
-        try { emit(event, details); } catch (Throwable ignored) { }
+        try { emit(event, details); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
     }
 
     private void addActivityRecord(Bundle result, String state) {
@@ -200,7 +201,7 @@ public final class GuestActivityController {
     private void invokeIfCreated(String name, Class<?>[] types, Object[] args) {
         if (guest == null) return;
         try { invokeLifecycle(guest, name, types, args); }
-        catch (Throwable error) { throw new IllegalStateException("Guest lifecycle " + name + " failed", root(error)); }
+        catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("Guest lifecycle " + name + " failed", root(error)); }
     }
 
     private static void invokeLifecycle(Activity activity, String name, Class<?>[] types, Object[] args) throws Exception {

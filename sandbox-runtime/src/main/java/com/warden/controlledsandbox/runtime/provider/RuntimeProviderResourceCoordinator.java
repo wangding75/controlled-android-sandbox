@@ -126,7 +126,7 @@ public final class RuntimeProviderResourceCoordinator {
     private void invokeBestEffort(GuestSession target, Bundle request) {
         if (request == null) return;
         try { guestInvoker.invoke(target.processSlot(), request); }
-        catch (Throwable ignored) { }
+        catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
     }
 
     private static boolean sameUnavailable(String sessionId, long generation,

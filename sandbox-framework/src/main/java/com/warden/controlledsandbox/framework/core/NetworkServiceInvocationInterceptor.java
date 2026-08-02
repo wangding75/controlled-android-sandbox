@@ -199,7 +199,7 @@ final class NetworkServiceInvocationInterceptor {
                 } else args[index] = null;
             }
             try { method.setAccessible(true); method.invoke(callback, args); return; }
-            catch (Throwable error) { throw new IllegalStateException("VIRTUAL_NETWORK_CALLBACK_FAILED:" + methodName, error); }
+            catch (Throwable error) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("VIRTUAL_NETWORK_CALLBACK_FAILED:" + methodName, error); }
         }
     }
 
@@ -216,7 +216,7 @@ final class NetworkServiceInvocationInterceptor {
                 else args[index] = record.values();
             }
             try { method.setAccessible(true); method.invoke(callback, args); return; }
-            catch (Throwable error) { throw new IllegalStateException("VIRTUAL_DNS_CALLBACK_FAILED", error); }
+            catch (Throwable error) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("VIRTUAL_DNS_CALLBACK_FAILED", error); }
         }
         throw new IllegalStateException("VIRTUAL_DNS_ANSWER_CALLBACK_UNSUPPORTED");
     }
@@ -230,7 +230,7 @@ final class NetworkServiceInvocationInterceptor {
                 args[index] = type == int.class || type == Integer.class ? code : null;
             }
             try { method.setAccessible(true); method.invoke(callback, args); return; }
-            catch (Throwable error) { throw new IllegalStateException("VIRTUAL_DNS_ERROR_CALLBACK_FAILED", error); }
+            catch (Throwable error) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("VIRTUAL_DNS_ERROR_CALLBACK_FAILED", error); }
         }
         throw new IllegalStateException("VIRTUAL_DNS_ERROR_CALLBACK_UNSUPPORTED");
     }
@@ -243,14 +243,14 @@ final class NetworkServiceInvocationInterceptor {
             write(value, "interfaze", profile.interfaceName()); write(value, "interfaceName", profile.interfaceName());
             write(value, "addresses", profile.addresses()); write(value, "routes", profile.routes());
             write(value, "dnsServers", profile.dnsServers()); return value;
-        } catch (Throwable ignored) { return null; }
+        } catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); return null; }
     }
     private static void write(Object target, String fieldName, Object value) {
         if (target == null) return;
         Class<?> cursor = target.getClass();
         while (cursor != null) {
             try { Field field = cursor.getDeclaredField(fieldName); field.setAccessible(true); field.set(target, value); return; }
-            catch (Throwable ignored) { cursor = cursor.getSuperclass(); }
+            catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); cursor = cursor.getSuperclass(); }
         }
     }
 
@@ -268,11 +268,11 @@ final class NetworkServiceInvocationInterceptor {
                     Method method = value.getClass().getMethod(name);
                     Object result = method.invoke(value);
                     if (result instanceof Number number) return number.intValue();
-                } catch (Throwable ignored) { }
+                } catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
             for (String name : new String[]{"netId", "mNetId", "networkId"}) {
                 try { Field field = value.getClass().getDeclaredField(name); field.setAccessible(true); return ((Number) field.get(value)).intValue(); }
-                catch (Throwable ignored) { }
+                catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
         }
         return -1;

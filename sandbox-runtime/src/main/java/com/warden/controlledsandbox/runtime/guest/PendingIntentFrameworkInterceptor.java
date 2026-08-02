@@ -238,7 +238,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
                     asBinder.setAccessible(true);
                     Object token = asBinder.invoke(value);
                     if (registry.find(token) != null) return token;
-                } catch (Throwable ignored) { }
+                } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
             if (value instanceof IBinder && registry.find(value) != null) return value;
         }

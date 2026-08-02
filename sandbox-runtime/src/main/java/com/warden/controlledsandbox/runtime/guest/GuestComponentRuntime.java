@@ -109,6 +109,7 @@ public final class GuestComponentRuntime {
                     throw new IllegalArgumentException("Unknown component operation: " + operation);
             }
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
@@ -120,7 +121,7 @@ public final class GuestComponentRuntime {
         services.clear();
         receivers.clear();
         for (ProviderRecord record : providersByClass.values()) {
-            try { record.provider.shutdown(); } catch (Throwable ignored) { }
+            try { record.provider.shutdown(); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         providersByClass.clear();
         providersByAuthority.clear();
@@ -158,6 +159,7 @@ public final class GuestComponentRuntime {
         try {
             resultCode = record.service.onStartCommand(intent, flags, startId);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (foregroundRequested) record.foregroundPolicy.terminate("SERVICE_START_CALLBACK_FAILED");
             throw error;
         }
@@ -323,7 +325,7 @@ public final class GuestComponentRuntime {
     }
 
     private static void destroyService(ServiceRecord record) {
-        try { record.service.onDestroy(); } catch (Throwable ignored) { }
+        try { record.service.onDestroy(); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         record.connections.clear();
         record.lastBinder = null;
         record.lastStartIntent = null;
@@ -432,6 +434,7 @@ public final class GuestComponentRuntime {
             RuntimeEventLog.event("GUEST_ORDERED_BROADCAST", out);
             return out;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             bridge.cancelLocal();
             throw error;
         }
@@ -705,6 +708,7 @@ public final class GuestComponentRuntime {
             } catch (NoSuchFieldException ignored) {
                 cursor = cursor.getSuperclass();
             } catch (Throwable ignored) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
                 return;
             }
         }

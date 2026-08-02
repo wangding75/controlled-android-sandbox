@@ -376,7 +376,7 @@ final class DeviceServiceInvocationInterceptor {
         for (Method method : listener.getClass().getMethods()) {
             if (!contains(names, method.getName()) || method.getParameterCount() != arguments.length) continue;
             try { method.setAccessible(true); method.invoke(listener, arguments); return; }
-            catch (Throwable ignored) { }
+            catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
     }
 

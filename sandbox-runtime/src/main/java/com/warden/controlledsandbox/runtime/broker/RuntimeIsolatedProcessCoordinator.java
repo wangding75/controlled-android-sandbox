@@ -149,6 +149,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                 }
                 if (staleRecovery != null) services.recoverSession(staleRecovery, session, spec);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 if (staleRecovery != null) services.invalidate(staleRecovery);
                 systemServices().stop(session);
                 sessions.transition(packageName, userId, processName, session.generation(),
@@ -242,6 +243,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                         session.processName(), session.generation(), SessionState.STOPPED, now(), "");
             }
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             GuestSession current = sessions.get(original.packageName(), original.virtualUserId(),
                     original.processName());
             if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
@@ -478,7 +480,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
             binderToken = service;
             worker = IIsolatedGuestProcess.Stub.asInterface(service);
             try { service.linkToDeath(this, 0); }
-            catch (Throwable error) { worker = null; binderToken = null; }
+            catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); worker = null; binderToken = null; }
             finally { connected.countDown(); }
         }
 
@@ -529,7 +531,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         void unlinkDeath() {
             IBinder token = binderToken;
             if (token != null) {
-                try { token.unlinkToDeath(this, 0); } catch (Throwable ignored) { }
+                try { token.unlinkToDeath(this, 0); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
         }
     }

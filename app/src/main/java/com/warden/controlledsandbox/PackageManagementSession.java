@@ -480,6 +480,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
             try {
                 return action.run();
             } catch (Throwable error) {
+                FatalErrorPolicy.rethrowIfFatal(error);
                 String code = error instanceof NativeGuestPolicyException policyError
                         ? policyError.code() : error.getClass().getSimpleName();
                 return PackageServiceResult.failure(operation, code, String.valueOf(error.getMessage()));

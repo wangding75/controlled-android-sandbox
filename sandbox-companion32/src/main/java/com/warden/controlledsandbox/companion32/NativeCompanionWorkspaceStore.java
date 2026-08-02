@@ -43,6 +43,7 @@ final class NativeCompanionWorkspaceStore {
             ensureDirectory(new File(state.workspaceRoot, "splits"));
             return result("PREPARE_WORKSPACE", "", "", "", state);
         } catch (Throwable error) {
+            FatalErrorPolicy.rethrowIfFatal(error);
             return failure("PREPARE_WORKSPACE", error);
         }
     }
@@ -103,6 +104,7 @@ final class NativeCompanionWorkspaceStore {
             return result("STAGE_ARTIFACT", request.artifactKind(), request.relativePath(),
                     target.getCanonicalPath(), state);
         } catch (Throwable error) {
+            FatalErrorPolicy.rethrowIfFatal(error);
             return failure("STAGE_ARTIFACT", error);
         }
     }
@@ -121,6 +123,7 @@ final class NativeCompanionWorkspaceStore {
             deleteTree(state.workspaceRoot);
             return result("CLEAR_WORKSPACE", "", "", "", state);
         } catch (Throwable error) {
+            FatalErrorPolicy.rethrowIfFatal(error);
             return failure("CLEAR_WORKSPACE", error);
         }
     }

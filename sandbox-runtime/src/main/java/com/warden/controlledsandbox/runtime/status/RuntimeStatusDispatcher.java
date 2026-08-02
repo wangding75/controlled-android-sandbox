@@ -53,6 +53,7 @@ public final class RuntimeStatusDispatcher {
             audit(AuditSink.Outcome.SUCCESS, request.requestId());
             return result;
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             RuntimeStatusResult result = RuntimeStatusContract.internalFailure(request, error);
             audit(AuditSink.Outcome.FAILURE, result.error().code());
             return result;
@@ -61,6 +62,6 @@ public final class RuntimeStatusDispatcher {
 
     private void audit(AuditSink.Outcome outcome, String detail) {
         try { auditSink.record(CATEGORY, ACTION, outcome, detail == null ? "" : detail); }
-        catch (Throwable ignored) { /* Audit failure must not alter the use-case result. */ }
+        catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); /* Audit failure must not alter the use-case result. */ }
     }
 }

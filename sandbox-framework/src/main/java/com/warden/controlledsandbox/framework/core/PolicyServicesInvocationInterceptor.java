@@ -359,6 +359,7 @@ import java.util.concurrent.atomic.AtomicInteger;
             constructor.setAccessible(true);
             return constructor.newInstance(flattened.substring(0, slash), flattened.substring(slash+1));
         } catch(Throwable ignored){
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored);
             return nullValue(type);
         }
     }

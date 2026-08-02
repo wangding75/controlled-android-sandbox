@@ -24,6 +24,7 @@ final class RuntimePermissionCoordinator implements AutoCloseable {
             return gateway.request(session.packageName(), session.virtualUserId(), value(permission, "permission"),
                     requestCode, session.sessionId(), session.generation());
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure("requestRuntimePermission", error);
         }
     }
@@ -36,6 +37,7 @@ final class RuntimePermissionCoordinator implements AutoCloseable {
                     requestCode, session.sessionId(), session.generation(), hostGranted,
                     reason == null ? "" : reason);
         } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure("reportRuntimePermissionResult", error);
         }
     }

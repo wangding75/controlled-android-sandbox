@@ -71,6 +71,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 return IsolatedProcessResult.success(request, "ISOLATED_READY",
                         Process.myPid(), Process.myUid(), prepared);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return failure(request, error);
             }
         }
@@ -100,6 +101,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 return IsolatedProcessResult.success(request, "ISOLATED_OPERATION_COMPLETE",
                         Process.myPid(), Process.myUid(), result);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return failure(request, error);
             }
         }
@@ -115,6 +117,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 return IsolatedProcessResult.success(request, "ISOLATED_STATUS",
                         Process.myPid(), Process.myUid(), status);
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return failure(request, error);
             }
         }
@@ -133,7 +136,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
     @Override public void onDestroy() {
         if (!activeSessionId.isEmpty()) {
             try { GuestRuntimeEnvironment.shutdown(activeSessionId, activeGeneration); }
-            catch (Throwable ignored) { }
+            catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         clearLease();
         super.onDestroy();

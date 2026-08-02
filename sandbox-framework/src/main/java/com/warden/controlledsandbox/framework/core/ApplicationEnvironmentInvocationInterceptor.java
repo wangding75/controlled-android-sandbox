@@ -418,7 +418,7 @@ final class ApplicationEnvironmentInvocationInterceptor {
                     else values[index] = firstCompatible(arguments, type);
                 }
                 try { callback.setAccessible(true); callback.invoke(observer, values); delivered = true; break; }
-                catch (Throwable error) { dead.add(observer); break; }
+                catch (Throwable error) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error); dead.add(observer); break; }
             }
             if (!delivered && !dead.contains(observer)) dead.add(observer);
         }

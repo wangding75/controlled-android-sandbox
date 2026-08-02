@@ -137,6 +137,7 @@ public final class BrokerObserverRuntime {
                 record.callback.onChange(uri, selfChange, flags);
                 delivered++;
             } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 failures.add(entry.id() + ":" + error.getClass().getSimpleName());
                 removeDead(entry.id(), record.binder);
             }
@@ -169,7 +170,7 @@ public final class BrokerObserverRuntime {
             try {
                 registry.unregister(id, entry.callerInstanceId(), entry.callerSessionId(),
                         entry.callerGeneration());
-            } catch (Throwable ignored) { }
+            } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         unlink(id);
     }
