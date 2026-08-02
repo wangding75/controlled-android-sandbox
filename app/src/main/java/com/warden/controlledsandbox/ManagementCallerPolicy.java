@@ -1,23 +1,26 @@
 package com.warden.controlledsandbox;
 
-/** UID-based policy for package-service capability minting.
- *
- * Android processes that share an application UID are not an independent security boundary. The
- * root package service therefore authorizes the Host application UID and the explicitly installed,
- * signature-permission-protected Companion UID. Per-session PID guards still prevent a capability
- * minted by one Binder client from being reused by another process.
- */
+/** Pure policy for package-service capability minting from stable UID and exact caller PID name. */
 final class ManagementCallerPolicy {
     private ManagementCallerPolicy() { }
 
-    static boolean isHostApplication(int callingUid, int callingPid, int hostUid) {
-        return callingPid > 0 && callingUid == hostUid;
+    static boolean isExpectedProcess(int callingUid, int callingPid, int expectedUid,
+            String actualProcessName, String expectedProcessName) {
+        return callingPid > 0
+                && callingUid == expectedUid
+                && expectedProcessName != null
+                && !expectedProcessName.isBlank()
+                && expectedProcessName.equals(actualProcessName);
     }
 
-    static boolean isRuntimePeer(int callingUid, int callingPid, int hostUid,
-            boolean signaturePermissionGranted, boolean companionUid) {
-        if (callingPid <= 0) return false;
-        if (callingUid == hostUid) return true;
-        return signaturePermissionGranted && companionUid;
+    static boolean isTrustedCompanionProcess(int callingUid, int callingPid,
+            boolean signaturePermissionGranted, String companionPackage,
+            String actualProcessName, String expectedProcessName) {
+        return callingPid > 0
+                && signaturePermissionGranted
+                && companionPackage != null
+                && !companionPackage.isBlank()
+                && expectedProcessName != null
+                && expectedProcessName.equals(actualProcessName);
     }
 }

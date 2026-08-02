@@ -6,16 +6,16 @@
 
 ## Implemented behavior
 
-- Host package-service capabilities are authorized by the Host application UID and a valid Binder calling PID.
-- Runtime capabilities accept the Host application UID or an installed Companion release/debug package UID that also holds the signature permission.
+- Host management capabilities require the Host UID and the exact main-process name read from the caller PID `/proc/<pid>/cmdline`.
+- Runtime capabilities require the exact Host `:sandbox_server` process or the exact Companion `:sandbox_server32` process, plus UID/package/signature checks.
 - Companion package visibility is declared explicitly in the Host manifest.
 - Host, Runtime and Companion package/permission constants are sourced from the stable `sandbox-contract` `RuntimePeerIdentity`.
-- AMS process-list and caller process-name checks are removed.
+- AMS process-list enumeration is removed; only the exact Binder caller PID is inspected with a bounded 512-byte read.
 - Session objects still bind the minted capability to the exact calling UID/PID, so another process cannot reuse an existing session Binder.
 
 ## Security boundary
 
-Android processes sharing one application UID are not treated as independent OS security principals. This change removes an unreliable process-name gate instead of claiming process-name isolation. Guest-to-Host API restrictions remain enforced by the runtime/framework boundary and per-session capabilities.
+Same-UID Guest processes remain rejected from root management and Runtime capability minting. Failure to read the exact caller PID identity fails closed.
 
 ## Evidence boundary
 

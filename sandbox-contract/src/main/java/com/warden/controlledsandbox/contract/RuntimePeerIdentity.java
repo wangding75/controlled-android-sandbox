@@ -11,6 +11,13 @@ public final class RuntimePeerIdentity {
 
     private RuntimePeerIdentity() { }
 
+    public static String companionBrokerProcess(String packageName) {
+        if (!isCompanionPackage(packageName)) {
+            throw new IllegalArgumentException("companion package is invalid");
+        }
+        return packageName + ":sandbox_server32";
+    }
+
     public static boolean isCompanionPackage(String packageName) {
         return COMPANION_RELEASE_PACKAGE.equals(packageName)
                 || COMPANION_DEBUG_PACKAGE.equals(packageName);

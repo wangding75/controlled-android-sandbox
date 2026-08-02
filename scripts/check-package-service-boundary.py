@@ -54,8 +54,8 @@ for fragment in ['guard.requireOwner', 'callerVerifier.requireMainProcessCaller(
 verifier_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java').read_text()
 if 'ActivityManager' in verifier_source or 'getRunningAppProcesses' in verifier_source:
     errors.append('PackageCallerVerifier must not depend on process-list visibility')
-for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID',
-                 'getPackageUid', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
+for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS',
+                 'getPackageUid', '/proc/', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
     if fragment not in verifier_source:
         errors.append('missing stable UID/package verification fragment: '+fragment)
 

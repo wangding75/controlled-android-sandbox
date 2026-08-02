@@ -1,41 +1,59 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.contract.RuntimePeerIdentity;
+
 public final class PackageManagementAuthorizationSelfTest {
     private PackageManagementAuthorizationSelfTest() { }
 
     public static void main(String[] args) {
-        require(ManagementCallerPolicy.isHostApplication(2000, 100, 2000),
-                "Host application UID should mint a management capability");
-        require(!ManagementCallerPolicy.isHostApplication(2001, 100, 2000),
-                "foreign UID must not mint a management capability");
-        require(!ManagementCallerPolicy.isHostApplication(2000, 0, 2000),
+        String host = RuntimePeerIdentity.HOST_RELEASE_PACKAGE;
+        require(ManagementCallerPolicy.isExpectedProcess(2000, 100, 2000, host, host),
+                "Host main process should be authorized");
+        require(!ManagementCallerPolicy.isExpectedProcess(
+                        2000, 101, 2000, host + ":guest0", host),
+                "same-UID Guest process must not mint management capability");
+        require(!ManagementCallerPolicy.isExpectedProcess(2001, 100, 2000, host, host),
+                "foreign UID must be rejected");
+        require(!ManagementCallerPolicy.isExpectedProcess(2000, 0, 2000, host, host),
                 "invalid Binder PID must fail closed");
+        require(!ManagementCallerPolicy.isExpectedProcess(2000, 100, 2000, "", host),
+                "unavailable caller process identity must fail closed");
 
-        require(ManagementCallerPolicy.isRuntimePeer(2000, 103, 2000, false, false),
-                "Host application UID should mint a Runtime capability");
-        require(ManagementCallerPolicy.isRuntimePeer(3000, 203, 2000, true, true),
-                "signature-protected Companion UID should mint a Runtime capability");
-        require(!ManagementCallerPolicy.isRuntimePeer(3000, 203, 2000, true, false),
-                "a signed but non-Companion UID must be rejected");
-        require(!ManagementCallerPolicy.isRuntimePeer(3000, 203, 2000, false, true),
-                "Companion package UID without the signature permission must be rejected");
-        require(!ManagementCallerPolicy.isRuntimePeer(3000, 0, 2000, true, true),
-                "invalid Binder PID must fail closed");
+        String companion = RuntimePeerIdentity.COMPANION_RELEASE_PACKAGE;
+        String companionBroker = RuntimePeerIdentity.companionBrokerProcess(companion);
+        require(ManagementCallerPolicy.isTrustedCompanionProcess(
+                        3000, 203, true, companion, companionBroker, companionBroker),
+                "signature-protected Companion broker should be authorized");
+        require(!ManagementCallerPolicy.isTrustedCompanionProcess(
+                        3000, 203, true, companion, companion + ":native32", companionBroker),
+                "other Companion process must be rejected");
+        require(!ManagementCallerPolicy.isTrustedCompanionProcess(
+                        3000, 203, false, companion, companionBroker, companionBroker),
+                "Companion without signature permission must be rejected");
 
-        FakeIdentity host = new FakeIdentity(2000, 101, 2000, false, false);
-        PackageCallerVerifier hostVerifier = new PackageCallerVerifier(host);
-        hostVerifier.requireMainProcessCaller();
-        hostVerifier.requireRuntimeBrokerCaller();
+        FakeIdentity main = new FakeIdentity(2000, 100, 2000, host, false, null, host);
+        new PackageCallerVerifier(main).requireMainProcessCaller();
+        expectSecurity(() -> new PackageCallerVerifier(main).requireRuntimeBrokerCaller(),
+                "Host main process must not mint Runtime capability");
 
-        FakeIdentity companion = new FakeIdentity(3000, 201, 2000, true, true);
-        new PackageCallerVerifier(companion).requireRuntimeBrokerCaller();
-        expectSecurity(() -> new PackageCallerVerifier(companion).requireMainProcessCaller(),
+        FakeIdentity guest = new FakeIdentity(
+                2000, 101, 2000, host, false, null, host + ":guest0");
+        expectSecurity(() -> new PackageCallerVerifier(guest).requireMainProcessCaller(),
+                "same-UID Guest process must not mint management capability");
+
+        FakeIdentity runtime = new FakeIdentity(
+                2000, 103, 2000, host, false, null, host + ":sandbox_server");
+        new PackageCallerVerifier(runtime).requireRuntimeBrokerCaller();
+
+        FakeIdentity companionIdentity = new FakeIdentity(
+                3000, 201, 2000, host, true, companion, companionBroker);
+        new PackageCallerVerifier(companionIdentity).requireRuntimeBrokerCaller();
+        expectSecurity(() -> new PackageCallerVerifier(companionIdentity).requireMainProcessCaller(),
                 "Companion must not mint management capability");
 
-        expectSecurity(() -> new PackageCallerVerifier(
-                        new FakeIdentity(3000, 201, 2000, true, false))
-                        .requireRuntimeBrokerCaller(),
-                "signed unknown package must fail closed");
+        FakeIdentity hidden = new FakeIdentity(3000, 201, 2000, host, true, null, companionBroker);
+        expectSecurity(() -> new PackageCallerVerifier(hidden).requireRuntimeBrokerCaller(),
+                "package identity lookup failure must fail closed");
 
         ManagementSessionGuard guard = new ManagementSessionGuard(2000, 100);
         guard.requireOwner(2000, 100);
@@ -52,31 +70,39 @@ public final class PackageManagementAuthorizationSelfTest {
         runtimeGuard.close();
         expectSecurity(() -> runtimeGuard.requireOwner(2000, 103),
                 "closed Runtime capability must remain closed");
-        System.out.println("PASS package management UID authorization self-test");
+        System.out.println("PASS package management exact caller-process authorization self-test");
     }
 
     private static final class FakeIdentity implements PackageCallerVerifier.CallerIdentitySource {
         private final int callingUid;
         private final int callingPid;
         private final int hostUid;
-        private final boolean signaturePermissionGranted;
-        private final boolean companionUid;
+        private final String hostPackage;
+        private final boolean permission;
+        private final String companionPackage;
+        private final String processName;
 
-        FakeIdentity(int callingUid, int callingPid, int hostUid,
-                boolean signaturePermissionGranted, boolean companionUid) {
+        FakeIdentity(int callingUid, int callingPid, int hostUid, String hostPackage,
+                boolean permission, String companionPackage, String processName) {
             this.callingUid = callingUid;
             this.callingPid = callingPid;
             this.hostUid = hostUid;
-            this.signaturePermissionGranted = signaturePermissionGranted;
-            this.companionUid = companionUid;
+            this.hostPackage = hostPackage;
+            this.permission = permission;
+            this.companionPackage = companionPackage;
+            this.processName = processName;
         }
 
         @Override public int callingUid() { return callingUid; }
         @Override public int callingPid() { return callingPid; }
         @Override public int hostUid() { return hostUid; }
-        @Override public boolean signaturePermissionGranted() { return signaturePermissionGranted; }
-        @Override public boolean uidOwnsCompanionPackage(int uid) {
-            return companionUid && uid == callingUid;
+        @Override public String hostPackage() { return hostPackage; }
+        @Override public boolean signaturePermissionGranted() { return permission; }
+        @Override public String companionPackageForUid(int uid) {
+            return uid == callingUid ? companionPackage : null;
+        }
+        @Override public String processName(int pid) {
+            return pid == callingPid ? processName : "";
         }
     }
 

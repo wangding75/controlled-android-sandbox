@@ -28,10 +28,12 @@ verifier = require(
     "getPackageUid(packageName, 0)",
     "RuntimePeerIdentity.SIGNATURE_PERMISSION",
     "signaturePermissionGranted()",
-    "uidOwnsCompanionPackage",
-    "RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID",
+    "companionPackageForUid",
+    "RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS",
+    'new FileInputStream("/proc/" + pid + "/cmdline")',
+    "MAX_PROCESS_NAME_BYTES = 512",
 )
-for forbidden in ("ActivityManager", "getRunningAppProcesses", "processName"):
+for forbidden in ("ActivityManager", "getRunningAppProcesses"):
     if forbidden in verifier:
         errors.append(f"PackageCallerVerifier retains process-list dependency: {forbidden}")
 
@@ -44,10 +46,9 @@ require(
 
 policy = require(
     "app/src/main/java/com/warden/controlledsandbox/ManagementCallerPolicy.java",
-    "isHostApplication",
-    "isRuntimePeer",
-    "callingUid == hostUid",
-    "signaturePermissionGranted && companionUid",
+    "isExpectedProcess",
+    "isTrustedCompanionProcess",
+    "expectedProcessName.equals(actualProcessName)",
 )
 if "ProcessIdentity" in policy:
     errors.append("ManagementCallerPolicy retains process-name identities")
@@ -63,9 +64,9 @@ for package_name in (
 
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
-    "signature-protected Companion UID",
-    "signed but non-Companion UID",
-    "invalid Binder PID",
+    "same-UID Guest process must not mint management capability",
+    "other Companion process must be rejected",
+    "package identity lookup failure must fail closed",
     "different process must not reuse",
 )
 runner = require(
@@ -88,8 +89,8 @@ report = {
     "finding": "P2-08 CallerVerifier depends on process-list visibility",
     "sourceStatus": "PASS" if not errors else "FAIL",
     "activityManagerProcessListDependency": False,
-    "hostAuthorization": "application UID plus per-session owner PID",
-    "companionAuthorization": "signature permission plus installed Companion package UID",
+    "hostAuthorization": "Host UID plus exact caller PID cmdline plus per-session owner PID",
+    "companionAuthorization": "signature permission plus installed Companion UID plus exact broker PID cmdline",
     "deviceEvidenceCount": 0,
     "errors": errors,
 }

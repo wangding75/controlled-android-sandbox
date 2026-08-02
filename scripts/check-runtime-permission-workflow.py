@@ -85,7 +85,8 @@ require(
     'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java',
     'requireRuntimeBrokerCaller()',
     'getPackageUid',
-    'RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID',
+    'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS',
+    '/proc/',
 )
 service = require(
     'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java',

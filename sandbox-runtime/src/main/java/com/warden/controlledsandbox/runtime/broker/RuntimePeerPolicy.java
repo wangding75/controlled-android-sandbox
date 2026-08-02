@@ -37,9 +37,6 @@ public final class RuntimePeerPolicy {
     }
 
     public static String companionBrokerProcess(String companionPackage) {
-        if (!isCompanionPackage(companionPackage)) {
-            throw new IllegalArgumentException("companion package is invalid");
-        }
-        return companionPackage + ":sandbox_server32";
+        return RuntimePeerIdentity.companionBrokerProcess(companionPackage);
     }
 }
