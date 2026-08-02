@@ -3,7 +3,7 @@ package com.warden.controlledsandbox;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Binder;
-import com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy;
+import com.warden.controlledsandbox.contract.RuntimePeerIdentity;
 import java.util.Objects;
 
 /** Authorizes package-service callers from stable Binder UID/package identity, not AMS process lists. */
@@ -52,13 +52,13 @@ final class PackageCallerVerifier {
         @Override public int callingPid() { return Binder.getCallingPid(); }
         @Override public int hostUid() { return context.getApplicationInfo().uid; }
         @Override public boolean signaturePermissionGranted() {
-            return context.checkCallingPermission(RuntimePeerPolicy.SIGNATURE_PERMISSION)
+            return context.checkCallingPermission(RuntimePeerIdentity.SIGNATURE_PERMISSION)
                     == PackageManager.PERMISSION_GRANTED;
         }
         @Override public boolean uidOwnsCompanionPackage(int uid) {
             PackageManager packages = context.getPackageManager();
-            return packageUid(packages, RuntimePeerPolicy.COMPANION_RELEASE_PACKAGE) == uid
-                    || packageUid(packages, RuntimePeerPolicy.COMPANION_DEBUG_PACKAGE) == uid;
+            return packageUid(packages, RuntimePeerIdentity.COMPANION_RELEASE_PACKAGE) == uid
+                    || packageUid(packages, RuntimePeerIdentity.COMPANION_DEBUG_PACKAGE) == uid;
         }
 
         private static int packageUid(PackageManager packages, String packageName) {

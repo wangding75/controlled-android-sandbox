@@ -9,6 +9,7 @@
 - Host package-service capabilities are authorized by the Host application UID and a valid Binder calling PID.
 - Runtime capabilities accept the Host application UID or an installed Companion release/debug package UID that also holds the signature permission.
 - Companion package visibility is declared explicitly in the Host manifest.
+- Host, Runtime and Companion package/permission constants are sourced from the stable `sandbox-contract` `RuntimePeerIdentity`.
 - AMS process-list and caller process-name checks are removed.
 - Session objects still bind the minted capability to the exact calling UID/PID, so another process cannot reuse an existing session Binder.
 

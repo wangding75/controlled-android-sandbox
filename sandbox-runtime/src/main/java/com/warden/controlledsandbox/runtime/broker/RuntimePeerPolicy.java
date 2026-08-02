@@ -4,15 +4,15 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.Process;
+import com.warden.controlledsandbox.contract.RuntimePeerIdentity;
 
 /** Shared package/signature boundary for Host and the independently packaged 32-bit runtime peer. */
 public final class RuntimePeerPolicy {
-    public static final String SIGNATURE_PERMISSION =
-            "com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION";
-    public static final String HOST_RELEASE_PACKAGE = "com.warden.controlledsandbox";
-    public static final String HOST_DEBUG_PACKAGE = HOST_RELEASE_PACKAGE + ".debug";
-    public static final String COMPANION_RELEASE_PACKAGE = HOST_RELEASE_PACKAGE + ".companion32";
-    public static final String COMPANION_DEBUG_PACKAGE = COMPANION_RELEASE_PACKAGE + ".debug";
+    public static final String SIGNATURE_PERMISSION = RuntimePeerIdentity.SIGNATURE_PERMISSION;
+    public static final String HOST_RELEASE_PACKAGE = RuntimePeerIdentity.HOST_RELEASE_PACKAGE;
+    public static final String HOST_DEBUG_PACKAGE = RuntimePeerIdentity.HOST_DEBUG_PACKAGE;
+    public static final String COMPANION_RELEASE_PACKAGE = RuntimePeerIdentity.COMPANION_RELEASE_PACKAGE;
+    public static final String COMPANION_DEBUG_PACKAGE = RuntimePeerIdentity.COMPANION_DEBUG_PACKAGE;
 
     private RuntimePeerPolicy() { }
 
@@ -33,8 +33,7 @@ public final class RuntimePeerPolicy {
     }
 
     public static boolean isCompanionPackage(String packageName) {
-        return COMPANION_RELEASE_PACKAGE.equals(packageName)
-                || COMPANION_DEBUG_PACKAGE.equals(packageName);
+        return RuntimePeerIdentity.isCompanionPackage(packageName);
     }
 
     public static String companionBrokerProcess(String companionPackage) {

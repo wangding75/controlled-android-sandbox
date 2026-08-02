@@ -26,6 +26,7 @@ verifier = require(
     "Binder.getCallingUid()",
     "Binder.getCallingPid()",
     "getPackageUid(packageName, 0)",
+    "RuntimePeerIdentity.SIGNATURE_PERMISSION",
     "signaturePermissionGranted()",
     "uidOwnsCompanionPackage",
     "RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID",
@@ -33,6 +34,13 @@ verifier = require(
 for forbidden in ("ActivityManager", "getRunningAppProcesses", "processName"):
     if forbidden in verifier:
         errors.append(f"PackageCallerVerifier retains process-list dependency: {forbidden}")
+
+require(
+    "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/RuntimePeerIdentity.java",
+    "SIGNATURE_PERMISSION",
+    "COMPANION_RELEASE_PACKAGE",
+    "COMPANION_DEBUG_PACKAGE",
+)
 
 policy = require(
     "app/src/main/java/com/warden/controlledsandbox/ManagementCallerPolicy.java",
