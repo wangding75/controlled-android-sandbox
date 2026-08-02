@@ -24,6 +24,12 @@ if live['maxMethodComplexity'] > baseline['maxMethodComplexity']:
     errors.append(f"max method complexity grew {baseline['maxMethodComplexity']} -> {live['maxMethodComplexity']}")
 if live['maxMethodsPerSource'] > baseline['maxMethodsPerSource']:
     errors.append(f"max methods per source grew {baseline['maxMethodsPerSource']} -> {live['maxMethodsPerSource']}")
+for band, baseline_count in baseline['complexityBands'].items():
+    if live['complexityBands'][band] > baseline_count:
+        errors.append(f"complexity band {band} grew {baseline_count} -> {live['complexityBands'][band]}")
+for band, baseline_count in baseline['methodCountBands'].items():
+    if live['methodCountBands'][band] > baseline_count:
+        errors.append(f"method-count band {band} grew {baseline_count} -> {live['methodCountBands'][band]}")
 
 allowed = {line.strip() for line in ALLOWLIST.read_text(encoding='utf-8').splitlines()
            if line.strip() and not line.lstrip().startswith('#')}
@@ -47,6 +53,8 @@ report = {
         'newPackageCyclesForbidden': True,
         'methodComplexityGrowthForbidden': True,
         'methodsPerSourceGrowthForbidden': True,
+        'highComplexityBandGrowthForbidden': True,
+        'highMethodCountBandGrowthForbidden': True,
         'publicApiGrowthRequiresAllowlist': True,
         'dependencyDirectionGate': 'scripts/check-architecture.py',
     },
@@ -72,4 +80,5 @@ if errors:
     raise SystemExit(1)
 print('PASS M5-T19.1-T architecture governance '
       f"(moduleCycles=0 packageCycles={len(live_cycles)} maxComplexity={live['maxMethodComplexity']} "
-      f"maxMethods={live['maxMethodsPerSource']} publicApi={live['publicApiCount']})")
+      f"maxMethods={live['maxMethodsPerSource']} complexityBands={live['complexityBands']} "
+      f"methodBands={live['methodCountBands']} publicApi={live['publicApiCount']})")

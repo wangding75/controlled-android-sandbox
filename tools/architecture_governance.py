@@ -184,9 +184,19 @@ def metrics(root: Path, commit: str | None = None) -> dict[str, object]:
         'packageDependencyCycles': _strongly_connected(package_graph),
         'methodCount': len(methods),
         'maxMethodComplexity': int(methods[0]['complexity']) if methods else 0,
+        'complexityBands': {
+            'atLeast15': sum(1 for row in methods if int(row['complexity']) >= 15),
+            'atLeast25': sum(1 for row in methods if int(row['complexity']) >= 25),
+            'atLeast40': sum(1 for row in methods if int(row['complexity']) >= 40),
+        },
         'highestComplexityMethods': methods[:25],
         'methodsPerSource': method_counts[:25],
         'maxMethodsPerSource': int(method_counts[0]['methods']) if method_counts else 0,
+        'methodCountBands': {
+            'atLeast40': sum(1 for row in method_counts if int(row['methods']) >= 40),
+            'atLeast80': sum(1 for row in method_counts if int(row['methods']) >= 80),
+            'atLeast120': sum(1 for row in method_counts if int(row['methods']) >= 120),
+        },
         'publicApiSignatures': sorted(api),
         'publicApiCount': len(api),
     }
