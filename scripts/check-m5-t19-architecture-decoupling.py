@@ -9,7 +9,13 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.architecture_metrics import commit_large_classes, live_large_classes
+
 BASE = "8ecb7d6"
+M5_T19_COMMIT = "2071974236f55d3a94aac40bb70d834cea590218"
 errors: list[str] = []
 
 
@@ -114,8 +120,20 @@ try:
         errors.append("M5-T19 invents device evidence")
     if audit.get("typeDebt", {}).get("legacyBundleAidlDeclarations") != 0:
         errors.append("M5-T19 must eliminate legacy Bundle AIDL declarations")
-    if audit.get("architecture", {}).get("largeProductionClassesOver500") > 12:
-        errors.append("M5-T19 must reduce large production classes to at most twelve")
+    architecture = audit.get("architecture", {})
+    baseline_large = commit_large_classes(ROOT, M5_T19_COMMIT)
+    if architecture.get("scanScope") != "*/src/main/**/*.java":
+        errors.append("M5-T19 architecture audit must declare the complete production scan scope")
+    if architecture.get("m5T19BaselineCommit") != M5_T19_COMMIT:
+        errors.append("M5-T19 architecture audit baseline commit is incorrect")
+    if architecture.get("m5T19BaselineLargeProductionClassesOver500") != len(baseline_large):
+        errors.append("M5-T19 architecture audit baseline large-class count is stale")
+    if architecture.get("m5T19BaselineLargeClasses") != baseline_large:
+        errors.append("M5-T19 architecture audit baseline large-class list is stale")
+    if len(baseline_large) != 13:
+        errors.append(f"M5-T19 full production scan must reproduce 13 large classes, found {len(baseline_large)}")
+    if not any(row.get("path", "").endswith("ManifestReceiverRegistry.java") for row in baseline_large):
+        errors.append("M5-T19 baseline scan omits ManifestReceiverRegistry.java")
     if audit.get("methodRouting", {}).get("directSubstringRoutingCount") != 0:
         errors.append("M5-T19 direct method-name routing count must be zero")
     if audit.get("testGovernance", {}).get("jacocoExecuted") is not False:
@@ -134,12 +152,20 @@ try:
     evidence = preflight.get("evidence", {})
     if evidence.get("legacyBundleAidlDeclarations") != 0:
         errors.append("M5-T19 preflight must record zero legacy Bundle declarations")
-    if evidence.get("largeProductionClassesOver500") > 12:
-        errors.append("M5-T19 preflight large-class count is too high")
+    if evidence.get("largeProductionClassesOver500") != 13:
+        errors.append("M5-T19 preflight must disclose the corrected full-scope count of thirteen")
     if evidence.get("mappedCriticalTestOwners") != 12:
         errors.append("M5-T19 preflight test ownership is incomplete")
 except Exception as exc:
     errors.append(f"invalid M5-T19 source preflight: {exc}")
+
+live_large = live_large_classes(ROOT)
+if not live_large:
+    errors.append("live production large-class scan returned no results")
+for row in live_large:
+    path = ROOT / str(row["path"])
+    if not path.is_file() or len(path.read_text(encoding="utf-8", errors="ignore").splitlines()) != row["lines"]:
+        errors.append(f"live large-class scan is inconsistent for {row['path']}")
 
 app_gradle = require(
     "app/build.gradle",

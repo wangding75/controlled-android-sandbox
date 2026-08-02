@@ -11,8 +11,10 @@
     "internalBundlePayloadBoundary": true
   },
   "architecture": {
-    "largeProductionClassesOver500": 12,
-    "largeClasses": [
+    "scanScope": "*/src/main/**/*.java",
+    "m5T19BaselineCommit": "2071974236f55d3a94aac40bb70d834cea590218",
+    "m5T19BaselineLargeProductionClassesOver500": 13,
+    "m5T19BaselineLargeClasses": [
       {
         "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
         "lines": 1512
@@ -54,6 +56,10 @@
         "lines": 580
       },
       {
+        "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+        "lines": 557
+      },
+      {
         "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
         "lines": 536
       },
@@ -62,12 +68,75 @@
         "lines": 508
       }
     ],
+    "largeProductionClassesOver500": 15,
+    "largeClasses": [
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
+        "lines": 1512
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
+        "lines": 1415
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "lines": 1276
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+        "lines": 879
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
+        "lines": 828
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
+        "lines": 785
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
+        "lines": 686
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
+        "lines": 649
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+        "lines": 598
+      },
+      {
+        "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+        "lines": 597
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
+        "lines": 585
+      },
+      {
+        "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
+        "lines": 557
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
+        "lines": 551
+      },
+      {
+        "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+        "lines": 538
+      },
+      {
+        "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+        "lines": 502
+      }
+    ],
     "lineCounts": {
-      "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java": 147,
+      "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java": 164,
       "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java": 500,
-      "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java": 1482,
+      "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java": 1415,
       "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java": 1512,
-      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java": 1254,
+      "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java": 1276,
       "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java": 473
     },
     "extractedOwners": [
@@ -90,9 +159,9 @@
     "matcherSelfTest": true
   },
   "testGovernance": {
-    "metricType": "explicit critical-path regression ownership",
-    "criticalOwners": 12,
-    "mappedCriticalOwners": 12,
+    "metricType": "main-reachable direct ownership plus successful Host-runner receipt",
+    "criticalOwners": 13,
+    "mappedCriticalOwners": 13,
     "lineCoverageClaimed": false,
     "branchCoverageClaimed": false,
     "jacocoExecuted": false

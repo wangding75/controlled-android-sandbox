@@ -21,7 +21,7 @@ Close the remaining offline architecture debt before the locked Android build st
 - legacy Bundle AIDL declarations in Broker and Guest interfaces equal zero;
 - repository-owned primary runtime routing remains typed V2 with protocol version, request correlation and stable error results;
 - `PackageManagementService` is at most 200 lines and only owns Android service lifecycle/dependency issuance;
-- same-scope production classes above 500 lines decrease from fourteen to at most twelve;
+- App/Runtime/Framework production classes above 500 lines decrease from fourteen to at most twelve; the full `*/src/main/**/*.java` evidence must also include Domain and report thirteen;
 - `ActivityTaskLedger`, `VirtualSystemServiceStore` and `RuntimeBrokerService` are smaller than their M5-T18 baselines and extracted owners have direct Host regression ownership;
 - direct method-name substring/prefix/suffix dispatch count is zero outside the centralized matcher;
 - all static Android, Java/Runtime/Framework, Native and reproducible-source gates pass;

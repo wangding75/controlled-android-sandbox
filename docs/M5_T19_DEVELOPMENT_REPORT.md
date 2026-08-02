@@ -26,7 +26,7 @@
 | Metric | M5-T18 | M5-T19 |
 |---|---:|---:|
 | Legacy Bundle AIDL declarations | 12 | 0 |
-| Production classes above 500 lines | 14 | 12 |
+| Production classes above 500 lines (full `*/src/main/**/*.java` scan) | 14 | 13 |
 | `PackageManagementService` | 1,191 | 147 |
 | `ActivityTaskLedger` | 1,741 | 1,512 |
 | `VirtualSystemServiceStore` | 1,654 | 1,482 |
@@ -47,7 +47,7 @@ The critical-path ownership metric is not a line-coverage or branch-coverage per
 
 ## Remaining architecture debt
 
-- Twelve production classes remain above 500 lines.
+- Thirteen production classes remained above 500 lines at the M5-T19 baseline. The original report omitted `ManifestReceiverRegistry.java` from `sandbox-domain`.
 - `ActivityTaskLedger`, `VirtualSystemServiceStore` and `RuntimeBrokerService` remain large and should be changed only with Android build/device evidence or narrowly scoped follow-up refactors.
 - Host regressions provide no real JaCoCo percentage.
 - AES-GCM key material remains app-private rather than Android Keystore-backed.

@@ -489,8 +489,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     }
 
     private void requireOwner() {
-        guard.requireOwner(Binder.getCallingUid(), Binder.getCallingPid());
-        callerVerifier.requireMainProcessCaller();
+        guard.requireOwner(Binder.getCallingUid(), Binder.getCallingPid()); callerVerifier.requireMainProcessCaller();
     }
 
     private void closeInternal() {

@@ -4,10 +4,17 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tools.architecture_metrics import commit_large_classes, live_large_classes
+
 BASE = "8ecb7d6"
+M5_T19_COMMIT = "2071974236f55d3a94aac40bb70d834cea590218"
 
 
 def read(rel: str) -> str:
@@ -32,17 +39,11 @@ def legacy_bundle_methods() -> list[str]:
 
 
 def large_classes() -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
-    for root in (
-        ROOT / "app/src/main/java",
-        ROOT / "sandbox-runtime/src/main/java",
-        ROOT / "sandbox-framework/src/main/java",
-    ):
-        for path in root.rglob("*.java"):
-            count = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
-            if count > 500:
-                rows.append({"path": str(path.relative_to(ROOT)), "lines": count})
-    return sorted(rows, key=lambda item: (-int(item["lines"]), str(item["path"])))
+    return live_large_classes(ROOT)
+
+
+def m5_t19_baseline_large_classes() -> list[dict[str, object]]:
+    return commit_large_classes(ROOT, M5_T19_COMMIT)
 
 
 def changed_references() -> list[str]:
@@ -69,6 +70,7 @@ def direct_method_routing() -> list[str]:
 
 ownership = json.loads(read("build/verification/m5-t19-critical-test-ownership.json"))
 large = large_classes()
+baseline_large = m5_t19_baseline_large_classes()
 report = {
     "iteration": "M5-T19",
     "sourceStatus": "PASS",
@@ -86,6 +88,10 @@ report = {
         ).is_file(),
     },
     "architecture": {
+        "scanScope": "*/src/main/**/*.java",
+        "m5T19BaselineCommit": M5_T19_COMMIT,
+        "m5T19BaselineLargeProductionClassesOver500": len(baseline_large),
+        "m5T19BaselineLargeClasses": baseline_large,
         "largeProductionClassesOver500": len(large),
         "largeClasses": large,
         "lineCounts": {

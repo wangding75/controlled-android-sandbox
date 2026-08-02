@@ -5,11 +5,13 @@
   "deviceEvidenceCount": 0,
   "evidence": {
     "legacyBundleAidlDeclarations": 0,
-    "largeProductionClassesOver500": 12,
+    "largeProductionClassesOver500": 13,
     "directSubstringRoutingCount": 0,
     "criticalTestOwners": 12,
     "mappedCriticalTestOwners": 12,
-    "referenceFilesModified": 0
+    "referenceFilesModified": 0,
+    "largeProductionClassScanScope": "*/src/main/**/*.java",
+    "omittedClassCorrected": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java"
   },
   "deviceBoundaries": [
     "Gradle/AGP generated AIDL and Android SDK/NDK compilation",

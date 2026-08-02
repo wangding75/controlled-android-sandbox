@@ -299,5 +299,5 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PASS — package capability sessions, Activity/Task checkpoint ownership, Guest connection ownership and virtual service records are separated from central Android service classes.
 - PASS — direct method-name substring/prefix/suffix routing is zero outside `InvocationMethodMatcher`.
 - PASS — twelve architecture-critical source owners map to executed Host regressions; no line/branch coverage percentage is claimed.
-- PARTIAL — twelve production classes remain above 500 lines.
+- PARTIAL — thirteen production classes remain above 500 lines in the corrected full production-source scan.
 - BLOCKED — JaCoCo, AGP-generated AIDL, Android Keystore, Emulator and physical-device evidence require the locked JDK-17 Android environment.
