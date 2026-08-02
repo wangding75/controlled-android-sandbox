@@ -4,6 +4,7 @@ import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
+import com.warden.controlledsandbox.contract.ControlledReleaseIdentity;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -188,7 +189,9 @@ final class NativeCompanionWorkspaceStore {
     }
 
     private static void requireProtocol(int protocol) {
-        if (protocol != 1) throw new SecurityException("NATIVE_COMPANION_PROTOCOL_MISMATCH");
+        if (protocol != ControlledReleaseIdentity.COMPANION_PROTOCOL) {
+            throw new SecurityException("NATIVE_COMPANION_PROTOCOL_MISMATCH");
+        }
     }
 
     private static File safeTarget(File workspaceRoot, String relativePath) throws IOException {

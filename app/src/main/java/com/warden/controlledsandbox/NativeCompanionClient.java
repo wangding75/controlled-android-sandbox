@@ -3,14 +3,17 @@ package com.warden.controlledsandbox;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import com.warden.controlledsandbox.contract.ControlledReleaseIdentity;
 import com.warden.controlledsandbox.contract.INativeAbiCompanion;
 import com.warden.controlledsandbox.contract.INativeCompanionArtifactService;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
+import com.warden.controlledsandbox.contract.NativeCompanionIdentity;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
@@ -34,7 +37,7 @@ final class NativeCompanionClient implements AutoCloseable {
             "com.warden.controlledsandbox.companion32.NativeCompanionArtifactService";
     private static final String RUNTIME_BROKER_SERVICE =
             "com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService";
-    private static final int PROTOCOL = 1;
+    private static final int PROTOCOL = ControlledReleaseIdentity.COMPANION_PROTOCOL;
     private static final int MAX_NATIVE_LIBRARIES = 256;
 
     private final Context context;
@@ -66,7 +69,8 @@ final class NativeCompanionClient implements AutoCloseable {
                 PROTOCOL, "preflight-" + UUID.randomUUID(), 1L, virtualUserId,
                 record.packageName, record.sha256, nonce, record.nativeAbi,
                 NativeCompanionRequest.OP_PROBE);
-        NativeCompanionResult result = requireControl().execute(request);
+        INativeAbiCompanion control = requireCompatibleControl();
+        NativeCompanionResult result = control.execute(request);
         if (result == null) throw new IllegalStateException("NATIVE_COMPANION_EMPTY_RESULT");
         return result;
     }
@@ -211,8 +215,23 @@ final class NativeCompanionClient implements AutoCloseable {
         return result;
     }
 
-    private INativeAbiCompanion requireControl() throws Exception {
-        return controlConnection.require();
+    private INativeAbiCompanion requireCompatibleControl() throws Exception {
+        INativeAbiCompanion control = controlConnection.require();
+        try {
+            NativeCompanionIdentity identity = control.getIdentity();
+            NativeCompanionIdentityVerifier.requireCompatible(identity);
+            PackageInfo host = context.getPackageManager()
+                    .getPackageInfo(context.getPackageName(), 0);
+            PackageInfo companion = context.getPackageManager()
+                    .getPackageInfo(companionPackage(), 0);
+            NativeCompanionIdentityVerifier.requireInstalledPair(
+                    identity, host.getLongVersionCode(), host.versionName,
+                    companion.getLongVersionCode(), companion.versionName);
+            return control;
+        } catch (Exception failure) {
+            controlConnection.invalidate();
+            throw failure;
+        }
     }
 
     private INativeCompanionArtifactService requireArtifacts() throws Exception {

@@ -10,8 +10,8 @@ android {
         applicationId 'com.warden.controlledsandbox.companion32'
         minSdk rootProject.ext.controlledMinSdk
         targetSdk rootProject.ext.controlledTargetSdk
-        versionCode 1
-        versionName '0.1.0-development'
+        versionCode rootProject.ext.controlledVersionCode
+        versionName rootProject.ext.controlledVersionName
         externalNativeBuild { cmake { cppFlags '-std=c++20 -Wall -Wextra -Werror' } }
         ndk { abiFilters 'armeabi-v7a', 'x86' }
     }

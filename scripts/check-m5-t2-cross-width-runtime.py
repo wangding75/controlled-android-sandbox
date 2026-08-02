@@ -47,6 +47,7 @@ if "## M5-T2 cross-width runtime source baseline" not in readme:
 
 for needle in (
     "INativeCompanionArtifactService", "stageArtifact", "prepareWorkspace",
+    "NativeCompanionIdentityVerifier.requireCompatible", "getIdentity()",
     "RuntimeOperationTransport.execute(requireBroker()",
     "RuntimeOperationRequest.PREPARE_GUEST", "RuntimeOperationRequest.LAUNCH_ACTIVITY",
     "RuntimeOperationRequest.INVOKE_COMPONENT", "requireBroker().stopGuest",
@@ -76,7 +77,9 @@ for needle in (
     if needle not in workspace:
         errors.append(f"workspace safety control missing: {needle}")
 
-for needle in ("sandbox-runtime", "armeabi-v7a", "x86"):
+for needle in ("sandbox-runtime", "armeabi-v7a", "x86",
+               "versionCode rootProject.ext.controlledVersionCode",
+               "versionName rootProject.ext.controlledVersionName"):
     if needle not in companion_gradle:
         errors.append(f"Companion Gradle missing: {needle}")
 for needle in ("arm64-v8a", "x86_64"):

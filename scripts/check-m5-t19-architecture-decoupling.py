@@ -141,7 +141,14 @@ try:
 except Exception as exc:
     errors.append(f"invalid M5-T19 source preflight: {exc}")
 
-app_gradle = require("app/build.gradle", "versionCode 19", "versionName '0.5.19-source'")
+app_gradle = require(
+    "app/build.gradle",
+    "versionCode rootProject.ext.controlledVersionCode",
+    "versionName rootProject.ext.controlledVersionName")
+require(
+    "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ControlledReleaseIdentity.java",
+    "VERSION_CODE = 19",
+    'VERSION_NAME = "0.5.19.1-source"')
 runner = text("tools/static_android_compile.py")
 if runner.count("InvocationMethodMatcherSelfTest") != 1:
     errors.append("static Android compiler must execute InvocationMethodMatcherSelfTest exactly once")

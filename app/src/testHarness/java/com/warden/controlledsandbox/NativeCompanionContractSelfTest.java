@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.contract.NativeCompanionRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
+import com.warden.controlledsandbox.contract.NativeCompanionIdentity;
+import com.warden.controlledsandbox.contract.ControlledReleaseIdentity;
 import java.util.Arrays;
 
 public final class NativeCompanionContractSelfTest {
@@ -26,6 +28,20 @@ public final class NativeCompanionContractSelfTest {
         requestParcel.recycle();
         require(request.equals(restoredRequest), "request Parcelable round-trip failed");
         require(Arrays.equals(request.capabilityNonce(), restoredRequest.capabilityNonce()), "nonce lost");
+
+        NativeCompanionIdentity identity = NativeCompanionIdentity.current();
+        Parcel identityParcel = Parcel.obtain();
+        identity.writeToParcel(identityParcel, 0);
+        identityParcel.setDataPosition(0);
+        NativeCompanionIdentity restoredIdentity =
+                NativeCompanionIdentity.CREATOR.createFromParcel(identityParcel);
+        identityParcel.recycle();
+        require(ControlledReleaseIdentity.RELEASE_TRAIN.equals(restoredIdentity.releaseTrain()),
+                "companion release train lost");
+        require(restoredIdentity.versionCode() == ControlledReleaseIdentity.VERSION_CODE,
+                "companion version code lost");
+        require(restoredIdentity.supportsProtocol(ControlledReleaseIdentity.COMPANION_PROTOCOL),
+                "companion protocol range lost");
 
         NativeCompanionResult result = NativeCompanionResult.success(request, "bitness=32;abi=armeabi-v7a");
         Parcel resultParcel = Parcel.obtain();

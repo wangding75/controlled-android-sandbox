@@ -84,10 +84,15 @@ require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/fra
 require(".github/workflows/source-gates.yml", "actions/setup-java@v4", "java-version: '17'",
         "./scripts/verify-all.sh", "actions/upload-artifact@v4")
 app_gradle = require("app/build.gradle",
-        "testInstrumentationRunner 'com.warden.controlledsandbox.SourceBaselineInstrumentation'")
-version_code_match = __import__("re").search(r"versionCode\s+(\d+)", app_gradle)
+        "testInstrumentationRunner 'com.warden.controlledsandbox.SourceBaselineInstrumentation'",
+        "versionCode rootProject.ext.controlledVersionCode",
+        "versionName rootProject.ext.controlledVersionName")
+release_identity = require(
+        "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ControlledReleaseIdentity.java",
+        "VERSION_CODE", "VERSION_NAME")
+version_code_match = __import__("re").search(r"VERSION_CODE\s*=\s*(\d+)", release_identity)
 if not version_code_match or int(version_code_match.group(1)) < 18:
-    errors.append("app versionCode must preserve or advance the M5-T18 baseline")
+    errors.append("shared release versionCode must preserve or advance the M5-T18 baseline")
 require("app/src/androidTest/java/com/warden/controlledsandbox/SourceBaselineInstrumentation.java",
         "extends Instrumentation", "SOURCE_BASELINE_INSTRUMENTATION_READY", "getTargetContext()")
 

@@ -2,26 +2,26 @@
   "bomFormat": "ControlledSandbox-SBOM",
   "specVersion": "1.0",
   "project": "controlled-sandbox-cleanroom",
-  "version": "0.5.19-source",
+  "version": "0.5.19.1-source",
   "components": [
     {
       "type": "application",
       "name": "app",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 126,
+      "fileCount": 128,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "06f3eb63f1314b690b7b4a11ae17fb1f493851ea48d71f15b4be83fe79aa0040"
+      "sourceDigestSha256": "1708b332df03c1762b16e647f0d9ebe135e37b8fefb74f052733a944fda03e4d"
     },
     {
       "type": "library",
       "name": "sandbox-domain",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 54,
       "languages": [
@@ -33,21 +33,21 @@
     {
       "type": "library",
       "name": "sandbox-contract",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 269,
+      "fileCount": 272,
       "languages": [
         "AIDL",
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "cdfee078388fda5464daed24b790dbfb10bb50f1fdde10f833c8a73880347620"
+      "sourceDigestSha256": "0c8af2a4ad362d784ec578a49057f906d28a17f830b8b4f7bae118e63e2bed13"
     },
     {
       "type": "library",
       "name": "sandbox-framework",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 205,
       "languages": [
@@ -55,12 +55,12 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "51ebb1485561e6a3a340cd8fdc2315934dbbff72bc33fb0d55de49b32da40292"
+      "sourceDigestSha256": "4aa067354304522474939d2dbc83ff98742a0da49e0a69179b29aae4659ac76e"
     },
     {
       "type": "library",
       "name": "sandbox-native",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 38,
       "languages": [
@@ -75,7 +75,7 @@
     {
       "type": "library",
       "name": "sandbox-companion32",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 12,
       "languages": [
@@ -85,12 +85,12 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "49b67fb9a452af0fd02470ccd08e164ff48a5788ca94656f29584f78c03951eb"
+      "sourceDigestSha256": "a26377e8205bd9de60402290b90ddb73c8a916fe9bf4f419010e616cf9b93cb5"
     },
     {
       "type": "library",
       "name": "sandbox-runtime",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 209,
       "languages": [
@@ -103,7 +103,7 @@
     {
       "type": "application",
       "name": "fixture-basic",
-      "version": "0.5.19-source",
+      "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 15,
       "languages": [

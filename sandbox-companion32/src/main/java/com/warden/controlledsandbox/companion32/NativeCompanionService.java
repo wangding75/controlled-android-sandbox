@@ -5,19 +5,26 @@ import android.content.Intent;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.INativeAbiCompanion;
 import com.warden.controlledsandbox.contract.NativeCompanionRequest;
+import com.warden.controlledsandbox.contract.NativeCompanionIdentity;
+import com.warden.controlledsandbox.contract.ControlledReleaseIdentity;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Signature-permission protected 32-bit companion endpoint. */
 public final class NativeCompanionService extends Service {
-    private static final int PROTOCOL = 1;
+    private static final int PROTOCOL = ControlledReleaseIdentity.COMPANION_PROTOCOL;
     private static final int MAX_NONCES = 256;
     private final Map<String, Boolean> consumedNonces = new LinkedHashMap<>();
     private final NativeCompanionGenerationRegistry generations =
             new NativeCompanionGenerationRegistry(256);
 
     private final INativeAbiCompanion.Stub binder = new INativeAbiCompanion.Stub() {
+        @Override public NativeCompanionIdentity getIdentity() {
+            NativeCompanionCallerGuard.requireSignedPeer(NativeCompanionService.this);
+            return NativeCompanionIdentity.current();
+        }
+
         @Override public NativeCompanionResult execute(NativeCompanionRequest request) {
             NativeCompanionCallerGuard.requireSignedPeer(NativeCompanionService.this);
             if (request == null) return NativeCompanionResult.failure("", "", "REQUEST_REQUIRED", "request is required");

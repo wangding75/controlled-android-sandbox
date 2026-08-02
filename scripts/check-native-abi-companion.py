@@ -42,12 +42,15 @@ contract_paths = [
     'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionResult.java',
     'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionArtifactRequest.java',
     'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionArtifactResult.java',
+    'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/NativeCompanionIdentity.java',
+    'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ControlledReleaseIdentity.java',
 ]
 contract = '\n'.join(text(path) for path in contract_paths)
 if 'Bundle' in contract:
     errors.append('Native companion typed contracts contain an untyped Bundle')
 for token in ('sessionId', 'generation', 'virtualUserId', 'packageRevision',
-              'capabilityNonce', 'requestedAbi', 'relativePath', 'sha256', 'sizeBytes'):
+              'capabilityNonce', 'requestedAbi', 'relativePath', 'sha256', 'sizeBytes',
+              'releaseTrain', 'minimumProtocol', 'maximumProtocol'):
     if token not in contract:
         errors.append(f'Native companion contracts are missing {token}')
 
@@ -67,6 +70,7 @@ for token in (permission, 'NativeCompanionArtifactService',
 client = text('app/src/main/java/com/warden/controlledsandbox/NativeCompanionClient.java')
 runtime = text('app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java')
 for token in ('INativeCompanionArtifactService', 'ParcelFileDescriptor.open',
+              'NativeCompanionIdentityVerifier.requireCompatible', 'getIdentity()',
               'RuntimeOperationRequest.PREPARE_GUEST', 'RuntimeOperationRequest.LAUNCH_ACTIVITY',
               'RuntimeOperationRequest.INVOKE_COMPONENT', 'stopGuest'):
     if token not in client:

@@ -3,7 +3,23 @@ plugins {
     id 'com.android.library' version '8.11.1' apply false
 }
 
+def releaseIdentitySource = file('sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ControlledReleaseIdentity.java').getText('UTF-8')
+def identityString = { String name ->
+    def match = releaseIdentitySource =~ /public static final String ${name} = "([^"]+)";/
+    if (!match.find()) throw new GradleException("Missing release identity string: ${name}")
+    return match.group(1)
+}
+def identityInt = { String name ->
+    def match = releaseIdentitySource =~ /public static final int ${name} = ([0-9]+);/
+    if (!match.find()) throw new GradleException("Missing release identity integer: ${name}")
+    return Integer.parseInt(match.group(1))
+}
+
 ext {
+    controlledReleaseTrain = identityString('RELEASE_TRAIN')
+    controlledVersionCode = identityInt('VERSION_CODE')
+    controlledVersionName = identityString('VERSION_NAME')
+    controlledCompanionProtocol = identityInt('COMPANION_PROTOCOL')
     controlledCompileSdk = 36
     controlledTargetSdk = 35
     controlledMinSdk = 26

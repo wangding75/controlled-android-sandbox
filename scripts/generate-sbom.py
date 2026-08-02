@@ -8,10 +8,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'verification/sbom.json'
-APP_GRADLE = (ROOT / 'app/build.gradle').read_text(encoding='utf-8')
-VERSION_MATCH = re.search(r"versionName\s+['\"]([^'\"]+)['\"]", APP_GRADLE)
+RELEASE_IDENTITY = (ROOT / 'sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/ControlledReleaseIdentity.java').read_text(encoding='utf-8')
+VERSION_MATCH = re.search(r'VERSION_NAME\s*=\s*"([^"]+)"', RELEASE_IDENTITY)
 if VERSION_MATCH is None:
-    raise SystemExit('app/build.gradle has no versionName')
+    raise SystemExit('ControlledReleaseIdentity.java has no VERSION_NAME')
 PROJECT_VERSION = VERSION_MATCH.group(1)
 MODULES = ['app', 'sandbox-domain', 'sandbox-contract', 'sandbox-framework', 'sandbox-native', 'sandbox-companion32', 'sandbox-runtime', 'fixture-basic']
 components = []
