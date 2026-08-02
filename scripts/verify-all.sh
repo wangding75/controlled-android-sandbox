@@ -60,6 +60,7 @@ python3 scripts/check-m5-t19-1-q-fatal-error-boundary.py
 python3 scripts/check-m5-t19-1-r-live-architecture-audit.py
 python3 scripts/check-m5-t19-1-s-durable-atomic-persistence.py
 python3 scripts/check-m5-t19-1-t-architecture-governance.py
+python3 scripts/check-m5-t19-1-u-supply-chain-governance.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

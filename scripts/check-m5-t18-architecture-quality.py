@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -81,8 +82,12 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/PrivilegedServicesVirtualizationSelfTest.java",
         "add-to-save-buffer must not be misclassified as cleanup")
 
-require(".github/workflows/source-gates.yml", "actions/setup-java@v4", "java-version: '17'",
-        "./scripts/verify-all.sh", "actions/upload-artifact@v4")
+workflow = require(".github/workflows/source-gates.yml", "./scripts/verify-all.sh")
+for action in ("actions/checkout", "actions/setup-java", "actions/upload-artifact"):
+    if not re.search(rf"{re.escape(action)}@[0-9a-f]{{40}}", workflow):
+        errors.append(f"source-gates workflow must pin {action} to a full commit SHA")
+if not re.search(r"java-version:\s*['\"]17\.[0-9]+\.[0-9]+\+[0-9]+['\"]", workflow):
+    errors.append("source-gates workflow must pin an exact Java 17 patch/build")
 app_gradle = require("app/build.gradle",
         "testInstrumentationRunner 'com.warden.controlledsandbox.SourceBaselineInstrumentation'",
         "versionCode rootProject.ext.controlledVersionCode",

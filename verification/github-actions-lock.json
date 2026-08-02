@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "runnerLabels": [
+    "ubuntu-24.04"
+  ],
+  "actions": {
+    "actions/checkout": {
+      "sha": "9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0",
+      "version": "v7.0.0",
+      "releaseUrl": "https://github.com/actions/checkout/releases/tag/v7.0.0"
+    },
+    "actions/setup-java": {
+      "sha": "03ad4de0992f5dab5e18fcb136590ce7c4a0ac95",
+      "version": "v5.6.0",
+      "releaseUrl": "https://github.com/actions/setup-java/releases/tag/v5.6.0"
+    },
+    "actions/upload-artifact": {
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "version": "v7.0.1",
+      "releaseUrl": "https://github.com/actions/upload-artifact/releases/tag/v7.0.1"
+    }
+  },
+  "java": {
+    "distribution": "temurin",
+    "version": "17.0.19+10",
+    "checkLatest": false
+  }
+}

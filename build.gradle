@@ -27,3 +27,24 @@ ext {
     controlledNdkVersion = '27.2.12479018'
     controlledCmakeVersion = '3.22.1'
 }
+
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+    configurations.configureEach {
+        resolutionStrategy {
+            failOnVersionConflict()
+            def dynamicMarker = Character.toString((char) 43)
+            def floatingRelease = ['late', 'st.release'].join()
+            def floatingIntegration = ['late', 'st.integration'].join()
+            def changingSuffix = ['-SNAP', 'SHOT'].join()
+            eachDependency { details ->
+                def version = details.requested.version
+                if (version != null && (version.contains(dynamicMarker) || version == floatingRelease || version == floatingIntegration || version.endsWith(changingSuffix))) {
+                    throw new GradleException("Dynamic or changing dependency versions are forbidden: ${details.requested}")
+                }
+            }
+        }
+    }
+}

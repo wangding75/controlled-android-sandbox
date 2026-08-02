@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "project": "AndroidX platform/frameworks/support",
+    "branchSnapshot": "androidx-main",
+    "tree": "70f032cc410862a4aed5aaee19aefc8c835bba6f",
+    "verificationMetadataBlob": "aa4ad1601be297b02440d5ea3a90b4ae6a313722",
+    "verificationKeyringBlob": "733a758ae6062d68573bd180def799f98b45736e",
+    "transformations": [
+      "Removed all imported <trusted-artifacts> exceptions so every resolved artifact must have a reviewed signature or exact checksum.",
+      "Added exact SHA-256 entries for com.android.tools.build:gradle:8.11.1 JAR and POM."
+    ]
+  },
+  "files": {
+    "gradle/verification-metadata.xml": "ba8afc8bc106bec9fc7ae1ea7e358c1d7ead52fe595cf9651990fec0fe2a3ef3",
+    "gradle/verification-keyring.keys": "3549af9040eca933521a27e5b9c08199e5c020ad784a1a5190bcece35f96b438"
+  },
+  "policy": {
+    "verifyMetadata": true,
+    "verifySignatures": true,
+    "keyServersEnabled": false,
+    "dependencyVerificationMode": "strict",
+    "reviewRequiredForUpdates": true
+  },
+  "importedFor": "M5-T19.1-U",
+  "importedOn": "2026-08-02",
+  "rootPluginChecksums": {
+    "coordinate": "com.android.tools.build:gradle:8.11.1",
+    "artifacts": {
+      "gradle-8.11.1.jar": "3f71d6d3bf4226a2c83131fe28980842f834b84375f04bf124cb00ab72506ea2",
+      "gradle-8.11.1.pom": "6710b4f9939057d90645e24da190560972ddb7be3eb0ece19fc4e9e1fb3d9fe2"
+    }
+  },
+  "reviewedCoordinateManifest": {
+    "path": "gradle/reviewed-dependency-coordinates.json",
+    "sha256": "25e280b9b8b76c814dc51a58353add68eae8508eb95a4f0884106cf08337606b",
+    "coordinateCount": 57
+  }
+}

@@ -1,0 +1,43 @@
+# Gradle dependency verification
+
+Gradle dependency verification is enabled through:
+
+- `gradle/verification-metadata.xml`
+- `gradle/verification-keyring.keys`
+- `gradle/reviewed-dependency-coordinates.json`
+- `gradle/dependency-verification-provenance.json`
+
+CI invokes Gradle with `--dependency-verification=strict` before running the source gates.
+
+## Policy
+
+- Maven metadata and artifact signatures are verified.
+- Network key-server lookup is disabled.
+- The armored public keyring is checked in and provenance-bound.
+- `trusted-artifacts` exceptions are forbidden. Resolved artifacts must use a reviewed signature or exact checksum.
+- Dynamic versions, snapshots and changing dependencies are forbidden.
+- Version conflicts fail configuration.
+- The Gradle wrapper distribution URL and SHA-256 are pinned.
+
+## Provenance
+
+The starting metadata and keyring were imported from a fixed AndroidX source-tree snapshot. The source tree/blob IDs, deliberate transformations and final local SHA-256 values are recorded in `dependency-verification-provenance.json`.
+
+The imported metadata is a reviewed superset. Gradle evaluates only dependencies actually resolved by this project. The first real strict build may expose missing project-specific signatures or checksums; additions must be independently reviewed rather than accepted automatically.
+
+## Updating dependencies
+
+1. Change plugin or dependency versions using exact versions only.
+2. Resolve candidates in an isolated trusted environment.
+3. Generate candidate verification data:
+
+   ```bash
+   ./gradlew --write-verification-metadata sha256,pgp help --dry-run
+   ```
+
+4. Review every new coordinate, checksum and signing key against an independent source.
+5. Do not add wildcard or trusted-artifact bypasses.
+6. Update the reviewed coordinate manifest and provenance SHA-256 values.
+7. Run the U gate and a strict Gradle build.
+
+`dependencyLocking.lockAllConfigurations()` is enabled, but generated lock state is not claimed until a real Gradle resolution in the locked Android environment writes and validates it.

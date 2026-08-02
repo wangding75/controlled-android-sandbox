@@ -301,3 +301,10 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 - PASS — twelve architecture-critical source owners map to executed Host regressions; no line/branch coverage percentage is claimed.
 - PARTIAL — thirteen production classes remain above 500 lines in the corrected full production-source scan.
 - BLOCKED — JaCoCo, AGP-generated AIDL, Android Keystore, Emulator and physical-device evidence require the locked JDK-17 Android environment.
+
+## M5-T19.1-U — Supply-chain governance
+
+- GitHub Actions pinned to full commit SHAs and `ubuntu-24.04`.
+- Gradle wrapper, dependency locking and verification policy are source-gated.
+- M5-T19.1 commit identities are restricted to a valid GitHub noreply identity.
+- Status: source implementation complete; Android Gradle/AIDL/APK execution remains an external-environment gate.
