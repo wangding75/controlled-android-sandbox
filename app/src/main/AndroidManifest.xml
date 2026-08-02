@@ -14,6 +14,10 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <queries>
+        <package android:name="com.warden.controlledsandbox.companion32" />
+        <package android:name="com.warden.controlledsandbox.companion32.debug" />
+    </queries>
     <application
         android:name=".SandboxApplication"
         android:allowBackup="false"

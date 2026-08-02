@@ -20,6 +20,17 @@ else:
     if service.get(android+'permission') != 'com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION':
         errors.append('exported PackageManagementService must require the signature companion permission')
     if service.get(android+'process') != ':sandbox_package': errors.append('PackageManagementService must own :sandbox_package')
+queries = manifest.find('./queries')
+query_packages = set()
+if queries is not None:
+    for item in queries.findall('./package'):
+        value = item.get(android+'name')
+        if value: query_packages.add(value)
+for expected in ('com.warden.controlledsandbox.companion32',
+                 'com.warden.controlledsandbox.companion32.debug'):
+    if expected not in query_packages:
+        errors.append('Host manifest queries must expose Companion package identity: '+expected)
+
 permissions = manifest.findall('./permission')
 if not any(item.get(android+'name') == 'com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION'
            and item.get(android+'protectionLevel') == 'signature' for item in permissions):
@@ -41,10 +52,12 @@ for fragment in ['guard.requireOwner', 'callerVerifier.requireMainProcessCaller(
     if fragment not in management_source:
         errors.append('missing package management session security/serialization fragment: '+fragment)
 verifier_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java').read_text()
-for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER',
-                 'companionBrokerProcess', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
+if 'ActivityManager' in verifier_source or 'getRunningAppProcesses' in verifier_source:
+    errors.append('PackageCallerVerifier must not depend on process-list visibility')
+for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID',
+                 'getPackageUid', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
     if fragment not in verifier_source:
-        errors.append('missing signed Companion process verification fragment: '+fragment)
+        errors.append('missing stable UID/package verification fragment: '+fragment)
 
 for path in [ROOT/'app/src/main/java/com/warden/controlledsandbox/MainActivity.java',
              ROOT/'app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java']:

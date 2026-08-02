@@ -84,7 +84,8 @@ if 'nextAudit.removeIf(audit -> audit.packageName.equals(packageName)' not in st
 require(
     'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java',
     'requireRuntimeBrokerCaller()',
-    ':sandbox_server',
+    'getPackageUid',
+    'RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID',
 )
 service = require(
     'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java',

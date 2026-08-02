@@ -1,74 +1,72 @@
 package com.warden.controlledsandbox;
 
-import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Binder;
-import android.os.Process;
-import java.util.ArrayList;
-import java.util.List;
+import com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy;
+import java.util.Objects;
 
-/** Uses Android's process registry rather than caller-provided data to authorize package capabilities. */
+/** Authorizes package-service callers from stable Binder UID/package identity, not AMS process lists. */
 final class PackageCallerVerifier {
-    private final Context context;
+    interface CallerIdentitySource {
+        int callingUid();
+        int callingPid();
+        int hostUid();
+        boolean signaturePermissionGranted();
+        boolean uidOwnsCompanionPackage(int uid);
+    }
 
-    PackageCallerVerifier(Context context) { this.context = context.getApplicationContext(); }
+    private final CallerIdentitySource identity;
+
+    PackageCallerVerifier(Context context) {
+        this(new AndroidCallerIdentitySource(Objects.requireNonNull(context, "context")
+                .getApplicationContext()));
+    }
+
+    PackageCallerVerifier(CallerIdentitySource identity) {
+        this.identity = Objects.requireNonNull(identity, "identity");
+    }
 
     void requireMainProcessCaller() {
-        requireProcess(context.getPackageName(), "PACKAGE_MANAGEMENT_CALLER_NOT_HOST_MAIN_PROCESS");
+        if (!ManagementCallerPolicy.isHostApplication(
+                identity.callingUid(), identity.callingPid(), identity.hostUid())) {
+            throw new SecurityException("PACKAGE_MANAGEMENT_CALLER_NOT_HOST_APPLICATION_UID");
+        }
     }
 
     void requireRuntimeBrokerCaller() {
-        int callerUid = Binder.getCallingUid();
-        if (callerUid == Process.myUid()) {
-            requireProcess(context.getPackageName() + ":sandbox_server",
-                    "RUNTIME_PERMISSION_CALLER_NOT_BROKER_PROCESS");
-            return;
-        }
-        if (context.checkCallingPermission(
-                com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy.SIGNATURE_PERMISSION)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_SIGNED_PEER");
-        }
-        int callerPid = Binder.getCallingPid();
-        for (ManagementCallerPolicy.ProcessIdentity identity : runningProcesses()) {
-            if (identity.pid == callerPid && identity.uid == callerUid
-                    && (com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
-                            .companionBrokerProcess(
-                                    com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
-                                            .COMPANION_RELEASE_PACKAGE)
-                            .equals(identity.processName)
-                        || com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
-                            .companionBrokerProcess(
-                                    com.warden.controlledsandbox.runtime.broker.RuntimePeerPolicy
-                                            .COMPANION_DEBUG_PACKAGE)
-                            .equals(identity.processName))) {
-                return;
-            }
-        }
-        throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER");
-    }
-
-    private void requireProcess(String expectedProcessName, String errorCode) {
-        int uid = Binder.getCallingUid();
-        int pid = Binder.getCallingPid();
-        if (!ManagementCallerPolicy.isAuthorized(uid, pid, Process.myUid(),
-                expectedProcessName, runningProcesses())) {
-            throw new SecurityException(errorCode);
+        int callerUid = identity.callingUid();
+        if (!ManagementCallerPolicy.isRuntimePeer(callerUid, identity.callingPid(),
+                identity.hostUid(), identity.signaturePermissionGranted(),
+                identity.uidOwnsCompanionPackage(callerUid))) {
+            throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_RUNTIME_UID");
         }
     }
 
-    private List<ManagementCallerPolicy.ProcessIdentity> runningProcesses() {
-        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-        List<ManagementCallerPolicy.ProcessIdentity> identities = new ArrayList<>();
-        if (manager != null) {
-            List<ActivityManager.RunningAppProcessInfo> processes = manager.getRunningAppProcesses();
-            if (processes != null) {
-                for (ActivityManager.RunningAppProcessInfo process : processes) {
-                    identities.add(new ManagementCallerPolicy.ProcessIdentity(
-                            process.pid, process.uid, process.processName));
-                }
+    private static final class AndroidCallerIdentitySource implements CallerIdentitySource {
+        private final Context context;
+
+        AndroidCallerIdentitySource(Context context) { this.context = context; }
+
+        @Override public int callingUid() { return Binder.getCallingUid(); }
+        @Override public int callingPid() { return Binder.getCallingPid(); }
+        @Override public int hostUid() { return context.getApplicationInfo().uid; }
+        @Override public boolean signaturePermissionGranted() {
+            return context.checkCallingPermission(RuntimePeerPolicy.SIGNATURE_PERMISSION)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        @Override public boolean uidOwnsCompanionPackage(int uid) {
+            PackageManager packages = context.getPackageManager();
+            return packageUid(packages, RuntimePeerPolicy.COMPANION_RELEASE_PACKAGE) == uid
+                    || packageUid(packages, RuntimePeerPolicy.COMPANION_DEBUG_PACKAGE) == uid;
+        }
+
+        private static int packageUid(PackageManager packages, String packageName) {
+            try {
+                return packages.getPackageUid(packageName, 0);
+            } catch (PackageManager.NameNotFoundException | RuntimeException unavailable) {
+                return -1;
             }
         }
-        return identities;
     }
 }

@@ -54,6 +54,7 @@ python3 scripts/check-m5-t19-1-k-guest-storage-context.py
 python3 scripts/check-m5-t19-1-l-system-service-capability-recovery.py
 python3 scripts/check-m5-t19-1-m-monotonic-route-ttl.py
 python3 scripts/check-m5-t19-1-n-companion-release-identity.py
+python3 scripts/check-m5-t19-1-o-caller-uid-identity.py
 ./scripts/test-m5-artifact-verifier.sh
 ./scripts/test-m5-device-lab.sh
 python3 scripts/check-ports-dispatchers.py

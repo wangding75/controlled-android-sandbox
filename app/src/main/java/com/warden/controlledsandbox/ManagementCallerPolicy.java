@@ -1,30 +1,23 @@
 package com.warden.controlledsandbox;
 
-import java.util.List;
-
-/** Pure policy for authorizing the one host main process allowed to mint management capabilities. */
+/** UID-based policy for package-service capability minting.
+ *
+ * Android processes that share an application UID are not an independent security boundary. The
+ * root package service therefore authorizes the Host application UID and the explicitly installed,
+ * signature-permission-protected Companion UID. Per-session PID guards still prevent a capability
+ * minted by one Binder client from being reused by another process.
+ */
 final class ManagementCallerPolicy {
     private ManagementCallerPolicy() { }
 
-    static boolean isAuthorized(int callingUid, int callingPid, int hostUid,
-                                String expectedProcessName, List<ProcessIdentity> processes) {
-        if (callingUid != hostUid || callingPid <= 0 || expectedProcessName == null
-                || expectedProcessName.trim().isEmpty() || processes == null) return false;
-        for (ProcessIdentity process : processes) {
-            if (process != null && process.pid == callingPid && process.uid == callingUid
-                    && expectedProcessName.equals(process.processName)) return true;
-        }
-        return false;
+    static boolean isHostApplication(int callingUid, int callingPid, int hostUid) {
+        return callingPid > 0 && callingUid == hostUid;
     }
 
-    static final class ProcessIdentity {
-        final int pid;
-        final int uid;
-        final String processName;
-        ProcessIdentity(int pid, int uid, String processName) {
-            this.pid = pid;
-            this.uid = uid;
-            this.processName = processName == null ? "" : processName;
-        }
+    static boolean isRuntimePeer(int callingUid, int callingPid, int hostUid,
+            boolean signaturePermissionGranted, boolean companionUid) {
+        if (callingPid <= 0) return false;
+        if (callingUid == hostUid) return true;
+        return signaturePermissionGranted && companionUid;
     }
 }
