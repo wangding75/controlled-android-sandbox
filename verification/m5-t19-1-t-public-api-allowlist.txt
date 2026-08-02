@@ -1,0 +1,2 @@
+# One exact normalized signature per line. Empty by default.
+# Additions require a reviewed source change and an explicit entry in this file.
