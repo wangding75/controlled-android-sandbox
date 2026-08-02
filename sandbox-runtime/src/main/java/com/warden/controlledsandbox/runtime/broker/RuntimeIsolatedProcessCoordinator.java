@@ -149,13 +149,16 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                 }
                 if (staleRecovery != null) services.recoverSession(staleRecovery, session, spec);
             } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                if (staleRecovery != null) services.invalidate(staleRecovery);
-                systemServices().stop(session);
-                sessions.transition(packageName, userId, processName, session.generation(),
-                        SessionState.FAILED, now(), String.valueOf(error.getMessage()));
-                removeCapabilities(session.sessionId());
-                releaseConnection(session.processSlot());
+                try {
+                    if (staleRecovery != null) services.invalidate(staleRecovery);
+                    systemServices().stop(session);
+                    sessions.transition(packageName, userId, processName, session.generation(),
+                            SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+                    removeCapabilities(session.sessionId());
+                    releaseConnection(session.processSlot());
+                } finally {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                }
                 throw error;
             }
             session = sessions.transition(packageName, userId, processName,
@@ -243,12 +246,15 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                         session.processName(), session.generation(), SessionState.STOPPED, now(), "");
             }
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            GuestSession current = sessions.get(original.packageName(), original.virtualUserId(),
-                    original.processName());
-            if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
-                sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                        current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+            try {
+                GuestSession current = sessions.get(original.packageName(), original.virtualUserId(),
+                        original.processName());
+                if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
+                    sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
+                            current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+                }
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
         } finally {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(),
@@ -480,7 +486,11 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
             binderToken = service;
             worker = IIsolatedGuestProcess.Stub.asInterface(service);
             try { service.linkToDeath(this, 0); }
-            catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); worker = null; binderToken = null; }
+            catch (Throwable error) {
+                worker = null;
+                binderToken = null;
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             finally { connected.countDown(); }
         }
 

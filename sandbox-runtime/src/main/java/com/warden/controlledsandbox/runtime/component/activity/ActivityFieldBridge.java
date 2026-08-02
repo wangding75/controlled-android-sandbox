@@ -102,8 +102,11 @@ public final class ActivityFieldBridge {
                     applied++;
                 }
             } catch (Throwable failure) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(failure);
-                rollback(writes, applied);
+                try {
+                    rollback(writes, applied);
+                } finally {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(failure);
+                }
                 throw failure;
             }
             return new BridgeReport(apiLevel, writes.size(), List.copyOf(optionalMissing));

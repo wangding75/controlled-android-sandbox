@@ -176,7 +176,10 @@ final class GuestJobServiceBridge implements AutoCloseable {
         AtomicReference<Throwable> failure = new AtomicReference<>();
         if (!mainHandler.post(() -> {
             try { result.set(action.get()); }
-            catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); failure.set(error); }
+            catch (Throwable error) {
+                failure.set(error);
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             finally { latch.countDown(); }
         })) throw new IllegalStateException("GUEST_JOB_MAIN_HANDLER_REJECTED");
         try {

@@ -162,10 +162,13 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, cause);
                 throw cause;
             } catch (Throwable error) {
-                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
-                interactionCall.onFailure();
-                virtualCall.onFailure();
-                if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, error);
+                try {
+                    interactionCall.onFailure();
+                    virtualCall.onFailure();
+                    if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, error);
+                } finally {
+                    com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+                }
                 throw error;
             }
         } finally {

@@ -60,8 +60,11 @@ public final class GuestActivityController {
             result.putStringArrayList("bridgeOptionalMissing", new java.util.ArrayList<>(bridge.optionalMissingFields()));
             addActivityRecord(result, "CREATED");
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            emitBestEffort("DESTROYED", new Bundle());
+            try {
+                emitBestEffort("DESTROYED", new Bundle());
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             result.putString(RuntimeKeys.STATUS, "FAILED");
             result.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
             result.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(root(error).getMessage()));

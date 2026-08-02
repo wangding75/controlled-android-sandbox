@@ -159,8 +159,11 @@ public final class GuestComponentRuntime {
         try {
             resultCode = record.service.onStartCommand(intent, flags, startId);
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            if (foregroundRequested) record.foregroundPolicy.terminate("SERVICE_START_CALLBACK_FAILED");
+            try {
+                if (foregroundRequested) record.foregroundPolicy.terminate("SERVICE_START_CALLBACK_FAILED");
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             throw error;
         }
         record.startCount++;
@@ -434,8 +437,11 @@ public final class GuestComponentRuntime {
             RuntimeEventLog.event("GUEST_ORDERED_BROADCAST", out);
             return out;
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            bridge.cancelLocal();
+            try {
+                bridge.cancelLocal();
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             throw error;
         }
     }

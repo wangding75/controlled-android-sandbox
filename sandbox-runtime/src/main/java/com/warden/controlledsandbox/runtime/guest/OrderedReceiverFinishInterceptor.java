@@ -86,10 +86,13 @@ final class OrderedReceiverFinishInterceptor implements FrameworkCallInterceptor
         try {
             entry.bridge.completeFromFramework(arguments);
         } catch (Throwable ignored) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
-            // The custom token must never fall through to the real AMS. The Broker independently
-            // times out or cancels the lease when completion delivery cannot be acknowledged.
-            entry.bridge.cancelLocal();
+            try {
+                // The custom token must never fall through to the real AMS. The Broker independently
+                // times out or cancels the lease when completion delivery cannot be acknowledged.
+                entry.bridge.cancelLocal();
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+            }
         }
         return Interception.handled(null);
     }

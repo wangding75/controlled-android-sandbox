@@ -263,12 +263,15 @@ public final class FrameworkHooks implements AutoCloseable {
             installed.put(activityTaskManager, true);
             hooks.add(() -> { controller.rollbackAll(); });
         } catch (Throwable error) {
-            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
-            String failure = error.getClass().getName() + ":" + String.valueOf(error.getMessage());
-            installed.put(activityManager, false);
-            installed.put(activityTaskManager, false);
-            failures.put(activityManager, failure);
-            failures.put(activityTaskManager, failure);
+            try {
+                String failure = error.getClass().getName() + ":" + String.valueOf(error.getMessage());
+                installed.put(activityManager, false);
+                installed.put(activityTaskManager, false);
+                failures.put(activityManager, failure);
+                failures.put(activityTaskManager, failure);
+            } finally {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            }
         }
     }
 
@@ -313,9 +316,12 @@ public final class FrameworkHooks implements AutoCloseable {
             hooks.add(hook);
             installed.put(name, true);
         } catch (Throwable error) {
-            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
-            installed.put(name, false);
-            failures.put(name, error.getClass().getName() + ":" + String.valueOf(error.getMessage()));
+            try {
+                installed.put(name, false);
+                failures.put(name, error.getClass().getName() + ":" + String.valueOf(error.getMessage()));
+            } finally {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            }
         }
     }
 

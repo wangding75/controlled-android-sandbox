@@ -84,9 +84,12 @@ public abstract class StubActivityBase extends Activity {
                             result.getString(RuntimeKeys.ERROR_MESSAGE, "Unknown failure") + "\n\n" + result.getString("stack", ""));
                 }
             } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                if (guestSession != null && frameworkActivityToken != null) {
-                    guestSession.unbindActivityTaskHost(frameworkActivityToken);
+                try {
+                    if (guestSession != null && frameworkActivityToken != null) {
+                        guestSession.unbindActivityTaskHost(frameworkActivityToken);
+                    }
+                } finally {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
                 showFailure(error.getClass().getName(), String.valueOf(error.getMessage()));
             }

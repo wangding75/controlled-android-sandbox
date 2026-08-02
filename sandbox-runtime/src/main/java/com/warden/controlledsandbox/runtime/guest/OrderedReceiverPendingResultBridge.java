@@ -50,8 +50,11 @@ final class OrderedReceiverPendingResultBridge {
             }
             return bridge;
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            bridge.cancelLocal();
+            try {
+                bridge.cancelLocal();
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException(error);
         }

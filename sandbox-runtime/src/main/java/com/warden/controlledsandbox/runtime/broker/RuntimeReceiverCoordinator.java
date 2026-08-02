@@ -284,10 +284,13 @@ public final class RuntimeReceiverCoordinator {
         try {
             result = guestInvoker.invoke(deliveryTarget.processSlot(), call);
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            if (orderedLease != null) {
-                ordered.cancel(orderedLease,
-                        "ORDERED_RECEIVER_GUEST_CALL_FAILED:" + error.getClass().getSimpleName());
+            try {
+                if (orderedLease != null) {
+                    ordered.cancel(orderedLease,
+                            "ORDERED_RECEIVER_GUEST_CALL_FAILED:" + error.getClass().getSimpleName());
+                }
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException(error);

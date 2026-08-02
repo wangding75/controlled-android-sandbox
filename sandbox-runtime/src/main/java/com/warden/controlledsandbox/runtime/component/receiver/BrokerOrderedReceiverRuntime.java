@@ -38,15 +38,16 @@ public final class BrokerOrderedReceiverRuntime {
                     token, identity, resultUpdate(result));
             return response(decision, token);
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             if (!token.isEmpty() && identity != null) {
                 OrderedReceiverTokenRegistry.CompletionDecision rejected = registry.reject(
                         token, identity, "ORDERED_RECEIVER_RESULT_INVALID:" + error.getClass().getSimpleName());
                 Bundle out = response(rejected, token);
                 out.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getSimpleName());
                 out.putString(RuntimeKeys.ERROR_MESSAGE, boundedMessage(error));
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 return out;
             }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return response(false, error.getClass().getSimpleName() + ":" + boundedMessage(error));
         }
     }

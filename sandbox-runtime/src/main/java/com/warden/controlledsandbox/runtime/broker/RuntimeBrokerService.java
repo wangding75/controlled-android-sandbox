@@ -208,8 +208,11 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             out.putAll(transaction);
             return out;
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            if (!issuedRouteToken.isEmpty()) activityRuntime.launchFailed(issuedRouteToken);
+            try {
+                if (!issuedRouteToken.isEmpty()) activityRuntime.launchFailed(issuedRouteToken);
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             return failure(error);
         }
     }
@@ -478,42 +481,48 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 }
                 return result;
             } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                receiverCoordinator.rollbackRegistration(receiverReservation);
-                providerRuntime.rollbackPrepare(providerReservation);
-                cursorRuntime.rollbackQuery(cursorQueryReservation);
-                if (cursorPageReservation != null) {
-                    cursorRuntime.abort(cursorPageReservation.token());
-                    providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
-                }
-                if (cursorTerminalReservation != null) {
-                    try { cursorRuntime.completeTerminal(cursorTerminalReservation); } catch (RuntimeException ignored) { }
-                }
-                if (cursorQueryReservation != null && cursorTargetSession != null) {
-                    providerResources.closeCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
-                }
-                fileRuntime.rollbackOpen(fileOpenReservation);
-                if (fileOpenReservation != null && fileTargetSession != null) {
-                    providerResources.closeFileBestEffort(fileTargetSession, fileOpenReservation.token());
-                }
-                if (fileCloseReservation != null) {
-                    fileRuntime.abort(fileCloseReservation.token());
-                    providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
-                }
-                if (providerRoute != null) {
-                    providerRuntime.failOperation(providerRoute, error, now());
-                    providerAuditFinalized = true;
+                try {
+                    receiverCoordinator.rollbackRegistration(receiverReservation);
+                    providerRuntime.rollbackPrepare(providerReservation);
+                    cursorRuntime.rollbackQuery(cursorQueryReservation);
+                    if (cursorPageReservation != null) {
+                        cursorRuntime.abort(cursorPageReservation.token());
+                        providerResources.closeCursorBestEffort(activeSession, cursorPageReservation.token());
+                    }
+                    if (cursorTerminalReservation != null) {
+                        try { cursorRuntime.completeTerminal(cursorTerminalReservation); } catch (RuntimeException ignored) { }
+                    }
+                    if (cursorQueryReservation != null && cursorTargetSession != null) {
+                        providerResources.closeCursorBestEffort(cursorTargetSession, cursorQueryReservation.token());
+                    }
+                    fileRuntime.rollbackOpen(fileOpenReservation);
+                    if (fileOpenReservation != null && fileTargetSession != null) {
+                        providerResources.closeFileBestEffort(fileTargetSession, fileOpenReservation.token());
+                    }
+                    if (fileCloseReservation != null) {
+                        fileRuntime.abort(fileCloseReservation.token());
+                        providerResources.closeFileBestEffort(activeSession, fileCloseReservation.token());
+                    }
+                    if (providerRoute != null) {
+                        providerRuntime.failOperation(providerRoute, error, now());
+                        providerAuditFinalized = true;
+                    }
+                } finally {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
                 throw error;
             }
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            cursorRuntime.rollbackQuery(cursorQueryReservation);
-            if (cursorPageReservation != null) cursorRuntime.abort(cursorPageReservation.token());
-            fileRuntime.rollbackOpen(fileOpenReservation);
-            if (fileCloseReservation != null) fileRuntime.abort(fileCloseReservation.token());
-            if (providerRoute != null && !providerAuditFinalized) {
-                providerRuntime.failOperation(providerRoute, error, now());
+            try {
+                cursorRuntime.rollbackQuery(cursorQueryReservation);
+                if (cursorPageReservation != null) cursorRuntime.abort(cursorPageReservation.token());
+                fileRuntime.rollbackOpen(fileOpenReservation);
+                if (fileCloseReservation != null) fileRuntime.abort(fileCloseReservation.token());
+                if (providerRoute != null && !providerAuditFinalized) {
+                    providerRuntime.failOperation(providerRoute, error, now());
+                }
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
             Bundle failed = failure(error);
             ProviderBatchRuntime.BatchException batchError = findBatchException(error);
@@ -613,8 +622,11 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             payload.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
             return payload;
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            activityRuntime.launchFailed(token);
+            try {
+                activityRuntime.launchFailed(token);
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
             return failure(error);
         }
     }
@@ -693,15 +705,18 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 guestResult = callGuest(session.processSlot(), guest -> guestOperation(
                         guest, RuntimeOperationRequest.PREPARE_GUEST, spec));
             } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                if (staleRecovery != null) {
-                    activityRuntime.invalidate(staleRecovery);
-                    serviceCoordinator.invalidate(staleRecovery);
-                    receiverCoordinator.stopSession(staleRecovery,
-                            "ORDERED_RECEIVER_RECOVERY_FAILED");
-                    providerResources.stopSession(staleRecovery);
+                try {
+                    if (staleRecovery != null) {
+                        activityRuntime.invalidate(staleRecovery);
+                        serviceCoordinator.invalidate(staleRecovery);
+                        receiverCoordinator.stopSession(staleRecovery,
+                                "ORDERED_RECEIVER_RECOVERY_FAILED");
+                        providerResources.stopSession(staleRecovery);
+                    }
+                    systemServiceCoordinator.stop(session);
+                } finally {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
-                systemServiceCoordinator.stop(session);
                 throw error;
             }
             String guestStatus = guestResult.getString(RuntimeKeys.STATUS, "FAILED");
@@ -784,11 +799,14 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                         session.generation(), SessionState.STOPPED, now(), "");
             }
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            GuestSession current = sessions.get(original.packageName(), original.virtualUserId(), original.processName());
-            if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
-                sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                        current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+            try {
+                GuestSession current = sessions.get(original.packageName(), original.virtualUserId(), original.processName());
+                if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
+                    sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
+                            current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+                }
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
         } finally {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(), original.processName()));

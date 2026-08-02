@@ -28,6 +28,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         testBinderDeathCallbackDisconnectsAndRebinds();
         testConcurrentCallersShareOneReconnect();
         testConnectionIsNotPublishedBeforeDeathLinkCompletes();
+        testFatalDeathLinkCleansAttemptBeforeRethrow();
         testBindTimeoutHasDistinctReasonAndRecovers();
         testDisconnectedHasDistinctReason();
         System.out.println("PASS RuntimeGuestConnectionPool direct ownership self-test");
@@ -166,6 +167,33 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         pool.close();
     }
 
+    private static void testFatalDeathLinkCleansAttemptBeforeRethrow() throws Exception {
+        TestService service = new TestService();
+        List<String> disconnects = new ArrayList<>();
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> disconnects.add(slot + ":" + reason));
+        service.guest.failDeathLinkWithFatal();
+        try {
+            pool.call(3, guest -> new Bundle());
+            throw new AssertionError("fatal death-link failure was converted into an ordinary bind failure");
+        } catch (AssertionError expected) {
+            require("fatal-death-link".equals(expected.getMessage()),
+                    "unexpected fatal death-link failure: " + expected);
+        }
+        require(service.unbindCount == 1,
+                "fatal death-link failure did not release the in-flight binding");
+        require(disconnects.equals(List.of("3:DEAD_BINDER")),
+                "fatal death-link failure did not publish terminal attempt state: " + disconnects);
+
+        FakeGuest replacement = new FakeGuest();
+        service.guest = replacement;
+        Bundle recovered = pool.call(3, guest -> resultFor(guest, replacement, "fatal-recovered"));
+        require("fatal-recovered".equals(recovered.getString("result")),
+                "slot did not recover after fatal death-link cleanup");
+        require(service.bindCount == 2, "fatal cleanup left a stale connection in the pool");
+        pool.close();
+    }
+
     private static void testBindTimeoutHasDistinctReasonAndRecovers() throws Exception {
         TestService service = new TestService();
         service.callbackMode = CallbackMode.NONE;
@@ -290,10 +318,15 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile boolean alive = true;
         private volatile CountDownLatch deathLinkEntered;
         private volatile CountDownLatch deathLinkRelease;
+        private volatile boolean fatalOnDeathLink;
 
         void blockDeathLink() {
             deathLinkEntered = new CountDownLatch(1);
             deathLinkRelease = new CountDownLatch(1);
+        }
+
+        void failDeathLinkWithFatal() {
+            fatalOnDeathLink = true;
         }
 
         boolean awaitDeathLinkEntered() throws InterruptedException {
@@ -319,6 +352,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
             CountDownLatch entered;
             CountDownLatch release;
             synchronized (this) {
+                if (fatalOnDeathLink) throw new AssertionError("fatal-death-link");
                 if (!alive) throw new RemoteException("dead");
                 entered = deathLinkEntered;
                 release = deathLinkRelease;

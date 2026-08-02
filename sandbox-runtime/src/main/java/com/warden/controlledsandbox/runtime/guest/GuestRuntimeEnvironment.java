@@ -186,16 +186,19 @@ public final class GuestRuntimeEnvironment {
             stagedSession = null;
             return ready;
         } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            if (stagedSession != null) stagedSession.shutdown();
-            else {
-                if (stagedHooks != null) stagedHooks.close();
-                if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
+            try {
+                if (stagedSession != null) stagedSession.shutdown();
+                else {
+                    if (stagedHooks != null) stagedHooks.close();
+                    if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
+                }
+                NativePolicy.resetAudioCapture();
+                NativePolicy.resetHooks();
+                NativePolicy.resetPolicy();
+                current = null;
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
-            NativePolicy.resetAudioCapture();
-            NativePolicy.resetHooks();
-            NativePolicy.resetPolicy();
-            current = null;
             result.putString(RuntimeKeys.STATUS, "FAILED");
             result.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
             result.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));

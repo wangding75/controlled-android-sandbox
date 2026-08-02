@@ -230,8 +230,9 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
                     }
                 }
             } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 markFailure("DEAD_BINDER");
+                disconnect(this, failureReasonOr("DEAD_BINDER"));
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             } finally {
                 if (!published && linked) {
                     try {
