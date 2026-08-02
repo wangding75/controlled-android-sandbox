@@ -82,7 +82,7 @@ report = {
         "typedGuestEndpoint": "RuntimeOperationResult executeV2" in read(
             "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl"),
         "internalBundlePayloadBoundary": (
-            ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeBrokerOperationHandler.java"
+            ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerOperationHandler.java"
         ).is_file(),
     },
     "architecture": {

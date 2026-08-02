@@ -169,7 +169,7 @@ if 'runtimeStatusDispatcher.dispatch(request)' not in service:
     errors.append('broker Binder must delegate typed status to RuntimeStatusDispatcher')
 
 
-broker_adapter = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeBrokerOperationAdapter.java').read_text()
+broker_adapter = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerOperationAdapter.java').read_text()
 for evidence in ['broker.prepareGuest(payload)', 'broker.launchActivity(payload)', 'RuntimeOperationTransport.fromLegacy']:
     if evidence not in broker_adapter:
         errors.append(f'RuntimeBrokerOperationAdapter missing evidence: {evidence}')

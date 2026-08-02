@@ -60,7 +60,7 @@ required_extractions = {
     "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceRecords.java": "final class VirtualSystemServiceRecords",
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskCheckpointCoordinator.java": "final class ActivityTaskCheckpointCoordinator",
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPool.java": "final class RuntimeGuestConnectionPool",
-    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeBrokerOperationHandler.java": "interface RuntimeBrokerOperationHandler",
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerOperationHandler.java": "interface RuntimeBrokerOperationHandler",
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationValues.java": "final class ApplicationEnvironmentInvocationValues",
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentUsageValues.java": "final class ApplicationEnvironmentUsageValues",
 }

@@ -91,7 +91,7 @@ report = {
         "legacyBundleCompatibilityDeclarations": len(legacy_bundle_methods()),
         "legacyBundleCompatibilityMethods": legacy_bundle_methods(),
         "internalV2TransportPreserved": "RuntimeOperationTransport" in read(
-            "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeBrokerOperationAdapter.java"
+            "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerOperationAdapter.java"
         ) or (ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransport.java").is_file(),
     },
     "methodClassification": {

@@ -1,14 +1,16 @@
-package com.warden.controlledsandbox.runtime.protocol;
+package com.warden.controlledsandbox.runtime.broker;
 
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 
 /** Compatibility adapter that dispatches typed Broker operations onto legacy entry points. */
-public final class RuntimeBrokerOperationAdapter {
+final class RuntimeBrokerOperationAdapter {
     private RuntimeBrokerOperationAdapter() { }
 
-    public static RuntimeOperationResult execute(
+    static RuntimeOperationResult execute(
             RuntimeBrokerOperationHandler broker,
             RuntimeOperationRequest request) {
         if (broker == null) throw new IllegalArgumentException("broker is required");

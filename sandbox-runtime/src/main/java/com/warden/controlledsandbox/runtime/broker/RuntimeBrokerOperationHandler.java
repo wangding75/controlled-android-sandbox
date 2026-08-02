@@ -1,9 +1,9 @@
-package com.warden.controlledsandbox.runtime.protocol;
+package com.warden.controlledsandbox.runtime.broker;
 
 import android.os.Bundle;
 
 /** Internal broker operation boundary; Bundle payloads never cross the public AIDL surface. */
-public interface RuntimeBrokerOperationHandler {
+interface RuntimeBrokerOperationHandler {
     Bundle prepareGuest(Bundle request);
     Bundle launchActivity(Bundle request);
     Bundle invokeComponent(Bundle request);
