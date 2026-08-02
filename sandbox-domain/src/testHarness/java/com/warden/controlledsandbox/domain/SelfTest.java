@@ -19,6 +19,7 @@ import com.warden.controlledsandbox.domain.packageinfo.PackageUpgradePolicy;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFileSelfTest;
 import com.warden.controlledsandbox.domain.persistence.PersistentStateException;
 import com.warden.controlledsandbox.domain.persistence.RecoverableFileStore;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
@@ -42,6 +43,7 @@ public final class SelfTest {
         testMultiProcessSessionRegistry();
         testRouteTable();
         testVirtualPathPolicy();
+        DurableAtomicFileSelfTest.run();
         testRecoverableFileStore();
         testRecoverableFileStoreFatalBoundary();
         testVirtualUidAllocator();

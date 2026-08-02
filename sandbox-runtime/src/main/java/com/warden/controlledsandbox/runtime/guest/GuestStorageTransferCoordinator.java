@@ -1,11 +1,12 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -114,11 +115,7 @@ final class GuestStorageTransferCoordinator {
 
     private static void moveOne(File source, File target) {
         try {
-            try {
-                Files.move(source.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException unsupported) {
-                Files.move(source.toPath(), target.toPath());
-            }
+            DurableAtomicFile.move(source.toPath(), target.toPath());
         } catch (IOException error) {
             throw new IllegalStateException(MOVE_FAILED + ":" + source.getName(), error);
         }
@@ -151,11 +148,10 @@ final class GuestStorageTransferCoordinator {
     }
 
     private static void syncDirectory(File directory) {
-        try (FileChannel channel = FileChannel.open(directory.toPath())) {
-            channel.force(true);
-        } catch (IOException | UnsupportedOperationException ignored) {
-            // Some Android filesystems do not expose directory handles. Each moved file still uses
-            // the strongest rename available; device durability remains a device-test boundary.
+        try {
+            DurableAtomicFile.syncDirectory(directory.toPath());
+        } catch (IOException error) {
+            throw new IllegalStateException("GUEST_STORAGE_DIRECTORY_FSYNC_FAILED", error);
         }
     }
 

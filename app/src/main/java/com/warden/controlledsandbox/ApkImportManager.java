@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -16,7 +18,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.StandardCopyOption;
@@ -607,8 +608,7 @@ final class ApkImportManager {
     }
 
     static void publishDirectory(File source, File destination) throws Exception {
-        try { Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE); }
-        catch (AtomicMoveNotSupportedException unsupported) { Files.move(source.toPath(), destination.toPath()); }
+        DurableAtomicFile.move(source.toPath(), destination.toPath());
     }
 
     private static void moveFile(File source, File destination) throws Exception {
@@ -618,7 +618,7 @@ final class ApkImportManager {
         }
         Exception moveFailure;
         try {
-            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE);
+            DurableAtomicFile.move(source.toPath(), destination.toPath());
             return;
         } catch (Exception error) {
             moveFailure = error;
@@ -633,10 +633,12 @@ final class ApkImportManager {
                 while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
                 output.flush(); file.getFD().sync();
             }
-            Files.move(temporary.toPath(), destination.toPath());
+            DurableAtomicFile.replacePrepared(temporary.toPath(), destination.toPath());
             if (!source.delete() && source.exists()) {
                 throw new IllegalStateException("Cannot remove copied staging file " + source);
             }
+            File sourceParent = source.getParentFile();
+            if (sourceParent != null) DurableAtomicFile.syncDirectory(sourceParent.toPath());
         } catch (Exception copyFailure) {
             copyFailure.addSuppressed(moveFailure);
             try {

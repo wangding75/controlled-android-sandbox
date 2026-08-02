@@ -171,7 +171,7 @@ require(
     "app/src/main/java/com/warden/controlledsandbox/VirtualMediaCommunicationStorePersistence.java",
     "CRC32",
     ".corrupt",
-    "ATOMIC_MOVE",
+    "DurableAtomicFile.replacePrepared",
 )
 require(
     "app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",

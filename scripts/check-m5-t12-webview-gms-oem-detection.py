@@ -68,7 +68,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualCompatibilityDefa
 require("app/src/main/java/com/warden/controlledsandbox/VirtualCompatibilityStore.java",
         "COMPATIBILITY_PROFILE_VERSION_CONFLICT", "deleteScopeBestEffort", "scope limit exceeded")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualCompatibilityStorePersistence.java",
-        "CRC32", ".corrupt", "ATOMIC_MOVE")
+        "CRC32", ".corrupt", "DurableAtomicFile.replacePrepared")
 require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getCompatibilityProfile", "setCompatibilityProfile", "resetCompatibilityProfile",
         "notifyCompatibilityProfileChanged")

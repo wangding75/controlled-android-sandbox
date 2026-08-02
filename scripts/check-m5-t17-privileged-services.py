@@ -66,7 +66,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedService
 require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedServicesStore.java",
         "PRIVILEGED_SERVICES_PROFILE_VERSION_CONFLICT", "deleteScopeBestEffort", "scope limit exceeded")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedServicesStorePersistence.java",
-        "CRC32", ".corrupt", "ATOMIC_MOVE")
+        "CRC32", ".corrupt", "DurableAtomicFile.replacePrepared")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualPrivilegedServicesStoreCodec.java",
         "PRIVILEGED_SERVICES_SCOPE_DUPLICATE", "maximumSuggestionResults",
         "maximumBuffers", "maximumClients", "maximumDataBytes")

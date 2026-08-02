@@ -36,7 +36,7 @@ codec = require(
     "isProvablyUniqueLegacyLogical",
     "decodeReversible",
     "pruneMissingHashClaims",
-    "syncDirectory(root)",
+    "DurableAtomicFile.replacePrepared",
 )
 if 'replaceAll("[^A-Za-z0-9._-]", "_")' not in codec:
     errors.append("codec must preserve the exact legacy mapping only for migration detection")

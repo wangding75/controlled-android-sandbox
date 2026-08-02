@@ -1,9 +1,10 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.zip.CRC32;
@@ -93,12 +94,7 @@ final class VirtualPeripheralServicesStorePersistence {
     }
 
     private static void moveAtomically(File source, File target) throws Exception {
-        try {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException ignored) {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        DurableAtomicFile.replacePrepared(source.toPath(), target.toPath());
     }
 
     private static String bounded(String value) {

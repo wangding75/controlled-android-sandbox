@@ -67,7 +67,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualNetworkServiceDef
 require("app/src/main/java/com/warden/controlledsandbox/VirtualNetworkServiceStore.java",
         "NETWORK_PROFILE_VERSION_CONFLICT", "VirtualNetworkServiceStorePersistence")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualNetworkServiceStorePersistence.java",
-        "CRC32", ".corrupt", "ATOMIC_MOVE")
+        "CRC32", ".corrupt", "DurableAtomicFile.replacePrepared")
 require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getNetworkServiceProfile", "setNetworkServiceProfile", "resetNetworkServiceProfile",
         "notifyNetworkProfileChanged")

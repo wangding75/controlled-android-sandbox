@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.runtime.component.activity;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import com.warden.controlledsandbox.framework.activity.ActivityIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityRestoreSnapshot;
 import com.warden.controlledsandbox.framework.activity.ActivityResultRegistration;
@@ -16,7 +18,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -95,12 +96,7 @@ public final class ActivityTaskCheckpointStore {
                 output.writeLong(crc.getValue());
                 output.flush();
             }
-            try {
-                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ignored) {
-                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
-            }
+            DurableAtomicFile.replacePrepared(temporary, file);
         } catch (IOException error) {
             try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
             throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_WRITE_FAILED", error);

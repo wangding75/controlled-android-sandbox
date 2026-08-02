@@ -40,7 +40,7 @@ require(
     "FileLock lock = channel.lock()",
     "Main artifact is the commit marker and moves last",
     "rollback(completed, mover, failure)",
-    "ATOMIC_MOVE",
+    "DurableAtomicFile.move",
     "GUEST_STORAGE_MOVE_ROLLBACK_FAILED",
     "CROSS_GUEST_STORAGE_MOVE_DENIED",
 )

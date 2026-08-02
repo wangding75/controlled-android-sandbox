@@ -26,7 +26,7 @@ ledger=require('sandbox-framework/src/main/java/com/warden/controlledsandbox/fra
  'restore(ActivityTaskCheckpoint','adoptRestoredProcessGeneration',
  'registerActivityResult','captureRollbackState','restoreRollbackState')
 store=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityTaskCheckpointStore.java',
- 'LEGACY_SCHEMA','CURRENT_SCHEMA','CRC32','ATOMIC_MOVE','quarantineCorrupt','MAX_FILE_BYTES',
+ 'LEGACY_SCHEMA','CURRENT_SCHEMA','CRC32','DurableAtomicFile.replacePrepared','quarantineCorrupt','MAX_FILE_BYTES',
  'ACTIVITY_TASK_CHECKPOINT_SCHEMA_UNSUPPORTED','PREVIOUS_SCHEMA')
 runtime=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/BrokerActivityRuntime.java',
  'ActivityLaunchSpecFactory.create','ActivityTaskOperationDispatcher','clearMismatchedRevision',

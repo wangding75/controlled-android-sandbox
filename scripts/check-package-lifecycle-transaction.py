@@ -76,7 +76,7 @@ if not errors:
         'IMMUTABLE_REVISION_CONTENT_MISMATCH',
         'publishDirectory(transactionDir, revisionDir);',
         'Files.isSymbolicLink(path)',
-        'StandardCopyOption.ATOMIC_MOVE',
+        'DurableAtomicFile',
     ]
     for fragment in required_importer:
         if fragment not in text['importer']:

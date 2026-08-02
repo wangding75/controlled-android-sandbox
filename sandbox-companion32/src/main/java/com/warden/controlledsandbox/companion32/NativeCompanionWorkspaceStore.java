@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.companion32;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactRequest;
 import com.warden.controlledsandbox.contract.NativeCompanionArtifactResult;
@@ -213,12 +215,7 @@ final class NativeCompanionWorkspaceStore {
     }
 
     private static void atomicReplace(File source, File target) throws IOException {
-        try {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {
-            Files.move(source.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        DurableAtomicFile.replacePrepared(source.toPath(), target.toPath());
     }
 
     private static void deleteTree(File value) throws IOException {

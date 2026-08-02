@@ -84,7 +84,7 @@ for token in ('nativeCompanion.prepare', 'nativeCompanion.launchActivity',
 
 workspace = text('sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionWorkspaceStore.java')
 for token in ('MAX_WORKSPACE_BYTES', 'MAX_ARTIFACTS_PER_WORKSPACE',
-              'COMPANION_ARTIFACT_HASH_MISMATCH', 'ATOMIC_MOVE', 'getCanonicalFile'):
+              'COMPANION_ARTIFACT_HASH_MISMATCH', 'DurableAtomicFile.replacePrepared', 'getCanonicalFile'):
     if token not in workspace:
         errors.append(f'Companion workspace is missing {token}')
 

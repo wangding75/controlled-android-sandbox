@@ -1,9 +1,10 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.zip.CRC32;
@@ -87,12 +88,7 @@ final class VirtualSystemServiceStorePersistence {
                     out.flush();
                     out.getFD().sync();
                 }
-                try {
-                    Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING,
-                            StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException error) {
-                    Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                }
+                DurableAtomicFile.replacePrepared(temp.toPath(), file.toPath());
             } finally {
                 if (temp.exists() && !temp.delete()) temp.deleteOnExit();
             }

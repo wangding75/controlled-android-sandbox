@@ -71,7 +71,7 @@ for needle in ("companionRoute(record)", "nativeCompanion.prepare", "nativeCompa
 
 for needle in (
     "MAX_WORKSPACES = 64", "MAX_ARTIFACTS_PER_WORKSPACE = 512",
-    "MAX_WORKSPACE_BYTES", "SHA-256", "getCanonicalFile", "ATOMIC_MOVE",
+    "MAX_WORKSPACE_BYTES", "SHA-256", "getCanonicalFile", "DurableAtomicFile.replacePrepared",
     "COMPANION_ARTIFACT_HASH_MISMATCH", "NATIVE_COMPANION_PROTOCOL_MISMATCH",
 ):
     if needle not in workspace:

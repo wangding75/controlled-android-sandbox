@@ -1,14 +1,9 @@
 package com.warden.controlledsandbox.domain.persistence;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.Objects;
 
 /**
@@ -118,23 +113,7 @@ public final class RecoverableFileStore {
     }
 
     private static void writePath(Path destination, String content, byte[] bytes) throws IOException {
-        Path parent = destination.getParent();
-        if (parent != null) Files.createDirectories(parent);
-        Path temporary = destination.resolveSibling(destination.getFileName() + ".tmp");
-        try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
-            ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) channel.write(buffer);
-            channel.force(true);
-        }
-        try {
-            Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING);
-        } catch (AtomicMoveNotSupportedException unsupported) {
-            Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
+        DurableAtomicFile.write(destination, bytes);
     }
 
     @FunctionalInterface

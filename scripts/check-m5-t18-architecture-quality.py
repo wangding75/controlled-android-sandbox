@@ -56,7 +56,7 @@ for rel in (
         errors.append(f"legacy one-shot ServiceConnection remains in {rel}")
 
 require("app/src/main/java/com/warden/controlledsandbox/VirtualSecretCipher.java",
-        "AES/GCM/NoPadding", "aesgcm:v1:", "GCMParameterSpec", "ATOMIC_MOVE")
+        "AES/GCM/NoPadding", "aesgcm:v1:", "GCMParameterSpec", "DurableAtomicFile.replacePrepared")
 require("app/src/main/java/com/warden/controlledsandbox/VirtualAccountAuthority.java",
         "snapshots", "setPassword", "setToken", "invalidateToken")
 codec = require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStoreCodec.java",

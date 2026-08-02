@@ -77,7 +77,7 @@ for required in [
         errors.append(f"VirtualSystemServiceStore closure evidence missing: {required}")
 
 persistence = (ROOT / "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStorePersistence.java").read_text(encoding="utf-8")
-for required in ["MAX_PAYLOAD_BYTES", "MAX_FILE_BYTES", "CRC32", "ATOMIC_MOVE", ".corrupt"]:
+for required in ["MAX_PAYLOAD_BYTES", "MAX_FILE_BYTES", "CRC32", "DurableAtomicFile.replacePrepared", ".corrupt"]:
     if required not in persistence:
         errors.append(f"bounded persistence evidence missing: {required}")
 

@@ -74,7 +74,7 @@ require("app/src/main/java/com/warden/controlledsandbox/ApplicationEnvironmentSt
         "APPLICATION_ENV_PROFILE_VERSION_CONFLICT", "replaceDynamicShortcuts", "allocateAppWidgetId",
         "reportUsageEvent", "putSetting", "USAGE_EVENT_PACKAGE_DENIED")
 require("app/src/main/java/com/warden/controlledsandbox/ApplicationEnvironmentStorePersistence.java",
-        "CRC32", ".corrupt", "ATOMIC_MOVE")
+        "CRC32", ".corrupt", "DurableAtomicFile.replacePrepared")
 require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getApplicationEnvironmentProfile", "setApplicationEnvironmentProfile",
         "resetApplicationEnvironmentProfile", "notifyApplicationEnvironmentProfileChanged")

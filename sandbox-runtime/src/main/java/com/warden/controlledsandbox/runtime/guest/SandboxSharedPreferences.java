@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import android.content.SharedPreferences;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -137,8 +139,12 @@ public final class SandboxSharedPreferences implements SharedPreferences {
             temporary.delete();
             return false;
         }
-        if (file.exists() && !file.delete()) { temporary.delete(); return false; }
-        if (!temporary.renameTo(file)) { temporary.delete(); return false; }
+        try {
+            DurableAtomicFile.replacePrepared(temporary.toPath(), file.toPath());
+        } catch (IOException failure) {
+            temporary.delete();
+            return false;
+        }
         values.clear();
         values.putAll(copyValues(replacement));
         return true;

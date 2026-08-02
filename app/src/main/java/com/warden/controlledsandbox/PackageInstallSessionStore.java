@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox;
 
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
+
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.BufferedInputStream;
@@ -340,12 +342,7 @@ final class PackageInstallSessionStore {
             output.write(content.getBytes(StandardCharsets.UTF_8));
             output.flush(); file.getFD().sync();
         }
-        try {
-            Files.move(temporary.toPath(), state.toPath(), StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING);
-        } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
-            Files.move(temporary.toPath(), state.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        DurableAtomicFile.replacePrepared(temporary.toPath(), state.toPath());
         directory.setLastModified(session.updatedAt);
     }
 
@@ -429,11 +426,7 @@ final class PackageInstallSessionStore {
     }
 
     private static void moveFile(File source, File destination) throws Exception {
-        try {
-            Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE);
-        } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
-            Files.move(source.toPath(), destination.toPath());
-        }
+        DurableAtomicFile.move(source.toPath(), destination.toPath());
     }
 
     private static String artifactName(int index) {
