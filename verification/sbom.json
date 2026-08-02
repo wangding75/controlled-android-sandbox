@@ -55,7 +55,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "4b8287523f7fee31dc634194b4a3e913dc6b51a85287694583421e80d8712e10"
+      "sourceDigestSha256": "de8e737f306ad3fb5e76888e807fded79ea5f8980f94cf9527bc9cd9990140f4"
     },
     {
       "type": "library",
@@ -98,7 +98,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "be9b239ddac6d1482e237b43d977807aae879aeededb3fa6d343bd2706100c1a"
+      "sourceDigestSha256": "54a3ac9bb0f897d084679665b3630d9326de2bc8ecfd69f150b3dde5a2cfb69b"
     },
     {
       "type": "application",
