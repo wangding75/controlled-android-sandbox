@@ -114,11 +114,11 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
-      "lines": 686
+      "lines": 688
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
-      "lines": 649
+      "lines": 638
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
@@ -130,7 +130,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
-      "lines": 585
+      "lines": 578
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",

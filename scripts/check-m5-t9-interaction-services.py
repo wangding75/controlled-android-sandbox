@@ -64,7 +64,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualInteractionStore.
 require("app/src/main/java/com/warden/controlledsandbox/VirtualInteractionStoreCodec.java",
         "static final int SCHEMA", 'put("window"', 'put("inputMethod"', 'put("display"')
 require("app/src/main/java/com/warden/controlledsandbox/VirtualInteractionStorePersistence.java",
-        "AtomicMoveNotSupportedException", "CRC32", "quarantine", "MAX_FILE_BYTES")
+        "DurableAtomicFile.replacePrepared", "CRC32", "quarantine", "MAX_FILE_BYTES")
 require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getInteractionProfile", "setInteractionProfile", "resetInteractionProfile",
         "notifyInteractionProfileChanged")

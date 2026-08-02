@@ -67,7 +67,7 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualDeviceServiceStor
         "static final int SCHEMA", 'put("location"', 'put("telephony"', 'put("wifi"',
         'put("bluetooth"', 'put("sensors"')
 require("app/src/main/java/com/warden/controlledsandbox/VirtualDeviceServiceStorePersistence.java",
-        "AtomicMoveNotSupportedException", "CRC32", "quarantine", "MAX_FILE_BYTES")
+        "DurableAtomicFile.replacePrepared", "CRC32", "quarantine", "MAX_FILE_BYTES")
 require("app/src/main/java/com/warden/controlledsandbox/PackageProfileAuthority.java",
         "getDeviceServiceProfile", "setDeviceServiceProfile", "resetDeviceServiceProfile",
         "notifyDeviceProfileChanged")
