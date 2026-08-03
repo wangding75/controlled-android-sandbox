@@ -31,6 +31,8 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         testFatalDeathLinkCleansAttemptBeforeRethrow();
         testBindTimeoutHasDistinctReasonAndRecovers();
         testDisconnectedHasDistinctReason();
+        testFrameworkDisconnectUnlinksDeathRecipient();
+        testBindingDiedUnlinksDeathRecipient();
         System.out.println("PASS RuntimeGuestConnectionPool direct ownership self-test");
     }
 
@@ -227,6 +229,36 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         pool.close();
     }
 
+    private static void testFrameworkDisconnectUnlinksDeathRecipient() throws Exception {
+        TestService service = new TestService();
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> { });
+        FakeGuest guest = service.guest;
+        pool.call(0, value -> resultFor(value, guest, "connected"));
+
+        service.disconnectCurrent();
+        require(guest.unlinkCount() == 1,
+                "framework disconnect must unlink the published death recipient before clearing token");
+        require(service.unbindCount == 1,
+                "framework disconnect must release its owned ServiceConnection");
+        pool.close();
+    }
+
+    private static void testBindingDiedUnlinksDeathRecipient() throws Exception {
+        TestService service = new TestService();
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> { });
+        FakeGuest guest = service.guest;
+        pool.call(1, value -> resultFor(value, guest, "connected"));
+
+        service.killCurrentBinding();
+        require(guest.unlinkCount() == 1,
+                "binding-died callback must unlink the published death recipient before clearing token");
+        require(service.unbindCount == 1,
+                "binding-died callback must release its owned ServiceConnection");
+        pool.close();
+    }
+
     private static Bundle resultFor(IGuestProcess actual, IGuestProcess expected, String value) {
         require(actual == expected, "pool published an unexpected Guest capability");
         Bundle result = new Bundle();
@@ -252,6 +284,8 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile int bindCount;
         private volatile int unbindCount;
         private volatile boolean asyncConnect;
+        private volatile ServiceConnection currentConnection;
+        private volatile ComponentName currentComponent;
         private volatile CountDownLatch blockedBindEntered;
         private volatile CountDownLatch blockedBindRelease;
 
@@ -268,6 +302,18 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         void releaseBlockedConnection() {
             CountDownLatch latch = blockedBindRelease;
             if (latch != null) latch.countDown();
+        }
+
+        void disconnectCurrent() {
+            ServiceConnection connection = currentConnection;
+            require(connection != null, "no current ServiceConnection to disconnect");
+            connection.onServiceDisconnected(currentComponent);
+        }
+
+        void killCurrentBinding() {
+            ServiceConnection connection = currentConnection;
+            require(connection != null, "no current ServiceConnection to kill");
+            connection.onBindingDied(currentComponent);
         }
 
         @Override public boolean bindService(Intent intent, ServiceConnection connection, int flags) {
@@ -291,6 +337,8 @@ public final class RuntimeGuestConnectionPoolSelfTest {
             if (callbackMode == CallbackMode.CONNECT) {
                 ComponentName component = new ComponentName(
                         "com.warden.controlledsandbox", "Guest" + bindCount);
+                currentConnection = connection;
+                currentComponent = component;
                 if (asyncConnect) {
                     Thread callback = new Thread(
                             () -> connection.onServiceConnected(component, guest),
@@ -319,6 +367,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile CountDownLatch deathLinkEntered;
         private volatile CountDownLatch deathLinkRelease;
         private volatile boolean fatalOnDeathLink;
+        private int unlinkCount;
 
         void blockDeathLink() {
             deathLinkEntered = new CountDownLatch(1);
@@ -379,8 +428,11 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         @Override public synchronized boolean unlinkToDeath(IBinder.DeathRecipient value, int flags) {
             if (recipient != value) return false;
             recipient = null;
+            unlinkCount++;
             return true;
         }
+
+        synchronized int unlinkCount() { return unlinkCount; }
 
         synchronized void dieWithoutCallback() {
             alive = false;

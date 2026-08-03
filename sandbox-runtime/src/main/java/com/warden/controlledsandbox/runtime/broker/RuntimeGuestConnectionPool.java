@@ -272,7 +272,6 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         private void clearAndDisconnect(String reason) {
             markFailure(reason);
             guest = null;
-            binderToken = null;
             connected.countDown();
             disconnect(this, reason);
         }
@@ -326,7 +325,12 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         }
 
         private void unlinkDeath() {
-            IBinder token = binderToken;
+            IBinder token;
+            synchronized (this) {
+                token = binderToken;
+                binderToken = null;
+                guest = null;
+            }
             if (token != null) {
                 try {
                     token.unlinkToDeath(this, 0);
