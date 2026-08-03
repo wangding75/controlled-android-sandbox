@@ -184,5 +184,5 @@ final class PackageServiceBinder extends IPackageService.Stub {
             throw new SecurityException(code, error);
         }
     }
-        
+
 }
