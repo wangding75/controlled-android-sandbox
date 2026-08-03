@@ -1,7 +1,6 @@
 package com.warden.controlledsandbox;
 
 import android.net.Uri;
-import android.os.Binder;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
@@ -24,26 +23,26 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private final PackageServiceDependencies dependencies;
     private final Object operationLock;
     private final SandboxPackageLifecycle lifecycle;
-    private final PackageCallerVerifier callerVerifier;
     private final VirtualPackageStateBuilder packageStateBuilder;
     private final HostPermissionStateResolver hostPermissions;
     private final VirtualSystemServiceStore systemServices;
     private final PackageProfileAuthority profiles;
 
-    private final ManagementSessionGuard guard;
+    private final PackageManagementAuthorityGuard guard;
     private final IBinder clientToken;
 
     PackageManagementSession(PackageServiceDependencies dependencies,
-            int ownerUid, int ownerPid, IBinder clientToken) {
+            int ownerUid, int ownerPid, IBinder clientToken,
+            IBinder authorityCapability, long authorityGeneration) {
         this.dependencies = java.util.Objects.requireNonNull(dependencies, "dependencies");
         operationLock = dependencies.operationLock;
         lifecycle = dependencies.lifecycle;
-        callerVerifier = dependencies.callerVerifier;
         packageStateBuilder = dependencies.packageStateBuilder;
         hostPermissions = dependencies.hostPermissions;
         systemServices = dependencies.systemServices;
         profiles = new PackageProfileAuthority(dependencies);
-        guard = new ManagementSessionGuard(ownerUid, ownerPid);
+        guard = new PackageManagementAuthorityGuard(ownerUid, ownerPid,
+                dependencies.capabilityRegistry, authorityCapability, authorityGeneration);
         this.clientToken = clientToken;
     }
 
@@ -488,9 +487,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         }
     }
 
-    private void requireOwner() {
-        guard.requireOwner(Binder.getCallingUid(), Binder.getCallingPid()); callerVerifier.requireMainProcessCaller();
-    }
+    private void requireOwner() { guard.requireOwner(); }
 
     private void closeInternal() {
         guard.close();

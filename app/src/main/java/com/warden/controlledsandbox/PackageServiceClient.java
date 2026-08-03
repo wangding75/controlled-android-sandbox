@@ -38,7 +38,13 @@ final class PackageServiceClient implements AutoCloseable {
         this.sessionConnection = new RebindableServiceConnector<>(this.context,
                 new Intent(this.context, PackageManagementService.class), binder -> {
                     IPackageService root = IPackageService.Stub.asInterface(binder);
-                    return root == null ? null : root.openManagementSession(clientToken);
+                    if (root == null) return null;
+                    root.registerManagementCapability(
+                            HostPackageAuthorityCapability.token(),
+                            HostPackageAuthorityCapability.generation());
+                    return root.openManagementSessionWithCapability(
+                            clientToken, HostPackageAuthorityCapability.token(),
+                            HostPackageAuthorityCapability.generation());
                 }, IPackageManagementSession::close, "Package management service");
     }
 

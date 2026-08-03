@@ -54,7 +54,7 @@ owners = {
         "activeJobExecutions.get(located.job.hostId) != execution",
         "rollbackDeathLinkLocked",
     ),
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java": (
+    "app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java": (
         "dependencies.systemServices.reserveClientRegistration(session)",
         "session.linkClientDeathAfterReservation()",
         "dependencies.systemServices.commitClientRegistration(session)",

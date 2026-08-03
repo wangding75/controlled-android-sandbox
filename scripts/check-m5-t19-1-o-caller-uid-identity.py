@@ -21,6 +21,7 @@ def require(rel: str, *tokens: str) -> str:
             errors.append(f"{rel} missing: {token}")
     return text
 
+
 verifier = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java",
     "Binder.getCallingUid()",
@@ -29,13 +30,15 @@ verifier = require(
     "RuntimePeerIdentity.SIGNATURE_PERMISSION",
     "signaturePermissionGranted()",
     "companionPackageForUid",
-    "RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS",
-    'new FileInputStream("/proc/" + pid + "/cmdline")',
-    "MAX_PROCESS_NAME_BYTES = 512",
+    "managementCaller()",
+    "runtimeCaller()",
+    "RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_UID",
 )
-for forbidden in ("ActivityManager", "getRunningAppProcesses"):
+for forbidden in (
+        "ActivityManager", "getRunningAppProcesses", "/proc/", "FileInputStream",
+        "processName(", "actualProcessName", "expectedProcessName"):
     if forbidden in verifier:
-        errors.append(f"PackageCallerVerifier retains process-list dependency: {forbidden}")
+        errors.append(f"PackageCallerVerifier retains mutable process-label authorization: {forbidden}")
 
 require(
     "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/RuntimePeerIdentity.java",
@@ -46,12 +49,47 @@ require(
 
 policy = require(
     "app/src/main/java/com/warden/controlledsandbox/ManagementCallerPolicy.java",
-    "isExpectedProcess",
-    "isTrustedCompanionProcess",
-    "expectedProcessName.equals(actualProcessName)",
+    "canBootstrapManagement",
+    "canBootstrapRuntime",
+    "callingUid == hostUid",
+    "signaturePermissionGranted",
 )
-if "ProcessIdentity" in policy:
-    errors.append("ManagementCallerPolicy retains process-name identities")
+for forbidden in ("processName", "expectedProcessName", "actualProcessName"):
+    if forbidden in policy:
+        errors.append(f"ManagementCallerPolicy retains process-label comparison: {forbidden}")
+
+registry = require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityCapabilityRegistry.java",
+    "generation <= existing.generation",
+    "ownerPid == caller.pid",
+    "capability.linkToDeath",
+    "capability.unlinkToDeath",
+    "PACKAGE_AUTHORITY_ROLE_ALREADY_REGISTERED",
+    "PACKAGE_AUTHORITY_GENERATION_NOT_ADVANCED",
+    "requireManagement",
+    "requireRuntime",
+)
+if "processName" in registry or "/proc/" in registry:
+    errors.append("PackageAuthorityCapabilityRegistry must not authorize process labels")
+
+root_aidl = require(
+    "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
+    "registerManagementCapability",
+    "registerRuntimeCapability",
+    "openManagementSessionWithCapability",
+    "openRuntimePermissionSessionWithCapability",
+    "openVirtualSystemServiceSessionWithCapability",
+    "startVirtualJobWithCapability",
+    "stopVirtualJobWithCapability",
+    "Legacy transaction IDs 1-5 are retained",
+)
+legacy = [
+    "IPackageManagementSession openManagementSession(in IBinder clientToken);",
+    "IRuntimePermissionSession openRuntimePermissionSession(in IBinder clientToken);",
+]
+for signature in legacy:
+    if signature not in root_aidl:
+        errors.append(f"legacy AIDL transaction order changed or removed: {signature}")
 
 manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
@@ -64,10 +102,14 @@ for package_name in (
 
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
-    "same-UID Guest process must not mint management capability",
-    "other Companion process must be rejected",
-    "package identity lookup failure must fail closed",
-    "different process must not reuse",
+    "different same-UID process reused management capability",
+    "second same-UID process replaced live management role",
+    "same-UID Guest process reused Runtime capability",
+    "same-UID Guest process replaced live Runtime role",
+    "package identity lookup failure did not fail closed",
+    "Companion without signature permission remained authorized",
+    "dead management capability remained active",
+    "management generation mismatch was accepted",
 )
 runner = require(
     "tools/static_android_compile.py",
@@ -85,12 +127,13 @@ else:
         errors.append("current static execution receipt omits PackageManagementAuthorizationSelfTest")
 
 report = {
-    "task": "M5-T19.1-O",
-    "finding": "P2-08 CallerVerifier depends on process-list visibility",
+    "task": "M5-T19.1-O2",
+    "finding": "NEW-P1-02 mutable process-label role authorization",
     "sourceStatus": "PASS" if not errors else "FAIL",
-    "activityManagerProcessListDependency": False,
-    "hostAuthorization": "Host UID plus exact caller PID cmdline plus per-session owner PID",
-    "companionAuthorization": "signature permission plus installed Companion UID plus exact broker PID cmdline",
+    "processLabelAuthorization": False,
+    "managementAuthorization": "host UID/PID bootstrap plus generation-bound death-linked Binder capability",
+    "runtimeAuthorization": "host/companion UID and signature eligibility plus PID-owned Binder capability",
+    "legacyTransactionsRetained": True,
     "deviceEvidenceCount": 0,
     "errors": errors,
 }
@@ -98,8 +141,8 @@ out = ROOT / "build/verification/m5-t19-1-o-caller-uid-identity.json"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 if errors:
-    print("FAIL M5-T19.1-O caller UID identity", file=sys.stderr)
+    print("FAIL M5-T19.1-O2 Binder capability caller authorization", file=sys.stderr)
     for error in errors:
         print(" - " + error, file=sys.stderr)
     raise SystemExit(1)
-print("PASS M5-T19.1-O caller authorization uses stable UID/package identity")
+print("PASS M5-T19.1-O2 caller roles use generation-bound Binder capabilities")

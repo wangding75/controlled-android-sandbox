@@ -12,6 +12,7 @@ final class PackageServiceDependencies implements AutoCloseable {
     final File filesDir;
     final SandboxPackageLifecycle lifecycle;
     final PackageCallerVerifier callerVerifier;
+    final PackageAuthorityCapabilityRegistry capabilityRegistry;
     final VirtualPackageStateBuilder packageStateBuilder;
     final HostPermissionStateResolver hostPermissions;
     final VirtualSystemServiceStore systemServices;
@@ -84,6 +85,7 @@ final class PackageServiceDependencies implements AutoCloseable {
         this.filesDir = Objects.requireNonNull(filesDir, "filesDir");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.callerVerifier = Objects.requireNonNull(callerVerifier, "callerVerifier");
+        this.capabilityRegistry = new PackageAuthorityCapabilityRegistry(this.callerVerifier);
         this.packageStateBuilder = Objects.requireNonNull(packageStateBuilder, "packageStateBuilder");
         this.hostPermissions = Objects.requireNonNull(hostPermissions, "hostPermissions");
         this.systemServices = Objects.requireNonNull(systemServices, "systemServices");
@@ -129,6 +131,7 @@ final class PackageServiceDependencies implements AutoCloseable {
     }
 
     @Override public void close() {
+        capabilityRegistry.close();
         systemServices.close();
     }
 

@@ -41,21 +41,31 @@ root_aidl=(ROOT/'sandbox-contract/src/main/aidl/com/warden/controlledsandbox/con
 if 'Bundle' in session_aidl or 'Bundle' in root_aidl: errors.append('package management AIDL must remain typed')
 if 'IPackageManagementSession openManagementSession(in IBinder clientToken);' not in root_aidl:
     errors.append('root package service must mint a Binder capability from a client death token')
+for fragment in ['registerManagementCapability', 'registerRuntimeCapability',
+                 'openManagementSessionWithCapability',
+                 'openRuntimePermissionSessionWithCapability']:
+    if fragment not in root_aidl:
+        errors.append('root package service missing role capability method: '+fragment)
 
-service_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java').read_text()
+service_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java').read_text()
 management_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java').read_text()
+authority_guard=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageManagementAuthorityGuard.java').read_text()
 for fragment in ['Binder.getCallingUid()', 'Binder.getCallingPid()', 'clientToken.linkToDeath']:
     if fragment not in service_source:
         errors.append('missing package service capability-minting fragment: '+fragment)
-for fragment in ['guard.requireOwner', 'callerVerifier.requireMainProcessCaller()',
-                 'synchronized (operationLock)']:
+for fragment in ['guard.requireOwner', 'synchronized (operationLock)']:
     if fragment not in management_source:
         errors.append('missing package management session security/serialization fragment: '+fragment)
+for fragment in ['owner.requireOwner', 'registry.requireManagement(capability, generation)']:
+    if fragment not in authority_guard:
+        errors.append('missing package authority guard fragment: '+fragment)
 verifier_source=(ROOT/'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java').read_text()
-if 'ActivityManager' in verifier_source or 'getRunningAppProcesses' in verifier_source:
-    errors.append('PackageCallerVerifier must not depend on process-list visibility')
-for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS',
-                 'getPackageUid', '/proc/', 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
+if ('ActivityManager' in verifier_source or 'getRunningAppProcesses' in verifier_source
+        or '/proc/' in verifier_source or 'processName(' in verifier_source):
+    errors.append('PackageCallerVerifier must not depend on process lists or mutable process labels')
+for fragment in ['checkCallingPermission', 'RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_UID',
+                 'getPackageUid', 'managementCaller()', 'runtimeCaller()',
+                 'Binder.getCallingPid()', 'Binder.getCallingUid()']:
     if fragment not in verifier_source:
         errors.append('missing stable UID/package verification fragment: '+fragment)
 

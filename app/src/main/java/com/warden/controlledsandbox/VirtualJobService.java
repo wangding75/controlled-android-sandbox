@@ -10,6 +10,7 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
+import com.warden.controlledsandbox.contract.RuntimePackageAuthorityCapability;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -45,10 +46,12 @@ public final class VirtualJobService extends JobService {
         IPackageService service = value.service;
         if (service != null) {
             try {
-                reschedule = service.stopVirtualJob(hostJobId,
+                reschedule = service.stopVirtualJobWithCapability(hostJobId,
                         HostJobParametersSnapshotFactory.stopReason(params),
                         HostJobParametersSnapshotFactory.internalStopReason(params),
-                        HostJobParametersSnapshotFactory.debugStopReason(params));
+                        HostJobParametersSnapshotFactory.debugStopReason(params),
+                        RuntimePackageAuthorityCapability.token(),
+                        RuntimePackageAuthorityCapability.generation());
             } catch (Exception ignored) { reschedule = true; }
         }
         unbind(value);
@@ -61,7 +64,9 @@ public final class VirtualJobService extends JobService {
                 value.stopped = true;
                 IPackageService service = value.service;
                 if (service != null) {
-                    try { service.stopVirtualJob(value.hostJobId, 0, -1, "host JobService destroyed"); }
+                    try { service.stopVirtualJobWithCapability(value.hostJobId, 0, -1,
+                            "host JobService destroyed", RuntimePackageAuthorityCapability.token(),
+                            RuntimePackageAuthorityCapability.generation()); }
                     catch (Exception ignored) { }
                 }
                 unbind(value);
@@ -107,7 +112,15 @@ public final class VirtualJobService extends JobService {
             if (stopped) { unbind(this); return; }
             service = IPackageService.Stub.asInterface(binder);
             boolean accepted = false;
-            try { accepted = service != null && service.startVirtualJob(snapshot, callback); }
+            try {
+                if (service != null) {
+                    service.registerRuntimeCapability(RuntimePackageAuthorityCapability.token(),
+                            RuntimePackageAuthorityCapability.generation());
+                    accepted = service.startVirtualJobWithCapability(snapshot, callback,
+                            RuntimePackageAuthorityCapability.token(),
+                            RuntimePackageAuthorityCapability.generation());
+                }
+            }
             catch (Exception ignored) { accepted = false; }
             if (!accepted) complete(this, true);
         }

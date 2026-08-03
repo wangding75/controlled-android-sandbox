@@ -162,11 +162,13 @@ Every host/runtime/Guest process writes bounded JSONL evidence under `files/runt
 - Claiming compatibility without versioned, reproducible device evidence.
 ## Package management authority
 
-Package and virtual-instance mutations are owned by `PackageManagementService` in the dedicated `:sandbox_package` process. Product callers bind through `PackageServiceClient` and receive a death-linked `IPackageManagementSession` capability only after the Android process registry identifies the caller as the host main process. The capability is bound to the caller PID and UID and is revalidated on each call. Guest and runtime processes may reach the non-exported same-UID service Binder, but cannot mint or reuse a management session.
+Package and virtual-instance mutations are owned by `PackageManagementService` in the dedicated `:sandbox_package` process. The legacy root methods keep their original AIDL transaction positions but fail closed. A product process must first register a process-owned Binder role capability and then present the same Binder plus generation when opening a session. The Package Service binds each live role slot to the registering Binder caller UID/PID, rejects replacement while the slot is live, links the role token to Binder death and revalidates the role token on every session call. `/proc/<pid>/cmdline` and process labels are not authorization inputs.
 
-This boundary serializes package writes and reduces privileged API exposure. It does not remove the shared Linux UID between host and Guest processes and is not a hostile-code security boundary.
+The host registers the management role before any Guest launch. The trusted Runtime Broker registers a separate runtime role before requesting permission, virtual-system-service or Job capabilities. Scoped sessions remain bound to their client Binder, owner UID/PID and authority generation. A different same-UID process cannot reuse an already registered live role token or an existing session.
 
-Package Service also owns a separate Runtime-Broker-only `IVirtualSystemServiceSession` capability. The capability is fixed to package, virtual user, virtual process and Runtime generation and exposes only bounded Clipboard, Account, Alarm and Notification/Job namespace operations. Guest code receives the scoped session Binder through its Runtime specification, never the Package Service root Binder.
+This boundary serializes package writes, prevents process-label spoofing and reduces privileged API exposure. The initial same-UID role registration still depends on trusted startup ordering because Android does not provide a cryptographic process identity inside one Linux UID. It is defense in depth, not a hostile-code boundary. Guest code that requires a hostile-code boundary must use the isolated-UID route.
+
+Package Service also owns a Runtime-role-only `IVirtualSystemServiceSession` capability. The capability is fixed to package, virtual user, virtual process and Runtime generation and exposes only bounded Clipboard, Account, Alarm and Notification/Job namespace operations. Guest code receives the scoped session Binder through its Runtime specification, never the Package Service root Binder.
 
 ## M4-T12 lifecycle ownership
 

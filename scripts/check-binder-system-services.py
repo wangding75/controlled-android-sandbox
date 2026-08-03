@@ -66,14 +66,16 @@ if "client.processName().equals(alarm.ownerProcessName)" not in store:
 if "client.generation() == alarm.ownerGeneration" not in store:
     errors.append("alarm delivery must be bound to the owning Runtime generation")
 
-service = require(
+require(
     "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
-    "PackageServiceDependencies", "PackageVirtualSystemServiceSession",
-    "openVirtualSystemServiceSession(", "dependencies.close()")
+    "PackageServiceDependencies", "PackageServiceBinder", "dependencies.close()")
+service = require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java",
+    "PackageVirtualSystemServiceSession", "openVirtualSystemServiceSessionWithCapability(")
 virtual_session = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageVirtualSystemServiceSession.java",
     "VirtualSystemServiceStore.Client", "requireCapability()", "processName", "generation")
-for token in ("callerVerifier.requireRuntimeBrokerCaller()", "VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED",
+for token in ("capabilityRegistry.requireRuntime(capability, capabilityGeneration)", "VIRTUAL_SYSTEM_SERVICE_SCOPE_NOT_INSTALLED",
               "systemServices.reserveClientRegistration(session)",
               "session.linkClientDeathAfterReservation()",
               "systemServices.commitClientRegistration(session)"):

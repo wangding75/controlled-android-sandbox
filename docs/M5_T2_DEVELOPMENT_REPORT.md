@@ -36,7 +36,7 @@ M5-T2 replaces the previous Companion probe-only route with an actual production
 ### Package authority and virtual services
 
 - Host PackageManagementService is exported only under the signature-level Companion permission.
-- Cross-package capability sessions additionally validate caller PID, UID and the exact Companion Broker process name.
+- Cross-package Runtime role registration validates caller PID/UID, signature permission and the UID-matching Companion package; subsequent operations require the registered death-linked Binder role token and generation.
 - Companion Runtime permission and virtual-system-service clients bind explicitly to the Host package authority.
 
 ### Remote and isolated process handling

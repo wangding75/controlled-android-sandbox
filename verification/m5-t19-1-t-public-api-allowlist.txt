@@ -1,2 +1,27 @@
-# One exact normalized signature per line. Empty by default.
-# Additions require a reviewed source change and an explicit entry in this file.
+# One exact normalized signature per line.
+# Each addition below is required by the reviewed M5-T19.1 post-review remediations.
+
+# NEW-P1-01: callers across domain/runtime modules must distinguish pre-rename failure,
+# confirmed commit and post-rename durability uncertainty.
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public enum CommitState
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static final class CommitFailure extends IOException
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static final class CommitResult
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public CommitState state()
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public IOException durabilityFailure()
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public boolean committed()
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public boolean durabilityConfirmed()
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static CommitResult confirmed()
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static CommitResult uncertain(IOException failure)
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static CommitResult write(Path destination, byte[] bytes) throws IOException
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static CommitResult replacePrepared(Path prepared, Path destination) throws IOException
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static CommitResult move(Path source, Path destination) throws IOException
+
+# NEW-P1-02: the Host and Runtime modules share capability generations/error codes,
+# while app-owned bridges in the Runtime process present one process-local Binder token.
+com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public final class PackageAuthorityCapabilityContract
+com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static final String MANAGEMENT_CAPABILITY_REQUIRED =
+com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static final String RUNTIME_CAPABILITY_REQUIRED =
+com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static long nextGeneration()
+com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public final class RuntimePackageAuthorityCapability
+com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public static IBinder token()
+com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public static long generation()

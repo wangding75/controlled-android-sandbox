@@ -83,23 +83,29 @@ if 'nextAudit.removeIf(audit -> audit.packageName.equals(packageName)' not in st
 
 require(
     'app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java',
-    'requireRuntimeBrokerCaller()',
-    'getPackageUid',
-    'RUNTIME_PERMISSION_CALLER_NOT_COMPANION_BROKER_PROCESS',
-    '/proc/',
+    'runtimeCaller()',
+    'companionPackageForUid',
+    'signaturePermissionGranted()',
+)
+require(
+    'app/src/main/java/com/warden/controlledsandbox/PackageAuthorityCapabilityRegistry.java',
+    'registerRuntime(',
+    'requireRuntime(',
+    'linkToDeath',
+    'ownerPid == caller.pid',
 )
 service = require(
-    'app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java',
-    'openRuntimePermissionSession',
+    'app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java',
+    'openRuntimePermissionSessionWithCapability',
     'clientToken.linkToDeath',
-    'callerVerifier.requireRuntimeBrokerCaller()',
+    'capabilityRegistry.requireRuntime(capability, capabilityGeneration)',
 )
 permission_session = require(
     'app/src/main/java/com/warden/controlledsandbox/PackageRuntimePermissionSession.java',
     'RUNTIME_PERMISSION_HOST_RESULT_MISMATCH',
     'RUNTIME_PERMISSION_PENDING_REQUEST_REQUIRED',
     'hostPermissions.resolve(',
-    'callerVerifier.requireRuntimeBrokerCaller()',
+    'capabilityRegistry.requireRuntime(authorityCapability, authorityGeneration)',
 )
 if 'lifecycle.requestRuntimePermission(' not in permission_session:
     errors.append('Runtime permission capability must persist a request before resolution')

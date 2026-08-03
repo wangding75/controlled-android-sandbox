@@ -42,7 +42,9 @@ final class PackageRuntimePermissionSession extends IRuntimePermissionSession.St
         implements IBinder.DeathRecipient {
     private final Object operationLock;
     private final SandboxPackageLifecycle lifecycle;
-    private final PackageCallerVerifier callerVerifier;
+    private final PackageAuthorityCapabilityRegistry capabilityRegistry;
+    private final IBinder authorityCapability;
+    private final long authorityGeneration;
     private final VirtualPackageStateBuilder packageStateBuilder;
     private final HostPermissionStateResolver hostPermissions;
 
@@ -50,11 +52,15 @@ final class PackageRuntimePermissionSession extends IRuntimePermissionSession.St
     private final IBinder clientToken;
 
     PackageRuntimePermissionSession(PackageServiceDependencies dependencies,
-            int ownerUid, int ownerPid, IBinder clientToken) {
+            int ownerUid, int ownerPid, IBinder clientToken,
+            IBinder authorityCapability, long authorityGeneration) {
         java.util.Objects.requireNonNull(dependencies, "dependencies");
         operationLock = dependencies.operationLock;
         lifecycle = dependencies.lifecycle;
-        callerVerifier = dependencies.callerVerifier;
+        capabilityRegistry = dependencies.capabilityRegistry;
+        this.authorityCapability = java.util.Objects.requireNonNull(
+                authorityCapability, "authorityCapability");
+        this.authorityGeneration = authorityGeneration;
         packageStateBuilder = dependencies.packageStateBuilder;
         hostPermissions = dependencies.hostPermissions;
         guard = new RuntimePermissionSessionGuard(ownerUid, ownerPid);
@@ -141,7 +147,7 @@ final class PackageRuntimePermissionSession extends IRuntimePermissionSession.St
     }
     private void requireRuntimeOwner() {
         guard.requireOwner(Binder.getCallingUid(), Binder.getCallingPid());
-        callerVerifier.requireRuntimeBrokerCaller();
+        capabilityRegistry.requireRuntime(authorityCapability, authorityGeneration);
     }
     private void closeInternal() {
         guard.close();

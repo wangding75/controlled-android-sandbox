@@ -1,22 +1,41 @@
-# M5-T19.1-O Stable Caller UID Identity
+# M5-T19.1-O2 Package Authority Binder Capabilities
 
-- Finding: P2-08 `PackageCallerVerifier` depended on `ActivityManager.getRunningAppProcesses()`, which can return incomplete or unavailable process data on modern Android and OEM devices.
-- Baseline: `405b9690fd8b4cc12c79abbbd0d01abdbdb5be21`.
-- Scope: package-service root capability authorization only; session owner PID guards remain unchanged.
+- Reopened finding: `NEW-P1-02` / original P2-08.
+- Development baseline: `0a2c1ae33edca7d17af69b2c8b2cf29612f939b9`.
+- Scope: Package Service root-role bootstrap and all management/runtime capability entry points.
+
+## Problem
+
+The previous remediation replaced `ActivityManager.getRunningAppProcesses()` with the exact Binder caller PID read from `/proc/<pid>/cmdline`. That improved availability but still treated a mutable process label as a role credential. A process name is suitable for diagnostics and routing evidence; it is not an unforgeable authorization primitive.
 
 ## Implemented behavior
 
-- Host management capabilities require the Host UID and the exact main-process name read from the caller PID `/proc/<pid>/cmdline`.
-- Runtime capabilities require the exact Host `:sandbox_server` process or the exact Companion `:sandbox_server32` process, plus UID/package/signature checks.
-- Companion package visibility is declared explicitly in the Host manifest.
-- Host, Runtime and Companion package/permission constants are sourced from the stable `sandbox-contract` `RuntimePeerIdentity`.
-- AMS process-list enumeration is removed; only the exact Binder caller PID is inspected with a bounded 512-byte read.
-- Session objects still bind the minted capability to the exact calling UID/PID, so another process cannot reuse an existing session Binder.
+- Existing `IPackageService` methods retain transaction positions 1-5 and now fail closed with an explicit role-capability-required error.
+- Capability-aware registration and operation methods are appended after the legacy AIDL methods, preserving old transaction IDs.
+- Host management and Runtime roles use separate process-owned Binder tokens and generations.
+- Package Service records the registering Binder caller UID/PID, role, token and generation.
+- A live role cannot be replaced by another PID or Binder token.
+- The role token is linked to Binder death; death retires the role registration.
+- Every management, runtime-permission, virtual-system-service and virtual-Job operation revalidates the role token and generation.
+- Companion Runtime registration additionally requires the signature permission and an installed, UID-matching Companion package.
+- `/proc/<pid>/cmdline`, ActivityManager process enumeration and process-name comparison are absent from authorization code.
+
+## Startup and recovery invariant
+
+The Host registers the management role before Guest launch. The trusted Runtime Broker registers the runtime role before requesting a scoped Package Service capability. Package Service restart invalidates its in-memory role slots; trusted clients re-register their still process-owned token before reopening sessions. Existing sessions are not accepted without a live matching authority slot.
 
 ## Security boundary
 
-Same-UID Guest processes remain rejected from root management and Runtime capability minting. Failure to read the exact caller PID identity fails closed.
+The change removes process-label spoofing and prevents a second process from replacing or reusing an already live role capability. It does not create a hostile-code boundary between processes that share the application Linux UID. Initial same-UID registration relies on trusted startup ordering; hostile Guest code must use the isolated-UID execution route.
 
-## Evidence boundary
+## Verification
 
-Host API stubs verify UID/package policy and fail-closed cases. Android package visibility, PackageManager UID resolution, Binder Driver identity, emulator, and physical-device behavior are not claimed.
+`PackageManagementAuthorizationSelfTest` covers:
+
+- same-UID, different-PID token replacement rejection;
+- token and generation mismatch rejection;
+- Binder death revocation;
+- Companion package/signature fail-closed behavior;
+- legacy root entry points failing closed.
+
+The static Android Host compile suite and the M5-T19.1-O caller-identity gate compile and execute the capability-aware paths. Emulator and physical-device Binder identity behavior remain part of the final Android validation phase.

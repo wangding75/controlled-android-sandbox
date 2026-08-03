@@ -51,7 +51,7 @@ require(
     "nativeExecutionMode",
 )
 require(
-    "app/src/main/java/com/warden/controlledsandbox/PackageManagementService.java",
+    "app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java",
     "NativeGuestExecutionPolicy.requireRuntimeAllowed(authoritative)",
     "VIRTUAL_SYSTEM_SERVICE_REVISION_MISMATCH",
 )

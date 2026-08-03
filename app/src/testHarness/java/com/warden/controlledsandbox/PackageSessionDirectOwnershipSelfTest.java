@@ -13,18 +13,22 @@ public final class PackageSessionDirectOwnershipSelfTest {
         File root = Files.createTempDirectory("package-session-direct-owner").toFile();
         PackageServiceDependencies dependencies = dependencies(new TestContext(root), root);
         try {
+            LiveBinder managementAuthority = new LiveBinder();
+            dependencies.capabilityRegistry.registerManagement(managementAuthority, 1L);
             LiveBinder managementToken = new LiveBinder();
             PackageManagementSession management = new PackageManagementSession(
-                    dependencies, 0, 1, managementToken);
+                    dependencies, 0, 1, managementToken, managementAuthority, 1L);
             management.binderDied();
             expectSecurity(management::loadCatalog,
                     "dead PackageManagementSession remained callable");
             require(managementToken.unlinkCount == 1,
                     "PackageManagementSession did not release its death registration");
 
+            LiveBinder runtimeAuthority = new LiveBinder();
+            dependencies.capabilityRegistry.registerRuntime(runtimeAuthority, 2L);
             LiveBinder runtimeToken = new LiveBinder();
             PackageRuntimePermissionSession runtime = new PackageRuntimePermissionSession(
-                    dependencies, 0, 1, runtimeToken);
+                    dependencies, 0, 1, runtimeToken, runtimeAuthority, 2L);
             runtime.binderDied();
             expectSecurity(() -> runtime.requestRuntimePermission(
                             "guest.pkg", 0, "android.permission.CAMERA", 7,

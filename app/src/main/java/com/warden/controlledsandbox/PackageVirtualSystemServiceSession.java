@@ -65,6 +65,9 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     private final VirtualPrivilegedServicesStore privilegedServices;
 
     private final int ownerUid;
+    private final PackageAuthorityCapabilityRegistry capabilityRegistry;
+    private final IBinder authorityCapability;
+    private final long authorityGeneration;
     private final VirtualSystemServiceStore.Scope scope;
     private final int virtualUid;
     private final String processName;
@@ -79,8 +82,13 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     PackageVirtualSystemServiceSession(PackageServiceDependencies dependencies,
             int ownerUid, IBinder clientToken,
                                 VirtualSystemServiceStore.Scope scope, int virtualUid,
-                                String processName, long generation, String packageRevision) {
+                                String processName, long generation, String packageRevision,
+                                IBinder authorityCapability, long authorityGeneration) {
         java.util.Objects.requireNonNull(dependencies, "dependencies");
+        capabilityRegistry = dependencies.capabilityRegistry;
+        this.authorityCapability = java.util.Objects.requireNonNull(
+                authorityCapability, "authorityCapability");
+        this.authorityGeneration = authorityGeneration;
         systemServices = dependencies.systemServices;
         deviceServices = dependencies.deviceServices;
         interactions = dependencies.interactions;
@@ -415,6 +423,7 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         if (!active || Binder.getCallingUid() != ownerUid) {
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
         }
+        capabilityRegistry.requireRuntime(authorityCapability, authorityGeneration);
     }
     private synchronized void closeInternal() {
         if (!active) return;

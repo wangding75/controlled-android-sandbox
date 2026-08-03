@@ -27,7 +27,7 @@ The state model supports:
 
 ### Runtime-Broker-only Binder capability
 
-`PackageManagementService` now issues `IRuntimePermissionSession` only to the process identity recorded by Android as `<host-package>:sandbox_server`. The capability is bound to the caller UID/PID and a client Binder death token. Management Session callers cannot substitute for the Runtime Broker and the Runtime Broker cannot use the host-management Session.
+`PackageManagementService` now issues `IRuntimePermissionSession` only after the caller registers and presents the Runtime role Binder capability. The role is bound to the registering UID/PID, generation and Binder death, while each session is separately bound to its client Binder. Management capability holders cannot substitute for the Runtime role and Runtime sessions cannot invoke host-management operations. The shared-UID route remains defense in depth; isolated UID execution is required for hostile Guest code.
 
 The typed runtime permission protocol contains no business `Bundle` payloads.
 

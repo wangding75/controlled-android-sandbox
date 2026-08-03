@@ -15,11 +15,13 @@ public final class PackageVirtualSystemServiceSessionSelfTest {
         TestContext context = new TestContext(root);
         PackageServiceDependencies dependencies = dependencies(context, root);
         try {
+            LiveBinder runtimeAuthority = new LiveBinder();
+            dependencies.capabilityRegistry.registerRuntime(runtimeAuthority, 1L);
             ImmediateDeathBinder clientToken = new ImmediateDeathBinder();
             PackageVirtualSystemServiceSession session = new PackageVirtualSystemServiceSession(
                     dependencies, 0, clientToken,
                     new VirtualSystemServiceStore.Scope("session.pkg", 2), 12002,
-                    "session.pkg", 1L, "session-revision");
+                    "session.pkg", 1L, "session-revision", runtimeAuthority, 1L);
             dependencies.systemServices.reserveClientRegistration(session);
             require(!session.linkClientDeathAfterReservation(),
                     "session that died inside linkToDeath was published");
@@ -36,7 +38,7 @@ public final class PackageVirtualSystemServiceSessionSelfTest {
                     new VirtualSystemServiceStore.Scope("replacement.pkg", 3);
             PackageVirtualSystemServiceSession existing = new PackageVirtualSystemServiceSession(
                     dependencies, 0, new LiveBinder(), scope, 12003,
-                    "replacement.pkg", 2L, "replacement-revision");
+                    "replacement.pkg", 2L, "replacement-revision", runtimeAuthority, 1L);
             dependencies.systemServices.reserveClientRegistration(existing);
             require(existing.linkClientDeathAfterReservation(),
                     "live existing session failed death registration");
@@ -45,7 +47,7 @@ public final class PackageVirtualSystemServiceSessionSelfTest {
             PackageVirtualSystemServiceSession deadReplacement =
                     new PackageVirtualSystemServiceSession(dependencies, 0,
                             new ImmediateDeathBinder(), scope, 12003,
-                            "replacement.pkg", 2L, "replacement-revision");
+                            "replacement.pkg", 2L, "replacement-revision", runtimeAuthority, 1L);
             dependencies.systemServices.reserveClientRegistration(deadReplacement);
             require(!deadReplacement.linkClientDeathAfterReservation(),
                     "dead replacement session was published");

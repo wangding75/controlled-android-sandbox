@@ -164,9 +164,11 @@ public final class VirtualSystemServicePagingSelfTest {
         File root = Files.createTempDirectory("virtual-account-page-test").toFile();
         TestContext context = new TestContext(root);
         PackageServiceDependencies dependencies = dependencies(context, root);
+        LiveBinder runtimeAuthority = new LiveBinder();
+        dependencies.capabilityRegistry.registerRuntime(runtimeAuthority, 1L);
         PackageVirtualSystemServiceSession session = new PackageVirtualSystemServiceSession(
                 dependencies, 0, new LiveBinder(), new VirtualSystemServiceStore.Scope("account.pkg", 4),
-                12004, "account.pkg", 1L, "account-revision");
+                12004, "account.pkg", 1L, "account-revision", runtimeAuthority, 1L);
         try {
             for (int index = 0; index < 40; index++) {
                 String name = String.format(java.util.Locale.ROOT, "user-%02d", index);
@@ -189,7 +191,7 @@ public final class VirtualSystemServicePagingSelfTest {
 
             PackageVirtualSystemServiceSession small = new PackageVirtualSystemServiceSession(
                     dependencies, 0, new LiveBinder(), new VirtualSystemServiceStore.Scope("small.pkg", 5),
-                    12005, "small.pkg", 1L, "small-revision");
+                    12005, "small.pkg", 1L, "small-revision", runtimeAuthority, 1L);
             try {
                 require(small.addAccount("one", "mail", "secret"), "small account add failed");
                 small.setAuthToken("one", "mail", "access", "sensitive-token");
