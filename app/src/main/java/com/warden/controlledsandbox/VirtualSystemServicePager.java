@@ -29,6 +29,12 @@ final class VirtualSystemServicePager implements AutoCloseable {
     private static final int PAGE_OVERHEAD_BYTES = 8 * 1024;
     private static final long TOKEN_TTL_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(2);
     private static final byte TOKEN_VERSION = 1;
+    private static final int TOKEN_BODY_BYTES = 1 + 16 + 16 + 8 + 4 + 8;
+    private static final int TOKEN_MAC_BYTES = 32;
+    private static final int TOKEN_ENCODED_CHARACTERS = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(new byte[TOKEN_BODY_BYTES + TOKEN_MAC_BYTES]).length();
+    private static final int NEXT_PAGE_TOKEN_RESERVE_BYTES =
+            stringBytes("A".repeat(TOKEN_ENCODED_CHARACTERS)) + 16;
 
     interface BinaryAdapter<T extends Parcelable> {
         String fieldName();
@@ -55,54 +61,60 @@ final class VirtualSystemServicePager implements AutoCloseable {
         long revision = revision(values);
         int start = request.pageToken().isEmpty() ? 0
                 : decodeToken(request.pageToken(), collection, scopeKey, revision, values.size());
-        ArrayList<T> items = new ArrayList<>();
-        ArrayList<VirtualPageBlob> pageBlobs = new ArrayList<>();
-        int estimated = PAGE_OVERHEAD_BYTES;
-        int index = start;
-        while (index < values.size() && items.size() < request.maxItems()) {
-            T original = values.get(index);
-            byte[] binary = binaryAdapter == null ? new byte[0] : binaryAdapter.payload(original);
-            boolean offload = binaryAdapter != null && binary.length > LARGE_BINARY_THRESHOLD;
-            if (offload && pageBlobs.size() >= VirtualPageBlobStore.MAX_GRANTS) break;
-            T transmitted = offload ? binaryAdapter.withoutPayload(original) : original;
-            int itemBytes = measuredBytes(transmitted);
-            int blobBytes = 0;
-            if (offload) {
-                VirtualPageBlob placeholder = new VirtualPageBlob(items.size(), binaryAdapter.fieldName(),
-                        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", binary.length,
-                        "0000000000000000000000000000000000000000000000000000000000000000");
-                blobBytes = measuredBytes(placeholder);
-            }
-            if (itemBytes + blobBytes + PAGE_OVERHEAD_BYTES > request.maxBytes()) {
-                if (items.isEmpty()) throw new IllegalStateException("ITEM_EXCEEDS_BINDER_BUDGET");
-                break;
-            }
-            if (!items.isEmpty() && estimated + itemBytes + blobBytes > request.maxBytes()) break;
-            VirtualPageBlob descriptor = null;
-            if (offload) {
-                try {
-                    descriptor = blobs.register(scopeKey, items.size(), binaryAdapter.fieldName(), binary);
-                } catch (IllegalStateException error) {
-                    if (!"PAGE_BLOB_SESSION_BUDGET_EXCEEDED".equals(error.getMessage()) || items.isEmpty()) {
-                        throw error;
-                    }
+        try (VirtualPageBlobStore.GrantBatch grantBatch = blobs.beginBatch(scopeKey)) {
+            ArrayList<T> items = new ArrayList<>();
+            ArrayList<VirtualPageBlob> pageBlobs = new ArrayList<>();
+            int estimated = PAGE_OVERHEAD_BYTES + NEXT_PAGE_TOKEN_RESERVE_BYTES;
+            int index = start;
+            while (index < values.size() && items.size() < request.maxItems()) {
+                T original = values.get(index);
+                byte[] binary = binaryAdapter == null ? new byte[0] : binaryAdapter.payload(original);
+                boolean offload = binaryAdapter != null && binary.length > LARGE_BINARY_THRESHOLD;
+                if (offload && pageBlobs.size() >= VirtualPageBlobStore.MAX_GRANTS) break;
+                T transmitted = offload ? binaryAdapter.withoutPayload(original) : original;
+                int itemBytes = measuredBytes(transmitted);
+                int blobBytes = 0;
+                if (offload) {
+                    VirtualPageBlob placeholder = new VirtualPageBlob(items.size(), binaryAdapter.fieldName(),
+                            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", binary.length,
+                            "0000000000000000000000000000000000000000000000000000000000000000");
+                    blobBytes = measuredBytes(placeholder);
+                }
+                if (estimated + itemBytes + blobBytes > request.maxBytes()) {
+                    if (items.isEmpty()) throw new IllegalStateException("ITEM_EXCEEDS_BINDER_BUDGET");
                     break;
                 }
+                VirtualPageBlob descriptor = null;
+                if (offload) {
+                    try {
+                        descriptor = grantBatch.register(
+                                items.size(), binaryAdapter.fieldName(), binary);
+                    } catch (IllegalStateException error) {
+                        if (!"PAGE_BLOB_SESSION_BUDGET_EXCEEDED".equals(error.getMessage())
+                                || items.isEmpty()) {
+                            throw error;
+                        }
+                        break;
+                    }
+                }
+                items.add(transmitted);
+                estimated += itemBytes;
+                if (descriptor != null) {
+                    pageBlobs.add(descriptor);
+                    estimated += measuredBytes(descriptor);
+                }
+                index++;
             }
-            items.add(transmitted);
-            estimated += itemBytes;
-            if (descriptor != null) {
-                pageBlobs.add(descriptor);
-                estimated += measuredBytes(descriptor);
+            String next = index < values.size() ? encodeToken(collection, scopeKey, revision, index) : "";
+            estimated = estimated - NEXT_PAGE_TOKEN_RESERVE_BYTES + stringBytes(next) + 16;
+            if (estimated > request.maxBytes()) {
+                throw new IllegalStateException("PAGE_BUDGET_ESTIMATE_MISMATCH");
             }
-            index++;
+            PageSlice<T> result = new PageSlice<>(List.copyOf(items), List.copyOf(pageBlobs),
+                    next, revision, estimated);
+            grantBatch.commit();
+            return result;
         }
-        String next = index < values.size() ? encodeToken(collection, scopeKey, revision, index) : "";
-        estimated += stringBytes(next) + 16;
-        if (estimated > request.maxBytes()) {
-            throw new IllegalStateException("PAGE_BUDGET_ESTIMATE_MISMATCH");
-        }
-        return new PageSlice<>(List.copyOf(items), List.copyOf(pageBlobs), next, revision, estimated);
     }
 
     <T extends Parcelable> List<T> legacy(PageSlice<T> page) {
@@ -117,6 +129,8 @@ final class VirtualSystemServicePager implements AutoCloseable {
     }
 
     byte[] blobForTest(String scopeKey, String token) { return blobs.payloadForTest(scopeKey, token); }
+    int blobGrantCountForTest() { return blobs.grantCountForTest(); }
+    int blobBytesForTest() { return blobs.totalBytesForTest(); }
 
     @Override public void close() { blobs.close(); }
 
@@ -132,7 +146,7 @@ final class VirtualSystemServicePager implements AutoCloseable {
 
     private String encodeToken(String collection, String scopeKey, long revision, int offset) {
         long expiry = System.nanoTime() + TOKEN_TTL_NANOS;
-        ByteBuffer payload = ByteBuffer.allocate(1 + 16 + 16 + 8 + 4 + 8);
+        ByteBuffer payload = ByteBuffer.allocate(TOKEN_BODY_BYTES);
         payload.put(TOKEN_VERSION);
         payload.put(hash16(collection));
         payload.put(hash16(scopeKey));
@@ -157,8 +171,8 @@ final class VirtualSystemServicePager implements AutoCloseable {
         if (!Base64.getUrlEncoder().withoutPadding().encodeToString(token).equals(value)) {
             throw new IllegalArgumentException("PAGE_TOKEN_INVALID");
         }
-        int bodyLength = 1 + 16 + 16 + 8 + 4 + 8;
-        if (token.length != bodyLength + 32) throw new IllegalArgumentException("PAGE_TOKEN_INVALID");
+        int bodyLength = TOKEN_BODY_BYTES;
+        if (token.length != bodyLength + TOKEN_MAC_BYTES) throw new IllegalArgumentException("PAGE_TOKEN_INVALID");
         byte[] body = java.util.Arrays.copyOf(token, bodyLength);
         byte[] suppliedMac = java.util.Arrays.copyOfRange(token, bodyLength, token.length);
         if (!MessageDigest.isEqual(hmac(body), suppliedMac)) throw new SecurityException("PAGE_TOKEN_TAMPERED");

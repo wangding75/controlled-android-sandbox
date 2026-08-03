@@ -26,6 +26,7 @@ public final class VirtualSystemServicePagingSelfTest {
         requestBounds();
         pageTokensAndBudgets();
         binaryOffload();
+        blobGrantRollbackAndExactBudget();
         accountSessionPaging();
         System.out.println("PASS virtual system-service Binder paging and byte-budget self-test");
     }
@@ -158,6 +159,80 @@ public final class VirtualSystemServicePagingSelfTest {
         require(second.items().size() == 1 && second.blobs().size() == 1
                         && second.nextPageToken().isEmpty(),
                 "blob-grant window did not resume after one-time handles were consumed");
+    }
+
+    private static void blobGrantRollbackAndExactBudget() throws Exception {
+        File root = Files.createTempDirectory("virtual-page-blob-rollback-test").toFile();
+        byte[] payload = new byte[100 * 1024];
+        Arrays.fill(payload, (byte) 7);
+        String wide = "x".repeat(5_000);
+        List<VirtualNotificationSnapshot> values = List.of(
+                notification(11, wide, payload), notification(12, wide, payload));
+        try (VirtualSystemServicePager pager = new VirtualSystemServicePager(root)) {
+            VirtualSystemServicePager.PageSlice<VirtualNotificationSnapshot> probe = pager.page(
+                    "NOTIFICATION-EXACT", "scope-exact", values,
+                    new VirtualPageRequest(1, VirtualPageRequest.MAX_BYTES, ""),
+                    VirtualSystemServicePageAdapters.NOTIFICATION);
+            require(probe.estimatedBytes() > VirtualPageRequest.MIN_BYTES,
+                    "exact-budget fixture did not exceed minimum page budget");
+            require(!probe.nextPageToken().isEmpty() && probe.blobs().size() == 1,
+                    "exact-budget fixture did not reserve a continuation token and blob grant");
+            try (ParcelFileDescriptor ignored = pager.openBlob(
+                    "scope-exact", probe.blobs().get(0).blobToken())) { }
+
+            VirtualSystemServicePager.PageSlice<VirtualNotificationSnapshot> exact = pager.page(
+                    "NOTIFICATION-EXACT", "scope-exact", values,
+                    new VirtualPageRequest(1, probe.estimatedBytes(), ""),
+                    VirtualSystemServicePageAdapters.NOTIFICATION);
+            require(exact.estimatedBytes() == probe.estimatedBytes(),
+                    "exact continuation-token budget changed between identical pages");
+            try (ParcelFileDescriptor ignored = pager.openBlob(
+                    "scope-exact", exact.blobs().get(0).blobToken())) { }
+
+            int grantsBefore = pager.blobGrantCountForTest();
+            int bytesBefore = pager.blobBytesForTest();
+            expect(IllegalStateException.class, "ITEM_EXCEEDS_BINDER_BUDGET", () -> pager.page(
+                    "NOTIFICATION-EXACT", "scope-exact", values,
+                    new VirtualPageRequest(1, probe.estimatedBytes() - 1, ""),
+                    VirtualSystemServicePageAdapters.NOTIFICATION));
+            require(pager.blobGrantCountForTest() == grantsBefore
+                            && pager.blobBytesForTest() == bytesBefore,
+                    "pre-registration budget rejection leaked a blob grant");
+
+            for (int attempt = 0; attempt < 3; attempt++) {
+                expect(IllegalStateException.class, "TEST_PAGE_ASSEMBLY_FAILURE", () -> pager.page(
+                        "NOTIFICATION-ROLLBACK", "scope-rollback", values,
+                        new VirtualPageRequest(2, VirtualPageRequest.MAX_BYTES, ""),
+                        failingAfterFirstBlobAdapter()));
+                require(pager.blobGrantCountForTest() == grantsBefore
+                                && pager.blobBytesForTest() == bytesBefore,
+                        "failed page assembly leaked blob grants or payload budget");
+            }
+        }
+    }
+
+    private static VirtualNotificationSnapshot notification(int id, String text, byte[] payload) {
+        return new VirtualNotificationSnapshot(id, id, text, "host-" + id, "channel",
+                VirtualNotificationSnapshot.ACTIVE, "revision", "", "", List.of(),
+                false, "", payload, id);
+    }
+
+    private static VirtualSystemServicePager.BinaryAdapter<VirtualNotificationSnapshot>
+            failingAfterFirstBlobAdapter() {
+        return new VirtualSystemServicePager.BinaryAdapter<>() {
+            private int payloadCalls;
+            @Override public String fieldName() {
+                return VirtualSystemServicePageAdapters.NOTIFICATION.fieldName();
+            }
+            @Override public byte[] payload(VirtualNotificationSnapshot value) {
+                if (++payloadCalls == 2) throw new IllegalStateException("TEST_PAGE_ASSEMBLY_FAILURE");
+                return VirtualSystemServicePageAdapters.NOTIFICATION.payload(value);
+            }
+            @Override public VirtualNotificationSnapshot withoutPayload(
+                    VirtualNotificationSnapshot value) {
+                return VirtualSystemServicePageAdapters.NOTIFICATION.withoutPayload(value);
+            }
+        };
     }
 
     private static void accountSessionPaging() throws Exception {

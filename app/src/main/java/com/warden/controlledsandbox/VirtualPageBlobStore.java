@@ -7,8 +7,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Iterator;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -29,7 +31,13 @@ final class VirtualPageBlobStore implements AutoCloseable {
         root = new File(parent, java.util.UUID.randomUUID().toString());
     }
 
-    synchronized VirtualPageBlob register(String scopeKey, int itemIndex, String fieldName, byte[] payload) {
+    synchronized GrantBatch beginBatch(String scopeKey) {
+        requireOpen();
+        return new GrantBatch(java.util.Objects.requireNonNull(scopeKey, "scopeKey"));
+    }
+
+    private synchronized VirtualPageBlob register(String scopeKey, int itemIndex, String fieldName,
+            byte[] payload) {
         requireOpen();
         byte[] value = payload == null ? new byte[0] : payload.clone();
         pruneExpiredLocked(System.nanoTime());
@@ -49,6 +57,68 @@ final class VirtualPageBlobStore implements AutoCloseable {
         grants.put(token, new Grant(scopeKey, System.nanoTime() + TTL_NANOS, value, digest));
         totalBytes += value.length;
         return new VirtualPageBlob(itemIndex, fieldName, token, value.length, digest);
+    }
+
+    private synchronized void revoke(String scopeKey, String token) {
+        if (closed) return;
+        Grant grant = grants.get(token);
+        if (grant == null) return;
+        if (!grant.scopeKey.equals(scopeKey)) throw new SecurityException("PAGE_BLOB_SCOPE_MISMATCH");
+        grants.remove(token);
+        totalBytes -= grant.payload.length;
+    }
+
+    synchronized int grantCountForTest() {
+        pruneExpiredLocked(System.nanoTime());
+        return grants.size();
+    }
+
+    synchronized int totalBytesForTest() {
+        pruneExpiredLocked(System.nanoTime());
+        return totalBytes;
+    }
+
+    final class GrantBatch implements AutoCloseable {
+        private final String scopeKey;
+        private final List<String> tokens = new ArrayList<>();
+        private boolean committed;
+        private boolean closedBatch;
+
+        private GrantBatch(String scopeKey) { this.scopeKey = scopeKey; }
+
+        VirtualPageBlob register(int itemIndex, String fieldName, byte[] payload) {
+            if (closedBatch) throw new IllegalStateException("PAGE_BLOB_BATCH_CLOSED");
+            VirtualPageBlob descriptor = VirtualPageBlobStore.this.register(
+                    scopeKey, itemIndex, fieldName, payload);
+            try {
+                tokens.add(descriptor.blobToken());
+            } catch (RuntimeException | Error error) {
+                VirtualPageBlobStore.this.revoke(scopeKey, descriptor.blobToken());
+                throw error;
+            }
+            return descriptor;
+        }
+
+        void commit() {
+            if (closedBatch) throw new IllegalStateException("PAGE_BLOB_BATCH_CLOSED");
+            committed = true;
+        }
+
+        @Override public void close() {
+            if (closedBatch) return;
+            closedBatch = true;
+            if (committed) return;
+            RuntimeException cleanupFailure = null;
+            for (int index = tokens.size() - 1; index >= 0; index--) {
+                try {
+                    VirtualPageBlobStore.this.revoke(scopeKey, tokens.get(index));
+                } catch (RuntimeException error) {
+                    if (cleanupFailure == null) cleanupFailure = error;
+                    else cleanupFailure.addSuppressed(error);
+                }
+            }
+            if (cleanupFailure != null) throw cleanupFailure;
+        }
     }
 
     synchronized ParcelFileDescriptor open(String scopeKey, String token) {
