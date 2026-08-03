@@ -1,12 +1,26 @@
 {
   "bomFormat": "ControlledSandbox-SBOM",
-  "specVersion": "1.0",
+  "specVersion": "1.1",
   "project": "controlled-sandbox-cleanroom",
   "version": "0.5.19.1-source",
+  "settingsGradleSha256": "6d363c51bc684e669605ca42f243a6fcbd352aa34ccda41727e98aaa5e9d9793",
+  "includedProjects": [
+    ":app",
+    ":sandbox-domain",
+    ":sandbox-contract",
+    ":sandbox-runtime",
+    ":sandbox-framework",
+    ":fixture-basic",
+    ":fixture-compat32",
+    ":sandbox-native",
+    ":sandbox-companion32"
+  ],
   "components": [
     {
       "type": "application",
+      "role": "host",
       "name": "app",
+      "gradleProjectPath": ":app",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 133,
@@ -16,11 +30,13 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "f630deee8d2d26ead11e89ad38e8a0a74ff5527c63d0f36b5a2898da4f5531da"
+      "sourceDigestSha256": "e1413a79a81631a22fb0b21958ca91933c62818f69ac2101170fa553d2052d74"
     },
     {
       "type": "library",
+      "role": "component",
       "name": "sandbox-domain",
+      "gradleProjectPath": ":sandbox-domain",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 57,
@@ -32,7 +48,9 @@
     },
     {
       "type": "library",
+      "role": "component",
       "name": "sandbox-contract",
+      "gradleProjectPath": ":sandbox-contract",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 275,
@@ -46,7 +64,24 @@
     },
     {
       "type": "library",
+      "role": "component",
+      "name": "sandbox-runtime",
+      "gradleProjectPath": ":sandbox-runtime",
+      "version": "0.5.19.1-source",
+      "license": "Apache-2.0",
+      "fileCount": 211,
+      "languages": [
+        "Gradle",
+        "Java",
+        "XML"
+      ],
+      "sourceDigestSha256": "7efbf815e685e963808526bd7cc24d5df2358d9bd71fdf3e0d50f82178368ac1"
+    },
+    {
+      "type": "library",
+      "role": "component",
       "name": "sandbox-framework",
+      "gradleProjectPath": ":sandbox-framework",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 206,
@@ -58,8 +93,41 @@
       "sourceDigestSha256": "de8e737f306ad3fb5e76888e807fded79ea5f8980f94cf9527bc9cd9990140f4"
     },
     {
+      "type": "application",
+      "role": "fixture",
+      "name": "fixture-basic",
+      "gradleProjectPath": ":fixture-basic",
+      "version": "0.5.19.1-source",
+      "license": "Apache-2.0",
+      "fileCount": 15,
+      "languages": [
+        "C++",
+        "Gradle",
+        "Java",
+        "XML",
+        "txt"
+      ],
+      "sourceDigestSha256": "8feadbc4264779606dbe475e70915b55f3b3ac87833a09aec93f6954a14ee353"
+    },
+    {
+      "type": "application",
+      "role": "fixture",
+      "name": "fixture-compat32",
+      "gradleProjectPath": ":fixture-compat32",
+      "version": "0.5.19.1-source",
+      "license": "Apache-2.0",
+      "fileCount": 2,
+      "languages": [
+        "Gradle",
+        "XML"
+      ],
+      "sourceDigestSha256": "4b59cde29e3f1dc44ec790bd5cda050f25775e1016d6ad01ec9c7c131536c59f"
+    },
+    {
       "type": "library",
+      "role": "component",
       "name": "sandbox-native",
+      "gradleProjectPath": ":sandbox-native",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 38,
@@ -73,8 +141,10 @@
       "sourceDigestSha256": "57c88bb580358caa0c2eb9899fa76edb9bffcdc9a0246bd2028f8e847d084c1e"
     },
     {
-      "type": "library",
+      "type": "application",
+      "role": "companion",
       "name": "sandbox-companion32",
+      "gradleProjectPath": ":sandbox-companion32",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
       "fileCount": 13,
@@ -86,34 +156,6 @@
         "txt"
       ],
       "sourceDigestSha256": "1c3f0403d640315b68c919abf344daa057e9f7d6c158e60ad4bb3a1fbdd00382"
-    },
-    {
-      "type": "library",
-      "name": "sandbox-runtime",
-      "version": "0.5.19.1-source",
-      "license": "Apache-2.0",
-      "fileCount": 211,
-      "languages": [
-        "Gradle",
-        "Java",
-        "XML"
-      ],
-      "sourceDigestSha256": "7efbf815e685e963808526bd7cc24d5df2358d9bd71fdf3e0d50f82178368ac1"
-    },
-    {
-      "type": "application",
-      "name": "fixture-basic",
-      "version": "0.5.19.1-source",
-      "license": "Apache-2.0",
-      "fileCount": 15,
-      "languages": [
-        "C++",
-        "Gradle",
-        "Java",
-        "XML",
-        "txt"
-      ],
-      "sourceDigestSha256": "8feadbc4264779606dbe475e70915b55f3b3ac87833a09aec93f6954a14ee353"
     }
   ],
   "externalRuntimeDependencies": [

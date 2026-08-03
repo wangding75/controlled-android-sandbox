@@ -88,7 +88,7 @@ python3 scripts/check-native-file-hooks.py
 python3 scripts/check-native-files-loader.py
 python3 scripts/check-native-network-audio.py
 python3 scripts/check-native-abi-companion.py
-python3 scripts/generate-sbom.py
+python3 scripts/generate-sbom.py --check
 python3 scripts/check-m3-source-progress.py
 ./scripts/test-native.sh
 ./scripts/test-m3-gate.sh
