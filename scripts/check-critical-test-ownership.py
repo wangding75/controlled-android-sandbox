@@ -60,6 +60,7 @@ P1_REGRESSIONS = (
     RegressionSpec("P1-04", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntimeSelfTest.java", required_methods=("testImmediateDeathDuringRegistration",)),
     RegressionSpec("P1-05", "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServicePagingSelfTest.java", required_methods=("pageTokensAndBudgets", "binaryOffload", "accountSessionPaging")),
     RegressionSpec("P1-06", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPoolSelfTest.java", required_methods=("testDelayedDeathReconnectsWithinCurrentRequest", "testConnectionIsNotPublishedBeforeDeathLinkCompletes")),
+    RegressionSpec("P2-01", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java", required_methods=("retiresSilentlyDeadBindingBeforeRebind",)),
 )
 
 

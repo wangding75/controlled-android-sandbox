@@ -21,6 +21,7 @@ public final class RebindableServiceConnectorSelfTest {
 
     public static void main(String[] args) throws Exception {
         reconnectsAfterBinderDeath();
+        retiresSilentlyDeadBindingBeforeRebind();
         usesBoundedExponentialBackoff();
         timesOutMissingCallbackAndRebinds();
         timeoutAfterBackoffCancelsAttempt();
@@ -48,6 +49,30 @@ public final class RebindableServiceConnectorSelfTest {
         require("service-2".equals(connector.require()), "next request must rebind after death");
         require(context.bindCount() == 2, "death recovery must create exactly one new binding");
         require(closed.equals(List.of("service-1")), "dead adapted capability must be closed");
+        connector.close();
+    }
+
+    private static void retiresSilentlyDeadBindingBeforeRebind() throws Exception {
+        FakeContext context = new FakeContext();
+        RebindableServiceConnector<String> connector = new RebindableServiceConnector<>(
+                context, new Intent(), binder -> "service-" + context.bindCount(),
+                service -> context.recordLifecycle("close-" + service),
+                "silent death service", 1_000L, 0L, 0L);
+
+        FakeBinder first = new FakeBinder();
+        context.nextBinder = first;
+        require("service-1".equals(connector.require()), "first Binder connection must resolve");
+        first.dieWithoutCallback();
+
+        context.nextBinder = new FakeBinder();
+        require("service-2".equals(connector.require()),
+                "silently dead Binder must be retired before a replacement bind");
+        require(first.unlinkCount() == 1,
+                "silently dead Binder death recipient must be unlinked exactly once");
+        require(context.lifecycle().equals(List.of(
+                        "bind-1", "close-service-1", "unbind-1", "bind-2")),
+                "old service, death recipient and binding must be released before rebind: "
+                        + context.lifecycle());
         connector.close();
     }
 
@@ -207,6 +232,7 @@ public final class RebindableServiceConnectorSelfTest {
         private final Deque<BindBehavior> behaviors = new ArrayDeque<>();
         private final List<PendingBinding> pending = new ArrayList<>();
         private final List<Long> bindTimesNanos = new ArrayList<>();
+        private final List<String> lifecycle = new ArrayList<>();
         private final CountDownLatch bindObserved = new CountDownLatch(1);
         private final CountDownLatch callbackDelivered = new CountDownLatch(1);
         private final CountDownLatch allowBindReturn = new CountDownLatch(1);
@@ -224,6 +250,7 @@ public final class RebindableServiceConnectorSelfTest {
             FakeBinder value;
             synchronized (this) {
                 bindCount++;
+                lifecycle.add("bind-" + bindCount);
                 bindTimesNanos.add(System.nanoTime());
                 bindObserved.countDown();
                 behavior = behaviors.isEmpty()
@@ -253,11 +280,14 @@ public final class RebindableServiceConnectorSelfTest {
 
         @Override public synchronized void unbindService(ServiceConnection connection) {
             unbindCount++;
+            lifecycle.add("unbind-" + unbindCount);
         }
 
         synchronized int bindCount() { return bindCount; }
         synchronized int unbindCount() { return unbindCount; }
         synchronized List<Long> bindTimesNanos() { return List.copyOf(bindTimesNanos); }
+        synchronized List<String> lifecycle() { return List.copyOf(lifecycle); }
+        synchronized void recordLifecycle(String event) { lifecycle.add(event); }
 
         boolean awaitBind(long timeout, TimeUnit unit) throws InterruptedException {
             return bindObserved.await(timeout, unit);
@@ -280,12 +310,14 @@ public final class RebindableServiceConnectorSelfTest {
     private static final class FakeBinder implements IBinder {
         private DeathRecipient recipient;
         private boolean alive = true;
+        private int unlinkCount;
 
         @Override public boolean isBinderAlive() { return alive; }
         @Override public void linkToDeath(DeathRecipient value, int flags) throws RemoteException {
             recipient = value;
         }
         @Override public boolean unlinkToDeath(DeathRecipient value, int flags) {
+            unlinkCount++;
             if (recipient == value) recipient = null;
             return true;
         }
@@ -294,6 +326,8 @@ public final class RebindableServiceConnectorSelfTest {
             DeathRecipient callback = recipient;
             if (callback != null) callback.binderDied();
         }
+        void dieWithoutCallback() { alive = false; }
+        int unlinkCount() { return unlinkCount; }
     }
 
     @FunctionalInterface

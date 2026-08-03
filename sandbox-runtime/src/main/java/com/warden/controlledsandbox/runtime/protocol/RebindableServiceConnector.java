@@ -54,6 +54,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     private long nextBindAtNanos;
     private Throwable lastFailure;
     private long epoch;
+    private CountDownLatch cleanupCompleted;
 
     public RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName) {
@@ -80,27 +81,49 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     public T require() throws Exception {
         long deadline = safeAdd(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(timeoutMs));
         while (true) {
-            T current = currentAlive();
-            if (current != null) return current;
-
+            T current;
             Attempt waiting;
+            DeadCleanup deadCleanup;
+            CountDownLatch cleanupWait;
             long delayNanos;
             synchronized (lock) {
                 ensureOpenLocked();
                 current = currentAliveLocked();
                 if (current != null) return current;
-                long now = System.nanoTime();
-                delayNanos = Math.max(0L, nextBindAtNanos - now);
-                if (delayNanos == 0L) {
-                    if (attempt == null || attempt.completed()) attempt = newAttemptLocked();
-                    waiting = attempt;
-                } else {
+                if (cleanupCompleted != null) {
+                    cleanupWait = cleanupCompleted;
+                    deadCleanup = null;
                     waiting = null;
+                    delayNanos = 0L;
+                } else if (hasDeadPublishedCapabilityLocked()) {
+                    deadCleanup = claimDeadCleanupLocked();
+                    cleanupWait = deadCleanup.completed;
+                    waiting = null;
+                    delayNanos = 0L;
+                } else {
+                    cleanupWait = null;
+                    deadCleanup = null;
+                    long now = System.nanoTime();
+                    delayNanos = Math.max(0L, nextBindAtNanos - now);
+                    if (delayNanos == 0L) {
+                        if (attempt == null || attempt.completed()) attempt = newAttemptLocked();
+                        waiting = attempt;
+                    } else {
+                        waiting = null;
+                    }
                 }
             }
 
             long remaining = deadline - System.nanoTime();
             if (remaining <= 0L) throw unavailable();
+            if (deadCleanup != null) {
+                completeDeadCleanup(deadCleanup);
+                continue;
+            }
+            if (cleanupWait != null) {
+                if (!cleanupWait.await(remaining, TimeUnit.NANOSECONDS)) throw unavailable();
+                continue;
+            }
             if (delayNanos > 0L) {
                 sleepNanos(Math.min(delayNanos, remaining));
                 continue;
@@ -173,6 +196,42 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     private T currentAliveLocked() {
         if (service == null || binder == null || !binder.isBinderAlive()) return null;
         return service;
+    }
+
+    private boolean hasDeadPublishedCapabilityLocked() {
+        if (service == null && binder == null) return false;
+        return service == null || binder == null || !binder.isBinderAlive();
+    }
+
+    private DeadCleanup claimDeadCleanupLocked() {
+        CountDownLatch completed = new CountDownLatch(1);
+        cleanupCompleted = completed;
+        Attempt staleAttempt = attempt;
+        T staleService = service;
+        IBinder staleBinder = binder;
+        attempt = null;
+        service = null;
+        binder = null;
+        if (staleAttempt != null) {
+            staleAttempt.done = true;
+            staleAttempt.latch.countDown();
+        }
+        recordFailureLocked("DEAD_BINDER", null);
+        return new DeadCleanup(staleAttempt, staleService, staleBinder, completed);
+    }
+
+    private void completeDeadCleanup(DeadCleanup cleanup) {
+        try {
+            unlink(cleanup.binder,
+                    cleanup.attempt == null ? null : cleanup.attempt.deathRecipient);
+            closeService(cleanup.service);
+            unbind(cleanup.attempt);
+        } finally {
+            synchronized (lock) {
+                if (cleanupCompleted == cleanup.completed) cleanupCompleted = null;
+                cleanup.completed.countDown();
+            }
+        }
     }
 
     private Attempt newAttemptLocked() {
@@ -411,6 +470,20 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
 
         boolean completed() {
             synchronized (lock) { return done; }
+        }
+    }
+
+    private final class DeadCleanup {
+        final Attempt attempt;
+        final T service;
+        final IBinder binder;
+        final CountDownLatch completed;
+
+        DeadCleanup(Attempt attempt, T service, IBinder binder, CountDownLatch completed) {
+            this.attempt = attempt;
+            this.service = service;
+            this.binder = binder;
+            this.completed = completed;
         }
     }
 
