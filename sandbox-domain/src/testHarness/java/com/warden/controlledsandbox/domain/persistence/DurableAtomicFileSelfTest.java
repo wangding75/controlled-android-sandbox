@@ -18,7 +18,8 @@ public final class DurableAtomicFileSelfTest {
         testActualDurableReplace();
         testOrdering();
         testNoNonAtomicFallback();
-        testDirectorySyncFailureIsReported();
+        testDirectorySyncFailureReturnsCommittedUncertain();
+        testMoveDirectorySyncFailureReturnsCommittedUncertain();
     }
 
     private static void testActualDurableReplace() throws Exception {
@@ -86,28 +87,68 @@ public final class DurableAtomicFileSelfTest {
         }
     }
 
-    private static void testDirectorySyncFailureIsReported() throws Exception {
+    private static void testDirectorySyncFailureReturnsCommittedUncertain() throws Exception {
         Path root = Files.createTempDirectory("durable-dir-fail-");
         try {
             Path temporary = root.resolve("state.tmp");
             Path destination = root.resolve("state");
             Files.writeString(temporary, "new");
-            boolean rejected = false;
-            try {
-                DurableAtomicFile.replacePrepared(temporary, destination, new DurableAtomicFile.Operations() {
-                    @Override public void forceFile(Path file) { }
-                    @Override public void atomicReplace(Path source, Path target) throws IOException {
-                        Files.move(source, target);
-                    }
-                    @Override public void forceDirectory(Path directory) throws IOException {
-                        throw new IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED);
-                    }
-                });
-            } catch (IOException expected) {
-                rejected = expected.getMessage().contains(DurableAtomicFile.DIRECTORY_SYNC_FAILED);
-            }
-            require(rejected, "directory fsync failure reported");
-            require("new".equals(Files.readString(destination)), "rename completed before durability failure");
+            DurableAtomicFile.CommitResult result = DurableAtomicFile.replacePrepared(
+                    temporary, destination, new DurableAtomicFile.Operations() {
+                        @Override public void forceFile(Path file) { }
+                        @Override public void atomicReplace(Path source, Path target) throws IOException {
+                            Files.move(source, target);
+                        }
+                        @Override public void forceDirectory(Path directory) throws IOException {
+                            throw new IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED);
+                        }
+                    });
+            require(result.state()
+                            == DurableAtomicFile.CommitState.POST_RENAME_DURABILITY_UNCERTAIN,
+                    "directory fsync failure did not return post-rename state");
+            require(result.committed(), "post-rename result was not committed");
+            require(!result.durabilityConfirmed(), "failed directory sync reported durable");
+            require(result.durabilityFailure() != null
+                            && result.durabilityFailure().getMessage()
+                            .contains(DurableAtomicFile.DIRECTORY_SYNC_FAILED),
+                    "directory fsync failure detail missing");
+            require("new".equals(Files.readString(destination)),
+                    "rename did not remain committed after durability uncertainty");
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+
+    private static void testMoveDirectorySyncFailureReturnsCommittedUncertain() throws Exception {
+        Path root = Files.createTempDirectory("durable-move-dir-fail-");
+        try {
+            Path sourceDir = root.resolve("source");
+            Path targetDir = root.resolve("target");
+            Files.createDirectories(sourceDir);
+            Files.createDirectories(targetDir);
+            Path source = sourceDir.resolve("state");
+            Path target = targetDir.resolve("state");
+            Files.writeString(source, "moved");
+            DurableAtomicFile.CommitResult result = DurableAtomicFile.move(
+                    source, target, new DurableAtomicFile.MoveOperations() {
+                        @Override public void createDirectories(Path directory) throws IOException {
+                            Files.createDirectories(directory);
+                        }
+                        @Override public void atomicMove(Path from, Path to) throws IOException {
+                            Files.move(from, to);
+                        }
+                        @Override public void forceDirectory(Path directory) throws IOException {
+                            throw new IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED
+                                    + ":" + directory);
+                        }
+                    });
+            require(result.state()
+                            == DurableAtomicFile.CommitState.POST_RENAME_DURABILITY_UNCERTAIN,
+                    "move directory failure did not return post-rename state");
+            require(!Files.exists(source), "source remained after committed move");
+            require("moved".equals(Files.readString(target)),
+                    "target content missing after committed move");
         } finally {
             deleteTree(root);
         }

@@ -10,6 +10,7 @@ import android.os.Bundle;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
+import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -57,6 +58,8 @@ public final class GuestContextStorageTransferSelfTest {
             testDestinationCollision(credential, device);
             testConcurrentMoveSingleWinner(credential);
             testPartialMoveRollback(root);
+            testPostRenameUncertainMoveIsTracked(root);
+            testPostRenameUncertainMainMoveReportsSuccess(root);
             testMissingSources(credential, device);
             testForeignContextDenied(root, credential, device);
             System.out.println("PASS Guest credential/device storage context and move self-test");
@@ -203,6 +206,7 @@ public final class GuestContextStorageTransferSelfTest {
                     File parent = to.getParentFile();
                     if (!parent.isDirectory()) parent.mkdirs();
                     Files.move(from.toPath(), to.toPath());
+                    return DurableAtomicFile.CommitResult.confirmed();
                 } catch (Exception error) {
                     throw new IllegalStateException(error);
                 }
@@ -217,6 +221,68 @@ public final class GuestContextStorageTransferSelfTest {
                 "companion file was not rolled back");
         require(!target.exists() && !new File(target.getPath() + "-wal").exists(),
                 "failed move left destination artifacts");
+    }
+
+    private static void testPostRenameUncertainMoveIsTracked(File root) throws Exception {
+        File instance = new File(root, "post-rename-rollback-instance");
+        File source = new File(instance, "data/databases/uncertain.db");
+        File target = new File(instance, "device_protected/databases/uncertain.db");
+        write(source, "main");
+        write(new File(source.getPath() + "-wal"), "wal");
+        AtomicInteger moves = new AtomicInteger();
+        boolean failed = false;
+        try {
+            GuestStorageTransferCoordinator.moveForTest(instance, source, target, (from, to) -> {
+                int move = moves.incrementAndGet();
+                if (move == 2) {
+                    throw new IllegalStateException(GuestStorageTransferCoordinator.MOVE_FAILED
+                            + ":injected-after-uncertain-companion");
+                }
+                try {
+                    File parent = to.getParentFile();
+                    if (!parent.isDirectory()) parent.mkdirs();
+                    Files.move(from.toPath(), to.toPath());
+                    return move == 1
+                            ? DurableAtomicFile.CommitResult.uncertain(
+                                    new java.io.IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED))
+                            : DurableAtomicFile.CommitResult.confirmed();
+                } catch (Exception error) {
+                    throw new IllegalStateException(error);
+                }
+            }, "-wal");
+        } catch (IllegalStateException expected) {
+            failed = String.valueOf(expected.getMessage()).contains(
+                    GuestStorageTransferCoordinator.MOVE_FAILED);
+        }
+        require(failed, "failure after uncertain companion move was not reported");
+        require("main".equals(read(source)), "main file changed after uncertain rollback");
+        require("wal".equals(read(new File(source.getPath() + "-wal"))),
+                "post-rename uncertain companion was omitted from rollback");
+        require(!target.exists() && !new File(target.getPath() + "-wal").exists(),
+                "rollback after uncertain move left destination artifacts");
+    }
+
+    private static void testPostRenameUncertainMainMoveReportsSuccess(File root) throws Exception {
+        File instance = new File(root, "post-rename-success-instance");
+        File source = new File(instance, "data/databases/uncertain-main.db");
+        File target = new File(instance, "device_protected/databases/uncertain-main.db");
+        write(source, "main");
+        boolean moved = GuestStorageTransferCoordinator.moveForTest(
+                instance, source, target, (from, to) -> {
+                    try {
+                        File parent = to.getParentFile();
+                        if (!parent.isDirectory()) parent.mkdirs();
+                        Files.move(from.toPath(), to.toPath());
+                        return DurableAtomicFile.CommitResult.uncertain(
+                                new java.io.IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED));
+                    } catch (Exception error) {
+                        throw new IllegalStateException(error);
+                    }
+                });
+        require(moved, "committed uncertain main move was reported as failure");
+        require(!source.exists(), "source remained after committed uncertain main move");
+        require("main".equals(read(target)),
+                "target missing after committed uncertain main move");
     }
 
     private static void testMissingSources(GuestContext credential, GuestContext device) {

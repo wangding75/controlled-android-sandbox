@@ -5,13 +5,15 @@ import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** Serializes cross-context Guest storage moves and rolls back partial companion-file transfers. */
@@ -21,6 +23,7 @@ final class GuestStorageTransferCoordinator {
     static final String ROLLBACK_FAILED = "GUEST_STORAGE_MOVE_ROLLBACK_FAILED";
 
     private static final String LOCK_NAME = ".guest-storage-transfer.lock";
+    private static final String REPAIR_NAME = ".guest-storage-transfer.repair";
     private static final ConcurrentHashMap<String, Object> JVM_LOCKS = new ConcurrentHashMap<>();
 
     private GuestStorageTransferCoordinator() {}
@@ -51,15 +54,17 @@ final class GuestStorageTransferCoordinator {
                  FileChannel channel = raw.getChannel();
                  FileLock lock = channel.lock()) {
                 if (!lock.isValid()) throw new IOException("transfer lock is invalid");
-                return moveLocked(canonicalSource, canonicalTarget, mover, companionSuffixes);
+                boolean priorRepairComplete = retryPendingDurabilityRepair(canonicalRoot);
+                return moveLocked(canonicalRoot, canonicalSource, canonicalTarget, mover,
+                        priorRepairComplete, companionSuffixes);
             } catch (IOException error) {
                 throw new IllegalStateException(MOVE_FAILED, error);
             }
         }
     }
 
-    private static boolean moveLocked(File source, File target, FileMover mover,
-                                      String[] companionSuffixes) {
+    private static boolean moveLocked(File instanceRoot, File source, File target, FileMover mover,
+                                      boolean priorRepairComplete, String[] companionSuffixes) {
         if (!source.isFile()) return false;
         List<String> companions = normalizedCompanions(companionSuffixes);
         if (target.exists()) return false;
@@ -72,23 +77,59 @@ final class GuestStorageTransferCoordinator {
         }
 
         List<Move> completed = new ArrayList<>();
+        List<File> uncertainDirectories = new ArrayList<>();
         try {
             for (String suffix : companions) {
                 File companion = new File(source.getPath() + suffix);
                 if (companion.exists()) {
                     File destination = new File(target.getPath() + suffix);
-                    mover.move(companion, destination);
+                    DurableAtomicFile.CommitResult result = mover.move(companion, destination);
                     completed.add(new Move(companion, destination));
+                    collectUncertainDirectories(result, companion, destination,
+                            uncertainDirectories);
                 }
             }
-            mover.move(source, target); // Main artifact is the commit marker and moves last.
+            // Main artifact is the commit marker and moves last.
+            DurableAtomicFile.CommitResult mainResult = mover.move(source, target);
             completed.add(new Move(source, target));
-            syncDirectory(source.getParentFile());
-            if (!source.getParentFile().equals(targetParent)) syncDirectory(targetParent);
+            collectUncertainDirectories(mainResult, source, target, uncertainDirectories);
+
+            collectDirectorySyncUncertainty(source.getParentFile(), uncertainDirectories);
+            if (!source.getParentFile().equals(targetParent)) {
+                collectDirectorySyncUncertainty(targetParent, uncertainDirectories);
+            }
+            if (uncertainDirectories.isEmpty()) {
+                if (priorRepairComplete) clearRepairMarker(instanceRoot);
+            } else {
+                recordRepairMarker(instanceRoot, uncertainDirectories);
+            }
             return true;
         } catch (RuntimeException failure) {
             rollback(completed, mover, failure);
             throw failure;
+        }
+    }
+
+    private static void collectUncertainDirectories(DurableAtomicFile.CommitResult result,
+                                                     File source, File target,
+                                                     List<File> directories) {
+        if (result == null) {
+            throw new IllegalStateException(MOVE_FAILED + ":mover returned no commit result");
+        }
+        if (result.state() != DurableAtomicFile.CommitState.POST_RENAME_DURABILITY_UNCERTAIN) {
+            return;
+        }
+        directories.add(source.getParentFile());
+        if (!source.getParentFile().equals(target.getParentFile())) {
+            directories.add(target.getParentFile());
+        }
+    }
+
+    private static void collectDirectorySyncUncertainty(File directory, List<File> directories) {
+        try {
+            DurableAtomicFile.syncDirectory(directory.toPath());
+        } catch (IOException error) {
+            directories.add(directory);
         }
     }
 
@@ -113,11 +154,74 @@ final class GuestStorageTransferCoordinator {
         }
     }
 
-    private static void moveOne(File source, File target) {
+    private static DurableAtomicFile.CommitResult moveOne(File source, File target) {
         try {
-            DurableAtomicFile.move(source.toPath(), target.toPath());
+            return DurableAtomicFile.move(source.toPath(), target.toPath());
         } catch (IOException error) {
             throw new IllegalStateException(MOVE_FAILED + ":" + source.getName(), error);
+        }
+    }
+
+    private static boolean retryPendingDurabilityRepair(File instanceRoot) {
+        File marker = new File(instanceRoot, REPAIR_NAME);
+        if (!marker.isFile()) return true;
+        boolean repaired = true;
+        try {
+            for (String relative : Files.readAllLines(marker.toPath(), StandardCharsets.UTF_8)) {
+                if (relative == null || relative.isBlank()) continue;
+                File directory = canonical(new File(instanceRoot, relative),
+                        "GUEST_STORAGE_REPAIR_PATH_INVALID");
+                requireInside(instanceRoot, directory);
+                if (!directory.isDirectory()) continue;
+                try {
+                    DurableAtomicFile.syncDirectory(directory.toPath());
+                } catch (IOException error) {
+                    repaired = false;
+                }
+            }
+        } catch (IOException | RuntimeException error) {
+            repaired = false;
+        }
+        if (repaired) clearRepairMarker(instanceRoot);
+        return repaired;
+    }
+
+    private static void recordRepairMarker(File instanceRoot, List<File> directories) {
+        Set<String> relativeDirectories = new LinkedHashSet<>();
+        File marker = new File(instanceRoot, REPAIR_NAME);
+        if (marker.isFile()) {
+            try {
+                for (String existing : Files.readAllLines(marker.toPath(), StandardCharsets.UTF_8)) {
+                    if (existing != null && !existing.isBlank()) relativeDirectories.add(existing);
+                }
+            } catch (IOException ignored) { }
+        }
+        for (File directory : directories) {
+            if (directory == null) continue;
+            File canonicalDirectory = canonical(directory, "GUEST_STORAGE_REPAIR_PATH_INVALID");
+            requireInside(instanceRoot, canonicalDirectory);
+            String relative = instanceRoot.toPath().relativize(
+                    canonicalDirectory.toPath()).toString();
+            relativeDirectories.add(relative.isEmpty() ? "." : relative);
+        }
+        if (relativeDirectories.isEmpty()) return;
+        try {
+            String payload = String.join("\n", relativeDirectories) + "\n";
+            DurableAtomicFile.write(new File(instanceRoot, REPAIR_NAME).toPath(),
+                    payload.getBytes(StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+            // The data move is already committed. Failure to persist the advisory repair marker
+            // must not turn a committed move into a reported failure.
+        }
+    }
+
+    private static void clearRepairMarker(File instanceRoot) {
+        File marker = new File(instanceRoot, REPAIR_NAME);
+        try {
+            if (!Files.deleteIfExists(marker.toPath())) return;
+            DurableAtomicFile.syncDirectory(instanceRoot.toPath());
+        } catch (IOException ignored) {
+            // A stale marker is safe: the next serialized transfer retries the directory syncs.
         }
     }
 
@@ -147,15 +251,9 @@ final class GuestStorageTransferCoordinator {
         }
     }
 
-    private static void syncDirectory(File directory) {
-        try {
-            DurableAtomicFile.syncDirectory(directory.toPath());
-        } catch (IOException error) {
-            throw new IllegalStateException("GUEST_STORAGE_DIRECTORY_FSYNC_FAILED", error);
-        }
+    interface FileMover {
+        DurableAtomicFile.CommitResult move(File source, File target);
     }
-
-    interface FileMover { void move(File source, File target); }
 
     private static final class Move {
         final File source;

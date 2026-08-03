@@ -16,9 +16,55 @@ public final class DurableAtomicFile {
     public static final String ATOMIC_MOVE_UNSUPPORTED = "STRICT_ATOMIC_MOVE_UNSUPPORTED";
     public static final String DIRECTORY_SYNC_FAILED = "PARENT_DIRECTORY_FSYNC_FAILED";
 
+    /** Observable commit phase for callers that must distinguish logical commit from durability. */
+    public enum CommitState {
+        PRE_RENAME_FAILED,
+        POST_RENAME_DURABILITY_UNCERTAIN,
+        COMMITTED
+    }
+
+    /** Result returned after the directory entry was atomically changed. */
+    public static final class CommitResult {
+        private static final CommitResult COMMITTED_RESULT =
+                new CommitResult(CommitState.COMMITTED, null);
+
+        private final CommitState state;
+        private final IOException durabilityFailure;
+
+        private CommitResult(CommitState state, IOException durabilityFailure) {
+            this.state = Objects.requireNonNull(state, "state");
+            this.durabilityFailure = durabilityFailure;
+        }
+
+        public CommitState state() { return state; }
+        public boolean committed() { return state != CommitState.PRE_RENAME_FAILED; }
+        public boolean durabilityConfirmed() { return state == CommitState.COMMITTED; }
+        public IOException durabilityFailure() { return durabilityFailure; }
+
+        public static CommitResult confirmed() { return COMMITTED_RESULT; }
+
+        public static CommitResult uncertain(IOException failure) {
+            return new CommitResult(CommitState.POST_RENAME_DURABILITY_UNCERTAIN,
+                    Objects.requireNonNull(failure, "failure"));
+        }
+    }
+
+    /** Failure guaranteed to have occurred before the atomic directory-entry change. */
+    public static final class CommitFailure extends IOException {
+        private static final long serialVersionUID = 1L;
+        private final CommitState state;
+
+        private CommitFailure(String message, Throwable cause) {
+            super(message, cause);
+            state = CommitState.PRE_RENAME_FAILED;
+        }
+
+        public CommitState state() { return state; }
+    }
+
     private DurableAtomicFile() { }
 
-    public static void write(Path destination, byte[] bytes) throws IOException {
+    public static CommitResult write(Path destination, byte[] bytes) throws IOException {
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(bytes, "bytes");
         Path normalized = destination.toAbsolutePath().normalize();
@@ -31,34 +77,23 @@ public final class DurableAtomicFile {
                 ByteBuffer buffer = ByteBuffer.wrap(bytes);
                 while (buffer.hasRemaining()) channel.write(buffer);
                 channel.force(true);
+            } catch (IOException failure) {
+                throw preRenameFailure(failure);
             }
-            replacePrepared(temporary, normalized);
+            return replacePrepared(temporary, normalized);
         } finally {
             Files.deleteIfExists(temporary);
         }
     }
 
-    /** Publishes a fully prepared file. The source remains untrusted until this method returns. */
-    public static void replacePrepared(Path prepared, Path destination) throws IOException {
-        replacePrepared(prepared, destination, NioOperations.INSTANCE);
+    /** Publishes a fully prepared file. The source remains untrusted until the rename commits. */
+    public static CommitResult replacePrepared(Path prepared, Path destination) throws IOException {
+        return replacePrepared(prepared, destination, NioOperations.INSTANCE);
     }
 
     /** Strictly moves an existing file or directory and persists both directory-entry changes. */
-    public static void move(Path source, Path destination) throws IOException {
-        Objects.requireNonNull(source, "source");
-        Objects.requireNonNull(destination, "destination");
-        Path normalizedSource = source.toAbsolutePath().normalize();
-        Path normalizedDestination = destination.toAbsolutePath().normalize();
-        Path destinationParent = requireParent(normalizedDestination);
-        Files.createDirectories(destinationParent);
-        Path sourceParent = requireParent(normalizedSource);
-        try {
-            Files.move(normalizedSource, normalizedDestination, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException unsupported) {
-            throw unsupported(unsupported);
-        }
-        syncDirectory(destinationParent);
-        if (!sourceParent.equals(destinationParent)) syncDirectory(sourceParent);
+    public static CommitResult move(Path source, Path destination) throws IOException {
+        return move(source, destination, NioMoveOperations.INSTANCE);
     }
 
     public static void syncDirectory(Path directory) throws IOException {
@@ -67,11 +102,12 @@ public final class DurableAtomicFile {
                 StandardOpenOption.READ)) {
             channel.force(true);
         } catch (IOException | UnsupportedOperationException failure) {
-            throw new IOException(DIRECTORY_SYNC_FAILED + ":" + directory, failure);
+            throw directorySyncFailure(directory, failure);
         }
     }
 
-    static void replacePrepared(Path prepared, Path destination, Operations operations) throws IOException {
+    static CommitResult replacePrepared(Path prepared, Path destination, Operations operations)
+            throws IOException {
         Objects.requireNonNull(prepared, "prepared");
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(operations, "operations");
@@ -79,15 +115,78 @@ public final class DurableAtomicFile {
         Path normalizedDestination = destination.toAbsolutePath().normalize();
         Path parent = requireParent(normalizedDestination);
         if (!requireParent(normalizedPrepared).equals(parent)) {
-            throw new IOException("ATOMIC_REPLACE_TEMP_NOT_SIBLING");
+            throw preRenameFailure(new IOException("ATOMIC_REPLACE_TEMP_NOT_SIBLING"));
         }
-        operations.forceFile(normalizedPrepared);
         try {
+            operations.forceFile(normalizedPrepared);
             operations.atomicReplace(normalizedPrepared, normalizedDestination);
         } catch (AtomicMoveNotSupportedException unsupported) {
-            throw unsupported(unsupported);
+            throw preRenameFailure(unsupported(unsupported));
+        } catch (IOException failure) {
+            throw preRenameFailure(failure);
         }
-        operations.forceDirectory(parent);
+        try {
+            operations.forceDirectory(parent);
+            return CommitResult.confirmed();
+        } catch (IOException failure) {
+            return CommitResult.uncertain(normalizeDirectoryFailure(parent, failure));
+        }
+    }
+
+    static CommitResult move(Path source, Path destination, MoveOperations operations)
+            throws IOException {
+        Objects.requireNonNull(source, "source");
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(operations, "operations");
+        Path normalizedSource = source.toAbsolutePath().normalize();
+        Path normalizedDestination = destination.toAbsolutePath().normalize();
+        Path destinationParent = requireParent(normalizedDestination);
+        Path sourceParent = requireParent(normalizedSource);
+        try {
+            operations.createDirectories(destinationParent);
+            operations.atomicMove(normalizedSource, normalizedDestination);
+        } catch (AtomicMoveNotSupportedException unsupported) {
+            throw preRenameFailure(unsupported(unsupported));
+        } catch (IOException failure) {
+            throw preRenameFailure(failure);
+        }
+
+        IOException durabilityFailure = null;
+        try {
+            operations.forceDirectory(destinationParent);
+        } catch (IOException failure) {
+            durabilityFailure = normalizeDirectoryFailure(destinationParent, failure);
+        }
+        if (!sourceParent.equals(destinationParent)) {
+            try {
+                operations.forceDirectory(sourceParent);
+            } catch (IOException failure) {
+                IOException normalized = normalizeDirectoryFailure(sourceParent, failure);
+                if (durabilityFailure == null) durabilityFailure = normalized;
+                else durabilityFailure.addSuppressed(normalized);
+            }
+        }
+        return durabilityFailure == null
+                ? CommitResult.confirmed()
+                : CommitResult.uncertain(durabilityFailure);
+    }
+
+    private static CommitFailure preRenameFailure(IOException failure) {
+        if (failure instanceof CommitFailure commitFailure) return commitFailure;
+        String message = failure.getMessage();
+        return new CommitFailure(message == null || message.isBlank()
+                ? CommitState.PRE_RENAME_FAILED.name() : message, failure);
+    }
+
+    private static IOException normalizeDirectoryFailure(Path directory, IOException failure) {
+        if (failure.getMessage() != null && failure.getMessage().contains(DIRECTORY_SYNC_FAILED)) {
+            return failure;
+        }
+        return directorySyncFailure(directory, failure);
+    }
+
+    private static IOException directorySyncFailure(Path directory, Throwable failure) {
+        return new IOException(DIRECTORY_SYNC_FAILED + ":" + directory, failure);
     }
 
     private static IOException unsupported(AtomicMoveNotSupportedException failure) {
@@ -97,13 +196,19 @@ public final class DurableAtomicFile {
 
     private static Path requireParent(Path path) throws IOException {
         Path parent = path.getParent();
-        if (parent == null) throw new IOException("ATOMIC_REPLACE_PARENT_REQUIRED:" + path);
+        if (parent == null) throw preRenameFailure(new IOException("ATOMIC_REPLACE_PARENT_REQUIRED:" + path));
         return parent;
     }
 
     interface Operations {
         void forceFile(Path file) throws IOException;
         void atomicReplace(Path source, Path destination) throws IOException;
+        void forceDirectory(Path directory) throws IOException;
+    }
+
+    interface MoveOperations {
+        void createDirectories(Path directory) throws IOException;
+        void atomicMove(Path source, Path destination) throws IOException;
         void forceDirectory(Path directory) throws IOException;
     }
 
@@ -119,6 +224,22 @@ public final class DurableAtomicFile {
         @Override public void atomicReplace(Path source, Path destination) throws IOException {
             Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
+        }
+
+        @Override public void forceDirectory(Path directory) throws IOException {
+            syncDirectory(directory);
+        }
+    }
+
+    private enum NioMoveOperations implements MoveOperations {
+        INSTANCE;
+
+        @Override public void createDirectories(Path directory) throws IOException {
+            Files.createDirectories(directory);
+        }
+
+        @Override public void atomicMove(Path source, Path destination) throws IOException {
+            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
         }
 
         @Override public void forceDirectory(Path directory) throws IOException {
