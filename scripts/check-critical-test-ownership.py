@@ -60,6 +60,9 @@ P1_REGRESSIONS = (
     RegressionSpec("P1-04", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/provider/BrokerObserverRuntimeSelfTest.java", required_methods=("testImmediateDeathDuringRegistration",)),
     RegressionSpec("P1-05", "app/src/testHarness/java/com/warden/controlledsandbox/VirtualSystemServicePagingSelfTest.java", required_methods=("pageTokensAndBudgets", "binaryOffload", "accountSessionPaging")),
     RegressionSpec("P1-06", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPoolSelfTest.java", required_methods=("testDelayedDeathReconnectsWithinCurrentRequest", "testConnectionIsNotPublishedBeforeDeathLinkCompletes")),
+)
+
+POST_REVIEW_REGRESSIONS = (
     RegressionSpec("P2-01", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnectorSelfTest.java", required_methods=("retiresSilentlyDeadBindingBeforeRebind",)),
     RegressionSpec("P2-02", "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPoolSelfTest.java", required_methods=("testFrameworkDisconnectUnlinksDeathRecipient", "testBindingDiedUnlinksDeathRecipient")),
 )
@@ -208,7 +211,8 @@ def main() -> None:
         })
 
     regressions: list[dict[str, object]] = []
-    for spec in P1_REGRESSIONS:
+    post_review_regressions: list[dict[str, object]] = []
+    for spec in P1_REGRESSIONS + POST_REVIEW_REGRESSIONS:
         path = ROOT / spec.test
         source = path.read_text(encoding="utf-8", errors="ignore") if path.is_file() else ""
         reachable, methods = main_reachable_methods(source)
@@ -217,10 +221,14 @@ def main() -> None:
         status = path.is_file() and all(pattern_status.values()) and all(method_status.values())
         if not status: errors.append(f"{spec.issue}: main-reachable regression evidence incomplete in {spec.test}")
         if path.is_file(): scanned.append(path)
-        regressions.append({"issue": spec.issue, "test": spec.test,
-                            "mainReachablePatterns": pattern_status,
-                            "mainReachableMethods": method_status,
-                            "status": "PASS" if status else "FAIL"})
+        record = {"issue": spec.issue, "test": spec.test,
+                  "mainReachablePatterns": pattern_status,
+                  "mainReachableMethods": method_status,
+                  "status": "PASS" if status else "FAIL"}
+        if spec in P1_REGRESSIONS:
+            regressions.append(record)
+        else:
+            post_review_regressions.append(record)
 
     report = {
         "gate": "critical-source-test-ownership",
@@ -232,6 +240,7 @@ def main() -> None:
         "directOwnerCount": sum(bool(r["mainReachableDirectReference"]) for r in records),
         "executedOwnerCount": sum(bool(r["runtimeExecutionReceipt"]) for r in records),
         "p1RegressionEvidence": regressions,
+        "postReviewRegressionEvidence": post_review_regressions,
         "executionReceipt": str(EXECUTION_RECEIPT.relative_to(ROOT)),
         "inputDigestSha256": digest(scanned + ([EXECUTION_RECEIPT] if EXECUTION_RECEIPT.is_file() else [])),
     }
