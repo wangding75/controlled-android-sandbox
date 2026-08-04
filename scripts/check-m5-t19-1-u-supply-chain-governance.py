@@ -460,6 +460,9 @@ def main() -> int:
         errors.append("Gradle resolveAndLockAll task is missing or does not resolve every resolvable configuration")
     if "no Gradle-generated gradle.lockfile exists" not in lock_tool or "--require-clean" not in lock_tool:
         errors.append("Gradle lock-state verifier is missing generated-file and clean-tree enforcement")
+    verify_all = (ROOT / "scripts/verify-all.sh").read_text(encoding="utf-8")
+    if "python3 tools/gradle_lock_state.py verify" not in verify_all:
+        errors.append("local verify-all does not fail closed when Gradle lock state is absent")
     identity_errors, identity_report = validate_commit_identities()
     errors.extend(identity_errors)
 

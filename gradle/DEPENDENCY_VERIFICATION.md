@@ -55,5 +55,6 @@ environment:
 The `resolveAndLockAll` task resolves every resolvable project configuration with strict dependency
 verification and `--write-locks`. CI then runs `tools/gradle_lock_state.py verify --require-clean`;
 new, missing, modified, malformed, or dynamic lock rows fail the build. Generated `gradle.lockfile`
-files must be reviewed and committed. Source-only gates no longer claim that the reviewed coordinate
-manifest is dependency lock state.
+files must be reviewed and committed. The local `verify-all.sh` also validates the checked-in Gradle
+lock files and fails closed while they are absent. Source policy checks do not substitute the reviewed
+coordinate manifest for dependency lock state.
