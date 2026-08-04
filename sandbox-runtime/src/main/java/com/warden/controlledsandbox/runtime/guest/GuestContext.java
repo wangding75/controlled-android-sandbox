@@ -27,6 +27,7 @@ import java.util.Map;
 public final class GuestContext extends GuestHostOperationDenyContext {
     private static final Object PREFERENCE_LOCK_TIE = new Object();
     private final Context hostServiceContext;
+    private final PackageManager packageManager;
     private final GuestPackageSpec spec;
     private final ClassLoader classLoader;
     private final Resources resources;
@@ -43,15 +44,23 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
-        this(host, spec, classLoader, resources, assets, false,
+        this(host, spec, classLoader, resources, assets, host.getPackageManager(), false,
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions())));
+    }
+
+    GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                 Resources resources, AssetManager assets, PackageManager packageManager) {
+        this(host, spec, classLoader, resources, assets, packageManager, false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions())));
     }
 
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
-                         Resources resources, AssetManager assets, boolean deviceProtected,
+                         Resources resources, AssetManager assets, PackageManager packageManager,
+                         boolean deviceProtected,
                          SharedState sharedState) {
         super();
         this.hostServiceContext = host.getApplicationContext();
+        this.packageManager = java.util.Objects.requireNonNull(packageManager, "packageManager");
         this.spec = spec;
         this.classLoader = classLoader;
         this.resources = resources;
@@ -104,7 +113,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
+    @Override public PackageManager getPackageManager() {
+        sharedState.systemServices.requireHookAvailable("packageManager", "getPackageManager");
+        return packageManager;
+    }
     @Override public Object getSystemService(String name) {
+        if (!sharedState.systemServices.isKnownService(name)) return null;
         capabilityGate.requireService(name);
         sharedState.systemServices.requireAvailable(name);
         return hostServiceContext.getSystemService(name);
@@ -277,7 +291,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     private GuestContext storageContext(boolean targetDeviceProtected) {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
-                targetDeviceProtected, sharedState);
+                packageManager, targetDeviceProtected, sharedState);
     }
 
     private synchronized SandboxSharedPreferences cachedPreferences(String name) {

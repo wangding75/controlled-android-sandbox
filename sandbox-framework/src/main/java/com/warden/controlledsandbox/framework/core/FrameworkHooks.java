@@ -62,6 +62,7 @@ import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
 
 
 import android.content.Context;
+import android.content.pm.PackageManager;
 import com.warden.controlledsandbox.framework.core.FrameworkProxyController;
 import com.warden.controlledsandbox.framework.identity.IdentityContext;
 import com.warden.controlledsandbox.framework.core.ProxyInstallReport;
@@ -93,13 +94,25 @@ public final class FrameworkHooks implements AutoCloseable {
     public static FrameworkHooks install(
             Context guestContext, Context hostServiceContext, GuestIdentity identity,
             FrameworkCallInterceptor callInterceptor) {
+        return install(guestContext, hostServiceContext,
+                hostServiceContext.getPackageManager(), identity, callInterceptor);
+    }
+
+    public static FrameworkHooks install(
+            Context guestContext, Context hostServiceContext, PackageManager packageManager,
+            GuestIdentity identity, FrameworkCallInterceptor callInterceptor) {
         List<AutoCloseable> hooks = new ArrayList<>();
         hooks.add(identity.virtualServices());
         hooks.add(identity.interactions());
         hooks.add(identity.networks());
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
-        attempt("packageManager", installed, failures, hooks, () -> PackageManagerHook.install(guestContext, identity));
+        // Hook installation needs the process-local platform PackageManager transport. GuestContext
+        // intentionally withholds getPackageManager() until the hook report is sealed, so using the
+        // Host service Context here avoids a deterministic bootstrap failure while still returning
+        // the same process-local, proxied PackageManager to Guest code after readiness succeeds.
+        attempt("packageManager", installed, failures, hooks,
+                () -> PackageManagerHook.install(packageManager, identity));
         installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);
         attempt("activityClient", installed, failures, hooks, () -> ActivityClientHook.install(identity));
         attempt("window", installed, failures, hooks, () -> WindowManagerHook.install(identity));

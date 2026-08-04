@@ -25,13 +25,31 @@ final class GuestSystemServiceBoundary {
         installedHooks = snapshot;
     }
 
+    boolean isKnownService(String androidServiceName) {
+        return HOOK_BY_ANDROID_SERVICE.containsKey(androidServiceName);
+    }
+
     void requireAvailable(String androidServiceName) {
         Map<String, Boolean> snapshot = installedHooks;
-        if (snapshot == null) return; // Framework hook installation phase; Guest code is not running.
         String hook = HOOK_BY_ANDROID_SERVICE.get(androidServiceName);
-        if (hook != null && !Boolean.TRUE.equals(snapshot.get(hook))) {
+        if (hook == null) {
+            throw new SecurityException("GUEST_SYSTEM_SERVICE_NOT_ALLOWLISTED:" + androidServiceName);
+        }
+        if (snapshot == null) return; // Framework hook installation phase; Guest code is not running.
+        if (!Boolean.TRUE.equals(snapshot.get(hook))) {
             throw new SecurityException("GUEST_SYSTEM_SERVICE_HOOK_UNAVAILABLE:"
                     + androidServiceName + ":" + hook);
+        }
+    }
+
+    void requireHookAvailable(String hookName, String apiName) {
+        Map<String, Boolean> snapshot = installedHooks;
+        if (snapshot == null) {
+            throw new SecurityException("GUEST_FRAMEWORK_API_NOT_READY:" + apiName);
+        }
+        if (!Boolean.TRUE.equals(snapshot.get(hookName))) {
+            throw new SecurityException("GUEST_FRAMEWORK_HOOK_UNAVAILABLE:"
+                    + apiName + ":" + hookName);
         }
     }
 

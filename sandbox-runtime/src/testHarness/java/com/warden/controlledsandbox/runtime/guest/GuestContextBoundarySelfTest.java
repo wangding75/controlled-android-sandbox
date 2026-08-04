@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -10,8 +11,12 @@ import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
+import com.warden.controlledsandbox.framework.identity.GuestIdentity;
+import com.warden.controlledsandbox.framework.packagemanager.PackageManagerHook;
 import java.io.File;
 import java.nio.file.Files;
+import java.lang.reflect.Proxy;
+import java.util.Set;
 
 public final class GuestContextBoundarySelfTest {
     public static void main(String[] args) throws Exception {
@@ -51,11 +56,13 @@ public final class GuestContextBoundarySelfTest {
             request.putString(RuntimeKeys.NATIVE_GUEST_TRUST,
                     InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED);
             GuestPackageSpec spec = new GuestPackageSpec(request);
-            Context host = new Context();
+            FakePackageManager processPackageManager = new FakePackageManager();
+            Context host = new StablePackageContext(processPackageManager);
             Resources resources = new Resources(new AssetManager(),
                     new android.util.DisplayMetrics(), new Configuration());
             GuestContext context = new GuestContext(host, spec,
-                    GuestContextBoundarySelfTest.class.getClassLoader(), resources, resources.getAssets());
+                    GuestContextBoundarySelfTest.class.getClassLoader(), resources,
+                    resources.getAssets(), processPackageManager);
 
             require(context.getBaseContext() == context, "base Context must not expose host");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
@@ -75,9 +82,29 @@ public final class GuestContextBoundarySelfTest {
                                         android.content.ComponentName name) { }
                             }), "bindService");
             expectDenied(context::getContentResolver, "getContentResolver");
-            expectDenied(context::getPackageManager, "getPackageManager");
+            boolean packageManagerNotReady = false;
+            try { context.getPackageManager(); }
+            catch (SecurityException expected) {
+                packageManagerNotReady = String.valueOf(expected.getMessage()).contains(
+                        "GUEST_FRAMEWORK_API_NOT_READY:getPackageManager");
+            }
+            require(packageManagerNotReady, "PackageManager unavailable before hook readiness");
             expectDenied(() -> context.startActivity(new android.content.Intent()), "startActivity");
-            context.sealSystemServices(java.util.Map.of("clipboard", false));
+            GuestIdentity identity = new GuestIdentity(spec.packageName, spec.virtualUid,
+                    context.getApplicationInfo(), Set.of(), host.getPackageName(), 1000);
+            Object originalPackageTransport = processPackageManager.mPM;
+            try (PackageManagerHook packageHook = PackageManagerHook.install(
+                    processPackageManager, identity)) {
+                require(Proxy.isProxyClass(processPackageManager.mPM.getClass()),
+                        "PackageManager transport proxied before Guest exposure");
+                context.sealSystemServices(java.util.Map.of(
+                        "packageManager", true,
+                        "clipboard", false));
+                require(context.getPackageManager() == processPackageManager,
+                        "Guest exposes the exact proxied process PackageManager");
+            }
+            require(processPackageManager.mPM == originalPackageTransport,
+                    "PackageManager transport restored during rollback");
             boolean missingHookDenied = false;
             try { context.getSystemService("clipboard"); }
             catch (SecurityException expected) {
@@ -85,6 +112,8 @@ public final class GuestContextBoundarySelfTest {
                         "GUEST_SYSTEM_SERVICE_HOOK_UNAVAILABLE:clipboard:clipboard");
             }
             require(missingHookDenied, "missing system-service hook cannot fall back to Host manager");
+            require(context.getSystemService("download") == null,
+                    "unknown system service cannot fall back to Host manager");
             require(context.getDataDir().getCanonicalPath().startsWith(spec.dataRootFile().getCanonicalPath()),
                     "data directory inside instance root");
             require(context.getNoBackupFilesDir().getCanonicalPath().startsWith(
@@ -151,6 +180,28 @@ public final class GuestContextBoundarySelfTest {
                     "GUEST_CONTEXT_HOST_OPERATION_DENIED:" + operation),
                     operation + " denial code");
         }
+    }
+
+    public interface FakePackageApi {
+        String marker();
+    }
+
+    private static final class FakePackageService implements FakePackageApi {
+        @Override public String marker() { return "platform"; }
+    }
+
+    private static final class FakePackageManager extends PackageManager {
+        Object mPM = new FakePackageService();
+    }
+
+    private static final class StablePackageContext extends Context {
+        private final PackageManager packages;
+
+        StablePackageContext(PackageManager packages) {
+            this.packages = packages;
+        }
+
+        @Override public PackageManager getPackageManager() { return packages; }
     }
 
     private static void require(boolean condition, String label) {

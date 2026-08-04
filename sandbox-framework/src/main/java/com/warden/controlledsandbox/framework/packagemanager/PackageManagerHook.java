@@ -21,7 +21,12 @@ public final class PackageManagerHook implements AutoCloseable {
     }
 
     public static PackageManagerHook install(Context context, GuestIdentity identity) throws Exception {
-        PackageManager packageManager = context.getPackageManager();
+        return install(context.getPackageManager(), identity);
+    }
+
+    public static PackageManagerHook install(
+            PackageManager packageManager, GuestIdentity identity) throws Exception {
+        if (packageManager == null) throw new IllegalArgumentException("packageManager is required");
         Field mPm = findField(packageManager.getClass(), "mPM");
         mPm.setAccessible(true);
         Object original = mPm.get(packageManager);

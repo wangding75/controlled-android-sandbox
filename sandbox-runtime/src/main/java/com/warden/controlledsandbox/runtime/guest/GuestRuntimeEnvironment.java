@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import android.app.Application;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -74,7 +75,9 @@ public final class GuestRuntimeEnvironment {
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader());
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
-            GuestContext guestContext = new GuestContext(host, spec, loader, loadedResources.resources, loadedResources.assets);
+            PackageManager processPackageManager = host.getPackageManager();
+            GuestContext guestContext = new GuestContext(host, spec, loader,
+                    loadedResources.resources, loadedResources.assets, processPackageManager);
             String nativeAbi = spec.nativeAbi;
             int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
             boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
@@ -120,6 +123,7 @@ public final class GuestRuntimeEnvironment {
                 throw new IllegalStateException("NATIVE_AUDIO_POLICY_UNAVAILABLE");
             }
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
+                    processPackageManager,
                     new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
