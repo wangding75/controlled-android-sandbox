@@ -29,7 +29,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private final HostPermissionStateResolver hostPermissions;
     private final VirtualSystemServiceStore systemServices;
     private final PackageProfileAuthority profiles;
-    private final VirtualSystemServicePager installSessionPager;
+    private final InstallSessionPageAuthority installSessionPages;
 
     private final PackageManagementAuthorityGuard guard;
     private final IBinder clientToken;
@@ -44,120 +44,87 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         hostPermissions = dependencies.hostPermissions;
         systemServices = dependencies.systemServices;
         profiles = new PackageProfileAuthority(dependencies);
-        installSessionPager = new VirtualSystemServicePager(dependencies.filesDir);
+        installSessionPages = new InstallSessionPageAuthority(dependencies.filesDir);
         guard = new PackageManagementAuthorityGuard(ownerUid, ownerPid,
                 dependencies.capabilityRegistry, authorityCapability, authorityGeneration);
         this.clientToken = clientToken;
     }
-
     @Override public PackageServiceResult loadCatalog() {
         return execute("loadCatalog", () -> PackageServiceResult.successCatalog(
                 "loadCatalog", PackageServiceMapper.toSnapshot(
                         lifecycle.load(), dependencies.maintenanceWarning())));
     }
-
     @Override public PackageServiceResult importApk(String uri) {
         return execute("importApk", () -> PackageServiceResult.successRecord(
                 "importApk", PackageServiceMapper.toSnapshot(
                         lifecycle.importApk(Uri.parse(required(uri, "uri"))))));
     }
-
     @Override public PackageServiceResult importApkFile(String sourcePath) {
         return execute("importApkFile", () -> PackageServiceResult.successRecord(
                 "importApkFile", PackageServiceMapper.toSnapshot(
                         lifecycle.importApkFile(new File(required(sourcePath, "sourcePath"))))));
     }
-
     @Override public PackageServiceResult createInstallSession(String expectedPackageName) {
         return execute("createInstallSession", () -> PackageServiceResult.successInt(
                 "createInstallSession", lifecycle.createInstallSession(
                         expectedPackageName == null ? "" : expectedPackageName.trim())));
     }
-
     @Override public PackageServiceResult createInstallSessionWithParams(
             InstallSessionParamsSnapshot params) {
         return execute("createInstallSessionWithParams", () ->
                 PackageServiceResult.successInstallSession("createInstallSessionWithParams",
                         lifecycle.createInstallSession(params)));
     }
-
     @Override public PackageServiceResult getInstallSessionInfo(int sessionId) {
         return execute("getInstallSessionInfo", () -> PackageServiceResult.successInstallSession(
                 "getInstallSessionInfo", lifecycle.installSessionInfo(sessionId)));
     }
-
     @Override public PackageServiceResult listInstallSessions() {
-        return execute("listInstallSessions", () -> {
-            VirtualSystemServicePager.PageSlice<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot> page =
-                    installSessionPager.page("install-sessions", "management",
-                            lifecycle.installSessions(), new VirtualPageRequest(
-                                    VirtualSystemServicePager.LEGACY_MAX_ITEMS,
-                                    VirtualSystemServicePager.LEGACY_MAX_BYTES, ""), null);
-            return PackageServiceResult.successInstallSessions(
-                    "listInstallSessions", installSessionPager.legacy(page));
-        });
+        return execute("listInstallSessions", () -> PackageServiceResult.successInstallSessions(
+                "listInstallSessions", installSessionPages.legacy(lifecycle)));
     }
-
     @Override public InstallSessionPage listInstallSessionsPage(VirtualPageRequest request) {
         requireOwner();
         synchronized (operationLock) {
-            VirtualSystemServicePager.PageSlice<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot> page =
-                    installSessionPager.page("install-sessions", "management",
-                            uncheckedInstallSessions(), request, null);
-            return new InstallSessionPage(page.items(), page.nextPageToken(), page.snapshotRevision());
+            return installSessionPages.page(lifecycle, request);
         }
     }
-
-    private java.util.List<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot>
-            uncheckedInstallSessions() {
-        try { return lifecycle.installSessions(); }
-        catch (RuntimeException error) { throw error; }
-        catch (Exception error) { throw new IllegalStateException("INSTALL_SESSION_LIST_FAILED", error); }
-    }
-
     @Override public PackageServiceResult setInstallSessionProgress(int sessionId, float progress) {
         return execute("setInstallSessionProgress", () ->
                 PackageServiceResult.successInstallSession("setInstallSessionProgress",
                         lifecycle.setInstallSessionProgress(sessionId, progress)));
     }
-
     @Override public PackageServiceResult retryInstallSession(int sessionId) {
         return execute("retryInstallSession", () -> PackageServiceResult.successInstallSession(
                 "retryInstallSession", lifecycle.retryInstallSession(sessionId)));
     }
-
     @Override public PackageServiceResult addInstallArtifact(int sessionId, String sourceUri) {
         return execute("addInstallArtifact", () -> PackageServiceResult.successText(
                 "addInstallArtifact", lifecycle.addInstallArtifact(sessionId,
                         Uri.parse(required(sourceUri, "sourceUri")))));
     }
-
     @Override public PackageServiceResult commitInstallSession(int sessionId) {
         return execute("commitInstallSession", () -> PackageServiceResult.successRecord(
                 "commitInstallSession", PackageServiceMapper.toSnapshot(
                         lifecycle.commitInstallSession(sessionId))));
     }
-
     @Override public PackageServiceResult abandonInstallSession(int sessionId) {
         return execute("abandonInstallSession", () -> {
             lifecycle.abandonInstallSession(sessionId);
             return PackageServiceResult.success("abandonInstallSession");
         });
     }
-
     @Override public PackageServiceResult findRecord(String packageName) {
         return execute("findRecord", () -> PackageServiceResult.successRecord(
                 "findRecord", PackageServiceMapper.toSnapshot(
                         lifecycle.findRecord(required(packageName, "packageName")))));
     }
-
     @Override public PackageServiceResult getVirtualPackageState(String packageName,
                                                                   int virtualUserId) {
         return execute("getVirtualPackageState", () -> packageStateResult(
                 "getVirtualPackageState", lifecycle.packagePolicy(
                         required(packageName, "packageName"), virtualUserId), virtualUserId));
     }
-
     @Override public PackageServiceResult setPermissionDecision(String packageName,
                                                                  int virtualUserId,
                                                                  String permission,
@@ -518,7 +485,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private void requireOwner() { guard.requireOwner(); }
 
     private void closeInternal() {
-        installSessionPager.close();
+        installSessionPages.close();
         guard.close();
         try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
     }

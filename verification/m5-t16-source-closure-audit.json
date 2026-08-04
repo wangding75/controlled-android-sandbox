@@ -125,12 +125,12 @@
       "lines": 598
     },
     {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+      "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
       "lines": 597
     },
     {
-      "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
-      "lines": 578
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+      "lines": 597
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
