@@ -1,2 +1,3 @@
 # Canonical author and committer identities accepted after .mailmap normalization.
 OpenAI <openai@users.noreply.github.com>
+OpenAI <openai@example.com>

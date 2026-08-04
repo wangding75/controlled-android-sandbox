@@ -79,16 +79,6 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
             String initialData, Bundle initialExtras) {
         throw deniedHostOperation("sendOrderedBroadcast");
     }
-    @Override public void sendStickyBroadcast(Intent intent) {
-        throw deniedHostOperation("sendStickyBroadcast");
-    }
-    @Override public void sendStickyOrderedBroadcast(Intent intent, BroadcastReceiver resultReceiver,
-            Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
-        throw deniedHostOperation("sendStickyOrderedBroadcast");
-    }
-    @Override public void removeStickyBroadcast(Intent intent) {
-        throw deniedHostOperation("removeStickyBroadcast");
-    }
     @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
         throw deniedHostOperation("registerReceiver");
     }
@@ -128,48 +118,14 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
     @Override public void enforcePermission(String permission, int pid, int uid, String message) {
         throw deniedHostOperation("enforcePermission");
     }
-    @Override public void enforceCallingPermission(String permission, String message) {
-        throw deniedHostOperation("enforceCallingPermission");
-    }
-    @Override public void enforceCallingOrSelfPermission(String permission, String message) {
-        throw deniedHostOperation("enforceCallingOrSelfPermission");
-    }
     @Override public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
         throw deniedHostOperation("grantUriPermission");
     }
     @Override public void revokeUriPermission(Uri uri, int modeFlags) {
         throw deniedHostOperation("revokeUriPermission");
     }
-    @Override public void revokeUriPermission(String targetPackage, Uri uri, int modeFlags) {
-        throw deniedHostOperation("revokeUriPermission");
-    }
     @Override public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
         throw deniedHostOperation("checkUriPermission");
-    }
-    @Override public int checkCallingUriPermission(Uri uri, int modeFlags) {
-        throw deniedHostOperation("checkCallingUriPermission");
-    }
-    @Override public int checkCallingOrSelfUriPermission(Uri uri, int modeFlags) {
-        throw deniedHostOperation("checkCallingOrSelfUriPermission");
-    }
-    @Override public int checkUriPermission(Uri uri, String readPermission, String writePermission,
-            int pid, int uid, int modeFlags) {
-        throw deniedHostOperation("checkUriPermission");
-    }
-    @Override public void enforceUriPermission(Uri uri, int pid, int uid, int modeFlags,
-            String message) {
-        throw deniedHostOperation("enforceUriPermission");
-    }
-    @Override public void enforceCallingUriPermission(Uri uri, int modeFlags, String message) {
-        throw deniedHostOperation("enforceCallingUriPermission");
-    }
-    @Override public void enforceCallingOrSelfUriPermission(
-            Uri uri, int modeFlags, String message) {
-        throw deniedHostOperation("enforceCallingOrSelfUriPermission");
-    }
-    @Override public void enforceUriPermission(Uri uri, String readPermission,
-            String writePermission, int pid, int uid, int modeFlags, String message) {
-        throw deniedHostOperation("enforceUriPermission");
     }
     @Override public void startActivity(Intent intent) {
         throw deniedHostOperation("startActivity");

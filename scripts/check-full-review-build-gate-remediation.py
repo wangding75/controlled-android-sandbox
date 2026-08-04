@@ -41,15 +41,26 @@ test_receipt_path = ROOT / "build/static-android-compile/verification/static-and
 try:
     module_receipt = json.loads(module_receipt_path.read_text(encoding="utf-8"))
     modules = [item.get("module") for item in module_receipt.get("modules", [])]
-    expected = ["foundation", "sandbox-framework", "sandbox-native", "sandbox-runtime",
-                "app", "sandbox-companion32", "fixture-basic", "test-harness"]
+    expected = ["android-platform-stubs", "sandbox-domain", "sandbox-contract",
+                "sandbox-framework", "sandbox-native", "sandbox-runtime", "app",
+                "sandbox-companion32", "fixture-basic", "fixture-compat32", "test-harness"]
     if module_receipt.get("completed") is not True or modules != expected:
-        errors.append(f"module-faithful receipt is incomplete: {modules}")
+        errors.append(f"module-scoped receipt is incomplete: {modules}")
+    if module_receipt.get("androidBuildEvidence") is not False:
+        errors.append("Host static receipt must not claim Android build evidence")
+    for item in module_receipt.get("modules", []):
+        module = item.get("module")
+        if module in expected and module not in {"android-platform-stubs", "test-harness"}:
+            actual = sorted(name for name in item.get("classpathModules", [])
+                            if name != "android-platform-stubs")
+            declared = sorted(item.get("declaredProjectDependencies", []))
+            if actual != declared:
+                errors.append(f"module graph mismatch for {module}: {actual} != {declared}")
 except Exception as exc:
     errors.append(f"invalid module compile receipt: {exc}")
 try:
     test_receipt = json.loads(test_receipt_path.read_text(encoding="utf-8"))
-    if test_receipt.get("completed") is not True or test_receipt.get("executedTestCount", 0) < 111:
+    if test_receipt.get("completed") is not True or test_receipt.get("executedTestCount", 0) < 113:
         errors.append("static Android test receipt is incomplete")
     statuses = [item.get("status") for item in test_receipt.get("events", [])]
     if statuses.count("START") != test_receipt.get("executedTestCount"):
@@ -68,4 +79,4 @@ if errors:
     for error in errors:
         print(" - " + error, file=sys.stderr)
     raise SystemExit(1)
-print("PASS full-review module-faithful compile and bounded self-test gate")
+print("PASS full-review module-scoped Host compile and bounded self-test gate")
