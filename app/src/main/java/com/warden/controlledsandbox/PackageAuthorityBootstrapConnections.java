@@ -41,16 +41,28 @@ final class PackageAuthorityBootstrapConnections implements AutoCloseable {
         runtime.close();
     }
 
+    String diagnosticState() {
+        return management.diagnosticState() + ";" + runtime.diagnosticState();
+    }
+
     private final class RoleConnection implements ServiceConnection {
         private final Intent intent;
         private final boolean managementRole;
+        private final PackageAuthorityRetryBackoff retryBackoff;
+        private final Runnable rebindTask = () -> {
+            rebindPosted = false;
+            scheduledDelayMs = 0L;
+            bind();
+        };
         private IBinder capability;
         private boolean bound;
         private boolean rebindPosted;
+        private long scheduledDelayMs;
 
         RoleConnection(Intent intent, boolean managementRole) {
             this.intent = intent;
             this.managementRole = managementRole;
+            this.retryBackoff = new PackageAuthorityRetryBackoff(managementRole ? 0x4d474d54 : 0x52554e54);
         }
 
         void bind() {
@@ -81,6 +93,8 @@ final class PackageAuthorityBootstrapConnections implements AutoCloseable {
                 } else {
                     registry.installRuntime(installed, Process.myUid(), ownerPid);
                 }
+                retryBackoff.reset();
+                scheduledDelayMs = 0L;
             } catch (Exception bootstrapFailure) {
                 disconnected();
             }
@@ -104,10 +118,19 @@ final class PackageAuthorityBootstrapConnections implements AutoCloseable {
         private void scheduleRebind() {
             if (closed || rebindPosted) return;
             rebindPosted = true;
-            handler.post(() -> {
+            scheduledDelayMs = retryBackoff.nextDelayMillis();
+            if (!handler.postDelayed(rebindTask, scheduledDelayMs)) {
                 rebindPosted = false;
-                bind();
-            });
+                scheduledDelayMs = 0L;
+            }
+        }
+
+        String diagnosticState() {
+            return (managementRole ? "management" : "runtime")
+                    + ":bound=" + bound
+                    + ":failures=" + retryBackoff.consecutiveFailures()
+                    + ":circuitOpen=" + retryBackoff.circuitOpen()
+                    + ":scheduledDelayMs=" + scheduledDelayMs;
         }
 
         private void unbind() {
@@ -118,6 +141,9 @@ final class PackageAuthorityBootstrapConnections implements AutoCloseable {
         }
 
         void close() {
+            handler.removeCallbacks(rebindTask);
+            rebindPosted = false;
+            scheduledDelayMs = 0L;
             IBinder stale = capability;
             capability = null;
             if (stale != null) {
