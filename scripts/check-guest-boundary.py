@@ -13,8 +13,9 @@ context_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/cont
 storage_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextStorageTransferSelfTest.java'
 loader_test_path = ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoaderSelfTest.java'
 compiler_path = ROOT / 'tools/static_android_compile.py'
+framework_hooks_path = ROOT / 'sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java'
 
-for path in [context_path, loader_path, context_test_path, storage_test_path, loader_test_path, compiler_path]:
+for path in [context_path, loader_path, context_test_path, storage_test_path, loader_test_path, compiler_path, framework_hooks_path]:
     if not path.is_file():
         errors.append(f'missing required Guest boundary file: {path.relative_to(ROOT)}')
 
@@ -25,6 +26,7 @@ if not errors:
     storage_test = storage_test_path.read_text(encoding='utf-8')
     loader_test = loader_test_path.read_text(encoding='utf-8')
     compiler = compiler_path.read_text(encoding='utf-8')
+    framework_hooks = framework_hooks_path.read_text(encoding='utf-8')
 
     required_context_fragments = {
         '@Override public Context getBaseContext() { return this; }': 'host Context unwrap is not closed',
@@ -95,6 +97,29 @@ if not errors:
             or 'com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap' not in loader_test
             or 'com.warden.controlledsandbox.contract.IPackageService' not in loader_test):
         errors.append('Guest class-loader test does not cover private bootstrap and Package Service denial')
+
+    mandatory_hook_names = [
+        'packageManager', 'activityManager', 'activityTaskManager', 'appOps', 'permission',
+        'notification', 'jobScheduler', 'alarm', 'clipboard', 'account', 'storage',
+    ]
+    readiness_position = framework_hooks.find(
+        'FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);')
+    if readiness_position < 0:
+        errors.append('Framework hook installation does not perform a mandatory readiness check')
+    else:
+        for hook_name in mandatory_hook_names:
+            if hook_name in {'activityManager', 'activityTaskManager'}:
+                fragment = 'installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);'
+            else:
+                fragment = f'attempt("{hook_name}", installed, failures, hooks'
+            position = framework_hooks.find(fragment)
+            if position < 0:
+                errors.append(f'mandatory framework hook is not installed: {hook_name}')
+            elif position > readiness_position:
+                errors.append(f'mandatory framework hook is checked before installation: {hook_name}')
+        optional_position = framework_hooks.find('attempt("camera", installed, failures, hooks')
+        if optional_position >= 0 and optional_position < readiness_position:
+            errors.append('optional framework hooks are installed before mandatory readiness closes')
 
     required_test_classes = [
         'com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest',

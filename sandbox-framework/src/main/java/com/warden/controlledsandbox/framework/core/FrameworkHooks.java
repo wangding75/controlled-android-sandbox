@@ -109,17 +109,17 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> DisplayManagerHook.install(hostServiceContext, identity));
         attempt("appOps", installed, failures, hooks, () -> AppOpsManagerHook.install(guestContext, identity));
         attempt("permission", installed, failures, hooks, () -> PermissionManagerHook.install(guestContext, identity));
-        FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
-        if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
-            rollbackInstalled(hooks, installed, failures);
-            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
-        }
         attempt("notification", installed, failures, hooks, () -> NotificationManagerHook.install(identity));
         attempt("jobScheduler", installed, failures, hooks, () -> JobSchedulerHook.install(guestContext, identity));
         attempt("alarm", installed, failures, hooks, () -> AlarmManagerHook.install(hostServiceContext, identity));
         attempt("clipboard", installed, failures, hooks, () -> ClipboardManagerHook.install(hostServiceContext, identity));
         attempt("account", installed, failures, hooks, () -> AccountManagerHook.install(hostServiceContext, identity));
         attempt("storage", installed, failures, hooks, () -> StorageManagerHook.install(guestContext, identity));
+        FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
+        if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
+            rollbackInstalled(hooks, installed, failures);
+            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
+        }
         attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, () -> LocationServiceHook.install(hostServiceContext, identity));
         attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));
