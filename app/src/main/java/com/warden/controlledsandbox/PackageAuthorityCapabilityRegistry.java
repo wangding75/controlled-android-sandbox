@@ -2,6 +2,7 @@ package com.warden.controlledsandbox;
 
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.PackageAuthorityCapabilityContract;
+import com.warden.controlledsandbox.contract.RuntimePeerIdentity;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -30,12 +31,20 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
         install(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability, ownerUid, ownerPid);
     }
 
+    void installCompanionRuntime(String packageName, IBinder capability, int ownerUid, int ownerPid) {
+        install(companionRole(packageName), capability, ownerUid, ownerPid);
+    }
+
     void clearManagement(IBinder capability) {
         clear(PackageCallerVerifier.MANAGEMENT_ROLE, capability);
     }
 
     void clearRuntime(IBinder capability) {
         clear(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability);
+    }
+
+    void clearCompanionRuntime(String packageName, IBinder capability) {
+        clear(companionRole(packageName), capability);
     }
 
     void requireManagement(IBinder capability, long clientEpochMarker) {
@@ -92,6 +101,13 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
         if (capability == null || !capability.isBinderAlive() || ownerUid < 0 || ownerPid <= 0) {
             throw new SecurityException("PACKAGE_AUTHORITY_BOOTSTRAP_REQUIRED");
         }
+    }
+
+    private static String companionRole(String packageName) {
+        if (!RuntimePeerIdentity.isCompanionPackage(packageName)) {
+            throw new IllegalArgumentException("companion package is invalid");
+        }
+        return PackageCallerVerifier.COMPANION_RUNTIME_ROLE_PREFIX + packageName;
     }
 
     private synchronized void clear(String role, IBinder capability) {

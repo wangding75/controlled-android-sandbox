@@ -32,3 +32,7 @@ com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public st
 com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static void writeAcknowledged(Path destination, byte[] bytes) throws IOException
 com.warden.controlledsandbox.contract|InstallSessionPage.java|public final class InstallSessionPage implements Parcelable, VirtualPageView<InstallSessionInfoSnapshot>
 com.warden.controlledsandbox.contract|InstallSessionPage.java|public static final Creator<InstallSessionPage> CREATOR = new Creator<>()
+
+# MAIN-R3-P1-02: Android must instantiate this signature-protected Companion bootstrap Service;
+# it shares the private Runtime process capability without exposing the token to Guest code.
+com.warden.controlledsandbox.runtime.protocol|CompanionRuntimePackageAuthorityBootstrapService.java|public final class CompanionRuntimePackageAuthorityBootstrapService extends Service

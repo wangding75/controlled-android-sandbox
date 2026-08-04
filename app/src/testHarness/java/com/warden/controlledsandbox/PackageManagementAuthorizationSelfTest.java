@@ -61,6 +61,16 @@ public final class PackageManagementAuthorizationSelfTest {
             identity.companionPackage = companion;
             expectSecurity(() -> registry.requireRuntime(hostRuntime, 0L),
                     "Companion reused Host Runtime capability");
+            TestBinder companionRuntime = new TestBinder();
+            registry.installCompanionRuntime(companion, companionRuntime, 3000, 300);
+            registry.requireRuntime(companionRuntime, 0L);
+            identity.pid = 301;
+            expectSecurity(() -> registry.requireRuntime(companionRuntime, 0L),
+                    "different Companion process reused Runtime capability");
+            identity.pid = 300;
+            companionRuntime.die();
+            expectSecurity(() -> registry.requireRuntime(companionRuntime, 0L),
+                    "dead Companion Runtime capability remained active");
 
             ManagementSessionGuard managementGuard = new ManagementSessionGuard(2000, 100);
             managementGuard.requireOwner(2000, 100);

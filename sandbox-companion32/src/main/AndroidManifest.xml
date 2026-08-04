@@ -12,6 +12,12 @@
             android:process=":sandbox_server32"
             android:stopWithTask="false" />
         <service
+            android:name="com.warden.controlledsandbox.runtime.protocol.CompanionRuntimePackageAuthorityBootstrapService"
+            android:exported="true"
+            android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
+            android:process=":sandbox_server32"
+            android:stopWithTask="false" />
+        <service
             android:name=".NativeCompanionArtifactService"
             android:exported="true"
             android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"

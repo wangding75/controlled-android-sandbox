@@ -59,14 +59,20 @@ binder = require(
 if binder.count("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED") < 2:
     errors.append("both legacy public bootstrap transactions must fail closed")
 
-require(
+connections = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityBootstrapConnections.java",
     "HostPackageAuthorityBootstrapService.class",
     "RuntimePackageAuthorityBootstrapService.class",
+    "CompanionRuntimePackageAuthorityBootstrapService",
     "endpoint.ownerPid()",
-    "registry.installManagement(installed, Process.myUid(), ownerPid)",
-    "registry.installRuntime(installed, Process.myUid(), ownerPid)",
+    "trustedCompanionUid()",
+    "packages.checkSignatures(context.getPackageName(), companionPackage)",
+    "registry.installManagement(installed, ownerUid, ownerPid)",
+    "registry.installRuntime(installed, ownerUid, ownerPid)",
+    "registry.installCompanionRuntime(companionPackage, installed, ownerUid, ownerPid)",
 )
+if "install(installed, ownerUid, ownerPid);" not in connections:
+    errors.append("bootstrap connection does not route every fixed endpoint through install-time UID/PID pinning")
 require(
     "app/src/main/java/com/warden/controlledsandbox/HostPackageAuthorityBootstrapService.java",
     "IPackageAuthorityBootstrap.Stub",
@@ -75,6 +81,12 @@ require(
 )
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimePackageAuthorityBootstrapService.java",
+    "IPackageAuthorityBootstrap.Stub",
+    "RuntimePackageAuthorityCapability.token()",
+    "return Process.myPid()",
+)
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/CompanionRuntimePackageAuthorityBootstrapService.java",
     "IPackageAuthorityBootstrap.Stub",
     "RuntimePackageAuthorityCapability.token()",
     "return Process.myPid()",
@@ -137,6 +149,23 @@ if runtime_bootstrap is None or runtime_bootstrap.get(android + "exported") != "
 if runtime_bootstrap is not None and runtime_bootstrap.get(android + "process") != ":sandbox_server":
     errors.append("Runtime bootstrap service must run in :sandbox_server")
 
+companion_manifest = ET.parse(ROOT / "sandbox-companion32/src/main/AndroidManifest.xml").getroot()
+companion_services = {
+    node.get(android + "name"): node
+    for node in companion_manifest.findall("./application/service")
+}
+companion_name = "com.warden.controlledsandbox.runtime.protocol.CompanionRuntimePackageAuthorityBootstrapService"
+companion_bootstrap = companion_services.get(companion_name)
+if companion_bootstrap is None:
+    errors.append("Companion Runtime bootstrap service is missing")
+else:
+    if companion_bootstrap.get(android + "exported") != "true":
+        errors.append("Companion Runtime bootstrap must be exported for the signed Host package")
+    if companion_bootstrap.get(android + "permission") != "com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION":
+        errors.append("Companion Runtime bootstrap must require the signature permission")
+    if companion_bootstrap.get(android + "process") != ":sandbox_server32":
+        errors.append("Companion Runtime bootstrap must run in :sandbox_server32")
+
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
     "first same-UID process claimed management capability",
@@ -170,6 +199,7 @@ report = {
     "epochOwner": "package-service",
     "managementBootstrap": "explicit non-exported main-process component with install-time PID pin",
     "runtimeBootstrap": "explicit non-exported :sandbox_server component with install-time PID pin",
+    "companionBootstrap": "explicit signature-protected :sandbox_server32 component with package/signature/UID/PID pin",
     "ownerPidBoundAtInstall": True,
     "guestPrivilegedContractAccess": "denied",
     "legacyTransactionsRetained": True,
