@@ -346,3 +346,9 @@ instance root; Host or foreign Guest Contexts are rejected.
 A cached virtual system-service session that is already dead is evicted and reopened during the same
 Guest attach. Concurrent attach callers share the replacement, while a newly opened dead capability
 is rejected before publication.
+
+## M5-T19.1 complete acceptance remediation
+
+The `main` acceptance pass now closes the deterministic Guest bootstrap defects found after the R2 merge. Guest PackageManager hook installation uses one process-local platform `PackageManager` object and exposes that exact proxied object only after mandatory hook readiness. Guest system-service lookup is an explicit allowlist: unknown names return `null`, and known services cannot fall back to a Host manager when their hook is unavailable. The 32-bit Companion exports a signature-permission bootstrap endpoint in `:sandbox_server32`; Package Service verifies the Companion package signature and UID, then installs a PID- and Binder-bound `COMPANION_RUNTIME:<package>` capability. These are source and Host-test results only; cross-APK Binder behavior remains device-unverified.
+
+Release packaging now includes Host, Fixture64, Fixture32 and Companion32. Host and Companion release variants consume one external keystore identity and the release gate runs locked `apksigner --print-certs`, requiring both APKs to have the same signer SHA-256 digest. No keystore is stored in the repository. Gradle-generated dependency lock files, real AGP/AIDL/CMake/APK evidence, Emulator results and physical-device evidence remain mandatory final-freeze blockers.

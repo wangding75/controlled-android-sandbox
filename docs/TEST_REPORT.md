@@ -73,3 +73,17 @@ The checkpoint restores bounded Activity/task state but deliberately does not re
 ## M5-T19 source-quality verification
 
 M5-T19 adds direct tests for centralized method matching and a machine-readable critical-path test-ownership map. The architecture audit now scans every `*/src/main/**/*.java` source at runtime; the corrected M5-T19 baseline is thirteen large classes, including `ManifestReceiverRegistry.java`, while the current M5-T19.1-R source tree is reported independently from the live scan. All static Android and Host regressions pass. The ownership map explicitly does not claim JaCoCo line or branch coverage. Real AGP, Android instrumentation, Emulator and physical-device evidence remain unavailable until the locked JDK-17/SDK/NDK environment is used.
+
+# M5-T19.1 complete acceptance remediation
+
+Status: **SOURCE/HOST ACCEPTANCE PASS; ANDROID BUILD BLOCKED**
+
+The acceptance branch closes three deterministic integration defects that were not covered by earlier isolated self-tests:
+
+- Guest PackageManager installation and Guest-visible lookup now share the exact process-local proxied `PackageManager` object.
+- Unknown system-service names cannot delegate to the Host Context; known services remain bound to installed Hook evidence.
+- Companion32 has an explicit signature-permission Package Authority bootstrap in the Runtime Broker process and a dedicated death-linked role capability.
+
+Release scripts now cover Host, Fixture64, Fixture32 and Companion32, require external signing inputs for Host/Companion release variants, verify every APK with locked `apksigner`, and compare Host/Companion certificate SHA-256 digests. The repository intentionally contains no private signing key.
+
+Local Host compilation/self-tests, AIDL compatibility, Native Host tests, architecture gates and reproducible source packaging are executable without Android SDK. The final Android gate remains BLOCKED until Gradle-generated dependency locks, Android SDK/NDK/CMake, signed APKs, Emulator and physical-device evidence are available.

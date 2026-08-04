@@ -471,12 +471,15 @@
         "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/VirtualPackageStateSnapshot.java",
         "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageMetadataMapper.java",
         "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/SharedLibraryInfoFactory.java",
-        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java"
+        "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/packagemanager/VirtualPackageQuerySelfTest.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
+        "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "Guest PackageManager projects typed instrumentation declarations, resolved shared-library objects, stable installer/signing identity and component/query metadata without Host fallback. Exact Android SharedLibraryInfo constructors, Binder overloads and instrumentation execution remain device-deferred."
+      "notes": "Guest prepare installs the PackageManager proxy on one process-local platform object and GuestContext exposes that exact object only after mandatory readiness. Query/identity projection remains source-wired; Android ApplicationPackageManager field layouts and OEM Binder overloads remain device-unverified."
     },
     {
       "id": "framework.activity-task-manager",
@@ -1524,12 +1527,16 @@
         "sandbox-native/build.gradle",
         "sandbox-companion32/build.gradle",
         "sandbox-companion32/src/main/cpp/CMakeLists.txt",
-        "scripts/check-native-abi-companion.py"
+        "scripts/check-native-abi-companion.py",
+        "gradle/release-signing.gradle",
+        "tools/release_apk_signing.py",
+        "scripts/reproducible-build.sh",
+        "scripts/reproducible-build.ps1"
       ],
       "sourceStatus": "complete",
       "productionStatus": "partial",
       "deviceStatus": "not-tested",
-      "notes": "Source/build configuration separates arm64-v8a/x86_64 Host libraries from armeabi-v7a/x86 companion libraries and compiles an independent controlled_sandbox_native32 target. Android APK packaging and installation are not proven in this source-only stage."
+      "notes": "Build configuration separates Host/Fixture64 and Companion/Fixture32 ABIs. Release scripts include all four APKs and require external Host/Companion signer continuity verified by apksigner. Actual signed Android packaging/install evidence remains blocked outside the locked Android environment."
     },
     {
       "id": "runtime.native-abi-routing",
@@ -1539,12 +1546,16 @@
         "app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java",
         "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionArtifactService.java",
         "sandbox-companion32/src/main/java/com/warden/controlledsandbox/companion32/NativeCompanionWorkspaceStore.java",
-        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePeerPolicy.java"
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePeerPolicy.java",
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/CompanionRuntimePackageAuthorityBootstrapService.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityBootstrapConnections.java",
+        "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityCapabilityRegistry.java",
+        "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java"
       ],
       "sourceStatus": "complete",
       "productionStatus": "wired",
       "deviceStatus": "not-tested",
-      "notes": "64-bit ABIs route to the Host Runtime Broker. armeabi-v7a/x86 guests are staged through a signature-protected bounded file channel and route prepare, Activity, Service, Receiver, Provider and stop operations to the production Runtime Broker embedded in the 32-bit Companion. Unknown or legacy ABI metadata fails closed. Android packaging and device execution remain untested."
+      "notes": "64-bit ABIs route to Host Runtime. armeabi-v7a/x86 use the Companion Runtime Broker with a signature-verified, UID/PID/Binder-bound COMPANION_RUNTIME capability and bounded artifact channel. Source/Host tests pass; Android cross-APK binding, process lifecycle and component execution remain device-unverified."
     },
     {
       "id": "quality.source-contract-closure",
