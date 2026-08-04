@@ -129,6 +129,8 @@ APP_ALLOWED_RUNTIME = {
     'com.warden.controlledsandbox.runtime.protocol.ComponentOperations',
     'com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport',
     'com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector',
+    'com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService',
+    'com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability',
     'com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics',
 }
 for source in (ROOT / 'app/src').rglob('*.java'):

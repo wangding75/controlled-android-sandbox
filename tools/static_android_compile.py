@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib, json, re, subprocess, shutil, textwrap, sys
+import hashlib, json, os, re, subprocess, shutil, textwrap, sys, time
 root = Path(__file__).resolve().parents[1]
 build = root / 'build' / 'static-android-compile'
 stubs = build / 'stubs'
@@ -116,325 +116,255 @@ w('com/warden/controlledsandbox/contract/INativeCompanionArtifactService.java','
 w('com/warden/controlledsandbox/contract/IIsolatedGuestProcess.java','''package com.warden.controlledsandbox.contract; import android.os.*; public interface IIsolatedGuestProcess extends IInterface { IsolatedProcessResult prepare(IsolatedProcessRequest request)throws RemoteException; IsolatedProcessResult invoke(IsolatedProcessRequest request)throws RemoteException; IsolatedProcessResult status(IsolatedProcessRequest request)throws RemoteException; void shutdown(String sessionId,long generation,String capabilityToken)throws RemoteException; abstract class Stub extends Binder implements IIsolatedGuestProcess { public IBinder asBinder(){return this;} public static IIsolatedGuestProcess asInterface(IBinder b){return b instanceof IIsolatedGuestProcess?(IIsolatedGuestProcess)b:null;} } }''')
 w('com/warden/controlledsandbox/contract/IRuntimeBroker.java','''package com.warden.controlledsandbox.contract; import android.os.*; public interface IRuntimeBroker extends IInterface { RuntimeOperationResult executeV2(RuntimeOperationRequest r)throws RemoteException; ActivityTaskResult activityTaskOperation(ActivityTaskRequest r)throws RemoteException; ActivityResultResult activityResultOperation(ActivityResultRequest r)throws RemoteException; PackageServiceResult requestRuntimePermission(String s,long g,String permission,int requestCode)throws RemoteException; PackageServiceResult reportRuntimePermissionResult(String s,long g,String permission,int requestCode,boolean hostGranted,String reason)throws RemoteException; RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest r)throws RemoteException; void stopGuest(String p,int u)throws RemoteException; abstract class Stub extends Binder implements IRuntimeBroker { public IBinder asBinder(){return this;} public static IRuntimeBroker asInterface(IBinder b){return b instanceof IRuntimeBroker?(IRuntimeBroker)b:null;} } }''')
 
-sources=[]
-for base in ['sandbox-domain/src/main/java','sandbox-contract/src/main/java','sandbox-framework/src/main/java','sandbox-framework/src/testHarness/java','sandbox-native/src/main/java','sandbox-companion32/src/main/java','sandbox-companion32/src/testHarness/java','sandbox-runtime/src/main/java','sandbox-runtime/src/testHarness/java','app/src/main/java','app/src/debug/java','app/src/testHarness/java','fixture-basic/src/main/java']:
-    sources += sorted((root/base).rglob('*.java'))
-sources += sorted(stubs.rglob('*.java'))
-cmd=['javac','--release','17','-Xlint:all','-d',str(classes)]+[str(x) for x in sources]
-result=subprocess.run(cmd, cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(result.stdout, end='')
-if result.returncode:
-    sys.exit(result.returncode)
-print('PASS static Android-source compilation with local API stubs')
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageServiceContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.NativeGuestExecutionPolicySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.NativeCompanionContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.NativeCompanionIdentityVerifierSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.companion32.NativeCompanionGenerationRegistrySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageManagementAuthorizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageSessionDirectOwnershipSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualSystemServiceStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualSystemServiceStoreCommitConsistencySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualSystemServicePagingSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualJobDeathRegistrationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageVirtualSystemServiceSessionSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualDeviceServiceStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualInteractionStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualNetworkServiceStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.ApplicationEnvironmentStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualCompatibilityStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualPolicyServicesStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualMediaCommunicationStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualPeripheralServicesStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualPrivilegedServicesStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.SandboxCatalogStateSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.RuntimePermissionWorkflowSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.VirtualPackageStateBuilderPolicySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifierSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifierSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageInstallSessionStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.PackageArtifactOrderSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.SandboxSharedPreferencesSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.ProviderTransportSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransportSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.BrokerFileRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.PendingIntentFrameworkInterceptorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.ActivityTaskFrameworkInterceptorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.WebViewProfileSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestContextBoundarySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestContextStorageTransferSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestStorageNameCodecSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestJobServiceBridgeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.GuestCapabilityGateSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransportSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimeBrokerOperationBoundarySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.status.RuntimeStatusContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcherSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.BrokerArchitecturePortsSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-cp',str(classes),'com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnosticsSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.BrokerStateStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimeGuestConnectionPoolSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimeSystemServiceCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimeServiceCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.receiver.BrokerManifestReceiverRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.receiver.ManifestBroadcastDispatcherSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.receiver.OrderedReceiverTokenRegistrySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.receiver.ReceiverLifecycleCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimeReceiverCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.OrderedReceiverPendingResultBridgeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.BrokerObserverRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.UriGrantLifecycleSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.provider.BrokerProviderRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.IsolatedComponentPolicySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.IsolatedProcessRoutePolicySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.IsolatedProcessContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.IsolatedProcessArchitectureSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.activity.ActivityFieldBridgeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.activity.ActivityResultContractSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntimeSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCheckpointStoreSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.FrameworkIdentityProxySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.NetworkServiceVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.ApplicationEnvironmentVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.CompatibilityVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.InvocationMethodMatcherSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.PolicyServicesVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.MediaCommunicationVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.PeripheralServicesVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.PrivilegedServicesVirtualizationSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.VirtualSystemServiceSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnectorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.capability.GuestCapabilityAuditLogSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.capability.CapabilityProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.DeviceServiceProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.InteractionProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.NetworkServiceProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.ApplicationEnvironmentProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.CompatibilityProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.PolicyServicesProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.MediaCommunicationProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.PeripheralServicesProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.guest.PrivilegedServicesProxyReadinessSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.runtime.broker.RuntimePermissionCoordinatorSelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.packagemanager.VirtualPackageQuerySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
-run=subprocess.run(['java','-ea','-cp',str(classes),'com.warden.controlledsandbox.framework.core.DynamicAccessPolicySelfTest'], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-print(run.stdout, end='')
-if run.returncode: sys.exit(run.returncode)
+module_root = build / 'modules'
+module_root.mkdir(parents=True, exist_ok=True)
+compile_receipts = []
+
+def java_sources(*bases):
+    result=[]
+    for base in bases:
+        path=root/base
+        if path.exists(): result += sorted(path.rglob('*.java'))
+    return result
+
+def compile_module(name, sources, classpath=()):
+    output=module_root/name
+    output.mkdir(parents=True, exist_ok=True)
+    cmd=['javac','--release','17','-Xlint:all','-d',str(output)]
+    if classpath:
+        cmd += ['-cp', os.pathsep.join(str(item) for item in classpath)]
+    cmd += [str(item) for item in sources]
+    started=time.monotonic()
+    result=subprocess.run(cmd, cwd=root, text=True, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, timeout=180)
+    print(result.stdout, end='')
+    compile_receipts.append({
+        'module': name,
+        'sourceCount': len(sources),
+        'elapsedMs': int((time.monotonic()-started)*1000),
+        'exitCode': result.returncode,
+        'classpathModules': [Path(item).name for item in classpath],
+    })
+    if result.returncode: sys.exit(result.returncode)
+    return output
+
+foundation=compile_module('foundation',
+    sorted(stubs.rglob('*.java')) + java_sources(
+        'sandbox-domain/src/main/java','sandbox-contract/src/main/java',
+        'sandbox-framework/src/testHarness/java/android'))
+framework=compile_module('sandbox-framework',
+    java_sources('sandbox-framework/src/main/java'), (foundation,))
+native=compile_module('sandbox-native',
+    java_sources('sandbox-native/src/main/java'), (foundation,))
+runtime=compile_module('sandbox-runtime',
+    java_sources('sandbox-runtime/src/main/java'), (foundation,framework,native))
+app=compile_module('app',
+    java_sources('app/src/main/java','app/src/debug/java'),
+    (foundation,framework,native,runtime))
+companion=compile_module('sandbox-companion32',
+    java_sources('sandbox-companion32/src/main/java'),
+    (foundation,framework,native,runtime))
+fixture=compile_module('fixture-basic',
+    java_sources('fixture-basic/src/main/java'), (foundation,))
+tests=compile_module('test-harness', java_sources(
+    'sandbox-domain/src/testHarness/java',
+    'sandbox-framework/src/testHarness/java',
+    'sandbox-native/src/testHarness/java',
+    'sandbox-companion32/src/testHarness/java',
+    'sandbox-runtime/src/testHarness/java',
+    'app/src/testHarness/java'),
+    (foundation,framework,native,runtime,app,companion,fixture))
+
+for output in (foundation,framework,native,runtime,app,companion,fixture,tests):
+    for source in output.rglob('*'):
+        if source.is_file():
+            target=classes/source.relative_to(output)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source,target)
+
+verification=build/'verification'
+verification.mkdir(parents=True,exist_ok=True)
+(verification/'static-android-module-compilation.json').write_text(json.dumps({
+    'completed': True,
+    'strategy': 'main sources compiled in declared Gradle dependency order',
+    'modules': compile_receipts,
+}, indent=2)+'\n', encoding='utf-8')
+print('PASS module-faithful static Android-source compilation with local API stubs')
+
+RUNNER_TIMEOUT_SECONDS = int(os.environ.get('STATIC_ANDROID_TEST_TIMEOUT_SECONDS', '30'))
+RUNNER_DEADLINE_SECONDS = int(os.environ.get('STATIC_ANDROID_STAGE_TIMEOUT_SECONDS', '900'))
+runner_deadline = time.monotonic() + RUNNER_DEADLINE_SECONDS
+execution_events = []
+execution_receipt = verification / 'static-android-test-execution.json'
+
+def write_execution_receipt(completed=False):
+    passed = [event['test'] for event in execution_events if event['status'] == 'PASS']
+    execution_receipt.write_text(json.dumps({
+        'runner': str(Path(__file__).relative_to(root)),
+        'completed': completed,
+        'stageTimeoutSeconds': RUNNER_DEADLINE_SECONDS,
+        'testTimeoutSeconds': RUNNER_TIMEOUT_SECONDS,
+        'executedTests': sorted(passed),
+        'executedTestCount': len(passed),
+        'events': execution_events,
+    }, indent=2) + '\n', encoding='utf-8')
+
+def terminate_process(process):
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == 'posix':
+            os.killpg(process.pid, 15)
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, 9)
+        else:
+            process.kill()
+    except ProcessLookupError:
+        pass
+    finally:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+def run_java(main_class, assertions=True):
+    remaining = runner_deadline - time.monotonic()
+    if remaining <= 0:
+        execution_events.append({'test': main_class, 'status': 'STAGE_TIMEOUT', 'elapsedMs': 0})
+        write_execution_receipt(False)
+        raise SystemExit('static Android self-test stage exceeded its watchdog')
+    timeout = min(RUNNER_TIMEOUT_SECONDS, max(1, int(remaining)))
+    cmd = ['java'] + (['-ea'] if assertions else []) + ['-cp', str(classes), main_class]
+    kwargs = dict(cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if os.name == 'posix':
+        kwargs['start_new_session'] = True
+    elif hasattr(subprocess, 'CREATE_NEW_PROCESS_GROUP'):
+        kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+    started = time.monotonic()
+    execution_events.append({'test': main_class, 'status': 'START', 'timeoutSeconds': timeout})
+    write_execution_receipt(False)
+    process = subprocess.Popen(cmd, **kwargs)
+    try:
+        output, _ = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        terminate_process(process)
+        elapsed = int((time.monotonic() - started) * 1000)
+        execution_events.append({'test': main_class, 'status': 'TIMEOUT', 'elapsedMs': elapsed})
+        write_execution_receipt(False)
+        raise SystemExit(f'TIMEOUT {main_class} after {timeout}s')
+    print(output, end='')
+    elapsed = int((time.monotonic() - started) * 1000)
+    status = 'PASS' if process.returncode == 0 else 'FAIL'
+    execution_events.append({'test': main_class, 'status': status,
+                             'elapsedMs': elapsed, 'exitCode': process.returncode})
+    write_execution_receipt(False)
+    if process.returncode:
+        raise SystemExit(process.returncode)
+run_java('com.warden.controlledsandbox.PackageServiceContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.NativeGuestExecutionPolicySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.NativeCompanionContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.NativeCompanionIdentityVerifierSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.companion32.NativeCompanionGenerationRegistrySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.PackageManagementAuthorizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.PackageSessionDirectOwnershipSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualSystemServiceStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualSystemServiceStoreCommitConsistencySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualSystemServicePagingSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualJobDeathRegistrationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.PackageVirtualSystemServiceSessionSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualDeviceServiceStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualInteractionStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualNetworkServiceStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.ApplicationEnvironmentStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualCompatibilityStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualPolicyServicesStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualMediaCommunicationStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualPeripheralServicesStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualPrivilegedServicesStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.SandboxCatalogStateSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.RuntimePermissionWorkflowSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.VirtualPackageStateBuilderPolicySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifierSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifierSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.PackageInstallSessionStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.PackageArtifactOrderSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.SandboxSharedPreferencesSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.provider.ProviderTransportSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransportSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.BrokerFileRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.PendingIntentFrameworkInterceptorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.ActivityTaskFrameworkInterceptorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.WebViewProfileSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestContextBoundarySelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestContextStorageTransferSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestStorageNameCodecSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestJobServiceBridgeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestCapabilityGateSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransportSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimeBrokerOperationBoundarySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.status.RuntimeStatusContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcherSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.BrokerArchitecturePortsSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnosticsSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.broker.BrokerStateStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimeGuestConnectionPoolSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimeSystemServiceCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimeServiceCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.receiver.BrokerManifestReceiverRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.receiver.ManifestBroadcastDispatcherSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.receiver.OrderedReceiverTokenRegistrySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.receiver.ReceiverLifecycleCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimeReceiverCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.OrderedReceiverPendingResultBridgeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.BrokerObserverRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.UriGrantLifecycleSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.ProviderLifecycleCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.provider.BrokerProviderRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.IsolatedComponentPolicySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessRoutePolicySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessArchitectureSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityFieldBridgeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityResultContractSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntimeSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCheckpointStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.FrameworkIdentityProxySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.NetworkServiceVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.ApplicationEnvironmentVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.CompatibilityVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.InvocationMethodMatcherSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.PolicyServicesVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.MediaCommunicationVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.PeripheralServicesVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.PrivilegedServicesVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.VirtualSystemServiceSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnectorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.capability.GuestCapabilityAuditLogSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.capability.CapabilityProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.DeviceServiceProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.InteractionProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.NetworkServiceProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.ApplicationEnvironmentProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.CompatibilityProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.PolicyServicesProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.MediaCommunicationProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.PeripheralServicesProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.PrivilegedServicesProxyReadinessSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.RuntimePermissionCoordinatorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.packagemanager.VirtualPackageQuerySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.DynamicAccessPolicySelfTest', assertions=True)
 for main_class in [
     'com.warden.controlledsandbox.framework.core.FrameworkCallInterceptorSelfTest',
     'com.warden.controlledsandbox.framework.core.FrameworkProxySelfTest',
@@ -445,23 +375,12 @@ for main_class in [
     'com.warden.controlledsandbox.framework.routing.OneTimeRouteStoreSelfTest',
     'com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistrySelfTest',
 ]:
-    run=subprocess.run(['java','-ea','-cp',str(classes),main_class], cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    print(run.stdout, end='')
-    if run.returncode: sys.exit(run.returncode)
+    run_java(main_class, assertions=True)
 
 
-# This receipt is emitted only after every declared Host self-test above completed successfully.
-runner_source = Path(__file__).read_text(encoding="utf-8")
-executed_tests = sorted(set(re.findall(
-    r"['\"](com\.warden\.controlledsandbox\.[^'\"]+SelfTest)['\"]",
-    runner_source,
-)))
-receipt_dir = build / "verification"
-receipt_dir.mkdir(parents=True, exist_ok=True)
-(receipt_dir / "static-android-test-execution.json").write_text(json.dumps({
-    "runner": str(Path(__file__).relative_to(root)),
-    "completed": True,
-    "executedTests": executed_tests,
-    "executedTestCount": len(executed_tests),
-    "runnerSha256": hashlib.sha256(runner_source.encode("utf-8")).hexdigest(),
-}, indent=2) + "\n", encoding="utf-8")
+# Mark the incremental receipt complete only after every declared Host self-test succeeds.
+write_execution_receipt(True)
+receipt = json.loads(execution_receipt.read_text(encoding='utf-8'))
+runner_source = Path(__file__).read_text(encoding='utf-8')
+receipt['runnerSha256'] = hashlib.sha256(runner_source.encode('utf-8')).hexdigest()
+execution_receipt.write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')

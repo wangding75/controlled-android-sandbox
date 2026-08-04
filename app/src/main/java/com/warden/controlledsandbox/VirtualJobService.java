@@ -10,7 +10,7 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
-import com.warden.controlledsandbox.runtime.broker.RuntimePackageAuthorityCapability;
+import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 

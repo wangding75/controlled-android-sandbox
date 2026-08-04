@@ -1,4 +1,4 @@
-package com.warden.controlledsandbox.runtime.broker;
+package com.warden.controlledsandbox.runtime.protocol;
 
 import android.os.Binder;
 import android.os.IBinder;

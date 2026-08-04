@@ -7,7 +7,7 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
-import com.warden.controlledsandbox.runtime.broker.RuntimePackageAuthorityBootstrapService;
+import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService;
 
 /** Owns Package Service outbound bindings to fixed, non-exported trusted process endpoints. */
 final class PackageAuthorityBootstrapConnections implements AutoCloseable {

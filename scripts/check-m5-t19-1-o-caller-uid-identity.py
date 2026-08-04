@@ -69,7 +69,7 @@ require(
     "HostPackageAuthorityCapability.token()",
 )
 require(
-    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePackageAuthorityBootstrapService.java",
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimePackageAuthorityBootstrapService.java",
     "RuntimePackageAuthorityCapability.token()",
 )
 require(
@@ -117,7 +117,7 @@ runtime_services = {
     node.get(android + "name"): node
     for node in runtime_manifest.findall("./application/service")
 }
-runtime_name = "com.warden.controlledsandbox.runtime.broker.RuntimePackageAuthorityBootstrapService"
+runtime_name = "com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService"
 runtime_bootstrap = runtime_services.get(runtime_name)
 if runtime_bootstrap is None or runtime_bootstrap.get(android + "exported") != "false":
     errors.append("Runtime bootstrap service must be non-exported")

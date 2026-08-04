@@ -1,4 +1,5 @@
 package com.warden.controlledsandbox.runtime.broker;
+import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability;
 
 import android.content.ComponentName;
 import android.content.Context;

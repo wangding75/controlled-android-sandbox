@@ -37,6 +37,7 @@ python3 scripts/check-m5-t16-source-closure.py
 python3 scripts/check-m5-t17-privileged-services.py
 python3 scripts/check-m5-t18-architecture-quality.py
 python3 tools/static_android_compile.py
+python3 scripts/check-full-review-build-gate-remediation.py
 python3 scripts/check-critical-test-ownership.py --self-test
 python3 scripts/check-critical-test-ownership.py
 python3 scripts/check-m5-t19-architecture-decoupling.py

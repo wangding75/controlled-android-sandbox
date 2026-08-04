@@ -1,4 +1,4 @@
-package com.warden.controlledsandbox.runtime.broker;
+package com.warden.controlledsandbox.runtime.protocol;
 
 import android.app.Service;
 import android.content.Intent;
