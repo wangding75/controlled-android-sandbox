@@ -23,14 +23,14 @@
       "gradleProjectPath": ":app",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 133,
+      "fileCount": 137,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "e1413a79a81631a22fb0b21958ca91933c62818f69ac2101170fa553d2052d74"
+      "sourceDigestSha256": "c1f72ae905395ccc11fd5ba687a3fbe466b9ae9a23ed26ac7bd40522f7f90131"
     },
     {
       "type": "library",
@@ -44,7 +44,7 @@
         "Gradle",
         "Java"
       ],
-      "sourceDigestSha256": "4290dd60551a31415285e80ea11f317410f99f1207c45e96432d9441554356d4"
+      "sourceDigestSha256": "fbcb7d0a89a7fc560ff4974275448afcf93bb02f44ef21277f18cde4bec996a2"
     },
     {
       "type": "library",
@@ -53,14 +53,14 @@
       "gradleProjectPath": ":sandbox-contract",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 275,
+      "fileCount": 276,
       "languages": [
         "AIDL",
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "e4de9df2d9fbf8d8f652a12faeac02bfa41ef2f171fa9349e9a6b061375891a6"
+      "sourceDigestSha256": "6b260795ab389f47d3b0a248723274d30bf18e6b77e69e527ef76763f6d16475"
     },
     {
       "type": "library",
@@ -69,13 +69,13 @@
       "gradleProjectPath": ":sandbox-runtime",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 211,
+      "fileCount": 214,
       "languages": [
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "3d05f2250652c8ab2d394f9ce90bc5cc34068e0ea08aa80532bd7189cbcbcce2"
+      "sourceDigestSha256": "5471dddb6cfcb6d2cbb62ada4e2781b330b50e263bb8a383e19c6ee317e2d0b2"
     },
     {
       "type": "library",
@@ -90,7 +90,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "de8e737f306ad3fb5e76888e807fded79ea5f8980f94cf9527bc9cd9990140f4"
+      "sourceDigestSha256": "141aa32ef8e31f89d017c2da0cebe202e7543f7982f841d3243663d220a5d106"
     },
     {
       "type": "application",
@@ -155,7 +155,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "1c3f0403d640315b68c919abf344daa057e9f7d6c158e60ad4bb3a1fbdd00382"
+      "sourceDigestSha256": "97224eb0904189199415f6564b26b59b3bcb9dab04710d1888dc137309fb4cb4"
     }
   ],
   "externalRuntimeDependencies": [

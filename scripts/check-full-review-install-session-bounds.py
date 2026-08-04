@@ -17,8 +17,14 @@ if 'InstallSessionPage listInstallSessionsPage(in VirtualPageRequest request);' 
 if methods[-1] != 'InstallSessionPage listInstallSessionsPage(in VirtualPageRequest request);':
  errors.append('paged install-session method must be appended to preserve transaction IDs')
 session=read('app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java')
-for token in ('listInstallSessionsPage(VirtualPageRequest request)','installSessionPager.page','installSessionPager.legacy'):
+for token in ('listInstallSessionsPage(VirtualPageRequest request)',
+              'installSessionPages.page(lifecycle, request)',
+              'installSessionPages.legacy(lifecycle)'):
  if token not in session: errors.append('management session missing '+token)
+paging=read('app/src/main/java/com/warden/controlledsandbox/InstallSessionPageAuthority.java')
+for token in ('pager.page(COLLECTION, SCOPE', 'pager.legacy(', 'VirtualSystemServicePager.LEGACY_MAX_ITEMS',
+              'VirtualSystemServicePager.LEGACY_MAX_BYTES'):
+ if token not in paging: errors.append('install-session page authority missing '+token)
 client=read('app/src/main/java/com/warden/controlledsandbox/PackageServiceClient.java')
 if 'listInstallSessionsPage' not in client: errors.append('client does not consume paged API')
 runner=read('tools/static_android_compile.py')

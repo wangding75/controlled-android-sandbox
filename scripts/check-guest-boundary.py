@@ -50,12 +50,15 @@ if not errors:
             errors.append(message)
 
     required_loader_fragments = {
-        'if (isDeniedSandboxInternal(name))': 'GuestClassLoader does not enforce host-internal denial',
+        'if (isDeniedSandboxInternal(name) || isPrivilegedContract(name))':
+            'GuestClassLoader does not enforce host and privileged-contract denial',
         'name.startsWith("com.warden.controlledsandbox.")': 'host namespace denial is missing',
         '!name.startsWith("com.warden.controlledsandbox.contract.")':
-            'stable Binder contract exception is missing',
-        'throw new ClassNotFoundException("Sandbox host implementation is not a Guest API: " + name);':
-            'host-internal denial does not fail closed',
+            'stable Guest-safe Binder contract exception is missing',
+        'throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);':
+            'host and privileged-contract denial does not fail closed',
+        'name.equals("com.warden.controlledsandbox.contract.IPackageService")':
+            'privileged Package Service contract is not explicitly denied',
     }
     for fragment, message in required_loader_fragments.items():
         if fragment not in loader:
@@ -86,6 +89,9 @@ if not errors:
     for namespace in forbidden_parent_first:
         if namespace not in loader_test:
             errors.append(f'Guest class-loader test does not cover denied namespace {namespace}')
+    if ('isPrivilegedContract(' not in loader_test
+            or 'com.warden.controlledsandbox.contract.IPackageService' not in loader_test):
+        errors.append('Guest class-loader test does not cover privileged Package Service denial')
 
     required_test_classes = [
         'com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest',

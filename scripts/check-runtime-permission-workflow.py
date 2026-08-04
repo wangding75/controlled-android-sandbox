@@ -89,10 +89,12 @@ require(
 )
 require(
     'app/src/main/java/com/warden/controlledsandbox/PackageAuthorityCapabilityRegistry.java',
-    'registerRuntime(',
+    'installRuntime(',
     'requireRuntime(',
     'linkToDeath',
-    'ownerPid == caller.pid',
+    'clientEpochMarker != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH',
+    'slot.ownerPid == 0',
+    'slot.ownerUid != caller.uid || slot.ownerPid != caller.pid',
 )
 service = require(
     'app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java',

@@ -57,7 +57,8 @@ ownership = require(
 )
 runner = require(
     "tools/static_android_compile.py",
-    "static-android-test-execution.json", '"completed": True', "executedTests",
+    "static-android-test-execution.json", "'completed': completed",
+    "'executedTests': sorted(passed)", "write_execution_receipt(True)",
 )
 verify = require(
     "scripts/verify-all.sh",

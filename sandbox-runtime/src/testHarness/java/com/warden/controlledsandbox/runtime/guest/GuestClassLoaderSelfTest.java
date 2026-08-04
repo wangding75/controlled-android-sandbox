@@ -22,6 +22,12 @@ public final class GuestClassLoaderSelfTest {
         require(!GuestClassLoader.isDeniedSandboxInternal(
                 "com.warden.controlledsandbox.contract.IRuntimeBroker"),
                 "contract remains available");
+        require(GuestClassLoader.isPrivilegedContract(
+                "com.warden.controlledsandbox.contract.IPackageService"),
+                "privileged Package Service contract denied");
+        require(!GuestClassLoader.isPrivilegedContract(
+                "com.warden.controlledsandbox.contract.IRuntimeBroker"),
+                "Guest-safe runtime contract remains available");
         require(!GuestClassLoader.isParentFirst("com.example.guest.MainActivity"), "Guest child first");
         require(!GuestClassLoader.isParentFirst("org.example.library.Client"), "Guest libraries child first");
         GuestClassLoader loader = new GuestClassLoader("", "", null, GuestClassLoaderSelfTest.class.getClassLoader());
