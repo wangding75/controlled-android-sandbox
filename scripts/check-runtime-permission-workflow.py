@@ -93,7 +93,8 @@ require(
     'requireRuntime(',
     'linkToDeath',
     'clientEpochMarker != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH',
-    'slot.ownerPid == 0',
+    'final int ownerUid',
+    'final int ownerPid',
     'slot.ownerUid != caller.uid || slot.ownerPid != caller.pid',
 )
 service = require(

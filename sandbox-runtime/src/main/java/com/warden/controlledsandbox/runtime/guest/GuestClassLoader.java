@@ -77,7 +77,9 @@ public final class GuestClassLoader extends DexClassLoader {
 
     static boolean isPrivilegedContract(String name) {
         if (name == null) return false;
-        return name.equals("com.warden.controlledsandbox.contract.IPackageService")
+        return name.equals("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap")
+                || name.startsWith("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap$")
+                || name.equals("com.warden.controlledsandbox.contract.IPackageService")
                 || name.startsWith("com.warden.controlledsandbox.contract.IPackageService$")
                 || name.equals("com.warden.controlledsandbox.contract.IPackageManagementSession")
                 || name.startsWith("com.warden.controlledsandbox.contract.IPackageManagementSession$")

@@ -57,6 +57,8 @@ if not errors:
             'stable Guest-safe Binder contract exception is missing',
         'throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);':
             'host and privileged-contract denial does not fail closed',
+        'name.equals("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap")':
+            'private Package Authority bootstrap contract is not explicitly denied',
         'name.equals("com.warden.controlledsandbox.contract.IPackageService")':
             'privileged Package Service contract is not explicitly denied',
     }
@@ -90,8 +92,9 @@ if not errors:
         if namespace not in loader_test:
             errors.append(f'Guest class-loader test does not cover denied namespace {namespace}')
     if ('isPrivilegedContract(' not in loader_test
+            or 'com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap' not in loader_test
             or 'com.warden.controlledsandbox.contract.IPackageService' not in loader_test):
-        errors.append('Guest class-loader test does not cover privileged Package Service denial')
+        errors.append('Guest class-loader test does not cover private bootstrap and Package Service denial')
 
     required_test_classes = [
         'com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest',

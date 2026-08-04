@@ -240,7 +240,7 @@ public final class VirtualSystemServicePagingSelfTest {
         TestContext context = new TestContext(root);
         PackageServiceDependencies dependencies = dependencies(context, root);
         LiveBinder runtimeAuthority = new LiveBinder();
-        dependencies.capabilityRegistry.installRuntime(runtimeAuthority);
+        dependencies.capabilityRegistry.installRuntime(runtimeAuthority, 0, 1);
         PackageVirtualSystemServiceSession session = new PackageVirtualSystemServiceSession(
                 dependencies, 0, new LiveBinder(), new VirtualSystemServiceStore.Scope("account.pkg", 4),
                 12004, "account.pkg", 1L, "account-revision", runtimeAuthority, 0L);

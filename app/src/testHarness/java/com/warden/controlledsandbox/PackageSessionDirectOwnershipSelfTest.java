@@ -14,7 +14,7 @@ public final class PackageSessionDirectOwnershipSelfTest {
         PackageServiceDependencies dependencies = dependencies(new TestContext(root), root);
         try {
             LiveBinder managementAuthority = new LiveBinder();
-            dependencies.capabilityRegistry.installManagement(managementAuthority);
+            dependencies.capabilityRegistry.installManagement(managementAuthority, 0, 1);
             LiveBinder managementToken = new LiveBinder();
             PackageManagementSession management = new PackageManagementSession(
                     dependencies, 0, 1, managementToken, managementAuthority, 0L);
@@ -25,7 +25,7 @@ public final class PackageSessionDirectOwnershipSelfTest {
                     "PackageManagementSession did not release its death registration");
 
             LiveBinder runtimeAuthority = new LiveBinder();
-            dependencies.capabilityRegistry.installRuntime(runtimeAuthority);
+            dependencies.capabilityRegistry.installRuntime(runtimeAuthority, 0, 1);
             LiveBinder runtimeToken = new LiveBinder();
             PackageRuntimePermissionSession runtime = new PackageRuntimePermissionSession(
                     dependencies, 0, 1, runtimeToken, runtimeAuthority, 0L);

@@ -39,6 +39,8 @@ registry = require(
     "installRuntime",
     "SERVER_MANAGED_EPOCH",
     "PROCESS_OWNER_MISMATCH",
+    "final int ownerUid",
+    "final int ownerPid",
     "capability.linkToDeath",
     "capability.unlinkToDeath",
     "requireManagement",
@@ -61,20 +63,31 @@ require(
     "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityBootstrapConnections.java",
     "HostPackageAuthorityBootstrapService.class",
     "RuntimePackageAuthorityBootstrapService.class",
-    "registry.installManagement",
-    "registry.installRuntime",
+    "endpoint.ownerPid()",
+    "registry.installManagement(installed, Process.myUid(), ownerPid)",
+    "registry.installRuntime(installed, Process.myUid(), ownerPid)",
 )
 require(
     "app/src/main/java/com/warden/controlledsandbox/HostPackageAuthorityBootstrapService.java",
+    "IPackageAuthorityBootstrap.Stub",
     "HostPackageAuthorityCapability.token()",
+    "return Process.myPid()",
 )
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimePackageAuthorityBootstrapService.java",
+    "IPackageAuthorityBootstrap.Stub",
     "RuntimePackageAuthorityCapability.token()",
+    "return Process.myPid()",
+)
+require(
+    "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageAuthorityBootstrap.aidl",
+    "IBinder capability()",
+    "int ownerPid()",
 )
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java",
     "isPrivilegedContract",
+    "IPackageAuthorityBootstrap",
     "IPackageService",
     "IPackageManagementSession",
 )
@@ -126,6 +139,7 @@ if runtime_bootstrap is not None and runtime_bootstrap.get(android + "process") 
 
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
+    "first same-UID process claimed management capability",
     "caller-supplied management token was accepted",
     "caller-controlled management generation was accepted",
     "different same-UID process reused management capability",
@@ -154,8 +168,9 @@ report = {
     "sourceStatus": "PASS" if not errors else "FAIL",
     "publicBootstrapEnabled": False,
     "epochOwner": "package-service",
-    "managementBootstrap": "explicit non-exported main-process component",
-    "runtimeBootstrap": "explicit non-exported :sandbox_server component",
+    "managementBootstrap": "explicit non-exported main-process component with install-time PID pin",
+    "runtimeBootstrap": "explicit non-exported :sandbox_server component with install-time PID pin",
+    "ownerPidBoundAtInstall": True,
     "guestPrivilegedContractAccess": "denied",
     "legacyTransactionsRetained": True,
     "deviceEvidenceCount": 0,

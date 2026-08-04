@@ -16,7 +16,12 @@ public final class PackageManagementAuthorizationSelfTest {
                 new PackageAuthorityCapabilityRegistry(verifier);
         try {
             TestBinder management = new TestBinder();
-            registry.installManagement(management);
+            registry.installManagement(management, 2000, 100);
+            identity.pid = 101;
+            expectSecurity(() -> registry.requireManagement(management,
+                            PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH),
+                    "first same-UID process claimed management capability");
+            identity.pid = 100;
             registry.requireManagement(management,
                     PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH);
 
@@ -36,13 +41,13 @@ public final class PackageManagementAuthorizationSelfTest {
 
             identity.pid = 102;
             TestBinder replacement = new TestBinder();
-            registry.installManagement(replacement);
+            registry.installManagement(replacement, 2000, 102);
             registry.requireManagement(replacement, 0L);
 
             identity.uid = 2000;
             identity.pid = 200;
             TestBinder hostRuntime = new TestBinder();
-            registry.installRuntime(hostRuntime);
+            registry.installRuntime(hostRuntime, 2000, 200);
             registry.requireRuntime(hostRuntime, 0L);
             identity.pid = 201;
             expectSecurity(() -> registry.requireRuntime(hostRuntime, 0L),

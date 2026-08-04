@@ -23,6 +23,9 @@ public final class GuestClassLoaderSelfTest {
                 "com.warden.controlledsandbox.contract.IRuntimeBroker"),
                 "contract remains available");
         require(GuestClassLoader.isPrivilegedContract(
+                "com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap"),
+                "private Package Authority bootstrap contract denied");
+        require(GuestClassLoader.isPrivilegedContract(
                 "com.warden.controlledsandbox.contract.IPackageService"),
                 "privileged Package Service contract denied");
         require(!GuestClassLoader.isPrivilegedContract(

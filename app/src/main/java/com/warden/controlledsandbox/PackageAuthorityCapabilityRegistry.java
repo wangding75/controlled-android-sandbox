@@ -22,12 +22,12 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
         this.verifier = Objects.requireNonNull(verifier, "verifier");
     }
 
-    void installManagement(IBinder capability) {
-        install(PackageCallerVerifier.MANAGEMENT_ROLE, capability);
+    void installManagement(IBinder capability, int ownerUid, int ownerPid) {
+        install(PackageCallerVerifier.MANAGEMENT_ROLE, capability, ownerUid, ownerPid);
     }
 
-    void installRuntime(IBinder capability) {
-        install(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability);
+    void installRuntime(IBinder capability, int ownerUid, int ownerPid) {
+        install(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability, ownerUid, ownerPid);
     }
 
     void clearManagement(IBinder capability) {
@@ -48,13 +48,15 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
                 "PACKAGE_RUNTIME_CAPABILITY_DENIED");
     }
 
-    private synchronized void install(String role, IBinder capability) {
-        requireCandidate(capability);
+    private synchronized void install(String role, IBinder capability,
+            int ownerUid, int ownerPid) {
+        requireCandidate(capability, ownerUid, ownerPid);
         Slot existing = slots.get(role);
-        if (existing != null && existing.active && existing.capability.equals(capability)) return;
+        if (existing != null && existing.active && existing.capability.equals(capability)
+                && existing.ownerUid == ownerUid && existing.ownerPid == ownerPid) return;
         if (existing != null) retire(existing);
 
-        Slot replacement = new Slot(role, capability, nextServerEpoch++);
+        Slot replacement = new Slot(role, capability, nextServerEpoch++, ownerUid, ownerPid);
         replacement.deathRecipient = () -> retire(replacement);
         try {
             capability.linkToDeath(replacement.deathRecipient, 0);
@@ -81,16 +83,13 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
             if (slot != null && !slot.capability.isBinderAlive()) retire(slot);
             throw new SecurityException(errorCode + ":" + caller.role);
         }
-        if (slot.ownerPid == 0) {
-            slot.ownerUid = caller.uid;
-            slot.ownerPid = caller.pid;
-        } else if (slot.ownerUid != caller.uid || slot.ownerPid != caller.pid) {
+        if (slot.ownerUid != caller.uid || slot.ownerPid != caller.pid) {
             throw new SecurityException(errorCode + ":PROCESS_OWNER_MISMATCH:" + caller.role);
         }
     }
 
-    private static void requireCandidate(IBinder capability) {
-        if (capability == null || !capability.isBinderAlive()) {
+    private static void requireCandidate(IBinder capability, int ownerUid, int ownerPid) {
+        if (capability == null || !capability.isBinderAlive() || ownerUid < 0 || ownerPid <= 0) {
             throw new SecurityException("PACKAGE_AUTHORITY_BOOTSTRAP_REQUIRED");
         }
     }
@@ -117,15 +116,18 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
         final String role;
         final IBinder capability;
         final long serverEpoch;
-        int ownerUid;
-        int ownerPid;
+        final int ownerUid;
+        final int ownerPid;
         IBinder.DeathRecipient deathRecipient;
         boolean active;
 
-        Slot(String role, IBinder capability, long serverEpoch) {
+        Slot(String role, IBinder capability, long serverEpoch,
+                int ownerUid, int ownerPid) {
             this.role = role;
             this.capability = capability;
             this.serverEpoch = serverEpoch;
+            this.ownerUid = ownerUid;
+            this.ownerPid = ownerPid;
         }
     }
 }

@@ -7,6 +7,8 @@ import android.content.ServiceConnection;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Process;
+import com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap;
 import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService;
 
 /** Owns Package Service outbound bindings to fixed, non-exported trusted process endpoints. */
@@ -60,13 +62,28 @@ final class PackageAuthorityBootstrapConnections implements AutoCloseable {
 
         @Override public void onServiceConnected(ComponentName name, IBinder value) {
             rebindPosted = false;
-            if (closed || value == null || !value.isBinderAlive()) {
-                scheduleRebind();
-                return;
+            try {
+                IPackageAuthorityBootstrap endpoint =
+                        IPackageAuthorityBootstrap.Stub.asInterface(value);
+                if (closed || endpoint == null || value == null || !value.isBinderAlive()) {
+                    disconnected();
+                    return;
+                }
+                IBinder installed = endpoint.capability();
+                int ownerPid = endpoint.ownerPid();
+                if (installed == null || !installed.isBinderAlive() || ownerPid <= 0) {
+                    disconnected();
+                    return;
+                }
+                capability = installed;
+                if (managementRole) {
+                    registry.installManagement(installed, Process.myUid(), ownerPid);
+                } else {
+                    registry.installRuntime(installed, Process.myUid(), ownerPid);
+                }
+            } catch (Exception bootstrapFailure) {
+                disconnected();
             }
-            capability = value;
-            if (managementRole) registry.installManagement(value);
-            else registry.installRuntime(value);
         }
 
         @Override public void onServiceDisconnected(ComponentName name) { disconnected(); }

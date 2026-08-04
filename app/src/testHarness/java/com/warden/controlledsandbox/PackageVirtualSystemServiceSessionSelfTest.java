@@ -16,7 +16,7 @@ public final class PackageVirtualSystemServiceSessionSelfTest {
         PackageServiceDependencies dependencies = dependencies(context, root);
         try {
             LiveBinder runtimeAuthority = new LiveBinder();
-            dependencies.capabilityRegistry.installRuntime(runtimeAuthority);
+            dependencies.capabilityRegistry.installRuntime(runtimeAuthority, 0, 1);
             ImmediateDeathBinder clientToken = new ImmediateDeathBinder();
             PackageVirtualSystemServiceSession session = new PackageVirtualSystemServiceSession(
                     dependencies, 0, clientToken,

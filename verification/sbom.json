@@ -30,7 +30,7 @@
         "XML",
         "pro"
       ],
-      "sourceDigestSha256": "c1f72ae905395ccc11fd5ba687a3fbe466b9ae9a23ed26ac7bd40522f7f90131"
+      "sourceDigestSha256": "cf3fde97dbd9a36fcf6ebe814e95889d84e29fd2936d36bf4da97f03382afe22"
     },
     {
       "type": "library",
@@ -53,14 +53,14 @@
       "gradleProjectPath": ":sandbox-contract",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 276,
+      "fileCount": 277,
       "languages": [
         "AIDL",
         "Gradle",
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "6b260795ab389f47d3b0a248723274d30bf18e6b77e69e527ef76763f6d16475"
+      "sourceDigestSha256": "61a96a2570f50150f8b5d581f428a25241d50bc1dd316cedb6d92272eaf538c8"
     },
     {
       "type": "library",
@@ -75,7 +75,7 @@
         "Java",
         "XML"
       ],
-      "sourceDigestSha256": "5471dddb6cfcb6d2cbb62ada4e2781b330b50e263bb8a383e19c6ee317e2d0b2"
+      "sourceDigestSha256": "6756915562e8ae57f1419127033dc9a98cdb6fbd1f6445f3c37510082f3e27ef"
     },
     {
       "type": "library",
