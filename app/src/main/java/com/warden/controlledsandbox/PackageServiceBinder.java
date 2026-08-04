@@ -54,12 +54,12 @@ final class PackageServiceBinder extends IPackageService.Stub {
 
     @Override public void registerManagementCapability(IBinder capability,
             long capabilityGeneration) {
-        dependencies.capabilityRegistry.registerManagement(capability, capabilityGeneration);
+        throw new SecurityException("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED");
     }
 
     @Override public void registerRuntimeCapability(IBinder capability,
             long capabilityGeneration) {
-        dependencies.capabilityRegistry.registerRuntime(capability, capabilityGeneration);
+        throw new SecurityException("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED");
     }
 
     @Override public IPackageManagementSession openManagementSessionWithCapability(

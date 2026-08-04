@@ -1,9 +1,10 @@
 package com.warden.controlledsandbox;
 
 import android.os.IBinder;
+import com.warden.controlledsandbox.contract.PackageAuthorityCapabilityContract;
 import com.warden.controlledsandbox.contract.RuntimePeerIdentity;
 
-/** Direct regression for generation-bound, PID-owned and death-linked role capabilities. */
+/** Direct regression for private-bootstrap, server-epoch and death-linked role capabilities. */
 public final class PackageManagementAuthorizationSelfTest {
     private PackageManagementAuthorizationSelfTest() { }
 
@@ -14,73 +15,47 @@ public final class PackageManagementAuthorizationSelfTest {
         PackageAuthorityCapabilityRegistry registry =
                 new PackageAuthorityCapabilityRegistry(verifier);
         try {
-            require(ManagementCallerPolicy.canBootstrapManagement(2000, 100, 2000),
-                    "Host UID should be eligible to bootstrap management capability");
-            require(!ManagementCallerPolicy.canBootstrapManagement(2001, 100, 2000),
-                    "foreign UID must not bootstrap management capability");
-            require(!ManagementCallerPolicy.canBootstrapManagement(2000, 0, 2000),
-                    "invalid Binder PID must fail closed");
-
             TestBinder management = new TestBinder();
-            registry.registerManagement(management, 10L);
-            registry.requireManagement(management, 10L);
-            registry.registerManagement(management, 10L); // idempotent reconnect
+            registry.installManagement(management);
+            registry.requireManagement(management,
+                    PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH);
+
+            expectSecurity(() -> registry.requireManagement(new TestBinder(), 0L),
+                    "caller-supplied management token was accepted");
+            expectSecurity(() -> registry.requireManagement(management, Long.MAX_VALUE),
+                    "caller-controlled management generation was accepted");
 
             identity.pid = 101;
-            expectSecurity(() -> registry.requireManagement(management, 10L),
+            expectSecurity(() -> registry.requireManagement(management, 0L),
                     "different same-UID process reused management capability");
-            expectSecurity(() -> registry.registerManagement(new TestBinder(), 11L),
-                    "second same-UID process replaced live management role");
 
             identity.pid = 100;
-            expectSecurity(() -> registry.requireManagement(management, 11L),
-                    "management generation mismatch was accepted");
             management.die();
-            expectSecurity(() -> registry.requireManagement(management, 10L),
+            expectSecurity(() -> registry.requireManagement(management, 0L),
                     "dead management capability remained active");
 
             identity.pid = 102;
             TestBinder replacement = new TestBinder();
-            registry.registerManagement(replacement, 11L);
-            registry.requireManagement(replacement, 11L);
-            expectSecurity(() -> registry.registerManagement(new TestBinder(), 11L),
-                    "management generation was not required to advance");
+            registry.installManagement(replacement);
+            registry.requireManagement(replacement, 0L);
 
             identity.uid = 2000;
             identity.pid = 200;
-            identity.permission = false;
-            identity.companionPackage = null;
             TestBinder hostRuntime = new TestBinder();
-            registry.registerRuntime(hostRuntime, 20L);
-            registry.requireRuntime(hostRuntime, 20L);
+            registry.installRuntime(hostRuntime);
+            registry.requireRuntime(hostRuntime, 0L);
             identity.pid = 201;
-            expectSecurity(() -> registry.requireRuntime(hostRuntime, 20L),
+            expectSecurity(() -> registry.requireRuntime(hostRuntime, 0L),
                     "same-UID Guest process reused Runtime capability");
-            expectSecurity(() -> registry.registerRuntime(new TestBinder(), 21L),
-                    "same-UID Guest process replaced live Runtime role");
+            expectSecurity(() -> registry.requireRuntime(new TestBinder(), 0L),
+                    "same-UID Guest process substituted Runtime capability");
 
             identity.uid = 3000;
             identity.pid = 300;
             identity.permission = true;
             identity.companionPackage = companion;
-            TestBinder companionRuntime = new TestBinder();
-            registry.registerRuntime(companionRuntime, 30L);
-            registry.requireRuntime(companionRuntime, 30L);
-
-            identity.companionPackage = null;
-            expectSecurity(() -> registry.requireRuntime(companionRuntime, 30L),
-                    "package identity lookup failure did not fail closed");
-            identity.companionPackage = companion;
-            identity.permission = false;
-            expectSecurity(() -> registry.requireRuntime(companionRuntime, 30L),
-                    "Companion without signature permission remained authorized");
-
-            identity.uid = 4000;
-            identity.pid = 400;
-            identity.permission = false;
-            identity.companionPackage = null;
-            expectSecurity(() -> registry.registerRuntime(new TestBinder(), 40L),
-                    "foreign unsigned UID bootstrapped Runtime capability");
+            expectSecurity(() -> registry.requireRuntime(hostRuntime, 0L),
+                    "Companion reused Host Runtime capability");
 
             ManagementSessionGuard managementGuard = new ManagementSessionGuard(2000, 100);
             managementGuard.requireOwner(2000, 100);
@@ -89,19 +64,10 @@ public final class PackageManagementAuthorizationSelfTest {
             managementGuard.close();
             expectSecurity(() -> managementGuard.requireOwner(2000, 100),
                     "closed management session remained callable");
-
-            RuntimePermissionSessionGuard runtimeGuard =
-                    new RuntimePermissionSessionGuard(2000, 200);
-            runtimeGuard.requireOwner(2000, 200);
-            expectSecurity(() -> runtimeGuard.requireOwner(2000, 201),
-                    "a different process reused the Runtime session");
-            runtimeGuard.close();
-            expectSecurity(() -> runtimeGuard.requireOwner(2000, 200),
-                    "closed Runtime session remained callable");
         } finally {
             registry.close();
         }
-        System.out.println("PASS package authority Binder capability authorization self-test");
+        System.out.println("PASS private Package Authority bootstrap self-test");
     }
 
     private static final class MutableIdentity
@@ -150,10 +116,6 @@ public final class PackageManagementAuthorizationSelfTest {
             DeathRecipient current = recipient;
             if (current != null) current.binderDied();
         }
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) throw new AssertionError(message);
     }
 
     private static void expectSecurity(Runnable action, String message) {

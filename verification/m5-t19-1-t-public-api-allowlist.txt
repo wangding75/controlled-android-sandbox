@@ -21,7 +21,10 @@ com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public st
 com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public final class PackageAuthorityCapabilityContract
 com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static final String MANAGEMENT_CAPABILITY_REQUIRED =
 com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static final String RUNTIME_CAPABILITY_REQUIRED =
-com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static long nextGeneration()
-com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public final class RuntimePackageAuthorityCapability
-com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public static IBinder token()
-com.warden.controlledsandbox.contract|RuntimePackageAuthorityCapability.java|public static long generation()
+com.warden.controlledsandbox.contract|PackageAuthorityCapabilityContract.java|public static final long SERVER_MANAGED_EPOCH = 0L
+com.warden.controlledsandbox.runtime.broker|RuntimePackageAuthorityBootstrapService.java|public final class RuntimePackageAuthorityBootstrapService extends Service
+com.warden.controlledsandbox.runtime.broker|RuntimePackageAuthorityCapability.java|public final class RuntimePackageAuthorityCapability
+com.warden.controlledsandbox.runtime.broker|RuntimePackageAuthorityCapability.java|public static IBinder token()
+com.warden.controlledsandbox.runtime.broker|RuntimePackageAuthorityCapability.java|public static long epochMarker()
+com.warden.controlledsandbox|HostPackageAuthorityBootstrapService.java|public final class HostPackageAuthorityBootstrapService extends Service
+com.warden.controlledsandbox.runtime.guest|GuestContext.java|public final class GuestContext extends GuestHostOperationDenyContext

@@ -1,6 +1,5 @@
 package com.warden.controlledsandbox.runtime.broker;
 
-import com.warden.controlledsandbox.contract.RuntimePackageAuthorityCapability;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -27,12 +26,10 @@ final class RuntimeVirtualSystemServicePackageClient implements AutoCloseable {
     IVirtualSystemServiceSession open(IBinder clientToken, String packageName,
                                       int virtualUserId, int virtualUid, String processName, long generation, String packageRevision) throws Exception {
         IPackageService root = rootConnection.require();
-        root.registerRuntimeCapability(RuntimePackageAuthorityCapability.token(),
-                RuntimePackageAuthorityCapability.generation());
         IVirtualSystemServiceSession session = root.openVirtualSystemServiceSessionWithCapability(
                 clientToken, packageName, virtualUserId, virtualUid, processName, generation,
                 packageRevision, RuntimePackageAuthorityCapability.token(),
-                RuntimePackageAuthorityCapability.generation());
+                RuntimePackageAuthorityCapability.epochMarker());
         if (session == null) throw new IllegalStateException("Package service returned no virtual system-service session");
         return session;
     }

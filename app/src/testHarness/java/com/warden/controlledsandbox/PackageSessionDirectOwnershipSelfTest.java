@@ -14,10 +14,10 @@ public final class PackageSessionDirectOwnershipSelfTest {
         PackageServiceDependencies dependencies = dependencies(new TestContext(root), root);
         try {
             LiveBinder managementAuthority = new LiveBinder();
-            dependencies.capabilityRegistry.registerManagement(managementAuthority, 1L);
+            dependencies.capabilityRegistry.installManagement(managementAuthority);
             LiveBinder managementToken = new LiveBinder();
             PackageManagementSession management = new PackageManagementSession(
-                    dependencies, 0, 1, managementToken, managementAuthority, 1L);
+                    dependencies, 0, 1, managementToken, managementAuthority, 0L);
             management.binderDied();
             expectSecurity(management::loadCatalog,
                     "dead PackageManagementSession remained callable");
@@ -25,10 +25,10 @@ public final class PackageSessionDirectOwnershipSelfTest {
                     "PackageManagementSession did not release its death registration");
 
             LiveBinder runtimeAuthority = new LiveBinder();
-            dependencies.capabilityRegistry.registerRuntime(runtimeAuthority, 2L);
+            dependencies.capabilityRegistry.installRuntime(runtimeAuthority);
             LiveBinder runtimeToken = new LiveBinder();
             PackageRuntimePermissionSession runtime = new PackageRuntimePermissionSession(
-                    dependencies, 0, 1, runtimeToken, runtimeAuthority, 2L);
+                    dependencies, 0, 1, runtimeToken, runtimeAuthority, 0L);
             runtime.binderDied();
             expectSecurity(() -> runtime.requestRuntimePermission(
                             "guest.pkg", 0, "android.permission.CAMERA", 7,

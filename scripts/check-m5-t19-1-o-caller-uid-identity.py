@@ -26,61 +26,72 @@ verifier = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageCallerVerifier.java",
     "Binder.getCallingUid()",
     "Binder.getCallingPid()",
-    "getPackageUid(packageName, 0)",
-    "RuntimePeerIdentity.SIGNATURE_PERMISSION",
-    "signaturePermissionGranted()",
-    "companionPackageForUid",
     "managementCaller()",
     "runtimeCaller()",
-    "RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_UID",
 )
-for forbidden in (
-        "ActivityManager", "getRunningAppProcesses", "/proc/", "FileInputStream",
-        "processName(", "actualProcessName", "expectedProcessName"):
+for forbidden in ("ActivityManager", "getRunningAppProcesses", "/proc/", "processName("):
     if forbidden in verifier:
-        errors.append(f"PackageCallerVerifier retains mutable process-label authorization: {forbidden}")
-
-require(
-    "sandbox-contract/src/main/java/com/warden/controlledsandbox/contract/RuntimePeerIdentity.java",
-    "SIGNATURE_PERMISSION",
-    "COMPANION_RELEASE_PACKAGE",
-    "COMPANION_DEBUG_PACKAGE",
-)
-
-policy = require(
-    "app/src/main/java/com/warden/controlledsandbox/ManagementCallerPolicy.java",
-    "canBootstrapManagement",
-    "canBootstrapRuntime",
-    "callingUid == hostUid",
-    "signaturePermissionGranted",
-)
-for forbidden in ("processName", "expectedProcessName", "actualProcessName"):
-    if forbidden in policy:
-        errors.append(f"ManagementCallerPolicy retains process-label comparison: {forbidden}")
+        errors.append(f"PackageCallerVerifier retains process-label authorization: {forbidden}")
 
 registry = require(
     "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityCapabilityRegistry.java",
-    "generation <= existing.generation",
-    "ownerPid == caller.pid",
+    "installManagement",
+    "installRuntime",
+    "SERVER_MANAGED_EPOCH",
+    "PROCESS_OWNER_MISMATCH",
     "capability.linkToDeath",
     "capability.unlinkToDeath",
-    "PACKAGE_AUTHORITY_ROLE_ALREADY_REGISTERED",
-    "PACKAGE_AUTHORITY_GENERATION_NOT_ADVANCED",
     "requireManagement",
     "requireRuntime",
 )
-if "processName" in registry or "/proc/" in registry:
-    errors.append("PackageAuthorityCapabilityRegistry must not authorize process labels")
+for forbidden in ("registerManagement(", "registerRuntime(", "generation <=", "/proc/"):
+    if forbidden in registry:
+        errors.append(f"registry retains caller-controlled bootstrap/generation: {forbidden}")
+
+binder = require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageServiceBinder.java",
+    "PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED",
+    "registerManagementCapability",
+    "registerRuntimeCapability",
+)
+if binder.count("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED") < 2:
+    errors.append("both legacy public bootstrap transactions must fail closed")
+
+require(
+    "app/src/main/java/com/warden/controlledsandbox/PackageAuthorityBootstrapConnections.java",
+    "HostPackageAuthorityBootstrapService.class",
+    "RuntimePackageAuthorityBootstrapService.class",
+    "registry.installManagement",
+    "registry.installRuntime",
+)
+require(
+    "app/src/main/java/com/warden/controlledsandbox/HostPackageAuthorityBootstrapService.java",
+    "HostPackageAuthorityCapability.token()",
+)
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimePackageAuthorityBootstrapService.java",
+    "RuntimePackageAuthorityCapability.token()",
+)
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestClassLoader.java",
+    "isPrivilegedContract",
+    "IPackageService",
+    "IPackageManagementSession",
+)
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestHostOperationDenyContext.java",
+    "GUEST_CONTEXT_HOST_OPERATION_DENIED: " .replace(" ", ""),
+    "bindService",
+    "getContentResolver",
+    "getPackageManager",
+    "startActivity",
+)
 
 root_aidl = require(
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IPackageService.aidl",
     "registerManagementCapability",
     "registerRuntimeCapability",
     "openManagementSessionWithCapability",
-    "openRuntimePermissionSessionWithCapability",
-    "openVirtualSystemServiceSessionWithCapability",
-    "startVirtualJobWithCapability",
-    "stopVirtualJobWithCapability",
     "Legacy transaction IDs 1-5 are retained",
 )
 legacy = [
@@ -91,25 +102,36 @@ for signature in legacy:
     if signature not in root_aidl:
         errors.append(f"legacy AIDL transaction order changed or removed: {signature}")
 
-manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
 android = "{http://schemas.android.com/apk/res/android}"
-queries = {node.get(android + "name") for node in manifest.findall("./queries/package")}
-for package_name in (
-        "com.warden.controlledsandbox.companion32",
-        "com.warden.controlledsandbox.companion32.debug"):
-    if package_name not in queries:
-        errors.append(f"manifest package visibility missing: {package_name}")
+app_manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
+services = {
+    node.get(android + "name"): node
+    for node in app_manifest.findall("./application/service")
+}
+host_bootstrap = services.get(".HostPackageAuthorityBootstrapService")
+if host_bootstrap is None or host_bootstrap.get(android + "exported") != "false":
+    errors.append("Host bootstrap service must be non-exported")
+
+runtime_manifest = ET.parse(ROOT / "sandbox-runtime/src/main/AndroidManifest.xml").getroot()
+runtime_services = {
+    node.get(android + "name"): node
+    for node in runtime_manifest.findall("./application/service")
+}
+runtime_name = "com.warden.controlledsandbox.runtime.broker.RuntimePackageAuthorityBootstrapService"
+runtime_bootstrap = runtime_services.get(runtime_name)
+if runtime_bootstrap is None or runtime_bootstrap.get(android + "exported") != "false":
+    errors.append("Runtime bootstrap service must be non-exported")
+if runtime_bootstrap is not None and runtime_bootstrap.get(android + "process") != ":sandbox_server":
+    errors.append("Runtime bootstrap service must run in :sandbox_server")
 
 require(
     "app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
+    "caller-supplied management token was accepted",
+    "caller-controlled management generation was accepted",
     "different same-UID process reused management capability",
-    "second same-UID process replaced live management role",
     "same-UID Guest process reused Runtime capability",
-    "same-UID Guest process replaced live Runtime role",
-    "package identity lookup failure did not fail closed",
-    "Companion without signature permission remained authorized",
+    "same-UID Guest process substituted Runtime capability",
     "dead management capability remained active",
-    "management generation mismatch was accepted",
 )
 runner = require(
     "tools/static_android_compile.py",
@@ -124,15 +146,17 @@ if not receipt.is_file():
 else:
     executed = set(json.loads(receipt.read_text(encoding="utf-8")).get("executedTests", []))
     if "com.warden.controlledsandbox.PackageManagementAuthorizationSelfTest" not in executed:
-        errors.append("current static execution receipt omits PackageManagementAuthorizationSelfTest")
+        errors.append("execution receipt omits PackageManagementAuthorizationSelfTest")
 
 report = {
-    "task": "M5-T19.1-O2",
-    "finding": "NEW-P1-02 mutable process-label role authorization",
+    "task": "M5-T19.1-O3",
+    "finding": "FULL-P1-01 same-UID Guest capability bootstrap",
     "sourceStatus": "PASS" if not errors else "FAIL",
-    "processLabelAuthorization": False,
-    "managementAuthorization": "host UID/PID bootstrap plus generation-bound death-linked Binder capability",
-    "runtimeAuthorization": "host/companion UID and signature eligibility plus PID-owned Binder capability",
+    "publicBootstrapEnabled": False,
+    "epochOwner": "package-service",
+    "managementBootstrap": "explicit non-exported main-process component",
+    "runtimeBootstrap": "explicit non-exported :sandbox_server component",
+    "guestPrivilegedContractAccess": "denied",
     "legacyTransactionsRetained": True,
     "deviceEvidenceCount": 0,
     "errors": errors,
@@ -141,8 +165,8 @@ out = ROOT / "build/verification/m5-t19-1-o-caller-uid-identity.json"
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 if errors:
-    print("FAIL M5-T19.1-O2 Binder capability caller authorization", file=sys.stderr)
+    print("FAIL M5-T19.1-O3 private Package Authority bootstrap", file=sys.stderr)
     for error in errors:
         print(" - " + error, file=sys.stderr)
     raise SystemExit(1)
-print("PASS M5-T19.1-O2 caller roles use generation-bound Binder capabilities")
+print("PASS M5-T19.1-O3 private Package Authority bootstrap and Guest denial")

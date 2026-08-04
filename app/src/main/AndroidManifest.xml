@@ -27,6 +27,10 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
         <service
+            android:name=".HostPackageAuthorityBootstrapService"
+            android:exported="false"
+            android:stopWithTask="false" />
+        <service
             android:name=".PackageManagementService"
             android:exported="true"
             android:permission="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"

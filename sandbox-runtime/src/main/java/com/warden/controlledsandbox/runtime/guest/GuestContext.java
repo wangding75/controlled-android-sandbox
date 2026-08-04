@@ -2,7 +2,6 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.app.Application;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -25,7 +24,7 @@ import java.util.Map;
  * but Guest-visible identity and storage methods must terminate at this object. In particular,
  * callers never receive the host base Context through the normal Context API.</p>
  */
-public final class GuestContext extends ContextWrapper {
+public final class GuestContext extends GuestHostOperationDenyContext {
     private static final Object PREFERENCE_LOCK_TIE = new Object();
     private final GuestPackageSpec spec;
     private final ClassLoader classLoader;
@@ -104,6 +103,7 @@ public final class GuestContext extends ContextWrapper {
         capabilityGate.requireService(name);
         return super.getSystemService(name);
     }
+
     @Override public File getDataDir() { return dataRoot; }
     @Override public File getFilesDir() { return ensureDirectory(new File(dataRoot, "files")); }
     @Override public File getCacheDir() { return ensureDirectory(new File(dataRoot, "cache")); }

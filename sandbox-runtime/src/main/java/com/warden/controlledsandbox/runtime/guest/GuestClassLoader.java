@@ -31,8 +31,8 @@ public final class GuestClassLoader extends DexClassLoader {
 
     @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         synchronized (getClassLoadingLock(name)) {
-            if (isDeniedSandboxInternal(name)) {
-                throw new ClassNotFoundException("Sandbox host implementation is not a Guest API: " + name);
+            if (isDeniedSandboxInternal(name) || isPrivilegedContract(name)) {
+                throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);
             }
             if (isPolicyHidden(name)) {
                 throw new ClassNotFoundException("Class is hidden by Guest detection policy: " + name);
@@ -73,6 +73,21 @@ public final class GuestClassLoader extends DexClassLoader {
         return name != null
                 && name.startsWith("com.warden.controlledsandbox.")
                 && !name.startsWith("com.warden.controlledsandbox.contract.");
+    }
+
+    static boolean isPrivilegedContract(String name) {
+        if (name == null) return false;
+        return name.equals("com.warden.controlledsandbox.contract.IPackageService")
+                || name.startsWith("com.warden.controlledsandbox.contract.IPackageService$")
+                || name.equals("com.warden.controlledsandbox.contract.IPackageManagementSession")
+                || name.startsWith("com.warden.controlledsandbox.contract.IPackageManagementSession$")
+                || name.equals("com.warden.controlledsandbox.contract.IRuntimePermissionSession")
+                || name.startsWith("com.warden.controlledsandbox.contract.IRuntimePermissionSession$")
+                || name.equals("com.warden.controlledsandbox.contract.IVirtualSystemServiceSession")
+                || name.startsWith("com.warden.controlledsandbox.contract.IVirtualSystemServiceSession$")
+                || name.equals("com.warden.controlledsandbox.contract.IHostJobCallback")
+                || name.startsWith("com.warden.controlledsandbox.contract.IHostJobCallback$")
+                || name.equals("com.warden.controlledsandbox.contract.PackageAuthorityCapabilityContract");
     }
 
     static boolean isParentFirst(String name) {

@@ -10,7 +10,7 @@ import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
-import com.warden.controlledsandbox.contract.RuntimePackageAuthorityCapability;
+import com.warden.controlledsandbox.runtime.broker.RuntimePackageAuthorityCapability;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -51,7 +51,7 @@ public final class VirtualJobService extends JobService {
                         HostJobParametersSnapshotFactory.internalStopReason(params),
                         HostJobParametersSnapshotFactory.debugStopReason(params),
                         RuntimePackageAuthorityCapability.token(),
-                        RuntimePackageAuthorityCapability.generation());
+                        RuntimePackageAuthorityCapability.epochMarker());
             } catch (Exception ignored) { reschedule = true; }
         }
         unbind(value);
@@ -66,7 +66,7 @@ public final class VirtualJobService extends JobService {
                 if (service != null) {
                     try { service.stopVirtualJobWithCapability(value.hostJobId, 0, -1,
                             "host JobService destroyed", RuntimePackageAuthorityCapability.token(),
-                            RuntimePackageAuthorityCapability.generation()); }
+                            RuntimePackageAuthorityCapability.epochMarker()); }
                     catch (Exception ignored) { }
                 }
                 unbind(value);
@@ -114,11 +114,9 @@ public final class VirtualJobService extends JobService {
             boolean accepted = false;
             try {
                 if (service != null) {
-                    service.registerRuntimeCapability(RuntimePackageAuthorityCapability.token(),
-                            RuntimePackageAuthorityCapability.generation());
                     accepted = service.startVirtualJobWithCapability(snapshot, callback,
                             RuntimePackageAuthorityCapability.token(),
-                            RuntimePackageAuthorityCapability.generation());
+                            RuntimePackageAuthorityCapability.epochMarker());
                 }
             }
             catch (Exception ignored) { accepted = false; }

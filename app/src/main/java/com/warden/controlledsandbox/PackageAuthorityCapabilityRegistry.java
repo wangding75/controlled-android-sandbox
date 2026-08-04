@@ -1,124 +1,131 @@
 package com.warden.controlledsandbox;
 
 import android.os.IBinder;
+import com.warden.controlledsandbox.contract.PackageAuthorityCapabilityContract;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Generation-bound, PID-owned and death-linked Package Service role capability registry. */
+/**
+ * Server-epoch, death-linked Package Service role capability registry.
+ *
+ * <p>Capabilities are installed only by PackageManagementService after Android binds an explicit,
+ * non-exported bootstrap component. Public Binder callers can present a capability, but can never
+ * register or replace one.</p>
+ */
 final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
     private final PackageCallerVerifier verifier;
     private final Map<String, Slot> slots = new HashMap<>();
+    private long nextServerEpoch = 1L;
 
     PackageAuthorityCapabilityRegistry(PackageCallerVerifier verifier) {
         this.verifier = Objects.requireNonNull(verifier, "verifier");
     }
 
-    void registerManagement(IBinder capability, long generation) {
-        register(verifier.managementCaller(), capability, generation);
+    void installManagement(IBinder capability) {
+        install(PackageCallerVerifier.MANAGEMENT_ROLE, capability);
     }
 
-    void registerRuntime(IBinder capability, long generation) {
-        register(verifier.runtimeCaller(), capability, generation);
+    void installRuntime(IBinder capability) {
+        install(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability);
     }
 
-    void requireManagement(IBinder capability, long generation) {
-        require(verifier.managementCaller(), capability, generation,
+    void clearManagement(IBinder capability) {
+        clear(PackageCallerVerifier.MANAGEMENT_ROLE, capability);
+    }
+
+    void clearRuntime(IBinder capability) {
+        clear(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability);
+    }
+
+    void requireManagement(IBinder capability, long clientEpochMarker) {
+        require(verifier.managementCaller(), capability, clientEpochMarker,
                 "PACKAGE_MANAGEMENT_CAPABILITY_DENIED");
     }
 
-    void requireRuntime(IBinder capability, long generation) {
-        require(verifier.runtimeCaller(), capability, generation,
+    void requireRuntime(IBinder capability, long clientEpochMarker) {
+        require(verifier.runtimeCaller(), capability, clientEpochMarker,
                 "PACKAGE_RUNTIME_CAPABILITY_DENIED");
     }
 
-    private synchronized void register(PackageCallerVerifier.VerifiedCaller caller,
-            IBinder capability, long generation) {
-        requireCandidate(capability, generation);
-        Slot existing = slots.get(caller.role);
-        if (existing != null && existing.active) {
-            if (existing.matches(caller, capability, generation)) return;
-            throw new SecurityException("PACKAGE_AUTHORITY_ROLE_ALREADY_REGISTERED:" + caller.role);
-        }
-        if (existing != null && generation <= existing.generation) {
-            throw new SecurityException("PACKAGE_AUTHORITY_GENERATION_NOT_ADVANCED:" + caller.role);
-        }
+    private synchronized void install(String role, IBinder capability) {
+        requireCandidate(capability);
+        Slot existing = slots.get(role);
+        if (existing != null && existing.active && existing.capability.equals(capability)) return;
+        if (existing != null) retire(existing);
 
-        Slot replacement = new Slot(caller.uid, caller.pid, caller.role, capability, generation);
+        Slot replacement = new Slot(role, capability, nextServerEpoch++);
         replacement.deathRecipient = () -> retire(replacement);
         try {
             capability.linkToDeath(replacement.deathRecipient, 0);
         } catch (Exception error) {
-            throw new SecurityException("PACKAGE_AUTHORITY_CAPABILITY_DEAD:" + caller.role, error);
+            throw new SecurityException("PACKAGE_AUTHORITY_BOOTSTRAP_DEAD:" + role, error);
         }
         if (!capability.isBinderAlive()) {
             try { capability.unlinkToDeath(replacement.deathRecipient, 0); }
             catch (Exception ignored) { }
-            throw new SecurityException("PACKAGE_AUTHORITY_CAPABILITY_DEAD:" + caller.role);
+            throw new SecurityException("PACKAGE_AUTHORITY_BOOTSTRAP_DEAD:" + role);
         }
         replacement.active = true;
-        slots.put(caller.role, replacement);
+        slots.put(role, replacement);
     }
 
     private synchronized void require(PackageCallerVerifier.VerifiedCaller caller,
-            IBinder capability, long generation, String errorCode) {
+            IBinder capability, long clientEpochMarker, String errorCode) {
+        if (clientEpochMarker != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH) {
+            throw new SecurityException("PACKAGE_AUTHORITY_CLIENT_EPOCH_FORBIDDEN:" + caller.role);
+        }
         Slot slot = slots.get(caller.role);
-        if (slot == null || !slot.active || !slot.matches(caller, capability, generation)
+        if (slot == null || !slot.active || !slot.capability.equals(capability)
                 || !slot.capability.isBinderAlive()) {
             if (slot != null && !slot.capability.isBinderAlive()) retire(slot);
             throw new SecurityException(errorCode + ":" + caller.role);
         }
+        if (slot.ownerPid == 0) {
+            slot.ownerUid = caller.uid;
+            slot.ownerPid = caller.pid;
+        } else if (slot.ownerUid != caller.uid || slot.ownerPid != caller.pid) {
+            throw new SecurityException(errorCode + ":PROCESS_OWNER_MISMATCH:" + caller.role);
+        }
     }
 
-    private static void requireCandidate(IBinder capability, long generation) {
+    private static void requireCandidate(IBinder capability) {
         if (capability == null || !capability.isBinderAlive()) {
-            throw new SecurityException("PACKAGE_AUTHORITY_CAPABILITY_REQUIRED");
+            throw new SecurityException("PACKAGE_AUTHORITY_BOOTSTRAP_REQUIRED");
         }
-        if (generation <= 0L) {
-            throw new SecurityException("PACKAGE_AUTHORITY_GENERATION_REQUIRED");
-        }
+    }
+
+    private synchronized void clear(String role, IBinder capability) {
+        Slot slot = slots.get(role);
+        if (slot != null && slot.capability.equals(capability)) retire(slot);
     }
 
     private synchronized void retire(Slot slot) {
         Slot current = slots.get(slot.role);
         if (current != slot) return;
+        slots.remove(slot.role);
         slot.active = false;
         try { slot.capability.unlinkToDeath(slot.deathRecipient, 0); }
         catch (Exception ignored) { }
     }
 
     @Override public synchronized void close() {
-        for (Slot slot : slots.values()) {
-            if (!slot.active) continue;
-            slot.active = false;
-            try { slot.capability.unlinkToDeath(slot.deathRecipient, 0); }
-            catch (Exception ignored) { }
-        }
+        for (Slot slot : slots.values().toArray(new Slot[0])) retire(slot);
     }
 
     private static final class Slot {
-        final int ownerUid;
-        final int ownerPid;
         final String role;
         final IBinder capability;
-        final long generation;
+        final long serverEpoch;
+        int ownerUid;
+        int ownerPid;
         IBinder.DeathRecipient deathRecipient;
         boolean active;
 
-        Slot(int ownerUid, int ownerPid, String role, IBinder capability, long generation) {
-            this.ownerUid = ownerUid;
-            this.ownerPid = ownerPid;
+        Slot(String role, IBinder capability, long serverEpoch) {
             this.role = role;
             this.capability = capability;
-            this.generation = generation;
-        }
-
-        boolean matches(PackageCallerVerifier.VerifiedCaller caller,
-                IBinder candidate, long candidateGeneration) {
-            return ownerUid == caller.uid
-                    && ownerPid == caller.pid
-                    && generation == candidateGeneration
-                    && capability.equals(candidate);
+            this.serverEpoch = serverEpoch;
         }
     }
 }

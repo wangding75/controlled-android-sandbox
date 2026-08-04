@@ -59,6 +59,16 @@ public final class GuestContextBoundarySelfTest {
 
             require(context.getBaseContext() == context, "base Context must not expose host");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
+            expectDenied(() -> context.bindService(new android.content.Intent(),
+                            new android.content.ServiceConnection() {
+                                @Override public void onServiceConnected(
+                                        android.content.ComponentName name, android.os.IBinder binder) { }
+                                @Override public void onServiceDisconnected(
+                                        android.content.ComponentName name) { }
+                            }, Context.BIND_AUTO_CREATE), "bindService");
+            expectDenied(context::getContentResolver, "getContentResolver");
+            expectDenied(context::getPackageManager, "getPackageManager");
+            expectDenied(() -> context.startActivity(new android.content.Intent()), "startActivity");
             require(context.getDataDir().getCanonicalPath().startsWith(spec.dataRootFile().getCanonicalPath()),
                     "data directory inside instance root");
             require(context.getNoBackupFilesDir().getCanonicalPath().startsWith(
@@ -113,6 +123,17 @@ public final class GuestContextBoundarySelfTest {
             System.out.println("PASS Guest Context storage and unwrap boundary self-test");
         } finally {
             deleteRecursively(root);
+        }
+    }
+
+    private static void expectDenied(Runnable action, String operation) {
+        try {
+            action.run();
+            throw new AssertionError(operation + " exposed Host Context");
+        } catch (SecurityException expected) {
+            require(String.valueOf(expected.getMessage()).contains(
+                    "GUEST_CONTEXT_HOST_OPERATION_DENIED:" + operation),
+                    operation + " denial code");
         }
     }
 
