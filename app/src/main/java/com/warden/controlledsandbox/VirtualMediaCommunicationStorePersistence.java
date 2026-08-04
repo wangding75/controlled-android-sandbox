@@ -97,7 +97,7 @@ final class VirtualMediaCommunicationStorePersistence {
     }
 
     private static void moveAtomically(File source, File target) throws Exception {
-        DurableAtomicFile.replacePrepared(
+        DurableAtomicFile.replacePreparedAcknowledged(
                     source.toPath(), target.toPath());
     }
 

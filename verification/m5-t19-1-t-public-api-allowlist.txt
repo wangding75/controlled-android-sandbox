@@ -28,3 +28,5 @@ com.warden.controlledsandbox.runtime.protocol|RuntimePackageAuthorityCapability.
 com.warden.controlledsandbox.runtime.protocol|RuntimePackageAuthorityCapability.java|public static long epochMarker()
 com.warden.controlledsandbox|HostPackageAuthorityBootstrapService.java|public final class HostPackageAuthorityBootstrapService extends Service
 com.warden.controlledsandbox.runtime.guest|GuestContext.java|public final class GuestContext extends GuestHostOperationDenyContext
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static void moveAcknowledged(Path source, Path destination) throws IOException
+com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static void writeAcknowledged(Path destination, byte[] bytes) throws IOException

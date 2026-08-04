@@ -608,7 +608,7 @@ final class ApkImportManager {
     }
 
     static void publishDirectory(File source, File destination) throws Exception {
-        DurableAtomicFile.move(source.toPath(), destination.toPath());
+        DurableAtomicFile.moveAcknowledged(source.toPath(), destination.toPath());
     }
 
     private static void moveFile(File source, File destination) throws Exception {
@@ -618,7 +618,7 @@ final class ApkImportManager {
         }
         Exception moveFailure;
         try {
-            DurableAtomicFile.move(source.toPath(), destination.toPath());
+            DurableAtomicFile.moveAcknowledged(source.toPath(), destination.toPath());
             return;
         } catch (Exception error) {
             moveFailure = error;
@@ -633,7 +633,7 @@ final class ApkImportManager {
                 while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
                 output.flush(); file.getFD().sync();
             }
-            DurableAtomicFile.replacePrepared(temporary.toPath(), destination.toPath());
+            DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), destination.toPath());
             if (!source.delete() && source.exists()) {
                 throw new IllegalStateException("Cannot remove copied staging file " + source);
             }

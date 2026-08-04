@@ -300,7 +300,7 @@ final class GuestStorageNameCodec {
 
     private static void move(File source, File target, String code) {
         try {
-            DurableAtomicFile.move(source.toPath(), target.toPath());
+            DurableAtomicFile.moveAcknowledged(source.toPath(), target.toPath());
         } catch (IOException error) {
             throw new IllegalStateException(code + ":" + source.getName(), error);
         }
@@ -515,7 +515,7 @@ final class GuestStorageNameCodec {
                 output.flush();
                 raw.getFD().sync();
             }
-            DurableAtomicFile.replacePrepared(temporary.toPath(), registryFile.toPath());
+            DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), registryFile.toPath());
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_NAME_REGISTRY_WRITE_FAILED", error);
         } finally {

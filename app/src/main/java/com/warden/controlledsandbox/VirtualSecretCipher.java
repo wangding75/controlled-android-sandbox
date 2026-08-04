@@ -99,7 +99,7 @@ final class VirtualSecretCipher {
                     output.getFD().sync();
                 }
                 restrictOwnerOnly(temp);
-                DurableAtomicFile.replacePrepared(temp.toPath(), keyFile.toPath());
+                DurableAtomicFile.replacePreparedAcknowledged(temp.toPath(), keyFile.toPath());
                 restrictOwnerOnly(keyFile);
             } finally {
                 if (temp.exists() && !temp.delete()) temp.deleteOnExit();

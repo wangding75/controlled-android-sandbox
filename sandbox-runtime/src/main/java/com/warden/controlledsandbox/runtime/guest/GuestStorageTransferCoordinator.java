@@ -207,7 +207,7 @@ final class GuestStorageTransferCoordinator {
         if (relativeDirectories.isEmpty()) return;
         try {
             String payload = String.join("\n", relativeDirectories) + "\n";
-            DurableAtomicFile.write(new File(instanceRoot, REPAIR_NAME).toPath(),
+            DurableAtomicFile.writeAcknowledged(new File(instanceRoot, REPAIR_NAME).toPath(),
                     payload.getBytes(StandardCharsets.UTF_8));
         } catch (IOException ignored) {
             // The data move is already committed. Failure to persist the advisory repair marker

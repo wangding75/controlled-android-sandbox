@@ -88,7 +88,7 @@ final class VirtualSystemServiceStorePersistence {
                     out.flush();
                     out.getFD().sync();
                 }
-                DurableAtomicFile.replacePrepared(temp.toPath(), file.toPath());
+                DurableAtomicFile.replacePreparedAcknowledged(temp.toPath(), file.toPath());
             } finally {
                 if (temp.exists() && !temp.delete()) temp.deleteOnExit();
             }

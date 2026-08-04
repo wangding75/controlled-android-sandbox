@@ -215,7 +215,7 @@ final class NativeCompanionWorkspaceStore {
     }
 
     private static void atomicReplace(File source, File target) throws IOException {
-        DurableAtomicFile.replacePrepared(source.toPath(), target.toPath());
+        DurableAtomicFile.replacePreparedAcknowledged(source.toPath(), target.toPath());
     }
 
     private static void deleteTree(File value) throws IOException {

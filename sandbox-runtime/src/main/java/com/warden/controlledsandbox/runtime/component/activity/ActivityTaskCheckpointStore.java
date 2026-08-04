@@ -96,7 +96,7 @@ public final class ActivityTaskCheckpointStore {
                 output.writeLong(crc.getValue());
                 output.flush();
             }
-            DurableAtomicFile.replacePrepared(temporary, file);
+            DurableAtomicFile.replacePreparedAcknowledged(temporary, file);
         } catch (IOException error) {
             try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
             throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_WRITE_FAILED", error);

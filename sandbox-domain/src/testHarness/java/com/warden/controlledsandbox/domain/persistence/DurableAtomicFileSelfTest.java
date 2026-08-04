@@ -20,6 +20,7 @@ public final class DurableAtomicFileSelfTest {
         testNoNonAtomicFallback();
         testDirectorySyncFailureReturnsCommittedUncertain();
         testMoveDirectorySyncFailureReturnsCommittedUncertain();
+        testAcknowledgedUncertaintyLeavesRepairMarker();
     }
 
     private static void testActualDurableReplace() throws Exception {
@@ -149,6 +150,28 @@ public final class DurableAtomicFileSelfTest {
             require(!Files.exists(source), "source remained after committed move");
             require("moved".equals(Files.readString(target)),
                     "target content missing after committed move");
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    private static void testAcknowledgedUncertaintyLeavesRepairMarker() throws Exception {
+        Path root = Files.createTempDirectory("durable-repair-marker-");
+        try {
+            Path destination = root.resolve("state");
+            Files.writeString(destination, "committed");
+            DurableAtomicFile.CommitResult uncertain = DurableAtomicFile.CommitResult.uncertain(
+                    new IOException(DurableAtomicFile.DIRECTORY_SYNC_FAILED + ":" + root));
+            DurableAtomicFile.acknowledge(destination, uncertain);
+            require(DurableAtomicFile.hasPendingDurabilityRepair(destination),
+                    "uncertain commit did not leave a repair marker");
+            DurableAtomicFile.repairPending(destination);
+            require(!DurableAtomicFile.hasPendingDurabilityRepair(destination),
+                    "repair marker was not cleared after directory sync");
+            DurableAtomicFile.writeAcknowledged(destination,
+                    "next".getBytes(StandardCharsets.UTF_8));
+            require("next".equals(Files.readString(destination)),
+                    "acknowledged write failed after repair");
         } finally {
             deleteTree(root);
         }

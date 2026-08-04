@@ -342,7 +342,7 @@ final class PackageInstallSessionStore {
             output.write(content.getBytes(StandardCharsets.UTF_8));
             output.flush(); file.getFD().sync();
         }
-        DurableAtomicFile.replacePrepared(temporary.toPath(), state.toPath());
+        DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), state.toPath());
         directory.setLastModified(session.updatedAt);
     }
 
@@ -426,7 +426,7 @@ final class PackageInstallSessionStore {
     }
 
     private static void moveFile(File source, File destination) throws Exception {
-        DurableAtomicFile.move(source.toPath(), destination.toPath());
+        DurableAtomicFile.moveAcknowledged(source.toPath(), destination.toPath());
     }
 
     private static String artifactName(int index) {

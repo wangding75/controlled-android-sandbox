@@ -8,6 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -15,6 +18,7 @@ import java.util.UUID;
 public final class DurableAtomicFile {
     public static final String ATOMIC_MOVE_UNSUPPORTED = "STRICT_ATOMIC_MOVE_UNSUPPORTED";
     public static final String DIRECTORY_SYNC_FAILED = "PARENT_DIRECTORY_FSYNC_FAILED";
+    private static final String DURABILITY_REPAIR_PREFIX = ".durability-pending-";
 
     /** Observable commit phase for callers that must distinguish logical commit from durability. */
     public enum CommitState {
@@ -94,6 +98,78 @@ public final class DurableAtomicFile {
     /** Strictly moves an existing file or directory and persists both directory-entry changes. */
     public static CommitResult move(Path source, Path destination) throws IOException {
         return move(source, destination, NioMoveOperations.INSTANCE);
+    }
+
+    /** Performs a write and records any committed-but-not-yet-confirmed directory entry. */
+    public static void writeAcknowledged(Path destination, byte[] bytes) throws IOException {
+        repairPending(destination);
+        CommitResult result = write(destination, bytes);
+        acknowledge(destination, result);
+    }
+
+    /** Publishes a prepared file and records any committed durability uncertainty. */
+    public static void replacePreparedAcknowledged(Path prepared, Path destination)
+            throws IOException {
+        repairPending(destination);
+        CommitResult result = replacePrepared(prepared, destination);
+        acknowledge(destination, result);
+    }
+
+    /** Moves a path and records uncertainty for both changed parent directories. */
+    public static void moveAcknowledged(Path source, Path destination) throws IOException {
+        repairPending(source);
+        repairPending(destination);
+        CommitResult result = move(source, destination);
+        if (!result.durabilityConfirmed()) {
+            acknowledge(source, result);
+            acknowledge(destination, result);
+        }
+    }
+
+    /** Records post-rename uncertainty without turning an already committed mutation into failure. */
+    static void acknowledge(Path destination, CommitResult result) {
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(result, "result");
+        if (result.durabilityConfirmed()) return;
+        Path marker = repairMarker(destination);
+        try {
+            Files.createDirectories(marker.getParent());
+            byte[] payload = (destination.toAbsolutePath().normalize() + "\n"
+                    + result.state() + "\n"
+                    + String.valueOf(result.durabilityFailure()) + "\n")
+                    .getBytes(StandardCharsets.UTF_8);
+            try (FileChannel channel = FileChannel.open(marker, StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+                ByteBuffer buffer = ByteBuffer.wrap(payload);
+                while (buffer.hasRemaining()) channel.write(buffer);
+                channel.force(true);
+            }
+            try { syncDirectory(marker.getParent()); }
+            catch (IOException markerSyncFailure) {
+                if (result.durabilityFailure() != null) {
+                    result.durabilityFailure().addSuppressed(markerSyncFailure);
+                }
+            }
+        } catch (IOException markerFailure) {
+            if (result.durabilityFailure() != null) {
+                result.durabilityFailure().addSuppressed(markerFailure);
+            }
+        }
+    }
+
+    /** Repairs and clears a previous durability marker before the next mutation of the same path. */
+    static void repairPending(Path destination) throws IOException {
+        Objects.requireNonNull(destination, "destination");
+        Path marker = repairMarker(destination);
+        if (!Files.exists(marker)) return;
+        Path parent = marker.getParent();
+        syncDirectory(parent);
+        Files.deleteIfExists(marker);
+        syncDirectory(parent);
+    }
+
+    static boolean hasPendingDurabilityRepair(Path destination) {
+        return Files.exists(repairMarker(destination));
     }
 
     public static void syncDirectory(Path directory) throws IOException {
@@ -192,6 +268,24 @@ public final class DurableAtomicFile {
     private static IOException unsupported(AtomicMoveNotSupportedException failure) {
         return new IOException(ATOMIC_MOVE_UNSUPPORTED + ":" + failure.getFile() + "->" + failure.getOtherFile(),
                 failure);
+    }
+
+    private static Path repairMarker(Path destination) {
+        Path normalized = destination.toAbsolutePath().normalize();
+        Path parent = normalized.getParent();
+        if (parent == null) parent = normalized.toAbsolutePath().getParent();
+        String digest;
+        try {
+            byte[] encoded = MessageDigest.getInstance("SHA-256")
+                    .digest(normalized.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder value = new StringBuilder(16);
+            for (int i = 0; i < 8; i++) value.append(String.format("%02x", encoded[i]));
+            digest = value.toString();
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
+        return Objects.requireNonNull(parent, "destination parent")
+                .resolve(DURABILITY_REPAIR_PREFIX + digest + ".marker");
     }
 
     private static Path requireParent(Path path) throws IOException {

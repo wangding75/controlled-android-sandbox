@@ -113,7 +113,7 @@ public final class RecoverableFileStore {
     }
 
     private static void writePath(Path destination, String content, byte[] bytes) throws IOException {
-        DurableAtomicFile.write(destination, bytes);
+        DurableAtomicFile.writeAcknowledged(destination, bytes);
     }
 
     @FunctionalInterface

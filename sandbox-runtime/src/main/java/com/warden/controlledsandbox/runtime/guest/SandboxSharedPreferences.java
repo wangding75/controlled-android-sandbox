@@ -140,7 +140,7 @@ public final class SandboxSharedPreferences implements SharedPreferences {
             return false;
         }
         try {
-            DurableAtomicFile.replacePrepared(temporary.toPath(), file.toPath());
+            DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), file.toPath());
         } catch (IOException failure) {
             temporary.delete();
             return false;

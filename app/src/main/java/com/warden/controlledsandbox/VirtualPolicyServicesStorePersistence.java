@@ -56,7 +56,7 @@ import org.json.JSONObject;
                     out.flush();
                     out.getFD().sync();
                 }
-                DurableAtomicFile.replacePrepared(temporary.toPath(), file.toPath());
+                DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), file.toPath());
             } finally {
                 if (temporary.exists() && !temporary.delete()) temporary.deleteOnExit();
             }

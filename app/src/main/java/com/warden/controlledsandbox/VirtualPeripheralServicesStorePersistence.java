@@ -94,7 +94,7 @@ final class VirtualPeripheralServicesStorePersistence {
     }
 
     private static void moveAtomically(File source, File target) throws Exception {
-        DurableAtomicFile.replacePrepared(source.toPath(), target.toPath());
+        DurableAtomicFile.replacePreparedAcknowledged(source.toPath(), target.toPath());
     }
 
     private static String bounded(String value) {

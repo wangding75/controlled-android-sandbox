@@ -54,7 +54,7 @@ final class ApplicationEnvironmentStorePersistence {
                 try (FileOutputStream out = new FileOutputStream(temporary)) {
                     out.write(bytes); out.flush(); out.getFD().sync();
                 }
-                DurableAtomicFile.replacePrepared(temporary.toPath(), file.toPath());
+                DurableAtomicFile.replacePreparedAcknowledged(temporary.toPath(), file.toPath());
             } finally { if (temporary.exists() && !temporary.delete()) temporary.deleteOnExit(); }
         } catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException("Cannot persist application environment", error); }
