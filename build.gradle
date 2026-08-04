@@ -48,3 +48,20 @@ allprojects {
         }
     }
 }
+
+tasks.register('resolveAndLockAll') {
+    group = 'verification'
+    description = 'Resolve every resolvable project configuration so Gradle writes complete lock state.'
+    doLast {
+        def resolved = []
+        allprojects.sort { it.path }.each { project ->
+            project.configurations.findAll { it.canBeResolved }.sort { it.name }.each { configuration ->
+                configuration.incoming.resolutionResult.allComponents
+                resolved << "${project.path}:${configuration.name}"
+            }
+        }
+        if (resolved.isEmpty()) throw new GradleException('No resolvable configurations were found')
+        println "RESOLVED_LOCK_CONFIGURATIONS=${resolved.size()}"
+        resolved.each { println "LOCKED_CONFIGURATION=${it}" }
+    }
+}

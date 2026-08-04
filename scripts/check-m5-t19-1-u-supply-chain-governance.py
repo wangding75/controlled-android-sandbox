@@ -19,7 +19,6 @@ PROVENANCE = ROOT / "gradle" / "dependency-verification-provenance.json"
 METADATA = ROOT / "gradle" / "verification-metadata.xml"
 KEYRING = ROOT / "gradle" / "verification-keyring.keys"
 REVIEWED_COORDINATES = ROOT / "gradle" / "reviewed-dependency-coordinates.json"
-DEPENDENCY_LOCK = ROOT / "gradle" / "reviewed-dependency-coordinates.json"
 WRAPPER = ROOT / "gradle" / "wrapper" / "gradle-wrapper.properties"
 IDENTITY_POLICY_BASELINE = "7370154b2f9dadcb41bd5a0d49afc8c6a4886bd2"
 HEX40 = re.compile(r"^[0-9a-f]{40}$")
@@ -121,7 +120,11 @@ def validate_workflow_text(text: str, lock: dict) -> list[str]:
         errors.append("workflow does not run the source supply-chain gate")
     if "--dependency-verification=strict" not in text:
         errors.append("workflow does not execute Gradle in strict dependency-verification mode")
-    elif gate_command in text and text.index(gate_command) > text.index(gradle_command):
+    if "resolveAndLockAll --write-locks" not in text:
+        errors.append("workflow does not generate Gradle dependency lock state")
+    if "python3 tools/gradle_lock_state.py verify --require-clean" not in text:
+        errors.append("workflow does not compare generated lock state with checked-in locks")
+    if gradle_command in text and gate_command in text and text.index(gate_command) > text.index(gradle_command):
         errors.append("source supply-chain gate must run before Gradle dependency resolution")
     if "apt-get" in text or "curl " in text or "wget " in text:
         errors.append("workflow performs unverified mutable package or script downloads")
@@ -185,12 +188,12 @@ def validate_dependency_metadata(metadata: Path, keyring: Path, provenance: dict
 
 
 
-def validate_dependency_lock(lock_path: Path, metadata: Path) -> tuple[list[str], dict]:
+def validate_reviewed_coordinate_manifest(lock_path: Path, metadata: Path) -> tuple[list[str], dict]:
     errors: list[str] = []
     try:
         lock = json.loads(lock_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        return [f"invalid dependency coordinate lock: {exc}"], {}
+        return [f"invalid reviewed dependency coordinate manifest: {exc}"], {}
 
     policy = lock.get("policy", {})
     required_policy = {
@@ -204,7 +207,7 @@ def validate_dependency_lock(lock_path: Path, metadata: Path) -> tuple[list[str]
     }
     for key, expected in required_policy.items():
         if policy.get(key) != expected:
-            errors.append(f"dependency coordinate lock policy mismatch: {key}")
+            errors.append(f"reviewed dependency coordinate manifest policy mismatch: {key}")
 
     root_plugin = lock.get("rootPlugin", {})
     if root_plugin.get("coordinate") != "com.android.tools.build:gradle:8.11.1":
@@ -228,7 +231,7 @@ def validate_dependency_lock(lock_path: Path, metadata: Path) -> tuple[list[str]
     }
     missing_markers = sorted(required_markers - set(coordinates))
     if missing_markers:
-        errors.append(f"plugin marker coordinates missing from reviewed lock: {missing_markers}")
+        errors.append(f"plugin marker coordinates missing from reviewed coordinate manifest: {missing_markers}")
 
     build_text = (ROOT / "build.gradle").read_text(encoding="utf-8")
     if "dependencyLocking" not in build_text or "lockAllConfigurations()" not in build_text:
@@ -238,7 +241,7 @@ def validate_dependency_lock(lock_path: Path, metadata: Path) -> tuple[list[str]
     plugin_rows = re.findall(r"id\s+'([^']+)'\s+version\s+'([^']+)'", build_text)
     actual_markers = {f"{plugin}:{plugin}.gradle.plugin:{version}" for plugin, version in plugin_rows}
     if actual_markers != required_markers:
-        errors.append(f"Gradle plugin declarations differ from reviewed lock: {sorted(actual_markers)}")
+        errors.append(f"Gradle plugin declarations differ from reviewed coordinate manifest: {sorted(actual_markers)}")
 
     try:
         tree = ET.parse(metadata)
@@ -257,7 +260,7 @@ def validate_dependency_lock(lock_path: Path, metadata: Path) -> tuple[list[str]
                     observed[artifact.attrib.get("name", "")] = digest.attrib.get("value", "")
             for name, expected in artifacts.items():
                 if observed.get(name) != expected:
-                    errors.append(f"verification metadata checksum differs from lock: {name}")
+                    errors.append(f"verification metadata checksum differs from reviewed manifest: {name}")
     except (ET.ParseError, OSError) as exc:
         errors.append(f"cannot compare dependency lock to verification metadata: {exc}")
 
@@ -395,7 +398,9 @@ def run_self_tests(lock: dict) -> list[str]:
     errors: list[str] = []
     valid = """
 permissions:\n  contents: read
-jobs:\n  x:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0\n        with:\n          persist-credentials: false\n      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95\n        with:\n          java-version: '17.0.19+10'\n          check-latest: false\n      - run: python3 scripts/check-m5-t19-1-u-supply-chain-governance.py\n      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n      - run: ./gradlew --dependency-verification=strict help
+jobs:\n  x:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0\n        with:\n          persist-credentials: false\n      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95\n        with:\n          java-version: '17.0.19+10'\n          check-latest: false\n      - run: python3 scripts/check-m5-t19-1-u-supply-chain-governance.py\n      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\n      - run: ./gradlew --dependency-verification=strict resolveAndLockAll --write-locks
+      - run: python3 tools/gradle_lock_state.py verify --require-clean
+      - run: ./gradlew --dependency-verification=strict help
 """
     if validate_workflow_text(valid, lock):
         errors.append("workflow validator rejected valid immutable fixture")
@@ -437,7 +442,7 @@ def main() -> int:
 
     errors.extend(validate_dependency_metadata(METADATA, KEYRING, provenance))
     errors.extend(validate_reviewed_coordinates(provenance))
-    dependency_lock_errors, dependency_lock_report = validate_dependency_lock(DEPENDENCY_LOCK, METADATA)
+    dependency_lock_errors, dependency_lock_report = validate_reviewed_coordinate_manifest(REVIEWED_COORDINATES, METADATA)
     errors.extend(dependency_lock_errors)
     provenance_manifest = provenance.get("reviewedCoordinateManifest", {})
     if provenance_manifest.get("path") != dependency_lock_report.get("manifestPath"):
@@ -449,6 +454,12 @@ def main() -> int:
     if provenance.get("rootPluginChecksums") != dependency_lock_report.get("rootPlugin"):
         errors.append("root plugin checksum lock differs from provenance")
     errors.extend(validate_gradle_configuration())
+    build_source = (ROOT / "build.gradle").read_text(encoding="utf-8")
+    lock_tool = (ROOT / "tools/gradle_lock_state.py").read_text(encoding="utf-8")
+    if "tasks.register('resolveAndLockAll')" not in build_source or "configuration.incoming.resolutionResult.allComponents" not in build_source:
+        errors.append("Gradle resolveAndLockAll task is missing or does not resolve every resolvable configuration")
+    if "no Gradle-generated gradle.lockfile exists" not in lock_tool or "--require-clean" not in lock_tool:
+        errors.append("Gradle lock-state verifier is missing generated-file and clean-tree enforcement")
     identity_errors, identity_report = validate_commit_identities()
     errors.extend(identity_errors)
 
@@ -481,7 +492,8 @@ def main() -> int:
         "workflowResults": workflow_reports,
         "actionLock": lock,
         "dependencyVerificationProvenance": provenance,
-        "dependencyCoordinateLock": dependency_lock_report,
+        "reviewedCoordinateManifest": dependency_lock_report,
+        "gradleLockStateClaimedBySourceGate": False,
         "commitIdentity": identity_report,
         "errors": errors,
         "androidGradleBuildEvidenceCount": 0,
