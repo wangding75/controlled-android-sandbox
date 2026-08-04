@@ -30,3 +30,5 @@ com.warden.controlledsandbox|HostPackageAuthorityBootstrapService.java|public fi
 com.warden.controlledsandbox.runtime.guest|GuestContext.java|public final class GuestContext extends GuestHostOperationDenyContext
 com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static void moveAcknowledged(Path source, Path destination) throws IOException
 com.warden.controlledsandbox.domain.persistence|DurableAtomicFile.java|public static void writeAcknowledged(Path destination, byte[] bytes) throws IOException
+com.warden.controlledsandbox.contract|InstallSessionPage.java|public final class InstallSessionPage implements Parcelable, VirtualPageView<InstallSessionInfoSnapshot>
+com.warden.controlledsandbox.contract|InstallSessionPage.java|public static final Creator<InstallSessionPage> CREATOR = new Creator<>()

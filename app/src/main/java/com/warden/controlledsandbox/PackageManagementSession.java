@@ -14,6 +14,8 @@ import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSna
 import com.warden.controlledsandbox.contract.VirtualPrivilegedServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionPage;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
 import java.io.File;
 
 import static com.warden.controlledsandbox.PackageServiceDependencies.required;
@@ -27,6 +29,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private final HostPermissionStateResolver hostPermissions;
     private final VirtualSystemServiceStore systemServices;
     private final PackageProfileAuthority profiles;
+    private final VirtualSystemServicePager installSessionPager;
 
     private final PackageManagementAuthorityGuard guard;
     private final IBinder clientToken;
@@ -41,6 +44,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         hostPermissions = dependencies.hostPermissions;
         systemServices = dependencies.systemServices;
         profiles = new PackageProfileAuthority(dependencies);
+        installSessionPager = new VirtualSystemServicePager(dependencies.filesDir);
         guard = new PackageManagementAuthorityGuard(ownerUid, ownerPid,
                 dependencies.capabilityRegistry, authorityCapability, authorityGeneration);
         this.clientToken = clientToken;
@@ -83,8 +87,32 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     }
 
     @Override public PackageServiceResult listInstallSessions() {
-        return execute("listInstallSessions", () -> PackageServiceResult.successInstallSessions(
-                "listInstallSessions", lifecycle.installSessions()));
+        return execute("listInstallSessions", () -> {
+            VirtualSystemServicePager.PageSlice<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot> page =
+                    installSessionPager.page("install-sessions", "management",
+                            lifecycle.installSessions(), new VirtualPageRequest(
+                                    VirtualSystemServicePager.LEGACY_MAX_ITEMS,
+                                    VirtualSystemServicePager.LEGACY_MAX_BYTES, ""), null);
+            return PackageServiceResult.successInstallSessions(
+                    "listInstallSessions", installSessionPager.legacy(page));
+        });
+    }
+
+    @Override public InstallSessionPage listInstallSessionsPage(VirtualPageRequest request) {
+        requireOwner();
+        synchronized (operationLock) {
+            VirtualSystemServicePager.PageSlice<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot> page =
+                    installSessionPager.page("install-sessions", "management",
+                            uncheckedInstallSessions(), request, null);
+            return new InstallSessionPage(page.items(), page.nextPageToken(), page.snapshotRevision());
+        }
+    }
+
+    private java.util.List<com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot>
+            uncheckedInstallSessions() {
+        try { return lifecycle.installSessions(); }
+        catch (RuntimeException error) { throw error; }
+        catch (Exception error) { throw new IllegalStateException("INSTALL_SESSION_LIST_FAILED", error); }
     }
 
     @Override public PackageServiceResult setInstallSessionProgress(int sessionId, float progress) {
@@ -490,6 +518,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private void requireOwner() { guard.requireOwner(); }
 
     private void closeInternal() {
+        installSessionPager.close();
         guard.close();
         try { clientToken.unlinkToDeath(this, 0); } catch (Exception ignored) { }
     }

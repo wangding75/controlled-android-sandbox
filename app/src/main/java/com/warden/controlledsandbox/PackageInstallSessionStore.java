@@ -32,6 +32,7 @@ final class PackageInstallSessionStore {
     private static final long MAX_ARTIFACT_BYTES = 1536L * 1024 * 1024;
     private static final long MAX_INSTALL_BYTES = 3L * 1024 * 1024 * 1024;
     private static final int MAX_ARTIFACTS = 256;
+    static final int MAX_ACTIVE_SESSIONS = 64;
     private final File root;
     private final AtomicInteger nextId = new AtomicInteger((int) (System.currentTimeMillis() & 0x3fffffff));
 
@@ -46,6 +47,9 @@ final class PackageInstallSessionStore {
 
     int create(InstallSessionParamsSnapshot rawParams) throws Exception {
         ensureRoot();
+        if (activeSessionCount() >= MAX_ACTIVE_SESSIONS) {
+            throw new IllegalStateException("INSTALL_SESSION_QUOTA_EXCEEDED");
+        }
         InstallSessionParamsSnapshot params = normalizeParams(rawParams);
         for (int attempts = 0; attempts < 1000; attempts++) {
             int id = positive(nextId.incrementAndGet());
@@ -175,6 +179,21 @@ final class PackageInstallSessionStore {
     }
 
     InstallSessionInfoSnapshot info(int sessionId) throws Exception { return load(sessionId).info(); }
+
+    private int activeSessionCount() throws Exception {
+        if (!root.exists()) return 0;
+        File[] children = root.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list install sessions");
+        int count = 0;
+        for (File child : children) {
+            if (Files.isSymbolicLink(child.toPath()) || !child.isDirectory()) {
+                throw new SecurityException("Unexpected install-session root entry: " + child.getName());
+            }
+            parseInt(child.getName(), "directoryId");
+            count++;
+        }
+        return count;
+    }
 
     List<InstallSessionInfoSnapshot> list() throws Exception {
         if (!root.exists()) return List.of();

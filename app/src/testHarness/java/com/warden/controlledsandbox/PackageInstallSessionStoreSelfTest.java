@@ -99,6 +99,17 @@ public final class PackageInstallSessionStoreSelfTest {
             try { restarted.info(sessionId); }
             catch (IllegalArgumentException expected) { missing = true; }
             require(missing, "abandoned session removed");
+            java.util.ArrayList<Integer> quotaSessions = new java.util.ArrayList<>();
+            for (int index = 0; index < PackageInstallSessionStore.MAX_ACTIVE_SESSIONS; index++) {
+                quotaSessions.add(restarted.create(InstallSessionParamsSnapshot.fullInstall("")));
+            }
+            boolean quotaRejected = false;
+            try { restarted.create(InstallSessionParamsSnapshot.fullInstall("")); }
+            catch (IllegalStateException expected) {
+                quotaRejected = "INSTALL_SESSION_QUOTA_EXCEEDED".equals(expected.getMessage());
+            }
+            require(quotaRejected, "install-session total quota enforced");
+            for (int id : quotaSessions) restarted.abandon(id);
             System.out.println("PASS persisted staged install session self-test with PackageInstaller-style state");
         } finally {
             ApkImportManager.deleteTreeOrThrow(root);

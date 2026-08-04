@@ -11,6 +11,8 @@ import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapsho
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPrivilegedServicesProfileSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionPage;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
 
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
@@ -78,4 +80,5 @@ interface IPackageManagementSession {
     VirtualPrivilegedServicesProfileSnapshot resetPrivilegedServicesProfile(String packageName, int virtualUserId);
     PackageServiceResult maintenanceStatus();
     void close();
+    InstallSessionPage listInstallSessionsPage(in VirtualPageRequest request);
 }

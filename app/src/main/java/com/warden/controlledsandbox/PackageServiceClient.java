@@ -9,6 +9,8 @@ import com.warden.controlledsandbox.contract.IPackageService;
 import com.warden.controlledsandbox.contract.PackageCatalogSnapshot;
 import com.warden.controlledsandbox.contract.PackageRecordSnapshot;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.InstallSessionPage;
+import com.warden.controlledsandbox.contract.VirtualPageRequest;
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
@@ -83,7 +85,15 @@ final class PackageServiceClient implements AutoCloseable {
     }
 
     List<InstallSessionInfoSnapshot> installSessions() throws Exception {
-        return requireSuccess(requireSession().listInstallSessions()).installSessions();
+        java.util.ArrayList<InstallSessionInfoSnapshot> result = new java.util.ArrayList<>();
+        String token = "";
+        do {
+            InstallSessionPage page = requireSession().listInstallSessionsPage(
+                    new VirtualPageRequest(32, 128 * 1024, token));
+            result.addAll(page.items());
+            token = page.nextPageToken();
+        } while (!token.isEmpty());
+        return java.util.List.copyOf(result);
     }
 
     InstallSessionInfoSnapshot setInstallSessionProgress(int sessionId, float progress)
