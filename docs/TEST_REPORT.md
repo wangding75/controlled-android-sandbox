@@ -84,6 +84,6 @@ The acceptance branch closes three deterministic integration defects that were n
 - Unknown system-service names cannot delegate to the Host Context; known services remain bound to installed Hook evidence.
 - Companion32 has an explicit signature-permission Package Authority bootstrap in the Runtime Broker process and a dedicated death-linked role capability.
 
-Release scripts now cover Host, Fixture64, Fixture32 and Companion32, require external signing inputs for Host/Companion release variants, verify every APK with locked `apksigner`, and compare Host/Companion certificate SHA-256 digests. The repository intentionally contains no private signing key.
+Release scripts now cover Host, Fixture64, Fixture32 and Companion32, require external signing inputs for all four release application variants, verify every APK with locked `apksigner`, and compare Host/Companion certificate SHA-256 digests. The repository intentionally contains no private signing key.
 
 Local Host compilation/self-tests, AIDL compatibility, Native Host tests, architecture gates and reproducible source packaging are executable without Android SDK. The final Android gate remains BLOCKED until Gradle-generated dependency locks, Android SDK/NDK/CMake, signed APKs, Emulator and physical-device evidence are available.
