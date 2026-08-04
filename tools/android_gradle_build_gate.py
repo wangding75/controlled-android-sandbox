@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+REPORT = ROOT / "build/verification/android-gradle-build.json"
+TASKS = [
+    ":sandbox-domain:check",
+    ":sandbox-contract:assembleDebug",
+    ":sandbox-framework:assembleDebug",
+    ":sandbox-native:assembleDebug",
+    ":sandbox-runtime:assembleDebug",
+    ":app:assembleDebug",
+    ":sandbox-companion32:assembleDebug",
+    ":fixture-basic:assembleDebug",
+    ":fixture-compat32:assembleDebug",
+]
+
+
+def sdk_root() -> Path | None:
+    value = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+    return Path(value).expanduser().resolve() if value else None
+
+
+def write_report(payload: dict) -> None:
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    REPORT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("verify",))
+    parser.add_argument("--timeout-seconds", type=int, default=1800)
+    args = parser.parse_args()
+
+    errors: list[str] = []
+    sdk = sdk_root()
+    if sdk is None:
+        errors.append("ANDROID_SDK_ROOT or ANDROID_HOME is not set")
+    else:
+        if not (sdk / "platforms" / "android-36" / "android.jar").is_file():
+            errors.append("compileSdk platform android-36 is unavailable")
+        if not (sdk / "build-tools" / "35.0.0").is_dir():
+            errors.append("Android build-tools 35.0.0 is unavailable")
+        if not (sdk / "ndk" / "27.2.12479018").is_dir():
+            errors.append("Android NDK 27.2.12479018 is unavailable")
+        if not (sdk / "cmake" / "3.22.1").is_dir():
+            errors.append("Android CMake 3.22.1 is unavailable")
+    wrapper = ROOT / ("gradlew.bat" if os.name == "nt" else "gradlew")
+    if not wrapper.is_file():
+        errors.append("Gradle wrapper launcher is unavailable")
+
+    payload = {
+        "status": "FAIL" if errors else "PENDING",
+        "androidBuildEvidence": False,
+        "sdkRoot": str(sdk) if sdk else "",
+        "tasks": TASKS,
+        "errors": errors,
+    }
+    if errors:
+        write_report(payload)
+        print("FAIL Android Gradle build gate", file=sys.stderr)
+        for error in errors:
+            print(" - " + error, file=sys.stderr)
+        return 1
+
+    command = [str(wrapper), "--no-daemon", "--stacktrace",
+               "--dependency-verification=strict", *TASKS]
+    started = time.monotonic()
+    try:
+        result = subprocess.run(command, cwd=ROOT, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                timeout=args.timeout_seconds)
+        output = result.stdout
+        exit_code = result.returncode
+    except subprocess.TimeoutExpired as error:
+        output = (error.stdout or "") + "\nANDROID_GRADLE_BUILD_TIMEOUT\n"
+        exit_code = 124
+    log = ROOT / "build/verification/android-gradle-build.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(output, encoding="utf-8")
+    payload.update({
+        "status": "PASS" if exit_code == 0 else "FAIL",
+        "androidBuildEvidence": exit_code == 0,
+        "elapsedMs": int((time.monotonic() - started) * 1000),
+        "exitCode": exit_code,
+        "log": str(log.relative_to(ROOT)).replace("\\", "/"),
+        "errors": [] if exit_code == 0 else ["Gradle task execution failed"],
+    })
+    write_report(payload)
+    if exit_code != 0:
+        print("FAIL Android Gradle build gate; see " + str(log), file=sys.stderr)
+        return exit_code
+    print("PASS Android Gradle/AIDL/CMake/APK build gate")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

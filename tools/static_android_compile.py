@@ -128,6 +128,12 @@ def java_sources(*bases):
         if path.exists(): result += sorted(path.rglob('*.java'))
     return result
 
+def declared_project_dependencies(module):
+    build_file = root / module / 'build.gradle'
+    if not build_file.is_file(): return []
+    source = build_file.read_text(encoding='utf-8')
+    return sorted(set(re.findall(r"project\(['\"]:([^'\"]+)['\"]\)", source)))
+
 def compile_module(name, sources, classpath=()):
     output=module_root/name
     output.mkdir(parents=True, exist_ok=True)
@@ -145,28 +151,36 @@ def compile_module(name, sources, classpath=()):
         'elapsedMs': int((time.monotonic()-started)*1000),
         'exitCode': result.returncode,
         'classpathModules': [Path(item).name for item in classpath],
+        'declaredProjectDependencies': declared_project_dependencies(name),
     })
     if result.returncode: sys.exit(result.returncode)
     return output
 
-foundation=compile_module('foundation',
-    sorted(stubs.rglob('*.java')) + java_sources(
-        'sandbox-domain/src/main/java','sandbox-contract/src/main/java',
-        'sandbox-framework/src/testHarness/java/android'))
+generated_project_stubs = sorted((stubs / 'com' / 'warden').rglob('*.java'))
+platform_stub_sources = [path for path in sorted(stubs.rglob('*.java'))
+                         if path not in generated_project_stubs]
+platform=compile_module('android-platform-stubs',
+    platform_stub_sources + java_sources('sandbox-framework/src/testHarness/java/android'))
+domain=compile_module('sandbox-domain', java_sources('sandbox-domain/src/main/java'))
+contract=compile_module('sandbox-contract',
+    generated_project_stubs + java_sources('sandbox-contract/src/main/java'), (platform,))
 framework=compile_module('sandbox-framework',
-    java_sources('sandbox-framework/src/main/java'), (foundation,))
+    java_sources('sandbox-framework/src/main/java'), (platform,contract))
 native=compile_module('sandbox-native',
-    java_sources('sandbox-native/src/main/java'), (foundation,))
+    java_sources('sandbox-native/src/main/java'), (platform,))
 runtime=compile_module('sandbox-runtime',
-    java_sources('sandbox-runtime/src/main/java'), (foundation,framework,native))
+    java_sources('sandbox-runtime/src/main/java'), (platform,domain,contract,framework,native))
 app=compile_module('app',
-    java_sources('app/src/main/java','app/src/debug/java'),
-    (foundation,framework,native,runtime))
+    [stubs / 'com' / 'warden' / 'controlledsandbox' / 'R.java']
+        + java_sources('app/src/main/java','app/src/debug/java'),
+    (platform,domain,contract,runtime))
 companion=compile_module('sandbox-companion32',
     java_sources('sandbox-companion32/src/main/java'),
-    (foundation,framework,native,runtime))
+    (platform,domain,contract,runtime))
 fixture=compile_module('fixture-basic',
-    java_sources('fixture-basic/src/main/java'), (foundation,))
+    java_sources('fixture-basic/src/main/java'), (platform,))
+fixture32=compile_module('fixture-compat32',
+    java_sources('fixture-basic/src/main/java'), (platform,))
 tests=compile_module('test-harness', java_sources(
     'sandbox-domain/src/testHarness/java',
     'sandbox-framework/src/testHarness/java',
@@ -174,9 +188,21 @@ tests=compile_module('test-harness', java_sources(
     'sandbox-companion32/src/testHarness/java',
     'sandbox-runtime/src/testHarness/java',
     'app/src/testHarness/java'),
-    (foundation,framework,native,runtime,app,companion,fixture))
+    (platform,domain,contract,framework,native,runtime,app,companion,fixture,fixture32))
 
-for output in (foundation,framework,native,runtime,app,companion,fixture,tests):
+for receipt in compile_receipts:
+    module = receipt['module']
+    if not (root / module / 'build.gradle').is_file():
+        continue
+    actual = sorted(item for item in receipt['classpathModules']
+                    if item != 'android-platform-stubs')
+    declared = receipt['declaredProjectDependencies']
+    if actual != declared:
+        raise SystemExit('STATIC_MODULE_GRAPH_MISMATCH:' + module
+                         + ':declared=' + ','.join(declared)
+                         + ':actual=' + ','.join(actual))
+
+for output in (platform,domain,contract,framework,native,runtime,app,companion,fixture,fixture32,tests):
     for source in output.rglob('*'):
         if source.is_file():
             target=classes/source.relative_to(output)
@@ -187,10 +213,19 @@ verification=build/'verification'
 verification.mkdir(parents=True,exist_ok=True)
 (verification/'static-android-module-compilation.json').write_text(json.dumps({
     'completed': True,
-    'strategy': 'main sources compiled in declared Gradle dependency order',
+    'strategy': 'each main source set compiled against only its declared Gradle project dependencies plus local Android API stubs',
+    'androidBuildEvidence': False,
+    'limitations': [
+        'local handwritten Android and AIDL stubs',
+        'no manifest merge or Android resource processing',
+        'no AGP build variants',
+        'no CMake, D8/R8, APK packaging or installation',
+    ],
     'modules': compile_receipts,
 }, indent=2)+'\n', encoding='utf-8')
-print('PASS module-faithful static Android-source compilation with local API stubs')
+print('PASS module-scoped Host source compilation matching declared Gradle project dependencies (not Android build evidence)')
+if os.environ.get('STATIC_ANDROID_COMPILE_ONLY') == '1':
+    raise SystemExit(0)
 
 RUNNER_TIMEOUT_SECONDS = int(os.environ.get('STATIC_ANDROID_TEST_TIMEOUT_SECONDS', '30'))
 RUNNER_DEADLINE_SECONDS = int(os.environ.get('STATIC_ANDROID_STAGE_TIMEOUT_SECONDS', '900'))
