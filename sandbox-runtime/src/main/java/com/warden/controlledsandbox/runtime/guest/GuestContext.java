@@ -26,6 +26,7 @@ import java.util.Map;
  */
 public final class GuestContext extends GuestHostOperationDenyContext {
     private static final Object PREFERENCE_LOCK_TIE = new Object();
+    private final Context hostServiceContext;
     private final GuestPackageSpec spec;
     private final ClassLoader classLoader;
     private final Resources resources;
@@ -49,7 +50,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                          Resources resources, AssetManager assets, boolean deviceProtected,
                          SharedState sharedState) {
-        super(host);
+        super();
+        this.hostServiceContext = host.getApplicationContext();
         this.spec = spec;
         this.classLoader = classLoader;
         this.resources = resources;
@@ -101,7 +103,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
     @Override public Object getSystemService(String name) {
         capabilityGate.requireService(name);
-        return super.getSystemService(name);
+        return hostServiceContext.getSystemService(name);
     }
 
     @Override public File getDataDir() { return dataRoot; }
@@ -270,7 +272,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public boolean isDeviceProtectedStorage() { return deviceProtected; }
 
     private GuestContext storageContext(boolean targetDeviceProtected) {
-        return new GuestContext(super.getBaseContext(), spec, classLoader, resources, assets,
+        return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 targetDeviceProtected, sharedState);
     }
 

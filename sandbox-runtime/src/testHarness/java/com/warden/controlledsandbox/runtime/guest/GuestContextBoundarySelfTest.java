@@ -66,6 +66,14 @@ public final class GuestContextBoundarySelfTest {
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
                             }, Context.BIND_AUTO_CREATE), "bindService");
+            expectDenied(() -> context.bindService(new android.content.Intent(),
+                            Context.BIND_AUTO_CREATE, Runnable::run,
+                            new android.content.ServiceConnection() {
+                                @Override public void onServiceConnected(
+                                        android.content.ComponentName name, android.os.IBinder binder) { }
+                                @Override public void onServiceDisconnected(
+                                        android.content.ComponentName name) { }
+                            }), "bindService");
             expectDenied(context::getContentResolver, "getContentResolver");
             expectDenied(context::getPackageManager, "getPackageManager");
             expectDenied(() -> context.startActivity(new android.content.Intent()), "startActivity");

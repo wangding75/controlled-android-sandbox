@@ -12,19 +12,34 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.UserHandle;
 import java.util.concurrent.Executor;
 
 /** Deny-by-default boundary for Host identity-bearing Context operations. */
 abstract class GuestHostOperationDenyContext extends ContextWrapper {
-    GuestHostOperationDenyContext(Context host) { super(host); }
+    /**
+     * Keep the ContextWrapper base detached. Any Android API overload that is added in a newer
+     * SDK and is not yet explicitly handled here therefore fails closed instead of delegating to
+     * the Host Context. GuestContext keeps the Host transport in a private field for the small
+     * allowlisted surface it intentionally exposes.
+     */
+    GuestHostOperationDenyContext() { super(null); }
 
     @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
+        throw deniedHostOperation("bindService");
+    }
+    @Override public boolean bindService(Intent service, int flags, Executor executor,
+            ServiceConnection connection) {
         throw deniedHostOperation("bindService");
     }
     @Override public boolean bindIsolatedService(Intent service, int flags, String instanceName,
             Executor executor, ServiceConnection connection) {
         throw deniedHostOperation("bindIsolatedService");
+    }
+    @Override public void updateServiceGroup(
+            ServiceConnection connection, int group, int importance) {
+        throw deniedHostOperation("updateServiceGroup");
     }
     @Override public void unbindService(ServiceConnection connection) {
         throw deniedHostOperation("unbindService");
@@ -44,17 +59,49 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
     @Override public void sendBroadcast(Intent intent, String receiverPermission) {
         throw deniedHostOperation("sendBroadcast");
     }
+    @Override public void sendBroadcast(
+            Intent intent, String receiverPermission, Bundle options) {
+        throw deniedHostOperation("sendBroadcast");
+    }
     @Override public void sendBroadcastAsUser(Intent intent, UserHandle user) {
         throw deniedHostOperation("sendBroadcastAsUser");
     }
     @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission) {
         throw deniedHostOperation("sendOrderedBroadcast");
     }
+    @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission,
+            BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) {
+        throw deniedHostOperation("sendOrderedBroadcast");
+    }
+    @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission,
+            Bundle options, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) {
+        throw deniedHostOperation("sendOrderedBroadcast");
+    }
+    @Override public void sendStickyBroadcast(Intent intent) {
+        throw deniedHostOperation("sendStickyBroadcast");
+    }
+    @Override public void sendStickyOrderedBroadcast(Intent intent, BroadcastReceiver resultReceiver,
+            Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+        throw deniedHostOperation("sendStickyOrderedBroadcast");
+    }
+    @Override public void removeStickyBroadcast(Intent intent) {
+        throw deniedHostOperation("removeStickyBroadcast");
+    }
     @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
         throw deniedHostOperation("registerReceiver");
     }
     @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
             int flags) {
+        throw deniedHostOperation("registerReceiver");
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
+            String broadcastPermission, Handler scheduler) {
+        throw deniedHostOperation("registerReceiver");
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
+            String broadcastPermission, Handler scheduler, int flags) {
         throw deniedHostOperation("registerReceiver");
     }
     @Override public void unregisterReceiver(BroadcastReceiver receiver) {
@@ -81,14 +128,48 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
     @Override public void enforcePermission(String permission, int pid, int uid, String message) {
         throw deniedHostOperation("enforcePermission");
     }
+    @Override public void enforceCallingPermission(String permission, String message) {
+        throw deniedHostOperation("enforceCallingPermission");
+    }
+    @Override public void enforceCallingOrSelfPermission(String permission, String message) {
+        throw deniedHostOperation("enforceCallingOrSelfPermission");
+    }
     @Override public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
         throw deniedHostOperation("grantUriPermission");
     }
     @Override public void revokeUriPermission(Uri uri, int modeFlags) {
         throw deniedHostOperation("revokeUriPermission");
     }
+    @Override public void revokeUriPermission(String targetPackage, Uri uri, int modeFlags) {
+        throw deniedHostOperation("revokeUriPermission");
+    }
     @Override public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
         throw deniedHostOperation("checkUriPermission");
+    }
+    @Override public int checkCallingUriPermission(Uri uri, int modeFlags) {
+        throw deniedHostOperation("checkCallingUriPermission");
+    }
+    @Override public int checkCallingOrSelfUriPermission(Uri uri, int modeFlags) {
+        throw deniedHostOperation("checkCallingOrSelfUriPermission");
+    }
+    @Override public int checkUriPermission(Uri uri, String readPermission, String writePermission,
+            int pid, int uid, int modeFlags) {
+        throw deniedHostOperation("checkUriPermission");
+    }
+    @Override public void enforceUriPermission(Uri uri, int pid, int uid, int modeFlags,
+            String message) {
+        throw deniedHostOperation("enforceUriPermission");
+    }
+    @Override public void enforceCallingUriPermission(Uri uri, int modeFlags, String message) {
+        throw deniedHostOperation("enforceCallingUriPermission");
+    }
+    @Override public void enforceCallingOrSelfUriPermission(
+            Uri uri, int modeFlags, String message) {
+        throw deniedHostOperation("enforceCallingOrSelfUriPermission");
+    }
+    @Override public void enforceUriPermission(Uri uri, String readPermission,
+            String writePermission, int pid, int uid, int modeFlags, String message) {
+        throw deniedHostOperation("enforceUriPermission");
     }
     @Override public void startActivity(Intent intent) {
         throw deniedHostOperation("startActivity");
@@ -104,6 +185,11 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
     }
     @Override public void startIntentSender(IntentSender intent, Intent fillInIntent,
             int flagsMask, int flagsValues, int extraFlags)
+            throws IntentSender.SendIntentException {
+        throw deniedHostOperation("startIntentSender");
+    }
+    @Override public void startIntentSender(IntentSender intent, Intent fillInIntent,
+            int flagsMask, int flagsValues, int extraFlags, Bundle options)
             throws IntentSender.SendIntentException {
         throw deniedHostOperation("startIntentSender");
     }
