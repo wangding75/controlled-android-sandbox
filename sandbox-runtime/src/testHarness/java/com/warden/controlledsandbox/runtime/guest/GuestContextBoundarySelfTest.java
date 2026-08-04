@@ -77,6 +77,14 @@ public final class GuestContextBoundarySelfTest {
             expectDenied(context::getContentResolver, "getContentResolver");
             expectDenied(context::getPackageManager, "getPackageManager");
             expectDenied(() -> context.startActivity(new android.content.Intent()), "startActivity");
+            context.sealSystemServices(java.util.Map.of("clipboard", false));
+            boolean missingHookDenied = false;
+            try { context.getSystemService("clipboard"); }
+            catch (SecurityException expected) {
+                missingHookDenied = String.valueOf(expected.getMessage()).contains(
+                        "GUEST_SYSTEM_SERVICE_HOOK_UNAVAILABLE:clipboard:clipboard");
+            }
+            require(missingHookDenied, "missing system-service hook cannot fall back to Host manager");
             require(context.getDataDir().getCanonicalPath().startsWith(spec.dataRootFile().getCanonicalPath()),
                     "data directory inside instance root");
             require(context.getNoBackupFilesDir().getCanonicalPath().startsWith(

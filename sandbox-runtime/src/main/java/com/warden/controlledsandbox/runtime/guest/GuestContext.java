@@ -90,6 +90,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     void updatePermissionState(java.util.List<com.warden.controlledsandbox.contract.VirtualPermissionSnapshot> permissions) {
         capabilityGate.replace(permissions);
     }
+    void sealSystemServices(java.util.Map<String, Boolean> installedHooks) {
+        sharedState.systemServices.seal(installedHooks);
+    }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     @Override public Context getBaseContext() { return this; }
@@ -103,6 +106,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
     @Override public Object getSystemService(String name) {
         capabilityGate.requireService(name);
+        sharedState.systemServices.requireAvailable(name);
         return hostServiceContext.getSystemService(name);
     }
 
@@ -335,6 +339,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     private static final class SharedState {
         final GuestCapabilityGate capabilityGate;
+        final GuestSystemServiceBoundary systemServices = new GuestSystemServiceBoundary();
         volatile Application application;
         SharedState(GuestCapabilityGate capabilityGate) { this.capabilityGate = capabilityGate; }
     }

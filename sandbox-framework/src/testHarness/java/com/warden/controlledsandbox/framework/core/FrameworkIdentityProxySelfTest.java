@@ -170,27 +170,28 @@ public final class FrameworkIdentityProxySelfTest {
     private static void testHookReadinessPolicy() {
         java.util.Map<String, Boolean> allInstalled = new java.util.LinkedHashMap<>();
         for (String name : java.util.List.of("packageManager", "activityManager", "activityTaskManager",
-                "appOps", "permission", "notification")) allInstalled.put(name, true);
+                "appOps", "permission", "notification", "jobScheduler", "alarm", "clipboard",
+                "account", "storage")) allInstalled.put(name, true);
         FrameworkHookReport ready = new FrameworkHookReport(allInstalled, java.util.Map.of());
         require(ready.readiness() == FrameworkHookReport.Readiness.READY, "mandatory hook ready");
         ready.requireMandatoryReady();
 
         java.util.Map<String, String> optionalFailure = java.util.Map.of(
-                "notification", "java.lang.IllegalStateException:not available");
+                "bluetooth", "java.lang.IllegalStateException:not available");
         FrameworkHookReport degraded = new FrameworkHookReport(allInstalled, optionalFailure);
         require(degraded.readiness() == FrameworkHookReport.Readiness.DEGRADED,
-                "optional hook failure is degraded");
+                "non-core hook failure is degraded");
         degraded.requireMandatoryReady();
 
         java.util.Map<String, Boolean> missingMandatory = new java.util.LinkedHashMap<>(allInstalled);
-        missingMandatory.put("activityTaskManager", false);
+        missingMandatory.put("notification", false);
         FrameworkHookReport blocked = new FrameworkHookReport(missingMandatory,
-                java.util.Map.of("activityTaskManager", "java.lang.IllegalStateException:signature mismatch"));
+                java.util.Map.of("notification", "java.lang.IllegalStateException:signature mismatch"));
         require(blocked.readiness() == FrameworkHookReport.Readiness.BLOCKED,
                 "mandatory hook failure is blocked");
         boolean rejected = false;
         try { blocked.requireMandatoryReady(); }
-        catch (IllegalStateException expected) { rejected = expected.getMessage().contains("activityTaskManager"); }
+        catch (IllegalStateException expected) { rejected = expected.getMessage().contains("notification"); }
         require(rejected, "mandatory hook failure rejects guest prepare");
     }
 

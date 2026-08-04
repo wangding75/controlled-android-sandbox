@@ -8,7 +8,8 @@ import java.util.Set;
 
 public final class FrameworkHookReport {
     private static final Set<String> MANDATORY = Set.of(
-            "packageManager", "activityManager", "activityTaskManager", "appOps", "permission");
+            "packageManager", "activityManager", "activityTaskManager", "appOps", "permission",
+            "notification", "jobScheduler", "alarm", "clipboard", "account", "storage");
     private final Map<String, Boolean> installed;
     private final Map<String, String> failures;
 

@@ -127,6 +127,7 @@ public final class GuestRuntimeEnvironment {
                             spec.packageRevision),
                     frameworkCallRouter);
             stagedHooks = frameworkHooks;
+            guestContext.sealSystemServices(frameworkHooks.report().installedServices());
             frameworkHooks.report().requireMandatoryReady();
             CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(),
                     spec.packageState.permissions());
