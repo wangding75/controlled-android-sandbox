@@ -107,7 +107,7 @@
         "XML",
         "txt"
       ],
-      "sourceDigestSha256": "8feadbc4264779606dbe475e70915b55f3b3ac87833a09aec93f6954a14ee353"
+      "sourceDigestSha256": "e1648e90c5908ae25a566a0921c64646504584b61fd47bdc2a396023556ed183"
     },
     {
       "type": "application",
@@ -121,7 +121,7 @@
         "Gradle",
         "XML"
       ],
-      "sourceDigestSha256": "4b59cde29e3f1dc44ec790bd5cda050f25775e1016d6ad01ec9c7c131536c59f"
+      "sourceDigestSha256": "a29d5c769acace4aac22fe436504e1b2424845680621de30177c0b5e3c00a2ab"
     },
     {
       "type": "library",
