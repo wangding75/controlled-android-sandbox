@@ -1,7 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-OUT="$ROOT/build/native-self-test"
+RECEIPT="$ROOT/build/verification/native-host-test-execution.json"
+STAGE_TIMEOUT_SECONDS=${NATIVE_STAGE_TIMEOUT_SECONDS:-600}
+COMPILE_TIMEOUT_SECONDS=${NATIVE_COMPILE_TIMEOUT_SECONDS:-120}
+
+if [[ ${NATIVE_SELF_TEST_WATCHDOG_ACTIVE:-0} != 1 ]]; then
+  mkdir -p "$(dirname "$RECEIPT")"
+  STARTED=$(date +%s)
+  set +e
+  NATIVE_SELF_TEST_WATCHDOG_ACTIVE=1 timeout --signal=TERM --kill-after=10s \
+    "${STAGE_TIMEOUT_SECONDS}s" bash "$0" "$@"
+  CODE=$?
+  set -e
+  FINISHED=$(date +%s)
+  STATUS=FAIL
+  [[ $CODE -eq 0 ]] && STATUS=PASS
+  [[ $CODE -eq 124 || $CODE -eq 137 ]] && STATUS=TIMEOUT
+  cat > "$RECEIPT" <<JSON
+{
+  "status": "$STATUS",
+  "exitCode": $CODE,
+  "stageTimeoutSeconds": $STAGE_TIMEOUT_SECONDS,
+  "compileTimeoutSeconds": $COMPILE_TIMEOUT_SECONDS,
+  "elapsedSeconds": $((FINISHED - STARTED))
+}
+JSON
+  if [[ $CODE -eq 124 || $CODE -eq 137 ]]; then
+    echo "FAIL native Host test stage exceeded ${STAGE_TIMEOUT_SECONDS}s" >&2
+  fi
+  exit "$CODE"
+fi
+
+OUT=$(mktemp -d "${TMPDIR:-/tmp}/controlled-sandbox-native-self-test.XXXXXX")
+trap 'rm -rf "$OUT"' EXIT
+
+GXX_PATH=$(command -v g++)
+g++() {
+  local source='unknown'
+  local argument
+  for argument in "$@"; do
+    [[ $argument == *.cpp ]] && source=$(basename "$argument")
+  done
+  echo "START native compile: $source"
+  timeout --signal=TERM --kill-after=10s "${COMPILE_TIMEOUT_SECONDS}s" "$GXX_PATH" "$@"
+  echo "PASS native compile: $source"
+}
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
