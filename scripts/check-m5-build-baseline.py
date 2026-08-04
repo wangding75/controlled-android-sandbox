@@ -45,7 +45,7 @@ def main() -> int:
         fail("Locked Android SDK package set changed")
 
     settings = (ROOT / "settings.gradle").read_text()
-    for module in (":app", ":fixture-basic", ":sandbox-companion32"):
+    for module in (":app", ":fixture-basic", ":fixture-compat32", ":sandbox-companion32"):
         if f"include '{module}'" not in settings:
             fail(f"Missing device-test module in settings.gradle: {module}")
 
@@ -74,6 +74,12 @@ def main() -> int:
     require("scripts/build-device-test-apks.ps1", "check-build-environment.py --android")
     require("scripts/reproducible-build.sh", ":sandbox-companion32:assembleRelease")
     require("scripts/reproducible-build.ps1", ":sandbox-companion32:assembleRelease")
+    require("scripts/reproducible-build.sh", ":fixture-compat32:assembleRelease")
+    require("scripts/reproducible-build.ps1", ":fixture-compat32:assembleRelease")
+    require("scripts/reproducible-build.sh", "release_apk_signing.py")
+    require("scripts/reproducible-build.ps1", "release_apk_signing.py")
+    require("app/build.gradle", "release-signing.gradle")
+    require("sandbox-companion32/build.gradle", "release-signing.gradle")
     require("app/src/main/AndroidManifest.xml", "BIND_NATIVE_COMPANION")
     require("sandbox-companion32/src/main/AndroidManifest.xml", "BIND_NATIVE_COMPANION")
     require("sandbox-companion32/src/main/AndroidManifest.xml", "android:exported=\"true\"")

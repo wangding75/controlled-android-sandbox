@@ -1,0 +1,50 @@
+def signingValues = [
+        storeFile: System.getenv('CONTROLLED_SANDBOX_RELEASE_STORE_FILE'),
+        storePassword: System.getenv('CONTROLLED_SANDBOX_RELEASE_STORE_PASSWORD'),
+        keyAlias: System.getenv('CONTROLLED_SANDBOX_RELEASE_KEY_ALIAS'),
+        keyPassword: System.getenv('CONTROLLED_SANDBOX_RELEASE_KEY_PASSWORD'),
+]
+def signingConfigured = signingValues.values().every { value ->
+    value != null && !value.trim().isEmpty()
+}
+ext.controlledReleaseSigningConfigured = signingConfigured
+
+android {
+    signingConfigs {
+        controlledRelease {
+            if (signingConfigured) {
+                storeFile file(signingValues.storeFile)
+                storePassword signingValues.storePassword
+                keyAlias signingValues.keyAlias
+                keyPassword signingValues.keyPassword
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+                enableV4Signing true
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (signingConfigured) {
+                signingConfig signingConfigs.controlledRelease
+            }
+        }
+    }
+}
+
+tasks.register('verifyControlledReleaseSigning') {
+    group = 'verification'
+    description = 'Fail closed unless the external release signing identity is fully configured.'
+    doLast {
+        if (!signingConfigured) {
+            throw new GradleException(
+                    'Release signing is not configured. Set CONTROLLED_SANDBOX_RELEASE_STORE_FILE, ' +
+                    'CONTROLLED_SANDBOX_RELEASE_STORE_PASSWORD, CONTROLLED_SANDBOX_RELEASE_KEY_ALIAS and ' +
+                    'CONTROLLED_SANDBOX_RELEASE_KEY_PASSWORD.')
+        }
+        if (!file(signingValues.storeFile).isFile()) {
+            throw new GradleException('Release keystore does not exist: ' + signingValues.storeFile)
+        }
+    }
+}

@@ -1,5 +1,7 @@
 plugins { id 'com.android.application' }
 
+apply from: rootProject.file('gradle/release-signing.gradle')
+
 android {
     namespace 'com.warden.controlledsandbox'
     compileSdk rootProject.ext.controlledCompileSdk

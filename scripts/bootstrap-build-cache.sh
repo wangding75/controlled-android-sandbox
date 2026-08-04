@@ -8,5 +8,6 @@ export TZ=UTC LC_ALL=C LANG=C
 export GRADLE_USER_HOME=${GRADLE_USER_HOME:-"$ROOT/.gradle-reproducible"}
 ./gradlew --no-daemon --no-build-cache --no-parallel --refresh-dependencies help
 ./gradlew --no-daemon --no-build-cache --no-parallel \
-  :fixture-basic:assembleRelease :app:assembleRelease :sandbox-companion32:assembleRelease
+  :fixture-basic:assembleRelease :fixture-compat32:assembleRelease \
+  :app:assembleRelease :sandbox-companion32:assembleRelease
 printf 'PASS populated locked Gradle cache at %s\n' "$GRADLE_USER_HOME"

@@ -22,7 +22,9 @@ export TZ=UTC LC_ALL=C LANG=C
 export GRADLE_USER_HOME=${GRADLE_USER_HOME:-"$ROOT/.gradle-reproducible"}
 ARGS=(--no-daemon --no-build-cache --no-parallel --stacktrace)
 if [[ $ONLINE -eq 0 ]]; then ARGS+=(--offline); fi
-TASKS=(clean check :fixture-basic:assembleRelease :app:assembleRelease :sandbox-companion32:assembleRelease)
+TASKS=(clean check :app:verifyControlledReleaseSigning :sandbox-companion32:verifyControlledReleaseSigning \
+  :fixture-basic:assembleRelease :fixture-compat32:assembleRelease \
+  :app:assembleRelease :sandbox-companion32:assembleRelease)
 COMMIT=$(git rev-parse --short=12 HEAD)
 OUT="$ROOT/build/reproducible/$COMMIT"
 rm -rf "$OUT"
@@ -31,10 +33,16 @@ run_build() {
   local label=$1
   ./gradlew "${ARGS[@]}" "${TASKS[@]}"
   mkdir -p "$OUT/$label"
-  find app/build/outputs/apk fixture-basic/build/outputs/apk sandbox-companion32/build/outputs/apk -type f -name '*.apk' -print0 \
+  find app/build/outputs/apk fixture-basic/build/outputs/apk fixture-compat32/build/outputs/apk \
+    sandbox-companion32/build/outputs/apk -type f -name '*.apk' -print0 \
     | LC_ALL=C sort -z \
     | while IFS= read -r -d '' apk; do cp "$apk" "$OUT/$label/$(basename "$apk")"; done
   (cd "$OUT/$label" && sha256sum *.apk | LC_ALL=C sort > SHA256SUMS.txt)
+  python3 tools/release_apk_signing.py verify \
+    --host "$OUT/$label/app-release.apk" \
+    --companion "$OUT/$label/sandbox-companion32-release.apk" \
+    --fixture64 "$OUT/$label/fixture-basic-release.apk" \
+    --fixture32 "$OUT/$label/fixture-compat32-release.apk"
 }
 run_build first
 if [[ $VERIFY_TWICE -eq 1 ]]; then

@@ -13,7 +13,9 @@ try {
     $env:GRADLE_USER_HOME = if ($env:GRADLE_USER_HOME) { $env:GRADLE_USER_HOME } else { Join-Path $Root '.gradle-reproducible' }
     $GradleArgs = @('--no-daemon','--no-build-cache','--no-parallel','--stacktrace')
     if (-not $Online) { $GradleArgs += '--offline' }
-    $Tasks = @('clean','check',':fixture-basic:assembleRelease',':app:assembleRelease',':sandbox-companion32:assembleRelease')
+    $Tasks = @('clean','check',':app:verifyControlledReleaseSigning',':sandbox-companion32:verifyControlledReleaseSigning',
+        ':fixture-basic:assembleRelease',':fixture-compat32:assembleRelease',
+        ':app:assembleRelease',':sandbox-companion32:assembleRelease')
     $Commit = (git rev-parse --short=12 HEAD)
     $Out = Join-Path $Root "build\reproducible\$Commit"
     Remove-Item $Out -Recurse -Force -ErrorAction SilentlyContinue
@@ -23,11 +25,17 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Gradle build failed: $Label" }
         $Target = Join-Path $Out $Label
         New-Item -ItemType Directory -Path $Target -Force | Out-Null
-        Get-ChildItem app\build\outputs\apk, fixture-basic\build\outputs\apk, sandbox-companion32\build\outputs\apk -Recurse -Filter *.apk |
+        Get-ChildItem app\build\outputs\apk, fixture-basic\build\outputs\apk, fixture-compat32\build\outputs\apk, sandbox-companion32\build\outputs\apk -Recurse -Filter *.apk |
             Sort-Object FullName | ForEach-Object { Copy-Item $_.FullName (Join-Path $Target $_.Name) }
         Get-ChildItem $Target -Filter *.apk | Sort-Object Name | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToLowerInvariant(), $_.Name
         } | Set-Content -Encoding ascii (Join-Path $Target 'SHA256SUMS.txt')
+        & python tools\release_apk_signing.py verify `
+            --host (Join-Path $Target 'app-release.apk') `
+            --companion (Join-Path $Target 'sandbox-companion32-release.apk') `
+            --fixture64 (Join-Path $Target 'fixture-basic-release.apk') `
+            --fixture32 (Join-Path $Target 'fixture-compat32-release.apk')
+        if ($LASTEXITCODE -ne 0) { throw "Release APK signing verification failed: $Label" }
     }
     Invoke-DeterministicBuild 'first'
     if ($VerifyTwice) {
