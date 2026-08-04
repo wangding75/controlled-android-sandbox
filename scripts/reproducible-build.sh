@@ -23,6 +23,7 @@ export GRADLE_USER_HOME=${GRADLE_USER_HOME:-"$ROOT/.gradle-reproducible"}
 ARGS=(--no-daemon --no-build-cache --no-parallel --stacktrace)
 if [[ $ONLINE -eq 0 ]]; then ARGS+=(--offline); fi
 TASKS=(clean check :app:verifyControlledReleaseSigning :sandbox-companion32:verifyControlledReleaseSigning \
+  :fixture-basic:verifyControlledReleaseSigning :fixture-compat32:verifyControlledReleaseSigning \
   :fixture-basic:assembleRelease :fixture-compat32:assembleRelease \
   :app:assembleRelease :sandbox-companion32:assembleRelease)
 COMMIT=$(git rev-parse --short=12 HEAD)

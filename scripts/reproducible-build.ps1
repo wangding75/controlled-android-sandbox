@@ -14,6 +14,7 @@ try {
     $GradleArgs = @('--no-daemon','--no-build-cache','--no-parallel','--stacktrace')
     if (-not $Online) { $GradleArgs += '--offline' }
     $Tasks = @('clean','check',':app:verifyControlledReleaseSigning',':sandbox-companion32:verifyControlledReleaseSigning',
+        ':fixture-basic:verifyControlledReleaseSigning',':fixture-compat32:verifyControlledReleaseSigning',
         ':fixture-basic:assembleRelease',':fixture-compat32:assembleRelease',
         ':app:assembleRelease',':sandbox-companion32:assembleRelease')
     $Commit = (git rev-parse --short=12 HEAD)

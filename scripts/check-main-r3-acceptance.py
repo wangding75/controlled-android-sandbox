@@ -54,7 +54,8 @@ def main() -> int:
     require("app/src/testHarness/java/com/warden/controlledsandbox/PackageManagementAuthorizationSelfTest.java",
             "registry.installCompanionRuntime", errors)
 
-    for path in ["app/build.gradle", "sandbox-companion32/build.gradle"]:
+    for path in ["app/build.gradle", "sandbox-companion32/build.gradle",
+                 "fixture-basic/build.gradle", "fixture-compat32/build.gradle"]:
         require(path, "release-signing.gradle", errors)
     for token in ["CONTROLLED_SANDBOX_RELEASE_STORE_FILE",
                   "CONTROLLED_SANDBOX_RELEASE_KEY_ALIAS",
@@ -62,6 +63,8 @@ def main() -> int:
         require("gradle/release-signing.gradle", token, errors)
     for path in ["scripts/reproducible-build.sh", "scripts/reproducible-build.ps1"]:
         require(path, ":fixture-compat32:assembleRelease", errors)
+        require(path, ":fixture-basic:verifyControlledReleaseSigning", errors)
+        require(path, ":fixture-compat32:verifyControlledReleaseSigning", errors)
         require(path, "release_apk_signing.py", errors)
     require("tools/release_apk_signing.py", "Host and Companion32 signer SHA-256 digests differ", errors)
     require("scripts/test-release-apk-signing.sh", "companion-mismatch", errors)
