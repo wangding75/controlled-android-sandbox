@@ -8,6 +8,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Child-first loader for Guest code with explicit platform sharing and policy-driven host-internal denial. */
 public final class GuestClassLoader extends DexClassLoader {
+    private static final String SANDBOX_ROOT = "com.warden.controlledsandbox.";
+    private static final List<String> HOST_INTERNAL_PREFIXES = List.of(
+            SANDBOX_ROOT + "runtime.",
+            SANDBOX_ROOT + "framework.",
+            SANDBOX_ROOT + "nativebridge.",
+            SANDBOX_ROOT + "domain.",
+            SANDBOX_ROOT + "companion32.");
+
     private volatile List<String> hiddenClassPrefixes = List.of();
     private volatile int maximumSuspiciousQueries;
     private final AtomicInteger suspiciousQueries = new AtomicInteger();
@@ -70,14 +78,19 @@ public final class GuestClassLoader extends DexClassLoader {
     int suspiciousQueryCount() { return suspiciousQueries.get(); }
 
     static boolean isDeniedSandboxInternal(String name) {
-        return name != null
-                && name.startsWith("com.warden.controlledsandbox.")
-                && !name.startsWith("com.warden.controlledsandbox.contract.");
+        if (name == null || !name.startsWith(SANDBOX_ROOT)) return false;
+        if (name.startsWith(SANDBOX_ROOT + "contract.")) return false;
+        for (String prefix : HOST_INTERNAL_PREFIXES) {
+            if (name.startsWith(prefix)) return true;
+        }
+        String relativeName = name.substring(SANDBOX_ROOT.length());
+        return relativeName.indexOf('.') < 0;
     }
 
     static boolean isPrivilegedContract(String name) {
         if (name == null) return false;
-        return name.equals("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap")
+        return name.startsWith("com.warden.controlledsandbox.contract.internal.")
+                || name.equals("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap")
                 || name.startsWith("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap$")
                 || name.equals("com.warden.controlledsandbox.contract.IPackageService")
                 || name.startsWith("com.warden.controlledsandbox.contract.IPackageService$")

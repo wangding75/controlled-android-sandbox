@@ -54,11 +54,18 @@ if not errors:
     required_loader_fragments = {
         'if (isDeniedSandboxInternal(name) || isPrivilegedContract(name))':
             'GuestClassLoader does not enforce host and privileged-contract denial',
-        'name.startsWith("com.warden.controlledsandbox.")': 'host namespace denial is missing',
-        '!name.startsWith("com.warden.controlledsandbox.contract.")':
+        'private static final String SANDBOX_ROOT = "com.warden.controlledsandbox.";':
+            'sandbox namespace root is not explicit',
+        'name.startsWith(SANDBOX_ROOT + "contract.")':
             'stable Guest-safe Binder contract exception is missing',
+        'String relativeName = name.substring(SANDBOX_ROOT.length());':
+            'Host root-package class denial is missing',
+        "return relativeName.indexOf('.') < 0;":
+            'Host root-package class denial is not fail-closed',
         'throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);':
             'host and privileged-contract denial does not fail closed',
+        'name.startsWith("com.warden.controlledsandbox.contract.internal.")':
+            'internal contract namespace is not explicitly denied',
         'name.equals("com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap")':
             'private Package Authority bootstrap contract is not explicitly denied',
         'name.equals("com.warden.controlledsandbox.contract.IPackageService")':
@@ -93,6 +100,13 @@ if not errors:
     for namespace in forbidden_parent_first:
         if namespace not in loader_test:
             errors.append(f'Guest class-loader test does not cover denied namespace {namespace}')
+    for fixture_class in [
+        'com.warden.controlledsandbox.fixture.FixtureApplication',
+        'com.warden.controlledsandbox.fixture.MainActivity',
+        'com.warden.controlledsandbox.fixture32.MainActivity',
+    ]:
+        if fixture_class not in loader_test:
+            errors.append(f'Guest class-loader test does not cover loadable Fixture class {fixture_class}')
     if ('isPrivilegedContract(' not in loader_test
             or 'com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap' not in loader_test
             or 'com.warden.controlledsandbox.contract.IPackageService' not in loader_test):

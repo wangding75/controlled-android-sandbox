@@ -19,20 +19,44 @@ public final class GuestClassLoaderSelfTest {
         require(GuestClassLoader.isDeniedSandboxInternal(
                 "com.warden.controlledsandbox.nativebridge.NativePolicy"),
                 "native management implementation denied");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.domain.SandboxIdentity"),
+                "domain implementation denied");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.companion32.CompanionRuntime"),
+                "companion implementation denied");
+        require(GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.PackageManagementService"),
+                "Host root-package implementation denied");
         require(!GuestClassLoader.isDeniedSandboxInternal(
                 "com.warden.controlledsandbox.contract.IRuntimeBroker"),
                 "contract remains available");
+        require(!GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.fixture.FixtureApplication"),
+                "official 64-bit Fixture remains Guest-loadable");
+        require(!GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.fixture.MainActivity"),
+                "official Fixture Activity remains Guest-loadable");
+        require(!GuestClassLoader.isDeniedSandboxInternal(
+                "com.warden.controlledsandbox.fixture32.MainActivity"),
+                "32-bit Fixture namespace remains Guest-loadable");
         require(GuestClassLoader.isPrivilegedContract(
                 "com.warden.controlledsandbox.contract.IPackageAuthorityBootstrap"),
                 "private Package Authority bootstrap contract denied");
         require(GuestClassLoader.isPrivilegedContract(
                 "com.warden.controlledsandbox.contract.IPackageService"),
                 "privileged Package Service contract denied");
+        require(GuestClassLoader.isPrivilegedContract(
+                "com.warden.controlledsandbox.contract.internal.InternalCapability"),
+                "internal contract namespace denied");
         require(!GuestClassLoader.isPrivilegedContract(
                 "com.warden.controlledsandbox.contract.IRuntimeBroker"),
                 "Guest-safe runtime contract remains available");
         require(!GuestClassLoader.isParentFirst("com.example.guest.MainActivity"), "Guest child first");
         require(!GuestClassLoader.isParentFirst("org.example.library.Client"), "Guest libraries child first");
+        require(!GuestClassLoader.isParentFirst(
+                "com.warden.controlledsandbox.fixture.FixtureApplication"),
+                "official Fixture is child first");
         GuestClassLoader loader = new GuestClassLoader("", "", null, GuestClassLoaderSelfTest.class.getClassLoader());
         loader.configureDetection(new VirtualDetectionPolicySnapshot(
                 VirtualLocationProfileSnapshot.MODE_STATIC, true, true, true, true, true, 2,
