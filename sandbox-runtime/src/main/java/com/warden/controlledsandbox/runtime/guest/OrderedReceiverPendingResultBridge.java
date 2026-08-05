@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
 import com.warden.controlledsandbox.contract.internal.DeathRegistrationHelper;
 import com.warden.controlledsandbox.domain.component.receiver.OrderedBroadcastState;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.OrderedBroadcastResultExtrasCodec;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -206,22 +207,7 @@ final class OrderedReceiverPendingResultBridge {
         if (normalized.length() > OrderedBroadcastState.MAX_RESULT_DATA_CHARS) {
             throw new IllegalArgumentException("BROADCAST_RESULT_DATA_TOO_LARGE");
         }
-        if (extras == null) return;
-        if (extras.keySet().size() > OrderedBroadcastState.MAX_EXTRA_ENTRIES) {
-            throw new IllegalArgumentException("BROADCAST_RESULT_EXTRAS_TOO_MANY");
-        }
-        for (String key : extras.keySet()) {
-            if (key == null || key.length() > OrderedBroadcastState.MAX_EXTRA_KEY_CHARS) {
-                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRA_KEY_INVALID");
-            }
-            Object value = extras.get(key);
-            if (!(value instanceof String)) {
-                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRAS_STRING_ONLY");
-            }
-            if (((String) value).length() > OrderedBroadcastState.MAX_EXTRA_VALUE_CHARS) {
-                throw new IllegalArgumentException("BROADCAST_RESULT_EXTRA_VALUE_TOO_LARGE");
-            }
-        }
+        OrderedBroadcastResultExtrasCodec.validate(extras);
     }
 
     private Object invokeReceiver(String method) throws Exception {

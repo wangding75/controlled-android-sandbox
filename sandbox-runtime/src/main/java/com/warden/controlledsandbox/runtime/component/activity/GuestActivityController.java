@@ -40,7 +40,7 @@ public final class GuestActivityController {
         this.eventSink = java.util.Objects.requireNonNull(eventSink, "eventSink");
     }
 
-    Bundle create(String componentClass, Bundle state) {
+    Bundle create(String componentClass, Intent launchIntent, Bundle state) {
         Bundle result = new Bundle();
         try {
             Class<?> type = session.classLoader().loadClass(componentClass);
@@ -48,6 +48,7 @@ public final class GuestActivityController {
             guest = (Activity) type.getDeclaredConstructor().newInstance();
             attachBaseContext(guest);
             ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(host, guest, session, componentClass);
+            guest.setIntent(launchIntent == null ? new Intent() : new Intent(launchIntent));
             Thread.currentThread().setContextClassLoader(session.classLoader());
             invokeLifecycle(guest, "onCreate", new Class<?>[]{Bundle.class}, new Object[]{state});
             created = true;

@@ -74,6 +74,28 @@ public final class BrokerManifestReceiverRuntimeSelfTest {
             privateDenied = "MANIFEST_RECEIVER_NOT_EXPORTED".equals(expected.getMessage());
         }
         require(privateDenied, "manifest Receiver exported policy bypass");
+
+        BrokerManifestReceiverRuntime allowedRuntime = new BrokerManifestReceiverRuntime();
+        allowedRuntime.indexManifest(senderManifest(true), template("com.example.sender", 0));
+        allowedRuntime.indexManifest(targetManifest(), template("com.example.target", 0));
+        Bundle explicitlyPermissioned = explicit("com.example.target", 0,
+                "com.example.target.RemoteReceiver");
+        explicitlyPermissioned.putString(RuntimeKeys.BROADCAST_REQUIRED_RECEIVER_PERMISSION,
+                "com.example.RECEIVE_EXPLICIT");
+        allowedRuntime.routeExplicit(explicitlyPermissioned, sender);
+        require(allowedRuntime.packageRequestsPermission("com.example.target", 0,
+                        "com.example.RECEIVE_EXPLICIT"),
+                "manifest requested permission index");
+        explicitlyPermissioned.putString(RuntimeKeys.BROADCAST_REQUIRED_RECEIVER_PERMISSION,
+                "com.example.NOT_DECLARED");
+        boolean explicitRequiredPermissionDenied = false;
+        try { allowedRuntime.routeExplicit(explicitlyPermissioned, sender); }
+        catch (SecurityException expected) {
+            explicitRequiredPermissionDenied = expected.getMessage().startsWith(
+                    "MANIFEST_RECEIVER_SENDER_PERMISSION_DENIED");
+        }
+        require(explicitRequiredPermissionDenied,
+                "explicit receiverPermission was not enforced");
     }
 
     private static void testGenerationBinding() {
@@ -205,6 +227,7 @@ public final class BrokerManifestReceiverRuntimeSelfTest {
     private static ManifestModel targetManifest() {
         ManifestModel model = new ManifestModel();
         model.packageName("com.example.target");
+        model.addPermission("com.example.RECEIVE_EXPLICIT");
         ManifestModel.Component remote = new ManifestModel.Component(
                 "com.example.target.RemoteReceiver", ":receiver", true, true,
                 false, "", "com.example.SEND_SECURE");

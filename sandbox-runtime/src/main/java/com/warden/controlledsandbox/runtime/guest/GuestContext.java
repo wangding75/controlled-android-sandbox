@@ -1,7 +1,13 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import android.app.Application;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -10,12 +16,15 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.os.Handler;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Executor;
 
 /**
  * Instance-scoped Context view used by Guest Application and components.
@@ -36,6 +45,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final File dataRoot;
     private final File externalRoot;
     private final ApplicationInfo applicationInfo;
+    private final GuestContextComponentRouter componentRouter;
     private final GuestCapabilityGate capabilityGate;
     private final GuestStorageNameCodec storageNames;
     private final SharedState sharedState;
@@ -72,16 +82,10 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 deviceProtected ? "device_protected" : "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot);
-        this.applicationInfo = new ApplicationInfo(host.getApplicationInfo());
+        this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath());
         this.capabilityGate = sharedState.capabilityGate;
-        applicationInfo.packageName = spec.packageName;
-        applicationInfo.sourceDir = spec.apkPath;
-        applicationInfo.publicSourceDir = spec.apkPath;
-        applicationInfo.splitSourceDirs = spec.splitPathArray();
-        applicationInfo.splitPublicSourceDirs = spec.splitPathArray();
-        applicationInfo.nativeLibraryDir = spec.nativeLibraryDir;
-        applicationInfo.dataDir = dataRoot.getAbsolutePath();
-        applicationInfo.uid = spec.virtualUid;
+        this.componentRouter = new GuestContextComponentRouter(
+                this, spec, packageManager, sharedState.dynamicReceivers);
         ensureDirectory(new File(dataRoot, "files"));
         ensureDirectory(new File(dataRoot, "cache"));
         ensureDirectory(new File(dataRoot, "databases"));
@@ -123,6 +127,83 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         sharedState.systemServices.requireAvailable(name);
         return hostServiceContext.getSystemService(name);
     }
+    @Override public ContentResolver getContentResolver() {
+        return hostServiceContext.getContentResolver();
+    }
+    @Override public Executor getMainExecutor() { return hostServiceContext.getMainExecutor(); }
+
+    @Override public void startActivity(Intent intent) { componentRouter.startActivity(intent, null); }
+    @Override public void startActivity(Intent intent, Bundle options) {
+        componentRouter.startActivity(intent, options);
+    }
+    @Override public void startActivities(Intent[] intents) { startActivities(intents, null); }
+    @Override public void startActivities(Intent[] intents, Bundle options) {
+        if (intents == null) throw new IllegalArgumentException("intents is required");
+        for (Intent intent : intents) componentRouter.startActivity(intent, options);
+    }
+    @Override public ComponentName startService(Intent service) {
+        return componentRouter.startService(service, false);
+    }
+    @Override public ComponentName startForegroundService(Intent service) {
+        return componentRouter.startService(service, true);
+    }
+    @Override public boolean stopService(Intent service) { return componentRouter.stopService(service); }
+    @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
+        return componentRouter.bindService(service, connection, flags, null);
+    }
+    @Override public boolean bindService(Intent service, int flags, Executor executor,
+            ServiceConnection connection) {
+        return componentRouter.bindService(service, connection, flags, executor);
+    }
+    @Override public void unbindService(ServiceConnection connection) {
+        componentRouter.unbindService(connection);
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+        return componentRouter.registerReceiver(receiver, filter, null, null, Context.RECEIVER_NOT_EXPORTED);
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, int flags) {
+        return componentRouter.registerReceiver(receiver, filter, null, null, flags);
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
+            String broadcastPermission, Handler scheduler) {
+        return componentRouter.registerReceiver(receiver, filter, broadcastPermission, scheduler,
+                Context.RECEIVER_NOT_EXPORTED);
+    }
+    @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
+            String broadcastPermission, Handler scheduler, int flags) {
+        return componentRouter.registerReceiver(receiver, filter, broadcastPermission, scheduler, flags);
+    }
+    @Override public void unregisterReceiver(BroadcastReceiver receiver) {
+        componentRouter.unregisterReceiver(receiver);
+    }
+    @Override public void sendBroadcast(Intent intent) { componentRouter.sendBroadcast(intent, null); }
+    @Override public void sendBroadcast(Intent intent, String receiverPermission) {
+        componentRouter.sendBroadcast(intent, receiverPermission);
+    }
+    @Override public void sendBroadcast(Intent intent, String receiverPermission, Bundle options) {
+        componentRouter.sendBroadcast(intent, receiverPermission, options);
+    }
+    @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission) {
+        componentRouter.sendOrderedBroadcast(intent, receiverPermission, null, null, null,
+                0, null, null);
+    }
+    @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission,
+            BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) {
+        componentRouter.sendOrderedBroadcast(intent, receiverPermission, null, resultReceiver,
+                scheduler, initialCode, initialData, initialExtras);
+    }
+    @Override public void sendOrderedBroadcast(Intent intent, String receiverPermission,
+            Bundle options, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
+            String initialData, Bundle initialExtras) {
+        componentRouter.sendOrderedBroadcast(intent, receiverPermission, options, resultReceiver,
+                scheduler, initialCode, initialData, initialExtras);
+    }
+
+    BroadcastReceiver dynamicReceiver(String receiverId) {
+        return sharedState.dynamicReceivers.require(receiverId);
+    }
+    void clearDynamicReceivers() { sharedState.dynamicReceivers.clear(); }
 
     @Override public File getDataDir() { return dataRoot; }
     @Override public File getFilesDir() { return ensureDirectory(new File(dataRoot, "files")); }
@@ -213,8 +294,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             return result;
         });
         if (moved) {
-            source.removeCachedPreferences(name);
-            removeCachedPreferences(name);
+            synchronized (source) { source.preferences.remove(name); }
+            synchronized (this) { preferences.remove(name); }
             source.storageNames.release(sourceParent, "shared_preferences", name,
                     "", ".cspf", ".tmp");
         }
@@ -299,7 +380,6 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return value instanceof SandboxSharedPreferences ? (SandboxSharedPreferences) value : null;
     }
 
-    private synchronized void removeCachedPreferences(String name) { preferences.remove(name); }
 
     private static boolean withPreferenceLocks(SandboxSharedPreferences first,
                                                SandboxSharedPreferences second,
@@ -354,6 +434,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private static final class SharedState {
         final GuestCapabilityGate capabilityGate;
         final GuestSystemServiceBoundary systemServices = new GuestSystemServiceBoundary();
+        final GuestDynamicReceiverRegistry dynamicReceivers = new GuestDynamicReceiverRegistry();
         volatile Application application;
         SharedState(GuestCapabilityGate capabilityGate) { this.capabilityGate = capabilityGate; }
     }

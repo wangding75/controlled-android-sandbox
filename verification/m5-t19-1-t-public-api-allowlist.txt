@@ -36,3 +36,36 @@ com.warden.controlledsandbox.contract|InstallSessionPage.java|public static fina
 # MAIN-R3-P1-02: Android must instantiate this signature-protected Companion bootstrap Service;
 # it shares the private Runtime process capability without exposing the token to Guest code.
 com.warden.controlledsandbox.runtime.protocol|CompanionRuntimePackageAuthorityBootstrapService.java|public final class CompanionRuntimePackageAuthorityBootstrapService extends Service
+
+# M5-T19.1 Context compatibility: wire keys and immutable dynamic receiver filter
+# metadata are shared across domain/runtime boundaries; cursor rows are decoded by
+# the Guest-side standard ContentResolver bridge.
+com.warden.controlledsandbox.domain.component.receiver|DynamicReceiverRegistry.java|public Set<String> categories()
+com.warden.controlledsandbox.domain.component.receiver|DynamicReceiverRegistry.java|public int priority()
+com.warden.controlledsandbox.domain.component.receiver|DynamicReceiverRegistry.java|public java.util.List<ManifestReceiverRegistry.DataRule> dataRules()
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_CATEGORIES =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_DATA_PATH_PATTERN =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_DATA_PATH_PREFIX =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_DATA_RULE_COUNT =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_DATA_RULE_PREFIX =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_DYNAMIC_INSTANCE =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String RECEIVER_PRIORITY =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String SERVICE_BIND_FLAGS =
+com.warden.controlledsandbox.runtime.provider|CursorWireCodec.java|public static Object decode(String encoded)
+
+# M5-T19.1 implicit Intent compatibility: one isolated wire envelope preserves
+# action/data/type/categories/flags/extras without allowing extras to overwrite Broker control fields.
+com.warden.controlledsandbox.runtime.protocol|RuntimeIntentWireCodec.java|public final class RuntimeIntentWireCodec
+com.warden.controlledsandbox.runtime.protocol|RuntimeIntentWireCodec.java|public static void encode(Bundle target, Intent intent)
+com.warden.controlledsandbox.runtime.protocol|RuntimeIntentWireCodec.java|public static Intent decode(Bundle source)
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String INTENT_COMPONENT_PACKAGE =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String INTENT_COMPONENT_CLASS =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String INTENT_EXTRAS =
+
+# M5-T19.1 ordered broadcast compatibility: preserve bounded primitive and String
+# collection result extras across the domain's Android-independent ordered state.
+com.warden.controlledsandbox.domain.component.receiver|DynamicReceiverRegistry.java|public String requiredSenderPermission()
+com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public final class OrderedBroadcastResultExtrasCodec
+com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static Bundle decode(Map<String, String> encoded)
+com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static Map<String, String> encode(Bundle extras)
+com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static void validate(Bundle extras)

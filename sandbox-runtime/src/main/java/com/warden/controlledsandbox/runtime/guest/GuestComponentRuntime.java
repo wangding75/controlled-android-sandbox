@@ -58,8 +58,7 @@ public final class GuestComponentRuntime {
                 case ComponentOperations.SET_SERVICE_FOREGROUND:
                     return setServiceForeground(componentClass, request);
                 case ComponentOperations.BIND_SERVICE:
-                    return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID),
-                            request.getString(ComponentOperations.ACTION, ""));
+                    return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID), request);
                 case ComponentOperations.UNBIND_SERVICE:
                     return unbindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID));
                 case ComponentOperations.REGISTER_RECEIVER:
@@ -120,6 +119,7 @@ public final class GuestComponentRuntime {
         for (ServiceRecord record : services.values()) destroyService(record);
         services.clear();
         receivers.clear();
+        session.context.clearDynamicReceivers();
         for (ProviderRecord record : providersByClass.values()) {
             try { record.provider.shutdown(); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
@@ -144,7 +144,7 @@ public final class GuestComponentRuntime {
         }
         ServiceRecord record = getOrCreateService(className);
         String action = request.getString(ComponentOperations.ACTION, "");
-        Intent intent = intent(action);
+        Intent intent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
         boolean recovery = request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
         int recoveredStartId = request.getInt(RuntimeKeys.SERVICE_START_ID, -1);
         int startId = recovery && recoveredStartId > 0 ? recoveredStartId : nextStartId++;
@@ -250,10 +250,10 @@ public final class GuestComponentRuntime {
         return out;
     }
 
-    private Bundle bindService(String className, String connectionId, String action) throws Exception {
+    private Bundle bindService(String className, String connectionId, Bundle request) throws Exception {
         ServiceRecord record = getOrCreateService(className);
         if (record.connections.containsKey(connectionId)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
-        Intent intent = intent(action);
+        Intent intent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
         IBinder binder;
         boolean rebound = false;
         if (record.connections.isEmpty() && record.rebindRequested && record.lastBinder != null) {
@@ -359,7 +359,15 @@ public final class GuestComponentRuntime {
         if (receivers.containsKey(receiverId)) throw new IllegalStateException("DUPLICATE_RECEIVER_ID");
         ArrayList<String> actions = request.getStringArrayList(RuntimeKeys.RECEIVER_ACTIONS);
         if (actions == null || actions.isEmpty()) throw new IllegalArgumentException("receiverActions is required");
-        BroadcastReceiver receiver = newReceiver(className);
+        BroadcastReceiver receiver;
+        if (request.getBoolean(RuntimeKeys.RECEIVER_DYNAMIC_INSTANCE, false)) {
+            receiver = session.context.dynamicReceiver(receiverId);
+            if (!receiver.getClass().getName().equals(className)) {
+                throw new SecurityException("DYNAMIC_RECEIVER_CLASS_MISMATCH");
+            }
+        } else {
+            receiver = newReceiver(className);
+        }
         ReceiverRecord record = new ReceiverRecord(receiverId, className, receiver,
                 new ArrayList<>(actions), request.getBoolean(RuntimeKeys.RECEIVER_EXPORTED, false));
         receivers.put(receiverId, record);
@@ -382,7 +390,7 @@ public final class GuestComponentRuntime {
 
     private Bundle sendBroadcast(String className, Bundle request) throws Exception {
         String action = request.getString(ComponentOperations.ACTION, "");
-        Intent intent = broadcastIntent(request);
+        Intent intent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
         String receiverId = request.getString(RuntimeKeys.RECEIVER_ID, "");
         boolean ordered = request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false);
         if (ordered) {
@@ -492,8 +500,8 @@ public final class GuestComponentRuntime {
         String[] projection = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_PROJECTION));
         String[] selectionArgs = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS));
         android.database.Cursor cursor = record.provider.query(uri, projection,
-                request.getString(RuntimeKeys.PROVIDER_SELECTION, ""), selectionArgs,
-                request.getString(RuntimeKeys.PROVIDER_SORT_ORDER, ""));
+                request.getString(RuntimeKeys.PROVIDER_SELECTION), selectionArgs,
+                request.getString(RuntimeKeys.PROVIDER_SORT_ORDER));
         Bundle out = cursorTransport.open(cursor, required(request, RuntimeKeys.CURSOR_TOKEN),
                 session.spec.sessionId, providerInstance(record), session.spec.generation,
                 request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64),
@@ -528,7 +536,7 @@ public final class GuestComponentRuntime {
         ProviderRecord record = requireProvider(className, request);
         Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
         int count = record.provider.update(uri, contentValues(request.getBundle(RuntimeKeys.PROVIDER_VALUES)),
-                request.getString(RuntimeKeys.PROVIDER_SELECTION, ""),
+                request.getString(RuntimeKeys.PROVIDER_SELECTION),
                 toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS)));
         Bundle out = providerResult("PROVIDER_UPDATED", record);
         out.putInt("affectedRows", count);
@@ -539,7 +547,7 @@ public final class GuestComponentRuntime {
     private Bundle deleteProvider(String className, Bundle request) throws Exception {
         ProviderRecord record = requireProvider(className, request);
         Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
-        int count = record.provider.delete(uri, request.getString(RuntimeKeys.PROVIDER_SELECTION, ""),
+        int count = record.provider.delete(uri, request.getString(RuntimeKeys.PROVIDER_SELECTION),
                 toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS)));
         Bundle out = providerResult("PROVIDER_DELETED", record);
         out.putInt("affectedRows", count);
@@ -550,12 +558,12 @@ public final class GuestComponentRuntime {
     private Bundle callProvider(String className, Bundle request) throws Exception {
         ProviderRecord record = requireProvider(className, request);
         String method = required(request, RuntimeKeys.PROVIDER_METHOD);
-        String argument = request.getString(RuntimeKeys.PROVIDER_ARGUMENT, "");
+        String argument = request.getString(RuntimeKeys.PROVIDER_ARGUMENT);
         Bundle extras = request.getBundle(RuntimeKeys.PROVIDER_EXTRAS);
         Bundle returned = record.provider.call(method, argument, extras == null ? null : new Bundle(extras));
         Bundle out = providerResult("PROVIDER_CALLED", record);
         out.putString(RuntimeKeys.PROVIDER_METHOD, method);
-        out.putBundle(RuntimeKeys.PROVIDER_RESULT, returned == null ? new Bundle() : new Bundle(returned));
+        out.putBundle(RuntimeKeys.PROVIDER_RESULT, returned == null ? null : new Bundle(returned));
         RuntimeEventLog.event("GUEST_PROVIDER_CALL", out);
         return out;
     }
@@ -668,34 +676,6 @@ public final class GuestComponentRuntime {
         return values == null ? null : values.toArray(new String[0]);
     }
 
-    private static Intent intent(String action) {
-        Intent intent = new Intent();
-        if (action != null && !action.trim().isEmpty()) intent.setAction(action);
-        return intent;
-    }
-
-    private static Intent broadcastIntent(Bundle request) {
-        Intent intent = intent(request.getString(ComponentOperations.ACTION, ""));
-        ArrayList<String> categories = request.getStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES);
-        if (categories != null) for (String category : categories) {
-            if (category != null && !category.trim().isEmpty()) intent.addCategory(category.trim());
-        }
-        String mimeType = request.getString(RuntimeKeys.BROADCAST_MIME_TYPE, "").trim();
-        String scheme = request.getString(RuntimeKeys.BROADCAST_SCHEME, "").trim();
-        android.net.Uri data = null;
-        if (!scheme.isEmpty()) {
-            String host = request.getString(RuntimeKeys.BROADCAST_HOST, "").trim();
-            String path = request.getString(RuntimeKeys.BROADCAST_PATH, "").trim();
-            StringBuilder uri = new StringBuilder(scheme).append(host.isEmpty() ? ":" : "://");
-            if (!host.isEmpty()) uri.append(host);
-            if (!path.isEmpty()) uri.append(path.startsWith("/") ? path : "/" + path);
-            data = android.net.Uri.parse(uri.toString());
-        }
-        if (data != null && !mimeType.isEmpty()) intent.setDataAndType(data, mimeType);
-        else if (data != null) intent.setData(data);
-        else if (!mimeType.isEmpty()) intent.setType(mimeType);
-        return intent;
-    }
 
     private static void attachBaseContext(ContextWrapper wrapper, Context context) throws Exception {
         Method method = ContextWrapper.class.getDeclaredMethod("attachBaseContext", Context.class);

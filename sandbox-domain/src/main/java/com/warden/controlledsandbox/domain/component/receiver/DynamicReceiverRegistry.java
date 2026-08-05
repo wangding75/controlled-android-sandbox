@@ -20,19 +20,22 @@ public final class DynamicReceiverRegistry {
         private final long generation;
         private final int virtualUserId;
         private final String receiverClass;
-        private final Set<String> actions;
+        private final ManifestReceiverRegistry.Filter filter;
+        private final String requiredSenderPermission;
         private final boolean exported;
 
         private Registration(String id, String packageName, String sessionId, long generation,
                              int virtualUserId, String receiverClass,
-                             Set<String> actions, boolean exported) {
+                             ManifestReceiverRegistry.Filter filter, String requiredSenderPermission,
+                             boolean exported) {
             this.id = id;
             this.packageName = packageName;
             this.sessionId = sessionId;
             this.generation = generation;
             this.virtualUserId = virtualUserId;
             this.receiverClass = receiverClass;
-            this.actions = Collections.unmodifiableSet(new LinkedHashSet<>(actions));
+            this.filter = java.util.Objects.requireNonNull(filter, "filter");
+            this.requiredSenderPermission = normalize(requiredSenderPermission);
             this.exported = exported;
         }
 
@@ -42,8 +45,13 @@ public final class DynamicReceiverRegistry {
         public long generation() { return generation; }
         public int virtualUserId() { return virtualUserId; }
         public String receiverClass() { return receiverClass; }
-        public Set<String> actions() { return actions; }
+        public Set<String> actions() { return filter.actions(); }
+        public Set<String> categories() { return filter.categories(); }
+        public java.util.List<ManifestReceiverRegistry.DataRule> dataRules() { return filter.dataRules(); }
+        public int priority() { return filter.priority(); }
+        public String requiredSenderPermission() { return requiredSenderPermission; }
         public boolean exported() { return exported; }
+        boolean matches(BroadcastIntent intent) { return filter.matches(intent); }
     }
 
     public record Snapshot(int registrations, int actionSubscriptions) {
@@ -60,11 +68,34 @@ public final class DynamicReceiverRegistry {
                                               long generation, int virtualUserId,
                                               String receiverClass, Collection<String> actions,
                                               boolean exported) {
+        LinkedHashSet<String> normalized = normalizedActions(actions);
+        return register(id, packageName, sessionId, generation, virtualUserId, receiverClass,
+                new ManifestReceiverRegistry.Filter(0, normalized, Collections.emptySet(),
+                        Collections.emptyList()), "", exported);
+    }
+
+    public synchronized Registration register(String id, String packageName, String sessionId,
+                                              long generation, int virtualUserId,
+                                              String receiverClass,
+                                              ManifestReceiverRegistry.Filter filter,
+                                              boolean exported) {
+        return register(id, packageName, sessionId, generation, virtualUserId, receiverClass,
+                filter, "", exported);
+    }
+
+    public synchronized Registration register(String id, String packageName, String sessionId,
+                                              long generation, int virtualUserId,
+                                              String receiverClass,
+                                              ManifestReceiverRegistry.Filter filter,
+                                              String requiredSenderPermission, boolean exported) {
         requireText(id, "id");
         requireText(packageName, "packageName");
         requireText(sessionId, "sessionId");
         requireText(receiverClass, "receiverClass");
         if (generation < 1 || virtualUserId < 0) throw new IllegalArgumentException("invalid registration owner");
+        if (filter == null || filter.actions().isEmpty()) {
+            throw new IllegalArgumentException("at least one action is required");
+        }
         String ownerKey = key(sessionId, generation, id);
         if (registrations.containsKey(ownerKey)) {
             throw new IllegalStateException("DUPLICATE_RECEIVER_REGISTRATION");
@@ -72,18 +103,11 @@ public final class DynamicReceiverRegistry {
         if (registrations.size() >= MAX_REGISTRATIONS) {
             throw new IllegalStateException("DYNAMIC_RECEIVER_CAPACITY_EXCEEDED");
         }
-        LinkedHashSet<String> normalized = new LinkedHashSet<>();
-        if (actions != null) {
-            for (String action : actions) {
-                if (action != null && !action.trim().isEmpty()) normalized.add(action.trim());
-            }
-        }
-        if (normalized.isEmpty()) throw new IllegalArgumentException("at least one action is required");
-        if (normalized.size() > MAX_ACTIONS_PER_REGISTRATION) {
+        if (filter.actions().size() > MAX_ACTIONS_PER_REGISTRATION) {
             throw new IllegalArgumentException("DYNAMIC_RECEIVER_ACTION_LIMIT_EXCEEDED");
         }
         Registration registration = new Registration(id, packageName.trim(), sessionId, generation,
-                virtualUserId, receiverClass, normalized, exported);
+                virtualUserId, receiverClass, filter, requiredSenderPermission, exported);
         registrations.put(ownerKey, registration);
         return registration;
     }
@@ -108,15 +132,24 @@ public final class DynamicReceiverRegistry {
 
     public synchronized List<Registration> resolve(String action, int virtualUserId,
                                                    String senderSessionId, boolean externalBroadcast) {
-        requireText(action, "action");
+        return resolve(new BroadcastIntent(action, Collections.emptySet(), "", "", "", ""),
+                virtualUserId, senderSessionId, externalBroadcast);
+    }
+
+    public synchronized List<Registration> resolve(BroadcastIntent intent, int virtualUserId,
+                                                   String senderSessionId, boolean externalBroadcast) {
+        if (intent == null) throw new IllegalArgumentException("intent is required");
         List<Registration> out = new ArrayList<>();
         for (Registration registration : registrations.values()) {
-            if (registration.virtualUserId != virtualUserId || !registration.actions.contains(action)) continue;
+            if (registration.virtualUserId != virtualUserId || !registration.matches(intent)) continue;
             if (externalBroadcast && !registration.exported) continue;
             if (!externalBroadcast && senderSessionId != null && !senderSessionId.isEmpty()
                     && !registration.sessionId.equals(senderSessionId) && !registration.exported) continue;
             out.add(registration);
         }
+        out.sort(java.util.Comparator.comparingInt(Registration::priority).reversed()
+                .thenComparing(Registration::packageName)
+                .thenComparing(Registration::id));
         return Collections.unmodifiableList(out);
     }
 
@@ -143,7 +176,7 @@ public final class DynamicReceiverRegistry {
 
     public synchronized Snapshot snapshot() {
         int subscriptions = 0;
-        for (Registration registration : registrations.values()) subscriptions += registration.actions.size();
+        for (Registration registration : registrations.values()) subscriptions += registration.actions().size();
         return new Snapshot(registrations.size(), subscriptions);
     }
 
@@ -156,8 +189,26 @@ public final class DynamicReceiverRegistry {
         return keys.size();
     }
 
+    private static LinkedHashSet<String> normalizedActions(Collection<String> actions) {
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        if (actions != null) {
+            for (String action : actions) {
+                if (action != null && !action.trim().isEmpty()) normalized.add(action.trim());
+            }
+        }
+        if (normalized.isEmpty()) throw new IllegalArgumentException("at least one action is required");
+        if (normalized.size() > MAX_ACTIONS_PER_REGISTRATION) {
+            throw new IllegalArgumentException("DYNAMIC_RECEIVER_ACTION_LIMIT_EXCEEDED");
+        }
+        return normalized;
+    }
+
     private static String key(String sessionId, long generation, String id) {
         return sessionId.length() + ":" + sessionId + ":" + generation + ":" + id;
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static void requireText(String value, String name) {

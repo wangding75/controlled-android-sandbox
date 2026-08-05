@@ -9,14 +9,16 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     private final ActivityTaskFrameworkInterceptor activityTasks;
     private final OrderedReceiverFinishInterceptor orderedReceivers;
     private final PendingIntentFrameworkInterceptor pendingIntents;
+    private final GuestContentProviderFrameworkInterceptor contentProviders;
 
-    GuestFrameworkCallRouter(GuestPackageSpec spec,
+    GuestFrameworkCallRouter(GuestContext context, GuestPackageSpec spec,
             VirtualSystemServiceState.PendingIntentState pendingIntentState,
             PendingIntentFrameworkInterceptor.Dispatcher dispatcher) {
         activityTasks = new ActivityTaskFrameworkInterceptor(spec);
         orderedReceivers = new OrderedReceiverFinishInterceptor();
         pendingIntents = new PendingIntentFrameworkInterceptor(spec, pendingIntentState,
                 activityTasks::virtualActivityToken, dispatcher);
+        contentProviders = new GuestContentProviderFrameworkInterceptor(context, spec);
     }
 
     ActivityTaskFrameworkInterceptor activityTasks() { return activityTasks; }
@@ -25,6 +27,8 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     boolean sendPersistentPendingIntent(String tokenId) { return pendingIntents.sendPersistent(tokenId); }
 
     @Override public Interception intercept(String serviceName, Method method, Object[] arguments) throws Throwable {
+        Interception provider = contentProviders.intercept(serviceName, method, arguments);
+        if (provider != null && provider.handled()) return provider;
         Interception tasks = activityTasks.intercept(serviceName, method, arguments);
         if (tasks != null && tasks.handled()) return tasks;
         Interception ordered = orderedReceivers.intercept(serviceName, method, arguments);
@@ -33,6 +37,7 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     }
 
     @Override public void close() {
+        contentProviders.close();
         activityTasks.close();
         pendingIntents.close();
         orderedReceivers.close();

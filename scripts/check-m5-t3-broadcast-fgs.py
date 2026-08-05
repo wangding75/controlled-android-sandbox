@@ -56,7 +56,7 @@ for rel, tokens in {
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/receiver/ManifestBroadcastDispatcherSelfTest.java":
         ("chain-wide timeout budget", "policy abort"),
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridgeSelfTest.java":
-        ("Broker completion Binder death", "invalid ordered result extras"),
+        ("Broker completion Binder death", "unsupported ordered result extras"),
 }.items():
     require(rel, *tokens)
 

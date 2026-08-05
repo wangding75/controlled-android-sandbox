@@ -66,22 +66,23 @@ public final class GuestContextBoundarySelfTest {
 
             require(context.getBaseContext() == context, "base Context must not expose host");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
-            expectDenied(() -> context.bindService(new android.content.Intent(),
+            expectVirtualRoutingFailure(() -> context.bindService(new android.content.Intent(),
                             new android.content.ServiceConnection() {
                                 @Override public void onServiceConnected(
                                         android.content.ComponentName name, android.os.IBinder binder) { }
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
-                            }, Context.BIND_AUTO_CREATE), "bindService");
-            expectDenied(() -> context.bindService(new android.content.Intent(),
+                            }, Context.BIND_AUTO_CREATE), "NO_GUEST_SERVICE_MATCH", "bindService");
+            expectVirtualRoutingFailure(() -> context.bindService(new android.content.Intent(),
                             Context.BIND_AUTO_CREATE, Runnable::run,
                             new android.content.ServiceConnection() {
                                 @Override public void onServiceConnected(
                                         android.content.ComponentName name, android.os.IBinder binder) { }
                                 @Override public void onServiceDisconnected(
                                         android.content.ComponentName name) { }
-                            }), "bindService");
-            expectDenied(context::getContentResolver, "getContentResolver");
+                            }), "NO_GUEST_SERVICE_MATCH", "bindService executor overload");
+            require(context.getContentResolver() != null,
+                    "ContentResolver is exposed through the framework interception boundary");
             boolean packageManagerNotReady = false;
             try { context.getPackageManager(); }
             catch (SecurityException expected) {
@@ -89,7 +90,8 @@ public final class GuestContextBoundarySelfTest {
                         "GUEST_FRAMEWORK_API_NOT_READY:getPackageManager");
             }
             require(packageManagerNotReady, "PackageManager unavailable before hook readiness");
-            expectDenied(() -> context.startActivity(new android.content.Intent()), "startActivity");
+            expectVirtualRoutingFailure(() -> context.startActivity(new android.content.Intent()),
+                    "ActivityNotFoundException", "startActivity");
             GuestIdentity identity = new GuestIdentity(spec.packageName, spec.virtualUid,
                     context.getApplicationInfo(), Set.of(), host.getPackageName(), 1000);
             Object originalPackageTransport = processPackageManager.mPM;
@@ -168,6 +170,18 @@ public final class GuestContextBoundarySelfTest {
             System.out.println("PASS Guest Context storage and unwrap boundary self-test");
         } finally {
             deleteRecursively(root);
+        }
+    }
+
+    private static void expectVirtualRoutingFailure(Runnable action, String marker, String operation) {
+        try {
+            action.run();
+            throw new AssertionError(operation + " unexpectedly succeeded");
+        } catch (RuntimeException expected) {
+            String value = expected.getClass().getSimpleName() + ":" + expected.getMessage();
+            require(value.contains(marker), operation + " remains confined to virtual resolution");
+            require(!value.contains("GUEST_CONTEXT_HOST_OPERATION_DENIED"),
+                    operation + " no longer uses the legacy blanket denial");
         }
     }
 

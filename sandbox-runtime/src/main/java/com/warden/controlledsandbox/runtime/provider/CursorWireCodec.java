@@ -19,7 +19,7 @@ public final class CursorWireCodec {
         return "B:" + Base64.getEncoder().encodeToString(value);
     }
 
-    static Object decode(String encoded) {
+    public static Object decode(String encoded) {
         if (encoded == null || encoded.equals("N")) return null;
         if (encoded.startsWith("I:")) return Long.parseLong(encoded.substring(2));
         if (encoded.startsWith("F:")) return Double.parseDouble(encoded.substring(2));

@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.runtime.broker;
 
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.IOrderedReceiverCompletion;
 
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
@@ -11,6 +12,7 @@ import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Regression coverage for Receiver ownership extracted from RuntimeBrokerService. */
@@ -32,6 +34,7 @@ public final class RuntimeReceiverCoordinatorSelfTest {
         store.putPrepared(RuntimeBrokerService.ownerKey(ready.packageName(), ready.virtualUserId())
                 + ":" + ready.processName(), prepared);
         AtomicInteger deliveries = new AtomicInteger();
+        ArrayList<String> orderedDeliveryIds = new ArrayList<>();
         RuntimeReceiverCoordinator coordinator = new RuntimeReceiverCoordinator(
                 sessions, store, new FixedClock(), new SequentialTokens(),
                 request -> { throw new AssertionError("unexpected process activation"); },
@@ -40,6 +43,27 @@ public final class RuntimeReceiverCoordinatorSelfTest {
                         .findFirst().orElse(null),
                 (slot, request) -> {
                     deliveries.incrementAndGet();
+                    if (request.getBoolean(RuntimeKeys.BROADCAST_ORDERED, false)) {
+                        String receiverId = request.getString(RuntimeKeys.RECEIVER_ID, "");
+                        orderedDeliveryIds.add(receiverId);
+                        IOrderedReceiverCompletion callback = IOrderedReceiverCompletion.Stub.asInterface(
+                                request.getBinder(RuntimeKeys.ORDERED_RECEIVER_COMPLETION_BINDER));
+                        Bundle completion = new Bundle();
+                        completion.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN,
+                                request.getString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, ""));
+                        completion.putString(RuntimeKeys.PACKAGE_NAME, ready.packageName());
+                        completion.putInt(RuntimeKeys.VIRTUAL_USER_ID, ready.virtualUserId());
+                        completion.putString(RuntimeKeys.SESSION_ID, ready.sessionId());
+                        completion.putLong(RuntimeKeys.GENERATION, ready.generation());
+                        completion.putString(RuntimeKeys.COMPONENT_CLASS,
+                                request.getString(RuntimeKeys.COMPONENT_CLASS, ""));
+                        if ("ordered-high".equals(receiverId)) {
+                            completion.putInt(RuntimeKeys.BROADCAST_RESULT_CODE, 77);
+                            completion.putString(RuntimeKeys.BROADCAST_RESULT_DATA, "dynamic-high");
+                            completion.putBoolean(RuntimeKeys.BROADCAST_ABORT, true);
+                        }
+                        return callback.complete(completion);
+                    }
                     Bundle out = new Bundle();
                     out.putString(RuntimeKeys.STATUS, "BROADCAST_DELIVERED");
                     return out;
@@ -63,12 +87,52 @@ public final class RuntimeReceiverCoordinatorSelfTest {
         require(coordinator.lifecycle().snapshot().dynamicRegistrations() == 1,
                 "dynamic registration owned by coordinator");
 
+        Bundle high = registration("ordered-high", "ACTION_ORDERED", 100);
+        Bundle low = registration("ordered-low", "ACTION_ORDERED", 10);
+        coordinator.reserveRegistration(high, ready);
+        coordinator.reserveRegistration(low, ready);
+        Bundle orderedRequest = new Bundle();
+        orderedRequest.putString(ComponentOperations.ACTION, "ACTION_ORDERED");
+        orderedRequest.putBoolean(RuntimeKeys.BROADCAST_ORDERED, true);
+        orderedRequest.putInt(RuntimeKeys.BROADCAST_RESULT_CODE, 1);
+        orderedRequest.putString(RuntimeKeys.BROADCAST_RESULT_DATA, "initial");
+        Bundle orderedResult;
+        try {
+            orderedResult = coordinator.dispatchImplicitManifestBroadcast(orderedRequest, ready, true);
+        } catch (Exception error) {
+            throw new AssertionError(error);
+        }
+        require("ORDERED_BROADCAST_ABORTED".equals(
+                        orderedResult.getString(RuntimeKeys.STATUS, "")),
+                "ordered dynamic broadcast abort status");
+        require(orderedResult.getInt(RuntimeKeys.BROADCAST_RESULT_CODE, 0) == 77
+                        && "dynamic-high".equals(orderedResult.getString(
+                                RuntimeKeys.BROADCAST_RESULT_DATA, "")),
+                "ordered dynamic broadcast final result state");
+        require(orderedResult.getInt(RuntimeKeys.BROADCAST_MATCHED_COUNT, 0) == 2
+                        && orderedResult.getInt(RuntimeKeys.BROADCAST_DELIVERED_COUNT, 0) == 1
+                        && orderedResult.getInt(RuntimeKeys.BROADCAST_SKIPPED_COUNT, 0) == 1,
+                "ordered dynamic broadcast counts");
+        require(orderedDeliveryIds.equals(List.of("ordered-high")),
+                "ordered dynamic priority and abort chain");
+
         coordinator.stopSession(ready, "TEST_STOP");
         require(coordinator.lifecycle().snapshot().dynamicRegistrations() == 0,
                 "session stop cleans Receiver registrations");
         coordinator.invalidateAll("TEST_CLOSE");
         require(coordinator.lifecycle().snapshot().empty(), "coordinator closes without Receiver leaks");
         System.out.println("PASS Runtime Receiver coordinator extraction self-test");
+    }
+
+    private static Bundle registration(String id, String action, int priority) {
+        Bundle registration = new Bundle();
+        registration.putString(RuntimeKeys.RECEIVER_ID, id);
+        registration.putString(RuntimeKeys.COMPONENT_CLASS, "com.example." + id.replace('-', '_'));
+        registration.putStringArrayList(RuntimeKeys.RECEIVER_ACTIONS,
+                new ArrayList<>(List.of(action)));
+        registration.putInt(RuntimeKeys.RECEIVER_PRIORITY, priority);
+        registration.putBoolean(RuntimeKeys.RECEIVER_EXPORTED, false);
+        return registration;
     }
 
     private static final class FixedClock implements Clock {

@@ -40,10 +40,15 @@ import java.util.function.BooleanSupplier;
 /** Process-local runtime. One Android guest process hosts exactly one generation at a time. */
 public final class GuestRuntimeEnvironment {
     private static Session current;
+    private static boolean preparing;
 
     private GuestRuntimeEnvironment() { }
 
-    static synchronized Bundle prepare(Context host, GuestPackageSpec spec) {
+    static Bundle prepare(Context host, GuestPackageSpec spec) {
+        synchronized (GuestRuntimeEnvironment.class) {
+            if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+            preparing = true;
+        }
         long started = android.os.SystemClock.elapsedRealtime();
         Bundle result = new Bundle();
         FrameworkHooks stagedHooks = null;
@@ -63,7 +68,9 @@ public final class GuestRuntimeEnvironment {
                 if (current.spec.sessionId.equals(spec.sessionId)
                         && current.spec.generation == spec.generation
                         && current.spec.packageRevision.equals(spec.packageRevision)) {
-                    return current.status("ALREADY_READY", started);
+                    Bundle alreadyReady = current.status("ALREADY_READY", started);
+                    synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
+                    return alreadyReady;
                 }
                 if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
                 current.shutdown();
@@ -105,7 +112,8 @@ public final class GuestRuntimeEnvironment {
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(
                     spec, virtualServices.compatibilityProfile().webView());
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
-                    spec, virtualServices.pendingIntents(), new GuestPendingIntentDispatcher(guestContext, spec));
+                    guestContext, spec, virtualServices.pendingIntents(),
+                    new GuestPendingIntentDispatcher(guestContext, spec));
             virtualServices.alarms().setRecoveredDelivery(alarm ->
                     com.warden.controlledsandbox.contract.VirtualAlarmSnapshot.PENDING_INTENT.equals(alarm.deliveryPath())
                             && !alarm.pendingIntentTokenId().isEmpty()
@@ -177,11 +185,16 @@ public final class GuestRuntimeEnvironment {
                     return session.onVirtualJobStop(guestJobId, parameters);
                 }
             });
-            current = session;
+            synchronized (GuestRuntimeEnvironment.class) { current = session; }
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
-            Thread.currentThread().setContextClassLoader(loader);
-            application.onCreate();
+            ClassLoader priorContextLoader = Thread.currentThread().getContextClassLoader();
+            try {
+                Thread.currentThread().setContextClassLoader(loader);
+                application.onCreate();
+            } finally {
+                Thread.currentThread().setContextClassLoader(priorContextLoader);
+            }
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                         + NativePolicy.hookStatus());
@@ -189,6 +202,7 @@ public final class GuestRuntimeEnvironment {
             Bundle ready = session.status("READY", started);
             RuntimeEventLog.event("GUEST_PREPARED", ready);
             stagedSession = null;
+            synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
             return ready;
         } catch (Throwable error) {
             try {
@@ -200,7 +214,10 @@ public final class GuestRuntimeEnvironment {
                 NativePolicy.resetAudioCapture();
                 NativePolicy.resetHooks();
                 NativePolicy.resetPolicy();
-                current = null;
+                synchronized (GuestRuntimeEnvironment.class) {
+                    current = null;
+                    preparing = false;
+                }
             } finally {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
@@ -229,10 +246,12 @@ public final class GuestRuntimeEnvironment {
             out.putInt("pid", Process.myPid());
             return out;
         }
-        return current.status("READY", android.os.SystemClock.elapsedRealtime());
+        return current.status(preparing ? "PREPARING" : "READY",
+                android.os.SystemClock.elapsedRealtime());
     }
 
     static synchronized void shutdown(String sessionId, long generation) {
+        if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
         Session session = require(sessionId, generation);
         session.shutdown();
         current = null;

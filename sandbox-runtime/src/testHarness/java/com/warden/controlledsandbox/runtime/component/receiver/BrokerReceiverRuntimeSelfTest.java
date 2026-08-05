@@ -17,6 +17,7 @@ public final class BrokerReceiverRuntimeSelfTest {
         ownerScopedIdsAndResolution();
         rollbackAndUnregisterOwnership();
         actionLimitAndInstanceCleanup();
+        fullFilterMatchingAndPriority();
         concurrentReservation();
         System.out.println("PASS broker Receiver production registry self-test");
     }
@@ -91,6 +92,55 @@ public final class BrokerReceiverRuntimeSelfTest {
         check(runtime.removeInstance(owner.packageName(), owner.virtualUserId()) == 1,
                 "dynamic Receiver instance cleanup");
         check(runtime.size() == 0, "dynamic Receiver instance cleanup leak");
+    }
+
+    private static void fullFilterMatchingAndPriority() {
+        BrokerReceiverRuntime runtime = new BrokerReceiverRuntime();
+        GuestSession owner = session("s-filter", 9, 1);
+        Bundle low = request("low", true);
+        low.putInt(RuntimeKeys.RECEIVER_PRIORITY, 10);
+        low.putStringArrayList(RuntimeKeys.RECEIVER_CATEGORIES,
+                new ArrayList<>(List.of("CATEGORY_SYNC")));
+        low.putInt(RuntimeKeys.RECEIVER_DATA_RULE_COUNT, 3);
+        Bundle scheme = new Bundle();
+        scheme.putString(RuntimeKeys.BROADCAST_SCHEME, "content");
+        low.putBundle(RuntimeKeys.RECEIVER_DATA_RULE_PREFIX + 0, scheme);
+        Bundle host = new Bundle();
+        host.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        low.putBundle(RuntimeKeys.RECEIVER_DATA_RULE_PREFIX + 1, host);
+        Bundle mime = new Bundle();
+        mime.putString(RuntimeKeys.BROADCAST_MIME_TYPE, "text/*");
+        low.putBundle(RuntimeKeys.RECEIVER_DATA_RULE_PREFIX + 2, mime);
+        Bundle high = new Bundle(low);
+        high.putString(RuntimeKeys.RECEIVER_ID, "high");
+        high.putInt(RuntimeKeys.RECEIVER_PRIORITY, 100);
+        low.putString(RuntimeKeys.RECEIVER_PERMISSION, "com.example.SEND_DYNAMIC");
+        runtime.reserveRegistration(low, owner);
+        runtime.reserveRegistration(high, owner);
+
+        Bundle matching = new Bundle();
+        matching.putString(com.warden.controlledsandbox.runtime.protocol.ComponentOperations.ACTION,
+                "ACTION_SYNC");
+        matching.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
+                new ArrayList<>(List.of("CATEGORY_SYNC")));
+        matching.putString(RuntimeKeys.BROADCAST_SCHEME, "content");
+        matching.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        matching.putString(RuntimeKeys.BROADCAST_MIME_TYPE, "text/plain");
+        List<com.warden.controlledsandbox.domain.component.receiver.DynamicReceiverRegistry.Registration>
+                matches = runtime.resolve(matching, 9, owner.sessionId(), false);
+        check(matches.size() == 2 && "high".equals(matches.get(0).id())
+                        && "low".equals(matches.get(1).id()),
+                "dynamic receiver full-filter priority order");
+        check("com.example.SEND_DYNAMIC".equals(matches.get(1).requiredSenderPermission()),
+                "dynamic receiver sender permission was not retained");
+        matching.putString(RuntimeKeys.BROADCAST_HOST, "other.example");
+        check(runtime.resolve(matching, 9, owner.sessionId(), false).isEmpty(),
+                "dynamic receiver data authority mismatch");
+        matching.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        matching.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
+                new ArrayList<>(List.of("CATEGORY_OTHER")));
+        check(runtime.resolve(matching, 9, owner.sessionId(), false).isEmpty(),
+                "dynamic receiver category mismatch");
     }
 
     private static void concurrentReservation() throws Exception {

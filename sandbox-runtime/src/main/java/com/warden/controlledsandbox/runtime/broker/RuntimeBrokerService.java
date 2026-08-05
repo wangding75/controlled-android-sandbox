@@ -264,22 +264,21 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 }
                 ProviderAuthorityRegistry.Entry target = providerRoute.entry();
                 session = sessionById(target.sessionId(), target.generation());
-                requireProviderTargetSession(session, target);
+                requireProviderTargetSession(session, target, request);
             } else if (isProviderCursorOperation(operation)) {
                 cursorLease = cursorRuntime.require(required(request, RuntimeKeys.CURSOR_TOKEN), now());
                 validateCursorRequestIdentity(request, requestedPackage, requestedUser, cursorLease);
                 session = sessionById(cursorLease.targetSessionId(), cursorLease.targetGeneration());
-                requireCursorTargetSession(session, cursorLease);
+                requireCursorTargetSession(session, cursorLease, request);
             } else if (ComponentOperations.isProviderFileLeaseOperation(operation)) {
                 fileLease = fileRuntime.require(required(request, RuntimeKeys.FILE_TOKEN), now());
                 validateFileRequestIdentity(request, requestedPackage, requestedUser, fileLease);
                 session = sessionById(fileLease.targetSessionId(), fileLease.targetGeneration());
-                requireFileTargetSession(session, fileLease);
+                requireFileTargetSession(session, fileLease, request);
             } else {
                 String processName = processName(request, requestedPackage);
                 session = sessions.get(requestedPackage, requestedUser, processName);
-                if (session == null || (session.state() != SessionState.READY
-                        && session.state() != SessionState.ACTIVE)) {
+                if (!RuntimePreparingSessionPolicy.isOperational(session, request, false)) {
                     Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
                     if (!isPrepared(prepared)) return prepared;
                     session = sessions.get(requestedPackage, requestedUser, processName);
@@ -700,12 +699,16 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             }
             Bundle spec = makeSpec(input, session);
             systemServiceCoordinator.attach(session, spec);
+            // Publish only the exact PREPARING generation so Application.onCreate() can use
+            // standard Context APIs without recursively trying to prepare the same process.
+            brokerState.putPrepared(key, new Bundle(spec));
             Bundle guestResult;
             try {
                 guestResult = callGuest(session.processSlot(), guest -> guestOperation(
                         guest, RuntimeOperationRequest.PREPARE_GUEST, spec));
             } catch (Throwable error) {
                 try {
+                    brokerState.removePrepared(key);
                     if (staleRecovery != null) {
                         activityRuntime.invalidate(staleRecovery);
                         serviceCoordinator.invalidate(staleRecovery);
@@ -732,6 +735,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                     providerResources.stopSession(staleRecovery);
                 }
                 systemServiceCoordinator.stop(session);
+                brokerState.removePrepared(key);
                 return guestResult;
             }
             if (staleRecovery != null) {
@@ -986,9 +990,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         }
         return null;
     }
-
-    private static void requireProviderTargetSession(GuestSession session, ProviderAuthorityRegistry.Entry target) {
-        if (session == null || (session.state() != SessionState.READY && session.state() != SessionState.ACTIVE)) {
+    private static void requireProviderTargetSession(GuestSession session,
+            ProviderAuthorityRegistry.Entry target, Bundle request) {
+        if (!RuntimePreparingSessionPolicy.isOperational(session, request, false)) {
             throw new IllegalStateException("PROVIDER_TARGET_SESSION_NOT_READY");
         }
         if (!ownerKey(session.packageName(), session.virtualUserId()).equals(target.instanceId())
@@ -997,8 +1001,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         }
     }
 
-    private static void requireCursorTargetSession(GuestSession session, BrokerCursorRuntime.Lease lease) {
-        if (session == null || (session.state() != SessionState.READY && session.state() != SessionState.ACTIVE)) {
+    private static void requireCursorTargetSession(GuestSession session,
+            BrokerCursorRuntime.Lease lease, Bundle request) {
+        if (!RuntimePreparingSessionPolicy.isOperational(session, request, false)) {
             throw new IllegalStateException("CURSOR_TARGET_SESSION_NOT_READY");
         }
         if (!session.packageName().equals(lease.targetPackage())
@@ -1036,7 +1041,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             caller = targetSession;
         } else {
             caller = sessionById(callerSessionId, callerGeneration);
-            if (caller == null || (caller.state() != SessionState.READY && caller.state() != SessionState.ACTIVE)) {
+            if (!RuntimePreparingSessionPolicy.isOperational(caller, request, true)) {
                 throw new SecurityException("PROVIDER_CALLER_SESSION_NOT_READY");
             }
             if (!ownerKey(caller.packageName(), caller.virtualUserId()).equals(route.callerInstance())) {
@@ -1069,7 +1074,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             throw new SecurityException("CURSOR_CALLER_SESSION_MISMATCH");
         }
         GuestSession caller = sessionById(callerSessionId, callerGeneration);
-        if (caller == null || (caller.state() != SessionState.READY && caller.state() != SessionState.ACTIVE)
+        if (!RuntimePreparingSessionPolicy.isOperational(caller, request, true)
                 || !ownerKey(caller.packageName(), caller.virtualUserId()).equals(lease.callerInstance())) {
             throw new SecurityException("CURSOR_CALLER_SESSION_NOT_READY");
         }
@@ -1095,8 +1100,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 || ComponentOperations.PROVIDER_CURSOR_CANCEL.equals(operation);
     }
 
-    private static void requireFileTargetSession(GuestSession session, BrokerFileRuntime.Lease lease) {
-        if (session == null || (session.state() != SessionState.READY && session.state() != SessionState.ACTIVE)) {
+    private static void requireFileTargetSession(GuestSession session,
+            BrokerFileRuntime.Lease lease, Bundle request) {
+        if (!RuntimePreparingSessionPolicy.isOperational(session, request, false)) {
             throw new IllegalStateException("PROVIDER_FILE_TARGET_SESSION_NOT_READY");
         }
         if (!session.packageName().equals(lease.targetPackage())
@@ -1129,7 +1135,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             throw new SecurityException("PROVIDER_FILE_CALLER_SESSION_MISMATCH");
         }
         GuestSession caller = sessionById(callerSessionId, callerGeneration);
-        if (caller == null || (caller.state() != SessionState.READY && caller.state() != SessionState.ACTIVE)
+        if (!RuntimePreparingSessionPolicy.isOperational(caller, request, true)
                 || !ownerKey(caller.packageName(), caller.virtualUserId()).equals(lease.callerInstance())) {
             throw new SecurityException("PROVIDER_FILE_CALLER_SESSION_NOT_READY");
         }

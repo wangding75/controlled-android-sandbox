@@ -132,11 +132,18 @@ for forbidden in [
 
 guest = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java').read_text()
 for token in [
-    'broadcastIntent(request)', 'BROADCAST_CATEGORIES', 'BROADCAST_MIME_TYPE', 'setData',
+    'RuntimeIntentWireCodec.decode(request)',
     'OrderedReceiverPendingResultBridge.install(', 'afterOnReceive()',
 ]:
     if token not in guest:
         errors.append(f'Guest broadcast Intent/PendingResult propagation missing: {token}')
+intent_codec = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeIntentWireCodec.java').read_text()
+for token in [
+    'BROADCAST_CATEGORIES', 'BROADCAST_MIME_TYPE', 'setDataAndType', 'setData',
+    'INTENT_EXTRAS', 'new Bundle(extras)',
+]:
+    if token not in intent_codec:
+        errors.append(f'Runtime Intent wire codec missing broadcast propagation: {token}')
 
 pending_bridge = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/OrderedReceiverPendingResultBridge.java').read_text()
 for token in [

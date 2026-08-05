@@ -74,8 +74,10 @@ require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/gues
         'PackageRevisionSetVerifier.verify(', 'spec.dexPath()', 'spec.splitPathArray()')
 require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestResourceLoader.java',
         'for (String splitPath : splitPaths)', 'addAssetPath')
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestApplicationInfoFactory.java',
+        'splitSourceDirs', 'splitPublicSourceDirs', 'spec.splitPathArray()')
 require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java',
-        'splitSourceDirs', 'createContextForSplit')
+        'createContextForSplit')
 
 require('app/src/testHarness/java/com/warden/controlledsandbox/PackageInstallSessionStoreSelfTest.java',
         'persisted staged install session self-test')

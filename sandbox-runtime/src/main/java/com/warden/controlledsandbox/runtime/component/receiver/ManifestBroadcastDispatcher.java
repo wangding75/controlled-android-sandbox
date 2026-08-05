@@ -24,8 +24,18 @@ public final class ManifestBroadcastDispatcher {
                                    OrderedBroadcastState initialState,
                                    Clock clock, long requestedChainTimeoutMs,
                                    Delivery delivery) {
-        if (routes == null || initialState == null || clock == null || delivery == null) {
-            throw new IllegalArgumentException("routes, initialState, clock and delivery are required");
+        return dispatchRoutes(routes, ordered, stopOnFailure, initialState, clock,
+                requestedChainTimeoutMs,
+                route -> route.receiver().packageName() + "/" + route.receiver().className(),
+                delivery::deliver);
+    }
+
+    public <T> DispatchReport dispatchRoutes(List<T> routes, boolean ordered, boolean stopOnFailure,
+                                   OrderedBroadcastState initialState, Clock clock,
+                                   long requestedChainTimeoutMs, RouteLabel<T> label,
+                                   RouteDelivery<T> delivery) {
+        if (routes == null || initialState == null || clock == null || label == null || delivery == null) {
+            throw new IllegalArgumentException("routes, initialState, clock, label and delivery are required");
         }
         long startedAtMs = clock.nowMillis();
         if (startedAtMs < 0) throw new IllegalArgumentException("clock returned negative time");
@@ -38,7 +48,7 @@ public final class ManifestBroadcastDispatcher {
         String terminalReason = "COMPLETED";
         String abortSource = "";
         ArrayList<String> failures = new ArrayList<>();
-        for (BrokerManifestReceiverRuntime.Route route : routes) {
+        for (T route : routes) {
             if (ordered && state.aborted()) {
                 if (abortSource.isEmpty()) {
                     terminalReason = "ABORTED";
@@ -75,8 +85,7 @@ public final class ManifestBroadcastDispatcher {
             } else {
                 failed++;
                 if (outcome.timedOut()) timedOut++;
-                failures.add(route.receiver().packageName() + "/" + route.receiver().className()
-                        + ":" + outcome.failureReason());
+                failures.add(label.label(route) + ":" + outcome.failureReason());
                 if (stopOnFailure) {
                     state = state.apply(new OrderedBroadcastState.ResultUpdate().abort());
                     terminalReason = outcome.timedOut() ? "TIMEOUT_ABORT" : "FAILURE_ABORT";
@@ -99,6 +108,12 @@ public final class ManifestBroadcastDispatcher {
     public interface Delivery {
         DeliveryOutcome deliver(BrokerManifestReceiverRuntime.Route route,
                                 OrderedBroadcastState currentState,
+                                long remainingChainBudgetMs) throws Exception;
+    }
+
+    @FunctionalInterface public interface RouteLabel<T> { String label(T route); }
+    @FunctionalInterface public interface RouteDelivery<T> {
+        DeliveryOutcome deliver(T route, OrderedBroadcastState currentState,
                                 long remainingChainBudgetMs) throws Exception;
     }
 

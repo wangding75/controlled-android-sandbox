@@ -22,7 +22,7 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         localTimeoutConsumesLateFinish();
         completionBinderDeathCancelsAsyncBridge();
         immediateCompletionDeathDuringLinkRollsBackReservation();
-        invalidResultExtrasAreRejected();
+        unsupportedResultExtrasAreRejected();
         System.out.println("PASS ordered Receiver PendingResult bridge self-test");
     }
 
@@ -198,7 +198,7 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
         }
     }
 
-    private static void invalidResultExtrasAreRejected() throws Exception {
+    private static void unsupportedResultExtrasAreRejected() throws Exception {
         FakeClock clock = new FakeClock(900);
         CapturingCompletion completion = new CapturingCompletion();
         OrderedReceiverFinishInterceptor interceptor = new OrderedReceiverFinishInterceptor(clock);
@@ -206,7 +206,7 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
             BroadcastReceiver receiver = new BroadcastReceiver() {
                 @Override public void onReceive(Context context, Intent intent) {
                     Bundle invalid = new Bundle();
-                    invalid.putInt("notString", 3);
+                    invalid.putBundle("nested", new Bundle());
                     setResultExtras(invalid);
                 }
             };
@@ -216,11 +216,11 @@ public final class OrderedReceiverPendingResultBridgeSelfTest {
             boolean rejected = false;
             try { bridge.afterOnReceive(); }
             catch (IllegalArgumentException expected) {
-                rejected = expected.getMessage().contains("STRING_ONLY");
+                rejected = expected.getMessage().contains("TYPE_UNSUPPORTED");
                 bridge.cancelLocal();
             }
             require(rejected && completion.calls == 0 && interceptor.pendingCount() == 0,
-                    "invalid ordered result extras were not rejected and cleaned");
+                    "unsupported ordered result extras were not rejected and cleaned");
         } finally {
             interceptor.close();
         }

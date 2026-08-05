@@ -81,7 +81,8 @@ public final class BrokerManifestReceiverRuntime {
         String targetPackage = request.getString(RuntimeKeys.TARGET_PACKAGE_NAME, sender.packageName());
         String component = normalizeClass(targetPackage, required(request, RuntimeKeys.COMPONENT_CLASS));
         return registry.resolveExplicit(sender.packageName(), sender.virtualUserId(), targetPackage,
-                targetUser, component);
+                targetUser, component, request.getString(
+                        RuntimeKeys.BROADCAST_REQUIRED_RECEIVER_PERMISSION, ""));
     }
 
     public synchronized List<Route> routeImplicit(Bundle request, GuestSession sender) {
@@ -134,6 +135,11 @@ public final class BrokerManifestReceiverRuntime {
         ManifestReceiverRegistry.Snapshot value = registry.snapshot();
         return new Snapshot(value.packages(), value.receivers(), value.bindings(),
                 value.actionIndexKeys(), value.actionIndexEntries(), startupTemplates.size());
+    }
+
+    public synchronized boolean packageRequestsPermission(String packageName, int userId,
+                                                          String permission) {
+        return registry.packageRequestsPermission(packageName, userId, permission);
     }
 
     public synchronized int packageCount() { return registry.packageCount(); }

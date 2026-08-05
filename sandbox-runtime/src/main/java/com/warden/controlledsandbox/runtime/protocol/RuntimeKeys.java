@@ -106,11 +106,19 @@ public final class RuntimeKeys {
     public static final String ERROR_MESSAGE = "errorMessage";
 
     public static final String CONNECTION_ID = "connectionId";
+    public static final String SERVICE_BIND_FLAGS = "serviceBindFlags";
     public static final String BINDER = "binder";
     public static final String RECEIVER_ID = "receiverId";
     public static final String RECEIVER_ACTIONS = "receiverActions";
     public static final String RECEIVER_EXPORTED = "receiverExported";
     public static final String RECEIVER_PERMISSION = "receiverPermission";
+    public static final String RECEIVER_DYNAMIC_INSTANCE = "receiverDynamicInstance";
+    public static final String RECEIVER_PRIORITY = "receiverPriority";
+    public static final String RECEIVER_CATEGORIES = "receiverCategories";
+    public static final String RECEIVER_DATA_RULE_COUNT = "receiverDataRuleCount";
+    public static final String RECEIVER_DATA_RULE_PREFIX = "receiverDataRule.";
+    public static final String RECEIVER_DATA_PATH_PREFIX = "receiverDataPathPrefix";
+    public static final String RECEIVER_DATA_PATH_PATTERN = "receiverDataPathPattern";
     public static final String RECEIVER_MANIFEST = "receiverManifest";
     public static final String RECEIVER_PROCESS_STARTED = "receiverProcessStarted";
     public static final String RECEIVER_ACTIVATION_KEY = "receiverActivationKey";
@@ -162,6 +170,9 @@ public final class RuntimeKeys {
     public static final String CALLER_SESSION_ID = "callerSessionId";
     public static final String CALLER_GENERATION = "callerGeneration";
     public static final String TARGET_PACKAGE_NAME = "targetPackageName";
+    public static final String INTENT_COMPONENT_PACKAGE = "intentComponentPackage";
+    public static final String INTENT_COMPONENT_CLASS = "intentComponentClass";
+    public static final String INTENT_EXTRAS = "intentExtras";
     public static final String TARGET_VIRTUAL_USER_ID = "targetVirtualUserId";
 
     public static final String PROVIDER_PROJECTION = "providerProjection";

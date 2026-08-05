@@ -110,6 +110,13 @@ public final class ManifestReceiverRegistry {
     public synchronized Resolution resolveExplicit(String senderPackage, int senderUser,
                                                    String targetPackage, int targetUser,
                                                    String receiverClass) {
+        return resolveExplicit(senderPackage, senderUser, targetPackage, targetUser, receiverClass, "");
+    }
+
+    public synchronized Resolution resolveExplicit(String senderPackage, int senderUser,
+                                                   String targetPackage, int targetUser,
+                                                   String receiverClass,
+                                                   String requiredReceiverPermission) {
         String sender = requirePackage(senderPackage, "senderPackage");
         String target = requirePackage(targetPackage, "targetPackage");
         requireSameUser(senderUser, targetUser);
@@ -117,7 +124,8 @@ public final class ManifestReceiverRegistry {
         if (targetRecord == null) throw new IllegalStateException("MANIFEST_RECEIVER_PACKAGE_NOT_INDEXED");
         Receiver receiver = targetRecord.receiversByClass().get(requireClass(receiverClass));
         if (receiver == null || !receiver.enabled()) throw new IllegalArgumentException("MANIFEST_RECEIVER_NOT_FOUND");
-        requireCallerAllowed(sender, senderUser, targetRecord, receiver, "");
+        requireCallerAllowed(sender, senderUser, targetRecord, receiver,
+                normalize(requiredReceiverPermission));
         return resolution(receiver, targetUser, 0);
     }
 
@@ -162,6 +170,15 @@ public final class ManifestReceiverRegistry {
                 .thenComparing(item -> item.receiver().packageName())
                 .thenComparing(item -> item.receiver().className()));
         return Collections.unmodifiableList(matches);
+    }
+
+    public synchronized boolean packageRequestsPermission(String packageName, int virtualUserId,
+                                                          String permission) {
+        String normalized = normalize(permission);
+        if (normalized.isEmpty()) return true;
+        PackageRecord record = packages.get(packageKey(requirePackage(packageName, "packageName"),
+                virtualUserId));
+        return record != null && record.requestedPermissions().contains(normalized);
     }
 
     public synchronized int packageCount() { return packages.size(); }

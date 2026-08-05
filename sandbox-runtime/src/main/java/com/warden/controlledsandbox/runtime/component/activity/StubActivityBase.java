@@ -73,7 +73,8 @@ public abstract class StubActivityBase extends Activity {
                         this::enqueueActivityEvent);
                 activityResults = new GuestActivityResultBridge(
                         this, session, activityToken, taskId);
-                Bundle result = controller.create(spec.componentClass, state);
+                Intent guestIntent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route);
+                Bundle result = controller.create(spec.componentClass, guestIntent, state);
                 RuntimeEventLog.event("GUEST_ACTIVITY_CREATE", result);
                 if ("ACTIVITY_CREATED".equals(result.getString(RuntimeKeys.STATUS))) {
                     if (hostStage >= 2) controller.start();
@@ -141,7 +142,8 @@ public abstract class StubActivityBase extends Activity {
                 showFailure("NEW_INTENT_ACTIVITY_MISMATCH", "Route targets another virtual Activity");
                 return;
             }
-            if (controller != null) controller.newIntent(new Intent(intent));
+            if (controller != null) controller.newIntent(
+                    com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route));
         });
     }
 
