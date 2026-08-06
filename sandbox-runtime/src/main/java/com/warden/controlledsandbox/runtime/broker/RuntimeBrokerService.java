@@ -257,7 +257,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 uriGrantAuthorization = beginUriGrantAuthorization(request, callerInstance, requestedTarget);
                 UriGrantRegistry.Authorization authorization = uriGrantAuthorization;
                 providerRoute = providerRuntime.routeOperation(request, operation, callerInstance,
-                        requestedUser, requestedTarget, authorization == null ? null : authorization::allows, now());
+                        requestedUser, requestedTarget, authorization == null ? null : authorization::allows,
+                        permission -> ProviderDeclaredPermissionAuthorizer.allows(request, requestedPackage, requestedUser,
+                                permission, this::sessionById, brokerState), now());
                 if ("URI_GRANT".equals(providerRoute.permissionBasis())) {
                     if (authorization == null) throw new SecurityException("URI_GRANT_CALLER_SESSION_REQUIRED");
                     uriGrantAuthorizationResult = authorization.commit(now());
@@ -1267,7 +1269,6 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         out.putString(RuntimeKeys.ERROR_MESSAGE, message == null ? "" : message);
         return out;
     }
-
     private static final class ObserverCaller {
         final String instanceId;
         final GuestSession session;
@@ -1277,7 +1278,6 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             this.session = session;
         }
     }
-
     private static final class ProviderAccess {
         final String callerInstance;
         final String callerSessionId;

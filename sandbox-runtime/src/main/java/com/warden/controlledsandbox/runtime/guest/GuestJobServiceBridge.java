@@ -7,9 +7,7 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.net.Uri;
 import android.os.Binder;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.Parcel;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
@@ -21,17 +19,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /** Executes Binder-delivered jobs against Guest JobService instances. */
 final class GuestJobServiceBridge implements AutoCloseable {
-    private static final long MAIN_THREAD_TIMEOUT_MS = 10_000L;
     private final GuestRuntimeEnvironment.Session session;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Map<String, JobService> services = new LinkedHashMap<>();
     private final Map<Integer, RunningJob> running = new LinkedHashMap<>();
+    private final java.util.Set<Integer> starting = new java.util.LinkedHashSet<>();
 
     GuestJobServiceBridge(GuestRuntimeEnvironment.Session session) {
         this.session = java.util.Objects.requireNonNull(session, "session");
@@ -48,10 +42,17 @@ final class GuestJobServiceBridge implements AutoCloseable {
         }
         synchronized (this) {
             RunningJob existing = running.get(guestJobId);
-            if (existing != null && existing.execution.active()) return false;
+            if ((existing != null && existing.execution.active()) || !starting.add(guestJobId)) return false;
         }
-        String className = serviceClass(jobPayload);
-        JobService service = service(className);
+        String className;
+        JobService service;
+        try {
+            className = serviceClass(jobPayload);
+            service = service(className);
+        } catch (RuntimeException error) {
+            synchronized (this) { starting.remove(guestJobId); }
+            throw error;
+        }
         GuestJobCallbackBinder callback = new GuestJobCallbackBinder(guestJobId, execution,
                 () -> removeFinished(guestJobId));
         JobParameters jobParameters = GuestJobParametersFactory.create(parameters, callback);
@@ -59,16 +60,19 @@ final class GuestJobServiceBridge implements AutoCloseable {
         try {
             ongoing = onMain(() -> service.onStartJob(jobParameters));
         } catch (RuntimeException error) {
+            synchronized (this) { starting.remove(guestJobId); }
             callback.invalidate();
             event("GUEST_JOB_START_FAILED", guestJobId, className, error.getClass().getSimpleName());
             return false;
         }
         if (!ongoing) {
+            synchronized (this) { starting.remove(guestJobId); }
             callback.finish(false);
             event("GUEST_JOB_FINISHED_SYNCHRONOUSLY", guestJobId, className, "");
             return true;
         }
         synchronized (this) {
+            starting.remove(guestJobId);
             if (callback.active()) {
                 RunningJob previous = running.putIfAbsent(guestJobId,
                         new RunningJob(className, service, jobParameters, callback, execution));
@@ -109,7 +113,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
         List<RunningJob> active;
         List<JobService> created;
         synchronized (this) {
-            active = new ArrayList<>(running.values()); running.clear();
+            active = new ArrayList<>(running.values()); running.clear(); starting.clear();
             created = new ArrayList<>(services.values()); services.clear();
         }
         for (RunningJob value : active) {
@@ -132,15 +136,18 @@ final class GuestJobServiceBridge implements AutoCloseable {
         }
         JobService created;
         try {
-            Class<?> type = session.classLoader.loadClass(className);
-            if (!JobService.class.isAssignableFrom(type)) {
-                throw new IllegalArgumentException("Component is not a JobService: " + className);
-            }
-            created = (JobService) type.getDeclaredConstructor().newInstance();
-            attachBaseContext(created, session.context);
-            setOptionalField(created, "mApplication", session.application);
-            setOptionalField(created, "mClassName", className);
-            onMain(() -> { created.onCreate(); return false; });
+            created = onMain(() -> {
+                Class<?> type = session.classLoader.loadClass(className);
+                if (!JobService.class.isAssignableFrom(type)) {
+                    throw new IllegalArgumentException("Component is not a JobService: " + className);
+                }
+                JobService value = (JobService) type.getDeclaredConstructor().newInstance();
+                attachBaseContext(value, session.context);
+                setOptionalField(value, "mApplication", session.application);
+                setOptionalField(value, "mClassName", className);
+                value.onCreate();
+                return value;
+            });
         } catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException("GUEST_JOB_SERVICE_CREATE_FAILED", error); }
         JobService existing;
@@ -166,34 +173,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
     }
 
     private <T> T onMain(ThrowingSupplier<T> action) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            try { return action.get(); }
-            catch (RuntimeException error) { throw error; }
-            catch (Exception error) { throw new IllegalStateException(error); }
-        }
-        CountDownLatch latch = new CountDownLatch(1);
-        AtomicReference<T> result = new AtomicReference<>();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        if (!mainHandler.post(() -> {
-            try { result.set(action.get()); }
-            catch (Throwable error) {
-                failure.set(error);
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            }
-            finally { latch.countDown(); }
-        })) throw new IllegalStateException("GUEST_JOB_MAIN_HANDLER_REJECTED");
-        try {
-            if (!latch.await(MAIN_THREAD_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                throw new IllegalStateException("GUEST_JOB_MAIN_THREAD_TIMEOUT");
-            }
-        } catch (InterruptedException error) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("GUEST_JOB_MAIN_THREAD_INTERRUPTED", error);
-        }
-        Throwable error = failure.get();
-        if (error instanceof RuntimeException runtime) throw runtime;
-        if (error != null) throw new IllegalStateException(error);
-        return result.get();
+        return session.mainThread.call(action::get);
     }
 
     private static void attachBaseContext(ContextWrapper wrapper, Context context) throws Exception {

@@ -69,3 +69,50 @@ com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.
 com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static Bundle decode(Map<String, String> encoded)
 com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static Map<String, String> encode(Bundle extras)
 com.warden.controlledsandbox.runtime.protocol|OrderedBroadcastResultExtrasCodec.java|public static void validate(Bundle extras)
+
+# PRE-DEVICE-P1: Provider read/write/path permissions and URI-grant metadata must cross
+# Manifest, typed contract, domain authority and Broker boundaries without raw Bundle fields.
+com.warden.controlledsandbox.contract|VirtualComponentSnapshot.java|public List<VirtualProviderPathRuleSnapshot> providerPathRules()
+com.warden.controlledsandbox.contract|VirtualComponentSnapshot.java|public String readPermission()
+com.warden.controlledsandbox.contract|VirtualComponentSnapshot.java|public String writePermission()
+com.warden.controlledsandbox.contract|VirtualComponentSnapshot.java|public boolean grantUriPermissions()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public String path()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public String pathPattern()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public String pathPrefix()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public String readPermission()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public String writePermission()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public boolean uriGrantRule()
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public final class VirtualProviderPathRuleSnapshot implements Parcelable
+com.warden.controlledsandbox.contract|VirtualProviderPathRuleSnapshot.java|public static final Creator<VirtualProviderPathRuleSnapshot> CREATOR = new Creator<>()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistration.java|public List<ProviderAuthorityRegistry.Entry> entries()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistration.java|public Set<String> createdAuthorities()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistration.java|public boolean createdAny()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistration.java|public final class ProviderAuthorityRegistration
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public List<ProviderPathRule> pathRules()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public String readPermission()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public String requiredReadPermission(String uri)
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public String requiredWritePermission(String uri)
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public String writePermission()
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public boolean allowsUriGrant(String uri)
+com.warden.controlledsandbox.domain.component.provider|ProviderAuthorityRegistry.java|public boolean grantUriPermissions()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public String path()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public String pathPattern()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public String pathPrefix()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public String readPermission()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public String writePermission()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public boolean uriGrantRule()
+com.warden.controlledsandbox.domain.component.provider|ProviderPathRule.java|public final class ProviderPathRule
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public List<ProviderPathRule> providerPathRules()
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public String readPermission()
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public String writePermission()
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public boolean grantUriPermissions()
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public boolean uriGrantRule()
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public static final class ProviderPathRule
+com.warden.controlledsandbox.domain.packageinfo.manifest|ManifestModel.java|public void addProviderPathRule(ProviderPathRule rule)
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public List<ProviderPathRule> providerPathRules()
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public String readPermission()
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public String writePermission()
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public boolean grantUriPermissions()
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public boolean uriGrantRule()
+com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public static final class ProviderPathRule
+com.warden.controlledsandbox.runtime.provider|BrokerProviderRuntime.java|public interface DeclaredPermissionChecker

@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import android.content.Context;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
@@ -263,10 +264,17 @@ final class VirtualPackageStateBuilder {
                 filters.add(new VirtualIntentFilterSnapshot(filter.priority(),
                         new ArrayList<>(filter.actions()), new ArrayList<>(filter.categories()), data));
             }
+            List<VirtualProviderPathRuleSnapshot> providerPathRules = new ArrayList<>();
+            for (ManifestModel.ProviderPathRule rule : component.providerPathRules()) {
+                providerPathRules.add(new VirtualProviderPathRuleSnapshot(rule.path(), rule.pathPrefix(),
+                        rule.pathPattern(), rule.readPermission(), rule.writePermission(),
+                        rule.uriGrantRule()));
+            }
             output.add(new VirtualComponentSnapshot(type, component.className(),
                     processName(packageName, component), component.exported(), enabled,
                     component.isolatedProcess(), component.authorities(), component.permission(),
-                    enabledSetting, component.actions(), filters));
+                    component.readPermission(), component.writePermission(), component.grantUriPermissions(),
+                    enabledSetting, component.actions(), filters, providerPathRules));
         }
     }
 

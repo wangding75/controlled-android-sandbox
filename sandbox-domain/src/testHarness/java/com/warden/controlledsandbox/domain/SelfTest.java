@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.domain;
 
+import com.warden.controlledsandbox.domain.component.provider.ProviderAuthorityRegistration;
 import com.warden.controlledsandbox.domain.component.activity.ActivityTaskRegistry;
 import com.warden.controlledsandbox.domain.component.activity.LaunchDecision;
 import com.warden.controlledsandbox.domain.component.activity.LaunchPolicy;
@@ -88,7 +89,17 @@ public final class SelfTest {
                         BinaryXmlFixtureBuilder.text("mimeType", "text/*")).end("data")
                 .end("intent-filter").end("receiver")
                 .start("receiver", BinaryXmlFixtureBuilder.text("name", ".InheritedPermissionReceiver"), BinaryXmlFixtureBuilder.bool("exported", false)).end("receiver")
-                .start("provider", BinaryXmlFixtureBuilder.text("name", ".DataProvider"), BinaryXmlFixtureBuilder.text("authorities", "com.example.guest.data")).end("provider")
+                .start("provider", BinaryXmlFixtureBuilder.text("name", ".DataProvider"),
+                        BinaryXmlFixtureBuilder.text("authorities", "com.example.guest.data"),
+                        BinaryXmlFixtureBuilder.text("permission", "com.example.PROVIDER"),
+                        BinaryXmlFixtureBuilder.text("readPermission", "com.example.READ"),
+                        BinaryXmlFixtureBuilder.text("writePermission", "com.example.WRITE"),
+                        BinaryXmlFixtureBuilder.bool("grantUriPermissions", true))
+                .start("path-permission", BinaryXmlFixtureBuilder.text("pathPrefix", "/private"),
+                        BinaryXmlFixtureBuilder.text("readPermission", "com.example.PRIVATE_READ"),
+                        BinaryXmlFixtureBuilder.text("writePermission", "com.example.PRIVATE_WRITE")).end("path-permission")
+                .start("grant-uri-permission", BinaryXmlFixtureBuilder.text("pathPattern", "/shared/.*")).end("grant-uri-permission")
+                .end("provider")
                 .end("application").end("manifest").build();
         ManifestModel model = new BinaryXmlManifestParser().parse(xml);
         require("com.example.guest".equals(model.packageName()), "package");
@@ -123,6 +134,18 @@ public final class SelfTest {
         require("com.example.SEND_BOOT".equals(model.receivers().get(0).permission()), "receiver permission");
         require(model.receivers().get(0).exported(), "legacy intent-filter exported default");
         require(!model.receivers().get(1).exported(), "explicit receiver exported=false");
+        ManifestModel.Component provider = model.providers().get(0);
+        require("com.example.READ".equals(provider.readPermission())
+                        && "com.example.WRITE".equals(provider.writePermission())
+                        && provider.grantUriPermissions(),
+                "Provider read/write/grant permissions");
+        require(provider.providerPathRules().size() == 2
+                        && "/private".equals(provider.providerPathRules().get(0).pathPrefix())
+                        && "com.example.PRIVATE_READ".equals(
+                                provider.providerPathRules().get(0).readPermission())
+                        && provider.providerPathRules().get(1).uriGrantRule()
+                        && "/shared/.*".equals(provider.providerPathRules().get(1).pathPattern()),
+                "Provider path and URI-grant rules");
         require("com.example.APP_COMPONENT".equals(model.receivers().get(1).permission()),
                 "application permission inheritance");
         require("com.example.guest.data".equals(model.providers().get(0).authorities()), "provider authority");
@@ -666,7 +689,7 @@ public final class SelfTest {
 
     private static void testProviderAuthorityRegistry() {
         ProviderAuthorityRegistry registry = new ProviderAuthorityRegistry();
-        ProviderAuthorityRegistry.Registration registration = registry.registerSession("instance-a", 0,
+        ProviderAuthorityRegistration registration = registry.registerSession("instance-a", 0,
                 "pkg.data;pkg.files", "pkg.DataProvider", "pkg:provider", true, "session-a", 1);
         ProviderAuthorityRegistry.Entry entry = registration.entries().get(0);
         require(registration.createdAuthorities().size() == 2, "provider authorities not staged atomically");
@@ -675,7 +698,7 @@ public final class SelfTest {
         require(registry.resolveExported(0, "pkg.data") != null, "exported provider resolve");
         require(registry.requireOwned(0, "instance-a", "pkg.data", "session-a", 1) != null,
                 "provider owner lookup");
-        ProviderAuthorityRegistry.Registration duplicate = registry.registerSession("instance-a", 0,
+        ProviderAuthorityRegistration duplicate = registry.registerSession("instance-a", 0,
                 "pkg.data;pkg.files", "pkg.DataProvider", "pkg:provider", true, "session-a", 1);
         require(!duplicate.createdAny() && registry.size() == 2, "idempotent provider registration");
 

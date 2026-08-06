@@ -19,6 +19,8 @@ import android.content.pm.ProviderInfo;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -33,98 +35,150 @@ public final class GuestComponentRuntime {
     private final Map<String, ReceiverRecord> receivers = new LinkedHashMap<>();
     private final Map<String, ProviderRecord> providersByClass = new LinkedHashMap<>();
     private final Map<String, ProviderRecord> providersByAuthority = new LinkedHashMap<>();
+    private final Object providerLock = new Object();
     private final ProviderCursorTransport cursorTransport = new ProviderCursorTransport();
     private final GuestProviderFileTransport fileTransport = new GuestProviderFileTransport();
     private int nextStartId = 1;
 
     GuestComponentRuntime(GuestRuntimeEnvironment.Session session) { this.session = session; }
 
-    synchronized Bundle invoke(Bundle request) {
+    Bundle invoke(Bundle request) {
         try {
+            if (request == null) throw new IllegalArgumentException("request is required");
             String operation = required(request, ComponentOperations.OPERATION);
-            String componentClass = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
-            IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass,
-                    request.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false));
-            switch (operation) {
-                case ComponentOperations.START_SERVICE:
-                    return startService(componentClass, request, false);
-                case ComponentOperations.START_FOREGROUND_SERVICE:
-                    return startService(componentClass, request, true);
-                case ComponentOperations.STOP_SERVICE:
-                    return stopService(componentClass);
-                case ComponentOperations.STOP_SERVICE_START_ID:
-                    return stopServiceStartId(componentClass,
-                            request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
-                case ComponentOperations.SET_SERVICE_FOREGROUND:
-                    return setServiceForeground(componentClass, request);
-                case ComponentOperations.BIND_SERVICE:
-                    return bindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID), request);
-                case ComponentOperations.UNBIND_SERVICE:
-                    return unbindService(componentClass, required(request, RuntimeKeys.CONNECTION_ID));
-                case ComponentOperations.REGISTER_RECEIVER:
-                    return registerReceiver(componentClass, request);
-                case ComponentOperations.UNREGISTER_RECEIVER:
-                    return unregisterReceiver(required(request, RuntimeKeys.RECEIVER_ID));
-                case ComponentOperations.SEND_BROADCAST:
-                    return sendBroadcast(componentClass, request);
-                case ComponentOperations.PREPARE_PROVIDER:
-                    return prepareProvider(componentClass, required(request, ComponentOperations.AUTHORITY));
-                case ComponentOperations.PROVIDER_QUERY:
-                    return queryProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_CURSOR_PAGE:
-                    return cursorTransport.page(required(request, RuntimeKeys.CURSOR_TOKEN),
-                            session.spec.sessionId, session.spec.generation,
-                            request.getInt(RuntimeKeys.CURSOR_OFFSET, 0),
-                            request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
-                            request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64));
-                case ComponentOperations.PROVIDER_CURSOR_CLOSE:
-                    return cursorTransport.close(required(request, RuntimeKeys.CURSOR_TOKEN),
-                            session.spec.sessionId, session.spec.generation);
-                case ComponentOperations.PROVIDER_CURSOR_CANCEL:
-                    return cursorTransport.cancel(required(request, RuntimeKeys.CURSOR_TOKEN),
-                            session.spec.sessionId, session.spec.generation);
-                case ComponentOperations.PROVIDER_GET_TYPE:
-                    return getProviderType(componentClass, request);
-                case ComponentOperations.PROVIDER_INSERT:
-                    return insertProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_UPDATE:
-                    return updateProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_DELETE:
-                    return deleteProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_CALL:
-                    return callProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_APPLY_BATCH:
-                    return applyBatchProvider(componentClass, request);
-                case ComponentOperations.PROVIDER_OPEN_FILE:
-                    return openProviderFile(componentClass, request);
-                case ComponentOperations.PROVIDER_OPEN_ASSET_FILE:
-                    return openProviderAssetFile(componentClass, request);
-                case ComponentOperations.PROVIDER_OPEN_TYPED_ASSET_FILE:
-                    return openProviderTypedAssetFile(componentClass, request);
-                case ComponentOperations.PROVIDER_FILE_CLOSE:
-                    return fileTransport.close(required(request, RuntimeKeys.FILE_TOKEN),
-                            session.spec.sessionId, session.spec.generation);
-                default:
-                    throw new IllegalArgumentException("Unknown component operation: " + operation);
+            if (requiresMainThread(operation)) {
+                return session.mainThread.call(() -> invokeOperation(request, operation));
             }
+            return withGuestClassLoader(() -> invokeOperation(request, operation));
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             return failure(error);
         }
     }
 
-    synchronized void shutdown() {
+    private Bundle invokeOperation(Bundle request, String operation) throws Exception {
+        String componentClass = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+        IsolatedComponentPolicy.requireSupported(session.packageMetadata, componentClass,
+                request.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false));
+        if (ComponentOperations.isServiceOperation(operation)) {
+            return invokeServiceOperation(componentClass, request, operation);
+        }
+        if (ComponentOperations.isProviderOperation(operation)) {
+            return invokeProviderOperation(componentClass, request, operation);
+        }
+        return invokeReceiverOperation(componentClass, request, operation);
+    }
+
+    private Bundle invokeServiceOperation(String componentClass, Bundle request, String operation)
+            throws Exception {
+        return switch (operation) {
+            case ComponentOperations.START_SERVICE -> startService(componentClass, request, false);
+            case ComponentOperations.START_FOREGROUND_SERVICE -> startService(componentClass, request, true);
+            case ComponentOperations.STOP_SERVICE -> stopService(componentClass);
+            case ComponentOperations.STOP_SERVICE_START_ID -> stopServiceStartId(componentClass,
+                    request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
+            case ComponentOperations.SET_SERVICE_FOREGROUND -> setServiceForeground(componentClass, request);
+            case ComponentOperations.BIND_SERVICE -> bindService(componentClass,
+                    required(request, RuntimeKeys.CONNECTION_ID), request);
+            case ComponentOperations.UNBIND_SERVICE -> unbindService(componentClass,
+                    required(request, RuntimeKeys.CONNECTION_ID));
+            default -> throw new IllegalArgumentException("Unknown Service operation: " + operation);
+        };
+    }
+
+    private Bundle invokeReceiverOperation(String componentClass, Bundle request, String operation)
+            throws Exception {
+        return switch (operation) {
+            case ComponentOperations.REGISTER_RECEIVER -> registerReceiver(componentClass, request);
+            case ComponentOperations.UNREGISTER_RECEIVER -> unregisterReceiver(
+                    required(request, RuntimeKeys.RECEIVER_ID));
+            case ComponentOperations.SEND_BROADCAST -> sendBroadcast(componentClass, request);
+            default -> throw new IllegalArgumentException("Unknown component operation: " + operation);
+        };
+    }
+
+    private Bundle invokeProviderOperation(String componentClass, Bundle request, String operation)
+            throws Exception {
+        if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
+            return prepareProvider(componentClass, required(request, ComponentOperations.AUTHORITY));
+        }
+        if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
+            return cursorTransport.page(required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, session.spec.generation,
+                    request.getInt(RuntimeKeys.CURSOR_OFFSET, 0),
+                    request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
+                    request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64));
+        }
+        if (ComponentOperations.PROVIDER_CURSOR_CLOSE.equals(operation)) {
+            return cursorTransport.close(required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, session.spec.generation);
+        }
+        if (ComponentOperations.PROVIDER_CURSOR_CANCEL.equals(operation)) {
+            return cursorTransport.cancel(required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, session.spec.generation);
+        }
+        if (ComponentOperations.PROVIDER_FILE_CLOSE.equals(operation)) {
+            return fileTransport.close(required(request, RuntimeKeys.FILE_TOKEN),
+                    session.spec.sessionId, session.spec.generation);
+        }
+        return invokeProviderTransaction(componentClass, request, operation);
+    }
+
+    private Bundle invokeProviderTransaction(String componentClass, Bundle request, String operation)
+            throws Exception {
+        return switch (operation) {
+            case ComponentOperations.PROVIDER_QUERY -> queryProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_GET_TYPE -> getProviderType(componentClass, request);
+            case ComponentOperations.PROVIDER_INSERT -> insertProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_UPDATE -> updateProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_DELETE -> deleteProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_CALL -> callProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_APPLY_BATCH -> applyBatchProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_OPEN_FILE -> openProviderFile(componentClass, request);
+            case ComponentOperations.PROVIDER_OPEN_ASSET_FILE -> openProviderAssetFile(componentClass, request);
+            case ComponentOperations.PROVIDER_OPEN_TYPED_ASSET_FILE ->
+                    openProviderTypedAssetFile(componentClass, request);
+            default -> throw new IllegalArgumentException("Unknown Provider operation: " + operation);
+        };
+    }
+
+    private static boolean requiresMainThread(String operation) {
+        return ComponentOperations.START_SERVICE.equals(operation)
+                || ComponentOperations.START_FOREGROUND_SERVICE.equals(operation)
+                || ComponentOperations.STOP_SERVICE.equals(operation)
+                || ComponentOperations.STOP_SERVICE_START_ID.equals(operation)
+                || ComponentOperations.SET_SERVICE_FOREGROUND.equals(operation)
+                || ComponentOperations.BIND_SERVICE.equals(operation)
+                || ComponentOperations.UNBIND_SERVICE.equals(operation)
+                || ComponentOperations.REGISTER_RECEIVER.equals(operation)
+                || ComponentOperations.UNREGISTER_RECEIVER.equals(operation)
+                || ComponentOperations.SEND_BROADCAST.equals(operation)
+                || ComponentOperations.PREPARE_PROVIDER.equals(operation);
+    }
+
+    void shutdown() {
+        session.mainThread.run(this::shutdownOnMain);
+    }
+
+    private void shutdownOnMain() {
         cursorTransport.closeAll();
         fileTransport.closeAll();
         for (ServiceRecord record : services.values()) destroyService(record);
         services.clear();
         receivers.clear();
         session.context.clearDynamicReceivers();
-        for (ProviderRecord record : providersByClass.values()) {
-            try { record.provider.shutdown(); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
+        java.util.List<ProviderRecord> providerRecords;
+        synchronized (providerLock) {
+            providerRecords = new java.util.ArrayList<>(providersByClass.values());
+            providersByClass.clear();
+            providersByAuthority.clear();
         }
-        providersByClass.clear();
-        providersByAuthority.clear();
+        for (ProviderRecord record : providerRecords) {
+            try { record.provider.shutdown(); }
+            catch (Throwable ignored) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+            }
+        }
     }
 
     private Bundle startService(String className, Bundle request, boolean foregroundRequested) throws Exception {
@@ -369,6 +423,8 @@ public final class GuestComponentRuntime {
             receiver = newReceiver(className);
         }
         ReceiverRecord record = new ReceiverRecord(receiverId, className, receiver,
+                request.getBoolean(RuntimeKeys.RECEIVER_DYNAMIC_INSTANCE, false)
+                        ? session.context.dynamicReceivers.scheduler(receiverId) : null,
                 new ArrayList<>(actions), request.getBoolean(RuntimeKeys.RECEIVER_EXPORTED, false));
         receivers.put(receiverId, record);
         Bundle out = success("RECEIVER_REGISTERED", className);
@@ -397,29 +453,31 @@ public final class GuestComponentRuntime {
             if (!receiverId.trim().isEmpty()) {
                 ReceiverRecord record = receivers.get(receiverId);
                 if (record == null) throw new IllegalArgumentException("UNKNOWN_RECEIVER_ID");
-                return deliverOrderedReceiver(record.receiver, record.className, intent, request, action);
+                return deliverOrderedReceiver(record, intent, request, action);
             }
             if (className == null || className.trim().isEmpty()) {
                 throw new IllegalArgumentException("ORDERED_RECEIVER_CLASS_REQUIRED");
             }
-            BroadcastReceiver receiver = newReceiver(className);
-            return deliverOrderedReceiver(receiver, className, intent, request, action);
+            ReceiverRecord record = new ReceiverRecord("", className, newReceiver(className), null,
+                    new ArrayList<>(), false);
+            return deliverOrderedReceiver(record, intent, request, action);
         }
 
         int delivered = 0;
         if (!receiverId.trim().isEmpty()) {
             ReceiverRecord record = receivers.get(receiverId);
             if (record == null) throw new IllegalArgumentException("UNKNOWN_RECEIVER_ID");
-            record.receiver.onReceive(session.context, intent);
+            deliverReceiver(record, intent);
             delivered = 1;
             className = record.className;
         } else if (className != null && !className.trim().isEmpty()) {
-            newReceiver(className).onReceive(session.context, intent);
+            deliverReceiver(new ReceiverRecord("", className, newReceiver(className), null,
+                    new ArrayList<>(), false), intent);
             delivered = 1;
         } else {
             for (ReceiverRecord record : receivers.values()) {
                 if (record.actions.contains(action)) {
-                    record.receiver.onReceive(session.context, intent);
+                    deliverReceiver(record, intent);
                     delivered++;
                 }
             }
@@ -432,15 +490,15 @@ public final class GuestComponentRuntime {
         return out;
     }
 
-    private Bundle deliverOrderedReceiver(BroadcastReceiver receiver, String className, Intent intent,
+    private Bundle deliverOrderedReceiver(ReceiverRecord record, Intent intent,
                                           Bundle request, String action) throws Exception {
         OrderedReceiverPendingResultBridge bridge = OrderedReceiverPendingResultBridge.install(
-                receiver, request, session.orderedReceiverFinishInterceptor);
+                record.receiver, request, session.orderedReceiverFinishInterceptor);
         try {
-            receiver.onReceive(session.context, intent);
+            deliverReceiver(record, intent);
             Bundle out = bridge.afterOnReceive();
             out.putString(ComponentOperations.ACTION, action);
-            out.putString(RuntimeKeys.COMPONENT_CLASS, className);
+            out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
             out.putInt("deliveredCount", 1);
             RuntimeEventLog.event("GUEST_ORDERED_BROADCAST", out);
             return out;
@@ -454,6 +512,17 @@ public final class GuestComponentRuntime {
         }
     }
 
+    private void deliverReceiver(ReceiverRecord record, Intent intent) {
+        if (record.scheduler == null || record.scheduler.getLooper() == Looper.getMainLooper()) {
+            session.mainThread.run(() -> record.receiver.onReceive(session.context, intent));
+            return;
+        }
+        session.mainThread.callOnHandler(record.scheduler, () -> {
+            record.receiver.onReceive(session.context, intent);
+            return null;
+        });
+    }
+
     private BroadcastReceiver newReceiver(String className) throws Exception {
         Class<?> type = session.classLoader.loadClass(className);
         if (!BroadcastReceiver.class.isAssignableFrom(type)) {
@@ -463,14 +532,16 @@ public final class GuestComponentRuntime {
     }
 
     private Bundle prepareProvider(String className, String authority) throws Exception {
-        ProviderRecord existing = providersByAuthority.get(authority);
+        ProviderRecord existing;
+        synchronized (providerLock) { existing = providersByAuthority.get(authority); }
         if (existing != null) {
             if (!existing.className.equals(className)) throw new IllegalStateException("PROVIDER_AUTHORITY_COLLISION");
             return providerResult("PROVIDER_ALREADY_READY", existing);
         }
-        ProviderRecord byClass = providersByClass.get(className);
+        ProviderRecord byClass;
+        synchronized (providerLock) { byClass = providersByClass.get(className); }
         if (byClass != null) {
-            providersByAuthority.put(authority, byClass);
+            synchronized (providerLock) { providersByAuthority.put(authority, byClass); }
             return providerResult("PROVIDER_AUTHORITY_ATTACHED", byClass);
         }
         Class<?> type = session.classLoader.loadClass(className);
@@ -479,16 +550,17 @@ public final class GuestComponentRuntime {
         }
         ContentProvider provider = (ContentProvider) type.getDeclaredConstructor().newInstance();
         requireNativeHookRefresh("PROVIDER_CREATE");
-        ProviderInfo info = new ProviderInfo();
-        info.name = className;
-        info.packageName = session.spec.packageName;
-        info.authority = authority;
-        info.exported = false;
+        ProviderInfo info = session.packageMetadata.provider(authority);
+        if (info == null || !className.equals(info.name)) {
+            throw new SecurityException("PROVIDER_METADATA_MISMATCH:" + authority);
+        }
         info.applicationInfo = session.context.getApplicationInfo();
         provider.attachInfo(session.context, info);
         ProviderRecord record = new ProviderRecord(className, authority, provider);
-        providersByClass.put(className, record);
-        providersByAuthority.put(authority, record);
+        synchronized (providerLock) {
+            providersByClass.put(className, record);
+            providersByAuthority.put(authority, record);
+        }
         Bundle out = providerResult("PROVIDER_READY", record);
         RuntimeEventLog.event("GUEST_PROVIDER_PREPARE", out);
         return out;
@@ -633,14 +705,24 @@ public final class GuestComponentRuntime {
 
     private ProviderRecord requireProvider(String className, Bundle request) throws Exception {
         String authority = request.getString(ComponentOperations.AUTHORITY, "");
-        ProviderRecord record = authority.trim().isEmpty() ? null : providersByAuthority.get(authority);
-        if (record == null && className != null && !className.trim().isEmpty()) record = providersByClass.get(className);
-        if (record == null) {
-            if (className == null || className.trim().isEmpty()) throw new IllegalArgumentException("Provider class is required");
-            if (authority.trim().isEmpty()) throw new IllegalArgumentException("providerAuthority is required");
-            prepareProvider(className, authority);
-            record = providersByAuthority.get(authority);
+        ProviderRecord record;
+        synchronized (providerLock) {
+            record = authority.trim().isEmpty() ? null : providersByAuthority.get(authority);
+            if (record == null && className != null && !className.trim().isEmpty()) {
+                record = providersByClass.get(className);
+            }
         }
+        if (record == null) {
+            if (className == null || className.trim().isEmpty()) {
+                throw new IllegalArgumentException("Provider class is required");
+            }
+            if (authority.trim().isEmpty()) {
+                throw new IllegalArgumentException("providerAuthority is required");
+            }
+            session.mainThread.call(() -> prepareProvider(className, authority));
+            synchronized (providerLock) { record = providersByAuthority.get(authority); }
+        }
+        if (record == null) throw new IllegalStateException("PROVIDER_PREPARE_DID_NOT_PUBLISH");
         return record;
     }
 
@@ -707,6 +789,16 @@ public final class GuestComponentRuntime {
         return out;
     }
 
+    private <T> T withGuestClassLoader(java.util.concurrent.Callable<T> action) throws Exception {
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(session.classLoader);
+            return action.call();
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
+    }
+
     private static Bundle failure(Throwable error) {
         Throwable root = error;
         while (root.getCause() != null && root.getCause() != root) root = root.getCause();
@@ -746,13 +838,15 @@ public final class GuestComponentRuntime {
         final String id;
         final String className;
         final BroadcastReceiver receiver;
+        final Handler scheduler;
         final ArrayList<String> actions;
         final boolean exported;
-        ReceiverRecord(String id, String className, BroadcastReceiver receiver,
+        ReceiverRecord(String id, String className, BroadcastReceiver receiver, Handler scheduler,
                        ArrayList<String> actions, boolean exported) {
             this.id = id;
             this.className = className;
             this.receiver = receiver;
+            this.scheduler = scheduler;
             this.actions = actions;
             this.exported = exported;
         }

@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /** Immutable public-API package view used by the process-local PackageManager proxy. */
 public final class VirtualPackageMetadata {
@@ -132,6 +131,37 @@ public final class VirtualPackageMetadata {
         public boolean enabled() { return enabled; }
     }
 
+    public static final class ProviderPathRule {
+        private final String path;
+        private final String pathPrefix;
+        private final String pathPattern;
+        private final String readPermission;
+        private final String writePermission;
+        private final boolean uriGrantRule;
+
+        public ProviderPathRule(String path, String pathPrefix, String pathPattern,
+                                String readPermission, String writePermission,
+                                boolean uriGrantRule) {
+            this.path = value(path);
+            this.pathPrefix = value(pathPrefix);
+            this.pathPattern = value(pathPattern);
+            int matchers = (this.path.isEmpty() ? 0 : 1) + (this.pathPrefix.isEmpty() ? 0 : 1)
+                    + (this.pathPattern.isEmpty() ? 0 : 1);
+            if (matchers != 1) throw new IllegalArgumentException(
+                    "Provider path rule requires exactly one matcher");
+            this.readPermission = value(readPermission);
+            this.writePermission = value(writePermission);
+            this.uriGrantRule = uriGrantRule;
+        }
+
+        public String path() { return path; }
+        public String pathPrefix() { return pathPrefix; }
+        public String pathPattern() { return pathPattern; }
+        public String readPermission() { return readPermission; }
+        public String writePermission() { return writePermission; }
+        public boolean uriGrantRule() { return uriGrantRule; }
+    }
+
     public static final class Component {
         private final Type type;
         private final String className;
@@ -142,8 +172,12 @@ public final class VirtualPackageMetadata {
         private final Set<String> actions;
         private final String authority;
         private final String permission;
+        private final String readPermission;
+        private final String writePermission;
+        private final boolean grantUriPermissions;
         private final String enabledSetting;
         private final List<Filter> filters;
+        private final List<ProviderPathRule> providerPathRules;
 
         public Component(Type type, String className, String processName,
                          boolean exported, boolean enabled, boolean isolated,
@@ -162,6 +196,15 @@ public final class VirtualPackageMetadata {
                          boolean exported, boolean enabled, boolean isolated,
                          Set<String> actions, String authority, String permission,
                          String enabledSetting, List<Filter> filters) {
+            this(type, className, processName, exported, enabled, isolated, actions, authority,
+                    permission, permission, permission, false, enabledSetting, filters, List.of());
+        }
+
+        public Component(Type type, String className, String processName,
+                         boolean exported, boolean enabled, boolean isolated, Set<String> actions,
+                         String authority, String permission, String readPermission,
+                         String writePermission, boolean grantUriPermissions, String enabledSetting,
+                         List<Filter> filters, List<ProviderPathRule> providerPathRules) {
             this.type = java.util.Objects.requireNonNull(type, "type");
             this.className = requireText(className, "className");
             this.processName = value(processName);
@@ -171,8 +214,13 @@ public final class VirtualPackageMetadata {
             this.actions = immutableSet(actions);
             this.authority = value(authority);
             this.permission = value(permission);
+            this.readPermission = value(readPermission);
+            this.writePermission = value(writePermission);
+            this.grantUriPermissions = grantUriPermissions;
             this.enabledSetting = VirtualPackageMetadata.enabledSetting(enabledSetting);
             this.filters = Collections.unmodifiableList(new ArrayList<>(filters == null ? List.of() : filters));
+            this.providerPathRules = Collections.unmodifiableList(new ArrayList<>(
+                    providerPathRules == null ? List.of() : providerPathRules));
         }
 
         public Type type() { return type; }
@@ -184,8 +232,12 @@ public final class VirtualPackageMetadata {
         public Set<String> actions() { return actions; }
         public String authority() { return authority; }
         public String permission() { return permission; }
+        public String readPermission() { return readPermission; }
+        public String writePermission() { return writePermission; }
+        public boolean grantUriPermissions() { return grantUriPermissions; }
         public String enabledSetting() { return enabledSetting; }
         public List<Filter> filters() { return filters; }
+        public List<ProviderPathRule> providerPathRules() { return providerPathRules; }
     }
 
     private final String packageName;
@@ -487,7 +539,13 @@ public final class VirtualPackageMetadata {
             ((ServiceInfo) info).flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
             ((ServiceInfo) info).permission = component.permission();
         }
-        if (info instanceof ProviderInfo) ((ProviderInfo) info).authority = component.authority();
+        if (info instanceof ProviderInfo) {
+            ProviderInfo provider = (ProviderInfo) info;
+            provider.authority = component.authority();
+            provider.readPermission = component.readPermission();
+            provider.writePermission = component.writePermission();
+            provider.grantUriPermissions = component.grantUriPermissions();
+        }
         return info;
     }
 
@@ -535,13 +593,17 @@ public final class VirtualPackageMetadata {
         String path = uri == null ? "" : value(uri.getPath());
         if (!rule.path().isEmpty() && !rule.path().equals(path)) return -1;
         if (!rule.pathPrefix().isEmpty() && !path.startsWith(rule.pathPrefix())) return -1;
-        if (!rule.pathPattern().isEmpty() && !simpleGlob(rule.pathPattern()).matcher(path).matches()) return -1;
+        if (!rule.pathPattern().isEmpty() && !simpleGlob(rule.pathPattern(), path)) return -1;
         int score = 0x20000;
         if (!rule.mimeType().isEmpty()) score += 0x1000;
         if (!rule.scheme().isEmpty()) score += 0x100;
         if (!rule.host().isEmpty()) score += 0x40;
         if (!rule.path().isEmpty() || !rule.pathPrefix().isEmpty() || !rule.pathPattern().isEmpty()) score += 0x20;
         return score;
+    }
+
+    private static boolean simpleGlob(String pattern, String value) {
+        return AndroidSimpleGlobMatcher.matches(pattern, value);
     }
 
     private static boolean mimeMatches(String filter, String actual) {
@@ -553,15 +615,6 @@ public final class VirtualPackageMetadata {
         return filter.equalsIgnoreCase(actual);
     }
 
-    private static Pattern simpleGlob(String value) {
-        StringBuilder regex = new StringBuilder("^");
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c == '*') regex.append(".*");
-            else regex.append(Pattern.quote(String.valueOf(c)));
-        }
-        return Pattern.compile(regex.append('$').toString());
-    }
 
     private static List<Filter> legacyFilters(Set<String> actions) {
         if (actions == null || actions.isEmpty()) return List.of();

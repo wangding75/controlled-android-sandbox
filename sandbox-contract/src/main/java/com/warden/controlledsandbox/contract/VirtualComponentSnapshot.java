@@ -17,9 +17,13 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final boolean isolated;
     private final String authority;
     private final String permission;
+    private final String readPermission;
+    private final String writePermission;
+    private final boolean grantUriPermissions;
     private final String enabledSetting;
     private final ArrayList<String> actions;
     private final ArrayList<VirtualIntentFilterSnapshot> intentFilters;
+    private final ArrayList<VirtualProviderPathRuleSnapshot> providerPathRules;
 
     public VirtualComponentSnapshot(String type, String className, String processName,
                                     boolean exported, boolean enabled, boolean isolated,
@@ -33,6 +37,17 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                     String authority, String permission, String enabledSetting,
                                     List<String> actions,
                                     List<VirtualIntentFilterSnapshot> intentFilters) {
+        this(type, className, processName, exported, enabled, isolated, authority, permission,
+                permission, permission, false, enabledSetting, actions, intentFilters, List.of());
+    }
+
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                    boolean exported, boolean enabled, boolean isolated,
+                                    String authority, String permission, String readPermission,
+                                    String writePermission, boolean grantUriPermissions,
+                                    String enabledSetting, List<String> actions,
+                                    List<VirtualIntentFilterSnapshot> intentFilters,
+                                    List<VirtualProviderPathRuleSnapshot> providerPathRules) {
         this.type = componentType(type);
         this.className = required(className, "className");
         this.processName = value(processName);
@@ -41,9 +56,19 @@ public final class VirtualComponentSnapshot implements Parcelable {
         this.isolated = isolated;
         this.authority = value(authority);
         this.permission = value(permission);
+        this.readPermission = value(readPermission);
+        this.writePermission = value(writePermission);
+        this.grantUriPermissions = grantUriPermissions;
         this.enabledSetting = enabledSetting(enabledSetting);
         this.intentFilters = new ArrayList<>(intentFilters == null ? List.of() : intentFilters);
         if (this.intentFilters.size() > 256) throw new IllegalArgumentException("Too many intent filters");
+        this.providerPathRules = new ArrayList<>(providerPathRules == null ? List.of() : providerPathRules);
+        if (this.providerPathRules.size() > 256) throw new IllegalArgumentException("Too many Provider path rules");
+        if (!"PROVIDER".equals(this.type) && (!this.readPermission.equals(this.permission)
+                || !this.writePermission.equals(this.permission) || grantUriPermissions
+                || !this.providerPathRules.isEmpty())) {
+            throw new IllegalArgumentException("Provider-only metadata on " + this.type);
+        }
         LinkedHashSet<String> merged = new LinkedHashSet<>();
         if (actions != null) merged.addAll(actions);
         for (VirtualIntentFilterSnapshot filter : this.intentFilters) merged.addAll(filter.actions());
@@ -53,8 +78,9 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private VirtualComponentSnapshot(Parcel in) {
         this(in.readString(), in.readString(), in.readString(), in.readInt() != 0,
                 in.readInt() != 0, in.readInt() != 0, in.readString(), in.readString(),
-                in.readString(), in.createStringArrayList(),
-                in.createTypedArrayList(VirtualIntentFilterSnapshot.CREATOR));
+                in.readString(), in.readString(), in.readInt() != 0, in.readString(),
+                in.createStringArrayList(), in.createTypedArrayList(VirtualIntentFilterSnapshot.CREATOR),
+                in.createTypedArrayList(VirtualProviderPathRuleSnapshot.CREATOR));
     }
 
     public String type() { return type; }
@@ -65,27 +91,29 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public boolean isolated() { return isolated; }
     public String authority() { return authority; }
     public String permission() { return permission; }
+    public String readPermission() { return readPermission; }
+    public String writePermission() { return writePermission; }
+    public boolean grantUriPermissions() { return grantUriPermissions; }
     public String enabledSetting() { return enabledSetting; }
     public List<String> actions() { return Collections.unmodifiableList(actions); }
-    public List<VirtualIntentFilterSnapshot> intentFilters() {
-        return Collections.unmodifiableList(intentFilters);
+    public List<VirtualIntentFilterSnapshot> intentFilters() { return Collections.unmodifiableList(intentFilters); }
+    public List<VirtualProviderPathRuleSnapshot> providerPathRules() {
+        return Collections.unmodifiableList(providerPathRules);
     }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeString(type); out.writeString(className); out.writeString(processName);
         out.writeInt(exported ? 1 : 0); out.writeInt(enabled ? 1 : 0); out.writeInt(isolated ? 1 : 0);
-        out.writeString(authority); out.writeString(permission); out.writeString(enabledSetting);
-        out.writeStringList(actions); out.writeTypedList(intentFilters);
+        out.writeString(authority); out.writeString(permission); out.writeString(readPermission);
+        out.writeString(writePermission); out.writeInt(grantUriPermissions ? 1 : 0);
+        out.writeString(enabledSetting); out.writeStringList(actions); out.writeTypedList(intentFilters);
+        out.writeTypedList(providerPathRules);
     }
     @Override public int describeContents() { return 0; }
 
     public static final Creator<VirtualComponentSnapshot> CREATOR = new Creator<>() {
-        @Override public VirtualComponentSnapshot createFromParcel(Parcel in) {
-            return new VirtualComponentSnapshot(in);
-        }
-        @Override public VirtualComponentSnapshot[] newArray(int size) {
-            return new VirtualComponentSnapshot[size];
-        }
+        @Override public VirtualComponentSnapshot createFromParcel(Parcel in) { return new VirtualComponentSnapshot(in); }
+        @Override public VirtualComponentSnapshot[] newArray(int size) { return new VirtualComponentSnapshot[size]; }
     };
 
     private static String componentType(String value) {
@@ -106,5 +134,5 @@ public final class VirtualComponentSnapshot implements Parcelable {
         if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException(name + " is required");
         return value.trim();
     }
-    private static String value(String value) { return value == null ? "" : value; }
+    private static String value(String value) { return value == null ? "" : value.trim(); }
 }

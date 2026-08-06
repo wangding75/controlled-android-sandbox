@@ -10,9 +10,11 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 final class GuestRuntimeBrokerBridge {
     private final GuestPackageSpec spec;
     private final IRuntimeBroker broker;
+    private final GuestMainThreadDispatcher mainThread;
 
-    GuestRuntimeBrokerBridge(GuestPackageSpec spec) {
+    GuestRuntimeBrokerBridge(GuestPackageSpec spec, GuestMainThreadDispatcher mainThread) {
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
+        this.mainThread = java.util.Objects.requireNonNull(mainThread, "mainThread");
         this.broker = IRuntimeBroker.Stub.asInterface(spec.runtimeBrokerBinder);
     }
 
@@ -38,8 +40,8 @@ final class GuestRuntimeBrokerBridge {
             if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_CAPABILITY_INVALID");
             Bundle payload = request == null ? baseRequest() : new Bundle(request);
             fillIdentity(payload);
-            Bundle result = RuntimeOperationTransport.toLegacyBundle(
-                    RuntimeOperationTransport.execute(broker, operation, payload));
+            Bundle result = mainThread.callBroker(() -> RuntimeOperationTransport.toLegacyBundle(
+                    RuntimeOperationTransport.execute(broker, operation, payload)));
             requireSuccess(result, operation);
             return result;
         } catch (RuntimeException error) {

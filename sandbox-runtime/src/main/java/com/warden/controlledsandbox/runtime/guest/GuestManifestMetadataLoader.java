@@ -50,10 +50,17 @@ public final class GuestManifestMetadataLoader {
                 filters.add(new VirtualPackageMetadata.Filter(filter.priority(),
                         new LinkedHashSet<>(filter.actions()), new LinkedHashSet<>(filter.categories()), data));
             }
+            List<VirtualPackageMetadata.ProviderPathRule> providerPathRules = new ArrayList<>();
+            for (ManifestModel.ProviderPathRule rule : component.providerPathRules()) {
+                providerPathRules.add(new VirtualPackageMetadata.ProviderPathRule(
+                        rule.path(), rule.pathPrefix(), rule.pathPattern(),
+                        rule.readPermission(), rule.writePermission(), rule.uriGrantRule()));
+            }
             output.add(new VirtualPackageMetadata.Component(type, component.className(),
                     processName(packageName, component), component.exported(), component.enabled(),
                     component.isolatedProcess(), actions, component.authorities(), component.permission(),
-                    "DEFAULT", filters));
+                    component.readPermission(), component.writePermission(), component.grantUriPermissions(),
+                    "DEFAULT", filters, providerPathRules));
         }
     }
 

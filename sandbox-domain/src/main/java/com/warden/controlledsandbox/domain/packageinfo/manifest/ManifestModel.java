@@ -232,6 +232,10 @@ public final class ManifestModel {
         private final boolean isolatedProcess;
         private final String authorities;
         private final String permission;
+        private final String readPermission;
+        private final String writePermission;
+        private final boolean grantUriPermissions;
+        private final List<ProviderPathRule> providerPathRules = new ArrayList<>();
         private final List<String> actions = new ArrayList<>();
         private final List<IntentFilter> intentFilters = new ArrayList<>();
         private boolean launcher;
@@ -254,14 +258,24 @@ public final class ManifestModel {
 
         public Component(String className, String processName, boolean exported, boolean exportedExplicit,
                          boolean enabled, boolean isolatedProcess, String authorities, String permission) {
-            this.className = className == null ? "" : className;
-            this.processName = processName == null ? "" : processName;
+            this(className, processName, exported, exportedExplicit, enabled, isolatedProcess, authorities,
+                    permission, permission, permission, false);
+        }
+
+        public Component(String className, String processName, boolean exported, boolean exportedExplicit,
+                         boolean enabled, boolean isolatedProcess, String authorities, String permission,
+                         String readPermission, String writePermission, boolean grantUriPermissions) {
+            this.className = normalize(className);
+            this.processName = normalize(processName);
             this.exported = exported;
             this.exportedExplicit = exportedExplicit;
             this.enabled = enabled;
             this.isolatedProcess = isolatedProcess;
-            this.authorities = authorities == null ? "" : authorities;
-            this.permission = permission == null ? "" : permission;
+            this.authorities = normalize(authorities);
+            this.permission = normalize(permission);
+            this.readPermission = normalize(readPermission);
+            this.writePermission = normalize(writePermission);
+            this.grantUriPermissions = grantUriPermissions;
         }
 
         public String className() { return className; }
@@ -272,6 +286,15 @@ public final class ManifestModel {
         public boolean isolatedProcess() { return isolatedProcess; }
         public String authorities() { return authorities; }
         public String permission() { return permission; }
+        public String readPermission() { return readPermission; }
+        public String writePermission() { return writePermission; }
+        public boolean grantUriPermissions() { return grantUriPermissions; }
+        public List<ProviderPathRule> providerPathRules() {
+            return Collections.unmodifiableList(providerPathRules);
+        }
+        public void addProviderPathRule(ProviderPathRule rule) {
+            if (rule != null) providerPathRules.add(rule);
+        }
         public List<String> actions() { return Collections.unmodifiableList(actions); }
         public List<IntentFilter> intentFilters() { return Collections.unmodifiableList(intentFilters); }
         public void addAction(String action) {
@@ -287,6 +310,37 @@ public final class ManifestModel {
         public boolean hasIntentFilter() { return intentFilterDeclared; }
         public boolean launcher() { return launcher; }
         public void launcher(boolean value) { launcher = value; }
+    }
+
+    public static final class ProviderPathRule {
+        private final String path;
+        private final String pathPrefix;
+        private final String pathPattern;
+        private final String readPermission;
+        private final String writePermission;
+        private final boolean uriGrantRule;
+
+        public ProviderPathRule(String path, String pathPrefix, String pathPattern,
+                                String readPermission, String writePermission,
+                                boolean uriGrantRule) {
+            this.path = normalize(path);
+            this.pathPrefix = normalize(pathPrefix);
+            this.pathPattern = normalize(pathPattern);
+            int matchers = (this.path.isEmpty() ? 0 : 1) + (this.pathPrefix.isEmpty() ? 0 : 1)
+                    + (this.pathPattern.isEmpty() ? 0 : 1);
+            if (matchers != 1) throw new IllegalArgumentException(
+                    "Provider path rule requires exactly one path matcher");
+            this.readPermission = normalize(readPermission);
+            this.writePermission = normalize(writePermission);
+            this.uriGrantRule = uriGrantRule;
+        }
+
+        public String path() { return path; }
+        public String pathPrefix() { return pathPrefix; }
+        public String pathPattern() { return pathPattern; }
+        public String readPermission() { return readPermission; }
+        public String writePermission() { return writePermission; }
+        public boolean uriGrantRule() { return uriGrantRule; }
     }
 
     public static final class IntentFilter {

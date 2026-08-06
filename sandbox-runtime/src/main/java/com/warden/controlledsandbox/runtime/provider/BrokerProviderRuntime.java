@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.provider;
 
+import com.warden.controlledsandbox.domain.component.provider.ProviderAuthorityRegistration;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
@@ -22,6 +23,10 @@ public final class BrokerProviderRuntime {
 
     public interface PermissionChecker {
         boolean allows(String callerInstance, String uri, int flags);
+    }
+
+    public interface DeclaredPermissionChecker {
+        boolean allows(String permission);
     }
 
     public interface SessionLookup {
@@ -135,10 +140,14 @@ public final class BrokerProviderRuntime {
     private long auditFailureCount;
 
     public synchronized Reservation reservePrepare(Bundle request, GuestSession session) {
-        ProviderAuthorityRegistry.Registration registration = registry.registerSession(
-                instanceId(session), session.virtualUserId(), required(request, ComponentOperations.AUTHORITY),
-                required(request, RuntimeKeys.COMPONENT_CLASS), session.processName(),
-                request.getBoolean(RuntimeKeys.PROVIDER_EXPORTED, false),
+        String authority = required(request, ComponentOperations.AUTHORITY);
+        String componentClass = required(request, RuntimeKeys.COMPONENT_CLASS);
+        ProviderManifestAuthorityResolver.Metadata provider =
+                ProviderManifestAuthorityResolver.resolve(request, componentClass, authority);
+        ProviderAuthorityRegistration registration = registry.registerSession(
+                instanceId(session), session.virtualUserId(), authority, componentClass,
+                session.processName(), provider.exported(), provider.readPermission(),
+                provider.writePermission(), provider.grantUriPermissions(), provider.pathRules(),
                 session.sessionId(), session.generation());
         return new Reservation(session.virtualUserId(), instanceId(session), session.sessionId(),
                 session.generation(), registration.createdAuthorities());
@@ -191,10 +200,31 @@ public final class BrokerProviderRuntime {
     public synchronized OperationRoute routeOperation(Bundle request, String operation, String callerInstance,
                                                 int targetVirtualUserId, String requestedTargetInstance,
                                                 PermissionChecker permissionChecker, long nowMs) {
+        return routeOperation(request, operation, callerInstance, targetVirtualUserId,
+                requestedTargetInstance, permissionChecker, null, nowMs);
+    }
+
+    public synchronized OperationRoute routeOperation(Bundle request, String operation, String callerInstance,
+                                                int targetVirtualUserId, String requestedTargetInstance,
+                                                PermissionChecker permissionChecker,
+                                                DeclaredPermissionChecker declaredPermissionChecker,
+                                                long nowMs) {
         if (!ComponentOperations.isProviderTransactionOperation(operation)) {
             throw new IllegalArgumentException("Provider operation is not transaction-routable: " + operation);
         }
         String authority = required(request, ComponentOperations.AUTHORITY);
+        ProviderAuthorityRegistry.Entry entry = requireRouteEntry(request, operation, callerInstance,
+                targetVirtualUserId, requestedTargetInstance, authority, nowMs);
+        OperationInput input = operationInput(request, operation, callerInstance, entry, authority, nowMs);
+        String permissionBasis = permissionBasis(entry, input, callerInstance, permissionChecker,
+                declaredPermissionChecker, operation, authority, nowMs);
+        return new OperationRoute(UUID.randomUUID().toString(), operation, callerInstance,
+                entry.instanceId(), authority, input.uri, input.flags, permissionBasis, entry);
+    }
+
+    private ProviderAuthorityRegistry.Entry requireRouteEntry(Bundle request, String operation,
+            String callerInstance, int targetVirtualUserId, String requestedTargetInstance,
+            String authority, long nowMs) {
         ProviderAuthorityRegistry.Entry entry = registry.resolveAuthority(targetVirtualUserId, authority);
         if (entry == null) {
             recordDenied(operation, callerInstance, requestedTargetInstance, authority,
@@ -207,14 +237,18 @@ public final class BrokerProviderRuntime {
                     request.getString(RuntimeKeys.URI, ""), 0, "TARGET_MISMATCH", nowMs);
             throw new SecurityException("PROVIDER_TARGET_INSTANCE_MISMATCH");
         }
+        return entry;
+    }
 
+    private OperationInput operationInput(Bundle request, String operation, String callerInstance,
+            ProviderAuthorityRegistry.Entry entry, String authority, long nowMs) {
         String uri = request.getString(RuntimeKeys.URI, "");
         ProviderBatchRuntime.Batch batch = null;
         if (ComponentOperations.PROVIDER_CALL.equals(operation)) {
             required(request, RuntimeKeys.PROVIDER_METHOD);
-            if (uri == null || uri.trim().isEmpty()) uri = "content://" + authority;
+            uri = defaultProviderUri(uri, authority);
         } else if (ComponentOperations.PROVIDER_APPLY_BATCH.equals(operation)) {
-            if (uri == null || uri.trim().isEmpty()) uri = "content://" + authority;
+            uri = defaultProviderUri(uri, authority);
             try {
                 batch = ProviderBatchRuntime.validate(request, authority);
             } catch (ProviderBatchRuntime.BatchException error) {
@@ -227,26 +261,34 @@ public final class BrokerProviderRuntime {
         }
         validateUriAuthority(uri, authority);
         int flags = batch == null ? requiredFlags(operation, request) : batch.requiredFlags();
-        String permissionBasis;
-        if (entry.instanceId().equals(callerInstance)) {
-            permissionBasis = "OWNER";
-        } else if (entry.exported()) {
-            permissionBasis = "EXPORTED";
-        } else if (batch != null && permissionChecker != null
-                && allBatchUrisAllowed(batch, callerInstance, permissionChecker)) {
-            permissionBasis = "URI_GRANT";
-        } else if (batch == null && permissionChecker != null
-                && permissionChecker.allows(callerInstance, uri, flags)) {
-            permissionBasis = "URI_GRANT";
-        } else {
-            recordDenied(operation, callerInstance, entry.instanceId(), authority, uri, flags,
-                    "PERMISSION_DENIED", nowMs);
-            throw new SecurityException("URI_PERMISSION_DENIED");
-        }
-
-        return new OperationRoute(UUID.randomUUID().toString(), operation, callerInstance,
-                entry.instanceId(), authority, uri, flags, permissionBasis, entry);
+        return new OperationInput(uri, flags, batch);
     }
+
+    private String permissionBasis(ProviderAuthorityRegistry.Entry entry, OperationInput input,
+            String callerInstance, PermissionChecker permissionChecker,
+            DeclaredPermissionChecker declaredPermissionChecker, String operation,
+            String authority, long nowMs) {
+        if (entry.instanceId().equals(callerInstance)) return "OWNER";
+        if (entry.exported() && declaredPermissionsAllow(entry, input.uri, input.flags, input.batch,
+                declaredPermissionChecker)) {
+            return hasDeclaredPermission(entry, input.uri, input.flags, input.batch)
+                    ? "DECLARED_PERMISSION" : "EXPORTED";
+        }
+        if (input.batch != null && permissionChecker != null
+                && allBatchUrisGrantable(entry, input.batch)
+                && allBatchUrisAllowed(input.batch, callerInstance, permissionChecker)) return "URI_GRANT";
+        if (input.batch == null && permissionChecker != null && entry.allowsUriGrant(input.uri)
+                && permissionChecker.allows(callerInstance, input.uri, input.flags)) return "URI_GRANT";
+        recordDenied(operation, callerInstance, entry.instanceId(), authority, input.uri, input.flags,
+                "PERMISSION_DENIED", nowMs);
+        throw new SecurityException("PROVIDER_PERMISSION_DENIED");
+    }
+
+    private static String defaultProviderUri(String uri, String authority) {
+        return uri == null || uri.trim().isEmpty() ? "content://" + authority : uri;
+    }
+
+    private record OperationInput(String uri, int flags, ProviderBatchRuntime.Batch batch) { }
 
     public synchronized void completeOperation(OperationRoute route, Bundle result, long nowMs) {
         if (route == null) return;
@@ -328,6 +370,45 @@ public final class BrokerProviderRuntime {
         while (auditEntries.size() > MAX_AUDIT_ENTRIES) auditEntries.removeFirst();
     }
 
+
+    private static boolean declaredPermissionsAllow(ProviderAuthorityRegistry.Entry entry,
+                                                     String uri, int flags,
+                                                     ProviderBatchRuntime.Batch batch,
+                                                     DeclaredPermissionChecker checker) {
+        if (batch != null) {
+            for (ProviderBatchRuntime.Operation operation : batch.operations()) {
+                if (!declaredPermissionsAllow(entry, operation.uri(), operation.flags(), null, checker)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        String read = (flags & UriGrantRegistry.READ) != 0 ? entry.requiredReadPermission(uri) : "";
+        String write = (flags & UriGrantRegistry.WRITE) != 0 ? entry.requiredWritePermission(uri) : "";
+        if (!read.isEmpty() && (checker == null || !checker.allows(read))) return false;
+        return write.isEmpty() || (checker != null && checker.allows(write));
+    }
+
+    private static boolean hasDeclaredPermission(ProviderAuthorityRegistry.Entry entry, String uri,
+                                                 int flags, ProviderBatchRuntime.Batch batch) {
+        if (batch != null) {
+            for (ProviderBatchRuntime.Operation operation : batch.operations()) {
+                if (hasDeclaredPermission(entry, operation.uri(), operation.flags(), null)) return true;
+            }
+            return false;
+        }
+        return ((flags & UriGrantRegistry.READ) != 0 && !entry.requiredReadPermission(uri).isEmpty())
+                || ((flags & UriGrantRegistry.WRITE) != 0
+                && !entry.requiredWritePermission(uri).isEmpty());
+    }
+
+    private static boolean allBatchUrisGrantable(ProviderAuthorityRegistry.Entry entry,
+                                                  ProviderBatchRuntime.Batch batch) {
+        for (ProviderBatchRuntime.Operation operation : batch.operations()) {
+            if (!entry.allowsUriGrant(operation.uri())) return false;
+        }
+        return true;
+    }
 
     private static boolean allBatchUrisAllowed(ProviderBatchRuntime.Batch batch, String callerInstance,
                                                PermissionChecker permissionChecker) {

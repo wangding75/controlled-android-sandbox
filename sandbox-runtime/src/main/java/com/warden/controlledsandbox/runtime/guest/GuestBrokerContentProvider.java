@@ -25,9 +25,10 @@ final class GuestBrokerContentProvider extends ContentProvider {
     private final String authority;
     private final String componentClass;
 
-    GuestBrokerContentProvider(GuestPackageSpec spec, String authority, String componentClass) {
+    GuestBrokerContentProvider(GuestContext context, GuestPackageSpec spec, String authority, String componentClass) {
+        java.util.Objects.requireNonNull(context, "context");
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
-        this.bridge = new GuestRuntimeBrokerBridge(spec);
+        this.bridge = new GuestRuntimeBrokerBridge(spec, context.mainThread);
         this.authority = required(authority, "authority");
         this.componentClass = required(componentClass, "componentClass");
     }

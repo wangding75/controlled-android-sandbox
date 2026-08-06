@@ -5,6 +5,7 @@ import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
@@ -32,12 +33,19 @@ final class GuestPackageMetadataMapper {
                         new LinkedHashSet<>(filter.actions()),
                         new LinkedHashSet<>(filter.categories()), data));
             }
+            List<VirtualPackageMetadata.ProviderPathRule> providerPathRules = new ArrayList<>();
+            for (VirtualProviderPathRuleSnapshot rule : component.providerPathRules()) {
+                providerPathRules.add(new VirtualPackageMetadata.ProviderPathRule(
+                        rule.path(), rule.pathPrefix(), rule.pathPattern(),
+                        rule.readPermission(), rule.writePermission(), rule.uriGrantRule()));
+            }
             components.add(new VirtualPackageMetadata.Component(
                     VirtualPackageMetadata.Type.valueOf(component.type()),
                     component.className(), component.processName(), component.exported(),
                     component.enabled(), component.isolated(),
                     new LinkedHashSet<>(component.actions()), component.authority(),
-                    component.permission(), component.enabledSetting(), filters));
+                    component.permission(), component.readPermission(), component.writePermission(),
+                    component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules));
         }
         List<String> permissions = new ArrayList<>();
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {

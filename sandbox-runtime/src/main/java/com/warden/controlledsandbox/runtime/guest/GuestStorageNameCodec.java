@@ -409,7 +409,10 @@ final class GuestStorageNameCodec {
         synchronized (jvmLock) {
             try (RandomAccessFile rawLock = new RandomAccessFile(lockFile, "rw");
                  FileChannel channel = rawLock.getChannel();
-                 FileLock ignored = channel.lock()) {
+                 FileLock lock = channel.lock()) {
+                if (!lock.isValid()) {
+                    throw new IOException("GUEST_STORAGE_NAME_REGISTRY_LOCK_INVALID");
+                }
                 Registry registry = loadRegistry();
                 removeObsoleteReversibleClaims(registry);
                 T result = action.run(registry);

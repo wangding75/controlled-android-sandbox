@@ -33,8 +33,12 @@ public final class GuestBrokerContentProviderSelfTest {
     public static void main(String[] args) throws Throwable {
         FakeBroker broker = new FakeBroker();
         GuestPackageSpec spec = new GuestPackageSpec(specBundle(broker));
+        GuestContext context = new GuestContext(new Context(), spec,
+                GuestBrokerContentProviderSelfTest.class.getClassLoader(),
+                new Resources(new AssetManager(), new DisplayMetrics(), new Configuration()),
+                new AssetManager(), new android.content.pm.PackageManager());
         GuestBrokerContentProvider provider = new GuestBrokerContentProvider(
-                spec, "guest.authority", "guest.pkg.Provider");
+                context, spec, "guest.authority", "guest.pkg.Provider");
 
         provider.prepare();
         require(ComponentOperations.PREPARE_PROVIDER.equals(broker.operations.get(0)),
@@ -104,10 +108,6 @@ public final class GuestBrokerContentProviderSelfTest {
                         && nullableRequest.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS) == null,
                 "null query arguments preserve Android ContentProvider semantics");
 
-        GuestContext context = new GuestContext(new Context(), spec,
-                GuestBrokerContentProviderSelfTest.class.getClassLoader(),
-                new Resources(new AssetManager(), new DisplayMetrics(), new Configuration()),
-                new AssetManager(), new android.content.pm.PackageManager());
         GuestContentProviderFrameworkInterceptor interceptor =
                 new GuestContentProviderFrameworkInterceptor(context, spec);
         Method providerMethod = FakeActivityManager.class.getMethod(

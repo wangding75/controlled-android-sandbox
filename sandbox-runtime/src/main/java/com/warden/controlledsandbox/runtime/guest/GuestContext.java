@@ -49,19 +49,21 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final GuestCapabilityGate capabilityGate;
     private final GuestStorageNameCodec storageNames;
     private final SharedState sharedState;
+    final GuestDynamicReceiverRegistry dynamicReceivers;
+    final GuestMainThreadDispatcher mainThread;
     private final boolean deviceProtected;
     private final Map<String, SharedPreferences> preferences = new HashMap<>();
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
         this(host, spec, classLoader, resources, assets, host.getPackageManager(), false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions())));
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader));
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets, PackageManager packageManager) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions())));
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader));
     }
 
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
@@ -83,9 +85,11 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath());
+        this.dynamicReceivers = sharedState.dynamicReceivers;
+        this.mainThread = sharedState.mainThread;
         this.capabilityGate = sharedState.capabilityGate;
         this.componentRouter = new GuestContextComponentRouter(
-                this, spec, packageManager, sharedState.dynamicReceivers);
+                this, spec, packageManager, sharedState.dynamicReceivers, sharedState.mainThread);
         ensureDirectory(new File(dataRoot, "files"));
         ensureDirectory(new File(dataRoot, "cache"));
         ensureDirectory(new File(dataRoot, "databases"));
@@ -201,9 +205,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
 
     BroadcastReceiver dynamicReceiver(String receiverId) {
-        return sharedState.dynamicReceivers.require(receiverId);
+        return dynamicReceivers.require(receiverId);
     }
-    void clearDynamicReceivers() { sharedState.dynamicReceivers.clear(); }
+    void clearDynamicReceivers() { dynamicReceivers.clear(); }
 
     @Override public File getDataDir() { return dataRoot; }
     @Override public File getFilesDir() { return ensureDirectory(new File(dataRoot, "files")); }
@@ -435,8 +439,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         final GuestCapabilityGate capabilityGate;
         final GuestSystemServiceBoundary systemServices = new GuestSystemServiceBoundary();
         final GuestDynamicReceiverRegistry dynamicReceivers = new GuestDynamicReceiverRegistry();
+        final GuestMainThreadDispatcher mainThread;
         volatile Application application;
-        SharedState(GuestCapabilityGate capabilityGate) { this.capabilityGate = capabilityGate; }
+        SharedState(GuestCapabilityGate capabilityGate, ClassLoader classLoader) {
+            this.capabilityGate = capabilityGate;
+            this.mainThread = new GuestMainThreadDispatcher(classLoader);
+        }
     }
 
     private static File ensureDirectory(File file) {

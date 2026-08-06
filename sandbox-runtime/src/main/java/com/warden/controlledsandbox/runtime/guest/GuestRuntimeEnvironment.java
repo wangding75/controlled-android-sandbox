@@ -188,13 +188,7 @@ public final class GuestRuntimeEnvironment {
             synchronized (GuestRuntimeEnvironment.class) { current = session; }
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
-            ClassLoader priorContextLoader = Thread.currentThread().getContextClassLoader();
-            try {
-                Thread.currentThread().setContextClassLoader(loader);
-                application.onCreate();
-            } finally {
-                Thread.currentThread().setContextClassLoader(priorContextLoader);
-            }
+            session.mainThread.run(application::onCreate);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                         + NativePolicy.hookStatus());
@@ -312,6 +306,7 @@ public final class GuestRuntimeEnvironment {
         final GuestPackageSpec spec;
         final GuestClassLoader classLoader;
         final GuestContext context;
+        final GuestMainThreadDispatcher mainThread;
         final Application application;
         final GuestResourceLoader.LoadedResources resources;
         final FrameworkHooks frameworkHooks;
@@ -344,6 +339,7 @@ public final class GuestRuntimeEnvironment {
             this.spec = spec;
             this.classLoader = classLoader;
             this.context = context;
+            this.mainThread = context.mainThread;
             this.application = application;
             this.resources = resources;
             this.frameworkHooks = frameworkHooks;
@@ -411,14 +407,14 @@ public final class GuestRuntimeEnvironment {
             packageState = updated;
         }
 
-        private synchronized boolean onVirtualJobStart(int guestJobId, Object jobPayload,
+        private boolean onVirtualJobStart(int guestJobId, Object jobPayload,
                 com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters,
                 com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecution execution) {
             if (jobServices == null) return false;
             return jobServices.start(guestJobId, jobPayload, parameters, execution);
         }
 
-        private synchronized boolean onVirtualJobStop(int guestJobId,
+        private boolean onVirtualJobStop(int guestJobId,
                 com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobParametersRecord parameters) {
             return jobServices == null || jobServices.stop(guestJobId, parameters);
         }
@@ -483,7 +479,7 @@ public final class GuestRuntimeEnvironment {
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             NativePolicy.resetCrashRecorder();
-            Thread.currentThread().setContextClassLoader(GuestRuntimeEnvironment.class.getClassLoader());
+            mainThread.close();
         }
 
         public String instanceId() { return "u" + spec.virtualUserId + ":" + spec.packageName; }

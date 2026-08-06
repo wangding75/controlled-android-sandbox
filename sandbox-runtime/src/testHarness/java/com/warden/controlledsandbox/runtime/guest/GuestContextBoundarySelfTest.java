@@ -97,6 +97,7 @@ public final class GuestContextBoundarySelfTest {
             Object originalPackageTransport = processPackageManager.mPM;
             try (PackageManagerHook packageHook = PackageManagerHook.install(
                     processPackageManager, identity)) {
+                require(packageHook != null, "PackageManager hook installed");
                 require(Proxy.isProxyClass(processPackageManager.mPM.getClass()),
                         "PackageManager transport proxied before Guest exposure");
                 context.sealSystemServices(java.util.Map.of(

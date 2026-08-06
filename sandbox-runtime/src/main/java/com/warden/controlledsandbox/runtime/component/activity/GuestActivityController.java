@@ -49,7 +49,6 @@ public final class GuestActivityController {
             attachBaseContext(guest);
             ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(host, guest, session, componentClass);
             guest.setIntent(launchIntent == null ? new Intent() : new Intent(launchIntent));
-            Thread.currentThread().setContextClassLoader(session.classLoader());
             invokeLifecycle(guest, "onCreate", new Class<?>[]{Bundle.class}, new Object[]{state});
             created = true;
             emit("CREATED", new Bundle());
@@ -208,10 +207,16 @@ public final class GuestActivityController {
         catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("Guest lifecycle " + name + " failed", root(error)); }
     }
 
-    private static void invokeLifecycle(Activity activity, String name, Class<?>[] types, Object[] args) throws Exception {
-        Method method = findMethod(activity.getClass(), name, types);
-        method.setAccessible(true);
-        method.invoke(activity, args);
+    private void invokeLifecycle(Activity activity, String name, Class<?>[] types, Object[] args) throws Exception {
+        ClassLoader previous = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(session.classLoader());
+            Method method = findMethod(activity.getClass(), name, types);
+            method.setAccessible(true);
+            method.invoke(activity, args);
+        } finally {
+            Thread.currentThread().setContextClassLoader(previous);
+        }
     }
 
     private static Method findMethod(Class<?> type, String name, Class<?>[] parameters) throws NoSuchMethodException {

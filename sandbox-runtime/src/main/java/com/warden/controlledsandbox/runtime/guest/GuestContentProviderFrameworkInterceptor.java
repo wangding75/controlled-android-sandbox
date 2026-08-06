@@ -72,7 +72,7 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
     private Object createHolder(Class<?> holderType, ProviderDescriptor descriptor) throws Exception {
         ProviderInfo info = providerInfo(descriptor);
         GuestBrokerContentProvider provider = new GuestBrokerContentProvider(
-                spec, descriptor.authority, descriptor.componentClass);
+                context, spec, descriptor.authority, descriptor.componentClass);
         provider.attachInfo(context, info);
         provider.prepare();
         Method transportMethod = ContentProvider.class.getDeclaredMethod("getIContentProvider");

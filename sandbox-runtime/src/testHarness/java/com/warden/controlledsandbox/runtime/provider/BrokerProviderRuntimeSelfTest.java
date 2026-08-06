@@ -3,6 +3,9 @@ package com.warden.controlledsandbox.runtime.provider;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 
 import android.os.Bundle;
 import com.warden.controlledsandbox.domain.session.GuestSession;
@@ -27,6 +30,7 @@ public final class BrokerProviderRuntimeSelfTest {
         callerSessionIdentityValidation();
         uriGrantOwnerValidation();
         batchPermissionAndValidation();
+        declaredProviderPermissionRouting();
         System.out.println("PASS broker Provider authority lifecycle self-test");
     }
 
@@ -441,6 +445,86 @@ public final class BrokerProviderRuntimeSelfTest {
         value.putString(ComponentOperations.AUTHORITY, authority);
         value.putString(RuntimeKeys.URI, uri);
         return value;
+    }
+
+    private static void declaredProviderPermissionRouting() {
+        BrokerProviderRuntime runtime = new BrokerProviderRuntime();
+        GuestSession owner = session("secure-owner", "com.secure", 0, 1);
+        Bundle prepare = securePrepare("secure.authority", "com.secure.Provider", true,
+                "perm.READ", "perm.WRITE", false, List.of(
+                        new VirtualProviderPathRuleSnapshot("", "/private", "",
+                                "perm.PRIVATE", "perm.PRIVATE_WRITE", false)));
+        runtime.reservePrepare(prepare, owner);
+        String caller = BrokerProviderRuntime.instanceId("com.caller", 0);
+        String target = BrokerProviderRuntime.instanceId("com.secure", 0);
+
+        BrokerProviderRuntime.OperationRoute read = runtime.routeOperation(
+                operation("secure.authority", "content://secure.authority/public"),
+                ComponentOperations.PROVIDER_QUERY, caller, 0, target, null,
+                permission -> "perm.READ".equals(permission), 1);
+        check("DECLARED_PERMISSION".equals(read.permissionBasis()),
+                "Provider read permission not enforced as declared permission");
+
+        boolean writeDenied = false;
+        try {
+            runtime.routeOperation(operation("secure.authority", "content://secure.authority/public"),
+                    ComponentOperations.PROVIDER_UPDATE, caller, 0, target, null,
+                    permission -> "perm.READ".equals(permission), 2);
+        } catch (SecurityException expected) { writeDenied = true; }
+        check(writeDenied, "Provider write permission accepted with read-only grant");
+
+        boolean pathDenied = false;
+        try {
+            runtime.routeOperation(operation("secure.authority", "content://secure.authority/private/item"),
+                    ComponentOperations.PROVIDER_QUERY, caller, 0, target, null,
+                    permission -> "perm.READ".equals(permission), 3);
+        } catch (SecurityException expected) { pathDenied = true; }
+        check(pathDenied, "Provider path-specific read permission was ignored");
+
+        BrokerProviderRuntime.OperationRoute pathAllowed = runtime.routeOperation(
+                operation("secure.authority", "content://secure.authority/private/item"),
+                ComponentOperations.PROVIDER_QUERY, caller, 0, target, null,
+                permission -> "perm.PRIVATE".equals(permission), 4);
+        check("DECLARED_PERMISSION".equals(pathAllowed.permissionBasis()),
+                "Provider path-specific permission was not accepted");
+
+        boolean uriGrantDenied = false;
+        try {
+            runtime.routeOperation(operation("secure.authority", "content://secure.authority/public"),
+                    ComponentOperations.PROVIDER_QUERY, caller, 0, target,
+                    (instance, uri, flags) -> true, permission -> false, 5);
+        } catch (SecurityException expected) { uriGrantDenied = true; }
+        check(uriGrantDenied, "Provider without grantUriPermissions accepted URI grant");
+
+        GuestSession grantOwner = session("grant-owner", "com.grant", 0, 1);
+        runtime.reservePrepare(securePrepare("grant.authority", "com.grant.Provider",
+                false, "", "", true, List.of()), grantOwner);
+        BrokerProviderRuntime.OperationRoute uriGrant = runtime.routeOperation(
+                operation("grant.authority", "content://grant.authority/item"),
+                ComponentOperations.PROVIDER_QUERY, caller, 0,
+                BrokerProviderRuntime.instanceId("com.grant", 0),
+                (instance, uri, flags) -> true, permission -> false, 6);
+        check("URI_GRANT".equals(uriGrant.permissionBasis()),
+                "grantUriPermissions Provider rejected valid URI grant");
+    }
+
+    private static Bundle securePrepare(String authority, String component, boolean exported,
+                                        String readPermission, String writePermission,
+                                        boolean grantUriPermissions,
+                                        List<VirtualProviderPathRuleSnapshot> pathRules) {
+        String packageName = component.substring(0, component.lastIndexOf('.'));
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.PACKAGE_NAME, packageName);
+        out.putString(ComponentOperations.AUTHORITY, authority);
+        out.putString(RuntimeKeys.COMPONENT_CLASS, component);
+        VirtualComponentSnapshot provider = new VirtualComponentSnapshot("PROVIDER", component,
+                packageName, exported, true, false, authority, "", readPermission, writePermission,
+                grantUriPermissions, "DEFAULT", List.of(), List.of(), pathRules);
+        String digest = "a".repeat(64);
+        out.putParcelable(RuntimeKeys.PACKAGE_STATE, new VirtualPackageStateSnapshot(packageName, 0,
+                "Secure", "1", 1L, digest, digest, "", "", true,
+                List.of(provider), List.of(), List.of()));
+        return out;
     }
 
     private static GuestSession session(String sessionId, String packageName, int userId, long generation) {

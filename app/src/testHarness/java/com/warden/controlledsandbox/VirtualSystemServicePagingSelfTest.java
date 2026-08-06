@@ -177,8 +177,10 @@ public final class VirtualSystemServicePagingSelfTest {
                     "exact-budget fixture did not exceed minimum page budget");
             require(!probe.nextPageToken().isEmpty() && probe.blobs().size() == 1,
                     "exact-budget fixture did not reserve a continuation token and blob grant");
-            try (ParcelFileDescriptor ignored = pager.openBlob(
-                    "scope-exact", probe.blobs().get(0).blobToken())) { }
+            try (ParcelFileDescriptor descriptor = pager.openBlob(
+                    "scope-exact", probe.blobs().get(0).blobToken())) {
+                require(descriptor.getFileDescriptor() != null, "probe blob descriptor available");
+            }
 
             VirtualSystemServicePager.PageSlice<VirtualNotificationSnapshot> exact = pager.page(
                     "NOTIFICATION-EXACT", "scope-exact", values,
@@ -186,8 +188,10 @@ public final class VirtualSystemServicePagingSelfTest {
                     VirtualSystemServicePageAdapters.NOTIFICATION);
             require(exact.estimatedBytes() == probe.estimatedBytes(),
                     "exact continuation-token budget changed between identical pages");
-            try (ParcelFileDescriptor ignored = pager.openBlob(
-                    "scope-exact", exact.blobs().get(0).blobToken())) { }
+            try (ParcelFileDescriptor descriptor = pager.openBlob(
+                    "scope-exact", exact.blobs().get(0).blobToken())) {
+                require(descriptor.getFileDescriptor() != null, "exact blob descriptor available");
+            }
 
             int grantsBefore = pager.blobGrantCountForTest();
             int bytesBefore = pager.blobBytesForTest();

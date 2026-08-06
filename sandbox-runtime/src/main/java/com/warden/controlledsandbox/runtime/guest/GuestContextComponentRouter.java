@@ -24,10 +24,10 @@ final class GuestContextComponentRouter {
 
     GuestContextComponentRouter(GuestContext context, GuestPackageSpec spec,
             android.content.pm.PackageManager packageManager,
-            GuestDynamicReceiverRegistry receivers) {
+            GuestDynamicReceiverRegistry receivers, GuestMainThreadDispatcher mainThread) {
         this.context = java.util.Objects.requireNonNull(context, "context");
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
-        this.bridge = new GuestRuntimeBrokerBridge(spec);
+        this.bridge = new GuestRuntimeBrokerBridge(spec, mainThread);
         this.resolver = new GuestIntentResolver(spec, packageManager);
         this.receivers = java.util.Objects.requireNonNull(receivers, "receivers");
     }
@@ -107,7 +107,7 @@ final class GuestContextComponentRouter {
                 && (flags & Context.RECEIVER_NOT_EXPORTED) != 0) {
             throw new IllegalArgumentException("Receiver cannot be both exported and not exported");
         }
-        String receiverId = receivers.reserve(receiver);
+        String receiverId = receivers.reserve(receiver, scheduler);
         try {
             Bundle request = bridge.baseRequest();
             request.putString(ComponentOperations.OPERATION, ComponentOperations.REGISTER_RECEIVER);

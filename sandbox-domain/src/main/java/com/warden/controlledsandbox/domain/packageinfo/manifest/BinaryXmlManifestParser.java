@@ -128,10 +128,12 @@ public final class BinaryXmlManifestParser {
                 model.addReceiver(component);
             }
             case "provider" -> {
-                ManifestModel.Component component = component(model, element, element.stringAttr("name"));
+                ManifestModel.Component component = providerComponent(model, element, element.stringAttr("name"));
                 element.component = component;
                 model.addProvider(component);
             }
+            case "path-permission" -> addProviderPathPermission(stack, element);
+            case "grant-uri-permission" -> addProviderGrantRule(stack, element);
             case "action" -> {
                 ManifestModel.Component component = nearestComponent(stack);
                 IntentState state = nearestIntent(stack);
@@ -184,6 +186,31 @@ public final class BinaryXmlManifestParser {
         }
     }
 
+    private static void addProviderPathPermission(Deque<ElementContext> stack, Element element) {
+        ManifestModel.Component component = nearestProvider(stack);
+        if (component == null) return;
+        String readPermission = element.stringAttr("readPermission");
+        String writePermission = element.stringAttr("writePermission");
+        if (readPermission.trim().isEmpty()) readPermission = component.readPermission();
+        if (writePermission.trim().isEmpty()) writePermission = component.writePermission();
+        component.addProviderPathRule(new ManifestModel.ProviderPathRule(
+                element.stringAttr("path"), element.stringAttr("pathPrefix"),
+                element.stringAttr("pathPattern"), readPermission, writePermission, false));
+    }
+
+    private static void addProviderGrantRule(Deque<ElementContext> stack, Element element) {
+        ManifestModel.Component component = nearestProvider(stack);
+        if (component == null) return;
+        component.addProviderPathRule(new ManifestModel.ProviderPathRule(
+                element.stringAttr("path"), element.stringAttr("pathPrefix"),
+                element.stringAttr("pathPattern"), "", "", true));
+    }
+
+    private static ManifestModel.Component nearestProvider(Deque<ElementContext> stack) {
+        ManifestModel.Component component = nearestComponent(stack);
+        return component != null && !component.authorities().isEmpty() ? component : null;
+    }
+
     private static ManifestModel.Component component(ManifestModel model, Element element, String rawClassName) {
         String className = model.resolveClassName(rawClassName);
         String process = element.stringAttr("process");
@@ -195,6 +222,26 @@ public final class BinaryXmlManifestParser {
         if (permission.trim().isEmpty()) permission = model.applicationPermission();
         return new ManifestModel.Component(className, process, exported, exportedExplicit, enabled, isolated,
                 element.stringAttr("authorities"), permission);
+    }
+
+
+    private static ManifestModel.Component providerComponent(ManifestModel model, Element element,
+                                                             String rawClassName) {
+        String className = model.resolveClassName(rawClassName);
+        String process = element.stringAttr("process");
+        boolean exported = element.boolAttr("exported", false);
+        boolean exportedExplicit = element.hasAttr("exported");
+        boolean enabled = element.boolAttr("enabled", true);
+        boolean isolated = element.boolAttr("isolatedProcess", false);
+        String permission = element.stringAttr("permission");
+        if (permission.trim().isEmpty()) permission = model.applicationPermission();
+        String readPermission = element.stringAttr("readPermission");
+        String writePermission = element.stringAttr("writePermission");
+        if (readPermission.trim().isEmpty()) readPermission = permission;
+        if (writePermission.trim().isEmpty()) writePermission = permission;
+        return new ManifestModel.Component(className, process, exported, exportedExplicit, enabled, isolated,
+                element.stringAttr("authorities"), permission, readPermission, writePermission,
+                element.boolAttr("grantUriPermissions", false));
     }
 
     private static ManifestModel.Component nearestComponent(Deque<ElementContext> stack) {

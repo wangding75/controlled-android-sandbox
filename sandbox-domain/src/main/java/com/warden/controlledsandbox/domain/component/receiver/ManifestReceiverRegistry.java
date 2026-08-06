@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.domain.component.receiver;
 
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -400,7 +401,7 @@ public final class ManifestReceiverRegistry {
         boolean pathMatches(String actualPath) {
             if (!path.isEmpty() && path.equals(actualPath)) return true;
             if (!pathPrefix.isEmpty() && actualPath.startsWith(pathPrefix)) return true;
-            return !pathPattern.isEmpty() && simpleGlob(pathPattern, actualPath);
+            return !pathPattern.isEmpty() && AndroidSimpleGlobMatcher.matches(pathPattern, actualPath);
         }
     }
 
@@ -523,16 +524,6 @@ public final class ManifestReceiverRegistry {
                 && ("*".equals(f[1]) || f[1].equals(a[1]));
     }
 
-    private static boolean simpleGlob(String pattern, String value) {
-        StringBuilder regex = new StringBuilder("^");
-        for (int index = 0; index < pattern.length(); index++) {
-            char c = pattern.charAt(index);
-            if (c == '*') regex.append(".*");
-            else regex.append(Pattern.quote(String.valueOf(c)));
-        }
-        regex.append('$');
-        return value.matches(regex.toString());
-    }
 
     private static void requireSameUser(int senderUser, int targetUser) {
         if (senderUser < 0 || targetUser < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");

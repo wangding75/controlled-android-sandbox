@@ -72,6 +72,7 @@ python3 tools/android_gradle_build_gate.py verify
 python3 scripts/check-ports-dispatchers.py
 python3 scripts/check-package-boundaries.py
 python3 scripts/check-guest-boundary.py
+python3 scripts/check-pre-device-runtime-hardening.py
 python3 scripts/check-apk-revision-binding.py
 python3 scripts/check-package-lifecycle-transaction.py
 python3 scripts/check-package-service-boundary.py
