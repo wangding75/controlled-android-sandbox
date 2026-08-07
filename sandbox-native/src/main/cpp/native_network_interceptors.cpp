@@ -17,6 +17,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include <vector>
+#include <utility>
 
 namespace controlled_sandbox {
 namespace {
@@ -123,7 +124,7 @@ bool message_oriented_socket(int socket_fd) noexcept {
 }
 
 bool socket_address_present(const sockaddr_storage& address, socklen_t length) noexcept {
-    if (length < sizeof(sa_family_t)) return false;
+    if (std::cmp_less(length, sizeof(sa_family_t))) return false;
     return address.ss_family == AF_INET || address.ss_family == AF_INET6
             || address.ss_family == AF_UNIX;
 }
@@ -134,14 +135,14 @@ bool socket_addresses_equal(const sockaddr_storage& first, socklen_t first_lengt
             || !socket_address_present(second, second_length)
             || first.ss_family != second.ss_family) return false;
     if (first.ss_family == AF_INET) {
-        if (first_length < sizeof(sockaddr_in) || second_length < sizeof(sockaddr_in)) return false;
+        if (std::cmp_less(first_length, sizeof(sockaddr_in)) || std::cmp_less(second_length, sizeof(sockaddr_in))) return false;
         const auto* left = reinterpret_cast<const sockaddr_in*>(&first);
         const auto* right = reinterpret_cast<const sockaddr_in*>(&second);
         return left->sin_port == right->sin_port
                 && left->sin_addr.s_addr == right->sin_addr.s_addr;
     }
     if (first.ss_family == AF_INET6) {
-        if (first_length < sizeof(sockaddr_in6) || second_length < sizeof(sockaddr_in6)) return false;
+        if (std::cmp_less(first_length, sizeof(sockaddr_in6)) || std::cmp_less(second_length, sizeof(sockaddr_in6))) return false;
         const auto* left = reinterpret_cast<const sockaddr_in6*>(&first);
         const auto* right = reinterpret_cast<const sockaddr_in6*>(&second);
         return left->sin6_port == right->sin6_port

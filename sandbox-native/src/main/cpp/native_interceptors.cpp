@@ -86,6 +86,7 @@ struct android_dlextinfo {
 #include <string>
 #include <string_view>
 #include <vector>
+#include <utility>
 
 namespace controlled_sandbox {
 namespace {
@@ -142,14 +143,14 @@ std::atomic<ReadlinkFn> real_readlink{nullptr};
 std::atomic<ReadlinkAtFn> real_readlinkat{nullptr};
 std::atomic<SetSockOptFn> real_setsockopt{nullptr};
 std::atomic<GetSockOptFn> real_getsockopt{nullptr};
-std::atomic<IfNameToIndexFn> real_if_nametoindex{nullptr};
-std::atomic<IfIndexToNameFn> real_if_indextoname{nullptr};
+[[maybe_unused]] std::atomic<IfNameToIndexFn> real_if_nametoindex{nullptr};
+[[maybe_unused]] std::atomic<IfIndexToNameFn> real_if_indextoname{nullptr};
 std::atomic<GetAddrInfoFn> real_getaddrinfo{nullptr};
 std::atomic<FreeAddrInfoFn> real_freeaddrinfo{nullptr};
 std::atomic<GetNameInfoFn> real_getnameinfo{nullptr};
-std::atomic<GetHostNameFn> real_gethostname{nullptr};
+[[maybe_unused]] std::atomic<GetHostNameFn> real_gethostname{nullptr};
 std::atomic<UnameFn> real_uname{nullptr};
-std::atomic<GetIfAddrsFn> real_getifaddrs{nullptr};
+[[maybe_unused]] std::atomic<GetIfAddrsFn> real_getifaddrs{nullptr};
 std::atomic<FreeIfAddrsFn> real_freeifaddrs{nullptr};
 std::atomic<AudioCallFn> real_aaudio_start{nullptr};
 std::atomic<AudioCallFn> real_aaudio_stop{nullptr};
@@ -581,7 +582,7 @@ extern "C" int controlled_getnameinfo(const sockaddr* address, socklen_t address
     if (status != 0) return status;
     if (host != nullptr && host_length > 0 && (flags & NI_NUMERICHOST) == 0) {
         const std::string value = native_virtual_hostname();
-        if (value.size() + 1 > host_length) return EAI_OVERFLOW;
+        if (std::cmp_greater(value.size() + 1, host_length)) return EAI_OVERFLOW;
         std::memcpy(host, value.c_str(), value.size() + 1);
     }
     return 0;

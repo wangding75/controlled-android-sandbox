@@ -38,7 +38,7 @@ public final class GuestClassLoader extends DexClassLoader {
     }
 
     @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        synchronized (getClassLoadingLock(name)) {
+        synchronized (this) {
             if (isDeniedSandboxInternal(name) || isPrivilegedContract(name)) {
                 throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);
             }

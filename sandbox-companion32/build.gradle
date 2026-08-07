@@ -18,7 +18,10 @@ android {
         ndk { abiFilters 'armeabi-v7a', 'x86' }
     }
     buildTypes {
-        debug { applicationIdSuffix '.debug' versionNameSuffix '-debug' }
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
         release { minifyEnabled false }
     }
     externalNativeBuild {

@@ -42,7 +42,7 @@ final class VirtualSystemServiceStorePersistence {
             }
             String text = new String(bytes, StandardCharsets.UTF_8);
             JSONObject root = new JSONObject(text);
-            if (!root.keySet().contains("envelopeVersion")) {
+            if (!root.has("envelopeVersion")) {
                 // Schema 1-5 legacy files were raw JSON payloads.
                 return boundedPayload(text);
             }

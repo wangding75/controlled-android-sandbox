@@ -12,6 +12,7 @@
 #include <netinet/tcp.h>
 #include <sstream>
 #include <unordered_set>
+#include <utility>
 
 #ifndef SOCK_TYPE_MASK
 #define SOCK_TYPE_MASK 0x0f
@@ -178,13 +179,13 @@ bool is_virtual_interface(const char* name, const NativeNetworkIdentity& identit
 bool native_socket_address_allowed(const sockaddr* address, socklen_t length) noexcept {
     if (address == nullptr) return false;
     try {
-        if (address->sa_family == AF_INET && length >= sizeof(sockaddr_in)) {
+        if (address->sa_family == AF_INET && std::cmp_greater_equal(length, sizeof(sockaddr_in))) {
             const auto* value = reinterpret_cast<const sockaddr_in*>(address);
             char text[INET_ADDRSTRLEN]{};
             return inet_ntop(AF_INET, &value->sin_addr, text, sizeof(text)) != nullptr
                     && global_policy().allow_ipv4(text);
         }
-        if (address->sa_family == AF_INET6 && length >= sizeof(sockaddr_in6)) {
+        if (address->sa_family == AF_INET6 && std::cmp_greater_equal(length, sizeof(sockaddr_in6))) {
             const auto* value = reinterpret_cast<const sockaddr_in6*>(address);
             char text[INET6_ADDRSTRLEN]{};
             return inet_ntop(AF_INET6, &value->sin6_addr, text, sizeof(text)) != nullptr
@@ -294,7 +295,7 @@ int native_project_bind_address(const sockaddr* requested, socklen_t requested_l
     }
     try {
         const NativeNetworkIdentity identity = global_policy().network_identity();
-        if (requested->sa_family == AF_INET && requested_length >= sizeof(sockaddr_in)) {
+        if (requested->sa_family == AF_INET && std::cmp_greater_equal(requested_length, sizeof(sockaddr_in))) {
             const auto* source = reinterpret_cast<const sockaddr_in*>(requested);
             if (!unspecified_or_loopback(requested) && !address_equals(requested, identity)) {
                 errno = EADDRNOTAVAIL;
@@ -307,7 +308,7 @@ int native_project_bind_address(const sockaddr* requested, socklen_t requested_l
             *projected_length = sizeof(*target);
             return 0;
         }
-        if (requested->sa_family == AF_INET6 && requested_length >= sizeof(sockaddr_in6)) {
+        if (requested->sa_family == AF_INET6 && std::cmp_greater_equal(requested_length, sizeof(sockaddr_in6))) {
             const auto* source = reinterpret_cast<const sockaddr_in6*>(requested);
             if (!unspecified_or_loopback(requested) && !address_equals(requested, identity)) {
                 errno = EADDRNOTAVAIL;
@@ -321,7 +322,7 @@ int native_project_bind_address(const sockaddr* requested, socklen_t requested_l
             return 0;
         }
         if (requested->sa_family == AF_UNIX) {
-            if (requested_length > sizeof(*projected)) { errno = EINVAL; return -1; }
+            if (std::cmp_greater(requested_length, sizeof(*projected))) { errno = EINVAL; return -1; }
             std::memcpy(projected, requested, requested_length);
             *projected_length = requested_length;
             return 0;
@@ -338,13 +339,13 @@ void native_project_local_address(sockaddr* address, socklen_t length) noexcept 
     if (address == nullptr) return;
     try {
         const NativeNetworkIdentity identity = global_policy().network_identity();
-        if (address->sa_family == AF_INET && length >= sizeof(sockaddr_in)) {
+        if (address->sa_family == AF_INET && std::cmp_greater_equal(length, sizeof(sockaddr_in))) {
             auto* value = reinterpret_cast<sockaddr_in*>(address);
             if ((ntohl(value->sin_addr.s_addr) >> 24U) != 127U
                     && inet_pton(AF_INET, identity.ipv4_address.c_str(), &value->sin_addr) == 1) {
                 count_projection();
             }
-        } else if (address->sa_family == AF_INET6 && length >= sizeof(sockaddr_in6)) {
+        } else if (address->sa_family == AF_INET6 && std::cmp_greater_equal(length, sizeof(sockaddr_in6))) {
             auto* value = reinterpret_cast<sockaddr_in6*>(address);
             if (!IN6_IS_ADDR_LOOPBACK(&value->sin6_addr)
                     && inet_pton(AF_INET6, identity.ipv6_address.c_str(), &value->sin6_addr) == 1) {
@@ -421,7 +422,7 @@ int native_get_virtual_socket_option(int socket_fd, int level, int option_name,
                 if (found == sockets.end()) { errno = EBADF; return -1; }
                 if (!found->second.bound_interface.empty()) name = found->second.bound_interface;
             }
-            if (*option_length < name.size() + 1) { errno = EINVAL; return -1; }
+            if (std::cmp_less(*option_length, name.size() + 1)) { errno = EINVAL; return -1; }
             std::memcpy(option_value, name.c_str(), name.size() + 1);
             *option_length = static_cast<socklen_t>(name.size() + 1);
             return 0;

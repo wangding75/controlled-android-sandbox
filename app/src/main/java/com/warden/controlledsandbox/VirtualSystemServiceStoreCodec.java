@@ -66,10 +66,12 @@ final class VirtualSystemServiceStoreCodec {
                     JSONObject tokens = account.optJSONObject(schema >= 6
                             ? "tokensEncrypted" : "tokens");
                     if (tokens != null) {
-                        if (tokens.keySet().size() > MAX_TOKENS_PER_ACCOUNT) {
+                        if (tokens.length() > MAX_TOKENS_PER_ACCOUNT) {
                             throw new IllegalStateException("Virtual account token limit exceeded");
                         }
-                        for (String tokenType : tokens.keySet()) {
+                        java.util.Iterator<String> keys = tokens.keys();
+                        while (keys.hasNext()) {
+                            String tokenType = keys.next();
                             String normalizedType = required(tokenType, "tokenType");
                             String tokenValue = schema >= 6
                                     ? secretCipher.decrypt(secretAad(scope, key, "token", normalizedType),
@@ -122,10 +124,12 @@ final class VirtualSystemServiceStoreCodec {
 
                 JSONObject namespaces = item.optJSONObject("namespaces");
                 if (namespaces != null) {
-                    if (namespaces.keySet().size() > MAX_NAMESPACES_PER_SCOPE) {
+                    if (namespaces.length() > MAX_NAMESPACES_PER_SCOPE) {
                         throw new IllegalStateException("Virtual namespace limit exceeded");
                     }
-                    for (String name : namespaces.keySet()) {
+                    java.util.Iterator<String> keys = namespaces.keys();
+                    while (keys.hasNext()) {
+                        String name = keys.next();
                         JSONObject namespace = namespaces.getJSONObject(name);
                         NamespaceState value = new NamespaceState(namespace.getInt("next"));
                         JSONArray mappings = namespace.optJSONArray("mappings");

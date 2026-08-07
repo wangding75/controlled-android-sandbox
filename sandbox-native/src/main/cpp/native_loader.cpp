@@ -64,7 +64,7 @@ bool path_has_prefix(std::string_view path, std::string_view prefix) {
 
 bool regular_file(std::string_view path) {
     struct stat value{};
-    return syscall(SYS_newfstatat, AT_FDCWD, std::string(path).c_str(), &value, 0) == 0
+    return fstatat(AT_FDCWD, std::string(path).c_str(), &value, 0) == 0
             && S_ISREG(value.st_mode);
 }
 

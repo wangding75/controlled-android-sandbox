@@ -225,7 +225,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public SQLiteDatabase openOrCreateDatabase(
             String name, int mode, SQLiteDatabase.CursorFactory factory,
             DatabaseErrorHandler errorHandler) {
-        return SQLiteDatabase.openOrCreateDatabase(getDatabasePath(name), factory, errorHandler);
+        return SQLiteDatabase.openOrCreateDatabase(getDatabasePath(name).getPath(), factory, errorHandler);
     }
     @Override public boolean moveDatabaseFrom(Context sourceContext, String name) {
         GuestContext source = compatibleStorageSource(sourceContext);
@@ -364,7 +364,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return this;
     }
 
-    @Override public Context createCredentialProtectedStorageContext() {
+    public Context createCredentialProtectedStorageContext() {
         return deviceProtected ? storageContext(false) : this;
     }
 

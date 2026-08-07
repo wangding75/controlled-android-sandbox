@@ -208,7 +208,6 @@ public final class ProviderBatchRuntime {
                 case ASSERT:
                     builder = ContentProviderOperation.newAssertQuery(uri);
                     ArrayList<String> projection = wire.getStringArrayList(RuntimeKeys.PROVIDER_PROJECTION);
-                    if (projection != null) builder.withProjection(projection.toArray(new String[0]));
                     applySelection(builder, wire);
                     int expected = wire.getInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT, -1);
                     if (expected >= 0) builder.withExpectedCount(expected);

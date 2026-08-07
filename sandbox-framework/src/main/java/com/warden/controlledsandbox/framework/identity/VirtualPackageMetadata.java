@@ -499,11 +499,9 @@ public final class VirtualPackageMetadata {
         info.targetProcesses = instrumentation.targetProcesses();
         info.handleProfiling = instrumentation.handleProfiling();
         info.functionalTest = instrumentation.functionalTest();
-        info.enabled = instrumentation.enabled();
         info.sourceDir = applicationInfo.sourceDir;
         info.publicSourceDir = applicationInfo.publicSourceDir;
         info.dataDir = applicationInfo.dataDir;
-        info.nativeLibraryDir = applicationInfo.nativeLibraryDir;
         return info;
     }
 

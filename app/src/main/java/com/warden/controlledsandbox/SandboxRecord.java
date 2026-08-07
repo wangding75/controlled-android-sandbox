@@ -276,7 +276,7 @@ final class SandboxRecord {
             }
         }
         if (artifacts.isEmpty()) artifacts.add(PackageArtifactRecord.legacyBase(apkPath, baseSha));
-        boolean containsNativeCode = o.keySet().contains("containsNativeCode")
+        boolean containsNativeCode = o.has("containsNativeCode")
                 ? o.optBoolean("containsNativeCode", false) : !nativeLibraryDir.trim().isEmpty();
         return new SandboxRecord(packageName, o.optString("label"), o.optString("versionName"),
                 o.optLong("versionCode"), o.optString("signatureSha256"), apkPath,
