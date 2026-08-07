@@ -66,6 +66,7 @@ public final class UriGrantLifecycleSelfTest {
         Bundle second = new Bundle();
         second.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, ProviderBatchRuntime.ASSERT);
         second.putString(RuntimeKeys.URI, "content://owner.batch/b");
+        second.putInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT, 0);
         batch.putBundle(RuntimeKeys.PROVIDER_BATCH_OPERATION_PREFIX + 0, first);
         batch.putBundle(RuntimeKeys.PROVIDER_BATCH_OPERATION_PREFIX + 1, second);
 

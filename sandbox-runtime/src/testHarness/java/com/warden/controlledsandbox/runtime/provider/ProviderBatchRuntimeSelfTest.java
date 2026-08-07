@@ -34,7 +34,10 @@ public final class ProviderBatchRuntimeSelfTest {
         assertionWithValuesMismatchFails();
         assertionWithValuesAndExpectedCountPasses();
         assertionWithSelectionArgsAndValues();
+        assertionWithWrongSelectionArgsFails();
         assertionWithNoValuesOnlyCount();
+        assertionWithEmptyConditionFails();
+        assertionWithEmptyValuesBundleFails();
         System.out.println("PASS ProviderBatchRuntimeSelfTest");
     }
 
@@ -75,6 +78,7 @@ public final class ProviderBatchRuntimeSelfTest {
     private static void assertionWithSelectionArgsAndValues() throws Exception {
         RecordingProvider provider = new RecordingProvider();
         provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("OTHER"));
         Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), 1);
         assertOp.putString(RuntimeKeys.PROVIDER_SELECTION, "_id=?");
         ArrayList<String> args = new ArrayList<>();
@@ -86,6 +90,24 @@ public final class ProviderBatchRuntimeSelfTest {
         require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion with selection args status");
     }
 
+    private static void assertionWithWrongSelectionArgsFails() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), 1);
+        assertOp.putString(RuntimeKeys.PROVIDER_SELECTION, "_id=?");
+        ArrayList<String> args = new ArrayList<>();
+        args.add("2");
+        assertOp.putStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS, args);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        try {
+            ProviderBatchRuntime.execute(provider, batch);
+            throw new AssertionError("Expected BatchException for wrong selection args in Assert");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require("PROVIDER_BATCH_APPLICATION_FAILED".equals(error.getMessage()), "error message for wrong args");
+        }
+    }
+
     private static void assertionWithNoValuesOnlyCount() throws Exception {
         RecordingProvider provider = new RecordingProvider();
         provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
@@ -94,6 +116,30 @@ public final class ProviderBatchRuntimeSelfTest {
         ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
         Bundle result = ProviderBatchRuntime.execute(provider, batch);
         require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion count only status");
+    }
+
+    private static void assertionWithEmptyConditionFails() throws Exception {
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", null, -1);
+        Bundle request = request(assertOp);
+        try {
+            ProviderBatchRuntime.validate(request, AUTHORITY);
+            throw new AssertionError("Expected BatchException for empty assert condition");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 0, "empty condition operation index");
+            require("PROVIDER_BATCH_ASSERT_CONDITION_REQUIRED".equals(error.getMessage()), "empty condition message");
+        }
+    }
+
+    private static void assertionWithEmptyValuesBundleFails() throws Exception {
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", new Bundle(), -1);
+        Bundle request = request(assertOp);
+        try {
+            ProviderBatchRuntime.validate(request, AUTHORITY);
+            throw new AssertionError("Expected BatchException for empty values bundle in assert");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 0, "empty values operation index");
+            require("PROVIDER_BATCH_ASSERT_CONDITION_REQUIRED".equals(error.getMessage()), "empty values message");
+        }
     }
 
     private static void assertionWithProjectionFails() throws Exception {
@@ -117,7 +163,7 @@ public final class ProviderBatchRuntimeSelfTest {
         Bundle request = request(
                 operation(ProviderBatchRuntime.INSERT, "/items", values("one"), -1),
                 operation(ProviderBatchRuntime.UPDATE, "/items", values("two"), -1),
-                operation(ProviderBatchRuntime.ASSERT, "/items", null, 1),
+                operation(ProviderBatchRuntime.ASSERT, "/items", values("two"), 1),
                 operation(ProviderBatchRuntime.DELETE, "/items", null, -1));
         ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
         require(batch.operations().size() == 4, "operation count");
@@ -278,7 +324,22 @@ public final class ProviderBatchRuntimeSelfTest {
         @Override public boolean onCreate() { return true; }
         @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
             MatrixCursor cursor = new MatrixCursor(new String[]{"_id", "value"});
-            for (Map.Entry<Long, String> row : rows.entrySet()) cursor.addRow(new Object[]{row.getKey(), row.getValue()});
+            Long filterId = null;
+            if (selection != null && !selection.isEmpty()) {
+                if ("_id=?".equals(selection)) {
+                    if (args == null || args.length == 0 || args[0] == null) {
+                        throw new IllegalArgumentException("selectionArgs required for _id=?");
+                    }
+                    filterId = Long.parseLong(args[0]);
+                } else {
+                    throw new IllegalArgumentException("Unsupported selection: " + selection);
+                }
+            }
+            for (Map.Entry<Long, String> row : rows.entrySet()) {
+                if (filterId == null || row.getKey().equals(filterId)) {
+                    cursor.addRow(new Object[]{row.getKey(), row.getValue()});
+                }
+            }
             return cursor;
         }
         @Override public String getType(Uri uri) { return "vnd.test"; }

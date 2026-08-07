@@ -277,6 +277,9 @@ public final class ProviderBatchRuntime {
                     throw new BatchException(index, "PROVIDER_BATCH_VALUES_INVALID", error);
                 }
             }
+            if ((values == null || values.isEmpty()) && expected < 0) {
+                throw new BatchException(index, "PROVIDER_BATCH_ASSERT_CONDITION_REQUIRED");
+            }
         }
         if (CALL.equals(type)) {
             String method = operation.getString(RuntimeKeys.PROVIDER_METHOD, "");
