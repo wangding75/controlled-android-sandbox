@@ -4,10 +4,16 @@ $RepoRoot = (Get-Item (Join-Path $PSScriptRoot "..")).FullName
 Set-Location $RepoRoot
 
 $TempRepoDir = Join-Path $env:TEMP ("evidence-git-test-" + (Get-Random))
+$BareRemote = Join-Path $env:TEMP ("evidence-remote-" + (Get-Random))
+$EvidenceDir = $null
+$RunDir = $null
+$ArtifactDir = $null
+
 if (Test-Path $TempRepoDir) { Remove-Item -Recurse -Force $TempRepoDir }
+if (Test-Path $BareRemote) { Remove-Item -Recurse -Force $BareRemote }
 
 try {
-    # 1. Initialize temporary git repository
+    # 1. Initialize temporary git repository with a real bare origin
     New-Item -ItemType Directory -Force -Path $TempRepoDir | Out-Null
     Set-Location $TempRepoDir
 
@@ -20,9 +26,11 @@ try {
     git add file.txt
     git commit -m "initial commit for evidence test" | Out-Null
 
-    # Create origin remote baseline locally
-    git remote add origin $TempRepoDir
-    git update-ref refs/remotes/origin/main (git rev-parse HEAD)
+    # Bare remote + push so refs/remotes/origin/main exists and matches HEAD
+    git init --bare $BareRemote | Out-Null
+    git remote add origin $BareRemote
+    git push -u origin main | Out-Null
+    git fetch origin | Out-Null
 
     $EvidenceDir = Join-Path $env:TEMP ("evidence-out-" + (Get-Random))
     $RunDir = Join-Path $env:TEMP ("run-out-" + (Get-Random))
@@ -38,8 +46,6 @@ try {
 
     $ValidBundle = Join-Path $ArtifactDir "valid.bundle"
     git bundle create $ValidBundle --all | Out-Null
-
-    # Helper script to create 4 valid run-result JSON files
 
     function Reset-RunResultsDir {
         param([string]$TargetRunDir)
@@ -60,17 +66,29 @@ try {
         }
     }
 
+    function Invoke-CaptureFinal {
+        param(
+            [string]$OutDir = $EvidenceDir,
+            [string]$Runs = $RunDir,
+            [string]$Zip = $ZipFile,
+            [string]$Bundle = $ValidBundle,
+            [string[]]$Apks = @($ApkFile)
+        )
+        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
+            -RepositoryPath $TempRepoDir `
+            -OutputDirectory $OutDir `
+            -RunResultsDirectory $Runs `
+            -SourceZipPath $Zip `
+            -GitBundlePath $Bundle `
+            -ApkPaths $Apks `
+            -StrictFinalVerification
+    }
+
     # ----------------------------------------------------
-    # 8.1 Test Clean worktree & exact commitMessage match
+    # 8.1 Clean worktree & exact commitMessage match (Final)
     # ----------------------------------------------------
     Reset-RunResultsDir -TargetRunDir $RunDir
-    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-        -RepositoryPath $TempRepoDir `
-        -OutputDirectory $EvidenceDir `
-        -RunResultsDirectory $RunDir `
-        -SourceZipPath $ZipFile `
-        -GitBundlePath $ValidBundle `
-        -ApkPaths @($ApkFile)
+    Invoke-CaptureFinal
 
     $manifest1 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
 
@@ -84,24 +102,96 @@ try {
         throw "Self-test commitMessage mismatch! Expected '$expectedMsg1', got '$($manifest1.commitMessage)'"
     }
 
+    if ($manifest1.headMatchesOriginMain -ne $true) {
+        throw "Self-test Clean failed! Expected headMatchesOriginMain=true"
+    }
+
     # ----------------------------------------------------
-    # 8.2 Test Dirty worktree
+    # 8.2 Non-Final: dirty worktree may still be recorded
     # ----------------------------------------------------
     Add-Content -Path $testFile -Value "Dirty Modified Content"
     & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
         -RepositoryPath $TempRepoDir `
         -OutputDirectory $EvidenceDir `
-        -RunResultsDirectory $RunDir `
-        -SourceZipPath $ZipFile `
         -GitBundlePath $ValidBundle `
-        -ApkPaths @($ApkFile)
+        -StrictFinalVerification:$false
 
     $manifest2 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
     if ($manifest2.worktreeClean -ne $false) {
-        throw "Self-test Dirty failed! Expected worktreeClean=false"
+        throw "Self-test Dirty (non-final) failed! Expected worktreeClean=false"
+    }
+
+    # ----------------------------------------------------
+    # T07-A Final dirty worktree MUST fail-closed
+    # ----------------------------------------------------
+    # worktree still dirty from 8.2
+    Reset-RunResultsDir -TargetRunDir $RunDir
+    $threwDirty = $false
+    $errDirty = ""
+    try {
+        Invoke-CaptureFinal
+    } catch {
+        $threwDirty = $true
+        $errDirty = $_.Exception.Message
+        if ($_.Exception.InnerException) {
+            $errDirty = "$errDirty $($_.Exception.InnerException.Message)"
+        }
+        $errDirty = "$errDirty $_"
+    }
+    if (-not $threwDirty) {
+        throw "T07-A failed! Final capture succeeded on dirty worktree (must reject)"
+    }
+    if ($errDirty -notmatch "FINAL_EVIDENCE_WORKTREE_NOT_CLEAN") {
+        throw "T07-A failed! Expected FINAL_EVIDENCE_WORKTREE_NOT_CLEAN, got: $errDirty"
     }
 
     git checkout -- file.txt
+    if (-not [string]::IsNullOrWhiteSpace((git status --porcelain=v1))) {
+        throw "Failed to restore clean worktree after dirty gate test"
+    }
+
+    # ----------------------------------------------------
+    # T07-B Final HEAD != origin/main (unpushed) MUST fail-closed
+    # ----------------------------------------------------
+    Set-Content -Path $testFile -Value "Unpushed Content"
+    git add file.txt
+    git commit -m "local unpushed commit" | Out-Null
+    # worktree clean, but HEAD has not been pushed
+    if (-not [string]::IsNullOrWhiteSpace((git status --porcelain=v1))) {
+        throw "T07-B setup failed: worktree not clean after unpushed commit"
+    }
+    $headNow = (git rev-parse HEAD).Trim()
+    $originNow = (git rev-parse refs/remotes/origin/main).Trim()
+    if ($headNow -eq $originNow) {
+        throw "T07-B setup failed: HEAD still equals origin/main (need unpushed divergence)"
+    }
+
+    # Refresh bundle to include new commit so only HEAD gate fails (not bundle)
+    git bundle create $ValidBundle --all | Out-Null
+    Reset-RunResultsDir -TargetRunDir $RunDir
+
+    $threwHead = $false
+    $errHead = ""
+    try {
+        Invoke-CaptureFinal
+    } catch {
+        $threwHead = $true
+        $errHead = $_.Exception.Message
+        if ($_.Exception.InnerException) {
+            $errHead = "$errHead $($_.Exception.InnerException.Message)"
+        }
+        $errHead = "$errHead $_"
+    }
+    if (-not $threwHead) {
+        throw "T07-B failed! Final capture succeeded when HEAD != origin/main (must reject)"
+    }
+    if ($errHead -notmatch "FINAL_EVIDENCE_HEAD_NOT_ORIGIN_MAIN") {
+        throw "T07-B failed! Expected FINAL_EVIDENCE_HEAD_NOT_ORIGIN_MAIN, got: $errHead"
+    }
+
+    # Restore synced HEAD for remaining tests
+    git reset --hard origin/main | Out-Null
+    git bundle create $ValidBundle --all | Out-Null
 
     # ----------------------------------------------------
     # 9.A Missing required run
@@ -111,14 +201,7 @@ try {
 
     $threwA = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath $ZipFile `
-            -GitBundlePath $ValidBundle `
-            -ApkPaths @($ApkFile) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal
     } catch {
         $threwA = $true
     }
@@ -134,14 +217,7 @@ try {
 
     $threwB = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath $ZipFile `
-            -GitBundlePath $ValidBundle `
-            -ApkPaths @($ApkFile) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal
     } catch {
         $threwB = $true
     }
@@ -155,14 +231,7 @@ try {
 
     $threwC = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath $ZipFile `
-            -GitBundlePath $ValidBundle `
-            -ApkPaths @($ApkFile) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal
     } catch {
         $threwC = $true
     }
@@ -174,14 +243,7 @@ try {
     Reset-RunResultsDir -TargetRunDir $RunDir
     $threwD = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath (Join-Path $TempRepoDir "non-existent-source.zip") `
-            -GitBundlePath $ValidBundle `
-            -ApkPaths @($ApkFile) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal -Zip (Join-Path $TempRepoDir "non-existent-source.zip")
     } catch {
         $threwD = $true
     }
@@ -193,14 +255,7 @@ try {
     Reset-RunResultsDir -TargetRunDir $RunDir
     $threwE = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath $ZipFile `
-            -GitBundlePath "" `
-            -ApkPaths @($ApkFile) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal -Bundle ""
     } catch {
         $threwE = $true
     }
@@ -212,50 +267,61 @@ try {
     Reset-RunResultsDir -TargetRunDir $RunDir
     $threwF = $false
     try {
-        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-            -RepositoryPath $TempRepoDir `
-            -OutputDirectory $EvidenceDir `
-            -RunResultsDirectory $RunDir `
-            -SourceZipPath $ZipFile `
-            -GitBundlePath $ValidBundle `
-            -ApkPaths @((Join-Path $TempRepoDir "non-existent.apk")) `
-            -StrictFinalVerification
+        Invoke-CaptureFinal -Apks @((Join-Path $TempRepoDir "non-existent.apk"))
     } catch {
         $threwF = $true
     }
     if (-not $threwF) { throw "Reverse test F failed! Expected failure when APK file does not exist" }
 
     # ----------------------------------------------------
-    # 9.G Complete Valid Evidence
+    # 9.G / T07 positive: clean + synced Final gate success
     # ----------------------------------------------------
     Reset-RunResultsDir -TargetRunDir $RunDir
-    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") `
-        -RepositoryPath $TempRepoDir `
-        -OutputDirectory $EvidenceDir `
-        -RunResultsDirectory $RunDir `
-        -SourceZipPath $ZipFile `
-        -GitBundlePath $ValidBundle `
-        -ApkPaths @($ApkFile) `
-        -StrictFinalVerification
+    if (-not [string]::IsNullOrWhiteSpace((git status --porcelain=v1))) {
+        throw "Positive final gate setup failed: worktree not clean"
+    }
+    $headPos = (git rev-parse HEAD).Trim()
+    $originPos = (git rev-parse refs/remotes/origin/main).Trim()
+    if ($headPos -ne $originPos) {
+        throw "Positive final gate setup failed: HEAD != origin/main"
+    }
+
+    Invoke-CaptureFinal
 
     $manifestG = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
 
+    if ($manifestG.worktreeClean -ne $true) {
+        throw "Positive final gate failed! Expected worktreeClean=true"
+    }
+    if ($manifestG.headMatchesOriginMain -ne $true) {
+        throw "Positive final gate failed! Expected headMatchesOriginMain=true"
+    }
+    if ($manifestG.headCommit -ne $manifestG.originMainCommit) {
+        throw "Positive final gate failed! Expected headCommit == originMainCommit (full SHA)"
+    }
     if ($manifestG.bundleVerifyPassed -ne $true) {
-        throw "Reverse test G failed! Expected bundleVerifyPassed=true"
+        throw "Positive final gate failed! Expected bundleVerifyPassed=true"
     }
     if ($manifestG.runs.Count -lt 4) {
-        throw "Reverse test G failed! Expected runs.Count >= 4, got $($manifestG.runs.Count)"
+        throw "Positive final gate failed! Expected runs.Count >= 4, got $($manifestG.runs.Count)"
+    }
+    foreach ($rn in @("static-android-compile", "strict-online-assemble", "strict-offline-assemble", "strict-directional-compile")) {
+        $m = @($manifestG.runs | Where-Object { $_.name -eq $rn })
+        if ($m.Count -ne 1 -or [int]$m[0].exitCode -ne 0) {
+            throw "Positive final gate failed! Required run '$rn' missing or exitCode != 0"
+        }
     }
     if ($manifestG.artifacts.Count -lt 3) {
-        throw "Reverse test G failed! Expected artifacts to contain ZIP, Bundle, and APK, got $($manifestG.artifacts.Count)"
+        throw "Positive final gate failed! Expected artifacts to contain ZIP, Bundle, and APK, got $($manifestG.artifacts.Count)"
     }
 
-    Write-Output "PASS test-capture-acceptance-evidence (all reverse tests A-G passed)"
+    Write-Output "PASS test-capture-acceptance-evidence (dirty final reject, unpushed HEAD reject, clean+synced final success, reverse A-F)"
 }
 finally {
     Set-Location $RepoRoot
     if (Test-Path $TempRepoDir) { Remove-Item -Recurse -Force $TempRepoDir -ErrorAction SilentlyContinue }
-    if (Test-Path $EvidenceDir) { Remove-Item -Recurse -Force $EvidenceDir -ErrorAction SilentlyContinue }
-    if (Test-Path $RunDir) { Remove-Item -Recurse -Force $RunDir -ErrorAction SilentlyContinue }
-    if (Test-Path $ArtifactDir) { Remove-Item -Recurse -Force $ArtifactDir -ErrorAction SilentlyContinue }
+    if (Test-Path $BareRemote) { Remove-Item -Recurse -Force $BareRemote -ErrorAction SilentlyContinue }
+    if ($EvidenceDir -and (Test-Path $EvidenceDir)) { Remove-Item -Recurse -Force $EvidenceDir -ErrorAction SilentlyContinue }
+    if ($RunDir -and (Test-Path $RunDir)) { Remove-Item -Recurse -Force $RunDir -ErrorAction SilentlyContinue }
+    if ($ArtifactDir -and (Test-Path $ArtifactDir)) { Remove-Item -Recurse -Force $ArtifactDir -ErrorAction SilentlyContinue }
 }

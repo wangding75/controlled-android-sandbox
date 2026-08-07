@@ -46,6 +46,17 @@ try {
     $statusRaw = (git status --porcelain=v1)
     $statusText = if ($null -ne $statusRaw) { ($statusRaw -join "`n").Trim() } else { "" }
     $worktreeClean = [string]::IsNullOrWhiteSpace($statusText)
+    $headMatchesOriginMain = ($headCommit -eq $originMainCommit)
+
+    # Final/Strict verification: fail-closed on dirty worktree or HEAD not synced to origin/main
+    if ($StrictFinalVerification) {
+        if (-not $worktreeClean) {
+            throw "FINAL_EVIDENCE_WORKTREE_NOT_CLEAN"
+        }
+        if ($headCommit -ne $originMainCommit) {
+            throw "FINAL_EVIDENCE_HEAD_NOT_ORIGIN_MAIN"
+        }
+    }
 
     $trackedFiles = git ls-files
     $trackedFileCount = if ($null -eq $trackedFiles) { 0 } elseif ($trackedFiles -is [array]) { $trackedFiles.Count } else { 1 }
@@ -191,6 +202,7 @@ try {
         commitMessage = $commitMessage
         originMainCommit = $originMainCommit
         worktreeClean = $worktreeClean
+        headMatchesOriginMain = $headMatchesOriginMain
         trackedFileCount = $trackedFileCount
         bundleVerifyExitCode = $bundleVerifyExitCode
         bundleVerifyPassed = $bundleVerifyPassed
