@@ -259,9 +259,17 @@ public final class ProviderBatchRuntime {
     }
 
     private static void validateOperation(String type, Bundle operation, int index) throws BatchException {
-        if (INSERT.equals(type) || UPDATE.equals(type)) {
+        if (INSERT.equals(type)) {
             Bundle values = operation.getBundle(RuntimeKeys.PROVIDER_VALUES);
             if (values == null) throw new BatchException(index, "PROVIDER_BATCH_VALUES_REQUIRED");
+            try { contentValues(values); }
+            catch (IllegalArgumentException error) {
+                throw new BatchException(index, "PROVIDER_BATCH_VALUES_INVALID", error);
+            }
+        }
+        if (UPDATE.equals(type)) {
+            Bundle values = operation.getBundle(RuntimeKeys.PROVIDER_VALUES);
+            if (values == null || values.isEmpty()) throw new BatchException(index, "PROVIDER_BATCH_VALUES_REQUIRED");
             try { contentValues(values); }
             catch (IllegalArgumentException error) {
                 throw new BatchException(index, "PROVIDER_BATCH_VALUES_INVALID", error);

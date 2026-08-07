@@ -33,12 +33,127 @@ public final class ProviderBatchRuntimeSelfTest {
         assertionWithValuesMatchingPasses();
         assertionWithValuesMismatchFails();
         assertionWithValuesAndExpectedCountPasses();
+        assertionWithMultiFieldValuesPasses();
+        assertionWithWrongColumnOrderFails();
+        assertionWithMissingColumnFails();
         assertionWithSelectionArgsAndValues();
         assertionWithWrongSelectionArgsFails();
         assertionWithNoValuesOnlyCount();
         assertionWithEmptyConditionFails();
         assertionWithEmptyValuesBundleFails();
+        updateNullValuesFails();
+        updateEmptyValuesFails();
+        updateNonEmptyValuesPasses();
+        insertEmptyValuesPasses();
         System.out.println("PASS ProviderBatchRuntimeSelfTest");
+    }
+
+    private static void assertionWithMultiFieldValuesPasses() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertValues = new Bundle();
+        assertValues.putLong("_id", 1L);
+        assertValues.putString("value", "READY");
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", assertValues, 1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion multi-field status");
+    }
+
+    private static void assertionWithWrongColumnOrderFails() throws Exception {
+        ContentProvider wrongOrderProvider = new ContentProvider() {
+            @Override public boolean onCreate() { return true; }
+            @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
+                MatrixCursor c = new MatrixCursor(new String[]{"value", "_id"});
+                c.addRow(new Object[]{"READY", "1"});
+                return c;
+            }
+            @Override public String getType(Uri uri) { return "vnd.test"; }
+            @Override public Uri insert(Uri uri, ContentValues values) { return null; }
+            @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+            @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { return 0; }
+        };
+        Bundle assertValues = new Bundle();
+        assertValues.putLong("_id", 1L);
+        assertValues.putString("value", "READY");
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", assertValues, 1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        try {
+            ProviderBatchRuntime.execute(wrongOrderProvider, batch);
+            throw new AssertionError("Expected BatchException for wrong column order");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require("PROVIDER_BATCH_APPLICATION_FAILED".equals(error.getMessage()), "error message for wrong column order");
+        }
+    }
+
+    private static void assertionWithMissingColumnFails() throws Exception {
+        ContentProvider missingColumnProvider = new ContentProvider() {
+            @Override public boolean onCreate() { return true; }
+            @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
+                MatrixCursor c = new MatrixCursor(new String[]{"_id"});
+                c.addRow(new Object[]{1L});
+                return c;
+            }
+            @Override public String getType(Uri uri) { return "vnd.test"; }
+            @Override public Uri insert(Uri uri, ContentValues values) { return null; }
+            @Override public int delete(Uri uri, String selection, String[] args) { return 0; }
+            @Override public int update(Uri uri, ContentValues values, String selection, String[] args) { return 0; }
+        };
+        Bundle assertValues = new Bundle();
+        assertValues.putLong("_id", 1L);
+        assertValues.putString("value", "READY");
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", assertValues, 1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        try {
+            ProviderBatchRuntime.execute(missingColumnProvider, batch);
+            throw new AssertionError("Expected BatchException for missing column in assert");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require("PROVIDER_BATCH_APPLICATION_FAILED".equals(error.getMessage()), "error message for missing column");
+        }
+    }
+
+    private static void updateNullValuesFails() throws Exception {
+        Bundle updateOp = operation(ProviderBatchRuntime.UPDATE, "/items", null, -1);
+        Bundle request = request(updateOp);
+        try {
+            ProviderBatchRuntime.validate(request, AUTHORITY);
+            throw new AssertionError("Expected BatchException for null values in update");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 0, "update null values operation index");
+            require("PROVIDER_BATCH_VALUES_REQUIRED".equals(error.getMessage()), "update null values message");
+        }
+    }
+
+    private static void updateEmptyValuesFails() throws Exception {
+        Bundle updateOp = operation(ProviderBatchRuntime.UPDATE, "/items", new Bundle(), -1);
+        Bundle request = request(updateOp);
+        try {
+            ProviderBatchRuntime.validate(request, AUTHORITY);
+            throw new AssertionError("Expected BatchException for empty values in update");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 0, "update empty values operation index");
+            require("PROVIDER_BATCH_VALUES_REQUIRED".equals(error.getMessage()), "update empty values message");
+        }
+    }
+
+    private static void updateNonEmptyValuesPasses() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("OLD"));
+        Bundle updateOp = operation(ProviderBatchRuntime.UPDATE, "/items", values("NEW"), -1);
+        Bundle request = request(updateOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "update non-empty values status");
+    }
+
+    private static void insertEmptyValuesPasses() throws Exception {
+        Bundle insertOp = operation(ProviderBatchRuntime.INSERT, "/items", new Bundle(), -1);
+        Bundle request = request(insertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        require(batch.operations().size() == 1, "insert empty values batch size");
     }
 
     private static void assertionWithValuesMatchingPasses() throws Exception {
@@ -323,7 +438,8 @@ public final class ProviderBatchRuntimeSelfTest {
 
         @Override public boolean onCreate() { return true; }
         @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
-            MatrixCursor cursor = new MatrixCursor(new String[]{"_id", "value"});
+            String[] cols = (projection == null || projection.length == 0) ? new String[]{"_id", "value"} : projection;
+            MatrixCursor cursor = new MatrixCursor(cols);
             Long filterId = null;
             if (selection != null && !selection.isEmpty()) {
                 if ("_id=?".equals(selection)) {
@@ -337,7 +453,17 @@ public final class ProviderBatchRuntimeSelfTest {
             }
             for (Map.Entry<Long, String> row : rows.entrySet()) {
                 if (filterId == null || row.getKey().equals(filterId)) {
-                    cursor.addRow(new Object[]{row.getKey(), row.getValue()});
+                    Object[] rowData = new Object[cols.length];
+                    for (int i = 0; i < cols.length; i++) {
+                        if ("_id".equals(cols[i])) {
+                            rowData[i] = row.getKey();
+                        } else if ("value".equals(cols[i])) {
+                            rowData[i] = row.getValue();
+                        } else {
+                            throw new IllegalArgumentException("Unknown projection column: " + cols[i]);
+                        }
+                    }
+                    cursor.addRow(rowData);
                 }
             }
             return cursor;
