@@ -73,7 +73,85 @@ public final class GuestClassLoaderSelfTest {
                 VirtualLocationProfileSnapshot.MODE_HOST, false, false, false, false, false, 0,
                 List.of(), List.of(), List.of()));
         require(loader.suspiciousQueryCount() == 0, "HOST mode resets detection ledger");
+        try {
+            concurrentLoadSameClass(loader);
+            concurrentLoadDifferentClasses(loader);
+            repeatedLoad(loader);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        loadNonExistentThrows(loader);
         System.out.println("PASS Guest class-loader host-boundary and detection policy self-test");
+    }
+
+    private static void concurrentLoadSameClass(GuestClassLoader loader) {
+        int threadCount = 10;
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threadCount);
+        java.util.concurrent.atomic.AtomicInteger success = new java.util.concurrent.atomic.AtomicInteger(0);
+        for (int i = 0; i < threadCount; i++) {
+            new Thread(() -> {
+                try {
+                    latch.await();
+                    Class<?> clazz = loader.loadClass("java.lang.String");
+                    if (clazz == String.class) {
+                        success.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    done.countDown();
+                }
+            }).start();
+        }
+        latch.countDown();
+        try { done.await(); } catch (InterruptedException e) { throw new RuntimeException(e); }
+        require(success.get() == threadCount, "concurrent load same class success");
+    }
+
+    private static void concurrentLoadDifferentClasses(GuestClassLoader loader) {
+        int threadCount = 10;
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(threadCount);
+        java.util.concurrent.atomic.AtomicInteger success = new java.util.concurrent.atomic.AtomicInteger(0);
+        String[] classNames = {
+            "java.lang.Integer", "java.lang.Long", "java.lang.Double", "java.lang.Float",
+            "java.lang.Short", "java.lang.Byte", "java.lang.Character", "java.lang.Boolean",
+            "java.lang.Object", "java.lang.Class"
+        };
+        for (int i = 0; i < threadCount; i++) {
+            final String className = classNames[i];
+            new Thread(() -> {
+                try {
+                    latch.await();
+                    Class<?> clazz = loader.loadClass(className);
+                    if (clazz != null) {
+                        success.incrementAndGet();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    done.countDown();
+                }
+            }).start();
+        }
+        latch.countDown();
+        try { done.await(); } catch (InterruptedException e) { throw new RuntimeException(e); }
+        require(success.get() == threadCount, "concurrent load different classes success");
+    }
+
+    private static void repeatedLoad(GuestClassLoader loader) throws Exception {
+        Class<?> first = loader.loadClass("java.lang.String");
+        Class<?> second = loader.loadClass("java.lang.String");
+        require(first == second, "repeated load returns same class");
+    }
+
+    private static void loadNonExistentThrows(GuestClassLoader loader) {
+        boolean thrown = false;
+        try {
+            loader.loadClass("com.example.NonExistentClass");
+        } catch (ClassNotFoundException e) {
+            thrown = true;
+        }
+        require(thrown, "non-existent class throws ClassNotFoundException");
     }
 
     private static void require(boolean condition, String label) {

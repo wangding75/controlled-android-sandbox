@@ -331,7 +331,7 @@ public final class SelfTest {
         VirtualPathPolicy policy = new VirtualPathPolicy("/sandbox", "com.example.guest", 3);
         require(policy.mapGuestPath("/data/data/com.example.guest/files/a.txt")
                 .equals(policy.dataDir().resolve("files/a.txt")), "data path mapping");
-        require(policy.webViewDir().toString().contains("users/3/apps/com.example.guest/webview"), "webview path");
+        require(policy.webViewDir().toString().replace('\\', '/').contains("users/3/apps/com.example.guest/webview"), "webview path");
         boolean traversal = false;
         try { policy.mapGuestPath("/data/data/com.example.guest/../../escape"); }
         catch (SecurityException expected) { traversal = true; }

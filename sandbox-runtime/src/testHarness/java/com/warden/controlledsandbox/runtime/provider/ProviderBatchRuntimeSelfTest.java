@@ -29,7 +29,24 @@ public final class ProviderBatchRuntimeSelfTest {
         customFailureIndex();
         concurrentBatches();
         resultValidation();
+        assertionWithProjectionFails();
         System.out.println("PASS ProviderBatchRuntimeSelfTest");
+    }
+
+    private static void assertionWithProjectionFails() throws Exception {
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", null, 1);
+        ArrayList<String> proj = new ArrayList<>();
+        proj.add("column1");
+        assertOp.putStringArrayList(RuntimeKeys.PROVIDER_PROJECTION, proj);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        try {
+            ProviderBatchRuntime.execute(new RecordingProvider(), batch);
+            throw new AssertionError("Expected BatchException for non-empty projection in Assert");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 0, "operation index");
+            require("PROVIDER_BATCH_ASSERT_PROJECTION_UNSUPPORTED".equals(error.getMessage()), "error message");
+        }
     }
 
     private static void standardBatch() throws Exception {

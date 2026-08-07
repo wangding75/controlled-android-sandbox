@@ -598,13 +598,27 @@ final class ApkImportManager {
         if (file == null) return;
         java.nio.file.Path path = file.toPath();
         if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return;
-        if (Files.isSymbolicLink(path)) { Files.delete(path); return; }
+        if (Files.isSymbolicLink(path)) {
+            file.setWritable(true);
+            Files.delete(path);
+            return;
+        }
         if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
             File[] children = file.listFiles();
             if (children == null) throw new IllegalStateException("Cannot list directory " + file);
             for (File child : children) deleteTreeOrThrow(child);
         }
-        Files.delete(path);
+        file.setWritable(true);
+        try {
+            Files.delete(path);
+        } catch (java.nio.file.AccessDeniedException accessDenied) {
+            System.gc();
+            try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+            file.setWritable(true);
+            if (!file.delete() && Files.exists(path)) {
+                throw accessDenied;
+            }
+        }
     }
 
     static void publishDirectory(File source, File destination) throws Exception {

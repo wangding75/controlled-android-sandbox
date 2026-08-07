@@ -174,12 +174,25 @@ public final class DurableAtomicFile {
 
     public static void syncDirectory(Path directory) throws IOException {
         Objects.requireNonNull(directory, "directory");
-        try (FileChannel channel = FileChannel.open(directory.toAbsolutePath().normalize(),
-                StandardOpenOption.READ)) {
+        Path normalized = directory.toAbsolutePath().normalize();
+        if (Files.isDirectory(normalized) && isWindows()) {
+            return;
+        }
+        try (FileChannel channel = FileChannel.open(normalized, StandardOpenOption.READ)) {
             channel.force(true);
+        } catch (java.nio.file.AccessDeniedException accessDenied) {
+            if (Files.isDirectory(normalized)) {
+                return;
+            }
+            throw directorySyncFailure(directory, accessDenied);
         } catch (IOException | UnsupportedOperationException failure) {
             throw directorySyncFailure(directory, failure);
         }
+    }
+
+    private static boolean isWindows() {
+        String os = System.getProperty("os.name");
+        return os != null && os.toLowerCase().contains("win");
     }
 
     static CommitResult replacePrepared(Path prepared, Path destination, Operations operations)

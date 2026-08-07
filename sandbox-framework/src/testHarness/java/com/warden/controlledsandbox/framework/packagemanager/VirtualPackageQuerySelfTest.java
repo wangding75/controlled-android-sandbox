@@ -94,6 +94,7 @@ public final class VirtualPackageQuerySelfTest {
         require(metadata.sharedLibraries().contains("org.apache.http.legacy"),
                 "shared library metadata is exposed");
 
+        application.nativeLibraryDir = "/data/app/guest.pkg/lib";
         VirtualPackageMetadata extended = new VirtualPackageMetadata("guest.pkg",
                 "guest.pkg.ViewActivity", application, metadata.components(), "2.3", 23L,
                 repeat('a'), 100L, 200L, "com.warden.virtualinstaller",
@@ -104,7 +105,9 @@ public final class VirtualPackageQuerySelfTest {
                         new VirtualPackageMetadata.SharedLibrary("SDK", "guest.sdk", true, 12L,
                                 repeat('b'), true, "guest.provider")),
                 List.of(new VirtualPackageMetadata.Instrumentation(
-                        "guest.pkg.TestRunner", "guest.pkg", ":test", true, false, true)),
+                                "guest.pkg.TestRunner", "guest.pkg", ":test", true, false, true),
+                        new VirtualPackageMetadata.Instrumentation(
+                                "guest.pkg.DisabledRunner", "guest.pkg", ":test", true, false, false)),
                 List.of("android.permission.INTERNET"), true);
         PackageInfo instrumented = extended.packageInfo(0x00000010L);
         require(instrumented.instrumentation != null && instrumented.instrumentation.length == 1,
@@ -119,6 +122,28 @@ public final class VirtualPackageQuerySelfTest {
                 "queryInstrumentation target filtering");
         require(extended.queryInstrumentation("other.pkg", 0L).isEmpty(),
                 "queryInstrumentation isolates target package");
+
+        // Verify disabled runner visibility rules
+        ComponentName disabledRunner = new ComponentName("guest.pkg", "guest.pkg.DisabledRunner");
+        require(extended.instrumentationInfo(disabledRunner, 0L) == null,
+                "disabled runner hidden by default");
+        require(extended.instrumentationInfo(disabledRunner, VirtualPackageMetadata.MATCH_DISABLED_COMPONENTS) != null,
+                "disabled runner visible with MATCH_DISABLED_COMPONENTS");
+
+        // Verify nativeLibraryDir is correctly mapped reflectively when present on platform InstrumentationInfo
+        android.content.pm.InstrumentationInfo runnerInfo = extended.instrumentationInfo(
+                new ComponentName("guest.pkg", "guest.pkg.TestRunner"), 0L);
+        try {
+            java.lang.reflect.Field field = android.content.pm.InstrumentationInfo.class.getDeclaredField("nativeLibraryDir");
+            field.setAccessible(true);
+            String libDir = (String) field.get(runnerInfo);
+            require("/data/app/guest.pkg/lib".equals(libDir), "nativeLibraryDir matches");
+        } catch (NoSuchFieldException expectedOnPublicSdkStub) {
+            // InstrumentationInfo.nativeLibraryDir is @hide on public SDK stubs
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         require(extended.resolvedSharedLibraryNames().equals(
                         List.of("org.apache.http.legacy", "guest.sdk")),
                 "resolved shared library names retained");
