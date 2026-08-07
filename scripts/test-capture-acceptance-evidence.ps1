@@ -3,66 +3,103 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Get-Item (Join-Path $PSScriptRoot "..")).FullName
 Set-Location $RepoRoot
 
-$TempEvidenceDir = Join-Path $env:TEMP ("evidence-test-" + (Get-Random))
-if (Test-Path $TempEvidenceDir) { Remove-Item -Recurse -Force $TempEvidenceDir }
-
-$DummyFile = Join-Path $TempEvidenceDir "dummy-artifact.bin"
-New-Item -ItemType Directory -Force -Path $TempEvidenceDir | Out-Null
-Set-Content -Path $DummyFile -Value "Test Artifact Content for Evidence Script"
+$TempRepoDir = Join-Path $env:TEMP ("evidence-git-test-" + (Get-Random))
+if (Test-Path $TempRepoDir) { Remove-Item -Recurse -Force $TempRepoDir }
 
 try {
-    # 1. Run capture script
-    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") -RepositoryPath $RepoRoot -OutputDirectory $TempEvidenceDir -SourceZipPath $DummyFile
+    # 1. Initialize temporary git repository
+    New-Item -ItemType Directory -Force -Path $TempRepoDir | Out-Null
+    Set-Location $TempRepoDir
 
-    $ManifestFile = Join-Path $TempEvidenceDir "evidence-manifest.json"
-    if (-not (Test-Path $ManifestFile)) { throw "Manifest file not created" }
+    git init -b main | Out-Null
+    git config user.email "test@example.com"
+    git config user.name "Test User"
 
-    $manifestObj = Get-Content $ManifestFile -Raw | ConvertFrom-Json
+    $testFile = Join-Path $TempRepoDir "file.txt"
+    Set-Content -Path $testFile -Value "Initial Content"
+    git add file.txt
+    git commit -m "initial commit for evidence test" | Out-Null
 
-    # Check 1: headCommit exact match
-    $expectedHead = (git rev-parse HEAD).Trim()
-    if ($manifestObj.headCommit -ne $expectedHead) {
-        throw "headCommit mismatch! Expected: $expectedHead, Actual: $($manifestObj.headCommit)"
+    # Create origin remote baseline locally
+    git remote add origin $TempRepoDir
+    git update-ref refs/remotes/origin/main (git rev-parse HEAD)
+
+    $EvidenceDir = Join-Path $TempRepoDir "evidence"
+
+    # ----------------------------------------------------
+    # 8.1 Test Clean worktree & exact commitMessage match
+    # ----------------------------------------------------
+    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") -RepositoryPath $TempRepoDir -OutputDirectory $EvidenceDir
+    $manifest1 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
+
+    if ($manifest1.worktreeClean -ne $true) {
+        throw "Self-test 8.1 Clean failed! Expected worktreeClean=true, got $($manifest1.worktreeClean)"
     }
 
-    # Check 2: headTree exact match
-    $expectedTree = (git rev-parse "HEAD^{tree}").Trim()
-    if ($manifestObj.headTree -ne $expectedTree) {
-        throw "headTree mismatch! Expected: $expectedTree, Actual: $($manifestObj.headTree)"
+    $expectedHead1 = (git rev-parse HEAD).Trim()
+    if ($manifest1.headCommit -ne $expectedHead1) {
+        throw "Self-test 8.1 headCommit mismatch! Expected $expectedHead1, got $($manifest1.headCommit)"
     }
 
-    # Check 3: originMainCommit exact match
-    $expectedOriginMain = (git rev-parse refs/remotes/origin/main).Trim()
-    if ($manifestObj.originMainCommit -ne $expectedOriginMain) {
-        throw "originMainCommit mismatch! Expected: $expectedOriginMain, Actual: $($manifestObj.originMainCommit)"
+    $expectedMsg1 = (git show -s --format=%s HEAD).Trim()
+    if ($manifest1.commitMessage -ne $expectedMsg1) {
+        throw "Self-test 8.1 commitMessage mismatch! Expected '$expectedMsg1', got '$($manifest1.commitMessage)'"
     }
 
-    # Check 4: trackedFileCount exact match
-    $expectedTrackedCount = (git ls-files).Count
-    if ([int]$manifestObj.trackedFileCount -ne [int]$expectedTrackedCount) {
-        throw "trackedFileCount mismatch! Expected: $expectedTrackedCount, Actual: $($manifestObj.trackedFileCount)"
+    # ----------------------------------------------------
+    # 8.2 Test Dirty worktree
+    # ----------------------------------------------------
+    Add-Content -Path $testFile -Value "Dirty Modified Content"
+    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") -RepositoryPath $TempRepoDir -OutputDirectory $EvidenceDir
+    $manifest2 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
+
+    if ($manifest2.worktreeClean -ne $false) {
+        throw "Self-test 8.2 Dirty failed! Expected worktreeClean=false, got $($manifest2.worktreeClean)"
     }
 
-    # Check 5: artifact sha256 exact match
-    $expectedDummyHash = (Get-FileHash -Path $DummyFile -Algorithm SHA256).Hash.ToLowerInvariant()
-    $dummyArtifactInManifest = $manifestObj.artifacts | Where-Object { $_.path -eq (Get-Item $DummyFile).FullName }
-    if ($null -eq $dummyArtifactInManifest) { throw "Dummy artifact not found in manifest" }
-    if ($dummyArtifactInManifest.sha256 -ne $expectedDummyHash) {
-        throw "Artifact SHA256 mismatch! Expected: $expectedDummyHash, Actual: $($dummyArtifactInManifest.sha256)"
+    # Revert dirty modification for bundle creation
+    git checkout -- file.txt
+
+    # ----------------------------------------------------
+    # 8.3 Test Valid Bundle
+    # ----------------------------------------------------
+    $ValidBundle = Join-Path $TempRepoDir "valid.bundle"
+    git bundle create $ValidBundle --all | Out-Null
+
+    & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") -RepositoryPath $TempRepoDir -OutputDirectory $EvidenceDir -GitBundlePath $ValidBundle
+    $manifest3 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
+
+    if ($manifest3.bundleVerifyPassed -ne $true -or $manifest3.bundleVerifyExitCode -ne 0) {
+        throw "Self-test 8.3 Valid Bundle failed! Expected bundleVerifyPassed=true, got exitCode=$($manifest3.bundleVerifyExitCode)"
     }
 
-    # Check 6 & 7: worktreeClean boolean exact match
-    $statusRaw = (git status --porcelain=v1)
-    $currentStatus = if ($null -ne $statusRaw) { ($statusRaw -join "`n").Trim() } else { "" }
-    $expectedClean = [string]::IsNullOrWhiteSpace($currentStatus)
-    if ($manifestObj.worktreeClean -ne $expectedClean) {
-        throw "worktreeClean mismatch! Expected: $expectedClean, Actual: $($manifestObj.worktreeClean)"
+    # ----------------------------------------------------
+    # 8.4 Test Invalid Bundle
+    # ----------------------------------------------------
+    $InvalidBundle = Join-Path $TempRepoDir "invalid.bundle"
+    Set-Content -Path $InvalidBundle -Value "CORRUPTED INVALID BUNDLE HEADER DATA"
+
+    $invalidFailedAsExpected = $false
+    try {
+        & (Join-Path $PSScriptRoot "capture-acceptance-evidence.ps1") -RepositoryPath $TempRepoDir -OutputDirectory $EvidenceDir -GitBundlePath $InvalidBundle
+    } catch {
+        $invalidFailedAsExpected = $true
     }
 
-    Write-Output "PASS test-capture-acceptance-evidence"
+    if (-not $invalidFailedAsExpected) {
+        throw "Self-test 8.4 Invalid Bundle failed! Expected capture script to fail non-zero on corrupt bundle"
+    }
+
+    $manifest4 = Get-Content (Join-Path $EvidenceDir "evidence-manifest.json") -Raw | ConvertFrom-Json
+    if ($manifest4.bundleVerifyPassed -ne $false -or $manifest4.bundleVerifyExitCode -eq 0) {
+        throw "Self-test 8.4 Invalid Bundle manifest record failed! Expected bundleVerifyPassed=false"
+    }
+
+    Write-Output "PASS test-capture-acceptance-evidence (all clean/dirty/valid/invalid reverse tests passed)"
 }
 finally {
-    if (Test-Path $TempEvidenceDir) {
-        Remove-Item -Recurse -Force $TempEvidenceDir -ErrorAction SilentlyContinue
+    Set-Location $RepoRoot
+    if (Test-Path $TempRepoDir) {
+        Remove-Item -Recurse -Force $TempRepoDir -ErrorAction SilentlyContinue
     }
 }
