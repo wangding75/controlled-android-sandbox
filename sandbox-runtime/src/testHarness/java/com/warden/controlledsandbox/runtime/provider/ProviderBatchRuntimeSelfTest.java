@@ -30,7 +30,70 @@ public final class ProviderBatchRuntimeSelfTest {
         concurrentBatches();
         resultValidation();
         assertionWithProjectionFails();
+        assertionWithValuesMatchingPasses();
+        assertionWithValuesMismatchFails();
+        assertionWithValuesAndExpectedCountPasses();
+        assertionWithSelectionArgsAndValues();
+        assertionWithNoValuesOnlyCount();
         System.out.println("PASS ProviderBatchRuntimeSelfTest");
+    }
+
+    private static void assertionWithValuesMatchingPasses() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), -1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion matching values status");
+    }
+
+    private static void assertionWithValuesMismatchFails() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("FAILED"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), -1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        try {
+            ProviderBatchRuntime.execute(provider, batch);
+            throw new AssertionError("Expected BatchException for mismatched assertion values");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require("PROVIDER_BATCH_APPLICATION_FAILED".equals(error.getMessage()), "error message for mismatch");
+        }
+    }
+
+    private static void assertionWithValuesAndExpectedCountPasses() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), 1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion matching values and count status");
+    }
+
+    private static void assertionWithSelectionArgsAndValues() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", values("READY"), 1);
+        assertOp.putString(RuntimeKeys.PROVIDER_SELECTION, "_id=?");
+        ArrayList<String> args = new ArrayList<>();
+        args.add("1");
+        assertOp.putStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS, args);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion with selection args status");
+    }
+
+    private static void assertionWithNoValuesOnlyCount() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        provider.insert(Uri.parse("content://" + AUTHORITY + "/items"), cv("READY"));
+        Bundle assertOp = operation(ProviderBatchRuntime.ASSERT, "/items", null, 1);
+        Bundle request = request(assertOp);
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")), "assertion count only status");
     }
 
     private static void assertionWithProjectionFails() throws Exception {
@@ -184,6 +247,12 @@ public final class ProviderBatchRuntimeSelfTest {
         Bundle values = new Bundle();
         values.putString("value", value);
         return values;
+    }
+
+    private static ContentValues cv(String value) {
+        ContentValues cv = new ContentValues();
+        cv.put("value", value);
+        return cv;
     }
 
     private static void expectBatchFailure(int expectedIndex, CheckedRunnable action) throws Exception {

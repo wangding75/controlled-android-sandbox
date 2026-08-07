@@ -111,7 +111,10 @@ public final class GuestClassLoaderSelfTest {
             }).start();
         }
         latch.countDown();
-        try { done.await(); } catch (InterruptedException e) { throw new RuntimeException(e); }
+        try {
+            boolean completed = done.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            require(completed, "concurrent load same class timed out");
+        } catch (InterruptedException e) { throw new RuntimeException(e); }
         require(success.get() == threadCount, "concurrent load same class success");
     }
 
@@ -141,7 +144,10 @@ public final class GuestClassLoaderSelfTest {
             }).start();
         }
         latch.countDown();
-        try { done.await(); } catch (InterruptedException e) { throw new RuntimeException(e); }
+        try {
+            boolean completed = done.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            require(completed, "concurrent load different classes timed out");
+        } catch (InterruptedException e) { throw new RuntimeException(e); }
         require(success.get() == threadCount, "concurrent load different classes success");
     }
 

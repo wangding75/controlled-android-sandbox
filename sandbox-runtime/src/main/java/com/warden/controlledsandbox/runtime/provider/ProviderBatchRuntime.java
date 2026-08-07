@@ -211,6 +211,10 @@ public final class ProviderBatchRuntime {
                     if (projection != null && !projection.isEmpty()) {
                         throw new BatchException(operation.index(), "PROVIDER_BATCH_ASSERT_PROJECTION_UNSUPPORTED");
                     }
+                    Bundle values = wire.getBundle(RuntimeKeys.PROVIDER_VALUES);
+                    if (values != null && !values.isEmpty()) {
+                        builder.withValues(contentValues(values));
+                    }
                     applySelection(builder, wire);
                     int expected = wire.getInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT, -1);
                     if (expected >= 0) builder.withExpectedCount(expected);
@@ -266,6 +270,13 @@ public final class ProviderBatchRuntime {
         if (ASSERT.equals(type)) {
             int expected = operation.getInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT, -1);
             if (expected < -1) throw new BatchException(index, "PROVIDER_BATCH_EXPECTED_COUNT_INVALID");
+            Bundle values = operation.getBundle(RuntimeKeys.PROVIDER_VALUES);
+            if (values != null) {
+                try { contentValues(values); }
+                catch (IllegalArgumentException error) {
+                    throw new BatchException(index, "PROVIDER_BATCH_VALUES_INVALID", error);
+                }
+            }
         }
         if (CALL.equals(type)) {
             String method = operation.getString(RuntimeKeys.PROVIDER_METHOD, "");
