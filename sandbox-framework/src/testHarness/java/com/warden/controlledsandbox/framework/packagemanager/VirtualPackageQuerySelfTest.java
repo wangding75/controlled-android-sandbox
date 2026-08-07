@@ -94,6 +94,7 @@ public final class VirtualPackageQuerySelfTest {
         require(metadata.sharedLibraries().contains("org.apache.http.legacy"),
                 "shared library metadata is exposed");
 
+        application.sourceDir = "/data/app/guest.pkg/base.apk";
         application.nativeLibraryDir = "/data/app/guest.pkg/lib";
         VirtualPackageMetadata extended = new VirtualPackageMetadata("guest.pkg",
                 "guest.pkg.ViewActivity", application, metadata.components(), "2.3", 23L,
@@ -130,19 +131,13 @@ public final class VirtualPackageQuerySelfTest {
         require(extended.instrumentationInfo(disabledRunner, VirtualPackageMetadata.MATCH_DISABLED_COMPONENTS) != null,
                 "disabled runner visible with MATCH_DISABLED_COMPONENTS");
 
-        // Verify nativeLibraryDir is correctly mapped reflectively when present on platform InstrumentationInfo
+        // Verify InstrumentationInfo public metadata fields
         android.content.pm.InstrumentationInfo runnerInfo = extended.instrumentationInfo(
                 new ComponentName("guest.pkg", "guest.pkg.TestRunner"), 0L);
-        try {
-            java.lang.reflect.Field field = android.content.pm.InstrumentationInfo.class.getDeclaredField("nativeLibraryDir");
-            field.setAccessible(true);
-            String libDir = (String) field.get(runnerInfo);
-            require("/data/app/guest.pkg/lib".equals(libDir), "nativeLibraryDir matches");
-        } catch (NoSuchFieldException expectedOnPublicSdkStub) {
-            // InstrumentationInfo.nativeLibraryDir is @hide on public SDK stubs
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        require(runnerInfo != null, "runnerInfo exists");
+        require("guest.pkg.TestRunner".equals(runnerInfo.name), "runnerInfo name");
+        require("guest.pkg".equals(runnerInfo.targetPackage), "runnerInfo targetPackage");
+        require("/data/app/guest.pkg/base.apk".equals(runnerInfo.sourceDir), "runnerInfo sourceDir");
 
         require(extended.resolvedSharedLibraryNames().equals(
                         List.of("org.apache.http.legacy", "guest.sdk")),

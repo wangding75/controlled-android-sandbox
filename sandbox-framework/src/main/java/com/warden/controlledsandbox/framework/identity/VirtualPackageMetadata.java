@@ -502,15 +502,6 @@ public final class VirtualPackageMetadata {
         info.sourceDir = applicationInfo.sourceDir;
         info.publicSourceDir = applicationInfo.publicSourceDir;
         info.dataDir = applicationInfo.dataDir;
-        try {
-            java.lang.reflect.Field field = InstrumentationInfo.class.getDeclaredField("nativeLibraryDir");
-            field.setAccessible(true);
-            field.set(info, applicationInfo.nativeLibraryDir);
-        } catch (NoSuchFieldException error) {
-            android.util.Log.w("VirtualPackageMetadata", "nativeLibraryDir field not found in InstrumentationInfo on this platform", error);
-        } catch (IllegalAccessException error) {
-            throw new IllegalStateException("Failed to set nativeLibraryDir on InstrumentationInfo", error);
-        }
         return info;
     }
 

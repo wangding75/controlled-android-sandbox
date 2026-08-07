@@ -327,6 +327,33 @@ run_java('com.warden.controlledsandbox.VirtualPrivilegedServicesStoreSelfTest', 
 run_java('com.warden.controlledsandbox.SandboxCatalogStateSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.RuntimePermissionWorkflowSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.VirtualPackageStateBuilderPolicySelfTest', assertions=True)
+def verify_anti_regression_rules():
+    prod_dirs = [root / m / 'src' / 'main' / 'java' for m in ['app', 'sandbox-domain', 'sandbox-contract', 'sandbox-framework', 'sandbox-runtime']]
+    for pdir in prod_dirs:
+        if not pdir.exists(): continue
+        for java_file in pdir.rglob('*.java'):
+            content = java_file.read_text(encoding='utf-8')
+            rel_path = java_file.relative_to(root).as_posix()
+            if '.withProjection(' in content:
+                raise RuntimeError(f"Anti-regression failure: .withProjection( found in {rel_path}")
+            if 'getDeclaredField("nativeLibraryDir")' in content:
+                raise RuntimeError(f"Anti-regression failure: getDeclaredField('nativeLibraryDir') found in {rel_path}")
+            if 'InstrumentationInfo' in content and 'nativeLibraryDir' in content:
+                # Check for direct field access InstrumentationInfo.nativeLibraryDir
+                for line in content.splitlines():
+                    if 'InstrumentationInfo' in line and 'nativeLibraryDir' in line and not line.strip().startswith('//'):
+                        raise RuntimeError(f"Anti-regression failure: direct InstrumentationInfo.nativeLibraryDir access in {rel_path}: {line}")
+            if 'InstrumentationInfo' in content and 'enabled' in content:
+                for line in content.splitlines():
+                    if 'InstrumentationInfo' in line and 'enabled' in line and not line.strip().startswith('//'):
+                        raise RuntimeError(f"Anti-regression failure: direct InstrumentationInfo.enabled access in {rel_path}: {line}")
+            if rel_path.endswith('GuestClassLoader.java'):
+                if 'registerAsParallelCapable' in content:
+                    raise RuntimeError(f"Anti-regression failure: registerAsParallelCapable found in {rel_path}")
+                if 'Object[] locks' in content or 'locks[' in content:
+                    raise RuntimeError(f"Anti-regression failure: lock striping found in {rel_path}")
+
+verify_anti_regression_rules()
 run_java('com.warden.controlledsandbox.runtime.protocol.ApkRevisionVerifierSelfTest', assertions=False)
 run_java('com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifierSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.PackageInstallSessionStoreSelfTest', assertions=True)

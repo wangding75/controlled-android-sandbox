@@ -77,11 +77,18 @@ public final class GuestClassLoaderSelfTest {
             concurrentLoadSameClass(loader);
             concurrentLoadDifferentClasses(loader);
             repeatedLoad(loader);
+            verifyNoParallelOrLockStriping(loader);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
         loadNonExistentThrows(loader);
         System.out.println("PASS Guest class-loader host-boundary and detection policy self-test");
+    }
+
+    private static void verifyNoParallelOrLockStriping(GuestClassLoader loader) {
+        for (java.lang.reflect.Field field : GuestClassLoader.class.getDeclaredFields()) {
+            require(!field.getName().equals("locks"), "GuestClassLoader must not contain locks array");
+        }
     }
 
     private static void concurrentLoadSameClass(GuestClassLoader loader) {

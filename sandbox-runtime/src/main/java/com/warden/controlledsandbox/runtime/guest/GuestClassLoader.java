@@ -6,25 +6,12 @@ import dalvik.system.DexClassLoader;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Child-first loader for Guest code with explicit platform sharing and policy-driven host-internal denial. */
+/**
+ * Child-first loader for Guest code with explicit platform sharing and policy-driven host-internal denial.
+ * Note: This ClassLoader is intentionally NOT registered as parallel-capable and uses instance-level
+ * synchronization (synchronized (this)) to maintain consistent non-parallel ClassLoader monitor semantics.
+ */
 public final class GuestClassLoader extends DexClassLoader {
-    static {
-        try {
-            java.lang.reflect.Method method = ClassLoader.class.getDeclaredMethod("registerAsParallelCapable");
-            method.setAccessible(true);
-            method.invoke(null);
-        } catch (Throwable ignored) {
-            // Ignored on platforms where parallel class loading is not supported or not exposed.
-        }
-    }
-
-    private final Object[] locks = new Object[128];
-    {
-        for (int i = 0; i < locks.length; i++) {
-            locks[i] = new Object();
-        }
-    }
-
     private static final String SANDBOX_ROOT = "com.warden.controlledsandbox.";
     private static final List<String> HOST_INTERNAL_PREFIXES = List.of(
             SANDBOX_ROOT + "runtime.",
@@ -55,8 +42,7 @@ public final class GuestClassLoader extends DexClassLoader {
     }
 
     @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-        int index = (name.hashCode() & 0x7fffffff) % locks.length;
-        synchronized (locks[index]) {
+        synchronized (this) {
             if (isDeniedSandboxInternal(name) || isPrivilegedContract(name)) {
                 throw new ClassNotFoundException("Sandbox privileged implementation is not a Guest API: " + name);
             }
