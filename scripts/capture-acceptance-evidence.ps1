@@ -71,7 +71,10 @@ try {
 
     # Bundle verification
     if (-not [string]::IsNullOrWhiteSpace($GitBundlePath) -and (Test-Path $GitBundlePath)) {
+        $oldEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
         $bundleVerifyOut = (git bundle verify "$GitBundlePath" 2>&1) -join "`n"
+        $ErrorActionPreference = $oldEap
         Set-Content -Path (Join-Path $OutFull "bundle-verify.txt") -Value $bundleVerifyOut
     } else {
         Set-Content -Path (Join-Path $OutFull "bundle-verify.txt") -Value "N/A"
