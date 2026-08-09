@@ -8,6 +8,7 @@ import android.content.Context;
 public final class JobSchedulerHook {
     private JobSchedulerHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerField(context, "jobscheduler", "mBinder", identity);
+        return ReflectiveServiceHook.serviceManagerBinding("jobscheduler",
+                "android.app.job.IJobScheduler", identity);
     }
 }

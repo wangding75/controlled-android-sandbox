@@ -8,7 +8,7 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 public final class ClipboardManagerHook {
     private ClipboardManagerHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerFieldCandidates(context, "clipboard", "clipboard", identity,
-                "mService", "sService");
+        return ReflectiveServiceHook.serviceManagerBinding("clipboard",
+                "android.content.IClipboard", identity);
     }
 }

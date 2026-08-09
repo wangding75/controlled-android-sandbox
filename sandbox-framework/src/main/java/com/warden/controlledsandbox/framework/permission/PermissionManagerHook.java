@@ -8,6 +8,7 @@ import android.content.Context;
 public final class PermissionManagerHook {
     private PermissionManagerHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerField(context, "permission", "mPermissionManager", identity);
+        return ReflectiveServiceHook.serviceManagerBinding("permission",
+                "android.os.IPermissionController", identity);
     }
 }

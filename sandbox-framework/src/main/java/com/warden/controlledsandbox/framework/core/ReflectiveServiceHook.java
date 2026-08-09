@@ -6,6 +6,8 @@ import android.content.Context;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.lang.reflect.InvocationHandler;
+import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -26,6 +28,48 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         Object manager = context.getSystemService(serviceName);
         if (manager == null) throw new IllegalStateException("System service unavailable: " + serviceName);
         return replaceField(manager, fieldName, identity, serviceName);
+    }
+
+    /**
+     * Installs at the stable ServiceManager boundary for framework managers which deliberately
+     * retain no per-instance IInterface field.  The replacement accepts only the expected Binder
+     * descriptor and exposes the already-audited interface proxy through queryLocalInterface.
+     */
+    public static AutoCloseable serviceManagerBinding(String serviceName, String descriptor,
+                                                      GuestIdentity identity) throws Exception {
+        Class<?> managerClass = Class.forName("android.os.ServiceManager");
+        Method getService = managerClass.getDeclaredMethod("getService", String.class);
+        Object original = getService.invoke(null, serviceName);
+        if (!(original instanceof android.os.IBinder)) {
+            throw new IllegalStateException("ServiceManager binder unavailable: " + serviceName);
+        }
+        android.os.IBinder binder = (android.os.IBinder) original;
+        String actualDescriptor = String.valueOf(binder.getClass()
+                .getMethod("getInterfaceDescriptor").invoke(binder));
+        if (!descriptor.equals(actualDescriptor)) {
+            throw new IllegalStateException("Unexpected Binder descriptor for " + serviceName
+                    + ": " + actualDescriptor);
+        }
+        Class<?> stub = Class.forName(descriptor + "$Stub");
+        Object service = stub.getMethod("asInterface", android.os.IBinder.class).invoke(null, binder);
+        Object serviceProxy = createProxy(service, identity, serviceName);
+        InvocationHandler binderHandler = (proxy, method, args) -> {
+            if ("queryLocalInterface".equals(method.getName()) && args != null && args.length == 1
+                    && descriptor.equals(args[0])) return serviceProxy;
+            try { return method.invoke(binder, args); }
+            catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+        };
+        android.os.IBinder replacement = (android.os.IBinder) Proxy.newProxyInstance(
+                binder.getClass().getClassLoader() == null ? ReflectiveServiceHook.class.getClassLoader()
+                        : binder.getClass().getClassLoader(),
+                new Class<?>[] {android.os.IBinder.class}, binderHandler);
+        Field cacheField = findField(managerClass, "sCache");
+        cacheField.setAccessible(true);
+        Object cache = cacheField.get(null);
+        if (!(cache instanceof Map)) throw new IllegalStateException("ServiceManager cache unavailable");
+        @SuppressWarnings("unchecked") Map<String, Object> entries = (Map<String, Object>) cache;
+        Object previous = entries.put(serviceName, replacement);
+        return () -> { if (previous == null) entries.remove(serviceName); else entries.put(serviceName, previous); };
     }
 
     public static ReflectiveServiceHook managerFieldCandidates(
