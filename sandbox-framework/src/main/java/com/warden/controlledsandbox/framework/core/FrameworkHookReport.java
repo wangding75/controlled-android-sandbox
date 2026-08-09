@@ -37,7 +37,17 @@ public final class FrameworkHookReport {
     public void requireMandatoryReady() {
         Set<String> missing = mandatoryFailures();
         if (!missing.isEmpty()) {
-            throw new IllegalStateException("MANDATORY_FRAMEWORK_HOOKS_FAILED:" + String.join(",", missing));
+            StringBuilder detail = new StringBuilder();
+            for (Map.Entry<String, String> item : failures.entrySet()) {
+                String service = item.getKey();
+                if (!missing.contains(service)) continue;
+                if (detail.length() > 0) detail.append(";");
+                detail.append(service).append("=").append(item.getValue());
+            }
+            String compactDetail = detail.length() > 240
+                    ? detail.substring(0, 240) + "..." : detail.toString();
+            throw new IllegalStateException("MANDATORY_FRAMEWORK_HOOKS_FAILED:"
+                    + String.join(",", missing) + " details=" + compactDetail);
         }
     }
 

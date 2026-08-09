@@ -168,6 +168,10 @@ public final class FrameworkIdentityProxySelfTest {
     }
 
     private static void testHookReadinessPolicy() {
+        FrameworkSignatureAudit api35Assistant = FrameworkSignatureAudit.inspect(
+                FrameworkServiceSpec.activityTaskManager(), java.util.List.of(Api35AssistantApi.class));
+        require(api35Assistant.passed(), "API 35 eight-argument assistant activity signature is supported");
+
         java.util.Map<String, Boolean> allInstalled = new java.util.LinkedHashMap<>();
         for (String name : java.util.List.of("packageManager", "activityManager", "activityTaskManager",
                 "appOps", "permission", "notification", "jobScheduler", "alarm", "clipboard",
@@ -204,6 +208,12 @@ public final class FrameworkIdentityProxySelfTest {
         void attribution(FakeAttribution source);
         void wrappedAttribution(FakeAttributionContext source);
         String[] packages();
+    }
+
+    interface Api35AssistantApi {
+        void startAssistantActivity(String packageName, String featureId, int callingPid,
+                int callingUid, android.content.Intent intent, String resolvedType,
+                android.os.Bundle options, int userId);
     }
 
     static final class FakeService implements FakeApi {

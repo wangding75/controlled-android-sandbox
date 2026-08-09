@@ -265,8 +265,10 @@ public final class FrameworkHooks implements AutoCloseable {
                 installed.put(activityManager, false);
                 installed.put(activityTaskManager, false);
                 for (ProxyInstallReport item : controller.reports()) {
-                    String key = serviceKey(item.service());
-                    failures.put(key, failureDetail(item));
+                    if (!item.passed()) {
+                        String key = serviceKey(item.service());
+                        failures.put(key, failureDetail(item));
+                    }
                 }
                 failures.putIfAbsent(activityManager, "java.lang.IllegalStateException:atomic proxy pair failed");
                 failures.putIfAbsent(activityTaskManager, "java.lang.IllegalStateException:atomic proxy pair failed");

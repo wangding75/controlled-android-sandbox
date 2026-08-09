@@ -112,7 +112,10 @@ final class PackageServiceBinder extends IPackageService.Stub {
                 if (authoritative == null) {
                     throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_PACKAGE_NOT_INSTALLED");
                 }
-                if (!authoritative.sha256.equals(packageRevision)) {
+                String authoritativeRevision = com.warden.controlledsandbox.domain.session
+                        .PackageRevision.of(authoritative.versionCode, authoritative.sha256)
+                        .canonical();
+                if (!authoritativeRevision.equals(packageRevision)) {
                     throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_REVISION_MISMATCH");
                 }
                 NativeGuestExecutionPolicy.requireRuntimeAllowed(authoritative);

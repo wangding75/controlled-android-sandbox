@@ -84,6 +84,9 @@ public record FrameworkServiceSpec(
                         policy("startActivityWithConfig", 13, pkg(1)),
                         policy("startActivityAsCaller", 12, pkg(1)),
                         policy("startVoiceActivity", 12, pkg(0), uid(3)),
+                        // Android 35 removed the legacy assistant-session argument, reducing
+                        // this Binder method from nine parameters to eight.
+                        policy("startAssistantActivity", 8, pkg(0), uid(3)),
                         policy("startAssistantActivity", 9, pkg(0), uid(3)),
                         policy("startActivityFromGameSession", 8, pkg(1), uid(4)),
                         policy("moveTaskToFront", 5, pkg(1)),

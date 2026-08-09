@@ -423,7 +423,7 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         if (!active || Binder.getCallingUid() != ownerUid) {
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
         }
-        capabilityRegistry.requireRuntime(authorityCapability, authorityGeneration);
+        capabilityRegistry.requireRuntimeSession(authorityCapability, authorityGeneration);
     }
     private synchronized void closeInternal() {
         if (!active) return;

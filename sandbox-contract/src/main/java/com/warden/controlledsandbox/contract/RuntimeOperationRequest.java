@@ -27,7 +27,7 @@ public final class RuntimeOperationRequest implements Parcelable {
             return new RuntimeOperationRequest(
                     source.readInt(), source.readString(), source.readString(),
                     source.readString(), source.readInt(), source.readString(),
-                    source.readLong(), source.readParcelable(Bundle.class.getClassLoader()));
+                    source.readLong(), source.readParcelable(RuntimeOperationRequest.class.getClassLoader()));
         }
 
         @Override public RuntimeOperationRequest[] newArray(int size) {
@@ -76,7 +76,7 @@ public final class RuntimeOperationRequest implements Parcelable {
         this.virtualUserId = virtualUserId;
         this.sessionId = normalizedSession;
         this.generation = generation;
-        this.payload = payload == null ? new Bundle() : new Bundle(payload);
+        this.payload = copyPayload(payload);
     }
 
     public int protocolVersion() { return protocolVersion; }
@@ -86,7 +86,17 @@ public final class RuntimeOperationRequest implements Parcelable {
     public int virtualUserId() { return virtualUserId; }
     public String sessionId() { return sessionId; }
     public long generation() { return generation; }
-    public Bundle payload() { return new Bundle(payload); }
+    public Bundle payload() { return copyPayload(payload); }
+
+    /**
+     * Runtime-operation payloads cross Binder and may contain contract Parcelables.  A Bundle
+     * decoded with the boot loader cannot restore those classes in a secondary app process.
+     */
+    private static Bundle copyPayload(Bundle source) {
+        Bundle copy = source == null ? new Bundle() : new Bundle(source);
+        copy.setClassLoader(RuntimeOperationRequest.class.getClassLoader());
+        return copy;
+    }
 
     @Override public int describeContents() { return payload.describeContents(); }
 

@@ -2,8 +2,11 @@ package com.warden.controlledsandbox;
 
 import android.app.Activity;
 import android.content.pm.ApplicationInfo;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
@@ -16,6 +19,12 @@ import org.json.JSONObject;
 /** Debug-build-only ADB entrypoint for deterministic emulator gates. */
 public final class DebugCommandActivity extends Activity {
     private static final String TAG = "CS_COMMAND";
+    private static final String DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED =
+            "DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED";
+    private static final String FIXTURE_BASIC_PACKAGE =
+            "com.warden.controlledsandbox.fixture";
+    private static final String FIXTURE_32_PACKAGE =
+            "com.warden.controlledsandbox.fixture32";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     @Override protected void onCreate(Bundle state) {
@@ -23,29 +32,43 @@ public final class DebugCommandActivity extends Activity {
         String command = getIntent().getStringExtra("command");
         String packageName = getIntent().getStringExtra("package");
         int virtualUserId = getIntent().getIntExtra("user", 0);
-        worker.execute(() -> execute(command == null ? "" : command, packageName == null ? "" : packageName, virtualUserId));
+        Bundle extras = getIntent().getExtras();
+        boolean trustNativeGuest = extras != null && extras.getBoolean("trustNativeGuest", false);
+        worker.execute(() -> execute(command == null ? "" : command,
+                packageName == null ? "" : packageName, virtualUserId, trustNativeGuest));
     }
 
-    private void execute(String command, String packageName, int virtualUserId) {
+    private void execute(String command, String packageName, int virtualUserId,
+                         boolean trustNativeGuest) {
         JSONObject result = new JSONObject();
         RuntimeClient runtime = null;
         PackageServiceClient packages = null;
         try {
-            result.put("command", command).put("package", packageName).put("virtualUserId", virtualUserId).put("startedAt", System.currentTimeMillis());
+            result.put("command", command).put("package", packageName)
+                    .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
+                    .put("startedAt", System.currentTimeMillis());
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
+            if (trustNativeGuest && !isOfficialFixture(packageName)) {
+                throw new SecurityException(DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED);
+            }
             packages = new PackageServiceClient(this);
             SandboxRecord record = packages.findRecord(packageName);
             boolean importRequested = "import-launch".equals(command)
                     || "import-prepare".equals(command) || record == null;
             if (importRequested) {
                 ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
-                record = packages.importApkFile(new File(installed.sourceDir));
+                File source = new File(installed.sourceDir);
+                record = trustNativeGuest
+                        ? trustedNativeFixtureImport(packages, packageName, source)
+                        : packages.importApkFile(source);
             }
+            result.put("nativeGuestTrust", record.nativeGuestTrust);
             packages.ensureInstance(packageName, virtualUserId);
             runtime = new RuntimeClient(this);
             Bundle operation;
             if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
+                requireStatus("launch", operation, "LAUNCH_REQUESTED");
             } else if ("component-suite".equals(command)) {
                 Bundle serviceStart = runtime.startService(record, virtualUserId);
                 requireStatus("serviceStart", serviceStart, "SERVICE_STARTED");
@@ -92,6 +115,38 @@ public final class DebugCommandActivity extends Activity {
             if (packages != null) packages.close();
             writeResult(result);
             runOnUiThread(() -> { finish(); worker.shutdown(); });
+        }
+    }
+
+    private static boolean isOfficialFixture(String packageName) {
+        return FIXTURE_BASIC_PACKAGE.equals(packageName) || FIXTURE_32_PACKAGE.equals(packageName);
+    }
+
+    private static SandboxRecord trustedNativeFixtureImport(PackageServiceClient packages,
+                                                              String packageName, File source)
+            throws Exception {
+        int sessionId = -1;
+        try {
+            InstallSessionInfoSnapshot session = packages.createInstallSession(
+                    InstallSessionParamsSnapshot.trustedNativeFullInstall(packageName));
+            sessionId = session.sessionId();
+            packages.addInstallArtifact(sessionId, Uri.parse(source.toURI().toString()));
+            SandboxRecord record = packages.commitInstallSession(sessionId);
+            sessionId = -1;
+            if (!InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED.equals(
+                    record.nativeGuestTrust)) {
+                throw new IllegalStateException("DEBUG_NATIVE_TRUST_NOT_RECORDED");
+            }
+            return record;
+        } catch (Exception error) {
+            if (sessionId != -1) {
+                try {
+                    packages.abandonInstallSession(sessionId);
+                } catch (Exception abandonFailure) {
+                    error.addSuppressed(abandonFailure);
+                }
+            }
+            throw error;
         }
     }
 

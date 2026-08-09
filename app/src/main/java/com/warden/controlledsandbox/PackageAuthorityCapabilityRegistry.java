@@ -57,6 +57,17 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
                 "PACKAGE_RUNTIME_CAPABILITY_DENIED");
     }
 
+    /**
+     * Revalidates an already-issued guest system-service session.  The session itself is the
+     * unforgeable capability handed to the controlled guest process; its calls therefore retain
+     * the host UID check in {@link PackageVirtualSystemServiceSession} but cannot be pinned to
+     * the broker PID that originally opened it.
+     */
+    void requireRuntimeSession(IBinder capability, long clientEpochMarker) {
+        requireActive(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability, clientEpochMarker,
+                "PACKAGE_RUNTIME_CAPABILITY_DENIED");
+    }
+
     private synchronized void install(String role, IBinder capability,
             int ownerUid, int ownerPid) {
         requireCandidate(capability, ownerUid, ownerPid);
@@ -83,17 +94,23 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
 
     private synchronized void require(PackageCallerVerifier.VerifiedCaller caller,
             IBinder capability, long clientEpochMarker, String errorCode) {
-        if (clientEpochMarker != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH) {
-            throw new SecurityException("PACKAGE_AUTHORITY_CLIENT_EPOCH_FORBIDDEN:" + caller.role);
-        }
+        requireActive(caller.role, capability, clientEpochMarker, errorCode);
         Slot slot = slots.get(caller.role);
+        if (slot.ownerUid != caller.uid || slot.ownerPid != caller.pid) {
+            throw new SecurityException(errorCode + ":PROCESS_OWNER_MISMATCH:" + caller.role);
+        }
+    }
+
+    private synchronized void requireActive(String role, IBinder capability,
+            long clientEpochMarker, String errorCode) {
+        if (clientEpochMarker != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH) {
+            throw new SecurityException("PACKAGE_AUTHORITY_CLIENT_EPOCH_FORBIDDEN:" + role);
+        }
+        Slot slot = slots.get(role);
         if (slot == null || !slot.active || !slot.capability.equals(capability)
                 || !slot.capability.isBinderAlive()) {
             if (slot != null && !slot.capability.isBinderAlive()) retire(slot);
-            throw new SecurityException(errorCode + ":" + caller.role);
-        }
-        if (slot.ownerUid != caller.uid || slot.ownerPid != caller.pid) {
-            throw new SecurityException(errorCode + ":PROCESS_OWNER_MISMATCH:" + caller.role);
+            throw new SecurityException(errorCode + ":" + role);
         }
     }
 
