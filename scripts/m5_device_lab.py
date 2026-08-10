@@ -33,6 +33,7 @@ ENVIRONMENT_NOISE_PATTERNS = (
 )
 COMMAND_ATTEMPTS = 3
 COMMAND_RESTART_DELAY_SECONDS = 5.0
+PACKAGE_AUTHORITY_RETRY_DELAY_SECONDS = 15.0
 POST_INSTALL_STARTUP_DELAY_SECONDS = 15.0
 LAUNCH_LIFECYCLE_TIMEOUT_SECONDS = 20.0
 LAUNCH_STABILITY_DELAY_SECONDS = 4.0
@@ -594,7 +595,7 @@ class DeviceLab:
                     # Keep the already-started Host authority alive.  Restarting
                     # it here only repeats the bootstrap race; the Binder
                     # connector is already bounded and will retry in place.
-                    time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+                    time.sleep(PACKAGE_AUTHORITY_RETRY_DELAY_SECONDS)
                 else:
                     self.recover_stale_runtime()
             elif self.guest_smoke_active:

@@ -104,6 +104,7 @@ class DeviceLabUnitTest(unittest.TestCase):
     def test_command_recovery_is_bounded(self) -> None:
         self.assertEqual(3, lab.COMMAND_ATTEMPTS)
         self.assertGreater(lab.COMMAND_RESTART_DELAY_SECONDS, 0)
+        self.assertGreaterEqual(lab.PACKAGE_AUTHORITY_RETRY_DELAY_SECONDS, 15)
         self.assertGreaterEqual(lab.POST_INSTALL_STARTUP_DELAY_SECONDS, 15)
         self.assertGreater(lab.LAUNCH_LIFECYCLE_TIMEOUT_SECONDS, 0)
         self.assertGreater(lab.LAUNCH_STABILITY_DELAY_SECONDS, 0)
