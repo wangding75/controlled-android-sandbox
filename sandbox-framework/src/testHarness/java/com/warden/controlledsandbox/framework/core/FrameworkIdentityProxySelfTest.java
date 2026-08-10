@@ -171,6 +171,38 @@ public final class FrameworkIdentityProxySelfTest {
         FrameworkSignatureAudit api35Assistant = FrameworkSignatureAudit.inspect(
                 FrameworkServiceSpec.activityTaskManager(), java.util.List.of(Api35AssistantApi.class));
         require(api35Assistant.passed(), "API 35 eight-argument assistant activity signature is supported");
+        FrameworkSignatureAudit api32Caller = FrameworkSignatureAudit.inspect(
+                FrameworkServiceSpec.activityTaskManager(), java.util.List.of(Api32CallerApi.class));
+        require(api32Caller.passed(), "API 32 thirteen-argument caller signature is supported");
+        FrameworkSignatureAudit api35Caller = FrameworkSignatureAudit.inspect(
+                FrameworkServiceSpec.activityTaskManager(), java.util.List.of(Api35CallerApi.class));
+        require(api35Caller.passed(), "API 35 twelve-argument caller signature is supported");
+        FrameworkSignatureAudit unsupportedCaller = FrameworkSignatureAudit.inspect(
+                FrameworkServiceSpec.activityTaskManager(), java.util.List.of(UnsupportedCallerApi.class));
+        require(!unsupportedCaller.passed(), "unsupported ATM caller signature fails closed");
+        require("android.app.IActivityTaskManager".equals(
+                        FrameworkServiceSpec.activityTaskManager().expectedDescriptor()),
+                "ATM Binder descriptor contract is explicit");
+        try {
+            FrameworkProxyInstaller.validateBinderDescriptorForTest(
+                    new android.os.Binder() {
+                        @Override public String getInterfaceDescriptor() {
+                            return "android.app.IActivityTaskManager";
+                        }
+                    }, "android.app.IActivityTaskManager", "activity-task-manager");
+        } catch (Exception error) {
+            throw new AssertionError("valid ATM Binder descriptor rejected", error);
+        }
+        boolean invalidDescriptor = false;
+        try {
+            FrameworkProxyInstaller.validateBinderDescriptorForTest(
+                    new android.os.Binder() {
+                        @Override public String getInterfaceDescriptor() { return "wrong.descriptor"; }
+                    }, "android.app.IActivityTaskManager", "activity-task-manager");
+        } catch (Exception expected) {
+            invalidDescriptor = expected.getMessage().contains("Unexpected Binder descriptor");
+        }
+        require(invalidDescriptor, "invalid ATM Binder descriptor fails closed");
 
         java.util.Map<String, Boolean> allInstalled = new java.util.LinkedHashMap<>();
         for (String name : java.util.List.of("packageManager", "activityManager", "activityTaskManager",
@@ -214,6 +246,29 @@ public final class FrameworkIdentityProxySelfTest {
         void startAssistantActivity(String packageName, String featureId, int callingPid,
                 int callingUid, android.content.Intent intent, String resolvedType,
                 android.os.Bundle options, int userId);
+    }
+
+    interface Api32CallerApi {
+        void startActivityAsCaller(Object caller, String callingPackage,
+                android.content.Intent intent, String resolvedType, android.os.IBinder resultTo,
+                String resultWho, int requestCode, int flags, Object profilerInfo,
+                android.os.Bundle options, android.os.IBinder permissionToken,
+                boolean ignoreTargetSecurity, int userId);
+    }
+
+    interface Api35CallerApi {
+        void startActivityAsCaller(Object caller, String callingPackage,
+                android.content.Intent intent, String resolvedType, android.os.IBinder resultTo,
+                String resultWho, int requestCode, int flags, Object profilerInfo,
+                android.os.Bundle options, boolean ignoreTargetSecurity, int userId);
+    }
+
+    interface UnsupportedCallerApi {
+        void startActivityAsCaller(Object caller, String callingPackage,
+                android.content.Intent intent, String resolvedType, android.os.IBinder resultTo,
+                String resultWho, int requestCode, int flags, Object profilerInfo,
+                android.os.Bundle options, android.os.IBinder permissionToken,
+                boolean ignoreTargetSecurity, int userId, String unsupportedTail);
     }
 
     static final class FakeService implements FakeApi {

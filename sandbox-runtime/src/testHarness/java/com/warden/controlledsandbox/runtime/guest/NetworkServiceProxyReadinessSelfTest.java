@@ -18,14 +18,20 @@ public final class NetworkServiceProxyReadinessSelfTest {
         installed.put("connectivity", true);
         installed.put("dnsResolver", true);
         installed.put("vpn", true);
-        NetworkServiceProxyReadiness.require(installed, profile(VirtualLocationProfileSnapshot.MODE_STATIC));
+        NetworkServiceProxyReadiness.require(installed, profile(VirtualLocationProfileSnapshot.MODE_STATIC), true);
         installed.put("dnsResolver", false);
         boolean blocked = false;
         try { NetworkServiceProxyReadiness.require(installed,
-                profile(VirtualLocationProfileSnapshot.MODE_STATIC)); }
+                profile(VirtualLocationProfileSnapshot.MODE_STATIC), true); }
         catch (IllegalStateException expected) { blocked = expected.getMessage().contains("dnsResolver"); }
         require(blocked, "missing DNS resolver hook blocks launch");
         NetworkServiceProxyReadiness.require(Map.of(), profile(VirtualLocationProfileSnapshot.MODE_HOST));
+        boolean nativeBlocked = false;
+        installed.put("dnsResolver", true);
+        try { NetworkServiceProxyReadiness.require(installed,
+                profile(VirtualLocationProfileSnapshot.MODE_STATIC), false); }
+        catch (IllegalStateException expected) { nativeBlocked = expected.getMessage().contains("dnsResolver"); }
+        require(nativeBlocked, "missing native DNS boundary blocks launch");
         System.out.println("PASS M5-T10 network-service proxy readiness self-test");
     }
 

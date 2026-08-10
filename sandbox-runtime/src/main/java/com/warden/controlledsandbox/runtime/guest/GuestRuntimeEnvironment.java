@@ -27,6 +27,11 @@ import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualDnsProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNetworkSnapshot;
+import com.warden.controlledsandbox.contract.VirtualVpnProfileSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
@@ -85,6 +90,12 @@ public final class GuestRuntimeEnvironment {
             PackageManager processPackageManager = host.getPackageManager();
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager);
+            IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
+                    spec.virtualSystemServiceBinder);
+            if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
+            VirtualNetworkServiceProfileSnapshot nativeNetworkProfile =
+                    systemServiceSession.getNetworkServiceProfile();
+            if (nativeNetworkProfile == null) throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_MISSING");
             String nativeAbi = spec.nativeAbi;
             int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
             boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
@@ -92,7 +103,7 @@ public final class GuestRuntimeEnvironment {
                     virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
                     spec.nativeLibraryDir, true, new String[0], new String[0], new String[0], new String[0],
                     new String[0], new String[0],
-                    NativeNetworkIdentity.isolated(spec.packageName, spec.virtualUserId));
+                    nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
             boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
@@ -103,9 +114,6 @@ public final class GuestRuntimeEnvironment {
             }
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo());
-            IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
-                    spec.virtualSystemServiceBinder);
-            if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
                     new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             loader.configureDetection(virtualServices.compatibilityProfile().detection());
@@ -137,7 +145,7 @@ public final class GuestRuntimeEnvironment {
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
                             permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices,
                             spec.packageRevision),
-                    frameworkCallRouter);
+                    frameworkCallRouter, nativeHooksInstalled);
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());
             frameworkHooks.report().requireMandatoryReady();
@@ -155,7 +163,7 @@ public final class GuestRuntimeEnvironment {
             InteractionProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.interactionProfile());
             NetworkServiceProxyReadiness.require(frameworkHooks.report().installedServices(),
-                    virtualServices.networkServiceProfile());
+                    virtualServices.networkServiceProfile(), nativeHooksInstalled);
             ApplicationEnvironmentProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.applicationEnvironmentProfile());
             CompatibilityProxyReadiness.require(frameworkHooks.report().installedServices(),
@@ -295,6 +303,63 @@ public final class GuestRuntimeEnvironment {
         attach.setAccessible(true);
         attach.invoke(application, context);
         return application;
+    }
+
+    /** Projects only virtual network data into native policy; no host resolver identity is read. */
+    private static NativeNetworkIdentity nativeNetworkIdentity(
+            String packageName, int virtualUserId, VirtualNetworkServiceProfileSnapshot profile) {
+        if (profile == null) throw new IllegalArgumentException("network profile is required");
+        NativeNetworkIdentity fallback = NativeNetworkIdentity.isolated(packageName, virtualUserId);
+        VirtualNetworkSnapshot network = profile.connectivity().defaultNetwork();
+        if (network == null) return fallback;
+        String ipv4 = address(network.addresses(), false, fallback.ipv4Address());
+        String ipv6 = address(network.addresses(), true, fallback.ipv6Address());
+        String[] dns = profile.dns().servers().isEmpty()
+                ? network.dnsServers().toArray(new String[0])
+                : profile.dns().servers().toArray(new String[0]);
+        if (dns.length == 0 && !profile.vpn().dnsServers().isEmpty()) {
+            dns = profile.vpn().dnsServers().toArray(new String[0]);
+        }
+        String proxyHost = "";
+        int proxyPort = 0;
+        if (VirtualLocationProfileSnapshot.MODE_STATIC.equals(profile.proxy().mode())
+                && !profile.proxy().host().isEmpty()) {
+            proxyHost = profile.proxy().host();
+            proxyPort = profile.proxy().port();
+        }
+        String privateDns = VirtualDnsProfileSnapshot.PRIVATE_DNS_HOSTNAME.equals(
+                profile.dns().privateDnsMode()) ? profile.dns().privateDnsHostname() : "";
+        boolean vpnActive = VirtualVpnProfileSnapshot.CONNECTED.equals(profile.vpn().state());
+        return new NativeNetworkIdentity(
+                fallback.hostname(), nonEmpty(network.interfaceName(), fallback.interfaceName()),
+                ipv4, ipv6, proxyHost, proxyPort, true,
+                network.networkId() > 0 ? network.networkId() : fallback.networkId(),
+                transport(network.transport(), vpnActive), vpnActive, network.metered(),
+                network.validated(), network.mtu() >= 576 ? network.mtu() : fallback.mtu(),
+                privateDns, dns);
+    }
+
+    private static String address(java.util.List<String> values, boolean ipv6, String fallback) {
+        if (values != null) for (String value : values) {
+            String candidate = value == null ? "" : value;
+            int slash = candidate.indexOf('/');
+            if (slash >= 0) candidate = candidate.substring(0, slash);
+            if ((candidate.indexOf(':') >= 0) == ipv6) return candidate;
+        }
+        return fallback;
+    }
+
+    private static String nonEmpty(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    private static String transport(String value, boolean vpnActive) {
+        if (vpnActive) return NativeNetworkIdentity.TRANSPORT_VPN;
+        return switch (value == null ? "" : value.toUpperCase(java.util.Locale.ROOT)) {
+            case VirtualNetworkSnapshot.CELLULAR -> NativeNetworkIdentity.TRANSPORT_CELLULAR;
+            case VirtualNetworkSnapshot.ETHERNET -> NativeNetworkIdentity.TRANSPORT_ETHERNET;
+            default -> NativeNetworkIdentity.TRANSPORT_WIFI;
+        };
     }
 
     private static String emptyToNull(String value) { return value == null || value.trim().isEmpty() ? null : value; }

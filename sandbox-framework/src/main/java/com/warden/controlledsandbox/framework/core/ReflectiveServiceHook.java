@@ -101,6 +101,19 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         return new ServiceManagerBinding(entries, androidServiceName, previous, replacement);
     }
 
+    /** Audits a platform ServiceManager Binder without requiring the hidden AIDL Stub class. */
+    public static void validateServiceManagerDescriptor(
+            String androidServiceName, String expectedDescriptor) throws Exception {
+        Class<?> managerClass = Class.forName("android.os.ServiceManager");
+        Method getService = managerClass.getDeclaredMethod("getService", String.class);
+        getService.setAccessible(true);
+        Object value = getService.invoke(null, androidServiceName);
+        if (!(value instanceof android.os.IBinder binder)) {
+            throw new IllegalStateException("ServiceManager binder unavailable: " + androidServiceName);
+        }
+        validateBinderDescriptor(binder, expectedDescriptor, androidServiceName);
+    }
+
     /**
      * Installs a local, descriptor-bound Binder only when every requested platform service is
      * absent.  This is the controlled boundary for radio-less images: a missing host service is
@@ -389,6 +402,26 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             catch (Throwable error) { failures.add(error); }
         }
         IllegalStateException failure = new IllegalStateException("No supported Binder field for " + serviceName);
+        for (Throwable error : failures) failure.addSuppressed(error);
+        throw failure;
+    }
+
+    /** API-compatible variant which refuses a resolver field with the wrong Binder contract. */
+    public static ReflectiveServiceHook staticInstanceFieldCandidatesWithDescriptor(
+            String ownerClassName, String getterMethod, GuestIdentity identity,
+            String serviceName, String expectedDescriptor, String... fieldPaths) throws Exception {
+        Class<?> owner = Class.forName(ownerClassName);
+        Method getter = owner.getDeclaredMethod(getterMethod);
+        getter.setAccessible(true);
+        Object instance = getter.invoke(null);
+        if (instance == null) throw new IllegalStateException(ownerClassName + "." + getterMethod + " returned null");
+        java.util.ArrayList<Throwable> failures = new java.util.ArrayList<>();
+        for (String path : fieldPaths) {
+            try {
+                return replacePath(instance, path, identity, serviceName, expectedDescriptor);
+            } catch (Throwable error) { failures.add(error); }
+        }
+        IllegalStateException failure = new IllegalStateException("No descriptor-validated Binder field for " + serviceName);
         for (Throwable error : failures) failure.addSuppressed(error);
         throw failure;
     }

@@ -61,6 +61,8 @@ public final class FrameworkProxyInstaller {
                 }
             }
 
+            validateBinderDescriptor(delegate, spec.expectedDescriptor(), spec.serviceName());
+
             // Collection.toArray(IntFunction) was added in Android API 33. The array overload is
             // API 1 and has the same component-type, null, order, and duplicate semantics here.
             Class<?>[] interfaces = collectInterfaces(delegate.getClass()).toArray(new Class<?>[0]);
@@ -205,6 +207,50 @@ public final class FrameworkProxyInstaller {
             }
         }
         return ClassLoader.getSystemClassLoader();
+    }
+
+    static void validateBinderDescriptorForTest(
+            android.os.IBinder binder, String expectedDescriptor, String serviceName) {
+        validateBinderDescriptor(binder, expectedDescriptor, serviceName);
+    }
+
+    private static void validateBinderDescriptor(
+            Object delegate, String expectedDescriptor, String serviceName) {
+        if (expectedDescriptor == null || expectedDescriptor.isEmpty()) return;
+        Method asBinder;
+        try {
+            asBinder = delegate.getClass().getMethod("asBinder");
+        } catch (NoSuchMethodException error) {
+            // Host-side self-tests use plain interface doubles. Real platform AIDL delegates
+            // implement IInterface, so an actual Binder-shaped delegate remains fail-closed.
+            if (!(delegate instanceof android.os.IInterface)) return;
+            throw new IllegalStateException("Framework delegate has no Binder contract: " + serviceName, error);
+        }
+        Object binder;
+        try {
+            binder = asBinder.invoke(delegate);
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException("Framework delegate Binder lookup failed: " + serviceName, error);
+        }
+        if (!(binder instanceof android.os.IBinder)) {
+            throw new IllegalStateException("Framework delegate returned no Binder: " + serviceName);
+        }
+        validateBinderDescriptor((android.os.IBinder) binder, expectedDescriptor, serviceName);
+    }
+
+    private static void validateBinderDescriptor(
+            android.os.IBinder binder, String expectedDescriptor, String serviceName) {
+        if (binder == null) throw new IllegalStateException("Framework Binder is null: " + serviceName);
+        String actual;
+        try {
+            actual = binder.getInterfaceDescriptor();
+        } catch (Throwable error) {
+            throw new IllegalStateException("Framework Binder descriptor lookup failed: " + serviceName, error);
+        }
+        if (!expectedDescriptor.equals(actual)) {
+            throw new IllegalStateException("Unexpected Binder descriptor for " + serviceName
+                    + ": " + actual + " expected=" + expectedDescriptor);
+        }
     }
 
     public record InstallOutcome(ProxyInstallReport report, InstalledFrameworkProxy installedProxy) {

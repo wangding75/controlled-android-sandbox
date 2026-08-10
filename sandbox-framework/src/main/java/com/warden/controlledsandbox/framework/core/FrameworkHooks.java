@@ -101,6 +101,19 @@ public final class FrameworkHooks implements AutoCloseable {
     public static FrameworkHooks install(
             Context guestContext, Context hostServiceContext, PackageManager packageManager,
             GuestIdentity identity, FrameworkCallInterceptor callInterceptor) {
+        return install(guestContext, hostServiceContext, packageManager, identity,
+                callInterceptor, false);
+    }
+
+    /**
+     * Installs framework hooks after the process-native boundary is established.  API 35's
+     * DnsResolver is a Java/native facade rather than a ServiceManager Binder, so the resolver
+     * installer must be told whether that real native boundary is active.
+     */
+    public static FrameworkHooks install(
+            Context guestContext, Context hostServiceContext, PackageManager packageManager,
+            GuestIdentity identity, FrameworkCallInterceptor callInterceptor,
+            boolean nativeHooksInstalled) {
         List<AutoCloseable> hooks = new ArrayList<>();
         hooks.add(identity.virtualServices());
         hooks.add(identity.interactions());
@@ -163,7 +176,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("connectivity", installed, failures, hooks,
                 () -> ConnectivityServiceHook.install(hostServiceContext, identity));
         attempt("dnsResolver", installed, failures, hooks,
-                () -> DnsResolverServiceHook.install(identity));
+                () -> DnsResolverServiceHook.install(identity, nativeHooksInstalled));
         attempt("vpn", installed, failures, hooks,
                 () -> VpnManagerServiceHook.install(hostServiceContext, identity));
         attempt("userManager", installed, failures, hooks,
@@ -279,6 +292,9 @@ public final class FrameworkHooks implements AutoCloseable {
             }
             installed.put(activityManager, true);
             installed.put(activityTaskManager, true);
+            android.util.Log.i("CS_FRAMEWORK", "ACTIVITY_FRAMEWORK_READY activityManager="
+                    + "android.app.IActivityManager activityTaskManager="
+                    + "android.app.IActivityTaskManager singleton/cache=validated");
             hooks.add(() -> { controller.rollbackAll(); });
         } catch (Throwable error) {
             try {

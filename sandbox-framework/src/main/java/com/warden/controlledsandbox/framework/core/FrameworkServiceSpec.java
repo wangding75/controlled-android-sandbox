@@ -32,6 +32,15 @@ public record FrameworkServiceSpec(
         return inboundPolicies.stream().anyMatch(policy -> policy.methodName().equals(methodName));
     }
 
+    /** Binder descriptors for the framework AIDL contracts installed by this specification. */
+    public String expectedDescriptor() {
+        return switch (serviceName) {
+            case "activity-manager" -> "android.app.IActivityManager";
+            case "activity-task-manager" -> "android.app.IActivityTaskManager";
+            default -> "";
+        };
+    }
+
     public static FrameworkServiceSpec activityManager() {
         return new FrameworkServiceSpec(
                 "activity-manager",
@@ -82,6 +91,8 @@ public record FrameworkServiceSpec(
                         policy("startActivityAndWait", 12, pkg(1)),
                         policy("startActivityWithConfig", 12, pkg(1)),
                         policy("startActivityWithConfig", 13, pkg(1)),
+                        // Android 12 retains the permissionToken argument; Android 35 removed it.
+                        policy("startActivityAsCaller", 13, pkg(1)),
                         policy("startActivityAsCaller", 12, pkg(1)),
                         policy("startVoiceActivity", 12, pkg(0), uid(3)),
                         // Android 35 removed the legacy assistant-session argument, reducing
