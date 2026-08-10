@@ -36,7 +36,10 @@ Java_com_warden_controlledsandbox_fixture_FixtureNative_nativeProbe(
     if (addresses != nullptr) freeaddrinfo(addresses);
     status += dns == 0 ? ";DNS_OK" : ";DNS_FAIL:" + std::to_string(dns);
 
-    void* self = dlopen(nullptr, RTLD_NOW);
+    // The Sandbox loader deliberately rejects dlopen(nullptr): exposing the
+    // main-program handle would bypass the guest library allowlist.  Probe the
+    // current, explicitly allowed Guest soname instead.
+    void* self = dlopen("libcontrolled_sandbox_fixture.so", RTLD_NOW | RTLD_LOCAL);
     status += self != nullptr ? ";DLOPEN_OK" : ";DLOPEN_FAIL";
     if (self != nullptr) dlclose(self);
     return env->NewStringUTF(status.c_str());
