@@ -18,6 +18,7 @@ public final class FrameworkProxySelfTest {
         testNonAllowlistedMethodUntouched();
         testDelegateExceptionUnwrapped();
         testAlreadyInstalled();
+        testInterfaceArrayConversionPreservesOrderAndDuplicates();
         testAttributionSourceChainRewrite();
         testSignaturePolicyDoesNotRewriteCoincidentalUid();
         testUnknownOverloadFailsInstallationAudit();
@@ -37,6 +38,10 @@ public final class FrameworkProxySelfTest {
 
         check(outcome.report().installed(), "proxy should install");
         check(outcome.installedProxy() != null, "install handle required");
+        check(outcome.report().interfaces().size() == 1,
+                "single-interface report must contain exactly one interface");
+        check(outcome.report().interfaces().get(0).equals(FakeService.class.getName()),
+                "single-interface report must preserve interface content");
         FakeService service = (FakeService) FakeOwner.SINGLETON.mInstance;
         String inbound = service.startActivity("guest.example", 11234, new String[] {"guest.example", "mime/type"});
         check(
@@ -90,6 +95,28 @@ public final class FrameworkProxySelfTest {
         FrameworkProxyInstaller.InstallOutcome second = installer.install(fakeSpec(), context(), ProxyTelemetry.NO_OP);
         check(second.report().alreadyInstalled(), "second install must be idempotent");
         rollback(first);
+    }
+
+    private static void testInterfaceArrayConversionPreservesOrderAndDuplicates() {
+        MultipleOwner.SINGLETON.mInstance = new MultipleServiceImpl();
+        FrameworkProxyInstaller.InstallOutcome outcome = new FrameworkProxyInstaller()
+                .install(fakeSpec(MultipleOwner.class), context(), ProxyTelemetry.NO_OP);
+        check(outcome.report().installed(), "multiple-interface proxy should install");
+
+        Class<?>[] interfaces = MultipleOwner.SINGLETON.mInstance.getClass().getInterfaces();
+        check(interfaces.length == 3, "interface conversion must retain unique interfaces");
+        check(interfaces[0] == MultipleService.class, "primary interface order must be preserved");
+        check(interfaces[1] == FakeService.class, "first inherited interface order must be preserved");
+        check(interfaces[2] == SecondaryService.class, "second inherited interface order must be preserved");
+        check(outcome.report().interfaces().size() == interfaces.length,
+                "reported interface count must match proxy interface count");
+        check(outcome.report().interfaces().contains(MultipleService.class.getName()),
+                "reported interfaces must contain the primary interface");
+        check(outcome.report().interfaces().contains(FakeService.class.getName()),
+                "reported interfaces must contain inherited interface");
+        check(outcome.report().interfaces().contains(SecondaryService.class.getName()),
+                "reported interfaces must contain secondary interface");
+        rollback(outcome);
     }
 
 
@@ -220,13 +247,19 @@ public final class FrameworkProxySelfTest {
         FrameworkProxyInstaller.InstallOutcome outcome = new FrameworkProxyInstaller()
                 .install(spec, context(), ProxyTelemetry.NO_OP);
         check(!outcome.report().passed(), "proxy without interfaces must fail closed");
+        check(outcome.report().interfaces().isEmpty(),
+                "empty-interface report must remain empty");
         check(!outcome.report().failure().isBlank(), "failure detail required");
     }
 
     private static FrameworkServiceSpec fakeSpec() {
+        return fakeSpec(FakeOwner.class);
+    }
+
+    private static FrameworkServiceSpec fakeSpec(Class<?> owner) {
         return new FrameworkServiceSpec(
                 "fake-activity",
-                FakeOwner.class.getName(),
+                owner.getName(),
                 "SINGLETON",
                 List.of(
                         MethodIdentityPolicy.of(
@@ -294,7 +327,7 @@ public final class FrameworkProxySelfTest {
         void fail(String packageName);
     }
 
-    public static final class FakeServiceImpl implements FakeService {
+    public static class FakeServiceImpl implements FakeService {
         @Override
         public String startActivity(String packageName, int uid, String[] packages) {
             return packageName + "|" + uid + "|" + String.join(",", packages);
@@ -328,6 +361,23 @@ public final class FrameworkProxySelfTest {
         @Override
         public void fail(String packageName) {
             throw new IllegalStateException(packageName);
+        }
+    }
+
+    public interface SecondaryService extends FakeService {
+    }
+
+    public interface MultipleService extends FakeService, SecondaryService {
+    }
+
+    public static final class MultipleServiceImpl extends FakeServiceImpl
+            implements MultipleService, FakeService {
+    }
+
+    public static final class MultipleOwner {
+        public static final FakeSingleton SINGLETON = new FakeSingleton();
+
+        private MultipleOwner() {
         }
     }
 

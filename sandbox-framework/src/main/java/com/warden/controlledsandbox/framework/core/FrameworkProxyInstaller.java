@@ -8,6 +8,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -55,23 +56,26 @@ public final class FrameworkProxyInstaller {
                         && existing.serviceName().equals(spec.serviceName())) {
                     ProxyInstallReport report = report(
                             spec, false, true, existing.delegate().getClass(),
-                            List.copyOf(collectInterfaces(existing.delegate().getClass())), "");
+                            immutableList(collectInterfaces(existing.delegate().getClass())), "");
                     return new InstallOutcome(report, null);
                 }
             }
 
-            Class<?>[] interfaces = collectInterfaces(delegate.getClass()).toArray(Class<?>[]::new);
+            // Collection.toArray(IntFunction) was added in Android API 33. The array overload is
+            // API 1 and has the same component-type, null, order, and duplicate semantics here.
+            Class<?>[] interfaces = collectInterfaces(delegate.getClass()).toArray(new Class<?>[0]);
             if (interfaces.length == 0) {
                 return failure(spec, "Delegate exposes no interfaces for dynamic proxy", delegate.getClass().getName());
             }
-            FrameworkSignatureAudit audit = FrameworkSignatureAudit.inspect(spec, List.of(interfaces));
+            List<Class<?>> interfaceList = immutableList(Arrays.asList(interfaces));
+            FrameworkSignatureAudit audit = FrameworkSignatureAudit.inspect(spec, interfaceList);
             if (!audit.passed()) {
                 return failure(
                         spec,
                         "Unsupported protected framework signatures: "
                                 + String.join(", ", audit.unsupportedProtectedSignatures()),
                         delegate.getClass().getName(),
-                        List.of(interfaces),
+                        interfaceList,
                         audit);
             }
             ClassLoader loader = chooseClassLoader(delegate.getClass(), interfaces);
@@ -83,7 +87,7 @@ public final class FrameworkProxyInstaller {
             InstalledFrameworkProxy installed = new InstalledFrameworkProxy(
                     spec, singleton, instanceField, delegate, proxy);
             ProxyInstallReport report = report(
-                    spec, true, false, delegate.getClass(), List.of(interfaces), "");
+                    spec, true, false, delegate.getClass(), interfaceList, "");
             return new InstallOutcome(report, installed);
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return failure(spec, exception.toString(), "");
@@ -95,8 +99,8 @@ public final class FrameworkProxyInstaller {
             String failure,
             String delegateClass) {
         return failure(
-                spec, failure, delegateClass, List.of(),
-                new FrameworkSignatureAudit(List.of(), List.of()));
+                spec, failure, delegateClass, Collections.emptyList(),
+                new FrameworkSignatureAudit(Collections.emptyList(), Collections.emptyList()));
     }
 
     private static InstallOutcome failure(
@@ -128,7 +132,20 @@ public final class FrameworkProxyInstaller {
     }
 
     private static List<String> interfaceNames(List<Class<?>> interfaces) {
-        return interfaces.stream().map(Class::getName).sorted().toList();
+        ArrayList<String> names = new ArrayList<>(interfaces.size());
+        for (Class<?> type : interfaces) {
+            names.add(type.getName());
+        }
+        Collections.sort(names);
+        return Collections.unmodifiableList(names);
+    }
+
+    private static <T> List<T> immutableList(Iterable<? extends T> values) {
+        ArrayList<T> copy = new ArrayList<>();
+        for (T value : values) {
+            copy.add(value);
+        }
+        return Collections.unmodifiableList(copy);
     }
 
     private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
