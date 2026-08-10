@@ -69,6 +69,19 @@ public final class GuestClassLoaderSelfTest {
         try { loader.loadClass("org.example.internal.RuntimeBridge"); }
         catch (ClassNotFoundException expected) { hidden = true; }
         require(hidden && loader.suspiciousQueryCount() == 2, "second policy-hidden class query");
+        GuestClassLoader fixtureLoader = new GuestClassLoader("", "", null,
+                GuestClassLoaderSelfTest.class.getClassLoader(),
+                "com.warden.controlledsandbox.fixture");
+        fixtureLoader.configureDetection(new VirtualDetectionPolicySnapshot(
+                VirtualLocationProfileSnapshot.MODE_STATIC, true, true, true, true, true, 2,
+                List.of(), List.of("com.warden.controlledsandbox"), List.of()));
+        try {
+            fixtureLoader.loadClass("com.warden.controlledsandbox.fixture.FixtureApplication");
+        } catch (ClassNotFoundException unexpected) {
+            throw new AssertionError("active Guest package must remain loadable", unexpected);
+        }
+        require(fixtureLoader.suspiciousQueryCount() == 0,
+                "active Guest package is exempt from Host namespace hiding");
         loader.configureDetection(new VirtualDetectionPolicySnapshot(
                 VirtualLocationProfileSnapshot.MODE_HOST, false, false, false, false, false, 0,
                 List.of(), List.of(), List.of()));

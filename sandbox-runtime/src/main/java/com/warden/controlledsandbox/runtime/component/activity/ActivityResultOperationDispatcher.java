@@ -100,7 +100,8 @@ final class ActivityResultOperationDispatcher {
 
     private ActivityResultResult drain(ActivityResultRequest request) {
         List<ActivityResultSnapshot> results = ledger.drainActivityResults(request.activityToken())
-                .stream().map(ActivityResultContractMapper::toContract).toList();
+                .stream().map(ActivityResultContractMapper::toContract)
+                .collect(java.util.stream.Collectors.toList());
         return ActivityResultResult.success(
                 RuntimeProtocol.CURRENT, request.requestId(), request.operation(),
                 !results.isEmpty(), -1, results);

@@ -54,6 +54,7 @@ final class ActivityTaskMutableTask {
                 packageName,
                 affinity,
                 documentTask,
-                activities.stream().map(ActivityTaskMutableActivity::snapshot).toList());
+                activities.stream().map(ActivityTaskMutableActivity::snapshot)
+                        .collect(java.util.stream.Collectors.toList()));
     }
 }

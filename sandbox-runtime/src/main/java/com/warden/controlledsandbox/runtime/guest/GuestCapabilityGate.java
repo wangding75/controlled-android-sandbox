@@ -34,6 +34,12 @@ final class GuestCapabilityGate {
                 + ":" + String.join("|", required));
     }
 
+    int checkPermission(String permission) {
+        return Boolean.TRUE.equals(effectivePermissions.get(permission))
+                ? android.content.pm.PackageManager.PERMISSION_GRANTED
+                : android.content.pm.PackageManager.PERMISSION_DENIED;
+    }
+
     private static Map<String, List<String>> requirements() {
         Map<String, List<String>> result = new LinkedHashMap<>();
         result.put("camera", List.of("android.permission.CAMERA"));

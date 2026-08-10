@@ -63,7 +63,9 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
     }
 
     synchronized void unbindHostActivity(IBinder frameworkToken) {
-        if (frameworkToken != null) hostBindings.remove(frameworkToken);
+        if (frameworkToken != null) {
+            hostBindings.remove(frameworkToken);
+        }
     }
 
     @Override public Interception intercept(String serviceName, Method method, Object[] arguments)

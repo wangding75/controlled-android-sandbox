@@ -466,7 +466,8 @@ public final class ActivityTaskLedger {
 
     /** Returns tasks in back-to-front order; the last entry is the foreground task. */
     public synchronized List<TaskSnapshot> snapshot() {
-        return tasks.values().stream().map(ActivityTaskMutableTask::snapshot).toList();
+        return tasks.values().stream().map(ActivityTaskMutableTask::snapshot)
+                .collect(java.util.stream.Collectors.toList());
     }
 
     public synchronized List<TaskQuerySnapshot> runningTasks(

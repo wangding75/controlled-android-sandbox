@@ -224,7 +224,8 @@ final class ApplicationEnvironmentInvocationInterceptor {
         }
         if (containsAny(name, "removealldynamicshortcuts")) {
             List<String> ids = authority.shortcuts().stream().filter(VirtualShortcutSnapshot::dynamic)
-                    .map(VirtualShortcutSnapshot::id).toList();
+                    .map(VirtualShortcutSnapshot::id)
+                    .collect(java.util.stream.Collectors.toList());
             authority.removeShortcuts(ids);
             return Decision.handled(successValue(method.getReturnType()));
         }
@@ -297,7 +298,8 @@ final class ApplicationEnvironmentInvocationInterceptor {
         if (containsAny(name, "getinstalledproviders", "getinstalledprovidersforprofile")) {
             if (!profile.exposeInstalledProviders()) return Decision.handled(emptyValue(method.getReturnType()));
             List<VirtualWidgetSnapshot> values = authority.appWidgets(-1).stream()
-                    .filter(VirtualWidgetSnapshot::bound).toList();
+                    .filter(VirtualWidgetSnapshot::bound)
+                    .collect(java.util.stream.Collectors.toList());
             return Decision.handled(FrameworkApplicationEnvironmentObjectFactory.collectionResult(
                     method.getReturnType(), values, (type, value) ->
                             FrameworkApplicationEnvironmentObjectFactory.appWidgetInfo(type,

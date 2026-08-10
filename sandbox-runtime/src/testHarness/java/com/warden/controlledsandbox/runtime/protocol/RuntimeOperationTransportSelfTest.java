@@ -11,6 +11,8 @@ import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import java.util.List;
 
 /** Regression evidence for the typed V2 runtime envelope and legacy Bundle adapter. */
 public final class RuntimeOperationTransportSelfTest {
@@ -26,6 +28,18 @@ public final class RuntimeOperationTransportSelfTest {
         payload.putString(RuntimeKeys.PACKAGE_NAME, "host.pkg");
         require("guest.pkg".equals(request.payload().getString(RuntimeKeys.PACKAGE_NAME)),
                 "request payload is defensive");
+        Bundle parcelablePayload = payload();
+        parcelablePayload.putParcelable(RuntimeKeys.PACKAGE_STATE,
+                new VirtualPackageStateSnapshot("guest.pkg", 2, "Guest", "1.0", 1L,
+                        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        "guest.pkg.MainActivity", "guest.pkg.GuestApplication", true,
+                        List.of(), List.of(), List.of()));
+        RuntimeOperationRequest parcelableRequest = RuntimeOperationTransport.request(
+                RuntimeOperationRequest.PREPARE_GUEST, parcelablePayload);
+        require(parcelableRequest.payload().getParcelable(RuntimeKeys.PACKAGE_STATE)
+                        instanceof VirtualPackageStateSnapshot,
+                "typed runtime payload restores contract Parcelable with contract loader");
 
         Bundle successPayload = new Bundle();
         successPayload.putString(RuntimeKeys.STATUS, "COMPONENT_INVOKED");

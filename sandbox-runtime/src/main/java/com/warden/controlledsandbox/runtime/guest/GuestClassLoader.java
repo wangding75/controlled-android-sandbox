@@ -23,10 +23,17 @@ public final class GuestClassLoader extends DexClassLoader {
     private volatile List<String> hiddenClassPrefixes = List.of();
     private volatile int maximumSuspiciousQueries;
     private final AtomicInteger suspiciousQueries = new AtomicInteger();
+    private final String guestPackageName;
 
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent) {
+        this(dexPath, optimizedDirectory, librarySearchPath, parent, "");
+    }
+
+    GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
+                     ClassLoader parent, String guestPackageName) {
         super(dexPath, optimizedDirectory, librarySearchPath, parent);
+        this.guestPackageName = normalizePackageName(guestPackageName);
     }
 
     void configureDetection(VirtualDetectionPolicySnapshot policy) {
@@ -68,6 +75,10 @@ public final class GuestClassLoader extends DexClassLoader {
 
     private boolean isPolicyHidden(String name) throws ClassNotFoundException {
         if (name == null || isParentFirst(name)) return false;
+        // The default profile hides the Host package namespace.  A Guest APK may intentionally
+        // use that namespace (the official fixtures do), so exempt only the active Guest package
+        // after the Host-internal boundary check in loadClass().
+        if (belongsToGuestPackage(name)) return false;
         for (String prefix : hiddenClassPrefixes) {
             if (!name.startsWith(prefix)) continue;
             int count = suspiciousQueries.incrementAndGet();
@@ -77,6 +88,11 @@ public final class GuestClassLoader extends DexClassLoader {
             return true;
         }
         return false;
+    }
+
+    private boolean belongsToGuestPackage(String name) {
+        return !guestPackageName.isEmpty()
+                && (name.equals(guestPackageName) || name.startsWith(guestPackageName + "."));
     }
 
     int suspiciousQueryCount() { return suspiciousQueries.get(); }
@@ -116,5 +132,9 @@ public final class GuestClassLoader extends DexClassLoader {
                 || name.startsWith("kotlin.") || name.startsWith("dalvik.")
                 || name.startsWith("sun.") || name.startsWith("com.android.")
                 || name.startsWith("com.warden.controlledsandbox.contract.");
+    }
+
+    private static String normalizePackageName(String value) {
+        return value == null ? "" : value.trim();
     }
 }

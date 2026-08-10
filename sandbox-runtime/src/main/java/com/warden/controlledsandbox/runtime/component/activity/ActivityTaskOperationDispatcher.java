@@ -125,7 +125,7 @@ final class ActivityTaskOperationDispatcher {
                 snapshot.baseComponentName(),
                 snapshot.topComponentName(),
                 snapshot.lastActiveSequence(),
-                snapshot.moveToFrontCount())).toList();
+                snapshot.moveToFrontCount())).collect(java.util.stream.Collectors.toList());
     }
 
     private static void verifySession(ActivityTaskRequest request, GuestSession session) {

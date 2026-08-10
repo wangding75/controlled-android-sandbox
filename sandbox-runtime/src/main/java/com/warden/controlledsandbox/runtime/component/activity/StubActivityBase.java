@@ -81,13 +81,16 @@ public abstract class StubActivityBase extends Activity {
                     if (hostStage >= 3) controller.resume();
                 } else {
                     session.unbindActivityTaskHost(frameworkActivityToken);
+                    frameworkActivityToken = null;
                     showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_CREATE_FAILED"),
                             result.getString(RuntimeKeys.ERROR_MESSAGE, "Unknown failure") + "\n\n" + result.getString("stack", ""));
                 }
             } catch (Throwable error) {
+                IBinder failedToken = frameworkActivityToken;
+                frameworkActivityToken = null;
                 try {
-                    if (guestSession != null && frameworkActivityToken != null) {
-                        guestSession.unbindActivityTaskHost(frameworkActivityToken);
+                    if (guestSession != null && failedToken != null) {
+                        guestSession.unbindActivityTaskHost(failedToken);
                     }
                 } finally {
                     com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
@@ -109,11 +112,13 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
     @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
     @Override protected void onDestroy() {
-        boolean brokerFinalized = guestSession != null && frameworkActivityToken != null
-                && guestSession.consumeActivityTaskFinalized(frameworkActivityToken);
+        IBinder destroyedToken = frameworkActivityToken;
+        frameworkActivityToken = null;
+        boolean brokerFinalized = guestSession != null && destroyedToken != null
+                && guestSession.consumeActivityTaskFinalized(destroyedToken);
         if (controller != null) controller.destroy(brokerFinalized);
-        if (guestSession != null && frameworkActivityToken != null) {
-            guestSession.unbindActivityTaskHost(frameworkActivityToken);
+        if (guestSession != null && destroyedToken != null) {
+            guestSession.unbindActivityTaskHost(destroyedToken);
         }
         super.onDestroy();
     }

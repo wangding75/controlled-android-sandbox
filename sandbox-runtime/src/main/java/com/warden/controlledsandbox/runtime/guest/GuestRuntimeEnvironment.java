@@ -85,7 +85,8 @@ public final class GuestRuntimeEnvironment {
                     + "/" + safe(spec.packageRevision) + "/" + spec.generation);
             ensureDirectory(optimized);
             GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
-                    emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader());
+                    emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader(),
+                    spec.packageName);
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
@@ -520,7 +521,11 @@ public final class GuestRuntimeEnvironment {
             out.putString(RuntimeKeys.STATUS, effectiveStatus);
             out.putString("frameworkReadiness", frameworkHooks.report().readiness().name());
             out.putInt("pid", Process.myPid());
-            out.putString("processName", Build.VERSION.SDK_INT >= 28 ? Application.getProcessName() : "pid-" + Process.myPid());
+            // PROCESS_NAME is the logical declared owner used by the Broker session key. Keep
+            // the actual Android hosting process in a separate diagnostic-only field so the
+            // guest status payload cannot rewrite that identity across Binder.
+            out.putString("androidProcessName", Build.VERSION.SDK_INT >= 28
+                    ? Application.getProcessName() : "pid-" + Process.myPid());
             out.putString("classLoader", classLoader.getClass().getName());
             out.putString("application", application.getClass().getName());
             out.putString("dataDir", context.getApplicationInfo().dataDir);
@@ -557,6 +562,9 @@ public final class GuestRuntimeEnvironment {
             out.putBoolean("nativeCrashRecorderInstalled", nativeCrashRecorderInstalled);
             out.putString("nativeCrashStatus", NativePolicy.crashStatus());
             out.putAll(RuntimeDiagnostics.snapshot());
+            // RuntimeDiagnostics also exposes a STATUS field; keep the guest-operation
+            // status authoritative for the broker transport after merging diagnostics.
+            out.putString(RuntimeKeys.STATUS, effectiveStatus);
             out.putAll(webViewProfile.toBundle());
             out.putString("nativePolicyLoadError", NativePolicy.loadError());
             out.putString("frameworkHookError", frameworkHooks.report().errorType() + ":" + frameworkHooks.report().errorMessage());

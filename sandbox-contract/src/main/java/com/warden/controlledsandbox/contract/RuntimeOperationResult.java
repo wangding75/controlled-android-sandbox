@@ -45,7 +45,7 @@ public final class RuntimeOperationResult implements Parcelable {
         this.successful = successful;
         this.status = ContractChecks.requiredText(status, "status", 128);
         this.error = error;
-        this.payload = payload == null ? new Bundle() : new Bundle(payload);
+        this.payload = copyPayload(payload);
     }
 
     public static RuntimeOperationResult success(RuntimeOperationRequest request,
@@ -66,7 +66,20 @@ public final class RuntimeOperationResult implements Parcelable {
     public boolean successful() { return successful; }
     public String status() { return status; }
     public SandboxError error() { return error; }
-    public Bundle payload() { return new Bundle(payload); }
+    public Bundle payload() { return copyPayload(payload); }
+
+    private static Bundle copyPayload(Bundle source) {
+        ClassLoader loader = RuntimeOperationResult.class.getClassLoader();
+        if (source == null) {
+            Bundle empty = new Bundle();
+            empty.setClassLoader(loader);
+            return empty;
+        }
+        source.setClassLoader(loader);
+        Bundle copy = new Bundle(source);
+        copy.setClassLoader(loader);
+        return copy;
+    }
 
     @Override public int describeContents() {
         return (error == null ? 0 : error.describeContents()) | payload.describeContents();

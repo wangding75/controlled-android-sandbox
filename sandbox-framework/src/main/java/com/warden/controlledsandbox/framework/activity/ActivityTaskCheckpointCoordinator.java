@@ -96,7 +96,7 @@ final class ActivityTaskCheckpointCoordinator {
                 transportDeliveries += activity.pendingNewIntents.size();
                 List<ActivityResultRegistration> registrations = activity.resultRegistrations.entrySet().stream()
                         .map(entry -> new ActivityResultRegistration(entry.getKey(), entry.getValue()))
-                        .toList();
+                        .collect(java.util.stream.Collectors.toList());
                 List<PendingActivityResultSnapshot> pendingLinks = activity.pendingResultLinks.stream()
                         .map(link -> new PendingActivityResultSnapshot(
                                 requireActivity(link.callerActivityToken()).stableId,
@@ -104,7 +104,7 @@ final class ActivityTaskCheckpointCoordinator {
                                 link.registryKey(),
                                 link.requestCode(),
                                 link.intentSenderToken()))
-                        .toList();
+                        .collect(java.util.stream.Collectors.toList());
                 activities.add(new ActivityRestoreSnapshot(
                         activity.identity,
                         activity.stableId,

@@ -125,6 +125,23 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         sharedState.systemServices.requireHookAvailable("packageManager", "getPackageManager");
         return packageManager;
     }
+    @Override public int checkPermission(String permission, int pid, int uid) {
+        return capabilityGate.checkPermission(permission);
+    }
+    @Override public int checkCallingPermission(String permission) {
+        return capabilityGate.checkPermission(permission);
+    }
+    @Override public int checkCallingOrSelfPermission(String permission) {
+        return capabilityGate.checkPermission(permission);
+    }
+    @Override public int checkSelfPermission(String permission) {
+        return capabilityGate.checkPermission(permission);
+    }
+    @Override public void enforcePermission(String permission, int pid, int uid, String message) {
+        if (checkPermission(permission, pid, uid) != PackageManager.PERMISSION_GRANTED) {
+            throw new SecurityException(message == null ? "Permission denied: " + permission : message);
+        }
+    }
     @Override public Object getSystemService(String name) {
         if (!sharedState.systemServices.isKnownService(name)) return null;
         capabilityGate.requireService(name);

@@ -18,7 +18,8 @@ public final class ActivityFieldBridge {
     private static final int MIN_API = 26;
     private static final int MAX_AUDITED_API = 36;
     private static final List<String> HOST_FIELDS = List.of(
-            "mWindow", "mWindowManager", "mToken", "mMainThread", "mInstrumentation", "mActivityInfo");
+            "mWindow", "mWindowManager", "mToken", "mMainThread", "mInstrumentation", "mActivityInfo",
+            "mFragments");
     private static final List<String> OPTIONAL_HOST_FIELDS = List.of("mCurrentConfig");
 
     private ActivityFieldBridge() { }

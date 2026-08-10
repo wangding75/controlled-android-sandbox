@@ -196,9 +196,24 @@ public final class GuestActivityController {
     }
 
     private void attachBaseContext(Activity activity) throws Exception {
-        Method attach = android.content.ContextWrapper.class.getDeclaredMethod("attachBaseContext", android.content.Context.class);
+        // Calling Activity.attachBaseContext on API 32 invokes the hidden Autofill client
+        // hand-off through ContextWrapper. GuestContext intentionally has no Host base, so that
+        // hand-off would dereference null. Temporarily provide only the Host transport for this
+        // framework attach operation, then restore the detached Guest Context boundary before any
+        // Guest lifecycle callback can observe it.
+        java.lang.reflect.Field base = android.content.ContextWrapper.class.getDeclaredField("mBase");
+        base.setAccessible(true);
+        android.content.Context hostContext = host.getBaseContext();
+        Method attach = android.app.Activity.class.getDeclaredMethod(
+                "attachBaseContext", android.content.Context.class);
         attach.setAccessible(true);
-        attach.invoke(activity, session.context());
+        attach.invoke(activity, hostContext);
+        // Activity.attachBaseContext has now initialized the framework-owned Activity state.
+        // Replace the base with the Guest Context. Its framework-only bridge supplies the
+        // Activity-owned theme/display queries without exposing the Host Context through
+        // GuestContext.getBaseContext().
+        base.set(session.context(), new com.warden.controlledsandbox.runtime.guest.GuestActivityBaseContext(hostContext));
+        base.set(activity, session.context());
     }
 
     private void invokeIfCreated(String name, Class<?>[] types, Object[] args) {

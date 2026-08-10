@@ -188,7 +188,7 @@ final class PrivilegedServicesInvocationInterceptor {
         }
         if (containsAny(name, "querynanoapps", "getnanoappinstanceinfo", "findnanoapp")) {
             List<String> ids = profile.hubs().stream().flatMap(value -> value.nanoAppIds().stream())
-                    .distinct().toList();
+                    .distinct().collect(java.util.stream.Collectors.toList());
             return Decision.handled(stringArrayOrList(method.getReturnType(), ids));
         }
         if (containsAny(name, "createclient", "creatependingintentclient")) {

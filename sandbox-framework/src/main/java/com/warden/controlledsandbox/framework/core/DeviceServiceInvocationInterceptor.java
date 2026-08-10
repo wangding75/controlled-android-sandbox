@@ -283,7 +283,8 @@ final class DeviceServiceInvocationInterceptor {
         int type = firstInt(arguments, -1);
         if (name.contains("getsensorlist") || name.contains("getfullsensorlist")) {
             List<VirtualSensorSnapshot> values = type <= 0 ? profile.sensors()
-                    : profile.sensors().stream().filter(sensor -> sensor.type() == type).toList();
+                    : profile.sensors().stream().filter(sensor -> sensor.type() == type)
+                            .collect(java.util.stream.Collectors.toList());
             return Decision.handled(FrameworkDeviceObjectFactory.list(method, values,
                     (targetType, value) -> FrameworkDeviceObjectFactory.sensor(
                             targetType, (VirtualSensorSnapshot) value)));

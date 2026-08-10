@@ -104,7 +104,6 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         return () -> Math.addExact(serviceCoordinator.recordCount(),
                 isolatedProcessCoordinator.serviceMetrics().recordCount());
     }
-
     @Override public void onCreate() {
         super.onCreate();
         guestConnections = new RuntimeGuestConnectionPool(this, this::handleGuestDisconnect);
@@ -125,7 +124,6 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             return RuntimeBrokerOperationAdapter.execute(RuntimeBrokerService.this, request);
         }
-
         @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
@@ -137,7 +135,6 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 return ActivityTaskContractFailure.from(request, error);
             }
         }
-
         @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             try {
@@ -182,6 +179,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
 
     @Override public Bundle launchActivity(Bundle request) {
         CallerGuard.requireRuntimePeer(RuntimeBrokerService.this); IsolatedProcessRoutePolicy.rejectOrdinaryRoute(request);
+        startService(new Intent(RuntimeBrokerService.this, RuntimeBrokerService.class));
         Bundle prepared = RuntimeBrokerService.this.prepareGuestInternal(request);
         if (!isPrepared(prepared)) return prepared;
         String issuedRouteToken = "";
@@ -189,7 +187,8 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             String packageName = prepared.getString(RuntimeKeys.PACKAGE_NAME, "");
             int userId = prepared.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
             String processName = processName(prepared, packageName);
-            GuestSession session = sessions.get(packageName, userId, processName);
+            GuestSession session = findSession(prepared.getString(RuntimeKeys.SESSION_ID, ""), prepared.getLong(RuntimeKeys.GENERATION, 0L));
+            if (session != null && (!session.packageName().equals(packageName) || session.virtualUserId() != userId || !session.processName().equals(processName))) return failure("SESSION_IDENTITY_MISMATCH", "Prepared session identity changed");
             if (session == null) return failure("SESSION_NOT_FOUND", "Prepared session disappeared");
             String component = request == null ? "" : request.getString(RuntimeKeys.COMPONENT_CLASS, "");
             if (component.trim().isEmpty()) component = prepared.getString(RuntimeKeys.COMPONENT_CLASS, "");
@@ -206,6 +205,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             startActivity(launch);
             Bundle out = sessionBundle(session, "LAUNCH_REQUESTED");
             out.putAll(transaction);
+            out.putString(RuntimeKeys.STATUS, "LAUNCH_REQUESTED");
             return out;
         } catch (Throwable error) {
             try {

@@ -93,8 +93,17 @@ public final class RuntimeOperationRequest implements Parcelable {
      * decoded with the boot loader cannot restore those classes in a secondary app process.
      */
     private static Bundle copyPayload(Bundle source) {
-        Bundle copy = source == null ? new Bundle() : new Bundle(source);
-        copy.setClassLoader(RuntimeOperationRequest.class.getClassLoader());
+        ClassLoader loader = RuntimeOperationRequest.class.getClassLoader();
+        if (source == null) {
+            Bundle empty = new Bundle();
+            empty.setClassLoader(loader);
+            return empty;
+        }
+        // On API 32 a Binder-restored Bundle may still carry the boot class loader.  Set the
+        // contract loader before copying; copying first can eagerly unparcel custom Parcelables.
+        source.setClassLoader(loader);
+        Bundle copy = new Bundle(source);
+        copy.setClassLoader(loader);
         return copy;
     }
 

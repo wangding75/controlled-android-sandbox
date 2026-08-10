@@ -25,6 +25,7 @@ abstract class GuestHostOperationDenyContext extends ContextWrapper {
      * allowlisted surface it intentionally exposes.
      */
     GuestHostOperationDenyContext() { super(null); }
+    GuestHostOperationDenyContext(Context base) { super(base); }
 
     @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
         throw deniedHostOperation("bindService");
