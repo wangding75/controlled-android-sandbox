@@ -412,6 +412,7 @@ run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCh
 run_java('com.warden.controlledsandbox.framework.core.FrameworkIdentityProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DeviceServiceBindingRegistrySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.ServiceManagerCompatibilitySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.service.AudioRoutingServiceHookSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest', assertions=True)
