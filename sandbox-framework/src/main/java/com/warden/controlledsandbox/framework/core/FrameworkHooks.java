@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.framework.service.SensorServiceHook;
 import com.warden.controlledsandbox.framework.service.WindowManagerHook;
 import com.warden.controlledsandbox.framework.service.ActivityClientHook;
 import com.warden.controlledsandbox.framework.service.InputMethodManagerHook;
+import com.warden.controlledsandbox.framework.service.InputManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.DisplayManagerHook;
 import com.warden.controlledsandbox.framework.service.ConnectivityServiceHook;
 import com.warden.controlledsandbox.framework.service.DnsResolverServiceHook;
@@ -59,6 +60,7 @@ import com.warden.controlledsandbox.framework.service.GraphicsStatsServiceHook;
 import com.warden.controlledsandbox.framework.service.ContextHubServiceHook;
 import com.warden.controlledsandbox.framework.service.PersistentDataBlockServiceHook;
 import com.warden.controlledsandbox.framework.service.SystemUpdateServiceHook;
+import com.warden.controlledsandbox.framework.service.CaptioningManagerHook;
 
 
 import android.content.Context;
@@ -126,10 +128,13 @@ public final class FrameworkHooks implements AutoCloseable {
         // Host service Context here avoids a deterministic bootstrap failure while still returning
         // the same process-local, proxied PackageManager to Guest code after readiness succeeds.
         attempt("packageManager", installed, failures, hooks,
-                () -> PackageManagerHook.install(packageManager, identity));
+                () -> PackageManagerHook.install(packageManager, identity,
+                        hostServiceContext.getApplicationContext().getPackageManager()));
         installActivityFrameworkPair(identity, callInterceptor, installed, failures, hooks);
         attempt("activityClient", installed, failures, hooks, () -> ActivityClientHook.install(identity));
         attempt("window", installed, failures, hooks, () -> WindowManagerHook.install(identity));
+        attempt("inputManager", installed, failures, hooks,
+                () -> InputManagerServiceHook.install(guestContext, identity));
         attempt("inputMethod", installed, failures, hooks,
                 () -> InputMethodManagerHook.install(hostServiceContext, identity));
         attempt("display", installed, failures, hooks,
@@ -158,8 +163,17 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> WebViewUpdateServiceHook.install(identity));
         attempt("deviceIdentifiers", installed, failures, hooks,
                 () -> DeviceIdentifiersServiceHook.install(identity));
-        attempt("googleServiceBroker", installed, failures, hooks,
-                () -> GoogleServiceBrokerHook.install(identity));
+        com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot googleProfile =
+                identity.virtualServices().compatibilityProfile().googleServices();
+        if (!com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot.MODE_HOST
+                .equals(googleProfile.mode()) && googleProfile.playServicesAvailable()) {
+            attempt("googleServiceBroker", installed, failures, hooks,
+                    () -> GoogleServiceBrokerHook.install(identity));
+        } else {
+            android.util.Log.i("CS_GMS_PROXY", "GMS_BROKER_CONTROLLED_UNAVAILABLE mode="
+                    + googleProfile.mode() + " playServicesAvailable="
+                    + googleProfile.playServicesAvailable());
+        }
         attempt("oemIdentifiers", installed, failures, hooks,
                 () -> OemIdentifierServiceHook.install(identity));
         attempt("telephony", installed, failures, hooks, bindingDetails,
@@ -198,6 +212,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> DevicePolicyManagerServiceHook.install(hostServiceContext, identity));
         attempt("accessibility", installed, failures, hooks,
                 () -> AccessibilityManagerServiceHook.install(hostServiceContext, identity));
+        attempt("captioning", installed, failures, hooks,
+                () -> CaptioningManagerHook.install(guestContext));
         attempt("autofill", installed, failures, hooks,
                 () -> AutofillManagerServiceHook.install(hostServiceContext, identity));
         attempt("biometric", installed, failures, hooks,
@@ -241,7 +257,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("persistentDataBlock", installed, failures, hooks,
                 () -> PersistentDataBlockServiceHook.install(hostServiceContext, identity));
         attempt("systemUpdate", installed, failures, hooks,
-                () -> SystemUpdateServiceHook.install(identity));
+                () -> SystemUpdateServiceHook.install(hostServiceContext, identity));
         attempt("bluetooth", installed, failures, hooks, bindingDetails,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks, bindingDetails,

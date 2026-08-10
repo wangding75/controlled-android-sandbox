@@ -516,13 +516,17 @@ public final class SelfTest {
                 java.util.List.of("ACTION_PRIVATE"), false);
         registry.register("r2", "pkg.app", "session-b", 1, 0, "pkg.PublicReceiver",
                 java.util.List.of("ACTION_PRIVATE", "ACTION_PUBLIC"), true);
+        registry.register("r-empty", "pkg.app", "session-a", 1, 0, "pkg.InertReceiver",
+                java.util.List.of(), false);
         require(registry.resolve("ACTION_PRIVATE", 0, "session-a", false).size() == 2,
                 "same-session private broadcast");
         require(registry.resolve("ACTION_PRIVATE", 0, "session-b", false).size() == 1,
                 "cross-session non-exported hidden");
         require(registry.resolve("ACTION_PRIVATE", 0, "", true).size() == 1,
                 "external exported receiver");
-        require(registry.removeSession("session-a", 1) == 1 && registry.size() == 1,
+        require(registry.resolve("ACTION_NEVER_MATCHES", 0, "session-a", false).isEmpty(),
+                "empty dynamic receiver filter must be inert");
+        require(registry.removeSession("session-a", 1) == 2 && registry.size() == 1,
                 "receiver session cleanup");
     }
 

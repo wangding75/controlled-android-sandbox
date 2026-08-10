@@ -93,9 +93,10 @@ public final class DynamicReceiverRegistry {
         requireText(sessionId, "sessionId");
         requireText(receiverClass, "receiverClass");
         if (generation < 1 || virtualUserId < 0) throw new IllegalArgumentException("invalid registration owner");
-        if (filter == null || filter.actions().isEmpty()) {
-            throw new IllegalArgumentException("at least one action is required");
-        }
+        if (filter == null) throw new IllegalArgumentException("filter is required");
+        // Android permits an empty IntentFilter for an inert, non-delivering registration.
+        // Keep it in the lifecycle registry, but Filter.matches() will never resolve it because
+        // no action can be contained in the empty action set.
         String ownerKey = key(sessionId, generation, id);
         if (registrations.containsKey(ownerKey)) {
             throw new IllegalStateException("DUPLICATE_RECEIVER_REGISTRATION");
@@ -196,7 +197,6 @@ public final class DynamicReceiverRegistry {
                 if (action != null && !action.trim().isEmpty()) normalized.add(action.trim());
             }
         }
-        if (normalized.isEmpty()) throw new IllegalArgumentException("at least one action is required");
         if (normalized.size() > MAX_ACTIONS_PER_REGISTRATION) {
             throw new IllegalArgumentException("DYNAMIC_RECEIVER_ACTION_LIMIT_EXCEEDED");
         }

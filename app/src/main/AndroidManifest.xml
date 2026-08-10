@@ -17,6 +17,9 @@
     <queries>
         <package android:name="com.warden.controlledsandbox.companion32" />
         <package android:name="com.warden.controlledsandbox.companion32.debug" />
+        <!-- WebViewFactory must resolve only the bounded platform provider candidates. -->
+        <package android:name="com.android.webview" />
+        <package android:name="com.google.android.webview" />
     </queries>
     <application
         android:name=".SandboxApplication"

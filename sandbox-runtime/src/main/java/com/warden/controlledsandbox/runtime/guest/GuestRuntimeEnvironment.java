@@ -60,6 +60,7 @@ public final class GuestRuntimeEnvironment {
         FrameworkHooks stagedHooks = null;
         GuestFrameworkCallRouter stagedFrameworkCallRouter = null;
         Session stagedSession = null;
+        GuestProcessIdentityBridge stagedProcessIdentity = null;
         try {
             RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot);
             boolean nativeCrashRecorderInstalled = RuntimeDiagnostics.nativeCrashFile() != null
@@ -124,6 +125,8 @@ public final class GuestRuntimeEnvironment {
             loader.configureDetection(virtualServices.compatibilityProfile().detection());
             WebViewProfileManager.Profile webViewProfile = WebViewProfileManager.install(
                     spec, virtualServices.compatibilityProfile().webView());
+            guestContext.configureWebViewProvider(
+                    virtualServices.compatibilityProfile().webView().providerPackage());
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
                     guestContext, spec, virtualServices.pendingIntents(),
                     new GuestPendingIntentDispatcher(guestContext, spec));
@@ -205,11 +208,14 @@ public final class GuestRuntimeEnvironment {
                         + NativePolicy.hookStatus());
             }
             guestContext.application(application);
+            stagedProcessIdentity = GuestProcessIdentityBridge.install(application, spec);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
                     capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
-                    nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile);
+                    nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile,
+                    stagedProcessIdentity);
             stagedSession = session;
+            stagedProcessIdentity = null;
             session.components = new GuestComponentRuntime(session);
             session.jobServices = new GuestJobServiceBridge(session);
             virtualServices.jobs().setExecutionListener(new com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecutionListener() {
@@ -240,6 +246,7 @@ public final class GuestRuntimeEnvironment {
             try {
                 if (stagedSession != null) stagedSession.shutdown();
                 else {
+                    if (stagedProcessIdentity != null) stagedProcessIdentity.close();
                     if (stagedHooks != null) stagedHooks.close();
                     if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
                 }
@@ -419,6 +426,7 @@ public final class GuestRuntimeEnvironment {
         final boolean nativeHooksInstalled;
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
+        final GuestProcessIdentityBridge processIdentity;
         GuestComponentRuntime components;
         GuestJobServiceBridge jobServices;
 
@@ -430,7 +438,8 @@ public final class GuestRuntimeEnvironment {
                 GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
                 VirtualSystemServiceState virtualServices,
                 boolean nativePolicyConfigured, boolean nativeHooksInstalled,
-                boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile) {
+                boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile,
+                GuestProcessIdentityBridge processIdentity) {
             this.spec = spec;
             this.classLoader = classLoader;
             this.context = context;
@@ -453,6 +462,7 @@ public final class GuestRuntimeEnvironment {
             this.nativeHooksInstalled = nativeHooksInstalled;
             this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
             this.webViewProfile = webViewProfile;
+            this.processIdentity = java.util.Objects.requireNonNull(processIdentity, "processIdentity");
         }
 
         public GuestPackageSpec spec() { return spec; }
@@ -580,9 +590,11 @@ public final class GuestRuntimeEnvironment {
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
             webViewProfile.renderers.close();
+            context.closeWebViewProviderServices();
             virtualServices.close();
             frameworkCallRouter.close();
             frameworkHooks.close();
+            processIdentity.close();
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             NativePolicy.resetCrashRecorder();

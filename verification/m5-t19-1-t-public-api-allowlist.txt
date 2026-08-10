@@ -116,3 +116,62 @@ com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|publ
 com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public boolean uriGrantRule()
 com.warden.controlledsandbox.framework.identity|VirtualPackageMetadata.java|public static final class ProviderPathRule
 com.warden.controlledsandbox.runtime.provider|BrokerProviderRuntime.java|public interface DeclaredPermissionChecker
+
+# T51 framework compatibility contracts, method classifier and bounded hooks.
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public final class CameraServiceContract
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static boolean isCameraFeature(String featureName)
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final List<String> SERVICE_NAMES = List.of(SERVICE_NAME)
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String CAMERA_MANAGER_GLOBAL_CLASS =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String CAMERA_MANAGER_GLOBAL_GETTER =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String CAMERA_MANAGER_SERVICE_FIELD =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String DESCRIPTOR =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String FEATURE_CAMERA =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String FEATURE_CAMERA_ANY =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String FEATURE_CAMERA_FRONT =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String LOGICAL_SERVICE =
+com.warden.controlledsandbox.framework.contract|CameraServiceContract.java|public static final String SERVICE_NAME =
+com.warden.controlledsandbox.framework.contract|InvocationMethodMatcher.java|public final class InvocationMethodMatcher
+com.warden.controlledsandbox.framework.contract|InvocationMethodMatcher.java|public static boolean containsAny(String normalizedName, String... fragments)
+com.warden.controlledsandbox.framework.contract|InvocationMethodMatcher.java|public static boolean named(String normalizedName, String... candidates)
+com.warden.controlledsandbox.framework.contract|InvocationMethodMatcher.java|public static boolean startsWith(String normalizedName, String... prefixes)
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public final class NfcServiceContract
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static boolean guestFeatureEnabled(VirtualNfcProfileSnapshot profile)
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static boolean isNfcFeature(String featureName)
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final List<String> SERVICE_NAMES = List.of(SERVICE_NAME)
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final String ADAPTER_CACHE_FIELD =
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final String DESCRIPTOR =
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final String FEATURE_NFC =
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final String LOGICAL_SERVICE =
+com.warden.controlledsandbox.framework.contract|NfcServiceContract.java|public static final String SERVICE_NAME =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public final class WebViewProviderServiceContract
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static boolean isProviderPackage(String packageName)
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static boolean isProviderService(String providerPackage, ComponentName component)
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static boolean isRendererService(String providerPackage, ComponentName component)
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String AOSP_PROVIDER =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String COMPONENTS_PROVIDER_SERVICE =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String GOOGLE_MOBILE_SERVICES =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String GOOGLE_PROVIDER =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String METRICS_BRIDGE_SERVICE =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String METRICS_UPLOAD_SERVICE =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String SUBSTRATUM_THEME_ENGINE =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String VARIATIONS_SEED_SERVER =
+com.warden.controlledsandbox.framework.contract|WebViewProviderServiceContract.java|public static final String WEBVIEW_FEATURE =
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public final class InputManagerServiceContract
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public static Object controlledResult(String methodName, Class<?> returnType)
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public static boolean isNoOpListenerRegistration(String methodName)
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public static final String ANDROID_SERVICE =
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public static final String DESCRIPTOR =
+com.warden.controlledsandbox.framework.core|InputManagerServiceContract.java|public static final String LOGICAL_SERVICE =
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public final class SystemUpdateServiceContract
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static boolean managerCacheRequired(int sdkInt)
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final List<String> SERVICE_NAMES = List.of(SERVICE_NAME)
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final String DESCRIPTOR =
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final String LOGICAL_SERVICE =
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final String MANAGER_CLASS =
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final String MANAGER_SERVICE_FIELD =
+com.warden.controlledsandbox.framework.core|SystemUpdateServiceContract.java|public static final String SERVICE_NAME =
+com.warden.controlledsandbox.framework.service|CaptioningManagerHook.java|public final class CaptioningManagerHook
+com.warden.controlledsandbox.framework.service|CaptioningManagerHook.java|public static AutoCloseable install(Context guestContext) throws Exception
+com.warden.controlledsandbox.framework.service|InputManagerServiceHook.java|public final class InputManagerServiceHook implements AutoCloseable
+com.warden.controlledsandbox.nativebridge|NativePolicy.java|public static boolean installHiddenApiBridge()
+com.warden.controlledsandbox.runtime.diagnostics|RuntimeEventLog.java|public static void failure(String name, Throwable error)

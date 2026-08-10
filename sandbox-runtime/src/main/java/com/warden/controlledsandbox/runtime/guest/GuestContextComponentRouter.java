@@ -100,8 +100,8 @@ final class GuestContextComponentRouter {
     Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
             String permission, Handler scheduler, int flags) {
         if (receiver == null) return null;
-        if (filter == null || filter.countActions() == 0) {
-            throw new IllegalArgumentException("IntentFilter requires at least one action");
+        if (filter == null) {
+            throw new IllegalArgumentException("IntentFilter is required");
         }
         if ((flags & Context.RECEIVER_EXPORTED) != 0
                 && (flags & Context.RECEIVER_NOT_EXPORTED) != 0) {

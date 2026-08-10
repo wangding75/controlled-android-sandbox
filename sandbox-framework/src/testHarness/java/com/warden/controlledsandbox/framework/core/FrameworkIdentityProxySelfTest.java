@@ -207,7 +207,7 @@ public final class FrameworkIdentityProxySelfTest {
         java.util.Map<String, Boolean> allInstalled = new java.util.LinkedHashMap<>();
         for (String name : java.util.List.of("packageManager", "activityManager", "activityTaskManager",
                 "appOps", "permission", "notification", "jobScheduler", "alarm", "clipboard",
-                "account", "storage")) allInstalled.put(name, true);
+                "account", "storage", "inputManager", "captioning")) allInstalled.put(name, true);
         FrameworkHookReport ready = new FrameworkHookReport(allInstalled, java.util.Map.of());
         require(ready.readiness() == FrameworkHookReport.Readiness.READY, "mandatory hook ready");
         ready.requireMandatoryReady();

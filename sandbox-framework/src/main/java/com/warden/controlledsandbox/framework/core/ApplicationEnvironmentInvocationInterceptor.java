@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import static com.warden.controlledsandbox.framework.core.ApplicationEnvironmentInvocationValues.*;
 import static com.warden.controlledsandbox.framework.core.ApplicationEnvironmentUsageValues.*;
 

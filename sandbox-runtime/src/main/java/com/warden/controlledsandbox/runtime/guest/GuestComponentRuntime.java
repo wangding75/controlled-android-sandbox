@@ -412,7 +412,7 @@ public final class GuestComponentRuntime {
         if (receiverId.trim().isEmpty()) throw new IllegalArgumentException("receiverId is required");
         if (receivers.containsKey(receiverId)) throw new IllegalStateException("DUPLICATE_RECEIVER_ID");
         ArrayList<String> actions = request.getStringArrayList(RuntimeKeys.RECEIVER_ACTIONS);
-        if (actions == null || actions.isEmpty()) throw new IllegalArgumentException("receiverActions is required");
+        if (actions == null) actions = new ArrayList<>();
         BroadcastReceiver receiver;
         if (request.getBoolean(RuntimeKeys.RECEIVER_DYNAMIC_INSTANCE, false)) {
             receiver = session.context.dynamicReceiver(receiverId);

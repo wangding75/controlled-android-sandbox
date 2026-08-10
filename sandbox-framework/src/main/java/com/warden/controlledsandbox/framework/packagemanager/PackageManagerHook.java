@@ -7,17 +7,18 @@ import android.content.pm.PackageManager;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 
 /** Process-local IPackageManager identity view. Installed only inside dedicated Guest processes. */
 public final class PackageManagerHook implements AutoCloseable {
-    private final Object packageManager;
-    private final Field field;
-    private final Object original;
+    private final List<Binding> bindings;
 
-    private PackageManagerHook(Object packageManager, Field field, Object original) {
-        this.packageManager = packageManager;
-        this.field = field;
-        this.original = original;
+    private PackageManagerHook(List<Binding> bindings) {
+        this.bindings = Collections.unmodifiableList(new ArrayList<>(bindings));
     }
 
     public static PackageManagerHook install(Context context, GuestIdentity identity) throws Exception {
@@ -26,7 +27,40 @@ public final class PackageManagerHook implements AutoCloseable {
 
     public static PackageManagerHook install(
             PackageManager packageManager, GuestIdentity identity) throws Exception {
+        return install(packageManager, identity, new PackageManager[0]);
+    }
+
+    /**
+     * Installs the same identity view on all process-local ApplicationPackageManager objects used
+     * by the Guest Context and by framework code that reaches AppGlobals' initial Application.
+     * Android may cache those objects independently; WebViewFactory uses the latter.
+     */
+    public static PackageManagerHook install(
+            PackageManager packageManager, GuestIdentity identity, PackageManager... siblings)
+            throws Exception {
         if (packageManager == null) throw new IllegalArgumentException("packageManager is required");
+        List<Binding> installed = new ArrayList<>();
+        Set<Object> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        installOne(packageManager, identity, seen, installed);
+        if (siblings != null) {
+            for (PackageManager sibling : siblings) {
+                if (sibling != null) installOne(sibling, identity, seen, installed);
+            }
+        }
+        installActivityThreadSource(identity, installed);
+        return new PackageManagerHook(installed);
+    }
+
+    @Override public void close() {
+        for (int index = bindings.size() - 1; index >= 0; index--) {
+            try { bindings.get(index).field.set(bindings.get(index).packageManager,
+                    bindings.get(index).original); } catch (Throwable ignored) { }
+        }
+    }
+
+    private static void installOne(PackageManager packageManager, GuestIdentity identity,
+                                   Set<Object> seen, List<Binding> installed) throws Exception {
+        if (!seen.add(packageManager)) return;
         Field mPm = findField(packageManager.getClass(), "mPM");
         mPm.setAccessible(true);
         Object original = mPm.get(packageManager);
@@ -36,12 +70,35 @@ public final class PackageManagerHook implements AutoCloseable {
         InvocationHandler handler = new PackageManagerInvocationHandler(original, identity);
         Object proxy = Proxy.newProxyInstance(original.getClass().getClassLoader(), interfaces, handler);
         mPm.set(packageManager, proxy);
-        return new PackageManagerHook(packageManager, mPm, original);
+        android.util.Log.i("CS_PM_HOOK", "installed packageManager="
+                + packageManager.getClass().getName() + "@"
+                + System.identityHashCode(packageManager) + " original="
+                + original.getClass().getName() + "@" + System.identityHashCode(original));
+        installed.add(new Binding(packageManager, mPm, original));
     }
 
-    @Override public void close() {
-        try { field.set(packageManager, original); } catch (Throwable ignored) { }
+    /** ApplicationPackageManager instances created after bootstrap obtain this static source. */
+    private static void installActivityThreadSource(GuestIdentity identity,
+                                                     List<Binding> installed) {
+        try {
+            Class<?> activityThread = Class.forName("android.app.ActivityThread");
+            Field field = findField(activityThread, "sPackageManager");
+            field.setAccessible(true);
+            Object original = field.get(null);
+            if (original == null) return;
+            Class<?>[] interfaces = original.getClass().getInterfaces();
+            if (interfaces.length == 0) return;
+            InvocationHandler handler = new PackageManagerInvocationHandler(original, identity);
+            Object proxy = Proxy.newProxyInstance(original.getClass().getClassLoader(), interfaces, handler);
+            field.set(null, proxy);
+            android.util.Log.i("CS_PM_HOOK", "installed ActivityThread.sPackageManager source");
+            installed.add(new Binding(null, field, original));
+        } catch (Throwable error) {
+            android.util.Log.w("CS_PM_HOOK", "ActivityThread PackageManager source unavailable", error);
+        }
     }
+
+    private record Binding(Object packageManager, Field field, Object original) { }
 
     private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
         Class<?> cursor = type;

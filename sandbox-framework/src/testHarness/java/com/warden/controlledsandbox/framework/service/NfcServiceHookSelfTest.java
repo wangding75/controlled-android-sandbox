@@ -8,7 +8,7 @@ import android.os.IInterface;
 import android.os.ServiceManager;
 
 import com.warden.controlledsandbox.contract.*;
-import com.warden.controlledsandbox.framework.core.NfcServiceContract;
+import com.warden.controlledsandbox.framework.contract.NfcServiceContract;
 import com.warden.controlledsandbox.framework.identity.*;
 import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
 import com.warden.controlledsandbox.framework.packagemanager.PackageManagerInvocationHandlerTestAccess;

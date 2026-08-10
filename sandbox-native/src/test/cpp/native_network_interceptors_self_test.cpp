@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
+#include <poll.h>
 #include <stdexcept>
 #include <string>
 #include <sys/socket.h>
@@ -95,6 +96,16 @@ void raw_send_udp(const sockaddr_in& destination, const std::string& payload) {
     require(::close(sender) == 0, "close raw UDP sender");
 }
 
+void wait_for_udp_datagram(int receiver) {
+    pollfd descriptor{receiver, POLLIN, 0};
+    int status;
+    do {
+        status = ::poll(&descriptor, 1, 1000);
+    } while (status < 0 && errno == EINTR);
+    require(status == 1 && (descriptor.revents & POLLIN) != 0,
+            "UDP datagram delivery before nonblocking assertion");
+}
+
 struct TcpPair {
     int listener{-1};
     int client{-1};
@@ -146,6 +157,7 @@ void test_denied_recvfrom_preserves_buffers_and_queue() {
     const int receiver = create_controlled_udp_receiver();
     const sockaddr_in destination = bound_address(receiver);
     raw_send_udp(destination, "secret-payload");
+    wait_for_udp_datagram(receiver);
 
     std::array<char, 32> payload{};
     payload.fill('#');
@@ -282,6 +294,7 @@ void test_denied_recvmsg_preserves_message_and_queue() {
     configure_policy(false);
     const int receiver = create_controlled_udp_receiver();
     raw_send_udp(bound_address(receiver), "hidden");
+    wait_for_udp_datagram(receiver);
 
     std::array<char, 8> payload{};
     payload.fill('!');

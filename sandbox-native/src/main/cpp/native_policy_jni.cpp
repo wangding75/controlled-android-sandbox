@@ -208,11 +208,13 @@ bool install_hidden_api_bridge(JNIEnv* env) {
     // package wildcard or process-wide global policy is intentionally not used.
     constexpr const char* prefixes[] = {
             "Landroid/app/",
+            "Landroid/companion/",
             "Landroid/content/",
             "Landroid/hardware/",
             "Landroid/media/",
             "Landroid/net/",
             "Landroid/os/",
+            "Landroid/print/",
             "Landroid/provider/",
             "Landroid/service/",
             "Landroid/telephony/",

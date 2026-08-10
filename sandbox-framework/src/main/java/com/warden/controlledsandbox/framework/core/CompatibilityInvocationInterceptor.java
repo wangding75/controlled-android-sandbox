@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot;

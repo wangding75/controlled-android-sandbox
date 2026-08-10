@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.WebViewProviderServiceContract;
+
 import android.content.pm.ApplicationInfo;
 import com.warden.controlledsandbox.contract.VirtualBluetoothProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
@@ -19,6 +21,7 @@ import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
+import com.warden.controlledsandbox.framework.packagemanager.PackageManagerInvocationHandlerTestAccess;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +61,17 @@ public final class CompatibilityVirtualizationSelfTest {
             denied = true;
         }
         require(denied, "WebView mutation denied");
+
+        PackageManagerApi packageManager = packageManager(
+                feature -> false, identity("STATIC"));
+        require(packageManager.hasSystemFeature(WebViewProviderServiceContract.WEBVIEW_FEATURE),
+                "STATIC WebView profile exposes FEATURE_WEBVIEW");
+        packageManager = packageManager(feature -> true, identity("BLOCKED"));
+        require(!packageManager.hasSystemFeature(WebViewProviderServiceContract.WEBVIEW_FEATURE),
+                "BLOCKED WebView profile hides FEATURE_WEBVIEW");
+        packageManager = packageManager(feature -> true, identity("HOST"));
+        require(packageManager.hasSystemFeature(WebViewProviderServiceContract.WEBVIEW_FEATURE),
+                "HOST WebView delegates FEATURE_WEBVIEW");
 
         DeviceIdApi identifiers = proxy(
                 DeviceIdApi.class, new FakeDeviceDelegate(), identity, "deviceidentifiers");
@@ -225,6 +239,15 @@ public final class CompatibilityVirtualizationSelfTest {
                 "rev");
     }
 
+    @SuppressWarnings("unchecked")
+    private static PackageManagerApi packageManager(
+            PackageManagerApi delegate, GuestIdentity identity) {
+        return (PackageManagerApi) Proxy.newProxyInstance(
+                PackageManagerApi.class.getClassLoader(),
+                new Class<?>[] {PackageManagerApi.class},
+                PackageManagerInvocationHandlerTestAccess.create(delegate, identity));
+    }
+
     interface WebViewApi {
         FakePackageInfo getCurrentWebViewPackage();
         FakeProviderResponse waitForAndGetProvider();
@@ -247,6 +270,10 @@ public final class CompatibilityVirtualizationSelfTest {
     interface OemApi {
         String getOAID();
         boolean isSupported();
+    }
+
+    public interface PackageManagerApi {
+        boolean hasSystemFeature(String feature);
     }
 
     public static final class FakePackageInfo {

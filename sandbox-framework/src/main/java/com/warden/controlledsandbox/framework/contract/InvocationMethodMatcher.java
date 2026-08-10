@@ -1,12 +1,12 @@
-package com.warden.controlledsandbox.framework.core;
+package com.warden.controlledsandbox.framework.contract;
 
 import java.util.Locale;
 
 /** Exact-first method classifier used where inverse operation names overlap by substring. */
-final class InvocationMethodMatcher {
+public final class InvocationMethodMatcher {
     private InvocationMethodMatcher() { }
 
-    static boolean named(String normalizedName, String... candidates) {
+    public static boolean named(String normalizedName, String... candidates) {
         if (normalizedName == null || candidates == null) return false;
         String name = normalize(normalizedName);
         for (String candidate : candidates) {
@@ -15,7 +15,7 @@ final class InvocationMethodMatcher {
         return false;
     }
 
-    static boolean startsWith(String normalizedName, String... prefixes) {
+    public static boolean startsWith(String normalizedName, String... prefixes) {
         if (normalizedName == null || prefixes == null) return false;
         String name = normalize(normalizedName);
         for (String prefix : prefixes) {
@@ -24,7 +24,7 @@ final class InvocationMethodMatcher {
         return false;
     }
 
-    static boolean containsAny(String normalizedName, String... fragments) {
+    public static boolean containsAny(String normalizedName, String... fragments) {
         if (normalizedName == null || fragments == null) return false;
         String name = normalize(normalizedName);
         for (String fragment : fragments) {

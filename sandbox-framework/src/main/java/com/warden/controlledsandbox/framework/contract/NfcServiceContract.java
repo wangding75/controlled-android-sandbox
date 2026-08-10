@@ -1,4 +1,4 @@
-package com.warden.controlledsandbox.framework.core;
+package com.warden.controlledsandbox.framework.contract;
 
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;

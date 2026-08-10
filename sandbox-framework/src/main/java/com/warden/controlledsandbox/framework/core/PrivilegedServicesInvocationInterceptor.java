@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import static com.warden.controlledsandbox.framework.core.PeripheralInvocationValues.*;
 
 import android.os.Bundle;
@@ -303,8 +305,71 @@ final class PrivilegedServicesInvocationInterceptor {
 
     private static Bundle firstBundle(Object[] arguments) {
         if (arguments == null) return null;
-        for (Object value : arguments) if (value instanceof Bundle bundle) return bundle;
+        for (Object value : arguments) {
+            if (value instanceof Bundle bundle) return new Bundle(bundle);
+            if (value != null && "android.os.PersistableBundle".equals(
+                    value.getClass().getName())) {
+                return persistableBundle(value);
+            }
+        }
         return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Bundle persistableBundle(Object value) {
+        try {
+            java.lang.reflect.Method keySet = value.getClass().getMethod("keySet");
+            java.lang.reflect.Method get = value.getClass().getMethod("get", String.class);
+            Bundle out = new Bundle();
+            for (String key : (java.util.Set<String>) keySet.invoke(value)) {
+                Object item = get.invoke(value, key);
+                if (item instanceof String text) out.putString(key, text);
+                else if (item instanceof Integer number) out.putInt(key, number);
+                else if (item instanceof Long number) out.putLong(key, number);
+                else if (item instanceof Boolean flag) out.putBoolean(key, flag);
+                else if (item instanceof Double number) out.putDouble(key, number);
+                else if (item != null && item.getClass().isArray()) {
+                    putBundleArray(out, key, item);
+                } else if (item != null) {
+                    throw new IllegalArgumentException(
+                            "VIRTUAL_SYSTEM_UPDATE_PAYLOAD_UNSUPPORTED:" + item.getClass());
+                }
+            }
+            return out;
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                    .rethrowIfFatal(cause);
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalArgumentException("VIRTUAL_SYSTEM_UPDATE_PAYLOAD_INVALID", cause);
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalArgumentException("VIRTUAL_SYSTEM_UPDATE_PAYLOAD_INVALID", error);
+        }
+    }
+
+    private static void putBundleArray(Bundle target, String key, Object value) {
+        try {
+            java.lang.reflect.Method method = Bundle.class.getMethod(
+                    bundleArrayMethod(value.getClass()), String.class, value.getClass());
+            method.invoke(target, key, value);
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                    .rethrowIfFatal(cause);
+            throw new IllegalArgumentException("VIRTUAL_SYSTEM_UPDATE_PAYLOAD_INVALID", cause);
+        } catch (ReflectiveOperationException | IllegalArgumentException error) {
+            throw new IllegalArgumentException("VIRTUAL_SYSTEM_UPDATE_PAYLOAD_UNSUPPORTED_ARRAY",
+                    error);
+        }
+    }
+
+    private static String bundleArrayMethod(Class<?> type) {
+        if (type == String[].class) return "putStringArray";
+        if (type == int[].class) return "putIntArray";
+        if (type == long[].class) return "putLongArray";
+        if (type == boolean[].class) return "putBooleanArray";
+        if (type == double[].class) return "putDoubleArray";
+        throw new IllegalArgumentException("VIRTUAL_SYSTEM_UPDATE_PAYLOAD_UNSUPPORTED_ARRAY:" + type);
     }
 
     private static int firstInt(Object[] arguments, int fallback) {

@@ -63,7 +63,8 @@ public final class ActivityTaskCheckpointStore {
                         || payloadLength != container.length - 16) {
                     throw new IllegalStateException("ACTIVITY_TASK_CHECKPOINT_LENGTH_INVALID");
                 }
-                byte[] payload = input.readNBytes(payloadLength);
+                byte[] payload = new byte[payloadLength];
+                input.readFully(payload);
                 long expectedCrc = input.readLong();
                 CRC32 crc = new CRC32();
                 crc.update(payload);

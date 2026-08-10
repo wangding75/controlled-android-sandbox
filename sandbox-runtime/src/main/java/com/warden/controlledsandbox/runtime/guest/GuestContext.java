@@ -46,6 +46,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final File externalRoot;
     private final ApplicationInfo applicationInfo;
     private final GuestContextComponentRouter componentRouter;
+    private final GuestWebViewProviderServiceBridge webViewProviderServices;
     private final GuestCapabilityGate capabilityGate;
     private final GuestStorageNameCodec storageNames;
     private final SharedState sharedState;
@@ -88,6 +89,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.dynamicReceivers = sharedState.dynamicReceivers;
         this.mainThread = sharedState.mainThread;
         this.capabilityGate = sharedState.capabilityGate;
+        this.webViewProviderServices = new GuestWebViewProviderServiceBridge(hostServiceContext);
         this.componentRouter = new GuestContextComponentRouter(
                 this, spec, packageManager, sharedState.dynamicReceivers, sharedState.mainThread);
         ensureDirectory(new File(dataRoot, "files"));
@@ -110,6 +112,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     void sealSystemServices(java.util.Map<String, Boolean> installedHooks) {
         sharedState.systemServices.seal(installedHooks);
     }
+    void configureWebViewProvider(String providerPackage) {
+        webViewProviderServices.configure(providerPackage);
+    }
+    void closeWebViewProviderServices() {
+        webViewProviderServices.close();
+    }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     @Override public Context getBaseContext() { return this; }
@@ -120,6 +128,16 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public ClassLoader getClassLoader() { return classLoader; }
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
+    @Override public android.os.Looper getMainLooper() { return hostServiceContext.getMainLooper(); }
+    @Override public String getSystemServiceName(Class<?> serviceClass) {
+        if (serviceClass != null && "android.view.accessibility.CaptioningManager"
+                .equals(serviceClass.getName())) return "captioning";
+        if (serviceClass != null && "android.view.accessibility.AccessibilityManager"
+                .equals(serviceClass.getName())) return "accessibility";
+        if (serviceClass != null && "android.view.inputmethod.InputMethodManager"
+                .equals(serviceClass.getName())) return "input_method";
+        return null;
+    }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
     @Override public PackageManager getPackageManager() {
         sharedState.systemServices.requireHookAvailable("packageManager", "getPackageManager");
@@ -173,13 +191,23 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
     @Override public boolean stopService(Intent service) { return componentRouter.stopService(service); }
     @Override public boolean bindService(Intent service, ServiceConnection connection, int flags) {
+        if (webViewProviderServices.bind(service, connection, flags, null)) return true;
         return componentRouter.bindService(service, connection, flags, null);
     }
     @Override public boolean bindService(Intent service, int flags, Executor executor,
             ServiceConnection connection) {
+        if (webViewProviderServices.bind(service, connection, flags, executor)) return true;
         return componentRouter.bindService(service, connection, flags, executor);
     }
+    @Override public boolean bindIsolatedService(Intent service, int flags, String instanceName,
+            Executor executor, ServiceConnection connection) {
+        if (webViewProviderServices.bindIsolated(service, flags, instanceName, executor, connection)) {
+            return true;
+        }
+        return super.bindIsolatedService(service, flags, instanceName, executor, connection);
+    }
     @Override public void unbindService(ServiceConnection connection) {
+        if (webViewProviderServices.unbind(connection)) return;
         componentRouter.unbindService(connection);
     }
     @Override public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {

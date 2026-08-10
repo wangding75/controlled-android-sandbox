@@ -17,6 +17,7 @@ public final class BrokerReceiverRuntimeSelfTest {
         ownerScopedIdsAndResolution();
         rollbackAndUnregisterOwnership();
         actionLimitAndInstanceCleanup();
+        emptyFilterIsInertAndLifecycleOwned();
         fullFilterMatchingAndPriority();
         concurrentReservation();
         System.out.println("PASS broker Receiver production registry self-test");
@@ -92,6 +93,20 @@ public final class BrokerReceiverRuntimeSelfTest {
         check(runtime.removeInstance(owner.packageName(), owner.virtualUserId()) == 1,
                 "dynamic Receiver instance cleanup");
         check(runtime.size() == 0, "dynamic Receiver instance cleanup leak");
+    }
+
+    private static void emptyFilterIsInertAndLifecycleOwned() {
+        BrokerReceiverRuntime runtime = new BrokerReceiverRuntime();
+        GuestSession owner = session("s-empty-filter", 8, 1);
+        Bundle request = request("empty-filter", false);
+        request.putStringArrayList(RuntimeKeys.RECEIVER_ACTIONS, new ArrayList<>());
+        runtime.reserveRegistration(request, owner);
+        check(runtime.size() == 1, "empty IntentFilter registration was rejected");
+        check(runtime.resolve("ACTION_NEVER_MATCHES", owner.virtualUserId(), owner.sessionId(), false)
+                        .isEmpty(),
+                "empty IntentFilter must remain inert for implicit broadcasts");
+        check(runtime.removeSession(owner) == 1 && runtime.size() == 0,
+                "empty IntentFilter lifecycle cleanup");
     }
 
     private static void fullFilterMatchingAndPriority() {

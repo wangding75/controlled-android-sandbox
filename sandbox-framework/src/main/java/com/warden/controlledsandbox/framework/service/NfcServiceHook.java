@@ -1,7 +1,7 @@
 package com.warden.controlledsandbox.framework.service;
 
 import com.warden.controlledsandbox.framework.core.DeviceServiceBindingRegistry;
-import com.warden.controlledsandbox.framework.core.NfcServiceContract;
+import com.warden.controlledsandbox.framework.contract.NfcServiceContract;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 

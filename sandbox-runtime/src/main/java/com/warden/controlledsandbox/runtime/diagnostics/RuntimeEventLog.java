@@ -23,10 +23,16 @@ public final class RuntimeEventLog {
         RuntimeDiagnostics.record(name, data, line.toString());
     }
 
-    static void failure(String name, Throwable error) {
-        String detail = name + " type=" + error.getClass().getName() + " message=" + String.valueOf(error.getMessage());
-        Log.e(TAG, detail);
-        RuntimeDiagnostics.record(name, null, detail);
+    public static void failure(String name, Throwable error) {
+        StringBuilder detail = new StringBuilder(name)
+                .append(" type=").append(error.getClass().getName())
+                .append(" message=").append(String.valueOf(error.getMessage()));
+        StackTraceElement[] stack = error.getStackTrace();
+        for (int index = 0; index < Math.min(stack.length, 12); index++) {
+            detail.append(" at=").append(stack[index]);
+        }
+        Log.e(TAG, detail.toString());
+        RuntimeDiagnostics.record(name, null, detail.toString());
     }
 
     public static void audit(String category, String action, String outcome, String detail) {

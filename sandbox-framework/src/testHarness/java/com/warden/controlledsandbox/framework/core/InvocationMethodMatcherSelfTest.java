@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 /** Regression tests for centralized exact/prefix/fragment method routing. */
 public final class InvocationMethodMatcherSelfTest {
     private InvocationMethodMatcherSelfTest() { }

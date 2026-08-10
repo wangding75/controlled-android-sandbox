@@ -69,6 +69,8 @@ public final class GuestActivityController {
             result.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
             result.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(root(error).getMessage()));
             result.putString("stack", stackSummary(root(error)));
+            com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog.failure(
+                    "GUEST_ACTIVITY_CREATE", root(error));
         }
         return result;
     }

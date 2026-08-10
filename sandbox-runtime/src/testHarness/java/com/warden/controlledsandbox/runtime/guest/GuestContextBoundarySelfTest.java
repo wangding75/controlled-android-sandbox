@@ -46,6 +46,9 @@ public final class GuestContextBoundarySelfTest {
                     "com.example.guest", 3, "Guest", "1", 1L, "b".repeat(64),
                     "a".repeat(64), "com.example.guest.MainActivity", "", true,
                     java.util.List.of(), java.util.List.of(), java.util.List.of()));
+            // Simulate an API 32 Binder-restored Bundle carrying the boot loader.  GuestPackageSpec
+            // must replace it with the contract loader before reading VirtualPackageStateSnapshot.
+            request.setClassLoader(new ClassLoader(null) { });
             boolean untrustedNativeDenied = false;
             try { new GuestPackageSpec(request); }
             catch (SecurityException expected) {

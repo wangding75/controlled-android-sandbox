@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox;
 
+import android.os.Build;
 import com.warden.controlledsandbox.contract.VirtualCompatibilityProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot;
@@ -22,7 +23,7 @@ final class VirtualCompatibilityDefaults {
         String attributionId = uuid(scope + "#oem").replace("-", "");
         String suffix = "u" + virtualUserId + "_" + Integer.toUnsignedString(scope.hashCode(), 36);
         VirtualWebViewProfileSnapshot webView = new VirtualWebViewProfileSnapshot(
-                VirtualLocationProfileSnapshot.MODE_STATIC, "com.android.webview", "virtual",
+                VirtualLocationProfileSnapshot.MODE_STATIC, defaultWebViewProvider(), "virtual",
                 suffix, "sandbox_webview_u" + virtualUserId, true, true, false, 4);
         VirtualGoogleServicesProfileSnapshot google = new VirtualGoogleServicesProfileSnapshot(
                 VirtualLocationProfileSnapshot.MODE_STATIC, false, advertisingId, true,
@@ -43,6 +44,19 @@ final class VirtualCompatibilityDefaults {
                 List.of("com.warden.controlledsandbox", "sandbox.internal.bridge", "virtual.runtime.internal"));
         return new VirtualCompatibilityProfileSnapshot(version, updatedAtMs, webView, google, oem, detection);
     }
+
+    /**
+     * The platform provider package is part of the API compatibility profile, not Host identity.
+     * API 32 uses the AOSP provider name; the API 35 GMS image used by the runtime matrix uses
+     * the Google provider name.  No installed package, version, signature or Host metadata is
+     * read while constructing defaults.
+     */
+    private static String defaultWebViewProvider() {
+        return Build.VERSION.SDK_INT >= 35
+                ? "com.google.android.webview"
+                : "com.android.webview";
+    }
+
     private static String uuid(String value) {
         return UUID.nameUUIDFromBytes(value.getBytes(StandardCharsets.UTF_8)).toString();
     }

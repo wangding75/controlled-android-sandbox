@@ -34,6 +34,7 @@ public abstract class StubActivityBase extends Activity {
     private String activityToken = "";
     private final Deque<Bundle> activityEvents = new ArrayDeque<>();
     private boolean activityEventInFlight;
+    private boolean destroying;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -112,6 +113,7 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
     @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
     @Override protected void onDestroy() {
+        destroying = true;
         IBinder destroyedToken = frameworkActivityToken;
         frameworkActivityToken = null;
         boolean brokerFinalized = guestSession != null && destroyedToken != null
@@ -228,6 +230,7 @@ public abstract class StubActivityBase extends Activity {
         if (sessionId.isEmpty() || generation < 1 || activityToken.isEmpty()) {
             throw new IllegalStateException("ACTIVITY_EVENT_IDENTITY_MISSING");
         }
+        if (destroying && !"DESTROYED".equals(event)) return;
         Bundle request = new Bundle(details);
         request.putString(RuntimeKeys.SESSION_ID, sessionId);
         request.putLong(RuntimeKeys.GENERATION, generation);
@@ -247,7 +250,7 @@ public abstract class StubActivityBase extends Activity {
                 if ("ACTIVITY_EVENT_APPLIED".equals(result.getString(RuntimeKeys.STATUS))) {
                     activityEvents.removeFirst();
                     String currentToken = result.getString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
-                    if (!currentToken.isEmpty()) {
+                    if (!destroying && !currentToken.isEmpty()) {
                         activityToken = currentToken;
                         if (controller != null) controller.updateActivityToken(currentToken);
                         if (activityResults != null) activityResults.updateActivityToken(currentToken);
@@ -257,8 +260,10 @@ public abstract class StubActivityBase extends Activity {
                     }
                 } else {
                     activityEvents.clear();
-                    showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_EVENT_FAILED"),
-                            result.getString(RuntimeKeys.ERROR_MESSAGE, "Broker rejected Activity event"));
+                    if (!destroying) {
+                        showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_EVENT_FAILED"),
+                                result.getString(RuntimeKeys.ERROR_MESSAGE, "Broker rejected Activity event"));
+                    }
                 }
                 sendNextActivityEvent();
             }

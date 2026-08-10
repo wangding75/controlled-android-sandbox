@@ -65,6 +65,9 @@ public final class InteractionServiceVirtualizationSelfTest {
                 "window arguments are restored after delegate call");
         require(identity.interactions().windows().owns(delegate.session, token),
                 "window token is owned by its session");
+        session.relayout(token, params, 7);
+        require(identity.interactions().windows().owns(delegate.session, token),
+                "window token remains owned across relayout");
         session.remove(token);
         require(identity.interactions().windows().windowCount() == 0,
                 "window removal releases ownership");
@@ -226,6 +229,7 @@ public final class InteractionServiceVirtualizationSelfTest {
     }
     interface WindowSessionApi {
         int addToDisplay(Object token, FakeLayoutParams params, int displayId);
+        void relayout(Object token, FakeLayoutParams params, int displayId);
         void remove(Object token);
     }
     static final class FakeWindowDelegate implements WindowApi {
@@ -238,6 +242,7 @@ public final class InteractionServiceVirtualizationSelfTest {
         public int addToDisplay(Object token, FakeLayoutParams params, int displayId) {
             throw new IllegalStateException("window failure");
         }
+        public void relayout(Object token, FakeLayoutParams params, int displayId) { }
         public void remove(Object token) { }
     }
 
@@ -246,6 +251,7 @@ public final class InteractionServiceVirtualizationSelfTest {
         public int addToDisplay(Object token, FakeLayoutParams params, int displayId) {
             seenPackage = params.packageName; seenFlags = params.flags; return 1;
         }
+        public void relayout(Object token, FakeLayoutParams params, int displayId) { }
         public void remove(Object token) { }
     }
     public static final class FakeLayoutParams {

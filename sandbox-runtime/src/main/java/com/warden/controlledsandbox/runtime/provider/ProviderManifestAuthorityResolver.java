@@ -30,6 +30,11 @@ final class ProviderManifestAuthorityResolver {
 
     private static VirtualComponentSnapshot requireProvider(Bundle request, String componentClass,
                                                              String authority) {
+        if (request == null) throw new IllegalArgumentException("provider request is required");
+        // Provider requests cross the Guest/Broker Binder boundary.  API 32 can restore the
+        // Bundle with the boot loader, so set the contract loader before resolving the package
+        // snapshot or the Broker dies with ClassNotFoundException/NoClassDefFoundError.
+        request.setClassLoader(VirtualPackageStateSnapshot.class.getClassLoader());
         VirtualPackageStateSnapshot state = request.getParcelable(RuntimeKeys.PACKAGE_STATE);
         if (state == null) {
             if (!request.getString(RuntimeKeys.PACKAGE_NAME, "").trim().isEmpty()) {

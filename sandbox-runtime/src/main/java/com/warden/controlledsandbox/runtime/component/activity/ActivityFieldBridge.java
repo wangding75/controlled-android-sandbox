@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
 import android.os.Build;
 import android.os.IBinder;
 import java.lang.reflect.Field;
@@ -54,7 +56,40 @@ public final class ActivityFieldBridge {
         direct.put("mIntent", guestIntent);
         direct.put("mComponent", new ComponentName(session.spec().packageName, componentClass));
         direct.put("mTitle", componentClass.substring(componentClass.lastIndexOf('.') + 1));
+        direct.put("mActivityInfo", guestActivityInfo(host, session, componentClass));
         return installFields(host, guest, HOST_FIELDS, OPTIONAL_HOST_FIELDS, direct, api);
+    }
+
+    /**
+     * Activity.attach() starts from the host StubActivity metadata.  Leaving that metadata on
+     * the Guest Activity makes framework code such as WebView's BuildInfo query the host package.
+     * Keep the host's audited window/theme fields, but replace only the identity-bearing portion
+     * with the Guest package and its Guest ApplicationInfo.
+     */
+    private static ActivityInfo guestActivityInfo(Activity host,
+                                                  GuestRuntimeEnvironment.Session session,
+                                                  String componentClass) {
+        try {
+            Field field = requireField(host.getClass(), "mActivityInfo");
+            field.setAccessible(true);
+            Object value = field.get(host);
+            if (!(value instanceof ActivityInfo source)) {
+                throw new IllegalStateException("ACTIVITY_INFO_SOURCE_INVALID");
+            }
+            ActivityInfo projected = new ActivityInfo(source);
+            ApplicationInfo guestApplication = session.context().getApplicationInfo();
+            projected.applicationInfo = guestApplication;
+            projected.packageName = session.spec().packageName;
+            projected.name = componentClass;
+            projected.processName = guestApplication.processName == null
+                    ? session.spec().packageName : guestApplication.processName;
+            return projected;
+        } catch (RuntimeException error) {
+            throw error;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_INFO_GUEST_PROJECTION_FAILED", error);
+        }
     }
 
     static BridgeReport installFields(Object host, Object guest, List<String> requiredHostFields,

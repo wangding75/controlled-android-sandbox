@@ -1,7 +1,7 @@
 package com.warden.controlledsandbox.framework.service;
 
 import android.content.Context;
-import com.warden.controlledsandbox.framework.core.CameraServiceContract;
+import com.warden.controlledsandbox.framework.contract.CameraServiceContract;
 import com.warden.controlledsandbox.framework.core.DeviceServiceBindingRegistry;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;

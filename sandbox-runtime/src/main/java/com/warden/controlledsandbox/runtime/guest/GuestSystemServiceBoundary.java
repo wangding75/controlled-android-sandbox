@@ -59,6 +59,7 @@ final class GuestSystemServiceBoundary {
         Map<String, String> result = new LinkedHashMap<>();
         result.put("activity", "activityManager");
         result.put("window", "window");
+        result.put("input", "inputManager");
         result.put("input_method", "inputMethod");
         result.put("display", "display");
         result.put("appops", "appOps");
@@ -85,6 +86,7 @@ final class GuestSystemServiceBoundary {
         result.put("usagestats", "usageStats");
         result.put("device_policy", "devicePolicy");
         result.put("accessibility", "accessibility");
+        result.put("captioning", "captioning");
         result.put("autofill", "autofill");
         result.put("biometric", "biometric");
         result.put("sensor_privacy", "sensorPrivacy");

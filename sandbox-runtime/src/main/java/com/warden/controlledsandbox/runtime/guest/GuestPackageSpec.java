@@ -50,6 +50,10 @@ public final class GuestPackageSpec {
 
     public GuestPackageSpec(Bundle bundle) {
         if (bundle == null) throw new IllegalArgumentException("request is required");
+        // Binder-restored Bundles may default to the boot class loader on API 32.  Install the
+        // contract loader before reading any custom Parcelable; copying or reading first can
+        // eagerly resolve VirtualPackageStateSnapshot through the wrong loader.
+        bundle.setClassLoader(VirtualPackageStateSnapshot.class.getClassLoader());
         protocol = bundle.getInt(RuntimeKeys.PROTOCOL, 0);
         if (!RuntimeProtocol.isCompatible(protocol)) throw new IllegalArgumentException("UNSUPPORTED_PROTOCOL:" + protocol);
         sessionId = required(bundle, RuntimeKeys.SESSION_ID);

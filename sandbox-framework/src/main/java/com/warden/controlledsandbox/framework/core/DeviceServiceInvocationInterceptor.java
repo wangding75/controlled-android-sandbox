@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import com.warden.controlledsandbox.contract.VirtualBluetoothDeviceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualBluetoothProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;

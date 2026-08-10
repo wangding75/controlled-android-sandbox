@@ -66,6 +66,7 @@ public final class RouteBrokerClient {
             Context context,
             ActivityResultRemoteCall call,
             ActivityResultCallback callback) {
+        Context bindingContext = bindingContext(context);
         Intent service = new Intent(context, RuntimeBrokerService.class);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -80,12 +81,12 @@ public final class RouteBrokerClient {
                                     error.getClass().getSimpleName() + ": " + String.valueOf(error.getMessage()),
                                     true));
                 }
-                try { context.unbindService(this); } catch (Exception ignored) { }
+                try { bindingContext.unbindService(this); } catch (Exception ignored) { }
                 callback.complete(result);
             }
             @Override public void onServiceDisconnected(ComponentName name) { }
         };
-        if (!context.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+        if (!bindingContext.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
             callback.complete(com.warden.controlledsandbox.contract.ActivityResultResult.failure(
                     com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT,
                     "activity-result-bind-failure",
@@ -96,6 +97,7 @@ public final class RouteBrokerClient {
 
     private static void permissionCall(Activity activity, PermissionRemoteCall call,
                                        PermissionCallback callback) {
+        Context bindingContext = bindingContext(activity);
         Intent service = new Intent(activity, RuntimeBrokerService.class);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -104,30 +106,31 @@ public final class RouteBrokerClient {
                 catch (Exception error) { result = PackageServiceResult.failure(
                         "runtimePermission", error.getClass().getSimpleName(),
                         String.valueOf(error.getMessage())); }
-                try { activity.unbindService(this); } catch (Exception ignored) { }
+                try { bindingContext.unbindService(this); } catch (Exception ignored) { }
                 callback.complete(result);
             }
             @Override public void onServiceDisconnected(ComponentName name) { }
         };
-        if (!activity.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+        if (!bindingContext.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
             callback.complete(PackageServiceResult.failure("runtimePermission",
                     "BIND_FAILED", "Cannot bind RuntimeBrokerService"));
         }
     }
 
     private static void call(Context context, RemoteCall call, Callback callback) {
+        Context bindingContext = bindingContext(context);
         Intent service = new Intent(context, RuntimeBrokerService.class);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
                 Bundle result;
                 try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
                 catch (Exception error) { result = failure(error); }
-                try { context.unbindService(this); } catch (Exception ignored) { }
+                try { bindingContext.unbindService(this); } catch (Exception ignored) { }
                 callback.complete(result);
             }
             @Override public void onServiceDisconnected(ComponentName name) { }
         };
-        if (!context.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
+        if (!bindingContext.bindService(service, connection, Context.BIND_AUTO_CREATE)) {
             Bundle failed = new Bundle();
             failed.putString(RuntimeKeys.STATUS, "FAILED");
             failed.putString(RuntimeKeys.ERROR_TYPE, "BIND_FAILED");
@@ -142,6 +145,17 @@ public final class RouteBrokerClient {
         failed.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
         failed.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
         return failed;
+    }
+
+    /**
+     * Broker calls can outlive a StubActivity during pause/stop/destroy.  Keep the binding owned
+     * by the Guest application context so an in-flight callback cannot leak an Activity-bound
+     * ServiceConnection.  The original context still builds the explicit Broker component, so
+     * the Guest package and route policy are unchanged.
+     */
+    private static Context bindingContext(Context context) {
+        Context application = context.getApplicationContext();
+        return application == null ? context : application;
     }
 
     private static Bundle execute(IRuntimeBroker broker, String operation, Bundle payload)

@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
@@ -201,6 +203,8 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                     + (delegated ? "delegate" : "virtual"));
         } catch (Throwable diagnosticFailure) {
             // Invocation evidence is diagnostic only and must not change service semantics.
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                    .rethrowIfFatal(diagnosticFailure);
         }
     }
 

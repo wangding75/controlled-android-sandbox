@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import java.lang.reflect.Array;
 import java.util.Collections;

@@ -3,11 +3,14 @@ package com.warden.controlledsandbox.framework.packagemanager;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
-import com.warden.controlledsandbox.framework.core.CameraServiceContract;
-import com.warden.controlledsandbox.framework.core.NfcServiceContract;
+import com.warden.controlledsandbox.framework.contract.CameraServiceContract;
+import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+import com.warden.controlledsandbox.framework.contract.NfcServiceContract;
+import com.warden.controlledsandbox.framework.contract.WebViewProviderServiceContract;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualWebViewProfileSnapshot;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -16,6 +19,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
+import android.content.pm.ServiceInfo;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -37,8 +41,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
         if (method.getDeclaringClass() == Object.class) return method.invoke(delegate, args);
-
-        Object virtual = virtualResult(name, method.getReturnType(), args);
+        Object virtual = virtualResult(method, name, method.getReturnType(), args);
         boolean hostFeaturePassThrough = virtual == HostFeaturePassThrough.VALUE;
         if (!hostFeaturePassThrough && virtual != NoResult.VALUE) return virtual;
         if (!hostFeaturePassThrough && isQueryMethod(name)) {
@@ -55,16 +58,32 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         }
     }
 
-    private Object virtualResult(String methodName, Class<?> returnType, Object[] args) {
+    private Object virtualResult(Method method, String methodName, Class<?> returnType, Object[] args)
+            throws Throwable {
+        // The platform has overloads which carry the caller package/uid in addition to the
+        // feature name. Those identity arguments describe the querying process, not a package
+        // target. Resolve controlled features before the generic host-package deny-first check.
+        if (isSystemFeatureMethod(methodName)) {
+            Object feature = virtualSystemFeature(args);
+            if (feature != NoResult.VALUE) return feature;
+        }
         boolean guestTarget = containsGuestPackage(args);
         boolean hiddenTarget = containsHiddenPackage(args);
-        if (hiddenTarget && !guestTarget) return hiddenHostResult(methodName, returnType);
-        if ("hasSystemFeature".equals(methodName)) {
-            Object nfcFeature = virtualNfcFeature(args);
-            if (nfcFeature != NoResult.VALUE) return nfcFeature;
-            Object cameraFeature = virtualCameraFeature(args);
-            if (cameraFeature != NoResult.VALUE) return cameraFeature;
+        if (hiddenTarget && !guestTarget) {
+            android.util.Log.w("CS_PM_HIDDEN_BLOCK", "method=" + methodName
+                    + " first=" + firstString(args), null);
+            return hiddenHostResult(methodName, returnType);
         }
+        if (isControlledUnavailableWebViewDependency(methodName, args)) {
+            // IPackageManager is a Binder-shaped interface whose method does not declare
+            // NameNotFoundException. Returning null lets ApplicationPackageManager translate the
+            // absence into its normal checked exception, which Chromium's PackageUtils handles.
+            return null;
+        }
+        Object webViewPackage = webViewPackageQuery(method, args);
+        if (webViewPackage != NoResult.VALUE) return webViewPackage;
+        Object webViewComponent = webViewComponentQuery(method, args);
+        if (webViewComponent != NoResult.VALUE) return webViewComponent;
         switch (methodName) {
             case "getApplicationInfo":
                 return guestTarget ? metadata.applicationInfo() : hiddenHostResult(methodName, returnType);
@@ -184,6 +203,205 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         }
     }
 
+    private Object virtualSystemFeature(Object[] args) {
+        if (WebViewProviderServiceContract.WEBVIEW_FEATURE.equals(firstString(args))) {
+            VirtualWebViewProfileSnapshot profile =
+                    identity.virtualServices().compatibilityProfile().webView();
+            if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) {
+                return HostFeaturePassThrough.VALUE;
+            }
+            return !VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
+                    && !profile.providerPackage().isEmpty();
+        }
+        Object nfcFeature = virtualNfcFeature(args);
+        if (nfcFeature != NoResult.VALUE) return nfcFeature;
+        Object cameraFeature = virtualCameraFeature(args);
+        if (cameraFeature != NoResult.VALUE) return cameraFeature;
+        return NoResult.VALUE;
+    }
+
+    private static boolean isSystemFeatureMethod(String methodName) {
+        return InvocationMethodMatcher.startsWith(methodName, "hasSystemFeature");
+    }
+
+    /**
+     * Projects the platform WebView APK as one virtual package while keeping the raw provider
+     * package hidden from ordinary Guest package queries. WebViewFactory asks PackageManager for
+     * the provider package after receiving it from IWebViewUpdateService; returning a synthetic
+     * PackageInfo is insufficient because the framework must load the trusted provider code and
+     * native library from its source APK.
+     *
+     * <p>Only the two AOSP provider package names are candidates. The selected package must be a
+     * system or updated-system package. The returned package name remains the policy's virtual
+     * name, while source/library metadata is retained solely so the framework can load that
+     * controlled platform provider. Provider data is redirected into the Guest data root.</p>
+     */
+    private Object webViewPackageQuery(Method method, Object[] args) throws Throwable {
+        String methodName = method.getName();
+        if (!("getApplicationInfo".equals(methodName)
+                || "getApplicationInfoAsUser".equals(methodName)
+                || "getPackageInfo".equals(methodName)
+                || "getPackageInfoAsUser".equals(methodName)
+                || "getPackageInfoVersioned".equals(methodName))) {
+            return NoResult.VALUE;
+        }
+        VirtualWebViewProfileSnapshot profile;
+        try {
+            profile = identity.virtualServices().compatibilityProfile().webView();
+        } catch (IllegalStateException unavailable) {
+            return NoResult.VALUE;
+        }
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) {
+            return NoResult.VALUE;
+        }
+        String requested = firstString(args);
+        if (requested.isEmpty() || !profile.providerPackage().equals(requested)) {
+            return NoResult.VALUE;
+        }
+        if (VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())) {
+            return hiddenHostResult(methodName, method.getReturnType());
+        }
+        int packageIndex = firstStringIndex(args);
+        if (packageIndex < 0) return NoResult.VALUE;
+
+        try {
+            Object raw = method.invoke(delegate, args);
+            if (raw == null) return hiddenHostResult(methodName, method.getReturnType());
+            return projectWebViewPackage(raw, profile);
+        } catch (InvocationTargetException error) {
+            // A configured provider which is not installed is a real compatibility failure. Do
+            // not silently substitute another platform package: WebView resource/package
+            // identity must remain exact and the contract must fail closed.
+            throw error.getCause();
+        }
+    }
+
+    private boolean isControlledUnavailableWebViewDependency(String methodName, Object[] args) {
+        if (!("getPackageInfo".equals(methodName)
+                || "getPackageInfoAsUser".equals(methodName)
+                || "getPackageInfoVersioned".equals(methodName))) return false;
+        try {
+            VirtualWebViewProfileSnapshot profile =
+                    identity.virtualServices().compatibilityProfile().webView();
+            return !VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())
+                    && !VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
+                    && WebViewProviderServiceContract.isControlledUnavailableDependency(
+                            profile.providerPackage(), firstString(args));
+        } catch (IllegalStateException unavailable) {
+            return false;
+        }
+    }
+
+    private Object projectWebViewPackage(Object raw, VirtualWebViewProfileSnapshot profile) {
+        if (raw instanceof ApplicationInfo application) {
+            return projectWebViewApplication(application, profile);
+        }
+        if (raw instanceof PackageInfo packageInfo) {
+            PackageInfo projected = new PackageInfo();
+            projected.packageName = profile.providerPackage();
+            projected.versionName = packageInfo.versionName;
+            projected.versionCode = packageInfo.versionCode;
+            projected.signatures = packageInfo.signatures;
+            projected.signingInfo = packageInfo.signingInfo;
+            projected.requestedPermissions = packageInfo.requestedPermissions;
+            projected.firstInstallTime = packageInfo.firstInstallTime;
+            projected.lastUpdateTime = packageInfo.lastUpdateTime;
+            copyField(packageInfo, projected, "versionCodeMajor");
+            if (packageInfo.applicationInfo != null) {
+                projected.applicationInfo = projectWebViewApplication(
+                        packageInfo.applicationInfo, profile);
+            }
+            return projected;
+        }
+        throw new IllegalStateException("VIRTUAL_WEBVIEW_PACKAGE_SIGNATURE_UNSUPPORTED"
+                + ":" + raw);
+    }
+
+    /**
+     * Exposes only the renderer service metadata required by Chromium's child-process launcher.
+     * The returned copy deliberately retains the provider APK's source/native-library and UID
+     * metadata: ActivityManager uses those fields to launch the trusted platform renderer.
+     * No other provider component is allowed through this path.
+     */
+    private Object webViewComponentQuery(Method method, Object[] args) throws Throwable {
+        if (!"getServiceInfo".equals(method.getName())) return NoResult.VALUE;
+        ComponentName component = firstComponent(args);
+        if (component == null) return NoResult.VALUE;
+        VirtualWebViewProfileSnapshot profile;
+        try {
+            profile = identity.virtualServices().compatibilityProfile().webView();
+        } catch (IllegalStateException unavailable) {
+            return NoResult.VALUE;
+        }
+        boolean renderer = WebViewProviderServiceContract.isRendererService(
+                profile.providerPackage(), component);
+        boolean providerService = WebViewProviderServiceContract.isProviderService(
+                profile.providerPackage(), component);
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())
+                || VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
+                || (!renderer && !providerService)) {
+            return NoResult.VALUE;
+        }
+        try {
+            Object raw = method.invoke(delegate, args);
+            if (!(raw instanceof ServiceInfo service)) {
+                throw new IllegalStateException("VIRTUAL_WEBVIEW_SERVICE_UNAVAILABLE");
+            }
+            if (!component.getClassName().equals(service.name)
+                    || !profile.providerPackage().equals(service.packageName)) {
+                throw new IllegalStateException("VIRTUAL_WEBVIEW_SERVICE_MISMATCH");
+            }
+            ServiceInfo projected = new ServiceInfo();
+            projected.name = service.name;
+            projected.packageName = service.packageName;
+            projected.processName = service.processName;
+            projected.exported = service.exported;
+            projected.enabled = service.enabled;
+            projected.applicationInfo = service.applicationInfo;
+            projected.permission = service.permission;
+            projected.flags = service.flags;
+            return projected;
+        } catch (InvocationTargetException error) {
+            throw error.getCause();
+        }
+    }
+
+    private ApplicationInfo projectWebViewApplication(
+            ApplicationInfo source, VirtualWebViewProfileSnapshot profile) {
+        ApplicationInfo projected = new ApplicationInfo(source);
+        // The profile package is an allowlisted, exact platform provider identity. Keeping the
+        // same value in PackageInfo and ApplicationInfo is required by WebViewFactory and by the
+        // provider resource table; arbitrary Host package names are never accepted here.
+        projected.packageName = profile.providerPackage();
+        projected.uid = identity.virtualUid();
+        String guestDataDir = identity.applicationInfo().dataDir;
+        if (guestDataDir != null && !guestDataDir.trim().isEmpty()) {
+            projected.dataDir = new java.io.File(guestDataDir, "webview/provider").getAbsolutePath();
+        }
+        return projected;
+    }
+
+    private static void copyField(Object source, Object target, String name) {
+        if (source == null || target == null) return;
+        try {
+            java.lang.reflect.Field sourceField = findField(source.getClass(), name);
+            java.lang.reflect.Field targetField = findField(target.getClass(), name);
+            sourceField.setAccessible(true);
+            targetField.setAccessible(true);
+            targetField.set(target, sourceField.get(source));
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+    }
+
+    private static java.lang.reflect.Field findField(Class<?> type, String name)
+            throws NoSuchFieldException {
+        Class<?> cursor = type;
+        while (cursor != null) {
+            try { return cursor.getDeclaredField(name); }
+            catch (NoSuchFieldException ignored) { cursor = cursor.getSuperclass(); }
+        }
+        throw new NoSuchFieldException(name);
+    }
+
     private Object virtualNfcFeature(Object[] args) {
         if (!NfcServiceContract.isNfcFeature(firstString(args))) return NoResult.VALUE;
         VirtualNfcProfileSnapshot profile;
@@ -227,6 +445,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         ComponentName name = firstComponent(args);
         if (name == null) throw new IllegalArgumentException("VIRTUAL_COMPONENT_REQUIRED");
         if (!identity.packageName().equals(name.getPackageName())) {
+            android.util.Log.w("CS_PM_COMPONENT_BLOCK", "type=" + type + " component="
+                    + name.flattenToShortString(), null);
             throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
         }
         return metadata.componentInfo(name, type, firstLong(args, 0L));
@@ -370,8 +590,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     }
 
     private static boolean isQueryMethod(String name) {
-        return name.startsWith("get") || name.startsWith("query") || name.startsWith("resolve")
-                || name.startsWith("check") || name.startsWith("is") || name.startsWith("has");
+        return InvocationMethodMatcher.startsWith(name, "get", "query", "resolve", "check", "is", "has");
     }
 
     private static Object isolatedQueryDefault(Class<?> returnType) {
@@ -392,6 +611,14 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (args == null) return "";
         for (Object arg : args) if (arg instanceof String) return (String) arg;
         return "";
+    }
+
+    private static int firstStringIndex(Object[] args) {
+        if (args == null) return -1;
+        for (int index = 0; index < args.length; index++) {
+            if (args[index] instanceof String) return index;
+        }
+        return -1;
     }
     private static long firstLong(Object[] args, long fallback) {
         if (args == null) return fallback;

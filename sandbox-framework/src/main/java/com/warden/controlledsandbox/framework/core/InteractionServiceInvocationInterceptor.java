@@ -88,7 +88,7 @@ final class InteractionServiceInvocationInterceptor {
         InteractionObjectRewriter.RewriteScope scope = InteractionObjectRewriter.rewrite(
                 arguments, identity, policy, profile.inputMethod());
         GuestInteractionState.WindowState state = identity.interactions().windows();
-        Object token = windowToken(arguments);
+        Object token = windowToken(method, arguments);
         int displayId = firstInt(arguments, profile.display().defaultDisplayId());
         int type = layoutType(arguments);
         if (startsAny(name, "addtodisplay", "addwithoutinputchannel", "add")) {
@@ -255,6 +255,21 @@ final class InteractionServiceInvocationInterceptor {
         }
         return Call.handled(FrameworkInteractionObjectFactory.point(
                 method.getReturnType(), display.widthPixels(), display.heightPixels()));
+    }
+
+    private static Object windowToken(Method method, Object[] arguments) {
+        if (method != null && arguments != null) {
+            Class<?>[] parameterTypes = method.getParameterTypes();
+            int count = Math.min(parameterTypes.length, arguments.length);
+            for (int index = 0; index < count; index++) {
+                String typeName = parameterTypes[index].getName();
+                if ("android.view.IWindow".equals(typeName)
+                        || typeName.endsWith(".IWindow")) {
+                    return arguments[index];
+                }
+            }
+        }
+        return windowToken(arguments);
     }
 
     private static Object windowToken(Object[] arguments) {

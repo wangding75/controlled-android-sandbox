@@ -16,6 +16,7 @@ import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetPage;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import java.io.FileInputStream;
+import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -143,7 +144,7 @@ final class RemoteVirtualPageHydrator {
         byte[] payload;
         try (ParcelFileDescriptor file = session.openPageBlob(descriptor.blobToken());
              FileInputStream input = new FileInputStream(file.getFileDescriptor())) {
-            payload = input.readNBytes(descriptor.byteCount() + 1);
+            payload = readAtMost(input, descriptor.byteCount() + 1);
         }
         if (payload.length != descriptor.byteCount()) {
             throw new SecurityException("PAGE_BLOB_LENGTH_MISMATCH");
@@ -154,6 +155,20 @@ final class RemoteVirtualPageHydrator {
             throw new SecurityException("PAGE_BLOB_DIGEST_MISMATCH");
         }
         return payload;
+    }
+
+    /** Reads at most {@code limit} bytes without relying on API-33 InputStream convenience APIs. */
+    private static byte[] readAtMost(FileInputStream input, int limit) throws java.io.IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(limit, 8192));
+        byte[] buffer = new byte[Math.min(limit, 8192) == 0 ? 1 : Math.min(limit, 8192)];
+        while (output.size() < limit) {
+            int remaining = limit - output.size();
+            int count = input.read(buffer, 0, Math.min(buffer.length, remaining));
+            if (count < 0) break;
+            if (count == 0) continue;
+            output.write(buffer, 0, count);
+        }
+        return output.toByteArray();
     }
 
     private static String sha256(byte[] value) {
