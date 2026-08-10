@@ -610,6 +610,7 @@ public final class GuestRuntimeEnvironment {
             frameworkCallRouter.close();
             frameworkHooks.close();
             processIdentity.close();
+            NativePolicy.resetAudioCapture();
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             NativePolicy.resetCrashRecorder();

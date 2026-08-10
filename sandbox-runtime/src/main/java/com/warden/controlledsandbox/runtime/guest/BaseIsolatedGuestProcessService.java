@@ -137,8 +137,12 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
         try {
             GuestRuntimeEnvironment.shutdownIfCurrent();
         } finally {
-            clearLease();
-            super.onDestroy();
+            try {
+                clearLease();
+                super.onDestroy();
+            } finally {
+                Process.killProcess(Process.myPid());
+            }
         }
     }
 
