@@ -97,9 +97,12 @@ class DeviceLabUnitTest(unittest.TestCase):
         self.assertFalse(lab.requires_explicit_native_trust("fixture64", "launch"))
         self.assertFalse(lab.requires_explicit_native_trust("other", "import-prepare"))
 
-    def test_package_authority_startup_error_retries_without_forced_restart(self) -> None:
+    def test_package_authority_startup_error_rebuilds_stale_boundary(self) -> None:
         self.assertTrue(lab.is_package_authority_startup_error("java.lang.IllegalStateException:Package management service is unavailable"))
         self.assertFalse(lab.is_package_authority_startup_error("android.os.DeadObjectException"))
+        source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
+        branch = source[source.index("if is_package_authority_startup_error"):source.index("else:", source.index("if is_package_authority_startup_error"))]
+        self.assertIn("self.recover_stale_runtime()", branch)
 
     def test_command_recovery_is_bounded(self) -> None:
         self.assertEqual(3, lab.COMMAND_ATTEMPTS)

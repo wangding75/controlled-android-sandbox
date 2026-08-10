@@ -592,9 +592,11 @@ class DeviceLab:
             # DeadObjectException during asynchronous Activity startup.
             if attempt > 1:
                 if is_package_authority_startup_error(last_error):
-                    # Keep the already-started Host authority alive.  Restarting
-                    # it here only repeats the bootstrap race; the Binder
-                    # connector is already bounded and will retry in place.
+                    # A MuMu low-memory recovery can kill Companion32 while the
+                    # Host Package Service still holds its old capability.  The
+                    # failed command has not started a Guest operation, so it is
+                    # safe to rebuild the fixed Companion -> Host boundary.
+                    self.recover_stale_runtime()
                     time.sleep(PACKAGE_AUTHORITY_RETRY_DELAY_SECONDS)
                 else:
                     self.recover_stale_runtime()
