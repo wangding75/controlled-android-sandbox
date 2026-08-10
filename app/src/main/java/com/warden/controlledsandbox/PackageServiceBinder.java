@@ -93,9 +93,10 @@ final class PackageServiceBinder extends IPackageService.Stub {
     @Override public IVirtualSystemServiceSession openVirtualSystemServiceSessionWithCapability(
             IBinder clientToken, String packageName, int virtualUserId, int virtualUid,
             String processName, long generation, String packageRevision,
-            IBinder capability, long capabilityGeneration) {
+        IBinder capability, long capabilityGeneration) {
         requireClientToken(clientToken, "VIRTUAL_SYSTEM_SERVICE_CLIENT_TOKEN_REQUIRED");
-        dependencies.capabilityRegistry.requireRuntime(capability, capabilityGeneration);
+        String authorityRole = dependencies.capabilityRegistry.requireRuntime(
+                capability, capabilityGeneration);
         String normalizedPackage = PackageServiceDependencies.required(packageName, "packageName");
         synchronized (dependencies.operationLock) {
             boolean installed = false;
@@ -133,7 +134,7 @@ final class PackageServiceBinder extends IPackageService.Stub {
                 new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId), virtualUid,
                 PackageServiceDependencies.required(processName, "processName"), generation,
                 PackageServiceDependencies.required(packageRevision, "packageRevision"),
-                capability, capabilityGeneration);
+                capability, capabilityGeneration, authorityRole);
         dependencies.systemServices.reserveClientRegistration(session);
         try {
             if (!session.linkClientDeathAfterReservation()) {

@@ -52,9 +52,11 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
                 "PACKAGE_MANAGEMENT_CAPABILITY_DENIED");
     }
 
-    void requireRuntime(IBinder capability, long clientEpochMarker) {
-        require(verifier.runtimeCaller(), capability, clientEpochMarker,
+    String requireRuntime(IBinder capability, long clientEpochMarker) {
+        PackageCallerVerifier.VerifiedCaller caller = verifier.runtimeCaller();
+        require(caller, capability, clientEpochMarker,
                 "PACKAGE_RUNTIME_CAPABILITY_DENIED");
+        return caller.role;
     }
 
     /**
@@ -63,8 +65,12 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
      * the host UID check in {@link PackageVirtualSystemServiceSession} but cannot be pinned to
      * the broker PID that originally opened it.
      */
-    void requireRuntimeSession(IBinder capability, long clientEpochMarker) {
-        requireActive(PackageCallerVerifier.HOST_RUNTIME_ROLE, capability, clientEpochMarker,
+    void requireRuntimeSession(String authorityRole, IBinder capability,
+                               long clientEpochMarker) {
+        if (authorityRole == null || authorityRole.trim().isEmpty()) {
+            throw new SecurityException("PACKAGE_RUNTIME_CAPABILITY_DENIED:ROLE_REQUIRED");
+        }
+        requireActive(authorityRole, capability, clientEpochMarker,
                 "PACKAGE_RUNTIME_CAPABILITY_DENIED");
     }
 

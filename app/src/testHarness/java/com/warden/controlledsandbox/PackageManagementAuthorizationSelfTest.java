@@ -48,7 +48,11 @@ public final class PackageManagementAuthorizationSelfTest {
             identity.pid = 200;
             TestBinder hostRuntime = new TestBinder();
             registry.installRuntime(hostRuntime, 2000, 200);
-            registry.requireRuntime(hostRuntime, 0L);
+            require(PackageCallerVerifier.HOST_RUNTIME_ROLE.equals(
+                            registry.requireRuntime(hostRuntime, 0L)),
+                    "Host Runtime role was not returned");
+            registry.requireRuntimeSession(PackageCallerVerifier.HOST_RUNTIME_ROLE,
+                    hostRuntime, 0L);
             identity.pid = 201;
             expectSecurity(() -> registry.requireRuntime(hostRuntime, 0L),
                     "same-UID Guest process reused Runtime capability");
@@ -63,7 +67,11 @@ public final class PackageManagementAuthorizationSelfTest {
                     "Companion reused Host Runtime capability");
             TestBinder companionRuntime = new TestBinder();
             registry.installCompanionRuntime(companion, companionRuntime, 3000, 300);
-            registry.requireRuntime(companionRuntime, 0L);
+            String companionRole = registry.requireRuntime(companionRuntime, 0L);
+            require((PackageCallerVerifier.COMPANION_RUNTIME_ROLE_PREFIX + companion)
+                            .equals(companionRole),
+                    "Companion Runtime role was not returned");
+            registry.requireRuntimeSession(companionRole, companionRuntime, 0L);
             identity.pid = 301;
             expectSecurity(() -> registry.requireRuntime(companionRuntime, 0L),
                     "different Companion process reused Runtime capability");
@@ -140,5 +148,9 @@ public final class PackageManagementAuthorizationSelfTest {
         } catch (SecurityException expected) {
             // expected
         }
+    }
+
+    private static void require(boolean condition, String message) {
+        if (!condition) throw new AssertionError(message);
     }
 }

@@ -68,6 +68,7 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     private final PackageAuthorityCapabilityRegistry capabilityRegistry;
     private final IBinder authorityCapability;
     private final long authorityGeneration;
+    private final String authorityRole;
     private final VirtualSystemServiceStore.Scope scope;
     private final int virtualUid;
     private final String processName;
@@ -83,12 +84,14 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
             int ownerUid, IBinder clientToken,
                                 VirtualSystemServiceStore.Scope scope, int virtualUid,
                                 String processName, long generation, String packageRevision,
-                                IBinder authorityCapability, long authorityGeneration) {
+                                IBinder authorityCapability, long authorityGeneration,
+                                String authorityRole) {
         java.util.Objects.requireNonNull(dependencies, "dependencies");
         capabilityRegistry = dependencies.capabilityRegistry;
         this.authorityCapability = java.util.Objects.requireNonNull(
                 authorityCapability, "authorityCapability");
         this.authorityGeneration = authorityGeneration;
+        this.authorityRole = required(authorityRole, "authorityRole");
         systemServices = dependencies.systemServices;
         deviceServices = dependencies.deviceServices;
         interactions = dependencies.interactions;
@@ -423,7 +426,8 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
         if (!active || Binder.getCallingUid() != ownerUid) {
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
         }
-        capabilityRegistry.requireRuntimeSession(authorityCapability, authorityGeneration);
+        capabilityRegistry.requireRuntimeSession(authorityRole, authorityCapability,
+                authorityGeneration);
     }
     private synchronized void closeInternal() {
         if (!active) return;

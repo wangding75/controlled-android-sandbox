@@ -247,7 +247,8 @@ public final class VirtualSystemServicePagingSelfTest {
         dependencies.capabilityRegistry.installRuntime(runtimeAuthority, 0, 1);
         PackageVirtualSystemServiceSession session = new PackageVirtualSystemServiceSession(
                 dependencies, 0, new LiveBinder(), new VirtualSystemServiceStore.Scope("account.pkg", 4),
-                12004, "account.pkg", 1L, "account-revision", runtimeAuthority, 0L);
+                12004, "account.pkg", 1L, "account-revision", runtimeAuthority, 0L,
+                PackageCallerVerifier.HOST_RUNTIME_ROLE);
         try {
             for (int index = 0; index < 40; index++) {
                 String name = String.format(java.util.Locale.ROOT, "user-%02d", index);
@@ -270,7 +271,8 @@ public final class VirtualSystemServicePagingSelfTest {
 
             PackageVirtualSystemServiceSession small = new PackageVirtualSystemServiceSession(
                     dependencies, 0, new LiveBinder(), new VirtualSystemServiceStore.Scope("small.pkg", 5),
-                    12005, "small.pkg", 1L, "small-revision", runtimeAuthority, 0L);
+                    12005, "small.pkg", 1L, "small-revision", runtimeAuthority, 0L,
+                    PackageCallerVerifier.HOST_RUNTIME_ROLE);
             try {
                 require(small.addAccount("one", "mail", "secret"), "small account add failed");
                 small.setAuthToken("one", "mail", "access", "sensitive-token");
