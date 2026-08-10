@@ -428,6 +428,7 @@ run_java('com.warden.controlledsandbox.framework.core.PolicyServicesVirtualizati
 run_java('com.warden.controlledsandbox.framework.core.MediaCommunicationVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.PeripheralServicesVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.PrivilegedServicesVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.PersistentDataBlockServiceContractSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.VirtualSystemServiceSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnectorSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.capability.GuestCapabilityAuditLogSelfTest', assertions=True)

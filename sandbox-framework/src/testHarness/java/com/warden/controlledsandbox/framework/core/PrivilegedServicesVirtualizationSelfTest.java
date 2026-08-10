@@ -92,7 +92,8 @@ public final class PrivilegedServicesVirtualizationSelfTest {
     }
 
     private static void testPersistentData(GuestIdentity identity) {
-        PersistentApi api = proxy(PersistentApi.class, new PersistentDelegate(), identity,
+        PersistentDelegate delegate = new PersistentDelegate();
+        PersistentApi api = proxy(PersistentApi.class, delegate, identity,
                 "persistentDataBlock");
         require(api.read().length == 3 && api.getDataBlockSize() == 3,
                 "persistent data block projected");
@@ -112,6 +113,14 @@ public final class PrivilegedServicesVirtualizationSelfTest {
             wipeDenied = expected.getMessage().contains("WIPE_DENIED");
         }
         require(wipeDenied, "persistent data wipe denied");
+        boolean frpDenied = false;
+        try {
+            api.setFactoryResetProtectionSecret(new byte[32]);
+        } catch (UnsupportedOperationException expected) {
+            frpDenied = expected.getMessage().contains("OPERATION_UNSUPPORTED");
+        }
+        require(frpDenied, "unsupported FRP mutation fails closed");
+        require(delegate.calls == 0, "persistent data virtualization does not call Host");
     }
 
     private static void testSystemUpdate(GuestIdentity identity) {
@@ -207,6 +216,7 @@ public final class PrivilegedServicesVirtualizationSelfTest {
         int write(byte[] value);
         int getDataBlockSize();
         void wipe();
+        void setFactoryResetProtectionSecret(byte[] secret);
     }
     interface SystemUpdateApi {
         Bundle retrieveSystemUpdateInfo();
@@ -239,10 +249,12 @@ public final class PrivilegedServicesVirtualizationSelfTest {
         public void loadNanoApp() { throw new AssertionError("delegate"); }
     }
     static final class PersistentDelegate implements PersistentApi {
-        public byte[] read() { return new byte[]{99}; }
-        public int write(byte[] value) { return value.length; }
-        public int getDataBlockSize() { return 99; }
-        public void wipe() { }
+        int calls;
+        public byte[] read() { calls++; return new byte[]{99}; }
+        public int write(byte[] value) { calls++; return value.length; }
+        public int getDataBlockSize() { calls++; return 99; }
+        public void wipe() { calls++; }
+        public void setFactoryResetProtectionSecret(byte[] secret) { calls++; }
     }
     static final class SystemUpdateDelegate implements SystemUpdateApi {
         public Bundle retrieveSystemUpdateInfo() { return new Bundle(); }

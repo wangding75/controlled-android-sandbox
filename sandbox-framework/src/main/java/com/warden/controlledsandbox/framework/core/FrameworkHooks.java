@@ -239,7 +239,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("contextHub", installed, failures, hooks,
                 () -> ContextHubServiceHook.install(hostServiceContext, identity));
         attempt("persistentDataBlock", installed, failures, hooks,
-                () -> PersistentDataBlockServiceHook.install(identity));
+                () -> PersistentDataBlockServiceHook.install(hostServiceContext, identity));
         attempt("systemUpdate", installed, failures, hooks,
                 () -> SystemUpdateServiceHook.install(identity));
         attempt("bluetooth", installed, failures, hooks, bindingDetails,

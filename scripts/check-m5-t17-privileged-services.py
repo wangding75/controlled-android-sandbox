@@ -116,7 +116,11 @@ require("app/src/testHarness/java/com/warden/controlledsandbox/VirtualPrivileged
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/PrivilegedServicesVirtualizationSelfTest.java",
         "global search component projected", "storage totals projected", "graphics buffer quota",
         "ContextHub client quota", "persistent data block size limit", "system update submission",
-        "HOST search passes through", "PASS M5-T17 privileged-services virtualization self-test")
+        "HOST search passes through", "persistent data virtualization does not call Host",
+        "PASS M5-T17 privileged-services virtualization self-test")
+require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/PersistentDataBlockServiceContractSelfTest.java",
+        "PersistentDataBlock service name", "API32/API35 manager cache compatibility",
+        "PASS PersistentDataBlock API32/API35 contract self-test")
 require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/PrivilegedServicesProxyReadinessSelfTest.java",
         "missing StorageStats proxy blocks startup", "missing SystemUpdate proxy blocks startup",
         "PASS M5-T17 privileged-services proxy readiness self-test")
@@ -125,6 +129,7 @@ runner = text("tools/static_android_compile.py")
 for class_name in (
     "com.warden.controlledsandbox.VirtualPrivilegedServicesStoreSelfTest",
     "com.warden.controlledsandbox.framework.core.PrivilegedServicesVirtualizationSelfTest",
+    "com.warden.controlledsandbox.framework.core.PersistentDataBlockServiceContractSelfTest",
     "com.warden.controlledsandbox.runtime.guest.PrivilegedServicesProxyReadinessSelfTest",
 ):
     if runner.count(f"'{class_name}'") != 1:
