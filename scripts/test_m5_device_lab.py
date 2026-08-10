@@ -114,6 +114,12 @@ class DeviceLabUnitTest(unittest.TestCase):
         host = source.index('self.packages["host"]', guest)
         self.assertLess(guest, host)
 
+    def test_launch_lifecycle_uses_bounded_logcat_window(self) -> None:
+        source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
+        self.assertIn("def reset_lifecycle_log", source)
+        self.assertIn("self.reset_lifecycle_log(fixture_id, user, attempt)", source)
+        self.assertIn('logcat-history.txt', source)
+
     def test_launch_smoke_teardown_stops_guest_before_host(self) -> None:
         source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
         start = source.index("def retire_guest_session_after_smoke")

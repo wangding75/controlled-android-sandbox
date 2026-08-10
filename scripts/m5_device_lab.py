@@ -331,6 +331,7 @@ class DeviceLab:
         self.started_emulator: subprocess.Popen[str] | None = None
         self.command_results: list[dict[str, Any]] = []
         self.guest_smoke_active = False
+        self.logcat_history_path = self.evidence_dir / "logcat-history.txt"
         self.started_monotonic = time.monotonic()
         self.evidence: dict[str, Any] = {
             "schemaVersion": SCHEMA_VERSION,
@@ -520,6 +521,25 @@ class DeviceLab:
         ).stdout
         return activity_lifecycle_counts_from_log(output)
 
+    def reset_lifecycle_log(self, fixture_id: str, user: int, attempt: int) -> None:
+        """Start a bounded logcat window for one launch lifecycle assertion.
+
+        MuMu's logcat ring can evict older Guest markers during a long run.  A
+        cumulative counter therefore cannot prove that the current launch
+        created/resumed an Activity.  Preserve the old ring for the final crash
+        scan, then clear it so the next window has an unambiguous baseline.
+        """
+        snapshot = self.adb(
+            "logcat", "-d", "-v", "threadtime", check=False, timeout=180,
+        ).stdout
+        with self.logcat_history_path.open("a", encoding="utf-8") as history:
+            history.write(
+                f"=== before {fixture_id}/u{user}/launch attempt {attempt} ===\n"
+            )
+            history.write(snapshot)
+            history.write("\n")
+        self.adb("logcat", "-c", check=False, timeout=60)
+
     def wait_for_activity_lifecycle(self, before: tuple[int, int], fixture_id: str, user: int) -> None:
         deadline = time.monotonic() + LAUNCH_LIFECYCLE_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
@@ -580,7 +600,11 @@ class DeviceLab:
             elif self.guest_smoke_active:
                 self.retire_guest_session_after_smoke()
                 self.guest_smoke_active = False
-            lifecycle_before = self.activity_lifecycle_counts() if command == "launch" else None
+            if command == "launch":
+                self.reset_lifecycle_log(fixture_id, user, attempt)
+                lifecycle_before = (0, 0)
+            else:
+                lifecycle_before = None
             self.adb("shell", "run-as", host, "rm", "-f", "files/debug-command-result.json")
             start = self.adb(*start_args, timeout=120)
             start_path = self.evidence_dir / f"start-{fixture_id}-u{user}-{command}-attempt{attempt}.txt"
@@ -695,8 +719,13 @@ class DeviceLab:
         log_path = self.evidence_dir / "logcat.txt"
         log_path.write_text(logcat, encoding="utf-8")
         self.evidence["logcatSha256"] = sha256(log_path)
-        self.evidence["fatalFindings"] = fatal_findings(logcat)
-        self.evidence["environmentNoise"] = environment_noise_findings(logcat)
+        history = ""
+        if self.logcat_history_path.is_file():
+            history = self.logcat_history_path.read_text(encoding="utf-8", errors="replace")
+        combined_logcat = history + "\n=== final logcat window ===\n" + logcat
+        self.evidence["logcatHistorySha256"] = sha256(self.logcat_history_path) if self.logcat_history_path.is_file() else ""
+        self.evidence["fatalFindings"] = fatal_findings(combined_logcat)
+        self.evidence["environmentNoise"] = environment_noise_findings(combined_logcat)
 
         process_text = (self.evidence_dir / "processes.txt").read_text(encoding="utf-8", errors="replace")
         process_name = self.packages["companion32"] + ":sandbox_server32"
