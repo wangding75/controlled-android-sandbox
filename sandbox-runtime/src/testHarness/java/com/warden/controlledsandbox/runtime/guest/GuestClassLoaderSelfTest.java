@@ -82,6 +82,29 @@ public final class GuestClassLoaderSelfTest {
         }
         require(fixtureLoader.suspiciousQueryCount() == 0,
                 "active Guest package is exempt from Host namespace hiding");
+        GuestClassLoader compatibilityFixtureLoader = new GuestClassLoader("", "", null,
+                GuestClassLoaderSelfTest.class.getClassLoader(),
+                "com.warden.controlledsandbox.fixture32",
+                List.of("com.warden.controlledsandbox.fixture.FixtureApplication",
+                        "com.warden.controlledsandbox.fixture.MainActivity"));
+        compatibilityFixtureLoader.configureDetection(new VirtualDetectionPolicySnapshot(
+                VirtualLocationProfileSnapshot.MODE_STATIC, true, true, true, true, true, 2,
+                List.of(), List.of("com.warden.controlledsandbox"), List.of()));
+        try {
+            compatibilityFixtureLoader.loadClass(
+                    "com.warden.controlledsandbox.fixture.FixtureApplication");
+        } catch (ClassNotFoundException unexpected) {
+            throw new AssertionError("declared Guest namespace must remain loadable", unexpected);
+        }
+        require(compatibilityFixtureLoader.suspiciousQueryCount() == 0,
+                "manifest-declared compatibility namespace is exempt without global whitelist");
+        boolean undeclaredHidden = false;
+        try {
+            compatibilityFixtureLoader.loadClass(
+                    "com.warden.controlledsandbox.other.UnlistedDetectionClass");
+        } catch (ClassNotFoundException expected) { undeclaredHidden = true; }
+        require(undeclaredHidden && compatibilityFixtureLoader.suspiciousQueryCount() == 1,
+                "undeclared compatibility namespace class remains policy-hidden");
         loader.configureDetection(new VirtualDetectionPolicySnapshot(
                 VirtualLocationProfileSnapshot.MODE_HOST, false, false, false, false, false, 0,
                 List.of(), List.of(), List.of()));

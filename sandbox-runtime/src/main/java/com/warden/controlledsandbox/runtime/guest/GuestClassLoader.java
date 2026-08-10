@@ -3,7 +3,10 @@ package com.warden.controlledsandbox.runtime.guest;
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import dalvik.system.DexClassLoader;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -24,6 +27,7 @@ public final class GuestClassLoader extends DexClassLoader {
     private volatile int maximumSuspiciousQueries;
     private final AtomicInteger suspiciousQueries = new AtomicInteger();
     private final String guestPackageName;
+    private final List<String> declaredGuestNamespaces;
 
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent) {
@@ -32,8 +36,15 @@ public final class GuestClassLoader extends DexClassLoader {
 
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent, String guestPackageName) {
+        this(dexPath, optimizedDirectory, librarySearchPath, parent, guestPackageName, List.of());
+    }
+
+    GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
+                     ClassLoader parent, String guestPackageName,
+                     List<String> declaredGuestClasses) {
         super(dexPath, optimizedDirectory, librarySearchPath, parent);
         this.guestPackageName = normalizePackageName(guestPackageName);
+        this.declaredGuestNamespaces = guestNamespaces(declaredGuestClasses);
     }
 
     void configureDetection(VirtualDetectionPolicySnapshot policy) {
@@ -75,10 +86,10 @@ public final class GuestClassLoader extends DexClassLoader {
 
     private boolean isPolicyHidden(String name) throws ClassNotFoundException {
         if (name == null || isParentFirst(name)) return false;
-        // The default profile hides the Host package namespace.  A Guest APK may intentionally
-        // use that namespace (the official fixtures do), so exempt only the active Guest package
+        // The default profile hides the Host package namespace. A Guest APK may intentionally use
+        // that namespace, so exempt only its package id or manifest-declared class namespaces
         // after the Host-internal boundary check in loadClass().
-        if (belongsToGuestPackage(name)) return false;
+        if (belongsToGuestPackage(name) || belongsToDeclaredGuestNamespace(name)) return false;
         for (String prefix : hiddenClassPrefixes) {
             if (!name.startsWith(prefix)) continue;
             int count = suspiciousQueries.incrementAndGet();
@@ -93,6 +104,28 @@ public final class GuestClassLoader extends DexClassLoader {
     private boolean belongsToGuestPackage(String name) {
         return !guestPackageName.isEmpty()
                 && (name.equals(guestPackageName) || name.startsWith(guestPackageName + "."));
+    }
+
+    private boolean belongsToDeclaredGuestNamespace(String name) {
+        for (String namespace : declaredGuestNamespaces) {
+            if (name.equals(namespace) || name.startsWith(namespace + ".")) return true;
+        }
+        return false;
+    }
+
+    private static List<String> guestNamespaces(List<String> declaredGuestClasses) {
+        if (declaredGuestClasses == null || declaredGuestClasses.isEmpty()) return List.of();
+        Set<String> namespaces = new LinkedHashSet<>();
+        for (String className : declaredGuestClasses) {
+            String normalized = normalizePackageName(className);
+            int separator = normalized.lastIndexOf('.');
+            if (separator <= 0 || separator == normalized.length() - 1) continue;
+            namespaces.add(normalized.substring(0, separator));
+            if (namespaces.size() > 1024) {
+                throw new IllegalArgumentException("Guest class namespace list is too large");
+            }
+        }
+        return List.copyOf(new ArrayList<>(namespaces));
     }
 
     int suspiciousQueryCount() { return suspiciousQueries.get(); }

@@ -87,7 +87,7 @@ public final class GuestRuntimeEnvironment {
             ensureDirectory(optimized);
             GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader(),
-                    spec.packageName);
+                    spec.packageName, declaredGuestClasses(spec));
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
@@ -409,6 +409,24 @@ public final class GuestRuntimeEnvironment {
 
     private static String emptyToNull(String value) { return value == null || value.trim().isEmpty() ? null : value; }
     private static String safe(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
+
+    /**
+     * Valid APKs may use an applicationId that differs from their Java component namespace.
+     * Derive compatibility exemptions only from this APK's manifest declarations; never add a
+     * global package allowlist. GuestClassLoader still applies Host/internal deny-first rules.
+     */
+    private static java.util.List<String> declaredGuestClasses(GuestPackageSpec spec) {
+        java.util.ArrayList<String> classes = new java.util.ArrayList<>();
+        if (spec.applicationClass != null && !spec.applicationClass.trim().isEmpty()) {
+            classes.add(spec.applicationClass);
+        }
+        for (com.warden.controlledsandbox.contract.VirtualComponentSnapshot component
+                : spec.packageState.components()) {
+            classes.add(component.className());
+        }
+        return java.util.List.copyOf(classes);
+    }
+
     private static void ensureDirectory(File value) {
         if (!value.isDirectory() && !value.mkdirs() && !value.isDirectory()) throw new IllegalStateException("Cannot create " + value);
     }
