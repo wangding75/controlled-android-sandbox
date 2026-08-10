@@ -75,6 +75,20 @@ public final class MediaCommunicationVirtualizationSelfTest {
         try { sms.sendTextForSubscriber(1, "guest.pkg", "10086", "third"); }
         catch (IllegalStateException expected) { quota = expected.getMessage().contains("QUOTA"); }
         require(quota, "SMS quota enforced");
+        boolean wrongSubscription = false;
+        try { sms.sendTextForSubscriber(2, "guest.pkg", "10086", "wrong-subscription"); }
+        catch (SecurityException expected) {
+            wrongSubscription = expected.getMessage().contains("SUBSCRIPTION_MISMATCH");
+        }
+        require(wrongSubscription, "SMS must retain the virtual subscription identity");
+        boolean hostPackageRejected = false;
+        try { sms.sendTextForSubscriber(1, "host.pkg", "10086", "host-package"); }
+        catch (SecurityException expected) {
+            hostPackageRejected = expected.getMessage().contains("HOST_PACKAGE_IDENTITY");
+        }
+        require(hostPackageRejected, "SMS must reject host package attribution");
+        proxy(SmsApi.class, new SmsDelegate(), identity, "isms_msim")
+                .sendTextForSubscriber(1, "guest.pkg", "10086", "bounded-alias");
 
         BackupApi backup = proxy(BackupApi.class, new BackupDelegate(), identity, "backup");
         require(backup.isBackupEnabled() && "local".equals(backup.getCurrentTransport()),

@@ -149,6 +149,11 @@ public final class GuestRuntimeEnvironment {
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());
             frameworkHooks.report().requireMandatoryReady();
+            if (!Boolean.TRUE.equals(frameworkHooks.report().installedServices().get("sms"))) {
+                throw new IllegalStateException("VIRTUAL_SMS_PROXY_REQUIRED");
+            }
+            android.util.Log.i("CS_SMS_PROXY", "SMS_READY binding="
+                    + frameworkHooks.report().bindingDetails().get("sms"));
             CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(),
                     spec.packageState.permissions());
             DeviceServiceProxyReadiness.require(frameworkHooks.report().installedServices(),

@@ -114,6 +114,48 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         validateBinderDescriptor(binder, expectedDescriptor, androidServiceName);
     }
 
+    /** Returns the actual descriptor for a registered service, or an empty string when absent. */
+    public static String serviceManagerDescriptor(String androidServiceName) throws Exception {
+        if (androidServiceName == null || androidServiceName.trim().isEmpty()) {
+            throw new IllegalArgumentException("androidServiceName is required");
+        }
+        Class<?> managerClass = Class.forName("android.os.ServiceManager");
+        Method getService = managerClass.getDeclaredMethod("getService", String.class);
+        getService.setAccessible(true);
+        Object value = getService.invoke(null, androidServiceName);
+        if (value == null) return "";
+        if (!(value instanceof android.os.IBinder binder)) {
+            throw new IllegalStateException("ServiceManager value is not a Binder: " + androidServiceName);
+        }
+        String descriptor = binder.getInterfaceDescriptor();
+        return descriptor == null ? "" : descriptor.trim();
+    }
+
+    /**
+     * Synchronizes a bounded set of known static service caches when one is already populated.
+     * A missing or null candidate is a lazy-cache shape and therefore needs no replacement;
+     * a populated candidate is descriptor-validated before it can be changed.
+     */
+    public static AutoCloseable staticFieldCandidatesWithDescriptorIfPresent(
+            String ownerClassName, String expectedDescriptor, GuestIdentity identity,
+            String serviceName, String... fieldNames) throws Exception {
+        Class<?> owner = Class.forName(ownerClassName);
+        for (String fieldName : fieldNames) {
+            if (fieldName == null || fieldName.isBlank()) continue;
+            Field field;
+            try {
+                field = findField(owner, fieldName);
+            } catch (NoSuchFieldException ignored) {
+                continue;
+            }
+            field.setAccessible(true);
+            Object original = field.get(null);
+            if (original == null) continue;
+            return replace(null, field, original, identity, serviceName, expectedDescriptor);
+        }
+        return () -> { };
+    }
+
     /**
      * Installs a local, descriptor-bound Binder only when every requested platform service is
      * absent.  This is the controlled boundary for radio-less images: a missing host service is
@@ -818,9 +860,10 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     }
 
     @Override public void close() {
-        if (field == null || fieldOwner == null) return;
+        if (field == null) return;
         try {
-            if (field.get(fieldOwner) == proxy) field.set(fieldOwner, original);
+            Object owner = fieldOwner;
+            if (field.get(owner) == proxy) field.set(owner, original);
         } catch (Throwable ignored) { }
     }
 

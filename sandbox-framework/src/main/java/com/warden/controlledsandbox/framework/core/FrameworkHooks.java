@@ -211,7 +211,7 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> MediaSessionManagerServiceHook.install(identity));
         attempt("mediaRouter", installed, failures, hooks,
                 () -> MediaRouterServiceHook.install(identity));
-        attempt("sms", installed, failures, hooks,
+        attempt("sms", installed, failures, hooks, bindingDetails,
                 () -> SmsServiceHook.install(identity));
         attempt("backup", installed, failures, hooks,
                 () -> BackupManagerServiceHook.install(identity));

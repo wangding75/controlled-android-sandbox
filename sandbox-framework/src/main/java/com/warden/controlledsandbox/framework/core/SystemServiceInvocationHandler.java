@@ -63,7 +63,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new PolicyServicesInvocationInterceptor(identity, this.serviceName) : null;
         this.mediaCommunicationInterceptor = Set.of("mediasession", "mediarouter", "audio",
-                "isms", "isms2", "backup", "dropbox").contains(
+                "isms", "isms2", "isms_msim", "backup", "dropbox").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new MediaCommunicationInvocationInterceptor(identity, this.serviceName) : null;
         this.peripheralServicesInterceptor = Set.of("nfc", "usb", "print",

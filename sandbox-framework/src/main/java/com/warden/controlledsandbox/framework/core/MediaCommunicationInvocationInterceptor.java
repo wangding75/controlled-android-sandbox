@@ -51,7 +51,7 @@ final class MediaCommunicationInvocationInterceptor {
             case "mediasession" -> mediaSession(method, arguments, profile.mediaSession());
             case "mediarouter" -> mediaRouter(method, arguments, profile.mediaRouter());
             case "audio" -> audio(method, arguments, profile.audioRouting());
-            case "isms", "isms2" -> messaging(method, arguments, profile.messaging());
+            case "isms", "isms2", "ismsmsim" -> messaging(method, arguments, profile.messaging());
             case "backup" -> backup(method, arguments, profile.backup());
             case "dropbox" -> dropBox(method, arguments, profile.dropBox());
             default -> Decision.passThrough();
@@ -199,6 +199,7 @@ final class MediaCommunicationInvocationInterceptor {
     private Decision messaging(Method method, Object[] arguments, VirtualMessagingProfileSnapshot profile) {
         String name = normalize(method.getName());
         if (host(profile.mode())) return Decision.passThrough();
+        requireSmsIdentity(name, arguments, profile);
         if (blocked(profile.mode())) return Decision.handled(emptyValue(method.getReturnType()));
         if (containsAny(name, "getpreferredsmsubscription", "getdefaultsmssubscriptionid")) {
             return Decision.handled(numeric(method.getReturnType(), profile.subscriptionId()));
@@ -307,6 +308,35 @@ final class MediaCommunicationInvocationInterceptor {
             sentMessages.addLast(new MessageRecord(kind, firstDestination(arguments), now));
             while (sentMessages.size() > Math.max(1, profile.maximumMessagesPerWindow())) sentMessages.removeFirst();
         }
+    }
+
+    private void requireSmsIdentity(String methodName, Object[] arguments,
+            VirtualMessagingProfileSnapshot profile) {
+        if (arguments == null) return;
+        for (Object argument : arguments) {
+            if (identity.hostPackageName().equals(argument)) {
+                throw new SecurityException("VIRTUAL_SMS_HOST_PACKAGE_IDENTITY_DENIED");
+            }
+        }
+        if (!containsAny(methodName, "subscriber", "subscription")) return;
+        int subscription = firstInt(arguments);
+        if (subscription == Integer.MIN_VALUE) return;
+        if (profile.subscriptionId() < 0) {
+            throw new SecurityException("VIRTUAL_SMS_SUBSCRIPTION_UNAVAILABLE");
+        }
+        if (subscription != profile.subscriptionId()) {
+            throw new SecurityException("VIRTUAL_SMS_SUBSCRIPTION_MISMATCH:"
+                    + subscription + " expected=" + profile.subscriptionId());
+        }
+        if (arguments.length > 1 && arguments[1] instanceof String packageName
+                && !identity.packageName().equals(packageName)) {
+            throw new SecurityException("VIRTUAL_SMS_GUEST_PACKAGE_REQUIRED");
+        }
+    }
+
+    private static int firstInt(Object[] arguments) {
+        for (Object argument : arguments) if (argument instanceof Integer value) return value;
+        return Integer.MIN_VALUE;
     }
 
     private void pruneMessages(long now, long windowMs) {
