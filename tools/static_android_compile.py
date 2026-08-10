@@ -11,7 +11,7 @@ classes.mkdir(parents=True)
 def w(rel, text):
     p=stubs/rel; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(textwrap.dedent(text).lstrip())
 
-w('android/os/IBinder.java','''package android.os; public interface IBinder { int INTERFACE_TRANSACTION=1598968902; interface DeathRecipient { void binderDied(); } default boolean isBinderAlive(){return true;} default void linkToDeath(DeathRecipient r,int f)throws RemoteException{} default boolean unlinkToDeath(DeathRecipient r,int f){return true;} }''')
+w('android/os/IBinder.java','''package android.os; public interface IBinder { int INTERFACE_TRANSACTION=1598968902; interface DeathRecipient { void binderDied(); } default String getInterfaceDescriptor(){return "";} default IInterface queryLocalInterface(String descriptor){return null;} default boolean isBinderAlive(){return true;} default void linkToDeath(DeathRecipient r,int f)throws RemoteException{} default boolean unlinkToDeath(DeathRecipient r,int f){return true;} }''')
 w('android/os/IInterface.java','''package android.os; public interface IInterface { default IBinder asBinder(){ return null; } }''')
 w('android/os/RemoteException.java','''package android.os; public class RemoteException extends Exception { private static final long serialVersionUID=1L; public RemoteException(){} public RemoteException(String s){super(s);} }''')
 w('android/os/Binder.java','''package android.os; public class Binder implements IBinder { private IInterface owner; private String descriptor; public static int getCallingUid(){return 0;} public static int getCallingPid(){return 1;} public void attachInterface(IInterface owner,String descriptor){this.owner=owner;this.descriptor=descriptor;} public IInterface queryLocalInterface(String descriptor){return this.descriptor!=null&&this.descriptor.equals(descriptor)?owner:null;} protected boolean onTransact(int c,Parcel d,Parcel r,int f)throws RemoteException{return false;} }''')
@@ -407,6 +407,7 @@ run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityResult
 run_java('com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntimeSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCheckpointStoreSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.FrameworkIdentityProxySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.core.ServiceManagerCompatibilitySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest', assertions=True)
