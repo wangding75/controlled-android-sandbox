@@ -171,6 +171,12 @@ final class PrivilegedServicesInvocationInterceptor {
             removeIdentity(contextHubClients, arguments);
             return Decision.handled(successValue(method.getReturnType()));
         }
+        // ContextHubManager registers its process callback from the constructor on API32/API35.
+        // A controlled-unavailable hub must keep that framework cache constructible while all
+        // actual client, message, and nanoapp operations remain policy-controlled below.
+        if (containsAny(name, "registercallback", "unregistercallback")) {
+            return Decision.handled(successValue(method.getReturnType()));
+        }
         if (blocked(profile.mode())) return Decision.handled(emptyValue(method.getReturnType()));
         if (containsAny(name, "getcontexthubhandles", "getcontexthubs")) {
             return Decision.handled(PrivilegedInvocationValues.contextHubs(
