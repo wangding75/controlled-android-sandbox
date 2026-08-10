@@ -177,6 +177,11 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.policyServicesProfile());
             MediaCommunicationProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.mediaCommunicationProfile());
+            PeripheralServicesProxyReadiness.requireNfc(frameworkHooks.report().installedServices(),
+                    virtualServices.peripheralServicesProfile());
+            android.util.Log.i("CS_NFC_PROXY", "NFC_READY binding="
+                    + frameworkHooks.report().bindingDetails().get("nfc")
+                    + " feature=android.hardware.nfc");
             PeripheralServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.peripheralServicesProfile());
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),

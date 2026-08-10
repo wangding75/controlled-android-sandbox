@@ -73,6 +73,10 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         validateBinderDescriptor(binder, descriptor, androidServiceName);
         if (binder instanceof Proxy) {
             InvocationHandler existing = Proxy.getInvocationHandler(binder);
+            if (existing instanceof SyntheticBinderInvocationHandler synthetic
+                    && synthetic.matches(descriptor)) {
+                return () -> { };
+            }
             if (existing instanceof ServiceManagerBinderInvocationHandler handler
                     && handler.matches(descriptor, logicalServiceName)) {
                 return () -> { };
@@ -218,26 +222,43 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     private static android.os.IBinder syntheticBinder(String descriptor, Object serviceProxy) {
         return (android.os.IBinder) Proxy.newProxyInstance(
                 ReflectiveServiceHook.class.getClassLoader(),
-                new Class<?>[] {android.os.IBinder.class}, (proxy, method, args) -> {
-                    if (method.getDeclaringClass() == Object.class) {
-                        return switch (method.getName()) {
-                            case "toString" -> "SyntheticBinder[" + descriptor + "]";
-                            case "hashCode" -> System.identityHashCode(proxy);
-                            case "equals" -> proxy == (args == null ? null : args[0]);
-                            default -> null;
-                        };
-                    }
-                    return switch (method.getName()) {
-                        case "getInterfaceDescriptor" -> descriptor;
-                        case "queryLocalInterface" -> args != null && args.length == 1
-                                && descriptor.equals(args[0]) ? serviceProxy : null;
-                        case "isBinderAlive", "pingBinder" -> true;
-                        case "unlinkToDeath" -> true;
-                        case "linkToDeath" -> null;
-                        default -> throw new UnsupportedOperationException(
-                                "SYNTHETIC_BINDER_SIGNATURE_UNSUPPORTED:" + method.getName());
-                    };
-                });
+                new Class<?>[] {android.os.IBinder.class},
+                new SyntheticBinderInvocationHandler(descriptor, serviceProxy));
+    }
+
+    private static final class SyntheticBinderInvocationHandler implements InvocationHandler {
+        private final String descriptor;
+        private final Object serviceProxy;
+
+        private SyntheticBinderInvocationHandler(String descriptor, Object serviceProxy) {
+            this.descriptor = descriptor;
+            this.serviceProxy = serviceProxy;
+        }
+
+        private boolean matches(String expectedDescriptor) {
+            return descriptor.equals(expectedDescriptor);
+        }
+
+        @Override public Object invoke(Object proxy, Method method, Object[] args) {
+            if (method.getDeclaringClass() == Object.class) {
+                return switch (method.getName()) {
+                    case "toString" -> "SyntheticBinder[" + descriptor + "]";
+                    case "hashCode" -> System.identityHashCode(proxy);
+                    case "equals" -> proxy == (args == null ? null : args[0]);
+                    default -> null;
+                };
+            }
+            return switch (method.getName()) {
+                case "getInterfaceDescriptor" -> descriptor;
+                case "queryLocalInterface" -> args != null && args.length == 1
+                        && descriptor.equals(args[0]) ? serviceProxy : null;
+                case "isBinderAlive", "pingBinder" -> true;
+                case "unlinkToDeath" -> true;
+                case "linkToDeath" -> null;
+                default -> throw new UnsupportedOperationException(
+                        "SYNTHETIC_BINDER_SIGNATURE_UNSUPPORTED:" + method.getName());
+            };
+        }
     }
 
     /**
@@ -721,10 +742,10 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     private static ReflectiveServiceHook replace(Object owner, Field field, Object original,
                                                  GuestIdentity identity, String serviceName,
                                                  String expectedDescriptor) throws Exception {
+        if (isServiceProxy(original, serviceName)) return new ReflectiveServiceHook();
         if (expectedDescriptor != null && !expectedDescriptor.isEmpty()) {
             validateServiceDescriptor(original, expectedDescriptor, serviceName);
         }
-        if (isServiceProxy(original, serviceName)) return new ReflectiveServiceHook();
         Object proxy = createProxy(original, identity, serviceName);
         field.set(owner, proxy);
         return new ReflectiveServiceHook(owner, field, original, proxy);

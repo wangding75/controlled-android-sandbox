@@ -217,7 +217,7 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> BackupManagerServiceHook.install(identity));
         attempt("dropBox", installed, failures, hooks,
                 () -> DropBoxManagerServiceHook.install(identity));
-        attempt("nfc", installed, failures, hooks,
+        attempt("nfc", installed, failures, hooks, bindingDetails,
                 () -> NfcServiceHook.install(identity));
         attempt("usb", installed, failures, hooks,
                 () -> UsbServiceHook.install(identity));

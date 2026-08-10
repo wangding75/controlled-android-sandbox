@@ -3,6 +3,9 @@ package com.warden.controlledsandbox.framework.packagemanager;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.core.NfcServiceContract;
+import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -34,8 +37,11 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (method.getDeclaringClass() == Object.class) return method.invoke(delegate, args);
 
         Object virtual = virtualResult(name, method.getReturnType(), args);
-        if (virtual != NoResult.VALUE) return virtual;
-        if (isQueryMethod(name)) return isolatedQueryDefault(method.getReturnType());
+        boolean hostFeaturePassThrough = virtual == HostFeaturePassThrough.VALUE;
+        if (!hostFeaturePassThrough && virtual != NoResult.VALUE) return virtual;
+        if (!hostFeaturePassThrough && isQueryMethod(name)) {
+            return isolatedQueryDefault(method.getReturnType());
+        }
 
         Object[] rewritten = args == null ? null : args.clone();
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
@@ -51,6 +57,10 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         boolean guestTarget = containsGuestPackage(args);
         boolean hiddenTarget = containsHiddenPackage(args);
         if (hiddenTarget && !guestTarget) return hiddenHostResult(methodName, returnType);
+        if ("hasSystemFeature".equals(methodName)) {
+            Object nfcFeature = virtualNfcFeature(args);
+            if (nfcFeature != NoResult.VALUE) return nfcFeature;
+        }
         switch (methodName) {
             case "getApplicationInfo":
                 return guestTarget ? metadata.applicationInfo() : hiddenHostResult(methodName, returnType);
@@ -168,6 +178,25 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             default:
                 return NoResult.VALUE;
         }
+    }
+
+    private Object virtualNfcFeature(Object[] args) {
+        if (!NfcServiceContract.isNfcFeature(firstString(args))) return NoResult.VALUE;
+        VirtualNfcProfileSnapshot profile;
+        try {
+            profile = identity.virtualServices().peripheralServicesProfile().nfc();
+        } catch (IllegalStateException unavailable) {
+            String message = unavailable.getMessage();
+            if ("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_AUTHORITY_REQUIRED".equals(message)
+                    || "VIRTUAL_PERIPHERAL_SERVICES_PROFILE_NOT_AVAILABLE".equals(message)) {
+                return NoResult.VALUE;
+            }
+            throw unavailable;
+        }
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) {
+            return HostFeaturePassThrough.VALUE;
+        }
+        return NfcServiceContract.guestFeatureEnabled(profile);
     }
 
     private Object component(Object[] args, VirtualPackageMetadata.Type type) {
@@ -382,4 +411,5 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     }
 
     private enum NoResult { VALUE }
+    private enum HostFeaturePassThrough { VALUE }
 }

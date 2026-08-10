@@ -11,7 +11,7 @@ final class PeripheralServicesProxyReadiness {
     static void require(
             Map<String, Boolean> installed, VirtualPeripheralServicesProfileSnapshot profile) {
         if (profile == null) throw new IllegalStateException("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_MISSING");
-        require(installed, "nfc", profile.nfc().mode(), "VIRTUAL_NFC_PROXY_REQUIRED");
+        requireNfc(installed, profile);
         require(installed, "usb", profile.usb().mode(), "VIRTUAL_USB_PROXY_REQUIRED");
         require(installed, "print", profile.printing().mode(), "VIRTUAL_PRINT_PROXY_REQUIRED");
         require(installed, "companionDevice", profile.companionDevice().mode(),
@@ -23,6 +23,12 @@ final class PeripheralServicesProxyReadiness {
             require(installed, "oemSystemServices", profile.oemSystemServices().mode(),
                     "VIRTUAL_OEM_SYSTEM_SERVICES_PROXY_REQUIRED");
         }
+    }
+
+    static void requireNfc(
+            Map<String, Boolean> installed, VirtualPeripheralServicesProfileSnapshot profile) {
+        if (profile == null) throw new IllegalStateException("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_MISSING");
+        require(installed, "nfc", profile.nfc().mode(), "VIRTUAL_NFC_PROXY_REQUIRED");
     }
 
     private static void require(
