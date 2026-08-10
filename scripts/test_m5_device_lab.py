@@ -76,6 +76,53 @@ class DeviceLabUnitTest(unittest.TestCase):
         self.assertTrue(lab.fatal_findings("FATAL EXCEPTION: main"))
         self.assertTrue(lab.fatal_findings("ANR in com.warden.controlledsandbox.debug"))
 
+    def test_mumu_watchdog_upload_is_environment_noise(self) -> None:
+        telemetry = (
+            'D Watchdog: upload event: {"x":{"app_package":"'
+            'com.warden.controlledsandbox.debug","error":{"code":0}}}'
+        )
+        self.assertEqual([], lab.fatal_findings(telemetry))
+        self.assertEqual(["MUMU_WATCHDOG_UPLOAD_TELEMETRY"], lab.environment_noise_findings(telemetry))
+
+    def test_activity_lifecycle_markers_require_create_and_resume(self) -> None:
+        log = (
+            "I/CS_RUNTIME(1): GUEST_ACTIVITY_CREATE status=ACTIVITY_CREATED component=Main\n"
+            "I/CS_FIXTURE(1): ACTIVITY_RESUME\n"
+        )
+        self.assertEqual((1, 1), lab.activity_lifecycle_counts_from_log(log))
+
+    def test_official_native_import_requires_explicit_trust(self) -> None:
+        self.assertTrue(lab.requires_explicit_native_trust("fixture64", "import-prepare"))
+        self.assertTrue(lab.requires_explicit_native_trust("fixture32", "import-prepare"))
+        self.assertFalse(lab.requires_explicit_native_trust("fixture64", "launch"))
+        self.assertFalse(lab.requires_explicit_native_trust("other", "import-prepare"))
+
+    def test_package_authority_startup_error_retries_without_forced_restart(self) -> None:
+        self.assertTrue(lab.is_package_authority_startup_error("java.lang.IllegalStateException:Package management service is unavailable"))
+        self.assertFalse(lab.is_package_authority_startup_error("android.os.DeadObjectException"))
+
+    def test_command_recovery_is_bounded(self) -> None:
+        self.assertEqual(3, lab.COMMAND_ATTEMPTS)
+        self.assertGreater(lab.COMMAND_RESTART_DELAY_SECONDS, 0)
+        self.assertGreaterEqual(lab.POST_INSTALL_STARTUP_DELAY_SECONDS, 15)
+        self.assertGreater(lab.LAUNCH_LIFECYCLE_TIMEOUT_SECONDS, 0)
+        self.assertGreater(lab.LAUNCH_STABILITY_DELAY_SECONDS, 0)
+
+    def test_command_recovery_stops_guest_before_host(self) -> None:
+        source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
+        guest = source.index('self.packages["companion32"]', source.index("def recover_stale_runtime"))
+        host = source.index('self.packages["host"]', guest)
+        self.assertLess(guest, host)
+
+    def test_launch_smoke_teardown_stops_guest_before_host(self) -> None:
+        source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
+        start = source.index("def retire_guest_session_after_smoke")
+        end = source.index("def invoke_guest", start)
+        section = source[start:end]
+        companion = section.index('self.packages["companion32"]')
+        host = section.index('self.packages["host"]')
+        self.assertLess(companion, host)
+
     def test_formal_evidence_passes(self) -> None:
         self.assertEqual([], lab.validate_formal_evidence(formal_evidence(), LOCK, COMMIT))
 

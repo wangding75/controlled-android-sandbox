@@ -27,8 +27,15 @@ FATAL_PATTERNS = (
     r"ANR in com\.warden\.controlledsandbox",
     r"Fatal signal.*controlledsandbox",
     r"Process: com\.warden\.controlledsandbox.*has died",
-    r"WATCHDOG.*controlledsandbox",
 )
+ENVIRONMENT_NOISE_PATTERNS = (
+    r"Watchdog: upload event:.*app_package.*com\.warden\.controlledsandbox",
+)
+COMMAND_ATTEMPTS = 3
+COMMAND_RESTART_DELAY_SECONDS = 5.0
+POST_INSTALL_STARTUP_DELAY_SECONDS = 15.0
+LAUNCH_LIFECYCLE_TIMEOUT_SECONDS = 20.0
+LAUNCH_STABILITY_DELAY_SECONDS = 4.0
 
 
 def utc_now() -> str:
@@ -61,6 +68,30 @@ def fatal_findings(log_text: str) -> list[str]:
         if re.search(pattern, log_text, re.IGNORECASE):
             findings.append(pattern)
     return findings
+
+
+def environment_noise_findings(log_text: str) -> list[str]:
+    findings: list[str] = []
+    for pattern in ENVIRONMENT_NOISE_PATTERNS:
+        if re.search(pattern, log_text, re.IGNORECASE | re.DOTALL):
+            findings.append("MUMU_WATCHDOG_UPLOAD_TELEMETRY")
+    return findings
+
+
+def activity_lifecycle_counts_from_log(log_text: str) -> tuple[int, int]:
+    """Return completed Guest Activity create/resume markers from filtered logcat text."""
+    created = len(re.findall(r"GUEST_ACTIVITY_CREATE status=ACTIVITY_CREATED", log_text))
+    resumed = len(re.findall(r"CS_FIXTURE.*ACTIVITY_RESUME", log_text))
+    return created, resumed
+
+
+def requires_explicit_native_trust(fixture_id: str, command: str) -> bool:
+    """The debug runner must carry the explicit trust decision into official Fixture imports."""
+    return fixture_id in FIXTURE_IDS and command == "import-prepare"
+
+
+def is_package_authority_startup_error(message: str) -> bool:
+    return "Package management service is unavailable" in (message or "")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -299,6 +330,7 @@ class DeviceLab:
         self.tools = self._resolve_tools()
         self.started_emulator: subprocess.Popen[str] | None = None
         self.command_results: list[dict[str, Any]] = []
+        self.guest_smoke_active = False
         self.started_monotonic = time.monotonic()
         self.evidence: dict[str, Any] = {
             "schemaVersion": SCHEMA_VERSION,
@@ -311,6 +343,7 @@ class DeviceLab:
             "deviceRunCount": 0,
             "commandResults": self.command_results,
             "fatalFindings": [],
+            "environmentNoise": [],
         }
 
     def _resolve_tools(self) -> ToolPaths:
@@ -460,59 +493,151 @@ class DeviceLab:
             if not path.startswith("package:"):
                 raise CommandError(f"installed package not visible: {key}={package}")
         self.adb("logcat", "-c")
+        # MuMu can report the APK immediately while its newly installed Binder
+        # service processes are still being registered.  Let the first binding
+        # attempt start from a settled package-authority state.
+        time.sleep(POST_INSTALL_STARTUP_DELAY_SECONDS)
+
+    def recover_stale_runtime(self) -> None:
+        """Stop the guest side before the host side when a command truly needs recovery.
+
+        A successful launch leaves a live guest activity backed by a Binder session owned
+        by the host.  Force-stopping the host first invalidates that session while the
+        guest is still starting and creates a synthetic DeadObjectException/FATAL in the
+        very lifecycle we are trying to verify.  Recovery is therefore ordered guest
+        first, host second, and is only used after a failed command attempt.
+        """
+        self.adb("shell", "am", "force-stop", self.packages["companion32"], check=False, timeout=60)
+        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+        self.adb("shell", "am", "force-stop", self.packages["host"], check=False, timeout=60)
+        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+        self.guest_smoke_active = False
+
+    def activity_lifecycle_counts(self) -> tuple[int, int]:
+        output = self.adb(
+            "logcat", "-d", "-v", "brief", "-s", "CS_RUNTIME", "CS_FIXTURE",
+            check=False, timeout=60,
+        ).stdout
+        return activity_lifecycle_counts_from_log(output)
+
+    def wait_for_activity_lifecycle(self, before: tuple[int, int], fixture_id: str, user: int) -> None:
+        deadline = time.monotonic() + LAUNCH_LIFECYCLE_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            created, resumed = self.activity_lifecycle_counts()
+            if created > before[0] and resumed > before[1]:
+                # The Guest callback is emitted inside Activity.onResume.  Android
+                # still has a small amount of window/task bookkeeping to complete
+                # after that callback returns; do not switch virtual tasks in that
+                # interval on API32 MuMu.
+                time.sleep(LAUNCH_STABILITY_DELAY_SECONDS)
+                return
+            time.sleep(0.5)
+        raise CommandError(
+            f"Guest Activity lifecycle timeout: {fixture_id}/u{user}/launch "
+            f"before={before} after={self.activity_lifecycle_counts()}"
+        )
+
+    def retire_guest_session_after_smoke(self) -> None:
+        """End a completed Guest smoke session before starting another task.
+
+        MuMu API32 can deliver a late resume to an old StubActivity when a new
+        Host command task is started while the old Guest task is still attached.
+        Guest activities and their :guestN processes are components of the Host
+        APK, while Companion owns the 32-bit transport.  Stop Companion first so
+        its transport is quiescent, then stop Host to remove the Guest task and
+        its process-local runtime before the next command is started.
+        """
+        self.adb("shell", "am", "force-stop", self.packages["companion32"], check=False, timeout=60)
+        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+        self.adb("shell", "am", "force-stop", self.packages["host"], check=False, timeout=60)
+        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
 
     def invoke_guest(self, fixture_id: str, command: str, user: int) -> dict[str, Any]:
         package = self.packages[fixture_id]
         host = self.packages["host"]
-        self.adb("shell", "run-as", host, "rm", "-f", "files/debug-command-result.json")
-        start = self.adb(
+        start_args = [
             "shell", "am", "start", "-W", "-n", self.command_activity,
             "--es", "command", command, "--es", "package", package,
-            "--ei", "user", str(user), timeout=120,
-        )
-        start_path = self.evidence_dir / f"start-{fixture_id}-u{user}-{command}.txt"
-        start_path.write_text(start.stdout + "\n" + start.stderr, encoding="utf-8")
-        deadline = time.monotonic() + int(self.lab["commandTimeoutSeconds"])
-        payload = ""
-        while time.monotonic() < deadline:
-            read = self.adb(
-                "shell", "run-as", host, "cat", "files/debug-command-result.json",
-                check=False, timeout=30,
-            )
-            payload = read.stdout.strip()
-            if payload.startswith("{"):
-                break
-            time.sleep(0.5)
-        if not payload.startswith("{"):
-            raise CommandError(f"Guest command result timeout: {fixture_id}/u{user}/{command}")
-        raw = json.loads(payload)
-        result = {
-            "fixtureId": fixture_id,
-            "package": package,
-            "virtualUserId": user,
-            "command": command,
-            "status": raw.get("status"),
-            "operation": raw.get("operation"),
-            "components": raw.get("components"),
-            "companion": raw.get("companion"),
-            "errorType": raw.get("errorType", ""),
-            "errorMessage": raw.get("errorMessage", ""),
-        }
-        path = self.evidence_dir / f"result-{fixture_id}-u{user}-{command}.json"
-        path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        self.command_results.append(result)
-        if result["status"] != "PASS":
-            raise CommandError(
-                f"Guest command failed: {fixture_id}/u{user}/{command}: "
-                f"{result['errorType']}:{result['errorMessage']}"
-            )
-        if fixture_id == "fixture32":
-            companion = result.get("companion")
-            if not isinstance(companion, dict) or companion.get("successful") is not True:
-                raise CommandError(f"missing successful Companion32 probe: u{user}/{command}")
-            if companion.get("processBitness") != 32:
-                raise CommandError(f"Companion process bitness is not 32: {companion}")
-        return result
+            "--ei", "user", str(user),
+        ]
+        if requires_explicit_native_trust(fixture_id, command):
+            start_args.extend(("--ez", "trustNativeGuest", "true"))
+        last_error = ""
+        for attempt in range(1, COMMAND_ATTEMPTS + 1):
+            # A successful command finishes its no-history command activity, so the
+            # next explicit start can be issued without disturbing a live guest
+            # session.  Only recover after an actual failed attempt; the guest must
+            # be stopped before its host Binder owner to avoid a synthetic
+            # DeadObjectException during asynchronous Activity startup.
+            if attempt > 1:
+                if is_package_authority_startup_error(last_error):
+                    # Keep the already-started Host authority alive.  Restarting
+                    # it here only repeats the bootstrap race; the Binder
+                    # connector is already bounded and will retry in place.
+                    time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+                else:
+                    self.recover_stale_runtime()
+            elif self.guest_smoke_active:
+                self.retire_guest_session_after_smoke()
+                self.guest_smoke_active = False
+            lifecycle_before = self.activity_lifecycle_counts() if command == "launch" else None
+            self.adb("shell", "run-as", host, "rm", "-f", "files/debug-command-result.json")
+            start = self.adb(*start_args, timeout=120)
+            start_path = self.evidence_dir / f"start-{fixture_id}-u{user}-{command}-attempt{attempt}.txt"
+            start_path.write_text(start.stdout + "\n" + start.stderr, encoding="utf-8")
+            deadline = time.monotonic() + int(self.lab["commandTimeoutSeconds"])
+            payload = ""
+            while time.monotonic() < deadline:
+                read = self.adb(
+                    "shell", "run-as", host, "cat", "files/debug-command-result.json",
+                    check=False, timeout=30,
+                )
+                payload = read.stdout.strip()
+                if payload.startswith("{"):
+                    break
+                time.sleep(0.5)
+            if not payload.startswith("{"):
+                last_error = f"Guest command result timeout: {fixture_id}/u{user}/{command}"
+                continue
+            try:
+                raw = json.loads(payload)
+            except json.JSONDecodeError as exc:
+                last_error = f"Guest command result is not JSON: {fixture_id}/u{user}/{command}: {exc}"
+                continue
+            result = {
+                "fixtureId": fixture_id,
+                "package": package,
+                "virtualUserId": user,
+                "command": command,
+                "status": raw.get("status"),
+                "operation": raw.get("operation"),
+                "components": raw.get("components"),
+                "companion": raw.get("companion"),
+                "errorType": raw.get("errorType", ""),
+                "errorMessage": raw.get("errorMessage", ""),
+            }
+            attempt_path = self.evidence_dir / f"result-{fixture_id}-u{user}-{command}-attempt{attempt}.json"
+            attempt_path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            if result["status"] != "PASS":
+                last_error = (
+                    f"Guest command failed: {fixture_id}/u{user}/{command}: "
+                    f"{result['errorType']}:{result['errorMessage']}"
+                )
+                continue
+            if lifecycle_before is not None:
+                self.wait_for_activity_lifecycle(lifecycle_before, fixture_id, user)
+                self.guest_smoke_active = True
+            path = self.evidence_dir / f"result-{fixture_id}-u{user}-{command}.json"
+            path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+            self.command_results.append(result)
+            if fixture_id == "fixture32":
+                companion = result.get("companion")
+                if not isinstance(companion, dict) or companion.get("successful") is not True:
+                    raise CommandError(f"missing successful Companion32 probe: u{user}/{command}")
+                if companion.get("processBitness") != 32:
+                    raise CommandError(f"Companion process bitness is not 32: {companion}")
+            return result
+        raise CommandError(last_error or f"Guest command failed: {fixture_id}/u{user}/{command}")
 
     def initial_suite(self) -> None:
         for fixture_id in FIXTURE_IDS:
@@ -571,6 +696,7 @@ class DeviceLab:
         log_path.write_text(logcat, encoding="utf-8")
         self.evidence["logcatSha256"] = sha256(log_path)
         self.evidence["fatalFindings"] = fatal_findings(logcat)
+        self.evidence["environmentNoise"] = environment_noise_findings(logcat)
 
         process_text = (self.evidence_dir / "processes.txt").read_text(encoding="utf-8", errors="replace")
         process_name = self.packages["companion32"] + ":sandbox_server32"
