@@ -292,8 +292,23 @@ public final class GuestRuntimeEnvironment {
     static synchronized void shutdown(String sessionId, long generation) {
         if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
         Session session = require(sessionId, generation);
-        session.shutdown();
         current = null;
+        session.shutdown();
+    }
+
+    /**
+     * Clears the process-local Guest lease when Android tears down its concrete Guest service.
+     * A service can be stopped after its Binder binding is released without receiving the typed
+     * shutdown call, so service destruction must not leave a prior session resident in the slot.
+     */
+    static synchronized void shutdownIfCurrent() {
+        // A concurrent prepare owns the staged cleanup path in prepare().  Android is already
+        // tearing down this process; do not publish a new current Session from that path.
+        if (preparing) return;
+        Session session = current;
+        if (session == null) return;
+        current = null;
+        session.shutdown();
     }
 
     public static synchronized void updatePermissionState(String sessionId, long generation,

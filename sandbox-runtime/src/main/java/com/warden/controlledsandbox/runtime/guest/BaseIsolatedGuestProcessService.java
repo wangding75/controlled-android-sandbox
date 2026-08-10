@@ -134,12 +134,12 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
     @Override public IBinder onBind(Intent intent) { return binder; }
 
     @Override public void onDestroy() {
-        if (!activeSessionId.isEmpty()) {
-            try { GuestRuntimeEnvironment.shutdown(activeSessionId, activeGeneration); }
-            catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
+        try {
+            GuestRuntimeEnvironment.shutdownIfCurrent();
+        } finally {
+            clearLease();
+            super.onDestroy();
         }
-        clearLease();
-        super.onDestroy();
     }
 
     private IsolatedProcessResult failure(IsolatedProcessRequest request, Throwable error) {

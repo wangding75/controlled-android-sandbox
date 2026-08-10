@@ -177,9 +177,21 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         source.markFailure(reason);
         source.unlinkDeath();
         unbind(source);
+        // A bound-only Guest service otherwise survives after the Binder lease is released.  That
+        // leaves the old process-local GuestRuntimeEnvironment resident in the slot and lets a
+        // later session collide with the slot's generation.  The logical slot owns exactly one
+        // Guest process, so retire the concrete service after releasing this binding.
+        stopGuestService(source);
         if (notify && source.claimDisconnectNotification()) {
             disconnectListener.onDisconnect(source.slot, reason);
         }
+    }
+
+    private void stopGuestService(GuestConnection connection) {
+        Class<?> serviceClass = RuntimeStubComponents.serviceClassFor(connection.slot);
+        Intent intent = new Intent();
+        intent.setComponent(new ComponentName(owner.getPackageName(), serviceClass.getName()));
+        owner.stopService(intent);
     }
 
     private void unbind(GuestConnection connection) {

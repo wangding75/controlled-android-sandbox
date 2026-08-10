@@ -33,6 +33,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         testDisconnectedHasDistinctReason();
         testFrameworkDisconnectUnlinksDeathRecipient();
         testBindingDiedUnlinksDeathRecipient();
+        testReleaseStopsConcreteGuestService();
         System.out.println("PASS RuntimeGuestConnectionPool direct ownership self-test");
     }
 
@@ -259,6 +260,21 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         pool.close();
     }
 
+    private static void testReleaseStopsConcreteGuestService() throws Exception {
+        TestService service = new TestService();
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> { });
+        FakeGuest guest = service.guest;
+        pool.call(6, value -> resultFor(value, guest, "connected"));
+
+        pool.release(6);
+        require(service.stopCount == 1,
+                "releasing a Guest Binder lease must stop the concrete Guest service");
+        require(RuntimeStubComponents.serviceClassFor(6).getName().equals(service.lastStoppedServiceClassName),
+                "release stopped the wrong concrete Guest service: "
+                        + service.lastStoppedServiceClassName);
+    }
+
     private static Bundle resultFor(IGuestProcess actual, IGuestProcess expected, String value) {
         require(actual == expected, "pool published an unexpected Guest capability");
         Bundle result = new Bundle();
@@ -283,11 +299,17 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile CallbackMode callbackMode = CallbackMode.CONNECT;
         private volatile int bindCount;
         private volatile int unbindCount;
+        private volatile int stopCount;
+        private volatile String lastStoppedServiceClassName;
         private volatile boolean asyncConnect;
         private volatile ServiceConnection currentConnection;
         private volatile ComponentName currentComponent;
         private volatile CountDownLatch blockedBindEntered;
         private volatile CountDownLatch blockedBindRelease;
+
+        @Override public String getPackageName() {
+            return "com.warden.controlledsandbox";
+        }
 
         void blockNextConnection() {
             blockedBindEntered = new CountDownLatch(1);
@@ -357,6 +379,13 @@ public final class RuntimeGuestConnectionPoolSelfTest {
 
         @Override public void unbindService(ServiceConnection connection) {
             unbindCount++;
+        }
+
+        @Override public boolean stopService(Intent service) {
+            stopCount++;
+            lastStoppedServiceClassName = service.getComponent() == null
+                    ? null : service.getComponent().getClassName();
+            return true;
         }
     }
 

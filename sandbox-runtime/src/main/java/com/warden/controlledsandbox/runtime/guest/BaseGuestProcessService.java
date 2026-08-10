@@ -53,4 +53,12 @@ public abstract class BaseGuestProcessService extends Service {
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
+
+    @Override public void onDestroy() {
+        try {
+            GuestRuntimeEnvironment.shutdownIfCurrent();
+        } finally {
+            super.onDestroy();
+        }
+    }
 }
