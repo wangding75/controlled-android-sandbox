@@ -107,6 +107,7 @@ public final class FrameworkHooks implements AutoCloseable {
         hooks.add(identity.networks());
         Map<String, Boolean> installed = new LinkedHashMap<>();
         Map<String, String> failures = new LinkedHashMap<>();
+        Map<String, String> bindingDetails = new LinkedHashMap<>();
         // Hook installation needs the process-local platform PackageManager transport. GuestContext
         // intentionally withholds getPackageManager() until the hook report is sealed, so using the
         // Host service Context here avoids a deterministic bootstrap failure while still returning
@@ -131,13 +132,14 @@ public final class FrameworkHooks implements AutoCloseable {
         FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
         if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
             rollbackInstalled(hooks, installed, failures);
-            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
+            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures, bindingDetails));
         }
         attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
-        attempt("location", installed, failures, hooks, () -> LocationServiceHook.install(hostServiceContext, identity));
+        attempt("location", installed, failures, hooks, bindingDetails,
+                () -> LocationServiceHook.install(hostServiceContext, identity));
         attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));
-        attempt("settingsIdentity", installed, failures, hooks,
-                () -> SettingsProviderIdentityHook.install(guestContext, identity));
+        attempt("settingsIdentity", installed, failures, hooks, bindingDetails,
+                () -> DeviceServiceBindingRegistry.install(guestContext, identity, "settingsIdentity"));
         attempt("webViewUpdate", installed, failures, hooks,
                 () -> WebViewUpdateServiceHook.install(identity));
         attempt("deviceIdentifiers", installed, failures, hooks,
@@ -146,16 +148,17 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> GoogleServiceBrokerHook.install(identity));
         attempt("oemIdentifiers", installed, failures, hooks,
                 () -> OemIdentifierServiceHook.install(identity));
-        attempt("telephony", installed, failures, hooks,
+        attempt("telephony", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installTelephony(hostServiceContext, identity));
-        attempt("phoneSubInfo", installed, failures, hooks,
+        attempt("phoneSubInfo", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installSubscriberInfo(hostServiceContext, identity));
-        attempt("telephonyRegistry", installed, failures, hooks,
+        attempt("telephonyRegistry", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installRegistry(hostServiceContext, identity));
-        attempt("subscription", installed, failures, hooks,
+        attempt("subscription", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installSubscription(hostServiceContext, identity));
-        attempt("wifi", installed, failures, hooks, () -> WifiServiceHook.install(hostServiceContext, identity));
-        attempt("wifiScanner", installed, failures, hooks,
+        attempt("wifi", installed, failures, hooks, bindingDetails,
+                () -> WifiServiceHook.install(hostServiceContext, identity));
+        attempt("wifiScanner", installed, failures, hooks, bindingDetails,
                 () -> WifiServiceHook.installScanner(hostServiceContext, identity));
         attempt("connectivity", installed, failures, hooks,
                 () -> ConnectivityServiceHook.install(hostServiceContext, identity));
@@ -225,12 +228,12 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> PersistentDataBlockServiceHook.install(identity));
         attempt("systemUpdate", installed, failures, hooks,
                 () -> SystemUpdateServiceHook.install(identity));
-        attempt("bluetooth", installed, failures, hooks,
+        attempt("bluetooth", installed, failures, hooks, bindingDetails,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
-        attempt("sensorCatalog", installed, failures, hooks,
+        attempt("sensorCatalog", installed, failures, hooks, bindingDetails,
                 () -> SensorServiceHook.install(hostServiceContext, identity));
         attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
-        return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures));
+        return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures, bindingDetails));
     }
 
     public FrameworkHookReport report() { return report; }
@@ -326,14 +329,33 @@ public final class FrameworkHooks implements AutoCloseable {
 
     private static void attempt(String name, Map<String, Boolean> installed, Map<String, String> failures,
                                 List<AutoCloseable> hooks, Installer installer) {
+        attempt(name, installed, failures, hooks, null, installer);
+    }
+
+    private static void attempt(String name, Map<String, Boolean> installed, Map<String, String> failures,
+                                List<AutoCloseable> hooks, Map<String, String> bindingDetails,
+                                Installer installer) {
         try {
             AutoCloseable hook = installer.install();
             hooks.add(hook);
             installed.put(name, true);
+            if (bindingDetails != null && hook instanceof DeviceServiceBindingRegistry.Described described) {
+                bindingDetails.put(name, described.description());
+            }
         } catch (Throwable error) {
             try {
                 installed.put(name, false);
-                failures.put(name, error.getClass().getName() + ":" + String.valueOf(error.getMessage()));
+                String detail = error.getClass().getName() + ":" + String.valueOf(error.getMessage());
+                if (error.getSuppressed().length > 0) {
+                    StringBuilder suppressed = new StringBuilder(detail);
+                    for (Throwable item : error.getSuppressed()) {
+                        suppressed.append(" | suppressed=").append(item.getClass().getName())
+                                .append(":").append(String.valueOf(item.getMessage()));
+                    }
+                    detail = suppressed.toString();
+                }
+                android.util.Log.w("CS_FRAMEWORK", "HOOK_FAILED " + name + " " + detail, null);
+                failures.put(name, detail.length() > 384 ? detail.substring(0, 384) + "..." : detail);
             } finally {
                 com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
             }

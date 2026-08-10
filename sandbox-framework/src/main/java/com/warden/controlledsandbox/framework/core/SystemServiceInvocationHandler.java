@@ -77,7 +77,12 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
-        if (method.getDeclaringClass() == Object.class) return method.invoke(delegate, arguments);
+        if (method.getDeclaringClass() == Object.class) {
+            if (delegate != null) return method.invoke(delegate, arguments);
+            return syntheticObjectMethod(proxy, method, arguments);
+        }
+        if (delegate == null && "asBinder".equals(method.getName())
+                && method.getParameterCount() == 0) return null;
         Object virtual = virtualDecision(method, arguments);
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
@@ -148,6 +153,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
         try {
             try {
+                if (delegate == null) {
+                    throw new UnsupportedOperationException(
+                            "VIRTUAL_" + serviceName.toUpperCase(java.util.Locale.ROOT)
+                                    + "_SIGNATURE_UNSUPPORTED:" + method.getName());
+                }
                 Object result = method.invoke(delegate, rewritten);
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
@@ -176,6 +186,15 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             virtualCall.close();
             interactionCall.close();
         }
+    }
+
+    private Object syntheticObjectMethod(Object proxy, Method method, Object[] arguments) {
+        return switch (method.getName()) {
+            case "toString" -> "SyntheticSystemService[" + serviceName + "]";
+            case "hashCode" -> System.identityHashCode(proxy);
+            case "equals" -> proxy == (arguments == null ? null : arguments[0]);
+            default -> null;
+        };
     }
 
     private Object virtualDecision(Method method, Object[] arguments) {

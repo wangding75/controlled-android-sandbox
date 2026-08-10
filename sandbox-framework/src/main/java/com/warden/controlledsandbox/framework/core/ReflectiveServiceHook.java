@@ -10,6 +10,8 @@ import java.lang.reflect.InvocationHandler;
 import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 /** Reversible proxy installer for framework manager fields and android.util.Singleton instances. */
 public final class ReflectiveServiceHook implements AutoCloseable {
@@ -84,6 +86,90 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     }
 
     /**
+     * Installs a local, descriptor-bound Binder only when every requested platform service is
+     * absent.  This is the controlled boundary for radio-less images: a missing host service is
+     * represented by a virtual AIDL interface, while an existing Binder (including a descriptor
+     * mismatch) remains fail-closed and is never overwritten.
+     */
+    public static AutoCloseable syntheticServiceManagerBindings(
+            List<String> androidServiceNames, String descriptor, String logicalServiceName,
+            GuestIdentity identity) throws Exception {
+        if (androidServiceNames == null || androidServiceNames.isEmpty()) {
+            throw new IllegalArgumentException("androidServiceNames are required");
+        }
+        Class<?> interfaceType = Class.forName(descriptor);
+        if (!interfaceType.isInterface()) {
+            throw new IllegalStateException("Synthetic Binder contract is not an interface: " + descriptor);
+        }
+        ClassLoader interfaceLoader = interfaceType.getClassLoader();
+        if (interfaceLoader == null) interfaceLoader = ReflectiveServiceHook.class.getClassLoader();
+        Object serviceProxy = Proxy.newProxyInstance(interfaceLoader,
+                new Class<?>[] {interfaceType},
+                new SystemServiceInvocationHandler(null, identity, logicalServiceName));
+        Class<?> managerClass = Class.forName("android.os.ServiceManager");
+        Method getService = managerClass.getDeclaredMethod("getService", String.class);
+        getService.setAccessible(true);
+        Field cacheField = findField(managerClass, "sCache");
+        cacheField.setAccessible(true);
+        Object cache = cacheField.get(null);
+        if (!(cache instanceof Map)) throw new IllegalStateException("ServiceManager cache unavailable");
+        @SuppressWarnings("unchecked") Map<String, Object> entries = (Map<String, Object>) cache;
+        List<ServiceManagerBinding> installed = new ArrayList<>();
+        try {
+            for (String androidServiceName : androidServiceNames) {
+                Object existing = getService.invoke(null, androidServiceName);
+                if (existing instanceof android.os.IBinder binder) {
+                    String actual = binder.getInterfaceDescriptor();
+                    throw new IllegalStateException("Host Binder exists for " + androidServiceName
+                            + ": " + actual + "; synthetic replacement refused");
+                }
+            }
+            for (String androidServiceName : androidServiceNames) {
+                android.os.IBinder replacement = syntheticBinder(descriptor, serviceProxy);
+                Object previous;
+                synchronized (entries) {
+                    previous = entries.put(androidServiceName, replacement);
+                }
+                installed.add(new ServiceManagerBinding(entries, androidServiceName,
+                        previous, replacement));
+            }
+            return new CompositeHook(installed);
+        } catch (Throwable error) {
+            for (int index = installed.size() - 1; index >= 0; index--) {
+                try { installed.get(index).close(); } catch (Throwable rollback) { error.addSuppressed(rollback); }
+            }
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof Exception exception) throw exception;
+            throw new IllegalStateException("SYNTHETIC_SERVICE_MANAGER_BINDING_FAILED", error);
+        }
+    }
+
+    private static android.os.IBinder syntheticBinder(String descriptor, Object serviceProxy) {
+        return (android.os.IBinder) Proxy.newProxyInstance(
+                ReflectiveServiceHook.class.getClassLoader(),
+                new Class<?>[] {android.os.IBinder.class}, (proxy, method, args) -> {
+                    if (method.getDeclaringClass() == Object.class) {
+                        return switch (method.getName()) {
+                            case "toString" -> "SyntheticBinder[" + descriptor + "]";
+                            case "hashCode" -> System.identityHashCode(proxy);
+                            case "equals" -> proxy == (args == null ? null : args[0]);
+                            default -> null;
+                        };
+                    }
+                    return switch (method.getName()) {
+                        case "getInterfaceDescriptor" -> descriptor;
+                        case "queryLocalInterface" -> args != null && args.length == 1
+                                && descriptor.equals(args[0]) ? serviceProxy : null;
+                        case "isBinderAlive", "pingBinder" -> true;
+                        case "unlinkToDeath" -> true;
+                        case "linkToDeath" -> null;
+                        default -> throw new UnsupportedOperationException(
+                                "SYNTHETIC_BINDER_SIGNATURE_UNSUPPORTED:" + method.getName());
+                    };
+                });
+    }
+
+    /**
      * Prefer the stable ServiceManager boundary and retain a descriptor-checked legacy field
      * fallback for platform revisions which do not expose the service through that boundary.
      */
@@ -102,27 +188,84 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         java.util.ArrayList<Throwable> failures = new java.util.ArrayList<>();
         for (String serviceName : serviceNames) {
             try {
-                return serviceManagerBinding(serviceName, logicalServiceName, descriptor, identity);
+                AutoCloseable serviceManagerHook = serviceManagerBinding(
+                        serviceName, logicalServiceName, descriptor, identity);
+                try {
+                    ReflectiveServiceHook managerHook = managerFieldCandidatesWithDescriptor(
+                            context, androidServiceName, logicalServiceName, descriptor,
+                            identity, fieldPaths);
+                    return new CompositeHook(serviceManagerHook, managerHook);
+                } catch (Throwable managerError) {
+                    // A lazy Android manager can resolve the now-replaced ServiceManager entry
+                    // later.  Keep the descriptor-validated binding when its private cache has
+                    // no compatible field, but never hide failures from the field-only path.
+                    return serviceManagerHook;
+                }
             } catch (Throwable error) {
                 failures.add(error);
             }
         }
 
-        Object manager = context.getSystemService(androidServiceName);
-        if (manager == null) {
-            failures.add(new IllegalStateException(
-                    "System service unavailable: " + androidServiceName));
-        } else {
-            for (String path : fieldPaths) {
-                try {
-                    return replacePath(manager, path, identity, logicalServiceName, descriptor);
-                } catch (Throwable error) {
-                    failures.add(error);
-                }
-            }
+        try {
+            return managerFieldCandidatesWithDescriptor(context, androidServiceName,
+                    logicalServiceName, descriptor, identity, fieldPaths);
+        } catch (Throwable error) {
+            failures.add(error);
         }
         IllegalStateException failure = new IllegalStateException(
                 "No supported Binder binding for " + logicalServiceName);
+        for (Throwable error : failures) failure.addSuppressed(error);
+        throw failure;
+    }
+
+    /**
+     * Installs a descriptor-checked manager-field binding without accepting an unvalidated
+     * private field.  This is the common fallback for Android releases whose managers cache an
+     * IInterface before ServiceManager can be replaced.
+     */
+    public static ReflectiveServiceHook managerFieldCandidatesWithDescriptor(
+            Context context, String androidServiceName, String logicalServiceName,
+            String descriptor, GuestIdentity identity, String... fieldPaths) throws Exception {
+        Object manager = context.getSystemService(androidServiceName);
+        if (manager == null) {
+            throw new IllegalStateException("System service unavailable: " + androidServiceName);
+        }
+        java.util.ArrayList<Throwable> failures = new java.util.ArrayList<>();
+        for (String path : fieldPaths) {
+            try {
+                return replacePath(manager, path, identity, logicalServiceName, descriptor);
+            } catch (Throwable error) {
+                failures.add(error);
+            }
+        }
+        IllegalStateException failure = new IllegalStateException(
+                "No descriptor-validated manager field for " + logicalServiceName);
+        for (Throwable error : failures) failure.addSuppressed(error);
+        throw failure;
+    }
+
+    /**
+     * Creates a fail-closed local interface only when the platform explicitly exposes a null
+     * IInterface field and no host Binder exists.  It is used for headless telephony stacks; a
+     * non-null host object is never replaced by this path.
+     */
+    public static ReflectiveServiceHook syntheticManagerFieldCandidates(
+            Context context, String androidServiceName, String logicalServiceName,
+            GuestIdentity identity, String... fieldPaths) throws Exception {
+        Object manager = context.getSystemService(androidServiceName);
+        if (manager == null) {
+            throw new IllegalStateException("System service unavailable: " + androidServiceName);
+        }
+        java.util.ArrayList<Throwable> failures = new java.util.ArrayList<>();
+        for (String path : fieldPaths) {
+            try {
+                return replaceSyntheticPath(manager, path, identity, logicalServiceName);
+            } catch (Throwable error) {
+                failures.add(error);
+            }
+        }
+        IllegalStateException failure = new IllegalStateException(
+                "No null manager field for synthetic " + logicalServiceName);
         for (Throwable error : failures) failure.addSuppressed(error);
         throw failure;
     }
@@ -237,6 +380,35 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         return replace(owner, target, target.get(owner), identity, serviceName, expectedDescriptor);
     }
 
+    private static ReflectiveServiceHook replaceSyntheticPath(Object root, String path,
+                                                              GuestIdentity identity,
+                                                              String serviceName) throws Exception {
+        if (path == null || path.trim().isEmpty()) {
+            throw new IllegalArgumentException("field path is required");
+        }
+        String[] segments = path.split("\\.");
+        Object owner = root;
+        for (int index = 0; index < segments.length - 1; index++) {
+            Field field = findField(owner.getClass(), segments[index]);
+            field.setAccessible(true);
+            owner = field.get(owner);
+            if (owner == null) {
+                throw new IllegalStateException("Null service field segment: " + segments[index]);
+            }
+        }
+        Field target = findField(owner.getClass(), segments[segments.length - 1]);
+        target.setAccessible(true);
+        if (target.get(owner) != null) {
+            throw new IllegalStateException("Synthetic binding refuses non-null field: " + path);
+        }
+        if (!target.getType().isInterface()) {
+            throw new IllegalStateException("Synthetic binding requires interface field: " + path);
+        }
+        Object proxy = createSyntheticProxy(target.getType(), identity, serviceName);
+        target.set(owner, proxy);
+        return new ReflectiveServiceHook(owner, target, null);
+    }
+
     static Object createProxy(Object original, GuestIdentity identity) {
         return createProxy(original, identity, "");
     }
@@ -254,6 +426,14 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         if (loader == null) loader = ReflectiveServiceHook.class.getClassLoader();
         return Proxy.newProxyInstance(loader, interfaces.toArray(new Class<?>[0]),
                 new SystemServiceInvocationHandler(original, identity, serviceName));
+    }
+
+    private static Object createSyntheticProxy(Class<?> serviceType, GuestIdentity identity,
+                                               String serviceName) {
+        ClassLoader loader = serviceType.getClassLoader();
+        if (loader == null) loader = ReflectiveServiceHook.class.getClassLoader();
+        return Proxy.newProxyInstance(loader, new Class<?>[] {serviceType},
+                new SystemServiceInvocationHandler(null, identity, serviceName));
     }
 
     private static ReflectiveServiceHook replace(Object owner, Field field, Object original,
@@ -336,11 +516,49 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         }
     }
 
+    private static final class CompositeHook implements AutoCloseable {
+        private final AutoCloseable first;
+        private final AutoCloseable second;
+
+        private CompositeHook(AutoCloseable first, AutoCloseable second) {
+            this.first = first;
+            this.second = second;
+        }
+
+        private CompositeHook(List<? extends AutoCloseable> hooks) {
+            this.first = hooks.isEmpty() ? () -> { } : hooks.get(0);
+            AutoCloseable remainder = () -> { };
+            for (int index = hooks.size() - 1; index >= 1; index--) {
+                AutoCloseable current = hooks.get(index);
+                AutoCloseable previous = remainder;
+                remainder = () -> {
+                    Exception failure = null;
+                    try { current.close(); } catch (Exception error) { failure = error; }
+                    try { previous.close(); } catch (Exception error) {
+                        if (failure == null) failure = error; else failure.addSuppressed(error);
+                    }
+                    if (failure != null) throw failure;
+                };
+            }
+            this.second = remainder;
+        }
+
+        @Override public void close() throws Exception {
+            Exception failure = null;
+            try { second.close(); } catch (Exception error) { failure = error; }
+            try { first.close(); } catch (Exception error) {
+                if (failure == null) failure = error; else failure.addSuppressed(error);
+            }
+            if (failure != null) throw failure;
+        }
+    }
+
     @Override public void close() {
         try { field.set(fieldOwner, original); } catch (Throwable ignored) { }
     }
 
     static Field findField(Class<?> type, String name) throws NoSuchFieldException {
+        HiddenApiAccess.ensureExemptions();
         Class<?> cursor = type;
         while (cursor != null) {
             try { return cursor.getDeclaredField(name); }

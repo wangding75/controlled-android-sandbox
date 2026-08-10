@@ -46,6 +46,10 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         if (authority.isEmpty()) {
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_UNRESOLVED");
         }
+        // Settings is a platform provider, not a guest-owned provider.  It remains behind the
+        // SettingsProviderIdentityHook, which projects Android ID and virtual settings values;
+        // allowing the transport here only lets Settings acquire its system IContentProvider.
+        if ("settings".equals(authority)) return Interception.passThrough();
         ProviderDescriptor descriptor = descriptors.get(authority);
         if (descriptor == null) {
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:" + authority);

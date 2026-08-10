@@ -1,6 +1,9 @@
 package com.warden.controlledsandbox.framework.core;
 
 import android.content.Context;
+import android.content.ContentResolver;
+import android.content.ContentProviderClient;
+import android.net.Uri;
 import android.os.Bundle;
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
@@ -22,9 +25,12 @@ import java.util.Set;
 /** Reversible Settings provider projection for Android ID and virtual Secure/System/Global values. */
 public final class SettingsProviderIdentityHook implements AutoCloseable {
     private final List<ProviderReplacement> replacements;
+    private final List<ContentProviderClient> providerLeases;
 
-    private SettingsProviderIdentityHook(List<ProviderReplacement> replacements) {
+    private SettingsProviderIdentityHook(List<ProviderReplacement> replacements,
+                                         List<ContentProviderClient> providerLeases) {
         this.replacements = replacements;
+        this.providerLeases = providerLeases;
     }
 
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
@@ -37,18 +43,23 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
                 && !VirtualLocationProfileSnapshot.MODE_HOST.equals(settings.mode());
         if (!virtualAndroidId && !virtualSettings) return () -> { };
         List<ProviderReplacement> replacements = new ArrayList<>();
+        List<ContentProviderClient> providerLeases = new ArrayList<>();
         try {
             installNamespace(context, identity, device, settings, "Secure",
-                    VirtualSettingsProfileSnapshot.NAMESPACE_SECURE, virtualAndroidId, replacements);
+                    VirtualSettingsProfileSnapshot.NAMESPACE_SECURE, virtualAndroidId,
+                    replacements, providerLeases);
             if (virtualSettings) {
                 installNamespace(context, identity, device, settings, "System",
-                        VirtualSettingsProfileSnapshot.NAMESPACE_SYSTEM, false, replacements);
+                        VirtualSettingsProfileSnapshot.NAMESPACE_SYSTEM, false,
+                        replacements, providerLeases);
                 installNamespace(context, identity, device, settings, "Global",
-                        VirtualSettingsProfileSnapshot.NAMESPACE_GLOBAL, false, replacements);
+                        VirtualSettingsProfileSnapshot.NAMESPACE_GLOBAL, false,
+                        replacements, providerLeases);
             }
-            return new SettingsProviderIdentityHook(replacements);
+            return new SettingsProviderIdentityHook(replacements, providerLeases);
         } catch (Throwable error) {
             for (int index = replacements.size() - 1; index >= 0; index--) replacements.get(index).restore();
+            for (ContentProviderClient lease : providerLeases) try { lease.close(); } catch (Exception ignored) { }
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException("VIRTUAL_SETTINGS_PROVIDER_INSTALL_FAILED", error);
         }
@@ -57,7 +68,8 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
     private static void installNamespace(Context context, GuestIdentity identity,
             VirtualDeviceIdentitySnapshot device, VirtualSettingsProfileSnapshot settings,
             String nestedName, String namespace, boolean virtualAndroidId,
-            List<ProviderReplacement> replacements) throws Exception {
+            List<ProviderReplacement> replacements,
+            List<ContentProviderClient> providerLeases) throws Exception {
         Class<?> owner = Class.forName("android.provider.Settings$" + nestedName);
         Field cacheField = ReflectiveServiceHook.findField(owner, "sNameValueCache");
         cacheField.setAccessible(true);
@@ -65,6 +77,10 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         if (cache == null) throw new IllegalStateException("Settings." + nestedName + " cache is unavailable");
         ProviderField provider = providerField(cache);
         Object original = provider.field.get(provider.owner);
+        if (original == null) {
+            original = acquireProvider(context, namespace, providerLeases);
+            if (original != null) provider.field.set(provider.owner, original);
+        }
         if (original == null) {
             initializeCache(context, owner, namespace.equals(VirtualSettingsProfileSnapshot.NAMESPACE_SECURE)
                     ? "android_id" : "screen_brightness");
@@ -74,6 +90,47 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         Object proxy = proxy(original, identity, device, settings, namespace, virtualAndroidId);
         provider.field.set(provider.owner, proxy);
         replacements.add(new ProviderReplacement(provider.owner, provider.field, original));
+    }
+
+    private static Object acquireProvider(Context context, String namespace,
+                                          List<ContentProviderClient> providerLeases) {
+        try {
+            Object resolver = context.getContentResolver();
+            Uri uri = Uri.parse("content://settings/" + namespace.toLowerCase(Locale.ROOT));
+            if (resolver instanceof ContentResolver contentResolver) {
+                ContentProviderClient client = contentResolver.acquireContentProviderClient("settings");
+                if (client != null) {
+                    for (String fieldName : new String[] {"mContentProvider", "mProvider"}) {
+                        try {
+                            Field field = ReflectiveServiceHook.findField(client.getClass(), fieldName);
+                            field.setAccessible(true);
+                            Object value = field.get(client);
+                            if (value != null) {
+                                providerLeases.add(client);
+                                return value;
+                            }
+                        } catch (NoSuchFieldException ignored) { }
+                    }
+                    try { client.close(); } catch (Exception ignored) { }
+                }
+            }
+            Class<?> type = resolver.getClass();
+            for (String methodName : new String[] {"acquireProvider", "acquireUnstableProvider"}) {
+                Method method = null;
+                Class<?> cursor = type;
+                while (cursor != null && method == null) {
+                    try { method = cursor.getDeclaredMethod(methodName, Uri.class); }
+                    catch (NoSuchMethodException ignored) { cursor = cursor.getSuperclass(); }
+                }
+                if (method == null) continue;
+                method.setAccessible(true);
+                Object value = method.invoke(resolver, uri);
+                if (value != null) return value;
+            }
+        } catch (Throwable ignored) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored);
+        }
+        return null;
     }
 
     private static ProviderField providerField(Object cache) throws Exception {
@@ -262,6 +319,8 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
     @Override public void close() {
         for (int index = replacements.size() - 1; index >= 0; index--) replacements.get(index).restore();
         replacements.clear();
+        for (ContentProviderClient lease : providerLeases) try { lease.close(); } catch (Exception ignored) { }
+        providerLeases.clear();
     }
 
     private record ProviderField(Object owner, Field field) { }

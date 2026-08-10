@@ -144,7 +144,14 @@ public final class GuestRuntimeEnvironment {
             CapabilityProxyReadiness.require(frameworkHooks.report().installedServices(),
                     spec.packageState.permissions());
             DeviceServiceProxyReadiness.require(frameworkHooks.report().installedServices(),
+                    frameworkHooks.report().bindingDetails(), frameworkHooks.report().failures(),
                     virtualServices.deviceServiceProfile());
+            for (String capability : new String[] {"location", "settingsIdentity", "telephony",
+                    "phoneSubInfo", "telephonyRegistry", "subscription", "wifiScanner",
+                    "bluetooth", "sensorCatalog"}) {
+                android.util.Log.i("CS_DEVICE_SERVICE", capability + " READY binding="
+                        + frameworkHooks.report().bindingDetails().get(capability));
+            }
             InteractionProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.interactionProfile());
             NetworkServiceProxyReadiness.require(frameworkHooks.report().installedServices(),
@@ -445,6 +452,11 @@ public final class GuestRuntimeEnvironment {
             }
             out.putStringArrayList("frameworkHooksInstalled", installedHooks);
             out.putStringArrayList("frameworkHooksFailed", failedHooks);
+            java.util.ArrayList<String> deviceServiceBindings = new java.util.ArrayList<>();
+            for (java.util.Map.Entry<String, String> item : frameworkHooks.report().bindingDetails().entrySet()) {
+                deviceServiceBindings.add(item.getKey() + "=" + item.getValue());
+            }
+            out.putStringArrayList("deviceServiceBindings", deviceServiceBindings);
             out.putInt("capabilityAuditCount", capabilityAudit.size());
             out.putInt("capabilityDeniedCount", capabilityAudit.deniedCount());
             out.putInt("capabilityActiveLeases", capabilityLeases.activeCount());

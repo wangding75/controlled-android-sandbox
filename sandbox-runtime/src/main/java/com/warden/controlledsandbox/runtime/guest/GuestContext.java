@@ -129,6 +129,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (!sharedState.systemServices.isKnownService(name)) return null;
         capabilityGate.requireService(name);
         sharedState.systemServices.requireAvailable(name);
+        Object override = com.warden.controlledsandbox.framework.core.GuestSystemServiceOverrideRegistry
+                .get(this, name);
+        if (override != null) return override;
         return hostServiceContext.getSystemService(name);
     }
     @Override public ContentResolver getContentResolver() {

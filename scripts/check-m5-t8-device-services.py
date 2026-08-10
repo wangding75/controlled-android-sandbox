@@ -89,6 +89,9 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
         "android_id", "VIRTUAL_ANDROID_ID_MUTATION_DENIED")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SensorCatalogHook.java",
         "mFullSensorsList", "handleContainer", "originalList")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceBindingRegistry.java",
+        "settingsIdentity", "telephonyRegistry", "android.location.ILocationManager",
+        "android.net.wifi.IWifiScanner", "android.gui.SensorServer", "classification()")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
         'attempt("deviceIdentity"', 'attempt("settingsIdentity"', 'attempt("telephonyRegistry"',
         'attempt("subscription"', 'attempt("wifiScanner"', 'attempt("sensorCatalog"')
@@ -106,11 +109,14 @@ require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/fra
         "static location replaces host result", "subscription list projected", "Wi-Fi scan results projected",
         "Bluetooth remote identity projected", "virtual sensor sample delivered",
         "HOST location mode passes query and cleanup")
+require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DeviceServiceBindingRegistrySelfTest.java",
+        "exactly the nine mandatory device capabilities", "platform aliases")
 require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/DeviceServiceProxyReadinessSelfTest.java",
         "PASS M5-T8 device-service proxy readiness self-test")
 
 runner = text("tools/static_android_compile.py")
 for test in ("VirtualDeviceServiceStoreSelfTest", "DeviceServiceVirtualizationSelfTest",
+             "DeviceServiceBindingRegistrySelfTest",
              "DeviceServiceProxyReadinessSelfTest"):
     if test not in runner:
         errors.append(f"static Android compiler does not execute {test}")

@@ -12,16 +12,24 @@ public final class FrameworkHookReport {
             "notification", "jobScheduler", "alarm", "clipboard", "account", "storage");
     private final Map<String, Boolean> installed;
     private final Map<String, String> failures;
+    private final Map<String, String> bindingDetails;
 
     FrameworkHookReport(Map<String, Boolean> installed, Map<String, String> failures) {
+        this(installed, failures, Collections.emptyMap());
+    }
+
+    FrameworkHookReport(Map<String, Boolean> installed, Map<String, String> failures,
+                        Map<String, String> bindingDetails) {
         this.installed = Collections.unmodifiableMap(new LinkedHashMap<>(installed));
         this.failures = Collections.unmodifiableMap(new LinkedHashMap<>(failures));
+        this.bindingDetails = Collections.unmodifiableMap(new LinkedHashMap<>(bindingDetails));
     }
 
     public boolean packageManagerInstalled() { return installed("packageManager"); }
     public boolean installed(String service) { return Boolean.TRUE.equals(installed.get(service)); }
     public Map<String, Boolean> installedServices() { return installed; }
     public Map<String, String> failures() { return failures; }
+    public Map<String, String> bindingDetails() { return bindingDetails; }
 
     public Set<String> mandatoryFailures() {
         Set<String> result = new LinkedHashSet<>();
