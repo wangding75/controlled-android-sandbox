@@ -489,6 +489,36 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         throw failure;
     }
 
+    /**
+     * Synchronizes a bounded static manager cache only when the framework has already populated
+     * it.  CameraManagerGlobal is lazy on API32/API35, so a null cache is deliberately left to
+     * resolve through the descriptor-validated ServiceManager binding installed by the caller.
+     */
+    public static AutoCloseable staticInstanceFieldCandidatesWithDescriptorIfPresent(
+            String ownerClassName, String getterMethod, GuestIdentity identity,
+            String serviceName, String expectedDescriptor, String... fieldPaths) throws Exception {
+        Class<?> owner = Class.forName(ownerClassName);
+        Method getter = owner.getDeclaredMethod(getterMethod);
+        getter.setAccessible(true);
+        Object instance = getter.invoke(null);
+        if (instance == null) {
+            throw new IllegalStateException(ownerClassName + "." + getterMethod + " returned null");
+        }
+        for (String path : fieldPaths) {
+            if (path == null || path.isBlank()) continue;
+            Field field;
+            try {
+                field = resolvePath(instance, path);
+            } catch (NoSuchFieldException ignored) {
+                continue;
+            }
+            Object original = field.get(targetOwner(instance, path));
+            if (original == null) continue;
+            return replacePath(instance, path, identity, serviceName, expectedDescriptor);
+        }
+        return () -> { };
+    }
+
     public static ReflectiveServiceHook singleton(String ownerClassName, String singletonFieldName,
                                            GuestIdentity identity) throws Exception {
         return singleton(ownerClassName, singletonFieldName, identity, "");

@@ -415,6 +415,7 @@ run_java('com.warden.controlledsandbox.framework.core.ServiceManagerCompatibilit
 run_java('com.warden.controlledsandbox.framework.service.AudioRoutingServiceHookSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.service.SmsServiceHookSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.service.NfcServiceHookSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.service.CameraServiceHookSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest', assertions=True)

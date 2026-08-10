@@ -147,7 +147,8 @@ public final class FrameworkHooks implements AutoCloseable {
             rollbackInstalled(hooks, installed, failures);
             return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures, bindingDetails));
         }
-        attempt("camera", installed, failures, hooks, () -> CameraServiceHook.install(hostServiceContext, identity));
+        attempt("camera", installed, failures, hooks, bindingDetails,
+                () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, bindingDetails,
                 () -> LocationServiceHook.install(hostServiceContext, identity));
         attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));

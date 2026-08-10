@@ -32,6 +32,7 @@ import com.warden.controlledsandbox.contract.VirtualDnsProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkSnapshot;
 import com.warden.controlledsandbox.contract.VirtualVpnProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
@@ -184,6 +185,14 @@ public final class GuestRuntimeEnvironment {
                     + " feature=android.hardware.nfc");
             PeripheralServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.peripheralServicesProfile());
+            VirtualCameraProfileSnapshot cameraProfile =
+                    virtualServices.peripheralServicesProfile().camera();
+            android.util.Log.i("CS_CAMERA_PROXY", "CAMERA_READY binding="
+                    + frameworkHooks.report().bindingDetails().get("camera")
+                    + " feature=android.hardware.camera mode=" + cameraProfile.mode()
+                    + " available=" + cameraProfile.cameraAvailable()
+                    + " ids=" + cameraProfile.cameraIds().size()
+                    + " frontIds=" + cameraProfile.frontCameraIds().size());
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.privilegedServicesProfile());
             Application application = createApplication(spec, loader, guestContext);

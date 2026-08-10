@@ -3,8 +3,10 @@ package com.warden.controlledsandbox.framework.packagemanager;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.core.CameraServiceContract;
 import com.warden.controlledsandbox.framework.core.NfcServiceContract;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;
 
 import android.content.ComponentName;
@@ -60,6 +62,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if ("hasSystemFeature".equals(methodName)) {
             Object nfcFeature = virtualNfcFeature(args);
             if (nfcFeature != NoResult.VALUE) return nfcFeature;
+            Object cameraFeature = virtualCameraFeature(args);
+            if (cameraFeature != NoResult.VALUE) return cameraFeature;
         }
         switch (methodName) {
             case "getApplicationInfo":
@@ -197,6 +201,26 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             return HostFeaturePassThrough.VALUE;
         }
         return NfcServiceContract.guestFeatureEnabled(profile);
+    }
+
+    private Object virtualCameraFeature(Object[] args) {
+        String featureName = firstString(args);
+        if (!CameraServiceContract.isCameraFeature(featureName)) return NoResult.VALUE;
+        VirtualCameraProfileSnapshot profile;
+        try {
+            profile = identity.virtualServices().peripheralServicesProfile().camera();
+        } catch (IllegalStateException unavailable) {
+            String message = unavailable.getMessage();
+            if ("VIRTUAL_PERIPHERAL_SERVICES_PROFILE_AUTHORITY_REQUIRED".equals(message)
+                    || "VIRTUAL_PERIPHERAL_SERVICES_PROFILE_NOT_AVAILABLE".equals(message)) {
+                return NoResult.VALUE;
+            }
+            throw unavailable;
+        }
+        if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) {
+            return HostFeaturePassThrough.VALUE;
+        }
+        return CameraServiceContract.guestFeatureEnabled(profile, featureName);
     }
 
     private Object component(Object[] args, VirtualPackageMetadata.Type type) {

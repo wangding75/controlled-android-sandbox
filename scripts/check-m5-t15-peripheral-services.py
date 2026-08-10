@@ -224,6 +224,14 @@ require(
     "stringArrayOrList",
 )
 require(
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/CameraServiceContract.java",
+    "media.camera",
+    "android.hardware.ICameraService",
+    "CameraManager$CameraManagerGlobal",
+    "mCameraService",
+    "FEATURE_CAMERA_FRONT",
+)
+require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
     "PeripheralServicesInvocationInterceptor",
 )
@@ -238,6 +246,7 @@ require(
     'attempt("camera"',
 )
 for hook in (
+    "CameraServiceHook",
     "NfcServiceHook",
     "UsbServiceHook",
     "PrintManagerServiceHook",
@@ -255,6 +264,14 @@ require(
     "OEM_SYSTEM_SERVICES_UNAVAILABLE",
     "addSuppressed",
 )
+require(
+    "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/service/CameraServiceHookSelfTest.java",
+    "testExistingServiceAndCacheRollback",
+    "testMissingServiceUsesControlledSyntheticCamera",
+    "invalid Camera descriptor",
+    "CameraManagerGlobal.mCameraService",
+    "PASS Camera service contract self-test",
+)
 
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PeripheralServicesProxyReadiness.java",
@@ -269,6 +286,7 @@ require(
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
     "PeripheralServicesProxyReadiness.require",
+    "CAMERA_READY",
 )
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
@@ -309,6 +327,7 @@ runner = text("tools/static_android_compile.py")
 for class_name in (
     "com.warden.controlledsandbox.VirtualPeripheralServicesStoreSelfTest",
     "com.warden.controlledsandbox.framework.core.PeripheralServicesVirtualizationSelfTest",
+    "com.warden.controlledsandbox.framework.service.CameraServiceHookSelfTest",
     "com.warden.controlledsandbox.runtime.guest.PeripheralServicesProxyReadinessSelfTest",
 ):
     if runner.count(f"'{class_name}'") != 1:
