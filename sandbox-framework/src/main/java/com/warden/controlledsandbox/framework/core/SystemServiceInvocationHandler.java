@@ -136,6 +136,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 ? InteractionServiceInvocationInterceptor.Call.passThrough()
                 : interactionInterceptor.before(method, rewritten);
         if (interactionCall.handled()) {
+            recordInteractionInvocation(method, false);
             try { return interactionCall.result(); }
             finally { interactionCall.close(); }
         }
@@ -158,6 +159,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                             "VIRTUAL_" + serviceName.toUpperCase(java.util.Locale.ROOT)
                                     + "_SIGNATURE_UNSUPPORTED:" + method.getName());
                 }
+                recordInteractionInvocation(method, true);
                 Object result = method.invoke(delegate, rewritten);
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
@@ -185,6 +187,20 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             scope.close();
             virtualCall.close();
             interactionCall.close();
+        }
+    }
+
+    String serviceName() { return serviceName; }
+
+    private void recordInteractionInvocation(Method method, boolean delegated) {
+        if (interactionInterceptor == null || identity == null) return;
+        try {
+            identity.interactions().invocations().record(serviceName, method.getName(), delegated);
+            android.util.Log.i("CS_INTERACTION_PROXY", "ACTUAL_PROXY_INVOCATION service="
+                    + serviceName + " method=" + method.getName() + " path="
+                    + (delegated ? "delegate" : "virtual"));
+        } catch (Throwable diagnosticFailure) {
+            // Invocation evidence is diagnostic only and must not change service semantics.
         }
     }
 

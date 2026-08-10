@@ -415,6 +415,7 @@ run_java('com.warden.controlledsandbox.framework.core.ServiceManagerCompatibilit
 run_java('com.warden.controlledsandbox.framework.core.CapabilityServiceProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DeviceServiceVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.InteractionServiceVirtualizationSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.service.InteractionProxyInstallationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.NetworkServiceVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.ApplicationEnvironmentVirtualizationSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.CompatibilityVirtualizationSelfTest', assertions=True)

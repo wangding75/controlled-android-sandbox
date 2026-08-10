@@ -14,14 +14,16 @@ public final class GuestInteractionState implements AutoCloseable {
     private final InputMethodState inputMethods = new InputMethodState();
     private final ActivityClientState activities = new ActivityClientState();
     private final DisplayState displays = new DisplayState();
+    private final InvocationState invocations = new InvocationState();
 
     public WindowState windows() { return windows; }
     public InputMethodState inputMethods() { return inputMethods; }
     public ActivityClientState activities() { return activities; }
     public DisplayState displays() { return displays; }
+    public InvocationState invocations() { return invocations; }
 
     @Override public void close() {
-        windows.clear(); inputMethods.clear(); activities.clear(); displays.clear();
+        windows.clear(); inputMethods.clear(); activities.clear(); displays.clear(); invocations.clear();
     }
 
     public static final class WindowState {
@@ -202,5 +204,36 @@ public final class GuestInteractionState implements AutoCloseable {
         public synchronized int size() { return owned.size(); }
         synchronized void clear() { owned.clear(); }
         private record DisplayRecord(long virtualId, String name, long updatedAtMs) { }
+    }
+
+    /** Debug-visible proof that a Guest call entered the installed interaction proxy. */
+    public static final class InvocationState {
+        private final Map<String, Integer> counts = new LinkedHashMap<>();
+        private final List<String> events = new ArrayList<>();
+
+        public synchronized void record(String service, String method, boolean delegated) {
+            String key = String.valueOf(service) + "." + String.valueOf(method);
+            counts.put(key, counts.getOrDefault(key, 0) + 1);
+            if (events.size() < 128) {
+                events.add(key + (delegated ? "|delegated" : "|virtual"));
+            }
+        }
+
+        public synchronized int count(String service) {
+            String prefix = String.valueOf(service) + ".";
+            int total = 0;
+            for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+                if (entry.getKey().startsWith(prefix)) total += entry.getValue();
+            }
+            return total;
+        }
+
+        public synchronized boolean invoked(String service) { return count(service) > 0; }
+
+        public synchronized List<String> events() {
+            return Collections.unmodifiableList(new ArrayList<>(events));
+        }
+
+        synchronized void clear() { counts.clear(); events.clear(); }
     }
 }

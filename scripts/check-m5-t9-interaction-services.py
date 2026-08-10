@@ -76,7 +76,10 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStor
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/GuestInteractionState.java",
         "class WindowState", "class InputMethodState", "class ActivityClientState",
         "class DisplayState", "VIRTUAL_WINDOW_LIMIT_EXCEEDED",
-        "VIRTUAL_INPUT_SESSION_LIMIT_EXCEEDED", "VIRTUAL_DISPLAY_LIMIT_EXCEEDED")
+        "VIRTUAL_INPUT_SESSION_LIMIT_EXCEEDED", "VIRTUAL_DISPLAY_LIMIT_EXCEEDED",
+        "class InvocationState")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+        "ACTUAL_PROXY_INVOCATION", "recordInteractionInvocation")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/InteractionObjectRewriter.java",
         "rewriteLayoutParams", "rewriteEditorInfo", "VIRTUAL_SYSTEM_ALERT_WINDOW_DENIED",
         "restore(restores)")
@@ -91,6 +94,10 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 for hook in ("WindowManagerHook", "ActivityClientHook", "InputMethodManagerHook", "DisplayManagerHook"):
     require(f"sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/{hook}.java",
             "ReflectiveServiceHook")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/ActivityClientHook.java",
+        "INTERFACE_SINGLETON", "mKnownInstance", "IActivityClientController")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/DisplayManagerHook.java",
+        "IDisplayManager", "mGlobal.mDisplayInfoCache", "cache=synchronized")
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/InteractionProxyReadiness.java",
         "VIRTUAL_INTERACTION_PROXY_REQUIRED", '"window", "activityClient"',
         '"inputMethod"', '"display"')
@@ -110,7 +117,7 @@ require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runti
 
 runner = text("tools/static_android_compile.py")
 for test in ("VirtualInteractionStoreSelfTest", "InteractionServiceVirtualizationSelfTest",
-             "InteractionProxyReadinessSelfTest"):
+             "InteractionProxyReadinessSelfTest", "InteractionProxyInstallationSelfTest"):
     if test not in runner:
         errors.append(f"static Android compiler does not execute {test}")
 

@@ -12,17 +12,28 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Objects;
+import java.lang.reflect.Array;
 
 /** Reversible proxy installer for framework manager fields and android.util.Singleton instances. */
 public final class ReflectiveServiceHook implements AutoCloseable {
     private final Object fieldOwner;
     private final Field field;
     private final Object original;
+    private final Object proxy;
 
-    private ReflectiveServiceHook(Object fieldOwner, Field field, Object original) {
+    private ReflectiveServiceHook(Object fieldOwner, Field field, Object original, Object proxy) {
         this.fieldOwner = fieldOwner;
         this.field = field;
         this.original = original;
+        this.proxy = proxy;
+    }
+
+    private ReflectiveServiceHook() {
+        this.fieldOwner = null;
+        this.field = null;
+        this.original = null;
+        this.proxy = null;
     }
 
     public static ReflectiveServiceHook managerField(Context context, String serviceName, String fieldName,
@@ -60,15 +71,20 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         }
         android.os.IBinder binder = (android.os.IBinder) original;
         validateBinderDescriptor(binder, descriptor, androidServiceName);
+        if (binder instanceof Proxy) {
+            InvocationHandler existing = Proxy.getInvocationHandler(binder);
+            if (existing instanceof ServiceManagerBinderInvocationHandler handler
+                    && handler.matches(descriptor, logicalServiceName)) {
+                return () -> { };
+            }
+        }
         Class<?> stub = Class.forName(descriptor + "$Stub");
         Object service = findAsInterface(stub).invoke(null, binder);
+        if (service == null) throw new IllegalStateException(
+                "Binder descriptor has no local interface: " + androidServiceName);
         Object serviceProxy = createProxy(service, identity, logicalServiceName);
-        InvocationHandler binderHandler = (proxy, method, args) -> {
-            if ("queryLocalInterface".equals(method.getName()) && args != null && args.length == 1
-                    && descriptor.equals(args[0])) return serviceProxy;
-            try { return method.invoke(binder, args); }
-            catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
-        };
+        InvocationHandler binderHandler = new ServiceManagerBinderInvocationHandler(
+                binder, descriptor, logicalServiceName, serviceProxy);
         android.os.IBinder replacement = (android.os.IBinder) Proxy.newProxyInstance(
                 binder.getClass().getClassLoader() == null ? ReflectiveServiceHook.class.getClassLoader()
                         : binder.getClass().getClassLoader(),
@@ -287,6 +303,58 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         throw failure;
     }
 
+    /**
+     * Replaces known manager/global caches with empty instances for the lifetime of a proxy.
+     * This prevents a DisplayManager created before installation from returning a host Display
+     * object after its Binder field has been virtualized.  Every replaced field is restored only
+     * if it still contains the replacement, so rollback cannot clobber a later owner.
+     */
+    public static AutoCloseable clearManagerCaches(Context context, String serviceName,
+                                                   String... fieldPaths) throws Exception {
+        Object manager = context.getSystemService(serviceName);
+        if (manager == null) throw new IllegalStateException("System service unavailable: " + serviceName);
+        List<ReflectiveServiceHook> installed = new ArrayList<>();
+        List<Throwable> failures = new ArrayList<>();
+        for (String path : fieldPaths) {
+            if (path == null || path.isBlank()) continue;
+            try {
+                Field target = resolvePath(manager, path);
+                Object original = target.get(targetOwner(manager, path));
+                Object replacement = emptyCache(original, target.getType());
+                if (replacement == null || replacement == original) continue;
+                Object owner = targetOwner(manager, path);
+                target.set(owner, replacement);
+                installed.add(new ReflectiveServiceHook(owner, target, original, replacement));
+            } catch (NoSuchFieldException ignored) {
+                // API32/API35 do not expose exactly the same cache set.
+            } catch (Throwable error) {
+                failures.add(error);
+            }
+        }
+        if (!failures.isEmpty()) {
+            for (int index = installed.size() - 1; index >= 0; index--) {
+                try { installed.get(index).close(); } catch (Throwable rollback) {
+                    failures.get(0).addSuppressed(rollback);
+                }
+            }
+            IllegalStateException failure = new IllegalStateException(
+                    "DISPLAY_MANAGER_CACHE_SYNC_FAILED");
+            for (Throwable error : failures) failure.addSuppressed(error);
+            throw failure;
+        }
+        if (installed.isEmpty()) {
+            throw new IllegalStateException("DISPLAY_MANAGER_CACHE_STRUCTURE_UNSUPPORTED");
+        }
+        return new CompositeHook(installed);
+    }
+
+    /** Combines reversible handles while preserving reverse-order rollback. */
+    public static AutoCloseable compose(AutoCloseable... hooks) {
+        List<AutoCloseable> values = new ArrayList<>();
+        if (hooks != null) for (AutoCloseable hook : hooks) if (hook != null) values.add(hook);
+        return new CompositeHook(values);
+    }
+
     public static ReflectiveServiceHook staticField(String ownerClassName, String fieldName,
                                              String initializerMethod, GuestIdentity identity) throws Exception {
         return staticField(ownerClassName, fieldName, initializerMethod, identity, "");
@@ -348,6 +416,92 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         return replace(singleton, instance, original, identity, serviceName);
     }
 
+    /**
+     * Installs one proxy across a framework Singleton's value and any version-specific cache
+     * fields which can bypass {@code Singleton#get()}.  ActivityClient has used both the
+     * inherited {@code mInstance} cache and the additional {@code mKnownInstance} fast path;
+     * replacing only one of them makes readiness look successful while calls still reach the
+     * host controller.
+     */
+    public static AutoCloseable singletonWithCacheCandidates(
+            String ownerClassName, String singletonFieldName, GuestIdentity identity,
+            String serviceName, String expectedDescriptor, String... cacheFieldNames)
+            throws Exception {
+        Objects.requireNonNull(cacheFieldNames, "cacheFieldNames");
+        Class<?> owner = Class.forName(ownerClassName);
+        Field singletonField = findField(owner, singletonFieldName);
+        singletonField.setAccessible(true);
+        Object singleton = singletonField.get(null);
+        if (singleton == null) throw new IllegalStateException(singletonFieldName + " is null");
+
+        Field instanceField = findField(singleton.getClass(), "mInstance");
+        instanceField.setAccessible(true);
+        List<Field> fields = new ArrayList<>();
+        fields.add(instanceField);
+        for (String name : cacheFieldNames) {
+            if (name == null || name.isBlank()) continue;
+            Field candidate;
+            try { candidate = findField(singleton.getClass(), name); }
+            catch (NoSuchFieldException ignored) { continue; }
+            candidate.setAccessible(true);
+            if (!fields.contains(candidate)) fields.add(candidate);
+        }
+
+        Object delegate = null;
+        Object existingProxy = null;
+        for (Field field : fields) {
+            Object value = field.get(singleton);
+            if (isServiceProxy(value, serviceName)) {
+                if (existingProxy != null && existingProxy != value) {
+                    throw new IllegalStateException("FRAMEWORK_SINGLETON_CACHE_INCONSISTENT:" + serviceName);
+                }
+                existingProxy = value;
+            } else if (value != null && delegate == null) {
+                delegate = value;
+            }
+        }
+        if (delegate == null && existingProxy == null) {
+            Method get = singleton.getClass().getMethod("get");
+            get.setAccessible(true);
+            delegate = get.invoke(singleton);
+        }
+        if (existingProxy != null) {
+            for (Field field : fields) {
+                Object value = field.get(singleton);
+                if (value != existingProxy) {
+                    throw new IllegalStateException("FRAMEWORK_SINGLETON_CACHE_INCONSISTENT:" + serviceName);
+                }
+            }
+            return () -> { };
+        }
+        if (delegate == null) {
+            throw new IllegalStateException("Framework delegate is null after singleton get(): "
+                    + serviceName);
+        }
+        if (expectedDescriptor != null && !expectedDescriptor.isEmpty()) {
+            validateServiceDescriptor(delegate, expectedDescriptor, serviceName);
+        }
+        Object proxy = createProxy(delegate, identity, serviceName);
+        List<ReflectiveServiceHook> installed = new ArrayList<>();
+        try {
+            for (Field field : fields) {
+                Object original = field.get(singleton);
+                field.set(singleton, proxy);
+                installed.add(new ReflectiveServiceHook(singleton, field, original, proxy));
+            }
+            return new CompositeHook(installed);
+        } catch (Throwable error) {
+            for (int index = installed.size() - 1; index >= 0; index--) {
+                try { installed.get(index).close(); } catch (Throwable rollback) {
+                    error.addSuppressed(rollback);
+                }
+            }
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof Exception exception) throw exception;
+            throw new IllegalStateException("FRAMEWORK_SINGLETON_CACHE_INSTALL_FAILED", error);
+        }
+    }
+
     static ReflectiveServiceHook replaceField(Object owner, String fieldName, GuestIdentity identity) throws Exception {
         return replaceField(owner, fieldName, identity, "");
     }
@@ -406,7 +560,7 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         }
         Object proxy = createSyntheticProxy(target.getType(), identity, serviceName);
         target.set(owner, proxy);
-        return new ReflectiveServiceHook(owner, target, null);
+        return new ReflectiveServiceHook(owner, target, null, proxy);
     }
 
     static Object createProxy(Object original, GuestIdentity identity) {
@@ -428,12 +582,60 @@ public final class ReflectiveServiceHook implements AutoCloseable {
                 new SystemServiceInvocationHandler(original, identity, serviceName));
     }
 
+    static boolean isServiceProxy(Object value, String serviceName) {
+        if (value == null || !Proxy.isProxyClass(value.getClass())) return false;
+        InvocationHandler handler = Proxy.getInvocationHandler(value);
+        return handler instanceof SystemServiceInvocationHandler system
+                && system.serviceName().equalsIgnoreCase(serviceName == null ? "" : serviceName);
+    }
+
     private static Object createSyntheticProxy(Class<?> serviceType, GuestIdentity identity,
                                                String serviceName) {
         ClassLoader loader = serviceType.getClassLoader();
         if (loader == null) loader = ReflectiveServiceHook.class.getClassLoader();
         return Proxy.newProxyInstance(loader, new Class<?>[] {serviceType},
                 new SystemServiceInvocationHandler(null, identity, serviceName));
+    }
+
+    private static Field resolvePath(Object root, String path) throws Exception {
+        String[] segments = path.split("\\.");
+        Object owner = root;
+        for (int index = 0; index < segments.length - 1; index++) {
+            Field field = findField(owner.getClass(), segments[index]);
+            field.setAccessible(true);
+            owner = field.get(owner);
+            if (owner == null) throw new IllegalStateException(
+                    "Null manager cache field segment: " + segments[index]);
+        }
+        Field target = findField(owner.getClass(), segments[segments.length - 1]);
+        target.setAccessible(true);
+        return target;
+    }
+
+    private static Object targetOwner(Object root, String path) throws Exception {
+        String[] segments = path.split("\\.");
+        Object owner = root;
+        for (int index = 0; index < segments.length - 1; index++) {
+            Field field = findField(owner.getClass(), segments[index]);
+            field.setAccessible(true);
+            owner = field.get(owner);
+            if (owner == null) throw new IllegalStateException(
+                    "Null manager cache field segment: " + segments[index]);
+        }
+        return owner;
+    }
+
+    private static Object emptyCache(Object original, Class<?> type) throws Exception {
+        if (original == null) return null;
+        if (type.isArray()) return Array.newInstance(type.getComponentType(), 0);
+        try {
+            java.lang.reflect.Constructor<?> constructor = type.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        } catch (NoSuchMethodException ignored) {
+            if (java.util.Collection.class.isAssignableFrom(type)) return new ArrayList<>();
+            throw new IllegalStateException("No empty cache constructor: " + type.getName());
+        }
     }
 
     private static ReflectiveServiceHook replace(Object owner, Field field, Object original,
@@ -447,9 +649,10 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         if (expectedDescriptor != null && !expectedDescriptor.isEmpty()) {
             validateServiceDescriptor(original, expectedDescriptor, serviceName);
         }
+        if (isServiceProxy(original, serviceName)) return new ReflectiveServiceHook();
         Object proxy = createProxy(original, identity, serviceName);
         field.set(owner, proxy);
-        return new ReflectiveServiceHook(owner, field, original);
+        return new ReflectiveServiceHook(owner, field, original, proxy);
     }
 
     private static void validateServiceDescriptor(Object service, String expectedDescriptor,
@@ -516,6 +719,34 @@ public final class ReflectiveServiceHook implements AutoCloseable {
         }
     }
 
+    private static final class ServiceManagerBinderInvocationHandler
+            implements InvocationHandler {
+        private final android.os.IBinder binder;
+        private final String descriptor;
+        private final String logicalServiceName;
+        private final Object serviceProxy;
+
+        private ServiceManagerBinderInvocationHandler(android.os.IBinder binder,
+                String descriptor, String logicalServiceName, Object serviceProxy) {
+            this.binder = binder;
+            this.descriptor = descriptor;
+            this.logicalServiceName = logicalServiceName;
+            this.serviceProxy = serviceProxy;
+        }
+
+        private boolean matches(String expectedDescriptor, String expectedService) {
+            return descriptor.equals(expectedDescriptor)
+                    && logicalServiceName.equals(expectedService);
+        }
+
+        @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            if ("queryLocalInterface".equals(method.getName()) && args != null
+                    && args.length == 1 && descriptor.equals(args[0])) return serviceProxy;
+            try { return method.invoke(binder, args); }
+            catch (java.lang.reflect.InvocationTargetException error) { throw error.getCause(); }
+        }
+    }
+
     private static final class CompositeHook implements AutoCloseable {
         private final AutoCloseable first;
         private final AutoCloseable second;
@@ -554,7 +785,15 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     }
 
     @Override public void close() {
-        try { field.set(fieldOwner, original); } catch (Throwable ignored) { }
+        if (field == null || fieldOwner == null) return;
+        try {
+            if (field.get(fieldOwner) == proxy) field.set(fieldOwner, original);
+        } catch (Throwable ignored) { }
+    }
+
+    private static Object readCurrent(Object owner, Field field) {
+        if (owner == null || field == null) return null;
+        try { return field.get(owner); } catch (Throwable ignored) { return null; }
     }
 
     static Field findField(Class<?> type, String name) throws NoSuchFieldException {
