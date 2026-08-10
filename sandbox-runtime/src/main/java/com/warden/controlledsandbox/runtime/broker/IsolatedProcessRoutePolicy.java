@@ -28,6 +28,10 @@ final class IsolatedProcessRoutePolicy {
 
     static Match match(Bundle request) {
         if (request == null) return null;
+        // API 32 may restore a Binder-delivered Bundle with the boot class loader.  Set the
+        // contract loader before reading the Parcelable or the runtime peer dies with a
+        // NoClassDefFoundError instead of reaching the isolated-route policy.
+        request.setClassLoader(VirtualPackageStateSnapshot.class.getClassLoader());
         VirtualPackageStateSnapshot state = request.getParcelable(RuntimeKeys.PACKAGE_STATE);
         if (state == null) return null;
         String requestedClass = value(request.getString(RuntimeKeys.COMPONENT_CLASS, ""));
