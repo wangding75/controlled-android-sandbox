@@ -1,10 +1,12 @@
 package com.warden.controlledsandbox.framework.core;
 
-import java.lang.reflect.Method;
+import android.util.Log;
 
 /** One platform-wide hidden-API access point for the audited framework compatibility layer. */
 final class HiddenApiAccess {
+    private static final String TAG = "CS_HIDDEN_API";
     private static boolean attempted;
+    private static String result = "NOT_ATTEMPTED";
 
     private HiddenApiAccess() { }
 
@@ -14,22 +16,16 @@ final class HiddenApiAccess {
                 return;
             }
             attempted = true;
-            try {
-                Class<?> runtime = Class.forName("dalvik.system.VMRuntime");
-                Method getRuntime = runtime.getDeclaredMethod("getRuntime");
-                Method setExemptions = runtime.getDeclaredMethod("setHiddenApiExemptions", String[].class);
-                getRuntime.setAccessible(true);
-                setExemptions.setAccessible(true);
-                Object instance = getRuntime.invoke(null);
-                setExemptions.invoke(instance, (Object) new String[] {"L"});
-            } catch (ClassNotFoundException hostJvm) {
-                // Host/static compilation has no Dalvik runtime and must remain deterministic.
-            } catch (Throwable error) {
-                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
-                // Android builds may deny the VMRuntime exemption itself while still allowing
-                // individual @UnsupportedAppUsage members.  Keep the audited reflection path
-                // alive and let the descriptor/field contract fail closed per service.
-            }
+            // Production GuestRuntimeEnvironment installs the exact, native ART bridge before
+            // any framework hook is entered. Keeping this Java-side class as a marker avoids a
+            // reflective VMRuntime fallback that would either be filtered on API35 or request a
+            // process-wide "L" exemption on older releases.
+            result = "NATIVE_BRIDGE_REQUIRED";
+            Log.i(TAG, "hidden-api access delegated to native platform bridge");
         }
+    }
+
+    static String status() {
+        synchronized (HiddenApiAccess.class) { return result; }
     }
 }

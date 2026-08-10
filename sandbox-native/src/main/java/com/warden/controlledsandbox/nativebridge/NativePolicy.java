@@ -28,6 +28,14 @@ public final class NativePolicy {
     public static boolean available() { return AVAILABLE; }
     public static String loadError() { return loadError; }
 
+    /**
+     * Installs the process-local, bounded framework reflection bridge used by Guest framework
+     * compatibility. This does not touch Settings.Global or any device-wide policy.
+     */
+    public static boolean installHiddenApiBridge() {
+        return AVAILABLE && nativeInstallHiddenApiBridge();
+    }
+
     public static boolean configure(String sessionId, long generation, String packageName,
                                     String processName, int virtualUserId, int virtualUid,
                                     int virtualPid, String abiName, String instanceRoot, String apkPath,
@@ -155,6 +163,7 @@ public final class NativePolicy {
     public static void resetCrashRecorder() { if (AVAILABLE) nativeResetCrashRecorder(); }
 
     private static String[] safe(String[] values) { return values == null ? new String[0] : values.clone(); }
+    private static native boolean nativeInstallHiddenApiBridge();
     private static native boolean nativeConfigure(String sessionId, long generation, String packageName,
                                                   String processName, int virtualUserId, int virtualUid,
                                                   int virtualPid, String abiName, String instanceRoot, String apkPath,

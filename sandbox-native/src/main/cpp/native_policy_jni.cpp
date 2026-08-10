@@ -4,7 +4,13 @@
 #include "controlled_sandbox/native_loader.h"
 #include "controlled_sandbox/native_network.h"
 
+#include <android/log.h>
+#include <dlfcn.h>
+#include <elf.h>
 #include <jni.h>
+#include <link.h>
+#include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -58,7 +64,209 @@ void throw_java(JNIEnv* env, const char* type, const std::string& message) {
     if (klass != nullptr) env->ThrowNew(klass, message.c_str());
 }
 
+using HiddenApiNative = void (*)(JNIEnv*, jclass, jobjectArray);
+
+struct LoadedSegment {
+    uintptr_t begin;
+    uintptr_t end;
+    int flags;
+};
+
+struct HiddenApiNativeSearch {
+    const char* method_name;
+    const char* signature;
+    HiddenApiNative method;
+};
+
+bool readable(const LoadedSegment& segment, uintptr_t address, std::size_t size) {
+    return (segment.flags & PF_R) != 0
+            && address >= segment.begin
+            && address <= segment.end
+            && size <= segment.end - address;
+}
+
+bool executable(const LoadedSegment& segment, uintptr_t address) {
+    return (segment.flags & PF_X) != 0
+            && address >= segment.begin
+            && address < segment.end;
+}
+
+uintptr_t read_pointer(uintptr_t address) {
+    uintptr_t value = 0;
+    std::memcpy(&value, reinterpret_cast<const void*>(address), sizeof(value));
+    return value;
+}
+
+uintptr_t find_string(const LoadedSegment& segment, const char* value) {
+    if ((segment.flags & PF_R) == 0 || segment.end <= segment.begin) return 0;
+    const std::size_t length = std::strlen(value) + 1;
+    if (length > segment.end - segment.begin) return 0;
+    for (uintptr_t address = segment.begin;
+            address <= segment.end - length; address++) {
+        if (std::memcmp(reinterpret_cast<const void*>(address), value, length) == 0) {
+            return address;
+        }
+    }
+    return 0;
+}
+
+int find_hidden_api_native(dl_phdr_info* info, std::size_t, void* opaque) {
+    auto* search = static_cast<HiddenApiNativeSearch*>(opaque);
+    const char* module = info->dlpi_name == nullptr ? "" : info->dlpi_name;
+    if (std::strstr(module, "libart.so") == nullptr) return 0;
+
+    LoadedSegment segments[32]{};
+    std::size_t segment_count = 0;
+    for (ElfW(Half) index = 0; index < info->dlpi_phnum && segment_count < 32; index++) {
+        const ElfW(Phdr)& header = info->dlpi_phdr[index];
+        if (header.p_type != PT_LOAD || header.p_memsz == 0) continue;
+        segments[segment_count++] = LoadedSegment{
+                static_cast<uintptr_t>(info->dlpi_addr + header.p_vaddr),
+                static_cast<uintptr_t>(info->dlpi_addr + header.p_vaddr + header.p_memsz),
+                static_cast<int>(header.p_flags)};
+    }
+
+    uintptr_t name_address = 0;
+    for (std::size_t index = 0; index < segment_count && name_address == 0; index++) {
+        name_address = find_string(segments[index], search->method_name);
+    }
+    if (name_address == 0) return 0;
+
+    const std::size_t pointer_bytes = sizeof(uintptr_t);
+    for (std::size_t segment_index = 0; segment_index < segment_count; segment_index++) {
+        const LoadedSegment& segment = segments[segment_index];
+        if ((segment.flags & PF_R) == 0 || segment.end - segment.begin < pointer_bytes * 3) {
+            continue;
+        }
+        const uintptr_t last = segment.end - pointer_bytes * 3;
+        for (uintptr_t address = segment.begin; address <= last; address += pointer_bytes) {
+            const uintptr_t name = read_pointer(address);
+            if (name != name_address) continue;
+            const uintptr_t signature = read_pointer(address + pointer_bytes);
+            bool signature_matches = false;
+            for (std::size_t candidate = 0; candidate < segment_count; candidate++) {
+                if (!readable(segments[candidate], signature,
+                        std::strlen(search->signature) + 1)) continue;
+                signature_matches = std::strcmp(
+                        reinterpret_cast<const char*>(signature), search->signature) == 0;
+                if (signature_matches) break;
+            }
+            if (!signature_matches) continue;
+            const uintptr_t method = read_pointer(address + pointer_bytes * 2);
+            for (std::size_t candidate = 0; candidate < segment_count; candidate++) {
+                if (!executable(segments[candidate], method)) continue;
+                search->method = reinterpret_cast<HiddenApiNative>(method);
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+HiddenApiNative find_hidden_api_native() {
+    HiddenApiNativeSearch search{
+            "setHiddenApiExemptions", "([Ljava/lang/String;)V", nullptr};
+    dl_iterate_phdr(find_hidden_api_native, &search);
+    return search.method;
+}
+
+bool install_hidden_api_bridge(JNIEnv* env) {
+    constexpr const char* tag = "CS_HIDDEN_API_NATIVE";
+    jclass runtime = env->FindClass("dalvik/system/VMRuntime");
+    if (runtime == nullptr) {
+        env->ExceptionClear();
+        __android_log_print(ANDROID_LOG_WARN, tag, "VMRuntime class unavailable");
+        return false;
+    }
+
+    // Java lookup intentionally remains unused for the hidden method: API35 filters it from
+    // ordinary application reflection. Scan the already loaded ART native-method table and call
+    // only the exact AOSP VMRuntime implementation; never re-register the VMRuntime class after
+    // ART startup, which is a process-aborting operation on API35.
+    HiddenApiNative native_method = find_hidden_api_native();
+    if (native_method == nullptr) {
+        __android_log_print(ANDROID_LOG_WARN, tag, "VMRuntime native method unavailable");
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+    jmethodID get_runtime = env->GetStaticMethodID(
+            runtime, "getRuntime", "()Ldalvik/system/VMRuntime;");
+    if (get_runtime == nullptr) {
+        env->ExceptionClear();
+        __android_log_print(ANDROID_LOG_WARN, tag, "VMRuntime.getRuntime unavailable");
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+
+    jclass string_class = env->FindClass("java/lang/String");
+    if (string_class == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+    // Keep this list tied to framework classes used by the audited compatibility hooks. A
+    // package wildcard or process-wide global policy is intentionally not used.
+    constexpr const char* prefixes[] = {
+            "Landroid/app/",
+            "Landroid/content/",
+            "Landroid/hardware/",
+            "Landroid/media/",
+            "Landroid/net/",
+            "Landroid/os/",
+            "Landroid/provider/",
+            "Landroid/service/",
+            "Landroid/telephony/",
+            "Landroid/view/",
+            "Landroid/webkit/"
+    };
+    constexpr jsize prefix_count = static_cast<jsize>(sizeof(prefixes) / sizeof(prefixes[0]));
+    jobjectArray values = env->NewObjectArray(prefix_count, string_class, nullptr);
+    if (values == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(string_class);
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+    for (jsize index = 0; index < prefix_count; index++) {
+        jstring value = env->NewStringUTF(prefixes[index]);
+        if (value == nullptr) {
+            env->ExceptionClear();
+            env->DeleteLocalRef(values);
+            env->DeleteLocalRef(string_class);
+            env->DeleteLocalRef(runtime);
+            return false;
+        }
+        env->SetObjectArrayElement(values, index, value);
+        env->DeleteLocalRef(value);
+    }
+    jobject instance = env->CallStaticObjectMethod(runtime, get_runtime);
+    if (env->ExceptionCheck() || instance == nullptr) {
+        env->ExceptionClear();
+        __android_log_print(ANDROID_LOG_WARN, tag, "VMRuntime.getRuntime invocation failed");
+        env->DeleteLocalRef(values);
+        env->DeleteLocalRef(string_class);
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+    native_method(env, runtime, values);
+    const bool success = !env->ExceptionCheck();
+    if (!success) env->ExceptionClear();
+    __android_log_print(success ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, tag,
+            "VMRuntime.setHiddenApiExemptions success=%s", success ? "true" : "false");
+    env->DeleteLocalRef(instance);
+    env->DeleteLocalRef(values);
+    env->DeleteLocalRef(string_class);
+    env->DeleteLocalRef(runtime);
+    return success;
+}
+
 }  // namespace
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallHiddenApiBridge(
+        JNIEnv* env, jclass) {
+    return install_hidden_api_bridge(env) ? JNI_TRUE : JNI_FALSE;
+}
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(

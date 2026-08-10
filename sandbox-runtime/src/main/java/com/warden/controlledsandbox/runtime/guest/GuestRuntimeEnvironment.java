@@ -114,6 +114,9 @@ public final class GuestRuntimeEnvironment {
             if (requiresNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
+            if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
+                throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
+            }
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo());
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
