@@ -37,7 +37,8 @@ require(
 
 codec = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
-    "ConcurrentHashMap<String, Object> JVM_LOCKS", "FileLock ignored = channel.lock()",
+    "ConcurrentHashMap<String, Object> JVM_LOCKS", "FileLock lock = channel.lock()",
+    "if (!lock.isValid())",
     "Registry registry = loadRegistry()", "UUID.randomUUID()",
     "LEGACY_NAME_INDEX_AMBIGUOUS", "isProvablyUniqueLegacyLogical",
     "decodeReversible", "pruneMissingHashClaims",

@@ -142,9 +142,42 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -o "$OUT/native_crash_self_test"
 "$OUT/native_crash_self_test"
 JAVA_HOME_REAL=$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")
+NDK_VERSION=${CONTROLLED_NDK_VERSION:-27.2.12479018}
+NDK_ROOT_REAL=${ANDROID_NDK_ROOT:-${ANDROID_NDK_HOME:-}}
+if [[ -z "$NDK_ROOT_REAL" ]]; then
+  for sdk_root in "${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}" \
+      /opt/android-sdk /opt/android-sdk-linux /mnt/c/Users/*/AppData/Local/Android/Sdk; do
+    candidate="$sdk_root/ndk/$NDK_VERSION"
+    if [[ -f "$candidate/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/log.h" ]]; then
+      NDK_ROOT_REAL="$candidate"
+      break
+    fi
+    if [[ -f "$candidate/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/include/android/log.h" ]]; then
+      NDK_ROOT_REAL="$candidate"
+      break
+    fi
+  done
+fi
+if [[ -z "$NDK_ROOT_REAL" ]]; then
+  echo "Missing Android NDK $NDK_VERSION sysroot; set ANDROID_NDK_ROOT" >&2
+  exit 2
+fi
+NDK_SYSROOT_REAL=""
+for sysroot in "$NDK_ROOT_REAL/toolchains/llvm/prebuilt/linux-x86_64/sysroot" \
+    "$NDK_ROOT_REAL/toolchains/llvm/prebuilt/windows-x86_64/sysroot"; do
+  if [[ -f "$sysroot/usr/include/android/log.h" ]]; then
+    NDK_SYSROOT_REAL="$sysroot"
+    break
+  fi
+done
+if [[ -z "$NDK_SYSROOT_REAL" ]]; then
+  echo "Android NDK $NDK_VERSION sysroot headers are incomplete" >&2
+  exit 2
+fi
 g++ -std=c++20 -Wall -Wextra -Werror \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -I"$JAVA_HOME_REAL/include" -I"$JAVA_HOME_REAL/include/linux" \
+  -idirafter "$NDK_SYSROOT_REAL/usr/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_policy_jni.cpp" \
   -o "$OUT/native_policy_jni.o"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \

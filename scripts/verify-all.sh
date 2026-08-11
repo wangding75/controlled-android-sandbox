@@ -111,7 +111,7 @@ PYTHONPYCACHEPREFIX="$ROOT/build/pycache" python3 -m py_compile scripts/*.py too
 python3 - <<'PY'
 from pathlib import Path
 for p in Path('scripts').glob('*.ps1'):
-    text=p.read_text()
+    text=p.read_text(encoding='utf-8-sig')
     pairs={'{':'}','(':')','[':']'}
     stack=[]; quote=None
     for i,ch in enumerate(text):

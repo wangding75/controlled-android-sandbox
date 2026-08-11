@@ -8,6 +8,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "verification/m5-t16-source-closure-audit.json"
 
+
+def read_text_utf8(path: Path) -> str:
+    return path.read_text(encoding="utf-8-sig")
+
 legacy_method = re.compile(r"\bBundle\s+(prepareGuest|launchActivity|invokeComponent|grantUriPermission|revokeUriPermission|consumeRoute|activityEvent|sessionStatus|runtimeStatus)\s*\(")
 legacy_calls = re.compile(r"\b(?:broker|guest|requireBroker\(\))\.(?:prepareGuest|launchActivity|invokeComponent|grantUriPermission|revokeUriPermission|consumeRoute|activityEvent|sessionStatus)\s*\(")
 
@@ -16,7 +20,7 @@ for rel in [
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl",
     "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl",
 ]:
-    for line in (ROOT / rel).read_text().splitlines():
+    for line in read_text_utf8(ROOT / rel).splitlines():
         if legacy_method.search(line):
             legacy_declarations.append(f"{rel}:{line.strip()}")
 
@@ -25,8 +29,8 @@ for base in [ROOT / "app/src/main/java", ROOT / "sandbox-runtime/src/main/java"]
     for source in base.rglob("*.java"):
         if source.name in {"RuntimeBrokerService.java", "BaseGuestProcessService.java", "RuntimeBrokerOperationAdapter.java"}:
             continue
-        if legacy_calls.search(source.read_text()):
-            internal_legacy_calls.append(str(source.relative_to(ROOT)))
+        if legacy_calls.search(read_text_utf8(source)):
+            internal_legacy_calls.append(source.relative_to(ROOT).as_posix())
 
 large_classes: list[dict[str, object]] = []
 for base in [
@@ -39,10 +43,10 @@ for base in [
     for source in (ROOT / base).rglob("*.java"):
         lines = sum(1 for _ in source.open(errors="ignore"))
         if lines > 500:
-            large_classes.append({"path": str(source.relative_to(ROOT)), "lines": lines})
+            large_classes.append({"path": source.relative_to(ROOT).as_posix(), "lines": lines})
 large_classes.sort(key=lambda item: (-int(item["lines"]), str(item["path"])))
 
-framework_hooks = (ROOT / "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java").read_text()
+framework_hooks = read_text_utf8(ROOT / "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java")
 hook_names = re.findall(r'attempt\("([^"]+)"', framework_hooks)
 
 remaining_candidates = [
@@ -60,33 +64,33 @@ report = {
     "productionStatus": "PARTIAL",
     "deviceEvidenceCount": 0,
     "typedRuntimeTransport": {
-        "brokerExecuteV2": "RuntimeOperationResult executeV2(in RuntimeOperationRequest request);" in (
+        "brokerExecuteV2": "RuntimeOperationResult executeV2(in RuntimeOperationRequest request);" in read_text_utf8(
             ROOT / "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl"
-        ).read_text(),
-        "guestExecuteV2": "RuntimeOperationResult executeV2(in RuntimeOperationRequest request);" in (
+        ),
+        "guestExecuteV2": "RuntimeOperationResult executeV2(in RuntimeOperationRequest request);" in read_text_utf8(
             ROOT / "sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IGuestProcess.aidl"
-        ).read_text(),
+        ),
         "legacyCompatibilityDeclarations": len(legacy_declarations),
         "legacyCompatibilityDetails": legacy_declarations,
         "internalLegacyDirectCalls": internal_legacy_calls,
     },
     "methodClassification": {
-        "exactFirstMatcher": (ROOT / "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcher.java").is_file(),
-        "sensorUnregisterRegression": "activeCount(\"sensor\") == 0" in (
+        "exactFirstMatcher": (ROOT / "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/contract/InvocationMethodMatcher.java").is_file(),
+        "sensorUnregisterRegression": "activeCount(\"sensor\") == 0" in read_text_utf8(
             ROOT / "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DeviceServiceVirtualizationSelfTest.java"
-        ).read_text(),
-        "contentObserverUnregisterRegression": "unregister content observer removes" in (
+        ),
+        "contentObserverUnregisterRegression": "unregister content observer removes" in read_text_utf8(
             ROOT / "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentVirtualizationSelfTest.java"
-        ).read_text(),
+        ),
     },
     "falseCoverageClosed": {
         "restrictionsManagerHook": "RestrictionsManagerServiceHook" in framework_hooks,
-        "restrictionsRuntimeProjection": 'case "restrictions"' in (
+        "restrictionsRuntimeProjection": 'case "restrictions"' in read_text_utf8(
             ROOT / "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java"
-        ).read_text(),
-        "restrictionsReadiness": '"restrictions"' in (
+        ),
+        "restrictionsReadiness": '"restrictions"' in read_text_utf8(
             ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/ApplicationEnvironmentProxyReadiness.java"
-        ).read_text(),
+        ),
     },
     "frameworkHookCount": len(hook_names),
     "frameworkHooks": hook_names,
@@ -95,5 +99,5 @@ report = {
     "referenceFilesModified": 0,
     "frozenCapabilityCategories": 113,
 }
-OUTPUT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+OUTPUT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(f"PASS wrote {OUTPUT.relative_to(ROOT)}")

@@ -47,7 +47,7 @@ for rel in [
 ]:
     require(rel, "RuntimeOperationTransport")
 
-require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcher.java", "Exact-first", "named(", "startsWith(")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/contract/InvocationMethodMatcher.java", "Exact-first", "named(", "startsWith(")
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/DeviceServiceVirtualizationSelfTest.java", 'activeCount("sensor") == 0')
 require("sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentVirtualizationSelfTest.java",
         "unregister content observer removes", "application restriction projection", "restrictions mutation denied")
@@ -57,7 +57,7 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/ApplicationEnvironmentProxyReadiness.java", '"restrictions"')
 
 subprocess.run([sys.executable, str(ROOT / "scripts/audit-m5-t16-source-closure.py")], cwd=ROOT, check=True)
-audit = json.loads((ROOT / "verification/m5-t16-source-closure-audit.json").read_text())
+audit = json.loads((ROOT / "verification/m5-t16-source-closure-audit.json").read_text(encoding="utf-8-sig"))
 if audit["typedRuntimeTransport"]["internalLegacyDirectCalls"]:
     errors.append("repository-owned Runtime callers still use legacy Bundle methods")
 if audit["typedRuntimeTransport"]["legacyCompatibilityDeclarations"] > 12:
@@ -73,7 +73,7 @@ if audit["referenceFilesModified"] != 0:
 if audit["frozenCapabilityCategories"] != 113:
     errors.append("frozen capability category count changed")
 
-preflight = json.loads((ROOT / "verification/m5-t16-source-preflight.json").read_text())
+preflight = json.loads((ROOT / "verification/m5-t16-source-preflight.json").read_text(encoding="utf-8-sig"))
 if preflight.get("sourceStatus") != "PASS" or preflight.get("productionStatus") != "PARTIAL":
     errors.append("invalid M5-T16 source/production status")
 if preflight.get("deviceEvidenceCount") != 0:
@@ -84,7 +84,7 @@ for base in [ROOT / "app/src/main/java", ROOT / "sandbox-runtime/src/main/java"]
     for source in base.rglob("*.java"):
         if source.name in {"RuntimeBrokerService.java", "BaseGuestProcessService.java", "RuntimeBrokerOperationAdapter.java"}:
             continue
-        if legacy_pattern.search(source.read_text()):
+        if legacy_pattern.search(source.read_text(encoding="utf-8-sig")):
             errors.append(f"legacy internal Runtime call: {source.relative_to(ROOT)}")
 
 changed_refs = subprocess.run(

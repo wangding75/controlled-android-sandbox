@@ -88,7 +88,10 @@ require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SettingsProviderIdentityHook.java",
         "android_id", "VIRTUAL_ANDROID_ID_MUTATION_DENIED")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SensorCatalogHook.java",
-        "mFullSensorsList", "handleContainer", "originalList")
+        "ControlledSensorManager", "GuestSystemServiceOverrideRegistry",
+        "MODE_HOST", "MODE_BLOCKED")
+require("sandbox-framework/src/main/java/android/hardware/ControlledSensorManager.java",
+        "getSensorList", "getDynamicSensorList", "registerListener", "return false")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceBindingRegistry.java",
         "settingsIdentity", "telephonyRegistry", "android.location.ILocationManager",
         "android.net.wifi.IWifiScanner", "android.gui.SensorServer", "classification()")

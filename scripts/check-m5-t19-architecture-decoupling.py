@@ -87,7 +87,7 @@ for rel, maximum in line_limits.items():
         errors.append(f"{rel} has {count} lines; limit is {maximum}")
 
 matcher = require(
-    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcher.java",
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/contract/InvocationMethodMatcher.java",
     "static boolean named", "static boolean startsWith", "static boolean containsAny")
 require(
     "sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/InvocationMethodMatcherSelfTest.java",
@@ -181,7 +181,8 @@ if runner.count("InvocationMethodMatcherSelfTest") != 1:
 
 changed = subprocess.run(
     ["git", "diff", "--name-only", BASE, "--", "ref/upstream"],
-    cwd=ROOT, text=True, capture_output=True, check=True,
+    cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+    capture_output=True, check=True,
 ).stdout.strip()
 if changed:
     errors.append("M5-T19 modifies ref/upstream")

@@ -49,7 +49,8 @@ def m5_t19_baseline_large_classes() -> list[dict[str, object]]:
 def changed_references() -> list[str]:
     result = subprocess.run(
         ["git", "diff", "--name-only", BASE, "--", "ref/upstream"],
-        cwd=ROOT, text=True, capture_output=True, check=True,
+        cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        capture_output=True, check=True,
     )
     return [line for line in result.stdout.splitlines() if line.strip()]
 

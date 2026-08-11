@@ -11,7 +11,10 @@ ROOT=Path(__file__).resolve().parents[1]
 BASELINE='2071974236f55d3a94aac40bb70d834cea590218'
 errors=[]
 # Generate from the current source on every run; no pre-generated current JSON is trusted.
-result=subprocess.run([sys.executable,'scripts/audit-m5-t19-architecture-decoupling.py'],cwd=ROOT,text=True,capture_output=True)
+result=subprocess.run(
+    [sys.executable,'scripts/audit-m5-t19-architecture-decoupling.py'],
+    cwd=ROOT, text=True, encoding='utf-8', errors='replace', capture_output=True,
+)
 if result.returncode:
     errors.append('live architecture audit failed: '+result.stderr.strip())
     report={}

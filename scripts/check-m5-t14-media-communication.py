@@ -302,7 +302,14 @@ for root in (
     "sandbox-native",
     "sandbox-native-companion",
 ):
-    for path in (ROOT / root).rglob("*"):
+    # Product source is rooted below ``src``.  Do not descend into Gradle/CMake
+    # output trees: besides being non-authoritative, they make this source-only
+    # policy check depend on a previous local build and become prohibitively slow
+    # on a Windows-mounted workspace.
+    source_root = ROOT / root / "src"
+    if not source_root.is_dir():
+        continue
+    for path in source_root.rglob("*"):
         if not path.is_file() or path.suffix not in {".java", ".kt", ".cpp", ".h", ".aidl"}:
             continue
         value = path.read_text(encoding="utf-8", errors="ignore")

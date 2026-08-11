@@ -29,7 +29,7 @@ def main() -> int:
     require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
             "PackageManager packageManager", errors)
     require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
-            "PackageManagerHook.install(packageManager, identity)", errors)
+            "PackageManagerHook.install(packageManager, identity,", errors)
     require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java",
             "Guest exposes the exact proxied process PackageManager", errors)
     require("sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java",

@@ -224,7 +224,7 @@ require(
     "stringArrayOrList",
 )
 require(
-    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/CameraServiceContract.java",
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/contract/CameraServiceContract.java",
     "media.camera",
     "android.hardware.ICameraService",
     "CameraManager$CameraManagerGlobal",

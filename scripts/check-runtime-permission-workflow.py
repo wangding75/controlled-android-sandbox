@@ -12,7 +12,7 @@ def text(relative: str) -> str:
     if not path.is_file():
         errors.append(f"missing required file: {relative}")
         return ""
-    return path.read_text()
+    return path.read_text(encoding='utf-8-sig')
 
 
 def require(relative: str, *needles: str) -> str:

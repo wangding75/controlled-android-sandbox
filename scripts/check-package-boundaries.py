@@ -16,7 +16,7 @@ REQUIRED_RUNTIME_PACKAGES = {
     'component.receiver', 'provider', 'diagnostics', 'protocol', 'status', 'capability', 'systemservice',
 }
 REQUIRED_FRAMEWORK_PACKAGES = {
-    'core', 'identity', 'activity', 'routing', 'packagemanager', 'permission', 'service', 'capability',
+    'core', 'contract', 'identity', 'activity', 'routing', 'packagemanager', 'permission', 'service', 'capability',
 }
 
 RUNTIME_ALLOWED_DEPS = {
@@ -34,13 +34,13 @@ RUNTIME_ALLOWED_DEPS = {
     'systemservice': set(),
 }
 FRAMEWORK_ALLOWED_DEPS = {
-    'core': {'capability', 'identity', 'packagemanager', 'permission', 'service'},
+    'core': {'capability', 'contract', 'identity', 'packagemanager', 'permission', 'service'},
     'identity': {'capability'},
     'activity': {'core', 'identity', 'routing'},
     'routing': set(),
-    'packagemanager': {'identity'},
+    'packagemanager': {'contract', 'identity'},
     'permission': {'core', 'identity'},
-    'service': {'core', 'identity'},
+    'service': {'contract', 'core', 'identity'},
     'capability': set(),
     'systemservice': set(),
 }
