@@ -156,6 +156,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> CameraServiceHook.install(hostServiceContext, identity));
         attempt("location", installed, failures, hooks, bindingDetails,
                 () -> LocationServiceHook.install(hostServiceContext, identity));
+        attempt("locationGuestManager", installed, failures, hooks,
+                () -> LocationServiceHook.installGuestManager(guestContext, identity));
         attempt("deviceIdentity", installed, failures, hooks, () -> BuildIdentityHook.install(identity));
         attempt("settingsIdentity", installed, failures, hooks, bindingDetails,
                 () -> DeviceServiceBindingRegistry.install(guestContext, identity, "settingsIdentity"));
@@ -178,6 +180,11 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> OemIdentifierServiceHook.install(identity));
         attempt("telephony", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installTelephony(hostServiceContext, identity));
+        // Keep the descriptor-bearing Binder binding as the readiness contract and install the
+        // Guest-facing manager as a separate reversible override. This preserves diagnostics and
+        // avoids turning a manager materialization detail into a false binding failure.
+        attempt("telephonyGuestManager", installed, failures, hooks,
+                () -> TelephonyServiceHook.installGuestManager(guestContext, identity));
         attempt("phoneSubInfo", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installSubscriberInfo(hostServiceContext, identity));
         attempt("telephonyRegistry", installed, failures, hooks, bindingDetails,

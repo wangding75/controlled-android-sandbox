@@ -14,11 +14,22 @@ public final class VirtualCameraProfileSnapshot implements Parcelable {
     private final List<String> cameraIds;
     private final List<String> frontCameraIds;
     private final List<String> torchAvailableCameraIds;
+    private final VirtualCameraSourceSnapshot source;
+    private final boolean substituteCaptureResult;
 
     public VirtualCameraProfileSnapshot(
             String mode, boolean cameraAvailable, boolean allowOpen, boolean allowTorch,
             int maximumOpenCameras, List<String> cameraIds, List<String> frontCameraIds,
             List<String> torchAvailableCameraIds) {
+        this(mode, cameraAvailable, allowOpen, allowTorch, maximumOpenCameras, cameraIds,
+                frontCameraIds, torchAvailableCameraIds, VirtualCameraSourceSnapshot.none(), false);
+    }
+
+    public VirtualCameraProfileSnapshot(
+            String mode, boolean cameraAvailable, boolean allowOpen, boolean allowTorch,
+            int maximumOpenCameras, List<String> cameraIds, List<String> frontCameraIds,
+            List<String> torchAvailableCameraIds, VirtualCameraSourceSnapshot source,
+            boolean substituteCaptureResult) {
         this.mode = VirtualLocationProfileSnapshot.mode(mode);
         this.cameraAvailable = cameraAvailable;
         this.allowOpen = allowOpen;
@@ -31,6 +42,8 @@ public final class VirtualCameraProfileSnapshot implements Parcelable {
         this.frontCameraIds = ContractLists.unique(frontCameraIds, "frontCameraIds", 32, 64, false);
         this.torchAvailableCameraIds = ContractLists.unique(
                 torchAvailableCameraIds, "torchAvailableCameraIds", 32, 64, false);
+        this.source = java.util.Objects.requireNonNull(source, "source");
+        this.substituteCaptureResult = substituteCaptureResult;
         requireSubset(this.frontCameraIds, this.cameraIds, "frontCameraIds");
         requireSubset(this.torchAvailableCameraIds, this.cameraIds, "torchAvailableCameraIds");
     }
@@ -38,7 +51,8 @@ public final class VirtualCameraProfileSnapshot implements Parcelable {
     private VirtualCameraProfileSnapshot(Parcel in) {
         this(in.readString(), in.readInt() != 0, in.readInt() != 0, in.readInt() != 0,
                 in.readInt(), in.createStringArrayList(), in.createStringArrayList(),
-                in.createStringArrayList());
+                in.createStringArrayList(), in.readParcelable(
+                        VirtualCameraSourceSnapshot.class.getClassLoader()), in.readInt() != 0);
     }
 
     public String mode() { return mode; }
@@ -49,6 +63,8 @@ public final class VirtualCameraProfileSnapshot implements Parcelable {
     public List<String> cameraIds() { return cameraIds; }
     public List<String> frontCameraIds() { return frontCameraIds; }
     public List<String> torchAvailableCameraIds() { return torchAvailableCameraIds; }
+    public VirtualCameraSourceSnapshot source() { return source; }
+    public boolean substituteCaptureResult() { return substituteCaptureResult; }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeString(mode);
@@ -59,6 +75,8 @@ public final class VirtualCameraProfileSnapshot implements Parcelable {
         out.writeStringList(cameraIds);
         out.writeStringList(frontCameraIds);
         out.writeStringList(torchAvailableCameraIds);
+        out.writeParcelable(source, flags);
+        out.writeInt(substituteCaptureResult ? 1 : 0);
     }
 
     @Override public int describeContents() { return 0; }

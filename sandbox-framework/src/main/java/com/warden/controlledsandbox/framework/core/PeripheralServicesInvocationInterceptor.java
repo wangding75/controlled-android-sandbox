@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.framework.core;
 import static com.warden.controlledsandbox.framework.core.PeripheralInvocationValues.*;
 
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraSourceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompanionDeviceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaProjectionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;
@@ -11,7 +12,15 @@ import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSna
 import com.warden.controlledsandbox.contract.VirtualPrintProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsbProfileSnapshot;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.ByteBuffer;
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +38,7 @@ final class PeripheralServicesInvocationInterceptor {
     private final Set<String> companionAssociations = new LinkedHashSet<>();
     private final Set<Object> projectionSessions = identitySet();
     private final Set<Object> cameraSessions = identitySet();
+    private final Set<Object> cameraListeners = identitySet();
     private final Set<Object> oemSessions = identitySet();
     private int syntheticSequence;
     private int tagOperations;
@@ -69,6 +79,7 @@ final class PeripheralServicesInvocationInterceptor {
     synchronized int companionObserverCount() { return companionObservers.size(); }
     synchronized int projectionSessionCount() { return projectionSessions.size(); }
     synchronized int cameraSessionCount() { return cameraSessions.size(); }
+    synchronized int cameraListenerCount() { return cameraListeners.size(); }
     synchronized int oemSessionCount() { return oemSessions.size(); }
 
     private Decision nfc(Method method, Object[] arguments, VirtualNfcProfileSnapshot profile) {
@@ -311,9 +322,19 @@ final class PeripheralServicesInvocationInterceptor {
 
     private Decision camera(Method method, Object[] arguments, VirtualCameraProfileSnapshot profile) {
         String name = normalize(method.getName());
+        if (containsAny(name, "connect", "connectdevice", "getcameracharacteristics",
+                "createstream", "createinputstream", "submitrequest", "submitrequestlist",
+                "disconnect")) {
+            android.util.Log.i("CS_CAMERA_CALL", "method=" + method.getName()
+                    + " return=" + method.getReturnType().getName()
+                    + " args=" + argumentTypes(arguments)
+                    + " mode=" + profile.mode() + " available=" + profile.cameraAvailable()
+                    + " ids=" + profile.cameraIds().size() + " source=" + profile.source().kind());
+        }
         if (host(profile.mode())) return Decision.passThrough();
         if (containsAny(name, "disconnect", "close", "release", "remove")) {
             removeIdentity(cameraSessions, arguments);
+            removeIdentity(cameraListeners, arguments);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (blocked(profile.mode())) return Decision.handled(emptyValue(method.getReturnType()));
@@ -340,7 +361,7 @@ final class PeripheralServicesInvocationInterceptor {
             if (token == null) token = new SyntheticToken(++syntheticSequence);
             addBounded(cameraSessions, token, profile.maximumOpenCameras(),
                     "VIRTUAL_CAMERA_SESSION_LIMIT_EXCEEDED");
-            return adaptableSessionResult("CAMERA", method, token, cameraSessions);
+            return cameraUserSession(method.getReturnType(), token, cameraSessions, profile, identity);
         }
         if (containsAny(name, "settorchmode", "turnontorch", "turnofftorch")) {
             String cameraId = firstString(arguments);
@@ -349,10 +370,418 @@ final class PeripheralServicesInvocationInterceptor {
             }
             return Decision.handled(successValue(method.getReturnType()));
         }
-        if (containsAny(name, "getcameracharacteristics", "getcamerainfo")) {
-            throw new IllegalStateException("VIRTUAL_CAMERA_CHARACTERISTICS_ADAPTER_REQUIRED");
+        // CameraManagerGlobal registers this Binder callback before it asks for the
+        // camera-id list.  Keep the listener lifecycle bounded and guest-owned; the
+        // virtual profile is authoritative for availability, so no host callback is
+        // forwarded into the Guest.
+        if (name.equals("addlistener")) {
+            Object listener = firstIdentity(arguments);
+            if (listener != null) {
+                addBounded(cameraListeners, listener, 32,
+                        "VIRTUAL_CAMERA_LISTENER_LIMIT_EXCEEDED");
+                identity.capabilityLeases().register("camera", listener, () -> {
+                    synchronized (PeripheralServicesInvocationInterceptor.this) {
+                        cameraListeners.remove(listener);
+                    }
+                    });
+            }
+            return Decision.handled(cameraStatusArray(method.getReturnType(), profile));
         }
+        if (containsAny(name, "getcameracharacteristics", "getcamerainfo")) {
+            return Decision.handled(cameraCharacteristics(method.getReturnType(), profile));
+        }
+        if (name.equals("getconcurrentcameraids")) {
+            // No concurrent-camera set is advertised by the single-source profile.  Returning a
+            // correctly typed empty array is required by CameraManagerGlobal's discovery loop.
+            if (method.getReturnType().isArray()) {
+                return Decision.handled(Array.newInstance(method.getReturnType().getComponentType(), 0));
+            }
+            return Decision.handled(emptyValue(method.getReturnType()));
+        }
+        if (captureOperation(name)) return capture(method, arguments, name, profile);
         return unsupported("camera", method);
+    }
+
+    /**
+     * The Binder service does not have one stable Java return type for camera results.  Keep the
+     * source substitution generic and only adapt byte[]/ByteBuffer or a callback whose first
+     * parameter is byte[].  Object-shaped Camera2 Image results remain an explicit adapter
+     * boundary instead of being reported as a fake successful capture.
+     */
+    private Decision capture(Method method, Object[] arguments, String name,
+            VirtualCameraProfileSnapshot profile) {
+        VirtualCameraSourceSnapshot source = profile.source();
+        if (!profile.substituteCaptureResult()) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_SUBSTITUTION_DISABLED");
+        }
+        if (source == null || !source.isConfigured()) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_SOURCE_NOT_CONFIGURED");
+        }
+        boolean nv21 = containsAny(name, "nv21", "yuv", "previewcallback");
+        byte[] value;
+        try {
+            value = VirtualCameraCaptureEngine.read(
+                    new File(identity.applicationInfo().dataDir, "files"), source, 0L, nv21);
+        } catch (Exception error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_SOURCE_FAILED", error);
+        }
+        Class<?> type = method.getReturnType();
+        if (type == byte[].class || type == Object.class) return Decision.handled(value);
+        if (type == ByteBuffer.class) return Decision.handled(ByteBuffer.wrap(value));
+        if (type == void.class || type == Void.class) {
+            if (!dispatchCaptureCallback(arguments, value)) {
+                throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_CALLBACK_ADAPTER_REQUIRED");
+            }
+            return Decision.handled(null);
+        }
+        throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_RESULT_ADAPTER_REQUIRED:" + type.getName());
+    }
+
+    private static boolean captureOperation(String name) {
+        return containsAny(name, "takepicture", "capture", "acquirelatestimage",
+                "acquirenextimage", "getframe", "nv21", "yuv", "jpeg", "previewcallback");
+    }
+
+    private static String argumentTypes(Object[] arguments) {
+        if (arguments == null || arguments.length == 0) return "[]";
+        StringBuilder result = new StringBuilder("[");
+        for (int index = 0; index < arguments.length; index++) {
+            if (index > 0) result.append(',');
+            Object value = arguments[index];
+            result.append(value == null ? "null" : value.getClass().getName());
+        }
+        return result.append(']').toString();
+    }
+
+    /**
+     * API 32's hidden ICameraService.addListener contract returns CameraStatus[].  Returning null
+     * makes CameraManagerGlobal dereference a missing status array before it can expose ids.
+     * Build only the platform status envelope here; frame data remains owned by the generic
+     * source/capture adapter below.
+     */
+    private static Object cameraStatusArray(Class<?> returnType,
+                                            VirtualCameraProfileSnapshot profile) {
+        if (!returnType.isArray()) return successValue(returnType);
+        Class<?> statusType = returnType.getComponentType();
+        Object statuses = Array.newInstance(statusType, profile.cameraIds().size());
+        try {
+            for (int index = 0; index < profile.cameraIds().size(); index++) {
+                Object status = statusType.getDeclaredConstructor().newInstance();
+                setStatusField(statusType, status, "cameraId", profile.cameraIds().get(index), true);
+                setStatusField(statusType, status, "status", 1, true);
+                setStatusField(statusType, status, "unavailablePhysicalCameras", null, false);
+                setStatusField(statusType, status, "clientPackage", null, false);
+                setStatusField(statusType, status, "deviceId", 0, false);
+                Array.set(statuses, index, status);
+            }
+            return statuses;
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_STATUS_ADAPTER_FAILED", error);
+        }
+    }
+
+    /** Construct the platform's empty metadata envelope without importing hidden camera classes. */
+    private static Object cameraCharacteristics(Class<?> returnType,
+                                                VirtualCameraProfileSnapshot profile) {
+        if (returnType == void.class || returnType == Void.class) return null;
+        try {
+            Constructor<?> constructor = returnType.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Object metadata = constructor.newInstance();
+            // CameraManager reads REQUEST_AVAILABLE_CAPABILITIES while building its
+            // physical-camera map.  An empty native envelope is not a valid Camera2
+            // characteristics object: getPhysicalCameraIds() asserts when that key is
+            // absent.  Populate the minimum backward-compatible profile through the
+            // platform's own CameraMetadataNative key marshalling rather than writing
+            // native buffers or pretending that open succeeded.
+            setCameraMetadata(metadata, "REQUEST_AVAILABLE_CAPABILITIES", new int[]{0});
+            setCameraMetadata(metadata, "LENS_FACING", 0);
+            setCameraMetadata(metadata, "SENSOR_ORIENTATION", 0);
+            setCameraMetadata(metadata, "INFO_SUPPORTED_HARDWARE_LEVEL", 0);
+            setCameraMetadata(metadata, "SCALER_AVAILABLE_MAX_DIGITAL_ZOOM", 1.0f);
+            setCameraMetadata(metadata, "SCALER_CROPPING_TYPE", 0);
+            setCameraMetadata(metadata, "FLASH_INFO_AVAILABLE", false);
+            setCameraMetadata(metadata, "LENS_INFO_MINIMUM_FOCUS_DISTANCE", 0.0f);
+            setCameraMetadata(metadata, "LENS_INFO_HYPERFOCAL_DISTANCE", 0.0f);
+            setCameraMetadata(metadata, "LENS_INFO_AVAILABLE_FOCAL_LENGTHS", new float[]{4.0f});
+            setCameraMetadata(metadata, "CONTROL_AE_AVAILABLE_MODES", new int[]{0});
+            setCameraMetadata(metadata, "CONTROL_AF_AVAILABLE_MODES", new int[]{0});
+            setCameraMetadata(metadata, "CONTROL_AWB_AVAILABLE_MODES", new int[]{0});
+            return metadata;
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_CHARACTERISTICS_ADAPTER_FAILED", error);
+        }
+    }
+
+    /**
+     * CameraManager expects the hidden ICameraDeviceUser Binder contract from connectDevice.
+     * A plain Object or a boolean cannot satisfy CameraDeviceImpl's subsequent configure and
+     * close calls.  Keep this adapter generic: it is selected by the Android interface type,
+     * not by a package name, and every unsupported frame operation remains an explicit error.
+     */
+    private static Decision cameraUserSession(Class<?> returnType, Object token,
+                                              Set<Object> registry,
+                                              VirtualCameraProfileSnapshot profile,
+                                              GuestIdentity identity) {
+        if (!returnType.isInterface()) {
+            registry.remove(token);
+            throw new IllegalStateException("VIRTUAL_CAMERA_RESULT_ADAPTER_REQUIRED:" + returnType.getName());
+        }
+        try {
+            final int[] nextStreamId = {1};
+            Object user = Proxy.newProxyInstance(returnType.getClassLoader(),
+                    new Class<?>[]{returnType}, (proxy, method, arguments) -> {
+                        String name = normalize(method.getName());
+                        if (name.equals("asbinder")) return new android.os.Binder();
+                        if (name.equals("tostring")) return "VirtualCameraDeviceUser{" + token + "}";
+                        if (name.equals("hashcode")) return System.identityHashCode(proxy);
+                        if (name.equals("equals")) return proxy == (arguments == null ? null : arguments[0]);
+                        if (name.equals("disconnect")) {
+                            registry.remove(token);
+                            return null;
+                        }
+                        if (name.equals("getcamerainfo") || name.equals("createdefaultrequest")) {
+                            return cameraCharacteristics(method.getReturnType(), profile);
+                        }
+                        if (name.equals("createstream")) return nextStreamId[0]++;
+                        if (name.equals("createinputstream")) return nextStreamId[0]++;
+                        if (name.equals("endconfigure")) return new int[0];
+                        if (name.equals("issessionconfigurationsupported")) return true;
+                        if (name.equals("submitrequest") || name.equals("submitrequestlist")) {
+                            deliverCameraFrame(arguments, profile, identity);
+                            return submitInfo(method.getReturnType());
+                        }
+                        if (name.equals("switchtooffline")) return null;
+                        if (name.equals("cancelrequest")) return 0L;
+                        if (name.equals("flush")) return 0L;
+                        if (method.getReturnType() == void.class
+                                || method.getReturnType() == Void.class) return null;
+                        if (method.getReturnType() == boolean.class
+                                || method.getReturnType() == Boolean.class) return true;
+                        if (method.getReturnType() == int.class
+                                || method.getReturnType() == Integer.class) return 0;
+                        if (method.getReturnType() == long.class
+                                || method.getReturnType() == Long.class) return 0L;
+                        if (method.getReturnType().isArray()) {
+                            return Array.newInstance(method.getReturnType().getComponentType(), 0);
+                        }
+                        if (method.getReturnType() == Object.class) return null;
+                        throw new IllegalStateException("VIRTUAL_CAMERA_DEVICE_OPERATION_UNSUPPORTED:"
+                                + method.getName());
+                    });
+            return Decision.handled(user);
+        } catch (RuntimeException error) {
+            registry.remove(token);
+            throw new IllegalStateException("VIRTUAL_CAMERA_DEVICE_USER_ADAPTER_FAILED", error);
+        }
+    }
+
+    private static Object submitInfo(Class<?> returnType) {
+        try {
+            Constructor<?> constructor = returnType.getDeclaredConstructor(int.class, long.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(1, 0L);
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_SUBMIT_INFO_ADAPTER_FAILED", error);
+        }
+    }
+
+    /** Deliver a configured source to the actual Camera2 output Surface(s). */
+    private static void deliverCameraFrame(Object[] arguments,
+                                           VirtualCameraProfileSnapshot profile,
+                                           GuestIdentity identity) {
+        if (!profile.substituteCaptureResult() || profile.source() == null
+                || !profile.source().isConfigured()) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_SOURCE_NOT_CONFIGURED");
+        }
+        Object request = arguments == null || arguments.length == 0 ? null : arguments[0];
+        if (request != null && request.getClass().isArray()) {
+            request = Array.getLength(request) == 0 ? null : Array.get(request, 0);
+        }
+        if (request == null) throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_REQUEST_REQUIRED");
+        try {
+            Method getTargets = request.getClass().getDeclaredMethod("getTargets");
+            getTargets.setAccessible(true);
+            Object targets = getTargets.invoke(request);
+            if (!(targets instanceof Iterable<?> iterable)) {
+                throw new IllegalStateException("VIRTUAL_CAMERA_CAPTURE_TARGETS_UNAVAILABLE");
+            }
+            byte[] jpeg = VirtualCameraCaptureEngine.read(
+                    new File(identity.applicationInfo().dataDir, "files"),
+                    profile.source(), nextFrameTimeMs(profile), false);
+            int delivered = 0;
+            StringBuilder failures = new StringBuilder();
+            for (Object target : iterable) {
+                if (!(target instanceof android.view.Surface surface)) continue;
+                try {
+                    // A Surface object can exist without a connected producer in a virtual
+                    // process.  ImageWriter/nativeCreatePlanes aborts the process in that
+                    // state, so never cross the native producer boundary without this check.
+                    if (!surface.isValid()) {
+                        failures.append(surface).append(":invalid-producer;");
+                    } else if (deliverToSurface(surface, jpeg)) {
+                        delivered++;
+                    } else {
+                        failures.append(surface).append(":no-adapter;");
+                    }
+                } catch (Throwable error) {
+                    failures.append(surface).append(":")
+                            .append(error.getClass().getSimpleName()).append(";");
+                }
+            }
+            if (delivered == 0) {
+                throw new IllegalStateException("VIRTUAL_CAMERA_FRAME_DELIVERY_FAILED:" + failures);
+            }
+            android.util.Log.i("CS_CAMERA_FRAME", "delivered=" + delivered
+                    + " source=" + profile.source().kind() + " sha256=" + profile.source().sha256());
+        } catch (IllegalStateException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_FRAME_ADAPTER_FAILED", error);
+        }
+    }
+
+    private static long nextFrameTimeMs(VirtualCameraProfileSnapshot profile) {
+        if (profile.source() == null
+                || !VirtualCameraSourceSnapshot.VIDEO.equals(profile.source().kind())) {
+            return 0L;
+        }
+        long duration = Math.max(1L, profile.source().durationMs());
+        return Math.floorMod(System.currentTimeMillis(), duration);
+    }
+
+    private static boolean deliverToSurface(android.view.Surface surface, byte[] jpeg) {
+        // ImageReader/JPEG requires a camera3 BLOB-compatible buffer.  Canvas produces RGBA
+        // pixels and is therefore only a preview fallback; never use it for an image consumer.
+        String descriptor = String.valueOf(surface);
+        boolean previewSurface = descriptor.contains("SurfaceTexture")
+                || descriptor.contains("SurfaceView");
+        if (!previewSurface) {
+            int nativeResult = NativePolicy.queueJpeg(surface, jpeg);
+            if (nativeResult == 0) return true;
+            android.util.Log.w("CS_CAMERA_FRAME", "jpeg_surface_rejected result=" + nativeResult
+                    + " surface=" + descriptor);
+            return false;
+        }
+        return deliverToSurfaceCanvas(surface, jpeg);
+    }
+
+    private static boolean deliverToSurfaceCanvas(android.view.Surface surface, byte[] jpeg) {
+        android.graphics.Bitmap bitmap = android.graphics.BitmapFactory.decodeByteArray(
+                jpeg, 0, jpeg.length);
+        if (bitmap == null) throw new IllegalStateException("VIRTUAL_CAMERA_BITMAP_DECODE_FAILED");
+        android.graphics.Canvas canvas = null;
+        try {
+            canvas = surface.lockCanvas(null);
+            if (canvas == null) return false;
+            android.graphics.Rect destination = new android.graphics.Rect(0, 0,
+                    canvas.getWidth(), canvas.getHeight());
+            canvas.drawBitmap(bitmap, null, destination, null);
+            return true;
+        } finally {
+            bitmap.recycle();
+            if (canvas != null) {
+                surface.unlockCanvasAndPost(canvas);
+                android.util.Log.i("CS_CAMERA_PREVIEW", "delivered surface=" + surface);
+            }
+        }
+    }
+
+    private static void setCameraMetadata(Object metadata, String keyName, Object value) {
+        try {
+            Class<?> characteristics = Class.forName("android.hardware.camera2.CameraCharacteristics");
+            Field keyField = characteristics.getDeclaredField(keyName);
+            keyField.setAccessible(true);
+            Object key = keyField.get(null);
+            Method setter = null;
+            for (String name : new String[]{"setBase", "set"}) {
+                for (Method candidate : metadata.getClass().getDeclaredMethods()) {
+                    if (candidate.getName().equals(name) && candidate.getParameterCount() == 2) {
+                        setter = candidate;
+                        break;
+                    }
+                }
+                if (setter != null) break;
+            }
+            if (setter == null) throw new NoSuchMethodException("CameraMetadataNative.set");
+            setter.setAccessible(true);
+            setter.invoke(metadata, key, value);
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_METADATA_KEY_FAILED:" + keyName, error);
+        }
+    }
+
+    private static void setStatusField(Class<?> type, Object target, String name, Object value,
+                                       boolean required) throws ReflectiveOperationException {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                java.lang.reflect.Field field = current.getDeclaredField(name);
+                field.setAccessible(true);
+                field.set(target, value);
+                return;
+            } catch (NoSuchFieldException missing) {
+                current = current.getSuperclass();
+            }
+        }
+        if (required) throw new NoSuchFieldException(type.getName() + "." + name);
+    }
+
+    private static boolean dispatchCaptureCallback(Object[] arguments, byte[] value) {
+        if (arguments == null) return false;
+        for (Object candidate : arguments) {
+            if (candidate == null || candidate instanceof String || candidate instanceof Number
+                    || candidate instanceof Boolean || candidate instanceof byte[]
+                    || candidate instanceof ByteBuffer || candidate.getClass().isEnum()) continue;
+            Method callback = callbackMethod(candidate.getClass());
+            if (callback == null) continue;
+            Object[] parameters = callbackArguments(callback, arguments, value);
+            if (parameters == null) continue;
+            try {
+                if (!callback.isAccessible()) callback.setAccessible(true);
+                callback.invoke(candidate, parameters);
+                return true;
+            } catch (IllegalAccessException | InvocationTargetException | RuntimeException ignored) {
+                // Try another callback shape; a failed callback is not a successful substitution.
+            }
+        }
+        return false;
+    }
+
+    private static Method callbackMethod(Class<?> type) {
+        for (Method method : type.getMethods()) {
+            String name = normalize(method.getName());
+            if (!containsAny(name, "onpicturetaken", "onpreviewframe", "onimageavailable",
+                    "oncapture", "onframe")) continue;
+            Class<?>[] parameters = method.getParameterTypes();
+            if (parameters.length > 0 && parameters[0] == byte[].class) return method;
+        }
+        for (Method method : type.getDeclaredMethods()) {
+            String name = normalize(method.getName());
+            if (!containsAny(name, "onpicturetaken", "onpreviewframe", "onimageavailable",
+                    "oncapture", "onframe")) continue;
+            Class<?>[] parameters = method.getParameterTypes();
+            if (parameters.length > 0 && parameters[0] == byte[].class) return method;
+        }
+        return null;
+    }
+
+    private static Object[] callbackArguments(Method callback, Object[] original, byte[] value) {
+        Class<?>[] types = callback.getParameterTypes();
+        Object[] output = new Object[types.length];
+        output[0] = value;
+        for (int index = 1; index < types.length; index++) {
+            Object match = null;
+            for (Object candidate : original) {
+                if (candidate != null && types[index].isInstance(candidate)) {
+                    match = candidate;
+                    break;
+                }
+            }
+            if (match == null && types[index].isPrimitive()) return null;
+            output[index] = match;
+        }
+        return output;
     }
 
     private Decision oem(Method method, Object[] arguments,

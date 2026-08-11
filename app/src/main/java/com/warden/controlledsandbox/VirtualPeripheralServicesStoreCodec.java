@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraSourceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompanionDeviceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaProjectionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNfcProfileSnapshot;
@@ -207,17 +208,36 @@ final class VirtualPeripheralServicesStoreCodec {
                 .put("maximumOpenCameras", value.maximumOpenCameras())
                 .put("cameraIds", new JSONArray(value.cameraIds()))
                 .put("frontCameraIds", new JSONArray(value.frontCameraIds()))
-                .put("torchAvailableCameraIds", new JSONArray(value.torchAvailableCameraIds()));
+                .put("torchAvailableCameraIds", new JSONArray(value.torchAvailableCameraIds()))
+                .put("source", source(value.source()))
+                .put("substituteCaptureResult", value.substituteCaptureResult());
     }
 
     private static VirtualCameraProfileSnapshot camera(JSONObject value) throws Exception {
+        JSONObject source = value.optJSONObject("source");
+        VirtualCameraSourceSnapshot sourceValue = source == null
+                ? VirtualCameraSourceSnapshot.none() : new VirtualCameraSourceSnapshot(
+                        source.optString("kind", VirtualCameraSourceSnapshot.NONE),
+                        source.optString("relativePath", ""), source.optString("mimeType", ""),
+                        source.optString("sha256", ""), source.optInt("width", 0),
+                        source.optInt("height", 0), source.optInt("orientationDegrees", 0),
+                        source.optLong("durationMs", 0L));
         return new VirtualCameraProfileSnapshot(
                 value.getString("mode"), value.optBoolean("cameraAvailable", false),
                 value.optBoolean("allowOpen", false), value.optBoolean("allowTorch", false),
                 value.optInt("maximumOpenCameras", 0),
                 strings(value.optJSONArray("cameraIds"), 32),
                 strings(value.optJSONArray("frontCameraIds"), 32),
-                strings(value.optJSONArray("torchAvailableCameraIds"), 32));
+                strings(value.optJSONArray("torchAvailableCameraIds"), 32), sourceValue,
+                value.optBoolean("substituteCaptureResult", false));
+    }
+
+    private static JSONObject source(VirtualCameraSourceSnapshot value) throws Exception {
+        return new JSONObject().put("kind", value.kind()).put("relativePath", value.relativePath())
+                .put("mimeType", value.mimeType()).put("sha256", value.sha256())
+                .put("width", value.width()).put("height", value.height())
+                .put("orientationDegrees", value.orientationDegrees())
+                .put("durationMs", value.durationMs());
     }
 
     private static JSONObject oem(VirtualOemSystemServicesProfileSnapshot value) throws Exception {

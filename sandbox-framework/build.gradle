@@ -12,4 +12,5 @@ android {
 }
 dependencies {
     api project(':sandbox-contract')
+    implementation project(':sandbox-native')
 }

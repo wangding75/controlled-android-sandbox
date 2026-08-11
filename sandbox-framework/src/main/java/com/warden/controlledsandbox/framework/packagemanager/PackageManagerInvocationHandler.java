@@ -214,6 +214,24 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             return !VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
                     && !profile.providerPackage().isEmpty();
         }
+        // A radio-less emulator commonly reports no telephony feature, which makes the public
+        // TelephonyManager short-circuit before it reaches the virtual Binder.  Project the
+        // feature from the Guest's explicit telephony profile instead of inheriting the Host
+        // hardware inventory.  This is intentionally generic and package-independent.
+        String feature = firstString(args);
+        if ("android.hardware.telephony".equals(feature)
+                || "android.hardware.telephony.radio.access".equals(feature)) {
+            try {
+                var profile = identity.virtualServices().deviceServiceProfile().telephony();
+                if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) {
+                    return HostFeaturePassThrough.VALUE;
+                }
+                return !VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
+                        && (!profile.slots().isEmpty() || !profile.cells().isEmpty());
+            } catch (IllegalStateException unavailable) {
+                return NoResult.VALUE;
+            }
+        }
         Object nfcFeature = virtualNfcFeature(args);
         if (nfcFeature != NoResult.VALUE) return nfcFeature;
         Object cameraFeature = virtualCameraFeature(args);

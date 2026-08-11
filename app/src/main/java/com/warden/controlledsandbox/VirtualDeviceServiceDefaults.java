@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.VirtualBluetoothProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCellInfoSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
@@ -53,7 +54,10 @@ final class VirtualDeviceServiceDefaults {
                 "Controlled Sandbox", 1, 5, 0, 0, false, false);
         VirtualTelephonyProfileSnapshot telephony = new VirtualTelephonyProfileSnapshot(
                 VirtualLocationProfileSnapshot.MODE_STATIC, subscriptionId, subscriptionId,
-                true, true, false, List.of(slot));
+                true, true, false, List.of(slot), List.of(new VirtualCellInfoSnapshot(
+                        VirtualCellInfoSnapshot.LTE, 1, 1, 101, 201,
+                        10_000L + Math.floorMod(virtualUserId, 10_000), 12, 6300,
+                        true, -84)));
         VirtualWifiNetworkSnapshot network = new VirtualWifiNetworkSnapshot(
                 ssid, wifiBssid, "[WPA2-PSK-CCMP][ESS]", 5180, -48, false);
         VirtualWifiProfileSnapshot wifi = new VirtualWifiProfileSnapshot(

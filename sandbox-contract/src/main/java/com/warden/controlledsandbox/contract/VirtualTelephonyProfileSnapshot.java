@@ -17,10 +17,19 @@ public final class VirtualTelephonyProfileSnapshot implements Parcelable {
     private final boolean smsCapable;
     private final boolean emergencyOnly;
     private final List<VirtualTelephonySlotSnapshot> slots;
+    private final List<VirtualCellInfoSnapshot> cells;
 
     public VirtualTelephonyProfileSnapshot(String mode, int defaultSubscriptionId,
             int activeDataSubscriptionId, boolean voiceCapable, boolean smsCapable,
             boolean emergencyOnly, List<VirtualTelephonySlotSnapshot> slots) {
+        this(mode, defaultSubscriptionId, activeDataSubscriptionId, voiceCapable, smsCapable,
+                emergencyOnly, slots, List.of());
+    }
+
+    public VirtualTelephonyProfileSnapshot(String mode, int defaultSubscriptionId,
+            int activeDataSubscriptionId, boolean voiceCapable, boolean smsCapable,
+            boolean emergencyOnly, List<VirtualTelephonySlotSnapshot> slots,
+            List<VirtualCellInfoSnapshot> cells) {
         this.mode = VirtualLocationProfileSnapshot.mode(mode);
         if (defaultSubscriptionId < -1 || activeDataSubscriptionId < -1) {
             throw new IllegalArgumentException("subscription id is invalid");
@@ -48,12 +57,18 @@ public final class VirtualTelephonyProfileSnapshot implements Parcelable {
             throw new IllegalArgumentException("activeDataSubscriptionId has no slot");
         }
         this.slots = Collections.unmodifiableList(copy);
+        List<VirtualCellInfoSnapshot> cellCopy = cells == null ? List.of() : new ArrayList<>(cells);
+        if (cellCopy.size() > 16 || cellCopy.contains(null)) {
+            throw new IllegalArgumentException("telephony cells are invalid");
+        }
+        this.cells = Collections.unmodifiableList(cellCopy);
     }
 
     private VirtualTelephonyProfileSnapshot(Parcel in) {
         this(in.readString(), in.readInt(), in.readInt(), in.readInt() != 0,
                 in.readInt() != 0, in.readInt() != 0,
-                in.createTypedArrayList(VirtualTelephonySlotSnapshot.CREATOR));
+                in.createTypedArrayList(VirtualTelephonySlotSnapshot.CREATOR),
+                in.createTypedArrayList(VirtualCellInfoSnapshot.CREATOR));
     }
 
     public String mode() { return mode; }
@@ -63,6 +78,7 @@ public final class VirtualTelephonyProfileSnapshot implements Parcelable {
     public boolean smsCapable() { return smsCapable; }
     public boolean emergencyOnly() { return emergencyOnly; }
     public List<VirtualTelephonySlotSnapshot> slots() { return slots; }
+    public List<VirtualCellInfoSnapshot> cells() { return cells; }
     public VirtualTelephonySlotSnapshot slotForIndex(int index) {
         for (VirtualTelephonySlotSnapshot slot : slots) if (slot.slotIndex() == index) return slot;
         return null;
@@ -82,6 +98,7 @@ public final class VirtualTelephonyProfileSnapshot implements Parcelable {
         out.writeString(mode); out.writeInt(defaultSubscriptionId); out.writeInt(activeDataSubscriptionId);
         out.writeInt(voiceCapable ? 1 : 0); out.writeInt(smsCapable ? 1 : 0);
         out.writeInt(emergencyOnly ? 1 : 0); out.writeTypedList(slots);
+        out.writeTypedList(cells);
     }
     @Override public int describeContents() { return 0; }
     public static final Creator<VirtualTelephonyProfileSnapshot> CREATOR = new Creator<>() {

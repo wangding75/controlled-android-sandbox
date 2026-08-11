@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraSourceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCompanionDeviceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualMediaProjectionProfileSnapshot;
@@ -31,7 +32,8 @@ final class VirtualPeripheralServicesDefaults {
                 new VirtualMediaProjectionProfileSnapshot(
                         mode, false, false, false, true, 0, 1080, 1920, 420);
         VirtualCameraProfileSnapshot camera = new VirtualCameraProfileSnapshot(
-                mode, false, false, false, 0, List.of(), List.of(), List.of());
+                mode, false, false, false, 0, List.of(), List.of(), List.of(),
+                VirtualCameraSourceSnapshot.none(), false);
         VirtualOemSystemServicesProfileSnapshot oem =
                 new VirtualOemSystemServicesProfileSnapshot(
                         mode, List.of(), List.of("get", "is", "has", "query", "check"),

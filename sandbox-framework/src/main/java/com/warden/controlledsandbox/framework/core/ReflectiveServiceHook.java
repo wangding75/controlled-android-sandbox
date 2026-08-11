@@ -251,13 +251,19 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             return switch (method.getName()) {
                 case "getInterfaceDescriptor" -> descriptor;
                 case "queryLocalInterface" -> args != null && args.length == 1
-                        && descriptor.equals(args[0]) ? serviceProxy : null;
+                        && descriptor.equals(args[0]) ? logAndReturn(serviceProxy, descriptor) : null;
                 case "isBinderAlive", "pingBinder" -> true;
                 case "unlinkToDeath" -> true;
                 case "linkToDeath" -> null;
                 default -> throw new UnsupportedOperationException(
                         "SYNTHETIC_BINDER_SIGNATURE_UNSUPPORTED:" + method.getName());
             };
+        }
+
+        private Object logAndReturn(Object value, String valueDescriptor) {
+            android.util.Log.i("CS_SYNTHETIC_BINDER", "queryLocalInterface descriptor="
+                    + valueDescriptor);
+            return value;
         }
     }
 

@@ -79,6 +79,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
+        if (serviceName.equals("telephony") || serviceName.equals("phonesubinfo")
+                || serviceName.equals("subscription")) {
+            android.util.Log.i("CS_TELEPHONY_PROXY", "service=" + serviceName
+                    + " method=" + method.getName() + " return=" + method.getReturnType().getName());
+        }
         if (method.getDeclaringClass() == Object.class) {
             if (delegate != null) return method.invoke(delegate, arguments);
             return syntheticObjectMethod(proxy, method, arguments);

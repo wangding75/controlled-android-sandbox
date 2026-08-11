@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.nativebridge;
 
+import android.view.Surface;
+
 /** JNI boundary for the clean-room native path and network policy engine. */
 public final class NativePolicy {
     private static final boolean AVAILABLE;
@@ -162,6 +164,16 @@ public final class NativePolicy {
     public static String loaderStatus() { return AVAILABLE ? nativeLoaderStatus() : "unavailable:" + loadError; }
     public static void resetCrashRecorder() { if (AVAILABLE) nativeResetCrashRecorder(); }
 
+    /**
+     * Queues one JPEG transport buffer to a guest-owned Surface.  This is a generic camera
+     * buffer boundary; callers must only pass a Surface obtained from the Guest API and a
+     * sandbox-owned byte array.  A negative result is a truthful adapter failure.
+     */
+    public static int queueJpeg(Surface surface, byte[] jpeg) {
+        if (!AVAILABLE || surface == null || jpeg == null || jpeg.length == 0) return -1;
+        return nativeQueueJpeg(surface, jpeg);
+    }
+
     private static String[] safe(String[] values) { return values == null ? new String[0] : values.clone(); }
     private static native boolean nativeInstallHiddenApiBridge();
     private static native boolean nativeConfigure(String sessionId, long generation, String packageName,
@@ -197,4 +209,5 @@ public final class NativePolicy {
     private static native String nativeNetworkStatus();
     private static native String nativeLoaderStatus();
     private static native void nativeResetCrashRecorder();
+    private static native int nativeQueueJpeg(Surface surface, byte[] jpeg);
 }

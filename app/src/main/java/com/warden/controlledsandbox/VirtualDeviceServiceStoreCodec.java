@@ -2,9 +2,11 @@ package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.VirtualBluetoothDeviceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualBluetoothProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCellInfoSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceIdentitySnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualLocationPointSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSensorProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSensorSnapshot;
 import com.warden.controlledsandbox.contract.VirtualTelephonyProfileSnapshot;
@@ -98,9 +100,28 @@ final class VirtualDeviceServiceStoreCodec {
                 .put("gnssEnabled", value.gnssEnabled())
                 .put("satellitesInView", value.satellitesInView())
                 .put("satellitesUsedInFix", value.satellitesUsedInFix())
-                .put("nmeaSentence", value.nmeaSentence());
+                .put("nmeaSentence", value.nmeaSentence())
+                .put("trajectoryMode", value.trajectoryMode())
+                .put("trajectoryIntervalMs", value.trajectoryIntervalMs())
+                .put("trajectoryPoints", trajectoryPoints(value.trajectoryPoints()))
+                .put("timestampPolicy", value.timestampPolicy())
+                .put("elapsedRealtimePolicy", value.elapsedRealtimePolicy());
     }
     private static VirtualLocationProfileSnapshot location(JSONObject value) throws Exception {
+        JSONArray points = value.optJSONArray("trajectoryPoints");
+        List<VirtualLocationPointSnapshot> trajectory = new ArrayList<>();
+        if (points != null) {
+            if (points.length() > 512) throw new IllegalStateException("Trajectory point limit exceeded");
+            for (int index = 0; index < points.length(); index++) {
+                JSONObject point = points.getJSONObject(index);
+                trajectory.add(new VirtualLocationPointSnapshot(point.optLong("offsetMs", 0L),
+                        point.optDouble("latitude", 0d), point.optDouble("longitude", 0d),
+                        point.optDouble("altitudeMeters", 0d),
+                        (float) point.optDouble("accuracyMeters", 0d),
+                        (float) point.optDouble("speedMetersPerSecond", 0d),
+                        (float) point.optDouble("bearingDegrees", 0d)));
+            }
+        }
         return new VirtualLocationProfileSnapshot(value.getString("mode"), value.optString("provider", ""),
                 value.optBoolean("providerEnabled", false), value.optDouble("latitude", 0d),
                 value.optDouble("longitude", 0d), value.optDouble("altitudeMeters", 0d),
@@ -109,7 +130,23 @@ final class VirtualDeviceServiceStoreCodec {
                 (float) value.optDouble("bearingDegrees", 0d), value.optLong("timeMs", 0L),
                 value.optLong("elapsedRealtimeNanos", 0L), value.optLong("minimumUpdateIntervalMs", 1000L),
                 value.optBoolean("gnssEnabled", false), value.optInt("satellitesInView", 0),
-                value.optInt("satellitesUsedInFix", 0), value.optString("nmeaSentence", ""));
+                value.optInt("satellitesUsedInFix", 0), value.optString("nmeaSentence", ""),
+                value.optString("trajectoryMode", VirtualLocationProfileSnapshot.TRAJECTORY_FIXED),
+                value.optLong("trajectoryIntervalMs", value.optLong("minimumUpdateIntervalMs", 1000L)),
+                trajectory, value.optString("timestampPolicy", VirtualLocationProfileSnapshot.TIME_POLICY_NOW),
+                value.optString("elapsedRealtimePolicy", VirtualLocationProfileSnapshot.ELAPSED_POLICY_NOW));
+    }
+
+    private static JSONArray trajectoryPoints(List<VirtualLocationPointSnapshot> values)
+            throws Exception {
+        JSONArray out = new JSONArray();
+        for (VirtualLocationPointSnapshot point : values) out.put(new JSONObject()
+                .put("offsetMs", point.offsetMs()).put("latitude", point.latitude())
+                .put("longitude", point.longitude()).put("altitudeMeters", point.altitudeMeters())
+                .put("accuracyMeters", point.accuracyMeters())
+                .put("speedMetersPerSecond", point.speedMetersPerSecond())
+                .put("bearingDegrees", point.bearingDegrees()));
+        return out;
     }
 
     private static JSONObject identity(VirtualDeviceIdentitySnapshot value) throws Exception {
@@ -143,11 +180,18 @@ final class VirtualDeviceServiceStoreCodec {
                 .put("simState", slot.simState()).put("dataNetworkType", slot.dataNetworkType())
                 .put("voiceNetworkType", slot.voiceNetworkType()).put("dataEnabled", slot.dataEnabled())
                 .put("roaming", slot.roaming()));
+        JSONArray cells = new JSONArray();
+        for (VirtualCellInfoSnapshot cell : value.cells()) cells.put(new JSONObject()
+                .put("technology", cell.technology()).put("mcc", cell.mcc()).put("mnc", cell.mnc())
+                .put("lac", cell.lac()).put("tac", cell.tac()).put("cid", cell.cid())
+                .put("pci", cell.pci()).put("arfcn", cell.arfcn())
+                .put("registered", cell.registered()).put("signalLevel", cell.signalLevel()));
         return new JSONObject().put("mode", value.mode())
                 .put("defaultSubscriptionId", value.defaultSubscriptionId())
                 .put("activeDataSubscriptionId", value.activeDataSubscriptionId())
                 .put("voiceCapable", value.voiceCapable()).put("smsCapable", value.smsCapable())
-                .put("emergencyOnly", value.emergencyOnly()).put("slots", slots);
+                .put("emergencyOnly", value.emergencyOnly()).put("slots", slots)
+                .put("cells", cells);
     }
     private static VirtualTelephonyProfileSnapshot telephony(JSONObject value) throws Exception {
         JSONArray array = value.optJSONArray("slots");
@@ -168,10 +212,23 @@ final class VirtualDeviceServiceStoreCodec {
                         slot.optBoolean("roaming", false)));
             }
         }
+        JSONArray cellArray = value.optJSONArray("cells");
+        List<VirtualCellInfoSnapshot> cells = new ArrayList<>();
+        if (cellArray != null) {
+            if (cellArray.length() > 16) throw new IllegalStateException("Telephony cell limit exceeded");
+            for (int index = 0; index < cellArray.length(); index++) {
+                JSONObject cell = cellArray.getJSONObject(index);
+                cells.add(new VirtualCellInfoSnapshot(cell.optString("technology", "LTE"),
+                        cell.optInt("mcc", 0), cell.optInt("mnc", 0), cell.optInt("lac", 0),
+                        cell.optInt("tac", 0), cell.optLong("cid", 0L), cell.optInt("pci", 0),
+                        cell.optInt("arfcn", 0), cell.optBoolean("registered", false),
+                        cell.optInt("signalLevel", -127)));
+            }
+        }
         return new VirtualTelephonyProfileSnapshot(value.getString("mode"),
                 value.optInt("defaultSubscriptionId", -1), value.optInt("activeDataSubscriptionId", -1),
                 value.optBoolean("voiceCapable", false), value.optBoolean("smsCapable", false),
-                value.optBoolean("emergencyOnly", false), slots);
+                value.optBoolean("emergencyOnly", false), slots, cells);
     }
 
     private static JSONObject wifi(VirtualWifiProfileSnapshot value) throws Exception {

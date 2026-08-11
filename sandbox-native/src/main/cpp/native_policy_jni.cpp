@@ -5,12 +5,15 @@
 #include "controlled_sandbox/native_network.h"
 
 #include <android/log.h>
+#include <android/native_window.h>
+#include <android/native_window_jni.h>
 #include <dlfcn.h>
 #include <elf.h>
 #include <jni.h>
 #include <link.h>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -490,4 +493,74 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeLoaderStatus(J
 extern "C" JNIEXPORT void JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetCrashRecorder(JNIEnv*, jclass) {
     controlled_sandbox::global_crash_recorder().reset();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeQueueJpeg(
+        JNIEnv* env, jclass, jobject surface, jbyteArray jpeg) {
+    // ImageReader's JPEG consumer accepts the platform's RGBA-to-BLOB compatibility path on
+    // API 29+.  The buffer must be one row and carry the camera3 JPEG transport footer; writing
+    // a normal Canvas frame here produces an RGBA buffer with a JPEG reader contract and causes
+    // ImageReader#getPlanes() to abort in native code.
+    if (surface == nullptr || jpeg == nullptr) return -1;
+    const jsize length = env->GetArrayLength(jpeg);
+    if (length <= 0) return -2;
+    constexpr std::size_t kJpegBlobBytes = 8;
+    const std::size_t required = static_cast<std::size_t>(length) + kJpegBlobBytes;
+    const std::size_t pixels = (required + 3U) / 4U;
+    const std::size_t side = static_cast<std::size_t>(std::ceil(std::sqrt(
+            static_cast<double>(pixels))));
+    if (side == 0 || side > static_cast<std::size_t>(INT32_MAX)) return -3;
+
+    ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
+    if (window == nullptr) return -4;
+    int result = ANativeWindow_setBuffersGeometry(window, static_cast<int32_t>(side),
+            static_cast<int32_t>(side),
+            AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM);
+    if (result != 0) {
+        ANativeWindow_release(window);
+        return result;
+    }
+
+    jbyte* source = env->GetByteArrayElements(jpeg, nullptr);
+    if (source == nullptr) {
+        ANativeWindow_release(window);
+        return -5;
+    }
+    ANativeWindow_Buffer buffer{};
+    ARect dirty{0, 0, static_cast<int32_t>(side), static_cast<int32_t>(side)};
+    result = ANativeWindow_lock(window, &buffer, &dirty);
+    if (result == 0) {
+        constexpr int32_t kRgbaBytes = 4;
+        // Android's RGBA-to-BLOB reader path measures the payload as the first row plus
+        // subsequent stride rows, not simply width*height.  Keep the footer at that exact
+        // transport boundary so ImageReader can find the JPEG size.
+        const std::size_t rowBytes = (static_cast<std::size_t>(buffer.width)
+                + static_cast<std::size_t>(buffer.stride)
+                * static_cast<std::size_t>(buffer.height - 1))
+                * static_cast<std::size_t>(kRgbaBytes);
+        const std::size_t capacity = static_cast<std::size_t>(buffer.stride)
+                * static_cast<std::size_t>(buffer.height)
+                * static_cast<std::size_t>(kRgbaBytes);
+        if (buffer.bits == nullptr || buffer.height != buffer.width || rowBytes < required
+                || capacity < required) {
+            result = -6;
+        } else {
+            std::memset(buffer.bits, 0, capacity);
+            std::memcpy(buffer.bits, source, static_cast<std::size_t>(length));
+            // camera3_jpeg_blob_t is { uint16_t id; uint16_t padding; uint32_t size }.
+            auto* footer = static_cast<std::uint8_t*>(buffer.bits) + rowBytes - kJpegBlobBytes;
+            footer[0] = 0xFF;
+            footer[1] = 0x00;
+            footer[2] = 0x00;
+            footer[3] = 0x00;
+            const std::uint32_t jpegSize = static_cast<std::uint32_t>(length);
+            std::memcpy(footer + 4, &jpegSize, sizeof(jpegSize));
+        }
+        const int unlockResult = ANativeWindow_unlockAndPost(window);
+        if (result == 0) result = unlockResult;
+    }
+    env->ReleaseByteArrayElements(jpeg, source, JNI_ABORT);
+    ANativeWindow_release(window);
+    return result;
 }

@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.contract.VirtualBluetoothDeviceSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCellInfoSnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSensorSnapshot;
 import com.warden.controlledsandbox.contract.VirtualTelephonySlotSnapshot;
@@ -19,9 +20,25 @@ import java.util.Set;
 
 /** Version-tolerant reflective construction for framework result objects. */
 public final class FrameworkDeviceObjectFactory {
+    private static volatile boolean WIFI_FACTORY_LOGGED;
     private FrameworkDeviceObjectFactory() { }
 
     static Object location(Class<?> type, VirtualLocationProfileSnapshot profile) {
+        profile = profile.sampleAt(System.currentTimeMillis(), System.nanoTime());
+        if (type != null && "android.location.LocationResult".equals(type.getName())) {
+            Object location = locationValue(android.location.Location.class, profile);
+            try {
+                Method wrap = type.getDeclaredMethod("wrap", List.class);
+                wrap.setAccessible(true);
+                return wrap.invoke(null, List.of(location));
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("VIRTUAL_LOCATION_RESULT_ADAPTER_FAILED", error);
+            }
+        }
+        return locationValue(type, profile);
+    }
+
+    private static Object locationValue(Class<?> type, VirtualLocationProfileSnapshot profile) {
         Object value = construct(type, profile.provider());
         write(value, new String[]{"setProvider"}, new String[]{"mProvider"}, profile.provider());
         write(value, new String[]{"setLatitude"}, new String[]{"mLatitude"}, profile.latitude());
@@ -45,6 +62,29 @@ public final class FrameworkDeviceObjectFactory {
 
     static Object wifiInfo(Class<?> type, VirtualWifiProfileSnapshot profile) {
         Object value = construct(type, null);
+        try {
+            Object wifiSsid = wifiSsid(profile.ssid());
+            write(value, new String[]{"setSSID"}, new String[]{"mWifiSsid"}, wifiSsid);
+            if (!WIFI_FACTORY_LOGGED) {
+                WIFI_FACTORY_LOGGED = true;
+                Object stored = null;
+                Field field = findField(value.getClass(), "mWifiSsid");
+                if (field != null) {
+                    field.setAccessible(true);
+                    stored = field.get(value);
+                }
+                android.util.Log.i("CS_WIFI_FACTORY", "ssid=" + profile.ssid()
+                        + " object=" + wifiSsid + " stored=" + stored
+                        + " field=" + (field == null ? "none" : field.getType().getName()));
+            }
+        } catch (Throwable error) {
+            // Older API images store SSID as a String; the compatibility write below covers it.
+            if (!WIFI_FACTORY_LOGGED) {
+                WIFI_FACTORY_LOGGED = true;
+                android.util.Log.i("CS_WIFI_FACTORY", "WifiSsid adapter unavailable error="
+                        + error.getClass().getName());
+            }
+        }
         write(value, new String[]{"setSSID"}, new String[]{"mSSID", "ssid"}, profile.ssid());
         write(value, new String[]{"setBSSID"}, new String[]{"mBSSID", "bssid"}, profile.bssid());
         write(value, new String[]{"setMacAddress"}, new String[]{"mMacAddress", "macAddress"},
@@ -67,8 +107,16 @@ public final class FrameworkDeviceObjectFactory {
 
     static Object wifiNetwork(Class<?> type, VirtualWifiNetworkSnapshot network) {
         Object value = construct(type, null);
+        Object wifiSsid;
+        try {
+            wifiSsid = wifiSsid(network.ssid());
+        } catch (ReflectiveOperationException error) {
+            // ScanResult on pre-WifiSsid images stores the SSID as a String.
+            wifiSsid = network.ssid();
+        }
         write(value, new String[]{"setSsid", "setSSID"}, new String[]{"SSID", "mWifiSsid", "ssid"},
-                network.ssid());
+                wifiSsid);
+        write(value, new String[]{"setSsid", "setSSID"}, new String[]{"SSID", "ssid"}, network.ssid());
         write(value, new String[]{"setBssid", "setBSSID"}, new String[]{"BSSID", "bssid"},
                 network.bssid());
         write(value, new String[]{"setCapabilities"}, new String[]{"capabilities", "mCapabilities"},
@@ -78,6 +126,45 @@ public final class FrameworkDeviceObjectFactory {
         write(value, new String[]{"setLevel", "setRssi"}, new String[]{"level", "mLevel", "rssi"},
                 network.rssi());
         return value;
+    }
+
+    /**
+     * WifiSsid is hidden and moved between the boot image and the Wi-Fi module across API
+     * levels.  Android 12 exposes createFromByteArray/createFromAsciiEncoded; older images
+     * used different names.  Keep the adaptation at the framework object boundary so the
+     * virtual profile never falls back to the host's SSID.
+     */
+    private static Object wifiSsid(String ssid) throws ReflectiveOperationException {
+        Class<?> type = Class.forName("android.net.wifi.WifiSsid");
+        byte[] bytes = ssid.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        for (String name : new String[]{"createFromByteArray", "fromBytes"}) {
+            try {
+                Method factory = type.getDeclaredMethod(name, byte[].class);
+                factory.setAccessible(true);
+                return factory.invoke(null, bytes);
+            } catch (NoSuchMethodException missing) {
+                // Continue with the next version-specific factory.
+            }
+        }
+        try {
+            Method factory = type.getDeclaredMethod("createFromAsciiEncoded", String.class);
+            factory.setAccessible(true);
+            return factory.invoke(null, ssid);
+        } catch (NoSuchMethodException missing) {
+            // Fall through to the public octet buffer used by the API-31/32 implementation.
+        }
+        Constructor<?> constructor = type.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        Object value = constructor.newInstance();
+        Field octets = findField(type, "octets");
+        if (octets == null) throw new NoSuchFieldException("WifiSsid.octets");
+        octets.setAccessible(true);
+        Object output = octets.get(value);
+        if (output instanceof java.io.ByteArrayOutputStream stream) {
+            stream.write(bytes, 0, bytes.length);
+            return value;
+        }
+        throw new IllegalStateException("VIRTUAL_WIFI_SSID_OCTETS_UNSUPPORTED");
     }
 
 
@@ -102,6 +189,115 @@ public final class FrameworkDeviceObjectFactory {
         write(value, new String[]{"setCardId"}, new String[]{"mCardId", "cardId"},
                 slot.simSerialNumber());
         return value;
+    }
+
+    static Object cellInfo(Class<?> type, VirtualCellInfoSnapshot cell) {
+        // CellInfo itself is abstract on API 32+.  Returning an allocated base object makes
+        // the List<CellInfo> call appear non-empty but fails as soon as a Guest asks for the
+        // identity or signal strength.  Build the concrete RAT object and its identity/signal
+        // children through the hidden, version-specific constructors instead.
+        String technology = cell.technology();
+        if (VirtualCellInfoSnapshot.LTE.equals(technology)) {
+            try {
+                Class<?> infoType = Class.forName("android.telephony.CellInfoLte");
+                Class<?> identityType = Class.forName("android.telephony.CellIdentityLte");
+                Class<?> signalType = Class.forName("android.telephony.CellSignalStrengthLte");
+                Object identity = constructLteIdentity(identityType, cell);
+                Object signal = constructLteSignal(signalType, cell);
+                Object value = constructLteInfo(type, infoType, identity, signal, cell);
+                if (value != null) return value;
+            } catch (ReflectiveOperationException | RuntimeException error) {
+                throw new IllegalStateException("VIRTUAL_CELL_LTE_ADAPTER_FAILED", error);
+            }
+        }
+        throw new IllegalStateException("VIRTUAL_CELL_TECHNOLOGY_ADAPTER_REQUIRED:" + technology);
+    }
+
+    private static Object constructLteIdentity(Class<?> type, VirtualCellInfoSnapshot cell)
+            throws ReflectiveOperationException {
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(
+                    int.class, int.class, int.class, int.class, int[].class, int.class,
+                    String.class, String.class, String.class, String.class,
+                    java.util.Collection.class,
+                    Class.forName("android.telephony.ClosedSubscriberGroupInfo"));
+            constructor.setAccessible(true);
+            return constructor.newInstance((int) cell.cid(), cell.pci(), cell.tac(), cell.arfcn(),
+                    new int[0], -1, String.format(java.util.Locale.ROOT, "%03d", cell.mcc()),
+                    String.format(java.util.Locale.ROOT, "%02d", cell.mnc()), null, null,
+                    java.util.List.of(), null);
+        } catch (NoSuchMethodException missingModernConstructor) {
+            // Continue with API-specific legacy constructors below.
+        }
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(
+                    int.class, int.class, int.class, int.class, int.class, int.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(cell.mcc(), cell.mnc(), (int) cell.cid(), cell.pci(),
+                    cell.tac(), cell.arfcn());
+        } catch (NoSuchMethodException missingEarfcnConstructor) {
+            // API 26-28 exposed only the five-argument identity constructor.
+        }
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(
+                    int.class, int.class, int.class, int.class, int.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(cell.mcc(), cell.mnc(), (int) cell.cid(), cell.pci(), cell.tac());
+        } catch (NoSuchMethodException missingLegacyConstructor) {
+            Constructor<?> constructor = type.getDeclaredConstructor(
+                    int.class, int.class, int.class, int.class, int.class, int.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(cell.mcc(), cell.mnc(), (int) cell.cid(), cell.pci(),
+                    cell.tac(), cell.arfcn());
+        }
+    }
+
+    private static Object constructLteSignal(Class<?> type, VirtualCellInfoSnapshot cell)
+            throws ReflectiveOperationException {
+        try {
+            Constructor<?> constructor = type.getDeclaredConstructor(
+                    int.class, int.class, int.class, int.class, int.class, int.class);
+            constructor.setAccessible(true);
+            int rsrp = cell.signalLevel();
+            return constructor.newInstance(asuFromDbm(rsrp), rsrp, -10, 0, 0, 0);
+        } catch (NoSuchMethodException missingParameterizedConstructor) {
+            Object value = construct(type, null);
+            write(value, new String[]{}, new String[]{"mSignalStrength"},
+                    asuFromDbm(cell.signalLevel()));
+            write(value, new String[]{}, new String[]{"mRsrp"}, cell.signalLevel());
+            return value;
+        }
+    }
+
+    private static Object constructLteInfo(Class<?> requestedType, Class<?> infoType,
+            Object identity, Object signal, VirtualCellInfoSnapshot cell)
+            throws ReflectiveOperationException {
+        Class<?> target = requestedType == null || requestedType == Object.class
+                || requestedType.isInterface() || java.lang.reflect.Modifier.isAbstract(requestedType.getModifiers())
+                ? infoType : requestedType;
+        for (Constructor<?> constructor : target.getDeclaredConstructors()) {
+            Class<?>[] parameters = constructor.getParameterTypes();
+            if (parameters.length == 5 && parameters[0] == int.class && parameters[1] == boolean.class
+                    && parameters[2] == long.class && parameters[3].isInstance(identity)
+                    && parameters[4].isInstance(signal)) {
+                constructor.setAccessible(true);
+                Object value = constructor.newInstance(cell.registered() ? 1 : 0, cell.registered(),
+                        System.nanoTime(), identity, signal);
+                return value;
+            }
+        }
+        Object value = construct(target, null);
+        write(value, new String[]{"setRegistered"}, new String[]{"mRegistered"}, cell.registered());
+        write(value, new String[]{"setCellConnectionStatus"}, new String[]{"mCellConnectionStatus"},
+                cell.registered() ? 1 : 0);
+        write(value, new String[]{"setTimeStamp"}, new String[]{"mTimeStamp"}, System.nanoTime());
+        write(value, new String[]{"setCellIdentity"}, new String[]{"mCellIdentityLte"}, identity);
+        write(value, new String[]{"setCellSignalStrength"}, new String[]{"mCellSignalStrengthLte"}, signal);
+        return value;
+    }
+
+    private static int asuFromDbm(int dbm) {
+        return dbm == Integer.MAX_VALUE ? 99 : Math.max(0, Math.min(31, dbm + 140));
     }
 
     static Object bluetoothDevice(Class<?> type, VirtualBluetoothDeviceSnapshot device) {
