@@ -133,6 +133,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     void closeWebViewProviderServices() {
         webViewProviderServices.close();
     }
+    void closeComponentServices() {
+        componentRouter.close();
+    }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     /**
@@ -162,6 +165,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 .equals(serviceClass.getName())) return "accessibility";
         if (serviceClass != null && "android.view.inputmethod.InputMethodManager"
                 .equals(serviceClass.getName())) return "input_method";
+        // Radio-less Host images may omit the TelephonyManager class-to-name registration even
+        // though the Guest has an explicit virtual telephony profile and Binder boundary.
+        if (serviceClass != null && "android.telephony.TelephonyManager"
+                .equals(serviceClass.getName())) return Context.TELEPHONY_SERVICE;
+        if (serviceClass != null && "android.telephony.SubscriptionManager"
+                .equals(serviceClass.getName())) return Context.TELEPHONY_SUBSCRIPTION_SERVICE;
         return null;
     }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }

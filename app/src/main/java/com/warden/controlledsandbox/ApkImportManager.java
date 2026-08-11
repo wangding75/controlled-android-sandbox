@@ -171,10 +171,13 @@ final class ApkImportManager {
         storageLayout.requireInsidePackagesRoot(revisionDir);
         storageLayout.requireNoManagedSymlinks(revisionDir);
         if (revisionDir.exists()) {
+            removeKnownRuntimeProfileSidecars(revisionDir);
             requireMatchingPublishedRevision(transactionDir, revisionDir);
+            sealPublishedRevision(revisionDir);
             deleteTreeOrThrow(transactionDir);
         } else {
             publishDirectory(transactionDir, revisionDir);
+            sealPublishedRevision(revisionDir);
         }
 
         File apk = new File(revisionDir, "base.apk");
@@ -634,6 +637,67 @@ final class ApkImportManager {
 
     static void publishDirectory(File source, File destination) throws Exception {
         DurableAtomicFile.moveAcknowledged(source.toPath(), destination.toPath());
+    }
+
+    /**
+     * Published APK/native revisions are content-addressed and must not become a writable
+     * staging area for ART profiles or application-generated files.  The same app UID is used
+     * by Guest processes, so sealing the directory is required in addition to sealing files.
+     * deleteTreeOrThrow() explicitly re-enables write access while reclaiming an unreferenced
+     * revision.
+     */
+    private static void sealPublishedRevision(File revision) throws Exception {
+        if (revision == null || !revision.isDirectory()) {
+            throw new IllegalStateException("Published revision directory is missing");
+        }
+        File[] children = revision.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list published revision " + revision);
+        for (File child : children) {
+            if (java.nio.file.Files.isSymbolicLink(child.toPath())) {
+                throw new SecurityException("PUBLISHED_REVISION_SYMLINK");
+            }
+            if (child.isDirectory()) sealPublishedRevision(child);
+            child.setReadable(true, true);
+            child.setWritable(false, false);
+            if (child.isDirectory()) child.setExecutable(true, true);
+        }
+        revision.setReadable(true, true);
+        revision.setWritable(false, false);
+        revision.setExecutable(true, true);
+    }
+
+    /**
+     * Older revisions may already contain ART's generated current-profile sidecars.  They are
+     * not APK/native content and are the only runtime files accepted during migration; any
+     * other unexpected entry still fails the immutable tree comparison below.
+     */
+    private static void removeKnownRuntimeProfileSidecars(File revision) throws Exception {
+        File profileDirectory = new File(new File(revision, "lib"), "oat");
+        if (!profileDirectory.exists()) return;
+        if (java.nio.file.Files.isSymbolicLink(profileDirectory.toPath())
+                || !profileDirectory.isDirectory()) {
+            throw new SecurityException("PUBLISHED_PROFILE_DIRECTORY_INVALID");
+        }
+        File[] children = profileDirectory.listFiles();
+        if (children == null) throw new IllegalStateException(
+                "Cannot list published profile directory " + profileDirectory);
+        for (File child : children) {
+            if (java.nio.file.Files.isSymbolicLink(child.toPath())
+                    || !child.isFile() || !child.getName().endsWith(".prof")) {
+                continue;
+            }
+            child.setWritable(true, false);
+            if (!child.delete() && child.exists()) {
+                throw new IllegalStateException("Cannot remove runtime profile sidecar " + child);
+            }
+        }
+        File[] remaining = profileDirectory.listFiles();
+        if (remaining != null && remaining.length == 0) {
+            profileDirectory.setWritable(true, false);
+            if (!profileDirectory.delete() && profileDirectory.exists()) {
+                throw new IllegalStateException("Cannot remove empty runtime profile directory");
+            }
+        }
     }
 
     private static void moveFile(File source, File destination) throws Exception {

@@ -695,6 +695,10 @@ public final class GuestRuntimeEnvironment {
 
         void shutdown() {
             if (jobServices != null) jobServices.close();
+            // Stop accepting Guest-side component unbinds before the Broker-side component
+            // runtime and WebView provider are torn down.  Chromium may issue one final unbind
+            // asynchronously; GuestContextComponentRouter handles that late call explicitly.
+            context.closeComponentServices();
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
             webViewProfile.renderers.close();

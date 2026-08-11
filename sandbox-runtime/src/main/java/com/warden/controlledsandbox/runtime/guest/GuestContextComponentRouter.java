@@ -22,6 +22,7 @@ final class GuestContextComponentRouter {
     private final GuestIntentResolver resolver;
     private final GuestDynamicReceiverRegistry receivers;
     private final IdentityHashMap<ServiceConnection, ConnectionRecord> connections = new IdentityHashMap<>();
+    private boolean closed;
 
     GuestContextComponentRouter(GuestContext context, GuestPackageSpec spec,
             android.content.pm.PackageManager packageManager,
@@ -67,6 +68,7 @@ final class GuestContextComponentRouter {
 
     synchronized boolean bindService(Intent intent, ServiceConnection connection, int flags,
             Executor executor) {
+        if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (connection == null) throw new IllegalArgumentException("connection is required");
         if (connections.containsKey(connection)) throw new IllegalArgumentException("ServiceConnection already bound");
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
@@ -95,7 +97,18 @@ final class GuestContextComponentRouter {
 
     synchronized void unbindService(ServiceConnection connection) {
         ConnectionRecord record = connections.remove(connection);
-        if (record == null) throw new IllegalArgumentException("ServiceConnection not bound");
+        if (record == null) {
+            // WebView can deliver a late unbind after the concrete Guest service has already
+            // released its Broker-side bindings.  Preserve Android's strict error while the
+            // Guest is live, but make process teardown idempotent so that this lifecycle race
+            // cannot crash Chromium's service thread.
+            if (closed) {
+                android.util.Log.i("CS_GUEST_SERVICE",
+                        "late unbind ignored after component-router teardown");
+                return;
+            }
+            throw new IllegalArgumentException("ServiceConnection not bound");
+        }
         Bundle request = bridge.baseRequest();
         request.putString(ComponentOperations.OPERATION, ComponentOperations.UNBIND_SERVICE);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.target.className());
@@ -107,6 +120,12 @@ final class GuestContextComponentRouter {
             connections.put(connection, record);
             throw error;
         }
+    }
+
+    synchronized void close() {
+        if (closed) return;
+        closed = true;
+        connections.clear();
     }
 
     Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter,
