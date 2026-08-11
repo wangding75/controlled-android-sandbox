@@ -27,7 +27,8 @@ if ($LASTEXITCODE -ne 0) { throw "git clone failed" }
 
 $actualCommit = (& git -C $restore rev-parse HEAD).Trim()
 $actualTree = (& git -C $restore rev-parse 'HEAD^{tree}').Trim()
-$status = (& git -C $restore status --porcelain=v1).Trim()
+$statusLines = & git -C $restore status --porcelain=v1
+$status = if ($null -eq $statusLines) { '' } else { ($statusLines | Out-String).Trim() }
 if ($actualCommit -ne $ExpectedCommit) {
     throw "Restored HEAD mismatch: expected $ExpectedCommit, found $actualCommit"
 }
