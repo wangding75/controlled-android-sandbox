@@ -815,21 +815,28 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 session = sessions.transition(session.packageName(), session.virtualUserId(), session.processName(),
                         session.generation(), SessionState.STOPPING, now(), "");
                 final GuestSession stopping = session;
-                callGuest(session.processSlot(), guest -> {
+                guestConnections.callWithTimeout(session.processSlot(), guest -> {
                     guest.shutdown(stopping.sessionId(), stopping.generation());
                     Bundle out = new Bundle();
                     out.putString(RuntimeKeys.STATUS, "STOPPED");
                     return out;
-                });
+                }, 10_000L);
                 sessions.transition(session.packageName(), session.virtualUserId(), session.processName(),
                         session.generation(), SessionState.STOPPED, now(), "");
             }
         } catch (Throwable error) {
             try {
                 GuestSession current = sessions.get(original.packageName(), original.virtualUserId(), original.processName());
-                if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
-                    sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                            current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+                if (current != null && current.state() == SessionState.STOPPING
+                        && current.state().canTransitionTo(SessionState.STOPPED)) {
+                    GuestSession stopped = sessions.transition(current.packageName(), current.virtualUserId(),
+                            current.processName(), current.generation(), SessionState.STOPPED, now(),
+                            String.valueOf(error.getMessage()));
+                    RuntimeEventLog.event("GUEST_STOP_FORCED", sessionBundle(stopped, "STOPPED"));
+                } else if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
+                    sessions.transition(current.packageName(), current.virtualUserId(),
+                            current.processName(), current.generation(), SessionState.FAILED, now(),
+                            String.valueOf(error.getMessage()));
                 }
             } finally {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);

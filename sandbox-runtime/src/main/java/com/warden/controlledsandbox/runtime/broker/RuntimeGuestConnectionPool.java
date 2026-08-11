@@ -12,7 +12,12 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Owns binding, binder-death handling, and cleanup for ordinary Guest process slots. */
 final class RuntimeGuestConnectionPool implements AutoCloseable {
@@ -26,6 +31,11 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
 
     private static final long DEFAULT_BIND_TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(10L);
     private static final int MAX_PRE_DISPATCH_DEAD_RETRIES = 1;
+    private static final ExecutorService BOUNDED_CALL_WORKERS = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "sandbox-bounded-guest-call");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     private final Service owner;
     private final DisconnectListener disconnectListener;
@@ -72,6 +82,42 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
                 throw error;
             }
         }
+    }
+
+    /**
+     * Executes a teardown Binder call without allowing an unresponsive Guest to pin the Broker
+     * forever.  Normal Guest operations remain synchronous and retain their existing semantics;
+     * this bound is intentionally used only for lifecycle teardown.
+     */
+    Bundle callWithTimeout(int slot, GuestCall call, long timeoutMillis) throws Exception {
+        Future<Bundle> future = BOUNDED_CALL_WORKERS.submit(() -> call(slot, call));
+        try {
+            return future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException error) {
+            future.cancel(true);
+            abort(slot, "GUEST_SHUTDOWN_TIMEOUT");
+            throw new IllegalStateException("GUEST_SHUTDOWN_TIMEOUT", error);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            future.cancel(true);
+            throw new IllegalStateException("GUEST_SHUTDOWN_INTERRUPTED", error);
+        } catch (ExecutionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException(cause);
+        }
+    }
+
+    /** Detaches a connection that can no longer participate in a bounded lifecycle operation. */
+    void abort(int slot, String reason) {
+        GuestConnection connection;
+        synchronized (this) {
+            connection = connections.remove(slot);
+        }
+        if (connection == null) return;
+        connection.closing = true;
+        retire(connection, reason == null ? "ABORTED" : reason, false);
     }
 
     void release(int slot) {

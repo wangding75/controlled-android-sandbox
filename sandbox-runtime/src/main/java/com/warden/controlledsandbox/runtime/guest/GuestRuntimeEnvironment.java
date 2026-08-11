@@ -337,10 +337,16 @@ public final class GuestRuntimeEnvironment {
                 android.os.SystemClock.elapsedRealtime());
     }
 
-    static synchronized void shutdown(String sessionId, long generation) {
-        if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
-        Session session = require(sessionId, generation);
-        current = null;
+    static void shutdown(String sessionId, long generation) {
+        Session session;
+        synchronized (GuestRuntimeEnvironment.class) {
+            if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+            session = require(sessionId, generation);
+            // Invalidate the lease before cleanup.  Cleanup can synchronously call a framework
+            // or Broker route which re-enters this class; never hold the class monitor while
+            // waiting for Guest main-thread lifecycle work to finish.
+            current = null;
+        }
         session.shutdown();
     }
 
@@ -349,13 +355,17 @@ public final class GuestRuntimeEnvironment {
      * A service can be stopped after its Binder binding is released without receiving the typed
      * shutdown call, so service destruction must not leave a prior session resident in the slot.
      */
-    static synchronized void shutdownIfCurrent() {
-        // A concurrent prepare owns the staged cleanup path in prepare().  Android is already
-        // tearing down this process; do not publish a new current Session from that path.
-        if (preparing) return;
-        Session session = current;
-        if (session == null) return;
-        current = null;
+    static void shutdownIfCurrent() {
+        Session session;
+        synchronized (GuestRuntimeEnvironment.class) {
+            // A concurrent prepare owns the staged cleanup path in prepare().  Android is
+            // already tearing down this process; do not publish a new current Session from
+            // that path.
+            if (preparing) return;
+            session = current;
+            if (session == null) return;
+            current = null;
+        }
         session.shutdown();
     }
 
