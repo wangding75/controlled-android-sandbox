@@ -1,15 +1,12 @@
-T52 RESULT: BLOCKED
+T52 RESULT: IN_PROGRESS (continuation in progress; prior BLOCKED verdict withdrawn)
 
 # T52 final report — SX migration to Controlled Android Sandbox
 
 ## Executive result
 
-The SX business surface has been migrated behind the Controlled Android Sandbox SDK/adapter boundary and the generic runtime hardening is implemented and buildable. Stage A passes. Quark now has a formal SX prepare/launch and warm thin-core stability PASS, while the pristine cold-start/10-start gate is not claimed. DingTalk Stage C remains blocked, so the overall T52 result is **BLOCKED**, not PASS.
+The prior BLOCKED conclusion was invalid because it stopped on ordinary Runtime/compatibility defects. T52 continues here without rollback. The SX business surface is migrated behind the Controlled Android Sandbox SDK/adapter boundary; generic Activity recovery, Guest main-thread/Binder routing, teardown, and task-safe acceptance entry have now been repaired and are being re-regressed on SX.
 
-The blockers are runtime compatibility failures, not missing APKs, missing authentication, or a deliberately skipped test:
-
-- Quark formal SX prepare and launch now reach `com.ucpro.BrowserActivity`; the Guest thin core is loaded from the isolated instance directory and remains stable for 335 seconds with no Guest fatal/disconnect markers. A pristine first-run thick-core success and a complete 10-start gate are not claimed because the rapid force-stop loop caused generic host-service churn before the next command, without a Quark process crash.
-- DingTalk imports and prepares, and the launch request is accepted, but the guest reaches `checkExportedActivityStartup`, calls `System.exit(0)`, disconnects, and does not provide a stable login/home surface.
+Current fresh SX evidence already shows Stage A, Quark 10x/5min, and DingTalk 10x/5min passing. The report remains `IN_PROGRESS` until final source review, backup/restore verification, final commit push, and worktree freeze are complete.
 
 ## Baseline and source state
 
