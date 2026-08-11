@@ -14,7 +14,7 @@
     },
     "gradle": {
       "version": "8.13",
-      "distribution": "https://services.gradle.org/distributions/gradle-8.13-bin.zip",
+      "distribution": "https://mirrors.aliyun.com/gradle/distributions/v8.13.0/gradle-8.13-bin.zip",
       "distributionSha256": "20f1b1176237254a6fc204d8434196fa11a4cfb387567519c61556e8710aed78",
       "bootstrapMode": "checked-in Java source-file launcher",
       "compatibilityWrapperJarSha256": "522395470c58b6afba18f194ef0c592e9612b681d4248dfb101b9c35d79c9859"
