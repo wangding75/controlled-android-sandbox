@@ -22,7 +22,7 @@ public final class FixtureProvider extends ContentProvider {
 
     @Override public synchronized boolean onCreate() {
         rows.put(nextId.getAndIncrement(), "seed");
-        Log.i("CS_FIXTURE", "PROVIDER_CREATE process=" + android.app.Application.getProcessName());
+        Log.i("CS_FIXTURE", "PROVIDER_CREATE process=" + getContext().getApplicationInfo().processName);
         return true;
     }
 

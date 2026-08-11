@@ -6,7 +6,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -57,6 +60,7 @@ final class GuestWebViewProviderServiceBridge implements AutoCloseable {
     synchronized boolean bindIsolated(Intent intent, int flags, String instanceName,
             Executor executor, ServiceConnection connection) {
         if (!isRendererService(intent)) return false;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false;
         if (connection == null) throw new IllegalArgumentException("connection is required");
         if (bindings.containsKey(connection)) throw new IllegalArgumentException(
                 "ServiceConnection already bound");
@@ -68,7 +72,7 @@ final class GuestWebViewProviderServiceBridge implements AutoCloseable {
         // The Host Context is used only as the Android transport. The component and provider
         // package were checked above; the Guest callback is still dispatched on its Executor.
         boolean bound = hostServiceContext.bindIsolatedService(copy, flags, instanceName,
-                hostServiceContext.getMainExecutor(), relay);
+                mainExecutor(), relay);
         if (!bound) return false;
         bindings.put(connection, relay);
         android.util.Log.i("CS_WEBVIEW_PROVIDER", "isolated-bound="
@@ -118,9 +122,23 @@ final class GuestWebViewProviderServiceBridge implements AutoCloseable {
             }
 
             @Override public void onNullBinding(ComponentName name) {
-                dispatch(executor, () -> connection.onNullBinding(name));
+                dispatch(executor, () -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        connection.onNullBinding(name);
+                    } else {
+                        connection.onServiceDisconnected(name);
+                    }
+                });
             }
         };
+    }
+
+    private Executor mainExecutor() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return hostServiceContext.getMainExecutor();
+        }
+        Handler handler = new Handler(Looper.getMainLooper());
+        return handler::post;
     }
 
     private static void dispatch(Executor executor, Runnable callback) {

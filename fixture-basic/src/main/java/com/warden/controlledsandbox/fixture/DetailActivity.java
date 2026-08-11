@@ -14,7 +14,7 @@ public class DetailActivity extends Activity {
         TextView content = new TextView(this);
         content.setText("Detail Activity create #" + count);
         setContentView(content);
-        Log.i("CS_FIXTURE", "DETAIL_CREATE count=" + count + " process=" + android.app.Application.getProcessName());
+        Log.i("CS_FIXTURE", "DETAIL_CREATE count=" + count + " process=" + getApplicationInfo().processName);
     }
 
     @Override protected void onResume() { super.onResume(); Log.i("CS_FIXTURE", "DETAIL_RESUME"); }

@@ -16,6 +16,8 @@ public final class RuntimeEventLog {
             append(line, "package", data.getString(RuntimeKeys.PACKAGE_NAME, ""));
             append(line, "session", data.getString(RuntimeKeys.SESSION_ID, ""));
             append(line, "component", data.getString(RuntimeKeys.COMPONENT_CLASS, ""));
+            append(line, "error", data.getString(RuntimeKeys.ERROR_TYPE, ""));
+            append(line, "message", data.getString(RuntimeKeys.ERROR_MESSAGE, ""));
             line.append(" generation=").append(data.getLong(RuntimeKeys.GENERATION, 0));
             line.append(" slot=").append(data.getInt(RuntimeKeys.PROCESS_SLOT, -1));
         }

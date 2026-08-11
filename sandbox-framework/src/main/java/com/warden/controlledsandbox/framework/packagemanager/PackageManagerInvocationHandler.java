@@ -20,6 +20,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Build;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -302,7 +303,9 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             projected.versionName = packageInfo.versionName;
             projected.versionCode = packageInfo.versionCode;
             projected.signatures = packageInfo.signatures;
-            projected.signingInfo = packageInfo.signingInfo;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                projected.signingInfo = packageInfo.signingInfo;
+            }
             projected.requestedPermissions = packageInfo.requestedPermissions;
             projected.firstInstallTime = packageInfo.firstInstallTime;
             projected.lastUpdateTime = packageInfo.lastUpdateTime;

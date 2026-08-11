@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.pm.ApplicationInfo;
+import android.os.Bundle;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
@@ -18,7 +19,8 @@ final class GuestPackageMetadataMapper {
     private GuestPackageMetadataMapper() { }
 
     static VirtualPackageMetadata fromSnapshot(VirtualPackageStateSnapshot state,
-                                               ApplicationInfo applicationInfo) {
+                                               ApplicationInfo applicationInfo,
+                                               GuestManifestMetadata manifestMetadata) {
         if (state == null) throw new IllegalArgumentException("virtual package state is required");
         List<VirtualPackageMetadata.Component> components = new ArrayList<>();
         for (VirtualComponentSnapshot component : state.components()) {
@@ -39,13 +41,22 @@ final class GuestPackageMetadataMapper {
                         rule.path(), rule.pathPrefix(), rule.pathPattern(),
                         rule.readPermission(), rule.writePermission(), rule.uriGrantRule()));
             }
+            Bundle providerMetadata = null;
+            if (VirtualPackageMetadata.Type.PROVIDER == VirtualPackageMetadata.Type.valueOf(component.type())
+                    && manifestMetadata != null) {
+                for (String authority : component.authority().split(";")) {
+                    providerMetadata = manifestMetadata.provider(authority);
+                    if (providerMetadata != null) break;
+                }
+            }
             components.add(new VirtualPackageMetadata.Component(
                     VirtualPackageMetadata.Type.valueOf(component.type()),
                     component.className(), component.processName(), component.exported(),
                     component.enabled(), component.isolated(),
                     new LinkedHashSet<>(component.actions()), component.authority(),
                     component.permission(), component.readPermission(), component.writePermission(),
-                    component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules));
+                    component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules,
+                    providerMetadata));
         }
         List<String> permissions = new ArrayList<>();
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {

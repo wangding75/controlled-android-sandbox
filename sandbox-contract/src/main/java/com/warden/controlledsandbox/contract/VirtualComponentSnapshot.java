@@ -21,6 +21,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final String writePermission;
     private final boolean grantUriPermissions;
     private final String enabledSetting;
+    private final int themeResId;
     private final ArrayList<String> actions;
     private final ArrayList<VirtualIntentFilterSnapshot> intentFilters;
     private final ArrayList<VirtualProviderPathRuleSnapshot> providerPathRules;
@@ -38,7 +39,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                     List<String> actions,
                                     List<VirtualIntentFilterSnapshot> intentFilters) {
         this(type, className, processName, exported, enabled, isolated, authority, permission,
-                permission, permission, false, enabledSetting, actions, intentFilters, List.of());
+                permission, permission, false, enabledSetting, actions, intentFilters, List.of(), 0);
     }
 
     public VirtualComponentSnapshot(String type, String className, String processName,
@@ -48,6 +49,19 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                     String enabledSetting, List<String> actions,
                                     List<VirtualIntentFilterSnapshot> intentFilters,
                                     List<VirtualProviderPathRuleSnapshot> providerPathRules) {
+        this(type, className, processName, exported, enabled, isolated, authority, permission,
+                readPermission, writePermission, grantUriPermissions, enabledSetting, actions,
+                intentFilters, providerPathRules, 0);
+    }
+
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                    boolean exported, boolean enabled, boolean isolated,
+                                    String authority, String permission, String readPermission,
+                                    String writePermission, boolean grantUriPermissions,
+                                    String enabledSetting, List<String> actions,
+                                    List<VirtualIntentFilterSnapshot> intentFilters,
+                                    List<VirtualProviderPathRuleSnapshot> providerPathRules,
+                                    int themeResId) {
         this.type = componentType(type);
         this.className = required(className, "className");
         this.processName = value(processName);
@@ -60,6 +74,8 @@ public final class VirtualComponentSnapshot implements Parcelable {
         this.writePermission = value(writePermission);
         this.grantUriPermissions = grantUriPermissions;
         this.enabledSetting = enabledSetting(enabledSetting);
+        if (themeResId < 0) throw new IllegalArgumentException("themeResId must be non-negative");
+        this.themeResId = themeResId;
         this.intentFilters = new ArrayList<>(intentFilters == null ? List.of() : intentFilters);
         if (this.intentFilters.size() > 256) throw new IllegalArgumentException("Too many intent filters");
         this.providerPathRules = new ArrayList<>(providerPathRules == null ? List.of() : providerPathRules);
@@ -80,7 +96,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
                 in.readInt() != 0, in.readInt() != 0, in.readString(), in.readString(),
                 in.readString(), in.readString(), in.readInt() != 0, in.readString(),
                 in.createStringArrayList(), in.createTypedArrayList(VirtualIntentFilterSnapshot.CREATOR),
-                in.createTypedArrayList(VirtualProviderPathRuleSnapshot.CREATOR));
+                in.createTypedArrayList(VirtualProviderPathRuleSnapshot.CREATOR), in.readInt());
     }
 
     public String type() { return type; }
@@ -95,6 +111,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public String writePermission() { return writePermission; }
     public boolean grantUriPermissions() { return grantUriPermissions; }
     public String enabledSetting() { return enabledSetting; }
+    public int themeResId() { return themeResId; }
     public List<String> actions() { return Collections.unmodifiableList(actions); }
     public List<VirtualIntentFilterSnapshot> intentFilters() { return Collections.unmodifiableList(intentFilters); }
     public List<VirtualProviderPathRuleSnapshot> providerPathRules() {
@@ -107,7 +124,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
         out.writeString(authority); out.writeString(permission); out.writeString(readPermission);
         out.writeString(writePermission); out.writeInt(grantUriPermissions ? 1 : 0);
         out.writeString(enabledSetting); out.writeStringList(actions); out.writeTypedList(intentFilters);
-        out.writeTypedList(providerPathRules);
+        out.writeTypedList(providerPathRules); out.writeInt(themeResId);
     }
     @Override public int describeContents() { return 0; }
 

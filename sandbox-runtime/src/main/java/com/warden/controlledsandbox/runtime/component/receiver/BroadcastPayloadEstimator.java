@@ -1,6 +1,8 @@
 package com.warden.controlledsandbox.runtime.component.receiver;
 
 import android.os.Bundle;
+import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.util.ArrayList;
 
 /** Conservative, deterministic Bundle size estimator for broadcast admission control. */
@@ -14,6 +16,39 @@ public final class BroadcastPayloadEstimator {
         int bytes = estimateBundle(bundle, 0);
         if (bytes > MAX_BROADCAST_BYTES) throw new IllegalArgumentException("BROADCAST_PAYLOAD_TOO_LARGE");
         return bytes;
+    }
+
+    /**
+     * Estimates only the public Intent payload carried by a Broker request. Control-plane
+     * Parcelable values such as the prepared package snapshot must never be treated as broadcast
+     * application data.
+     */
+    public static int requireIntentWithinLimit(Bundle request) {
+        Bundle payload = new Bundle();
+        copyString(request, payload, ComponentOperations.ACTION);
+        copyString(request, payload, RuntimeKeys.TARGET_PACKAGE_NAME);
+        copyString(request, payload, RuntimeKeys.URI);
+        copyString(request, payload, RuntimeKeys.BROADCAST_SCHEME);
+        copyString(request, payload, RuntimeKeys.BROADCAST_HOST);
+        copyString(request, payload, RuntimeKeys.BROADCAST_PATH);
+        copyString(request, payload, RuntimeKeys.BROADCAST_MIME_TYPE);
+        if (request != null) {
+            ArrayList<String> categories = request.getStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES);
+            if (categories != null) payload.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
+                    new ArrayList<>(categories));
+            Bundle extras = request.getBundle(RuntimeKeys.INTENT_EXTRAS);
+            if (extras != null) payload.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+            copyString(request, payload, RuntimeKeys.BROADCAST_RESULT_DATA);
+            Bundle resultExtras = request.getBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS);
+            if (resultExtras != null) payload.putBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS,
+                    new Bundle(resultExtras));
+        }
+        return requireWithinLimit(payload);
+    }
+
+    private static void copyString(Bundle source, Bundle target, String key) {
+        if (source == null || !source.containsKey(key)) return;
+        target.putString(key, source.getString(key, ""));
     }
 
     private static int estimateBundle(Bundle bundle, int depth) {

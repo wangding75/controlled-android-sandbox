@@ -14,6 +14,7 @@ public final class ManifestModel {
     private String splitName = "";
     private String configForSplit = "";
     private String usesSplit = "";
+    private int applicationThemeResId;
     private boolean featureSplit;
     private int minSdk;
     private int targetSdk;
@@ -38,6 +39,8 @@ public final class ManifestModel {
     public void configForSplit(String value) { configForSplit = normalize(value); }
     public String usesSplit() { return usesSplit; }
     public void usesSplit(String value) { usesSplit = normalize(value); }
+    public int applicationThemeResId() { return applicationThemeResId; }
+    public void applicationThemeResId(int value) { applicationThemeResId = Math.max(0, value); }
     public boolean featureSplit() { return featureSplit; }
     public void featureSplit(boolean value) { featureSplit = value; }
     public void applicationPermission(String value) { applicationPermission = normalize(value); }
@@ -251,6 +254,7 @@ public final class ManifestModel {
         private final List<IntentFilter> intentFilters = new ArrayList<>();
         private boolean launcher;
         private boolean intentFilterDeclared;
+        private int themeResId;
 
         public Component(String className, String processName, boolean exported, boolean enabled,
                          boolean isolatedProcess) {
@@ -321,6 +325,8 @@ public final class ManifestModel {
         public boolean hasIntentFilter() { return intentFilterDeclared; }
         public boolean launcher() { return launcher; }
         public void launcher(boolean value) { launcher = value; }
+        public int themeResId() { return themeResId; }
+        public void themeResId(int value) { themeResId = Math.max(0, value); }
 
         /**
          * Android package parsing exposes one component record even when an APK
@@ -342,7 +348,8 @@ public final class ManifestModel {
                     || !permission.equals(other.permission)
                     || !readPermission.equals(other.readPermission)
                     || !writePermission.equals(other.writePermission)
-                    || grantUriPermissions != other.grantUriPermissions) {
+                    || grantUriPermissions != other.grantUriPermissions
+                    || themeResId != other.themeResId) {
                 throw new IllegalArgumentException(
                         "Conflicting duplicate component declaration: " + className);
             }

@@ -72,8 +72,8 @@ public final class SelfTest {
                 .start("uses-native-library", BinaryXmlFixtureBuilder.text("name", "libguest_optional.so"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-native-library")
                 .start("uses-sdk-library", BinaryXmlFixtureBuilder.text("name", "com.example.sdk"), BinaryXmlFixtureBuilder.integer("versionMajor", 3), BinaryXmlFixtureBuilder.text("certDigest", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).end("uses-sdk-library")
                 .start("instrumentation", BinaryXmlFixtureBuilder.text("name", ".GuestInstrumentation"), BinaryXmlFixtureBuilder.text("targetPackage", "com.example.guest"), BinaryXmlFixtureBuilder.text("targetProcesses", ":remote"), BinaryXmlFixtureBuilder.bool("handleProfiling", true), BinaryXmlFixtureBuilder.bool("functionalTest", true)).end("instrumentation")
-                .start("application", BinaryXmlFixtureBuilder.text("name", ".GuestApp"), BinaryXmlFixtureBuilder.text("permission", "com.example.APP_COMPONENT"))
-                .start("activity", BinaryXmlFixtureBuilder.text("name", ".MainActivity"), BinaryXmlFixtureBuilder.bool("exported", true))
+                .start("application", BinaryXmlFixtureBuilder.text("name", ".GuestApp"), BinaryXmlFixtureBuilder.text("permission", "com.example.APP_COMPONENT"), BinaryXmlFixtureBuilder.reference("theme", 0x7f120001))
+                .start("activity", BinaryXmlFixtureBuilder.text("name", ".MainActivity"), BinaryXmlFixtureBuilder.bool("exported", true), BinaryXmlFixtureBuilder.reference("theme", 0x7f120002))
                 .start("intent-filter")
                 .start("action", BinaryXmlFixtureBuilder.text("name", "android.intent.action.MAIN")).end("action")
                 .start("category", BinaryXmlFixtureBuilder.text("name", "android.intent.category.LAUNCHER")).end("category")
@@ -104,8 +104,10 @@ public final class SelfTest {
         ManifestModel model = new BinaryXmlManifestParser().parse(xml);
         require("com.example.guest".equals(model.packageName()), "package");
         require("com.example.guest.GuestApp".equals(model.applicationClass()), "application class");
+        require(model.applicationThemeResId() == 0x7f120001, "application theme resource");
         require(model.minSdk() == 26 && model.targetSdk() == 35, "sdk values");
         require("com.example.guest.MainActivity".equals(model.launcherActivity()), "launcher activity");
+        require(model.activities().get(0).themeResId() == 0x7f120002, "activity theme resource");
         require(model.isolatedProcessCount() == 1, "isolated process");
         require(model.permissions().contains("android.permission.INTERNET"), "permission");
         require(model.sharedLibraryDependencies().size() == 3, "typed shared-library declarations");
@@ -702,12 +704,12 @@ public final class SelfTest {
             new BroadcastIntent("ACTION", categories, "", "", "", "");
         } catch (IllegalArgumentException expected) { tooManyCategories = true; }
         require(tooManyCategories, "broadcast category limit");
-        boolean invalidDataFilter = false;
-        try {
-            new ManifestReceiverRegistry.Filter(0, java.util.Set.of("ACTION"), java.util.Set.of(),
-                    java.util.List.of(new ManifestReceiverRegistry.DataRule("", "", "", "/items", "", "")));
-        } catch (IllegalArgumentException expected) { invalidDataFilter = true; }
-        require(invalidDataFilter, "data path without scheme/host rejected");
+        ManifestReceiverRegistry.Filter independentDataFilter =
+                new ManifestReceiverRegistry.Filter(0, java.util.Set.of("ACTION"), java.util.Set.of(),
+                        java.util.List.of(new ManifestReceiverRegistry.DataRule(
+                                "", "", "", "/items", "", "")));
+        require(independentDataFilter.dataRules().size() == 1,
+                "independent data path registration rejected");
     }
 
     private static void testProviderAuthorityRegistry() {

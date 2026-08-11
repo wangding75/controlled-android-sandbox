@@ -18,7 +18,7 @@ public final class GuestResourceLoader {
         }
         Resources hostResources = host.getResources();
         Resources resources = new Resources(assets, hostResources.getDisplayMetrics(), hostResources.getConfiguration());
-        return new LoadedResources(assets, resources);
+        return new LoadedResources(assets, resources, GuestManifestMetadata.read(assets));
     }
 
     private static void addRequiredAssetPath(Method addAssetPath, AssetManager assets,
@@ -32,6 +32,11 @@ public final class GuestResourceLoader {
     static final class LoadedResources {
         final AssetManager assets;
         final Resources resources;
-        LoadedResources(AssetManager assets, Resources resources) { this.assets = assets; this.resources = resources; }
+        final GuestManifestMetadata manifestMetadata;
+        LoadedResources(AssetManager assets, Resources resources, GuestManifestMetadata manifestMetadata) {
+            this.assets = assets;
+            this.resources = resources;
+            this.manifestMetadata = manifestMetadata;
+        }
     }
 }

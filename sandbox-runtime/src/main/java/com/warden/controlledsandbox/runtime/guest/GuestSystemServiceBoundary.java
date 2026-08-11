@@ -91,6 +91,10 @@ final class GuestSystemServiceBoundary {
         result.put("biometric", "biometric");
         result.put("sensor_privacy", "sensorPrivacy");
         result.put("power", "power");
+        // KeyguardManager is a framework-owned, read-only capability on the target APIs. Its
+        // availability follows the validated power boundary; do not expose it when that boundary
+        // failed, and never let an unknown service silently fall back to the Host context.
+        result.put("keyguard", "power");
         result.put("vibrator", "vibrator");
         result.put("vibrator_manager", "vibrator");
         result.put("media_session", "mediaSession");

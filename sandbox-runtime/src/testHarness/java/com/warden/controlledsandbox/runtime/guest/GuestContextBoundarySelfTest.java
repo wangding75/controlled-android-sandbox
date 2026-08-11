@@ -67,7 +67,13 @@ public final class GuestContextBoundarySelfTest {
                     GuestContextBoundarySelfTest.class.getClassLoader(), resources,
                     resources.getAssets(), processPackageManager);
 
-            require(context.getBaseContext() == context, "base Context must not expose host");
+            Context boundary = context.getBaseContext();
+            require(boundary != context && boundary != host,
+                    "base Context must not expose host or self-cycle");
+            require(boundary.getBaseContext() == null,
+                    "Guest base Context unwrap terminates at null");
+            require(spec.packageName.equals(boundary.getPackageName()),
+                    "Guest base Context preserves package identity");
             require(context.getApplicationContext() == context, "application Context before bootstrap");
             expectVirtualRoutingFailure(() -> context.bindService(new android.content.Intent(),
                             new android.content.ServiceConnection() {
@@ -86,6 +92,8 @@ public final class GuestContextBoundarySelfTest {
                             }), "NO_GUEST_SERVICE_MATCH", "bindService executor overload");
             require(context.getContentResolver() != null,
                     "ContentResolver is exposed through the framework interception boundary");
+            require(context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) != null,
+                    "LayoutInflater is cloned into the Guest context");
             boolean packageManagerNotReady = false;
             try { context.getPackageManager(); }
             catch (SecurityException expected) {

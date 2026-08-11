@@ -4,7 +4,11 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Host-side framework pass-through needs the same read-only network capability. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -25,7 +29,7 @@
         android:name=".SandboxApplication"
         android:allowBackup="false"
         android:extractNativeLibs="true"
-        android:label="Controlled Sandbox"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">

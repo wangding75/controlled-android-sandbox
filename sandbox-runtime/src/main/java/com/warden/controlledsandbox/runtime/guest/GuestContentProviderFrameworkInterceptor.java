@@ -102,6 +102,13 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         info.enabled = true;
         info.processName = processName(descriptor.componentClass);
         info.applicationInfo = new ApplicationInfo(context.getApplicationInfo());
+        try {
+            GuestManifestMetadata metadata = GuestManifestMetadata.read(context.getAssets());
+            info.metaData = metadata.provider(descriptor.authority);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("GUEST_PROVIDER_METADATA_READ_FAILED", error);
+        }
         return info;
     }
 

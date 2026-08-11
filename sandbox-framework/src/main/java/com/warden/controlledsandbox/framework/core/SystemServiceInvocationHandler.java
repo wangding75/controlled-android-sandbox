@@ -266,7 +266,34 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         int mode = identity.appOpsPolicy().modeCode(opName);
         if (result == int.class || result == Integer.class) return mode;
         if (result == boolean.class || result == Boolean.class) return mode == 0;
+        // Android 11+ returns a SyncNotedAppOp from noteOperation/noteProxyOperation and
+        // AppOpsManager converts that value back to the public mode. Preserve the framework
+        // contract instead of rejecting the operation merely because the Binder return type
+        // changed from int to a structured value.
+        if ("android.app.SyncNotedAppOp".equals(result.getName())) {
+            try {
+                java.lang.reflect.Constructor<?> constructor =
+                        result.getDeclaredConstructor(int.class, String.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(mode, firstAttributionTag(arguments));
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                throw new IllegalStateException("VIRTUAL_APPOPS_SYNC_NOTED_APP_OP_FAILED", error);
+            }
+        }
         throw new SecurityException("VIRTUAL_APPOPS_SIGNATURE_UNSUPPORTED:" + methodName);
+    }
+
+    private String firstAttributionTag(Object[] arguments) {
+        if (arguments == null) return null;
+        for (Object argument : arguments) {
+            if (!(argument instanceof String value)) continue;
+            if (identity.packageName().equals(value) || identity.hostPackageName().equals(value)) continue;
+            if (value.startsWith("android:") || identity.appOpsPolicy().modes().containsKey(value)) continue;
+            return value;
+        }
+        return null;
     }
 
     private boolean targetsGuest(Object[] arguments) {

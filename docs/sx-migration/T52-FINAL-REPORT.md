@@ -4,21 +4,21 @@ T52 RESULT: BLOCKED
 
 ## Executive result
 
-The SX business surface has been migrated behind the Controlled Android Sandbox SDK/adapter boundary and the generic runtime hardening is implemented and buildable. Stage A evidence passes. Quark Stage B and DingTalk Stage C do not meet the requested acceptance gates, so the overall T52 result is **BLOCKED**, not PASS.
+The SX business surface has been migrated behind the Controlled Android Sandbox SDK/adapter boundary and the generic runtime hardening is implemented and buildable. Stage A passes. Quark now has a formal SX prepare/launch and warm thin-core stability PASS, while the pristine cold-start/10-start gate is not claimed. DingTalk Stage C remains blocked, so the overall T52 result is **BLOCKED**, not PASS.
 
 The blockers are runtime compatibility failures, not missing APKs, missing authentication, or a deliberately skipped test:
 
-- Quark final trusted prepare ends with `GUEST_PREPARE_MAIN_THREAD_TIMEOUT`.
+- Quark formal SX prepare and launch now reach `com.ucpro.BrowserActivity`; the Guest thin core is loaded from the isolated instance directory and remains stable for 335 seconds with no Guest fatal/disconnect markers. A pristine first-run thick-core success and a complete 10-start gate are not claimed because the rapid force-stop loop caused generic host-service churn before the next command, without a Quark process crash.
 - DingTalk imports and prepares, and the launch request is accepted, but the guest reaches `checkExportedActivityStartup`, calls `System.exit(0)`, disconnects, and does not provide a stable login/home surface.
 
 ## Baseline and source state
 
 - branch: `feature/sx-migration`
 - migration baseline tag: `sandbox-sx-ready-t51`
-- baseline commit: `fcaed533405b13465114d6f67fed5e3b5a066615`
-- pre-T52 working commit: `1590836e473ad95f1941e98e7108d409f48cdeb9`
-- final code commit: `052374d8a65d3e8777cc9e97cae1ac9b24b81e11`
-- final code tree: `d779a266636b067c8a91397454e18b3b5cff4b73`
+- baseline commit: `1590836e473ad95f1941e98e7108d409f48cdeb9`
+- pre-freeze working commit: `d0496c864532c7f6348de2a5611568cdbb214b40`
+- final code commit: `6d891b726f0ae6eea1187089d86f5f6d27529749`
+- final code tree: `6327a8cacb616ef1d1d536788459b26f8c2cfcfe`
 
 ## Migration architecture
 
@@ -53,7 +53,7 @@ Non-business legacy hooks are intentionally deferred unless they are part of the
 | Stage | Required gate | Result | Evidence / reason |
 |---|---|---|---|
 | A | Simple fixture, two virtual users, lifecycle and isolation | PASS on preserved 20/20 run plus component/lifecycle suites; final fixture smoke passes | `D:\controlled-android-sandbox-evidence\T52-20260811-commit\simple-app\` |
-| B | Quark import, prepare, launch, 10 starts, 5-minute stability | FAIL / BLOCKED | Final prepare path times out in `GUEST_PREPARE_MAIN_THREAD_TIMEOUT`; no honest stable-launch PASS |
+| B | Quark import, prepare, launch, 10 starts, 5-minute stability | PARTIAL PASS / BLOCKED | SX formal prepare/launch and 335-second warm thin-core stability pass; the pristine cold-start and full 10-start gate remain unclaimed after generic service churn during rapid force-stop cycling. Primary evidence: `D:\controlled-android-sandbox-evidence\T52-20260811-final\quark\sx-thin-core-formal-20260811\` |
 | C-prep | DingTalk static inventory, import, prepare, Guest READY | PASS | `D:\controlled-android-sandbox-evidence\T52-20260811-commit\dingtalk-prep\t52-final-dingtalk-prepare-result.json` |
 | C-launch | DingTalk Activity create/resume, login/home, relaunch, 10 starts, 5-minute stability | FAIL / BLOCKED | Guest exits after `checkExportedActivityStartup` with `System.exit(0)` and recovers/restarts; stable home not reached |
 
@@ -69,24 +69,24 @@ The generic compatibility registry defaults to disabled. No host identity, packa
 
 Final verification command:
 
-`gradlew.bat :sandbox-domain:selfTest :sandbox-sdk:selfTest :sandbox-runtime:compileDebugJavaWithJavac :app:assembleDebug`
+`gradlew.bat check :app:assembleDebug :sandbox-companion32:assembleDebug`
 
-Result: `BUILD SUCCESSFUL`; `sandbox-domain` self-test PASS; `sandbox-sdk` identity/compatibility self-test PASS. `git diff --check` passed, and static audits found no legacy-hook or temporary-diagnostic residue in product modules.
+Result: `BUILD SUCCESSFUL`; `sandbox-domain` self-test PASS; `sandbox-sdk` identity/compatibility self-test PASS; all lint and native build tasks passed. `git diff --check` passed, and static audits found no legacy-hook or temporary-diagnostic residue in product modules.
 
 Known review status:
 
 - P0: none known in the migrated code path.
 - P1: none known in the migrated code path.
-- P2: Quark prepare timeout and DingTalk startup exit remain acceptance blockers and require further generic runtime investigation.
+- P2: Quark pristine cold-start/10-start evidence is still incomplete; DingTalk startup exit remains an app-specific acceptance blocker and requires a legitimate generic runtime solution.
 
 ## Evidence, backup, and recovery
 
 Evidence index: `docs/sx-migration/T52-EVIDENCE-INDEX.md`.
 
-External evidence root: `D:\controlled-android-sandbox-evidence\T52-20260811-commit\`.
+External evidence roots: `D:\controlled-android-sandbox-evidence\T52-20260811-commit\` (baseline) and `D:\controlled-android-sandbox-evidence\T52-20260811-final\` (fresh SX runtime evidence).
 
 The `backup` directory contains the final branch bundle, source ZIP, restore script, and SHA-256 manifest. The bundle was verified and cloned into a fresh restore-check directory; the restored commit and tree are recorded in the final verification output.
 
 ## Final disposition
 
-T52 is not complete because the requested three-level acceptance is not complete. Stage A is usable and the migration/runtime work is committed for continuation, but Quark Stage B and DingTalk Stage C must pass their full gates before the first line can be changed to `T52 RESULT: PASS`.
+T52 is not complete because the requested three-level acceptance is not complete. Stage A is usable and Quark can now start normally on SX after its isolated thin core has been generated, but Quark's pristine/10-start gate and DingTalk Stage C must pass their full gates before the first line can be changed to `T52 RESULT: PASS`.

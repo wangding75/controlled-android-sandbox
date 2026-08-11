@@ -4,6 +4,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.contract.ControlledReleaseIdentity;
@@ -225,8 +226,8 @@ final class NativeCompanionClient implements AutoCloseable {
             PackageInfo companion = context.getPackageManager()
                     .getPackageInfo(companionPackage(), 0);
             NativeCompanionIdentityVerifier.requireInstalledPair(
-                    identity, host.getLongVersionCode(), host.versionName,
-                    companion.getLongVersionCode(), companion.versionName);
+                    identity, versionCode(host), host.versionName,
+                    versionCode(companion), companion.versionName);
             return control;
         } catch (Exception failure) {
             controlConnection.invalidate();
@@ -236,6 +237,13 @@ final class NativeCompanionClient implements AutoCloseable {
 
     private INativeCompanionArtifactService requireArtifacts() throws Exception {
         return artifactConnection.require();
+    }
+
+    private static long versionCode(PackageInfo packageInfo) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return packageInfo.getLongVersionCode();
+        }
+        return packageInfo.versionCode;
     }
 
     private IRuntimeBroker requireBroker() throws Exception {

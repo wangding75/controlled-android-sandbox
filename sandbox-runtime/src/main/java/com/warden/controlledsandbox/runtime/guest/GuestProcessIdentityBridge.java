@@ -20,8 +20,8 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
     private final Object originalInitialApplication;
     private final Field boundApplicationInfoField;
     private final Object boundApplication;
-    private final ApplicationInfo boundApplicationInfo;
-    private final String originalBoundPackageName;
+    private final ApplicationInfo originalBoundApplicationInfo;
+    private final ApplicationInfo guestBoundApplicationInfo;
     private final Field boundProcessNameField;
     private final Object originalBoundProcessName;
     private final Application guestApplication;
@@ -35,8 +35,8 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
             Object originalInitialApplication,
             Field boundApplicationInfoField,
             Object boundApplication,
-            ApplicationInfo boundApplicationInfo,
-            String originalBoundPackageName,
+            ApplicationInfo originalBoundApplicationInfo,
+            ApplicationInfo guestBoundApplicationInfo,
             Field boundProcessNameField,
             Object originalBoundProcessName,
             Application guestApplication,
@@ -47,8 +47,8 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
         this.originalInitialApplication = originalInitialApplication;
         this.boundApplicationInfoField = boundApplicationInfoField;
         this.boundApplication = boundApplication;
-        this.boundApplicationInfo = boundApplicationInfo;
-        this.originalBoundPackageName = originalBoundPackageName;
+        this.originalBoundApplicationInfo = originalBoundApplicationInfo;
+        this.guestBoundApplicationInfo = guestBoundApplicationInfo;
         this.boundProcessNameField = boundProcessNameField;
         this.originalBoundProcessName = originalBoundProcessName;
         this.guestApplication = guestApplication;
@@ -57,8 +57,10 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
     }
 
     static GuestProcessIdentityBridge install(Application guestApplication,
+                                               ApplicationInfo guestInfo,
                                                GuestPackageSpec spec) throws Exception {
         if (guestApplication == null) throw new IllegalArgumentException("guestApplication is required");
+        if (guestInfo == null) throw new IllegalArgumentException("guestInfo is required");
         if (spec == null) throw new IllegalArgumentException("spec is required");
         Class<?> activityThreadType = Class.forName("android.app.ActivityThread");
         java.lang.reflect.Method currentMethod = activityThreadType.getDeclaredMethod(
@@ -74,8 +76,8 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
 
         Object bound = null;
         Field boundInfoField = null;
+        ApplicationInfo originalInfo = null;
         ApplicationInfo boundInfo = null;
-        String originalPackage = null;
         Field processNameField = null;
         Object originalProcessName = null;
         try {
@@ -89,9 +91,17 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
             if (!(value instanceof ApplicationInfo)) {
                 throw new IllegalStateException("GUEST_BOUND_APPLICATION_INFO_UNAVAILABLE");
             }
-            boundInfo = (ApplicationInfo) value;
-            originalPackage = boundInfo.packageName;
-            boundInfo.packageName = spec.packageName;
+            originalInfo = (ApplicationInfo) value;
+            if (guestInfo == null || !spec.packageName.equals(guestInfo.packageName)) {
+                throw new IllegalStateException("GUEST_APPLICATION_INFO_PROJECTION_INVALID");
+            }
+            // ActivityThread's bound application info is consulted by WebViewFactory, the
+            // linker/dex loader and framework package lookups.  Changing only packageName
+            // leaves the host APK/data/native paths behind, producing a mixed identity in
+            // native WebView startup.  Publish the complete Guest projection and restore the
+            // original object on teardown so the host container remains untouched.
+            boundInfoField.set(bound, guestInfo);
+            boundInfo = guestInfo;
             try {
                 processNameField = findField(bound.getClass(), "processName");
                 processNameField.setAccessible(true);
@@ -101,8 +111,9 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
                 // Older platform shapes do not expose a separate bound process name.
             }
         } catch (Throwable error) {
-            if (boundInfo != null && spec.packageName.equals(boundInfo.packageName)) {
-                boundInfo.packageName = originalPackage;
+            if (boundInfoField != null && bound != null && boundInfo != null
+                    && boundInfoField.get(bound) == boundInfo) {
+                boundInfoField.set(bound, originalInfo);
             }
             if (processNameField != null && bound != null
                     && spec.processName.equals(processNameField.get(bound))) {
@@ -116,7 +127,7 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
         android.util.Log.i("CS_GUEST_PROCESS_IDENTITY", "installed package=" + spec.packageName
                 + " process=" + spec.processName);
         return new GuestProcessIdentityBridge(current, initial, originalInitial,
-                boundInfoField, bound, boundInfo, originalPackage, processNameField,
+                boundInfoField, bound, originalInfo, boundInfo, processNameField,
                 originalProcessName, guestApplication, spec.packageName, spec.processName);
     }
 
@@ -125,9 +136,8 @@ final class GuestProcessIdentityBridge implements AutoCloseable {
         closed = true;
         try {
             if (boundApplicationInfoField != null && boundApplication != null
-                    && boundApplicationInfoField.get(boundApplication) == boundApplicationInfo
-                    && guestPackageName.equals(boundApplicationInfo.packageName)) {
-                boundApplicationInfo.packageName = originalBoundPackageName;
+                    && boundApplicationInfoField.get(boundApplication) == guestBoundApplicationInfo) {
+                boundApplicationInfoField.set(boundApplication, originalBoundApplicationInfo);
             }
             if (boundProcessNameField != null && boundApplication != null
                     && guestProcessName.equals(boundProcessNameField.get(boundApplication))) {

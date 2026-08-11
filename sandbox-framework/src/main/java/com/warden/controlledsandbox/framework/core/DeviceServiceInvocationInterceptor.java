@@ -251,6 +251,12 @@ final class DeviceServiceInvocationInterceptor {
         if (!isBluetoothOperation(name)) return Decision.passThrough();
         requireMode(profile.mode(), "bluetooth", name);
         if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return Decision.passThrough();
+        // BluetoothAdapter initializes its optional binder through these lifecycle calls.
+        // A virtual profile without a host-backed adapter must return an absent binder,
+        // rather than exposing the host service or throwing on an otherwise harmless probe.
+        if (name.equals("registeradapter") || name.equals("unregisteradapter")) {
+            return Decision.handled(null);
+        }
         if (name.equals("isenabled")) return Decision.handled(profile.enabled());
         if (name.equals("getstate")) return Decision.handled(profile.state());
         if (name.equals("getname")) return Decision.handled(profile.name());

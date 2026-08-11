@@ -30,7 +30,8 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
 
     synchronized void bindHostActivity(IBinder frameworkToken, String activityToken, int taskId,
                                        Runnable moveToFront, BooleanSupplier moveToBack,
-                                       Runnable finishAffinity, Runnable finishAndRemoveTask) {
+                                       Runnable finishAffinity,
+                                       Runnable finishAndRemoveTask) {
         Objects.requireNonNull(frameworkToken, "frameworkToken");
         if (activityToken == null || activityToken.isBlank() || taskId < 1) {
             throw new IllegalArgumentException("virtual Activity task identity is incomplete");
@@ -248,7 +249,8 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
         private boolean brokerFinalized;
 
         private HostBinding(String activityToken, int taskId, Runnable moveToFront,
-                            BooleanSupplier moveToBack, Runnable finishAffinity,
+                            BooleanSupplier moveToBack,
+                            Runnable finishAffinity,
                             Runnable finishAndRemoveTask) {
             this.activityToken = activityToken;
             this.taskId = taskId;

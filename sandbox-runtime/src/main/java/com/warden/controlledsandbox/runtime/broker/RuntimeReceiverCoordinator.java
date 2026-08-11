@@ -112,7 +112,7 @@ public final class RuntimeReceiverCoordinator {
 
     public Bundle dispatchImplicitManifestBroadcast(Bundle request, GuestSession sender,
                                                     boolean orderedDelivery) throws Exception {
-        int payloadBytes = BroadcastPayloadEstimator.requireWithinLimit(request);
+        int payloadBytes = BroadcastPayloadEstimator.requireIntentWithinLimit(request);
         ArrayList<BroadcastRoute> routes = new ArrayList<>();
         for (BrokerManifestReceiverRuntime.Route route : manifest.routeImplicit(request, sender)) {
             routes.add(BroadcastRoute.manifest(route));

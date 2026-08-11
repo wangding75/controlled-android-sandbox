@@ -21,6 +21,7 @@ public final class BinaryXmlManifestParser {
     private static final int RES_XML_END_ELEMENT_TYPE = 0x0103;
     private static final int UTF8_FLAG = 0x00000100;
     private static final int TYPE_STRING = 0x03;
+    private static final int TYPE_REFERENCE = 0x01;
     private static final int TYPE_INT_DEC = 0x10;
     private static final int TYPE_INT_BOOLEAN = 0x12;
     private static final int NO_INDEX = 0xFFFFFFFF;
@@ -105,6 +106,7 @@ public final class BinaryXmlManifestParser {
             case "application" -> {
                 model.applicationClass(element.stringAttr("name"));
                 model.applicationPermission(element.stringAttr("permission"));
+                model.applicationThemeResId(element.intAttr("theme", 0));
             }
             case "activity" -> {
                 ManifestModel.Component component = component(model, element, element.stringAttr("name"));
@@ -223,8 +225,11 @@ public final class BinaryXmlManifestParser {
         boolean isolated = element.boolAttr("isolatedProcess", false);
         String permission = element.stringAttr("permission");
         if (permission.trim().isEmpty()) permission = model.applicationPermission();
-        return new ManifestModel.Component(className, process, exported, exportedExplicit, enabled, isolated,
-                element.stringAttr("authorities"), permission);
+        ManifestModel.Component component = new ManifestModel.Component(className, process, exported,
+                exportedExplicit, enabled, isolated, element.stringAttr("authorities"), permission);
+        component.themeResId(element.hasAttr("theme")
+                ? element.intAttr("theme", 0) : model.applicationThemeResId());
+        return component;
     }
 
 
@@ -384,7 +389,8 @@ public final class BinaryXmlManifestParser {
             return fallback;
         }
         int asInt(int fallback) {
-            if (dataType == TYPE_INT_DEC || dataType == TYPE_INT_BOOLEAN) return data;
+            if (dataType == TYPE_REFERENCE || dataType == TYPE_INT_DEC
+                    || dataType == TYPE_INT_BOOLEAN) return data;
             try { return Integer.parseInt(text); } catch (NumberFormatException ignored) { return fallback; }
         }
     }

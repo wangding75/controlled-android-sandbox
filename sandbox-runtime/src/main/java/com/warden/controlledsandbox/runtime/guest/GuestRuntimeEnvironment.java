@@ -157,7 +157,7 @@ public final class GuestRuntimeEnvironment {
                 throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
             }
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
-                    spec.packageState, guestContext.getApplicationInfo());
+                    spec.packageState, guestContext.getApplicationInfo(), loadedResources.manifestMetadata);
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
                     new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             loader.configureDetection(virtualServices.compatibilityProfile().detection());
@@ -243,14 +243,19 @@ public final class GuestRuntimeEnvironment {
             // Android creates Application instances and calls attachBaseContext/onCreate on the
             // process main thread.  Binder-driven preparation must preserve that contract because
             // real APK constructors commonly allocate a Handler/Looper during initialization.
+            // Project the Guest process identity before attachBaseContext: Tinker-style
+            // Application delegates cache ActivityThread's process name during that hook, and
+            // observing the Host process there silently skips normal startup tasks.
             Application application = guestContext.mainThread.call(
-                    () -> createApplication(spec, loader, guestContext));
+                    () -> instantiateApplication(spec, loader));
+            guestContext.application(application);
+            stagedProcessIdentity = GuestProcessIdentityBridge.install(
+                    application, guestContext.getApplicationInfo(), spec);
+            guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
             }
-            guestContext.application(application);
-            stagedProcessIdentity = GuestProcessIdentityBridge.install(application, spec);
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
                     capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
@@ -274,6 +279,7 @@ public final class GuestRuntimeEnvironment {
             synchronized (GuestRuntimeEnvironment.class) { current = session; }
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
+            session.components.prepareDeclaredProviders();
             session.mainThread.run(application::onCreate);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
@@ -379,19 +385,13 @@ public final class GuestRuntimeEnvironment {
         return new SandboxAppOpsPolicy(modes);
     }
 
-    private static Application createApplication(GuestPackageSpec spec, ClassLoader loader,
-                                                 GuestContext context) throws Exception {
+    private static Application instantiateApplication(GuestPackageSpec spec, ClassLoader loader)
+            throws Exception {
         String className = spec.applicationClass == null || spec.applicationClass.trim().isEmpty()
                 ? Application.class.getName() : spec.applicationClass;
         Class<?> type = loader.loadClass(className);
         if (!Application.class.isAssignableFrom(type)) throw new IllegalArgumentException("Application class has wrong type: " + className);
-        Application application = (Application) type.getDeclaredConstructor().newInstance();
-        // Android's real Application base Context already resolves getApplicationContext() to
-        // the Application while attachBaseContext() is running. Publish the pending instance
-        // before invoking guest attach hooks so process-wide libraries observe that contract.
-        context.application(application);
-        invokeNearestAttachBaseContext(application, context);
-        return application;
+        return (Application) type.getDeclaredConstructor().newInstance();
     }
 
     /**
@@ -569,7 +569,8 @@ public final class GuestRuntimeEnvironment {
 
         public void bindActivityTaskHost(IBinder frameworkToken, String activityToken, int taskId,
                                          Runnable moveToFront, BooleanSupplier moveToBack,
-                                         Runnable finishAffinity, Runnable finishAndRemoveTask) {
+                                         Runnable finishAffinity,
+                                         Runnable finishAndRemoveTask) {
             frameworkCallRouter.activityTasks().bindHostActivity(frameworkToken, activityToken, taskId,
                     moveToFront, moveToBack, finishAffinity, finishAndRemoveTask);
         }

@@ -2,7 +2,7 @@
     android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:padding="16dp">
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="Controlled Sandbox" android:textSize="24sp" android:textStyle="bold" />
+        android:text="@string/app_name" android:textSize="24sp" android:textStyle="bold" />
     <TextView android:id="@+id/runtimeStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="6dp" android:text="Runtime: connecting…" android:textSize="14sp" />
     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"

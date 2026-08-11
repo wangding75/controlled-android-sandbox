@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.component.activity;
 
+import android.annotation.SuppressLint;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.guest.GuestPackageSpec;
 import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
@@ -35,14 +36,21 @@ public abstract class StubActivityBase extends Activity {
     private final Deque<Bundle> activityEvents = new ArrayDeque<>();
     private boolean activityEventInFlight;
     private boolean destroying;
+    private boolean diagnosticInstalled;
+    private Bundle pendingGrantedRoute;
+    private Bundle pendingRouteState;
+    private boolean guestCreationPosted;
 
     @Override protected void onCreate(Bundle state) {
-        super.onCreate(state);
+        // This Activity is only a Host trampoline. Its FragmentManager must not restore a Guest
+        // Activity's saved Fragment classes with the Host class loader after a Guest process
+        // restart (for example androidx.lifecycle.ReportFragment). The original state remains
+        // available to GuestActivityController below.
+        super.onCreate(null);
         diagnostic = new TextView(this);
         diagnostic.setGravity(Gravity.CENTER);
         diagnostic.setPadding(32, 32, 32, 32);
         diagnostic.setText("Resolving one-time Guest route…");
-        setContentView(diagnostic);
         consumeInitialRoute(getIntent(), state);
     }
 
@@ -56,59 +64,96 @@ public abstract class StubActivityBase extends Activity {
         }
         RouteBrokerClient.consume(this, token, sessionId, generation, route -> {
             if (!"ROUTE_GRANTED".equals(route.getString(RuntimeKeys.STATUS))) {
+                if (isStaleRouteFailure(route.getString(RuntimeKeys.ERROR_TYPE, ""),
+                        route.getString(RuntimeKeys.ERROR_MESSAGE, ""))) {
+                    // Android may restore a Host trampoline after its Guest generation was
+                    // stopped. The one-time route is intentionally invalid at that point;
+                    // discard only this stale task and keep real launch failures observable.
+                    discardStaleRouteTask();
+                    return;
+                }
                 showFailure(route.getString(RuntimeKeys.ERROR_TYPE, "ROUTE_DENIED"),
                         route.getString(RuntimeKeys.ERROR_MESSAGE, "Route was denied"));
                 return;
             }
-            try {
-                GuestPackageSpec spec = new GuestPackageSpec(route);
-                GuestRuntimeEnvironment.Session session = GuestRuntimeEnvironment.require(spec.sessionId, spec.generation);
-                guestSession = session;
-                activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
-                int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
-                frameworkActivityToken = ActivityFieldBridge.hostToken(this);
-                session.bindActivityTaskHost(frameworkActivityToken, activityToken, taskId,
-                        this::moveHostTaskToFront, this::moveHostTaskToBack,
-                        this::finishHostAffinity, this::finishHostAndRemoveTask);
-                controller = new GuestActivityController(this, session, activityToken, taskId,
-                        this::enqueueActivityEvent);
-                activityResults = new GuestActivityResultBridge(
-                        this, session, activityToken, taskId);
-                Intent guestIntent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route);
-                Bundle result = controller.create(spec.componentClass, guestIntent, state);
-                RuntimeEventLog.event("GUEST_ACTIVITY_CREATE", result);
-                if ("ACTIVITY_CREATED".equals(result.getString(RuntimeKeys.STATUS))) {
-                    if (hostStage >= 2) controller.start();
-                    if (hostStage >= 3) controller.resume();
-                } else {
-                    session.unbindActivityTaskHost(frameworkActivityToken);
-                    frameworkActivityToken = null;
-                    showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_CREATE_FAILED"),
-                            result.getString(RuntimeKeys.ERROR_MESSAGE, "Unknown failure") + "\n\n" + result.getString("stack", ""));
-                }
-            } catch (Throwable error) {
-                IBinder failedToken = frameworkActivityToken;
-                frameworkActivityToken = null;
-                try {
-                    if (guestSession != null && failedToken != null) {
-                        guestSession.unbindActivityTaskHost(failedToken);
-                    }
-                } finally {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-                showFailure(error.getClass().getName(), String.valueOf(error.getMessage()));
-            }
+            queueGrantedRoute(route, state);
         });
+    }
+
+    private void queueGrantedRoute(Bundle route, Bundle state) {
+        pendingGrantedRoute = new Bundle(route);
+        pendingRouteState = state == null ? null : new Bundle(state);
+        postGuestCreationIfResumed();
+    }
+
+    private void postGuestCreationIfResumed() {
+        if (pendingGrantedRoute == null || hostStage < 3 || guestCreationPosted || destroying) return;
+        guestCreationPosted = true;
+        new android.os.Handler(getMainLooper()).postDelayed(() -> {
+            guestCreationPosted = false;
+            if (pendingGrantedRoute == null || hostStage < 3 || destroying) return;
+            Bundle route = pendingGrantedRoute;
+            Bundle state = pendingRouteState;
+            pendingGrantedRoute = null;
+            pendingRouteState = null;
+            createGuestActivity(route, state);
+        }, 1000L);
+    }
+
+    private void createGuestActivity(Bundle route, Bundle state) {
+        try {
+            GuestPackageSpec spec = new GuestPackageSpec(route);
+            GuestRuntimeEnvironment.Session session = GuestRuntimeEnvironment.require(spec.sessionId, spec.generation);
+            guestSession = session;
+            activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+            int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
+            frameworkActivityToken = ActivityFieldBridge.hostToken(this);
+            session.bindActivityTaskHost(frameworkActivityToken, activityToken, taskId,
+                    this::moveHostTaskToFront, this::moveHostTaskToBack,
+                    this::finishHostAffinity, this::finishHostAndRemoveTask);
+            controller = new GuestActivityController(this, session, activityToken, taskId,
+                    this::enqueueActivityEvent);
+            activityResults = new GuestActivityResultBridge(
+                    this, session, activityToken, taskId);
+            Intent guestIntent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route);
+            Bundle result = controller.create(spec.componentClass, guestIntent, state);
+            RuntimeEventLog.event("GUEST_ACTIVITY_CREATE", result);
+            if ("ACTIVITY_CREATED".equals(result.getString(RuntimeKeys.STATUS))) {
+                if (hostStage >= 2) controller.start();
+                if (hostStage >= 3) controller.resume();
+            } else {
+                session.unbindActivityTaskHost(frameworkActivityToken);
+                frameworkActivityToken = null;
+                showFailure(result.getString(RuntimeKeys.ERROR_TYPE, "ACTIVITY_CREATE_FAILED"),
+                        result.getString(RuntimeKeys.ERROR_MESSAGE, "Unknown failure") + "\n\n" + result.getString("stack", ""));
+            }
+        } catch (Throwable error) {
+            IBinder failedToken = frameworkActivityToken;
+            frameworkActivityToken = null;
+            try {
+                if (guestSession != null && failedToken != null) {
+                    guestSession.unbindActivityTaskHost(failedToken);
+                }
+            } finally {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
+            showFailure(error.getClass().getName(), String.valueOf(error.getMessage()));
+        }
     }
 
     @Override protected void onStart() { super.onStart(); hostStage = 2; if (controller != null) controller.start(); }
     @Override protected void onResume() {
         super.onResume();
+        if (!diagnosticInstalled) {
+            setContentView(diagnostic);
+            diagnosticInstalled = true;
+        }
         hostStage = 3;
         if (controller != null) controller.resume();
         if (controller != null && activityResults != null) {
             activityResults.drain(controller::activityResult);
         }
+        postGuestCreationIfResumed();
     }
     @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
     @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
@@ -122,6 +167,7 @@ public abstract class StubActivityBase extends Activity {
         if (guestSession != null && destroyedToken != null) {
             guestSession.unbindActivityTaskHost(destroyedToken);
         }
+        clearMissingWindowRoot();
         super.onDestroy();
     }
 
@@ -140,6 +186,8 @@ public abstract class StubActivityBase extends Activity {
         }
         RouteBrokerClient.consume(this, token, sessionId, generation, route -> {
             if (!"ROUTE_GRANTED".equals(route.getString(RuntimeKeys.STATUS))) {
+                if (isStaleRouteFailure(route.getString(RuntimeKeys.ERROR_TYPE, ""),
+                        route.getString(RuntimeKeys.ERROR_MESSAGE, ""))) return;
                 showFailure(route.getString(RuntimeKeys.ERROR_TYPE, "NEW_INTENT_ROUTE_DENIED"),
                         route.getString(RuntimeKeys.ERROR_MESSAGE, "New Intent route denied"));
                 return;
@@ -271,6 +319,7 @@ public abstract class StubActivityBase extends Activity {
     }
 
 
+    @SuppressLint("MissingPermission")
     private void moveHostTaskToFront() {
         Object service = getSystemService(Context.ACTIVITY_SERVICE);
         if (!(service instanceof ActivityManager manager)) {
@@ -284,12 +333,72 @@ public abstract class StubActivityBase extends Activity {
     private void finishHostAndRemoveTask() { super.finishAndRemoveTask(); }
 
     private void showFailure(String type, String message) {
-        if (diagnostic != null) diagnostic.setText("Guest launch failed\n\n" + type + "\n" + message);
+        if (diagnostic != null) {
+            // If Guest creation fails after changing the host content view, restore the
+            // host-owned diagnostic view before platform teardown.
+            try {
+                setContentView(diagnostic);
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            }
+            diagnostic.setText("Guest launch failed\n\n" + type + "\n" + message);
+        }
         Bundle event = new Bundle();
         event.putString(RuntimeKeys.STATUS, "FAILED");
         event.putString(RuntimeKeys.ERROR_TYPE, type);
         event.putString(RuntimeKeys.ERROR_MESSAGE, message);
         RuntimeEventLog.event("GUEST_ACTIVITY_FAILED", event);
+    }
+
+    private void discardStaleRouteTask() {
+        try {
+            finishAndRemoveTask();
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            finish();
+        }
+    }
+
+    private static boolean isStaleRouteFailure(String type, String message) {
+        return containsStaleRouteCode(type) || containsStaleRouteCode(message);
+    }
+
+    private static boolean containsStaleRouteCode(String value) {
+        return "SESSION_OR_GENERATION_MISMATCH".equals(value)
+                || "SESSION_NOT_FOUND".equals(value)
+                || "ACTIVITY_TRANSACTION_NOT_FOUND".equals(value)
+                || "ACTIVITY_ROUTE_EXPIRED_OR_CONSUMED".equals(value)
+                || "ACTIVITY_ROUTE_ENVELOPE_MISSING".equals(value);
+    }
+
+    /**
+     * An emulator can remove a trampoline root while two same-process Stub Activities are
+     * crossing pause/stop. ActivityThread can still leave mWindowAdded=true, so its later destroy
+     * path calls WindowManagerGlobal.removeViewImmediate() for a root that no longer exists. Only
+     * clear the local marker when the DecorView has neither an attachment nor a ViewRoot; a live
+     * root keeps the platform's normal cleanup path.
+     */
+    private void clearMissingWindowRoot() {
+        try {
+            android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+            if (decor == null || decor.isAttachedToWindow() || viewRoot(decor) != null) return;
+            java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
+            added.setAccessible(true);
+            if (added.getBoolean(this)) added.setBoolean(this, false);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    private static Object viewRoot(android.view.View view) {
+        try {
+            java.lang.reflect.Method method = android.view.View.class.getDeclaredMethod("getViewRootImpl");
+            method.setAccessible(true);
+            return method.invoke(view);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return null;
+        }
     }
 
     private static String value(String value) { return value == null ? "" : value; }

@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -81,7 +82,13 @@ final class GuestContextComponentRouter {
         ConnectionRecord record = new ConnectionRecord(connectionId, target, component);
         connections.put(connection, record);
         Executor callbackExecutor = executor == null ? context.getMainExecutor() : executor;
-        if (binder == null) callbackExecutor.execute(() -> connection.onNullBinding(component));
+        if (binder == null) callbackExecutor.execute(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                connection.onNullBinding(component);
+            } else {
+                connection.onServiceDisconnected(component);
+            }
+        });
         else callbackExecutor.execute(() -> connection.onServiceConnected(component, binder));
         return true;
     }
@@ -132,12 +139,13 @@ final class GuestContextComponentRouter {
     }
 
     void unregisterReceiver(BroadcastReceiver receiver) {
-        String receiverId = receivers.id(receiver);
-        Bundle request = bridge.baseRequest();
-        request.putString(ComponentOperations.OPERATION, ComponentOperations.UNREGISTER_RECEIVER);
-        request.putString(RuntimeKeys.RECEIVER_ID, receiverId);
-        bridge.invokeComponent(request);
-        receivers.remove(receiverId);
+        for (String receiverId : receivers.ids(receiver)) {
+            Bundle request = bridge.baseRequest();
+            request.putString(ComponentOperations.OPERATION, ComponentOperations.UNREGISTER_RECEIVER);
+            request.putString(RuntimeKeys.RECEIVER_ID, receiverId);
+            bridge.invokeComponent(request);
+            receivers.remove(receiverId);
+        }
     }
 
     void sendBroadcast(Intent intent, String receiverPermission) {
@@ -149,6 +157,11 @@ final class GuestContextComponentRouter {
         resolver.requireGuestScopeForBroadcast(intent);
         Bundle request = bridge.baseRequest();
         GuestIntentResolver.applyIntent(request, intent);
+        // The base request carries the prepared Activity component for launch routing. An
+        // implicit broadcast has no component target; leaving that inherited value in place
+        // makes the Broker misclassify the request as a manifest broadcast and route it back into
+        // GuestComponentRuntime during Activity.onPause().
+        if (intent.getComponent() == null) request.remove(RuntimeKeys.COMPONENT_CLASS);
         request.putString(ComponentOperations.OPERATION,
                 intent.getComponent() == null
                         ? ComponentOperations.SEND_IMPLICIT_BROADCAST
@@ -171,6 +184,7 @@ final class GuestContextComponentRouter {
         resolver.requireGuestScopeForBroadcast(intent);
         Bundle request = bridge.baseRequest();
         GuestIntentResolver.applyIntent(request, intent);
+        if (intent.getComponent() == null) request.remove(RuntimeKeys.COMPONENT_CLASS);
         request.putString(ComponentOperations.OPERATION, intent.getComponent() == null
                 ? ComponentOperations.SEND_ORDERED_BROADCAST
                 : ComponentOperations.SEND_BROADCAST);

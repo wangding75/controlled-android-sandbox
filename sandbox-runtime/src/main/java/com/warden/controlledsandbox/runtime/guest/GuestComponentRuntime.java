@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransport;
 import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderCursorTransport;
 import com.warden.controlledsandbox.domain.component.service.ForegroundServiceStateMachine;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -41,6 +42,29 @@ public final class GuestComponentRuntime {
     private int nextStartId = 1;
 
     GuestComponentRuntime(GuestRuntimeEnvironment.Session session) { this.session = session; }
+
+    /**
+     * Mirrors Android's process bootstrap order: enabled providers declared for this Guest
+     * process are attached before Application.onCreate().  Explicit provider operations remain
+     * lazy for providers in other processes and for components not selected by this process.
+     */
+    void prepareDeclaredProviders() throws Exception {
+        for (VirtualComponentSnapshot component : session.spec.packageState().components()) {
+            if (!"PROVIDER".equals(component.type()) || !component.enabled()
+                    || !currentProcess(component.processName())) continue;
+            for (String authority : component.authority().split(";")) {
+                String normalized = authority == null ? "" : authority.trim();
+                if (normalized.isEmpty()) continue;
+                prepareProvider(component.className(), normalized);
+            }
+        }
+    }
+
+    private boolean currentProcess(String componentProcess) {
+        String declared = componentProcess == null ? "" : componentProcess.trim();
+        String effective = declared.isEmpty() ? session.spec.processName : declared;
+        return session.spec.processName.equals(effective);
+    }
 
     Bundle invoke(Bundle request) {
         try {
@@ -555,6 +579,8 @@ public final class GuestComponentRuntime {
             throw new SecurityException("PROVIDER_METADATA_MISMATCH:" + authority);
         }
         info.applicationInfo = session.context.getApplicationInfo();
+        android.os.Bundle metadata = session.resources.manifestMetadata.provider(authority);
+        if (metadata != null && !metadata.isEmpty()) info.metaData = metadata;
         provider.attachInfo(session.context, info);
         ProviderRecord record = new ProviderRecord(className, authority, provider);
         synchronized (providerLock) {

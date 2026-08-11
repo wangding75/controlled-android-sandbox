@@ -17,7 +17,9 @@ import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -50,6 +52,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final GuestCapabilityGate capabilityGate;
     private final GuestStorageNameCodec storageNames;
     private final SharedState sharedState;
+    private final Context unwrapBoundary;
+    private final Resources.Theme frameworkTheme;
     final GuestDynamicReceiverRegistry dynamicReceivers;
     final GuestMainThreadDispatcher mainThread;
     private final boolean deviceProtected;
@@ -71,8 +75,18 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                          Resources resources, AssetManager assets, PackageManager packageManager,
                          boolean deviceProtected,
                          SharedState sharedState) {
-        super();
+        // ContextWrapper has a small set of hidden framework helpers (for example
+        // getDisplayNoVerify(), used while PhoneWindow tears down a DecorView) that call the
+        // private base field directly. Keep that field on the host's application transport so
+        // those helpers remain total; all public Guest identity/storage APIs below are projected
+        // here and getBaseContext() still returns the finite Guest-only boundary.
+        super(host.getApplicationContext());
         this.hostServiceContext = host.getApplicationContext();
+        // The Guest APK has an independent Resources table, while AndroidX still requires a
+        // non-null framework Theme during Activity.onCreate. Apply the virtual component's
+        // manifest theme to a Theme created by Guest Resources; reusing the Host Theme would
+        // make Host resource IDs (drawables, colors, styles) visible to Guest code.
+        this.frameworkTheme = createFrameworkTheme(resources, spec);
         this.packageManager = java.util.Objects.requireNonNull(packageManager, "packageManager");
         this.spec = spec;
         this.classLoader = classLoader;
@@ -80,6 +94,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.assets = assets;
         this.deviceProtected = deviceProtected;
         this.sharedState = sharedState;
+        this.unwrapBoundary = new GuestContextUnwrapBoundary(this);
         this.instanceRoot = ensureDirectory(spec.dataRootFile());
         this.dataRoot = ensureDirectory(new File(instanceRoot,
                 deviceProtected ? "device_protected" : "data"));
@@ -120,16 +135,27 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
 
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
-    @Override public Context getBaseContext() { return this; }
+    /**
+     * Return a finite Guest-only unwrap boundary. Returning this object here used to satisfy
+     * the no-Host-leak rule but violates the ContextWrapper contract for libraries that walk
+     * wrappers (Qigsaw's split loader did exactly that and looped forever). The boundary is not
+     * backed by the Host and terminates at null after one hop.
+     */
+    @Override public Context getBaseContext() { return unwrapBoundary; }
     @Override public String getPackageName() { return spec.packageName; }
+    @Override public String getOpPackageName() { return spec.packageName; }
     @Override public Context getApplicationContext() {
         return sharedState.application == null ? this : sharedState.application;
     }
     @Override public ClassLoader getClassLoader() { return classLoader; }
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
+    @Override public Resources.Theme getTheme() { return frameworkTheme; }
+    @Override public void setTheme(int resid) { frameworkTheme.applyStyle(resid, true); }
     @Override public android.os.Looper getMainLooper() { return hostServiceContext.getMainLooper(); }
     @Override public String getSystemServiceName(Class<?> serviceClass) {
+        String hostServiceName = hostServiceContext.getSystemServiceName(serviceClass);
+        if (hostServiceName != null) return hostServiceName;
         if (serviceClass != null && "android.view.accessibility.CaptioningManager"
                 .equals(serviceClass.getName())) return "captioning";
         if (serviceClass != null && "android.view.accessibility.AccessibilityManager"
@@ -161,6 +187,11 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         }
     }
     @Override public Object getSystemService(String name) {
+        // LayoutInflater is framework-owned but context-bound. It must be cloned into the
+        // Guest context so Activity/Fragment UI code does not receive null or a Host inflater.
+        if (Context.LAYOUT_INFLATER_SERVICE.equals(name)) {
+            return android.view.LayoutInflater.from(hostServiceContext).cloneInContext(this);
+        }
         if (!sharedState.systemServices.isKnownService(name)) return null;
         capabilityGate.requireService(name);
         sharedState.systemServices.requireAvailable(name);
@@ -172,7 +203,13 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public ContentResolver getContentResolver() {
         return hostServiceContext.getContentResolver();
     }
-    @Override public Executor getMainExecutor() { return hostServiceContext.getMainExecutor(); }
+    @Override public Executor getMainExecutor() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return hostServiceContext.getMainExecutor();
+        }
+        Handler handler = new Handler(Looper.getMainLooper());
+        return handler::post;
+    }
 
     @Override public void startActivity(Intent intent) { componentRouter.startActivity(intent, null); }
     @Override public void startActivity(Intent intent, Bundle options) {
@@ -503,6 +540,22 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             throw new IllegalStateException("Cannot create directory " + file);
         }
         return file;
+    }
+
+    private static Resources.Theme createFrameworkTheme(Resources resources, GuestPackageSpec spec) {
+        Resources.Theme theme = resources.newTheme();
+        int themeResId = 0;
+        for (com.warden.controlledsandbox.contract.VirtualComponentSnapshot component
+                : spec.packageState.components()) {
+            if ("ACTIVITY".equals(component.type())
+                    && component.className().equals(spec.componentClass)) {
+                themeResId = component.themeResId();
+                break;
+            }
+        }
+        if (themeResId != 0) theme.applyStyle(themeResId, true);
+        else theme.applyStyle(android.R.style.Theme_DeviceDefault_Light_NoActionBar, true);
+        return theme;
     }
 
 }

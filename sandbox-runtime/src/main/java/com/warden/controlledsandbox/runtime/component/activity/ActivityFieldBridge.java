@@ -22,7 +22,7 @@ public final class ActivityFieldBridge {
     private static final int MIN_API = 26;
     private static final int MAX_AUDITED_API = 36;
     private static final List<String> HOST_FIELDS = List.of(
-            "mWindow", "mWindowManager", "mToken", "mMainThread", "mInstrumentation", "mActivityInfo",
+            "mToken", "mMainThread", "mInstrumentation", "mActivityInfo",
             "mFragments");
     private static final List<String> OPTIONAL_HOST_FIELDS = List.of("mCurrentConfig");
 
@@ -53,6 +53,19 @@ public final class ActivityFieldBridge {
             throw new IllegalStateException("UNSUPPORTED_ACTIVITY_BRIDGE_API:" + api);
         }
         LinkedHashMap<String, Object> direct = new LinkedHashMap<>();
+        // Full Activity.attach() temporarily uses the attached Stub as framework transport.
+        // Replace ContextWrapper.mBase before Guest code observes the Activity so identity and
+        // storage calls terminate at the Guest Context rather than at the Host Stub.
+        direct.put("mBase", session.context());
+        // Activity.attach() constructs ContextThemeWrapper's cached Theme while the Stub is
+        // still the temporary base. Replace that cache as well; otherwise AndroidX resolves
+        // Host drawable/style IDs through Guest Resources during onCreate.
+        direct.put("mTheme", session.context().getTheme());
+        // ContextThemeWrapper also caches Resources independently of mBase. Full attach() has
+        // initialized that cache from the temporary Stub, so project it together with mTheme;
+        // otherwise Guest resource IDs (for example AppCompat vector drawables) are looked up
+        // in the Host APK and fail with Resources.NotFoundException.
+        direct.put("mResources", session.context().getResources());
         direct.put("mApplication", session.application());
         direct.put("mInstrumentation", new GuestActivityInstrumentation(session.context(), callerTaskId));
         Intent guestIntent = new Intent(host.getIntent());
@@ -63,26 +76,37 @@ public final class ActivityFieldBridge {
         ActivityInfo projectedInfo = guestActivityInfo(host, session, componentClass);
         direct.put("mActivityInfo", projectedInfo);
         BridgeReport report = installFields(host, guest, HOST_FIELDS, OPTIONAL_HOST_FIELDS, direct, api);
-        // ActivityThread's current ActivityClientRecord normally retains the same
-        // ActivityInfo object that the host Stub received at attach time. Project
-        // that internal record too, so framework/app checks observe the virtual
-        // component instead of the private Stub declaration.
-        Field hostInfo = requireField(host.getClass(), "mActivityInfo");
-        hostInfo.setAccessible(true);
-        try {
-            hostInfo.set(host, projectedInfo);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            throw new IllegalStateException("ACTIVITY_HOST_INFO_PROJECTION_FAILED", error);
-        }
+        applyGuestTheme(guest, session, componentClass);
         return report;
+    }
+
+    /**
+     * Activity.attach() may initialize ContextThemeWrapper's theme bookkeeping from the Host
+     * transport before the audited field projection runs. Re-apply the Guest component theme
+     * through the public API after projection so AndroidX/AppCompat sees the Guest style parent
+     * during both creation and teardown.
+     */
+    private static void applyGuestTheme(Activity guest,
+                                        GuestRuntimeEnvironment.Session session,
+                                        String componentClass) {
+        int themeResId = 0;
+        for (VirtualComponentSnapshot component : session.spec().packageState().components()) {
+            if ("ACTIVITY".equals(component.type())
+                    && componentClass.equals(component.className())) {
+                themeResId = component.themeResId();
+                break;
+            }
+        }
+        if (themeResId != 0) guest.setTheme(themeResId);
     }
 
     /**
      * Activity.attach() starts from the host StubActivity metadata.  Leaving that metadata on
      * the Guest Activity makes framework code such as WebView's BuildInfo query the host package.
-     * Keep the host's audited window/theme fields, but replace only the identity-bearing portion
-     * with the Guest package and its Guest ApplicationInfo.
+     * Keep the host's audited framework identity fields, but leave the Guest-owned Window and
+     * WindowManager created by Activity.attach() intact. Sharing the Stub Window would make two
+     * Android Activity records own one DecorView and causes WindowManagerGlobal cleanup failures
+     * when a Guest Activity starts a nested Stub.
      */
     private static ActivityInfo guestActivityInfo(Activity host,
                                                   GuestRuntimeEnvironment.Session session,
@@ -113,6 +137,7 @@ public final class ActivityFieldBridge {
                         ? null : component.permission();
                 projected.processName = component.processName().isEmpty()
                         ? projected.processName : component.processName();
+                projected.theme = component.themeResId();
                 break;
             }
             return projected;

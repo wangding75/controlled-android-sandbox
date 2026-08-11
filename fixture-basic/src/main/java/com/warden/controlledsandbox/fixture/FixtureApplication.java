@@ -10,7 +10,7 @@ public final class FixtureApplication extends Application {
         int count = getSharedPreferences("fixture", Context.MODE_PRIVATE).getInt("applicationCreates", 0) + 1;
         getSharedPreferences("fixture", Context.MODE_PRIVATE).edit().putInt("applicationCreates", count).commit();
         Log.i("CS_FIXTURE", "APPLICATION_CREATE count=" + count + " package=" + getPackageName()
-                + " process=" + Application.getProcessName());
+                + " process=" + getApplicationInfo().processName);
         Log.i("CS_FIXTURE", "NATIVE_LOAD " + FixtureNative.loadStatus());
     }
 }

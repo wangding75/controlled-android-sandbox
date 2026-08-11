@@ -10,6 +10,7 @@ import android.content.pm.PackageInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Bundle;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.net.URI;
@@ -178,6 +179,7 @@ public final class VirtualPackageMetadata {
         private final String enabledSetting;
         private final List<Filter> filters;
         private final List<ProviderPathRule> providerPathRules;
+        private final Bundle metaData;
 
         public Component(Type type, String className, String processName,
                          boolean exported, boolean enabled, boolean isolated,
@@ -205,6 +207,17 @@ public final class VirtualPackageMetadata {
                          String authority, String permission, String readPermission,
                          String writePermission, boolean grantUriPermissions, String enabledSetting,
                          List<Filter> filters, List<ProviderPathRule> providerPathRules) {
+            this(type, className, processName, exported, enabled, isolated, actions, authority,
+                    permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
+                    filters, providerPathRules, null);
+        }
+
+        public Component(Type type, String className, String processName,
+                         boolean exported, boolean enabled, boolean isolated, Set<String> actions,
+                         String authority, String permission, String readPermission,
+                         String writePermission, boolean grantUriPermissions, String enabledSetting,
+                         List<Filter> filters, List<ProviderPathRule> providerPathRules,
+                         Bundle metaData) {
             this.type = java.util.Objects.requireNonNull(type, "type");
             this.className = requireText(className, "className");
             this.processName = value(processName);
@@ -221,6 +234,7 @@ public final class VirtualPackageMetadata {
             this.filters = Collections.unmodifiableList(new ArrayList<>(filters == null ? List.of() : filters));
             this.providerPathRules = Collections.unmodifiableList(new ArrayList<>(
                     providerPathRules == null ? List.of() : providerPathRules));
+            this.metaData = metaData == null ? null : new Bundle(metaData);
         }
 
         public Type type() { return type; }
@@ -238,6 +252,7 @@ public final class VirtualPackageMetadata {
         public String enabledSetting() { return enabledSetting; }
         public List<Filter> filters() { return filters; }
         public List<ProviderPathRule> providerPathRules() { return providerPathRules; }
+        public Bundle metaData() { return metaData == null ? null : new Bundle(metaData); }
     }
 
     private final String packageName;
@@ -543,6 +558,7 @@ public final class VirtualPackageMetadata {
             provider.readPermission = component.readPermission();
             provider.writePermission = component.writePermission();
             provider.grantUriPermissions = component.grantUriPermissions();
+            provider.metaData = component.metaData();
         }
         return info;
     }

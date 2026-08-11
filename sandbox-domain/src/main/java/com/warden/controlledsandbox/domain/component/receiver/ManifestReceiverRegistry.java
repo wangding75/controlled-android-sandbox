@@ -305,20 +305,10 @@ public final class ManifestReceiverRegistry {
                 throw new IllegalArgumentException("Too many data rules in Receiver filter");
             }
             this.dataRules = Collections.unmodifiableList(dataCopy);
-            boolean hasScheme = false;
-            boolean hasHost = false;
-            boolean hasPath = false;
-            for (DataRule rule : dataCopy) {
-                hasScheme |= !rule.scheme().isEmpty();
-                hasHost |= !rule.host().isEmpty();
-                hasPath |= rule.hasPathConstraint();
-            }
-            if ((hasHost || hasPath) && !hasScheme) {
-                throw new IllegalArgumentException("Receiver data authority/path requires a scheme");
-            }
-            if (hasPath && !hasHost) {
-                throw new IllegalArgumentException("Receiver data path requires a host");
-            }
+            // Android permits IntentFilter data dimensions to be added independently. In
+            // particular, dynamic filters may contain a path entry without an authority or
+            // scheme; the platform keeps that registration instead of rejecting it here.
+            // Matching below still applies every dimension that was supplied.
         }
 
         public int priority() { return priority; }

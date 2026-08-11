@@ -12,7 +12,7 @@ public class FixtureService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         Log.i("CS_FIXTURE", "SERVICE_CREATE " + getClass().getName()
-                + " process=" + android.app.Application.getProcessName());
+                + " process=" + getApplicationInfo().processName);
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         Log.i("CS_FIXTURE", "SERVICE_START id=" + startId

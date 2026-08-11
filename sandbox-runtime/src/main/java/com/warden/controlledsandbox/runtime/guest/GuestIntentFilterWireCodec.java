@@ -25,13 +25,13 @@ final class GuestIntentFilterWireCodec {
 
         ArrayList<Bundle> rules = new ArrayList<>();
         ArrayList<String> schemes = values(filter.countDataSchemes(), filter::getDataScheme, "scheme");
-        ArrayList<String> mimeTypes = values(filter.countDataTypes(), filter::getDataType, "mimeType");
-        for (String scheme : schemes) rules.add(rule(scheme, "", "", "", "", ""));
+        ArrayList<String> hosts = new ArrayList<>();
         for (int index = 0; index < filter.countDataAuthorities(); index++) {
             IntentFilter.AuthorityEntry authority = filter.getDataAuthority(index);
-            if (authority == null) continue;
-            rules.add(rule("", value(authority.getHost()), "", "", "", ""));
+            if (authority != null) hosts.add(value(authority.getHost()));
         }
+        ArrayList<String> mimeTypes = values(filter.countDataTypes(), filter::getDataType, "mimeType");
+        ArrayList<Bundle> paths = new ArrayList<>();
         for (int index = 0; index < filter.countDataPaths(); index++) {
             PatternMatcher path = filter.getDataPath(index);
             if (path == null) continue;
@@ -41,7 +41,31 @@ final class GuestIntentFilterWireCodec {
             if (path.getType() == PatternMatcher.PATTERN_LITERAL) exact = value(path.getPath());
             else if (path.getType() == PatternMatcher.PATTERN_PREFIX) prefix = value(path.getPath());
             else pattern = value(path.getPath());
-            rules.add(rule("", "", exact, prefix, pattern, ""));
+            paths.add(rule("", "", exact, prefix, pattern, ""));
+        }
+        if (!paths.isEmpty()) {
+            ArrayList<String> pathSchemes = schemes.isEmpty()
+                    ? new ArrayList<>(java.util.List.of("")) : schemes;
+            ArrayList<String> pathHosts = hosts.isEmpty()
+                    ? new ArrayList<>(java.util.List.of("")) : hosts;
+            for (String scheme : pathSchemes) {
+                for (String host : pathHosts) {
+                    for (Bundle path : paths) {
+                        rules.add(rule(scheme, host,
+                                path.getString(RuntimeKeys.BROADCAST_PATH, ""),
+                                path.getString(RuntimeKeys.RECEIVER_DATA_PATH_PREFIX, ""),
+                                path.getString(RuntimeKeys.RECEIVER_DATA_PATH_PATTERN, ""), ""));
+                    }
+                }
+            }
+        } else {
+            for (String scheme : schemes) rules.add(rule(scheme, "", "", "", "", ""));
+            if (!hosts.isEmpty()) {
+                for (String scheme : schemes.isEmpty()
+                        ? new ArrayList<>(java.util.List.of("")) : schemes) {
+                    for (String host : hosts) rules.add(rule(scheme, host, "", "", "", ""));
+                }
+            }
         }
         for (String mimeType : mimeTypes) rules.add(rule("", "", "", "", "", mimeType));
         if (rules.size() > MAX_DATA_RULES) {

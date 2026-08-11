@@ -46,7 +46,7 @@ public final class GuestActivityController {
             Class<?> type = session.classLoader().loadClass(componentClass);
             if (!Activity.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not an Activity: " + componentClass);
             guest = (Activity) type.getDeclaredConstructor().newInstance();
-            attachBaseContext(guest);
+            attachFrameworkState(guest, componentClass);
             ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(
                     host, guest, session, componentClass, taskId);
             guest.setIntent(launchIntent == null ? new Intent() : new Intent(launchIntent));
@@ -93,17 +93,18 @@ public final class GuestActivityController {
 
     void pause() {
         if (!resumed || destroyed) return;
-        invokeIfCreated("onPause", new Class<?>[0], new Object[0]);
-        emit("PAUSED", new Bundle());
         resumed = false;
+        if (!invokeIfCreated("onPause", new Class<?>[0], new Object[0])) return;
+        emit("PAUSED", new Bundle());
     }
 
     void stop() {
         if (!started || destroyed) return;
         if (resumed) pause();
-        invokeIfCreated("onStop", new Class<?>[0], new Object[0]);
-        emit("STOPPED", new Bundle());
         started = false;
+        if (destroyed) return;
+        if (!invokeIfCreated("onStop", new Class<?>[0], new Object[0])) return;
+        emit("STOPPED", new Bundle());
     }
 
     void destroy() { destroy(false); }
@@ -111,8 +112,9 @@ public final class GuestActivityController {
     void destroy(boolean brokerAlreadyFinalized) {
         if (!created || destroyed) return;
         if (started) stop();
+        if (destroyed || guest == null) return;
         ActivityResultFieldBridge.Captured result = ActivityResultFieldBridge.capture(guest);
-        invokeIfCreated("onDestroy", new Class<?>[0], new Object[0]);
+        if (!invokeIfCreated("onDestroy", new Class<?>[0], new Object[0])) return;
         if (!brokerAlreadyFinalized) {
             if (result.explicit()) {
                 Bundle details = new Bundle();
@@ -198,31 +200,119 @@ public final class GuestActivityController {
         result.putString("instanceId", session.instanceId());
     }
 
-    private void attachBaseContext(Activity activity) throws Exception {
-        // Calling Activity.attachBaseContext on API 32 invokes the hidden Autofill client
-        // hand-off through ContextWrapper. GuestContext intentionally has no Host base, so that
-        // hand-off would dereference null. Temporarily provide only the Host transport for this
-        // framework attach operation, then restore the detached Guest Context boundary before any
-        // Guest lifecycle callback can observe it.
-        java.lang.reflect.Field base = android.content.ContextWrapper.class.getDeclaredField("mBase");
-        base.setAccessible(true);
-        android.content.Context hostContext = host.getBaseContext();
-        Method attach = android.app.Activity.class.getDeclaredMethod(
-                "attachBaseContext", android.content.Context.class);
+    private void attachFrameworkState(Activity activity, String componentClass) throws Exception {
+        // Activity.attachBaseContext alone leaves framework-owned state such as mFragments
+        // uninitialized. Android's own ActivityThread invokes the hidden full attach() before
+        // onCreate; reproduce that state transition with the already-created Stub's framework
+        // transport, then ActivityFieldBridge replaces identity-bearing fields with Guest data.
+        Method attach = null;
+        for (Method candidate : Activity.class.getDeclaredMethods()) {
+            if ("attach".equals(candidate.getName()) && candidate.getParameterTypes().length >= 16) {
+                attach = candidate;
+                break;
+            }
+        }
+        if (attach == null) throw new IllegalStateException("ACTIVITY_ATTACH_METHOD_UNAVAILABLE");
         attach.setAccessible(true);
-        attach.invoke(activity, hostContext);
-        // Activity.attachBaseContext has now initialized the framework-owned Activity state.
-        // Replace the base with the Guest Context. Its framework-only bridge supplies the
-        // Activity-owned theme/display queries without exposing the Host Context through
-        // GuestContext.getBaseContext().
-        base.set(session.context(), new com.warden.controlledsandbox.runtime.guest.GuestActivityBaseContext(hostContext));
-        base.set(activity, session.context());
+        Class<?>[] types = attach.getParameterTypes();
+        Object[] args = new Object[types.length];
+        int binderIndex = 0;
+        int stringIndex = 0;
+        for (int index = 0; index < types.length; index++) {
+            Class<?> type = types[index];
+            String name = type.getName();
+            if (android.app.Application.class.isAssignableFrom(type)) {
+                args[index] = session.application();
+            } else if (android.app.Activity.class.isAssignableFrom(type)) {
+                args[index] = null;
+            } else if (android.content.Context.class.isAssignableFrom(type)) {
+                // Activity.attachBaseContext invokes framework callbacks such as Autofill on
+                // this argument. The already-attached Stub is the only safe framework transport
+                // at this point; ActivityFieldBridge projects mBase to the Guest Context after
+                // attach() has initialized the platform state.
+                args[index] = host;
+            } else if ("android.app.ActivityThread".equals(name)) {
+                args[index] = fieldValue(host, "mMainThread");
+            } else if (android.app.Instrumentation.class.isAssignableFrom(type)) {
+                args[index] = fieldValue(host, "mInstrumentation");
+            } else if (android.os.IBinder.class.isAssignableFrom(type)) {
+                if (binderIndex++ == 0) args[index] = fieldValue(host, "mToken");
+                else if (binderIndex == 2) args[index] = fieldValue(host, "mAssistToken");
+                else args[index] = fieldValue(host, "mShareableActivityToken");
+            } else if (type == int.class || type == Integer.class) {
+                args[index] = fieldValue(host, "mIdent");
+            } else if (android.content.Intent.class.isAssignableFrom(type)) {
+                Intent intent = host.getIntent() == null ? new Intent() : new Intent(host.getIntent());
+                intent.setComponent(new android.content.ComponentName(session.spec().packageName,
+                        componentClass));
+                args[index] = intent;
+            } else if (android.content.pm.ActivityInfo.class.isAssignableFrom(type)) {
+                args[index] = fieldValue(host, "mActivityInfo");
+            } else if (CharSequence.class.isAssignableFrom(type)) {
+                args[index] = componentClass;
+            } else if (type == String.class) {
+                args[index] = stringIndex++ == 0
+                        ? fieldValue(host, "mEmbeddedID") : fieldValue(host, "mReferrer");
+            } else if (android.content.res.Configuration.class.isAssignableFrom(type)) {
+                args[index] = fieldValue(host, "mCurrentConfig");
+            } else if ("android.app.Activity$NonConfigurationInstances".equals(name)) {
+                args[index] = fieldValue(host, "mLastNonConfigurationInstances");
+            } else if (name.endsWith("IVoiceInteractor")) {
+                args[index] = fieldValue(host, "mVoiceInteractor");
+            } else if ("android.view.Window".equals(name)) {
+                // Activity.attach() uses this only as an optional parent/container window.
+                // A Guest Activity is a separate virtual Activity record, so sharing the Stub
+                // window would give two Android Activity records ownership of one DecorView.
+                args[index] = null;
+            } else if (name.endsWith("ActivityConfigCallback")) {
+                args[index] = fieldValue(host, "mActivityConfigCallback");
+            } else {
+                throw new IllegalStateException("ACTIVITY_ATTACH_PARAMETER_UNSUPPORTED:" + name);
+            }
+        }
+        attach.invoke(activity, args);
     }
 
-    private void invokeIfCreated(String name, Class<?>[] types, Object[] args) {
-        if (guest == null) return;
+    private static Object fieldValue(Object target, String name) throws Exception {
+        Class<?> cursor = target.getClass();
+        while (cursor != null) {
+            try {
+                java.lang.reflect.Field field = cursor.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(target);
+            } catch (NoSuchFieldException ignored) {
+                cursor = cursor.getSuperclass();
+            }
+        }
+        return null;
+    }
+
+    private boolean invokeIfCreated(String name, Class<?>[] types, Object[] args) {
+        if (guest == null || destroyed) return false;
         try { invokeLifecycle(guest, name, types, args); }
-        catch (Throwable error) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error); throw new IllegalStateException("Guest lifecycle " + name + " failed", root(error)); }
+        catch (Throwable error) {
+            if (isClosedDispatcher(error)) {
+                // Runtime stop/disconnect can close the Guest broker while Android is still
+                // delivering the Host trampoline's pause/stop callback. Treat that callback as
+                // already finalized; a later lifecycle callback must remain idempotent.
+                destroyed = true;
+                guest = null;
+                return false;
+            }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("Guest lifecycle " + name + " failed", root(error));
+        }
+        return true;
+    }
+
+    private static boolean isClosedDispatcher(Throwable error) {
+        Throwable cursor = error;
+        while (cursor != null) {
+            if ("GUEST_MAIN_DISPATCHER_CLOSED".equals(cursor.getMessage())) return true;
+            if (cursor.getCause() == cursor) break;
+            cursor = cursor.getCause();
+        }
+        return false;
     }
 
     private void invokeLifecycle(Activity activity, String name, Class<?>[] types, Object[] args) throws Exception {

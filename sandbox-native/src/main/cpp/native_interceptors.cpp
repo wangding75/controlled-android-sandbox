@@ -749,7 +749,6 @@ void* replacement_for(std::string_view name) {
     if (name == "statx") return reinterpret_cast<void*>(&controlled_statx);
     if (name == "renameat2") return reinterpret_cast<void*>(&controlled_renameat2);
     if (name == "getdents64") return reinterpret_cast<void*>(&controlled_getdents64);
-    if (name == "mmap") return reinterpret_cast<void*>(&controlled_mmap);
     if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);
     if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);
     if (name == "socket") return reinterpret_cast<void*>(&controlled_socket);

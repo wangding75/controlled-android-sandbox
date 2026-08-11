@@ -291,7 +291,8 @@ final class VirtualPackageStateBuilder {
                     processName(packageName, component), component.exported(), enabled,
                     component.isolatedProcess(), component.authorities(), component.permission(),
                     component.readPermission(), component.writePermission(), component.grantUriPermissions(),
-                    enabledSetting, component.actions(), filters, providerPathRules));
+                    enabledSetting, component.actions(), filters, providerPathRules,
+                    component.themeResId()));
         }
     }
 

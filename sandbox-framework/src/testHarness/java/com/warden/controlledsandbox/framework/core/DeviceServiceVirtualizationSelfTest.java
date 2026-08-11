@@ -98,6 +98,7 @@ public final class DeviceServiceVirtualizationSelfTest {
     private static void testBluetooth(GuestIdentity identity) {
         FakeBluetoothDelegate delegate = new FakeBluetoothDelegate();
         BluetoothApi api = proxy(BluetoothApi.class, delegate, identity, "bluetooth");
+        require(api.registerAdapter() == null, "optional Bluetooth adapter binder is absent safely");
         require("02:66:77:88:99:AA".equals(api.getAddress()), "adapter address projected");
         Set<FakeBluetoothDevice> bonded = api.getBondedDevices();
         require(bonded.size() == 1 && bonded.iterator().next().address.equals("02:00:00:00:00:01"),
@@ -301,10 +302,12 @@ public final class DeviceServiceVirtualizationSelfTest {
     }
 
     interface BluetoothApi {
+        Object registerAdapter();
         String getAddress(); Set<FakeBluetoothDevice> getBondedDevices(); String getRemoteName(String address);
     }
     static final class FakeBluetoothDelegate implements BluetoothApi {
         int calls;
+        public Object registerAdapter() { calls++; return new Object(); }
         public String getAddress() { calls++; return "host"; }
         public Set<FakeBluetoothDevice> getBondedDevices() { calls++; return Set.of(); }
         public String getRemoteName(String address) { calls++; return "host"; }
