@@ -2,6 +2,7 @@ package com.warden.controlledsandbox;
 
 import android.app.Activity;
 import android.content.pm.ApplicationInfo;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -23,11 +24,23 @@ public final class DebugCommandActivity extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        String command = getIntent().getStringExtra("command");
-        String packageName = getIntent().getStringExtra("package");
-        int virtualUserId = getIntent().getIntExtra("user", 0);
-        Bundle extras = getIntent().getExtras();
+        executeIntent(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        executeIntent(intent);
+    }
+
+    private void executeIntent(Intent intent) {
+        String command = intent == null ? "" : intent.getStringExtra("command");
+        String packageName = intent == null ? "" : intent.getStringExtra("package");
+        int virtualUserId = intent == null ? 0 : intent.getIntExtra("user", 0);
+        Bundle extras = intent == null ? null : intent.getExtras();
         boolean trustNativeGuest = extras != null && extras.getBoolean("trustNativeGuest", false);
+        Log.i(TAG, "COMMAND_BEGIN command=" + command + " package=" + packageName
+                + " user=" + virtualUserId);
         worker.execute(() -> execute(command == null ? "" : command,
                 packageName == null ? "" : packageName, virtualUserId, trustNativeGuest));
     }
@@ -42,8 +55,10 @@ public final class DebugCommandActivity extends Activity {
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("startedAt", System.currentTimeMillis());
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
+            Log.i(TAG, "PACKAGE_LOOKUP_BEGIN command=" + command + " package=" + packageName);
             packages = new PackageServiceClient(this);
             SandboxRecord record = packages.findRecord(packageName);
+            Log.i(TAG, "PACKAGE_LOOKUP_RETURN command=" + command + " package=" + packageName);
             boolean importRequested = "import-launch".equals(command)
                     || "import-prepare".equals(command) || record == null;
             if (importRequested) {
@@ -55,10 +70,14 @@ public final class DebugCommandActivity extends Activity {
             }
             result.put("nativeGuestTrust", record.nativeGuestTrust);
             packages.ensureInstance(packageName, virtualUserId);
+            Log.i(TAG, "INSTANCE_READY command=" + command + " package=" + packageName
+                    + " user=" + virtualUserId);
             runtime = new RuntimeClient(this);
             Bundle operation;
             if ("stop".equals(command)) {
+                Log.i(TAG, "STOP_CALL_BEGIN package=" + packageName + " user=" + virtualUserId);
                 runtime.stop(record, virtualUserId);
+                Log.i(TAG, "STOP_CALL_RETURN package=" + packageName + " user=" + virtualUserId);
                 operation = new Bundle();
                 operation.putString(RuntimeKeys.STATUS, "STOPPED");
             } else if ("clear".equals(command)) {
