@@ -37,5 +37,6 @@ android {
 dependencies {
     implementation project(':sandbox-domain')
     implementation project(':sandbox-contract')
+    implementation project(':sandbox-sdk')
     implementation project(':sandbox-runtime')
 }

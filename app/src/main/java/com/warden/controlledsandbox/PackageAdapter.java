@@ -18,6 +18,7 @@ final class PackageAdapter extends BaseAdapter {
         void onLaunch(SandboxItem item);
         void onComponentTest(SandboxItem item);
         void onClone(SandboxItem item);
+        void onClear(SandboxItem item);
         void onDelete(SandboxItem item);
     }
     private final LayoutInflater inflater;
@@ -48,6 +49,7 @@ final class PackageAdapter extends BaseAdapter {
         Button components = view.findViewById(R.id.components); components.setOnClickListener(v -> listener.onComponentTest(item));
         Button clone = view.findViewById(R.id.clone); clone.setOnClickListener(v -> listener.onClone(item));
         Button delete = view.findViewById(R.id.delete); delete.setOnClickListener(v -> listener.onDelete(item));
+        Button clear = view.findViewById(R.id.clear); clear.setOnClickListener(v -> listener.onClear(item));
         return view;
     }
     private static String empty(String value) { return value == null || value.trim().isEmpty() ? "<missing>" : value; }

@@ -214,6 +214,10 @@ final class PackageServiceClient implements AutoCloseable {
         return PackageServiceMapper.fromSnapshot(snapshot);
     }
 
+    void clearInstanceData(String packageName, int virtualUserId) throws Exception {
+        requireSuccess(requireSession().clearInstanceData(packageName, virtualUserId));
+    }
+
     VirtualDeviceServiceProfileSnapshot deviceServiceProfile(
             String packageName, int virtualUserId) throws Exception {
         return requireSession().getDeviceServiceProfile(packageName, virtualUserId);

@@ -1,0 +1,26 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+sourceSets {
+    testHarness {
+        java.srcDir 'src/testHarness/java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+tasks.register('selfTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs the dependency-free sandbox SDK and compatibility self-tests.'
+    classpath = sourceSets.testHarness.runtimeClasspath
+    mainClass = 'com.warden.controlledsandbox.sdk.SandboxSdkSelfTest'
+}
+
+check.dependsOn selfTest

@@ -42,6 +42,7 @@ interface IPackageManagementSession {
     PackageServiceResult createClone(String packageName);
     PackageServiceResult updateInstanceStatus(String packageName, int virtualUserId, String status);
     PackageServiceResult deleteInstance(String packageName, int virtualUserId);
+    PackageServiceResult clearInstanceData(String packageName, int virtualUserId);
     VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(String packageName, int virtualUserId);
     VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(String packageName, int virtualUserId,
             in VirtualDeviceServiceProfileSnapshot profile);

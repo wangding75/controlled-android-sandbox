@@ -20,4 +20,6 @@
         <Button android:id="@+id/delete" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginStart="6dp" android:text="Delete" />
     </LinearLayout>
+    <Button android:id="@+id/clear" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" android:text="Clear instance data" />
 </LinearLayout>

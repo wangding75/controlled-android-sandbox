@@ -285,6 +285,17 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     }
 
     @Override
+    public PackageServiceResult clearInstanceData(String packageName, int virtualUserId) {
+        return execute("clearInstanceData", () -> {
+            String normalizedPackage = required(packageName, "packageName");
+            lifecycle.clearInstanceData(normalizedPackage, virtualUserId);
+            dependencies.deleteScopeBestEffort(
+                    new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+            return PackageServiceResult.success("clearInstanceData");
+        });
+    }
+
+    @Override
     public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(String packageName, int virtualUserId) {
         requireOwner();
         return profiles.getDeviceServiceProfile(packageName, virtualUserId);
@@ -475,6 +486,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
                 return action.run();
             } catch (Throwable error) {
                 FatalErrorPolicy.rethrowIfFatal(error);
+                android.util.Log.e("CS_PACKAGE", "FAIL operation=" + operation, error);
                 String code = error instanceof NativeGuestPolicyException policyError
                         ? policyError.code() : error.getClass().getSimpleName();
                 return PackageServiceResult.failure(operation, code, String.valueOf(error.getMessage()));

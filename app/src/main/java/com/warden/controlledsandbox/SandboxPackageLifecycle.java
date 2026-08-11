@@ -315,6 +315,33 @@ final class SandboxPackageLifecycle {
         return next;
     }
 
+    /** Clears only the selected Guest instance root and keeps the authoritative instance record. */
+    synchronized void clearInstanceData(String packageName, int virtualUserId) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        boolean exists = false;
+        for (SandboxInstance instance : current.instances()) {
+            if (instance.packageName.equals(packageName) && instance.virtualUserId == virtualUserId) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) throw new IllegalArgumentException("Sandbox instance does not exist");
+        File root = instanceDirectory(packageName, virtualUserId).getCanonicalFile();
+        if (java.nio.file.Files.isSymbolicLink(root.toPath())) {
+            throw new SecurityException("INSTANCE_DATA_ROOT_SYMLINK");
+        }
+        if (!root.exists()) return;
+        if (!root.isDirectory()) throw new IllegalStateException("Instance data root is not a directory");
+        File[] children = root.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list instance data root");
+        for (File child : children) {
+            if (java.nio.file.Files.isSymbolicLink(child.toPath())) {
+                throw new SecurityException("INSTANCE_DATA_CHILD_SYMLINK");
+            }
+            ApkImportManager.deleteTreeOrThrow(child);
+        }
+    }
+
     synchronized String maintenanceWarning() {
         return maintenanceWarning;
     }

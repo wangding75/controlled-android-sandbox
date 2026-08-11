@@ -24,8 +24,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final List<SandboxRecord> records = new ArrayList<>();
     private final List<SandboxInstance> instances = new ArrayList<>();
-    private PackageServiceClient packageService;
-    private RuntimeClient runtime;
+    private SxSandboxAdapter sandbox;
     private PackageAdapter adapter;
     private TextView runtimeStatus;
     private TextView emptyText;
@@ -35,8 +34,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         setContentView(R.layout.activity_main);
-        packageService = new PackageServiceClient(this);
-        runtime = new RuntimeClient(this);
+        sandbox = new SxSandboxAdapter(this);
         runtimeStatus = findViewById(R.id.runtimeStatus);
         emptyText = findViewById(R.id.emptyText);
         ListView list = findViewById(R.id.packageList);
@@ -48,7 +46,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         refresh();
         worker.execute(() -> {
             try {
-                RuntimeStatusResult status = runtime.status();
+                RuntimeStatusResult status = sandbox.runtimeStatus();
                 runOnUiThread(() -> {
                     if (status.successful()) {
                         runtimeStatus.setText("Runtime: " + status.status() + " · " + status.capability());
@@ -90,11 +88,11 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         try {
             SandboxRecord imported;
             if (selected.size() == 1) {
-                imported = packageService.importApk(selected.get(0));
+                imported = sandbox.importApk(selected.get(0));
             } else {
-                sessionId = packageService.createInstallSession("");
-                for (Uri uri : selected) packageService.addInstallArtifact(sessionId, uri);
-                imported = packageService.commitInstallSession(sessionId);
+                sessionId = sandbox.createInstallSession("");
+                for (Uri uri : selected) sandbox.addInstallArtifact(sessionId, uri);
+                imported = sandbox.commitInstallSession(sessionId);
                 sessionId = -1;
             }
             SandboxRecord completed = imported;
@@ -105,7 +103,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
             });
         } catch (Exception error) {
             if (sessionId > 0) {
-                try { packageService.abandonInstallSession(sessionId); }
+                try { sandbox.abandonInstallSession(sessionId); }
                 catch (Exception cleanupFailure) { error.addSuppressed(cleanupFailure); }
             }
             showImportFailure(error);
@@ -138,7 +136,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private void refresh() {
         worker.execute(() -> {
             try {
-                SandboxCatalogState state = packageService.load();
+                SandboxCatalogState state = sandbox.load();
                 runOnUiThread(() -> applyCatalog(state));
             } catch (PersistentStateException error) {
                 runOnUiThread(() -> failClosedMetadata(error));
@@ -182,12 +180,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
 
     @Override public void onPrepare(SandboxItem item) {
         setBusy("Preparing", item);
-        worker.execute(() -> runOperation(item, () -> runtime.prepare(item.record, item.instance.virtualUserId)));
+        worker.execute(() -> runOperation(item, () -> sandbox.prepare(item.record, item.instance.virtualUserId)));
     }
 
     @Override public void onLaunch(SandboxItem item) {
         setBusy("Launching", item);
-        worker.execute(() -> runOperation(item, () -> runtime.launch(item.record, item.instance.virtualUserId)));
+        worker.execute(() -> runOperation(item, () -> sandbox.launchBundle(item.record, item.instance.virtualUserId)));
     }
 
     @Override public void onComponentTest(SandboxItem item) {
@@ -195,10 +193,10 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         worker.execute(() -> {
             try {
                 int userId = item.instance.virtualUserId;
-                Bundle service = runtime.startService(item.record, userId);
-                Bundle receiver = runtime.sendBroadcast(item.record, userId);
-                Bundle provider = runtime.prepareProvider(item.record, userId);
-                Bundle stop = runtime.stopService(item.record, userId);
+                Bundle service = sandbox.startService(item.record, userId);
+                Bundle receiver = sandbox.sendBroadcast(item.record, userId);
+                Bundle provider = sandbox.prepareProvider(item.record, userId);
+                Bundle stop = sandbox.stopService(item.record, userId);
                 String summary = "Service=" + service.getString("status", "")
                         + " · Receiver=" + receiver.getString("status", "")
                         + " · Provider=" + provider.getString("status", "")
@@ -217,7 +215,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override public void onClone(SandboxItem item) {
         worker.execute(() -> {
             try {
-                int userId = packageService.createClone(item.record.packageName);
+                int userId = sandbox.createClone(item.record.packageName);
                 runOnUiThread(() -> {
                     runtimeStatus.setText("Created clone user=" + userId);
                     refresh();
@@ -231,8 +229,8 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override public void onDelete(SandboxItem item) {
         worker.execute(() -> {
             try {
-                runtime.stop(item.record, item.instance.virtualUserId);
-                packageService.deleteInstance(item.record.packageName, item.instance.virtualUserId);
+                sandbox.stopRuntime(item.record, item.instance.virtualUserId);
+                sandbox.deleteInstance(item.record.packageName, item.instance.virtualUserId);
                 runOnUiThread(() -> {
                     runtimeStatus.setText(operationMessage("Deleted " + item.record.packageName
                             + " user=" + item.instance.virtualUserId));
@@ -240,6 +238,23 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
                 });
             } catch (Exception error) {
                 showFailure("Delete failed", error);
+            }
+        });
+    }
+
+    @Override public void onClear(SandboxItem item) {
+        setBusy("Clearing data for", item);
+        worker.execute(() -> {
+            try {
+                sandbox.clearInstanceData(item.record.packageName, item.instance.virtualUserId);
+                saveInstanceStatus(item.instance, "CLEARED");
+                runOnUiThread(() -> {
+                    runtimeStatus.setText("Cleared data for " + item.record.packageName
+                            + " user=" + item.instance.virtualUserId);
+                    refresh();
+                });
+            } catch (Exception error) {
+                showFailure("Clear data failed", error);
             }
         });
     }
@@ -266,12 +281,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     private void saveInstanceStatus(SandboxInstance instance, String status) throws Exception {
-        packageService.updateInstanceStatus(instance.packageName, instance.virtualUserId, status);
+        sandbox.updateInstanceStatus(instance.packageName, instance.virtualUserId, status);
     }
 
     private String operationMessage(String success) {
         try {
-            String warning = packageService.maintenanceWarning();
+            String warning = sandbox.maintenanceWarning();
             return warning.isEmpty() ? success : success + " · Cleanup pending: " + warning;
         } catch (Exception error) {
             return success + " · Cleanup status unavailable: " + error.getMessage();
@@ -291,8 +306,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     @Override protected void onDestroy() {
-        packageService.close();
-        runtime.close();
+        sandbox.close();
         worker.shutdownNow();
         super.onDestroy();
     }
