@@ -98,11 +98,15 @@ public final class ActivityLaunchCoordinator {
             throw new IllegalArgumentException(
                     "new generation must be greater than stale generation");
         }
-        int revoked = routeStore.revokeStaleGenerations(
+        // ActivityTaskManager can recreate a Host trampoline after a Guest process restart.
+        // Rebind the still-unconsumed route to the new virtual generation instead of revoking
+        // an accepted platform launch.
+        routeStore.rebindStaleGenerations(
                 staleOwner.virtualUserId(),
                 staleOwner.packageName(),
                 staleOwner.processName(),
-                staleOwner.processGeneration());
+                staleOwner.processGeneration(),
+                newGeneration);
         return new ProcessRecreationOutcome(
                 ledger.recreateProcessGeneration(
                         staleOwner.virtualUserId(),
@@ -110,7 +114,7 @@ public final class ActivityLaunchCoordinator {
                         staleOwner.processName(),
                         staleOwner.processGeneration(),
                         newGeneration),
-                revoked);
+                0);
     }
 
     public synchronized ProcessInvalidationOutcome invalidateProcessGeneration(

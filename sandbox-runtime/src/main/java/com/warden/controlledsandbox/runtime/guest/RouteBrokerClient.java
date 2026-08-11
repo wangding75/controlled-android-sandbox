@@ -10,6 +10,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
@@ -122,11 +124,18 @@ public final class RouteBrokerClient {
         Intent service = new Intent(context, RuntimeBrokerService.class);
         ServiceConnection connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, IBinder binder) {
-                Bundle result;
-                try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
-                catch (Exception error) { result = failure(error); }
-                try { bindingContext.unbindService(this); } catch (Exception ignored) { }
-                callback.complete(result);
+                // ServiceConnection is delivered on the Guest main thread by default.  A Broker
+                // recovery call may synchronously prepare this very Guest process, so invoking
+                // it inline would deadlock: Guest main -> Broker -> Guest main.  Keep Binder I/O
+                // off the Guest main thread and marshal only the bounded result back.
+                new Thread(() -> {
+                    Bundle result;
+                    try { result = call.invoke(IRuntimeBroker.Stub.asInterface(binder)); }
+                    catch (Exception error) { result = failure(error); }
+                    try { bindingContext.unbindService(this); } catch (Exception ignored) { }
+                    Bundle completed = result;
+                    new Handler(Looper.getMainLooper()).post(() -> callback.complete(completed));
+                }, "cs-broker-call").start();
             }
             @Override public void onServiceDisconnected(ComponentName name) { }
         };

@@ -618,11 +618,27 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     @Override public Bundle consumeRoute(String token, String sessionId, long generation) {
         CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
         try {
-            GuestSession current = findSession(sessionId, generation);
+            GuestSession current = sessionById(sessionId, generation);
+            if (current == null) current = latestSessionById(sessionId);
+            if (current == null) throw new SecurityException("SESSION_OR_GENERATION_MISMATCH");
+            if (current.state() == SessionState.RECOVERING) {
+                // ActivityManager can recreate the Stub Activity before the replacement Guest
+                // generation has been prepared.  Recover from the broker-owned route envelope;
+                // this is the same generic prepare path used by launchActivity.
+                Bundle route = activityRuntime.routeForPreparation(token);
+                if (route == null) throw new IllegalStateException("ACTIVITY_ROUTE_NOT_FOUND");
+                Bundle prepared = prepareGuestInternal(route);
+                if (!isPrepared(prepared)) {
+                    throw new IllegalStateException(prepared.getString(
+                            RuntimeKeys.ERROR_TYPE, "GUEST_RECOVERY_FAILED"));
+                }
+                current = findSession(sessionId,
+                        prepared.getLong(RuntimeKeys.GENERATION, current.generation()));
+            }
             Bundle payload = activityRuntime.consume(token, current);
             if (current.state() == SessionState.READY) {
                 current = sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                        generation, SessionState.ACTIVE, now(), "");
+                        current.generation(), SessionState.ACTIVE, now(), "");
             }
             payload.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
             return payload;
@@ -995,6 +1011,17 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             if (candidate.sessionId().equals(sessionId) && candidate.generation() == generation) return candidate;
         }
         return null;
+    }
+
+    private GuestSession latestSessionById(String sessionId) {
+        GuestSession latest = null;
+        for (GuestSession candidate : sessions.snapshot()) {
+            if (!candidate.sessionId().equals(sessionId)
+                    || candidate.state() == SessionState.STOPPED
+                    || candidate.state() == SessionState.FAILED) continue;
+            if (latest == null || candidate.generation() > latest.generation()) latest = candidate;
+        }
+        return latest;
     }
     private static void requireProviderTargetSession(GuestSession session,
             ProviderAuthorityRegistry.Entry target, Bundle request) {

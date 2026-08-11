@@ -16,6 +16,7 @@ import com.warden.controlledsandbox.framework.activity.ActivityProcessIdentity;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskLedger;
 import com.warden.controlledsandbox.framework.activity.ActivityTaskRestoreOutcome;
 import com.warden.controlledsandbox.framework.activity.ConfigurationDecision;
+import com.warden.controlledsandbox.framework.activity.LaunchDecision;
 import com.warden.controlledsandbox.framework.activity.LaunchAction;
 import com.warden.controlledsandbox.framework.activity.LifecycleState;
 import com.warden.controlledsandbox.framework.activity.SavedActivityState;
@@ -30,6 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import com.warden.controlledsandbox.framework.activity.ActivityRecreation;
+import com.warden.controlledsandbox.framework.activity.ProcessRecreationOutcome;
 
 /** Broker-owned production adapter for the B2 Activity ledger and one-time route store. */
 public final class BrokerActivityRuntime {
@@ -42,6 +45,8 @@ public final class BrokerActivityRuntime {
     private final ActivityCheckpointTransaction checkpointTransactions;
     private final BrokerStateStore transport;
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
+    /** Consumed routes retained only as process-restart candidates until their task is finalized. */
+    private final ConcurrentMap<String, ConsumedRoute> consumed = new ConcurrentHashMap<>();
     private ActivityTaskCheckpointStore checkpointStore;
     private String checkpointStatus = "DISABLED";
     private ActivityTaskRestoreOutcome restoreOutcome = new ActivityTaskRestoreOutcome(0, 0, 0, 0);
@@ -139,6 +144,17 @@ public final class BrokerActivityRuntime {
     public synchronized Bundle consume(String token, GuestSession session) {
         ActivityLaunchTransaction transaction = pending.get(token);
         if (transaction == null) throw new IllegalStateException("ACTIVITY_TRANSACTION_NOT_FOUND");
+        ConsumedRoute alreadyConsumed = consumed.get(token);
+        if (alreadyConsumed != null) {
+            if (!alreadyConsumed.recoverable) {
+                throw new IllegalStateException("ACTIVITY_ROUTE_ALREADY_CONSUMED");
+            }
+            alreadyConsumed.recoverable = false;
+            Bundle replay = new Bundle(alreadyConsumed.envelope);
+            replay.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
+            addDecision(replay, transaction);
+            return replay;
+        }
         RouteOwner expected = owner(session);
         Optional<RoutePayload> payload = coordinator.consumePayload(transaction, expected);
         if (payload.isEmpty()) {
@@ -147,15 +163,17 @@ public final class BrokerActivityRuntime {
             throw new IllegalStateException("ACTIVITY_ROUTE_EXPIRED_OR_CONSUMED");
         }
         Bundle envelope = transport.consumeRoute(token);
-        pending.remove(token, transaction);
         if (envelope == null) throw new IllegalStateException("ACTIVITY_ROUTE_ENVELOPE_MISSING");
         envelope.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
         addDecision(envelope, transaction);
         envelope.putLong(RuntimeKeys.ROUTE_EXPIRES_AT, payload.get().expiresAtMillis());
+        consumed.put(token, new ConsumedRoute(envelope));
         return envelope;
     }
 
     public synchronized void launchFailed(String token) {
+        ConsumedRoute consumedRoute = consumed.get(token);
+        if (consumedRoute != null && !consumedRoute.recoverable) return;
         ActivityLaunchTransaction transaction = pending.get(token);
         if (transaction != null) {
             LaunchAction action = transaction.decision().action();
@@ -167,6 +185,7 @@ public final class BrokerActivityRuntime {
         }
         transport.removeRoute(token);
         routeStore.revoke(token);
+        consumed.remove(token);
     }
 
     public synchronized Bundle event(GuestSession session, Bundle request) {
@@ -204,6 +223,9 @@ public final class BrokerActivityRuntime {
                         ActivityResultBundleCodec.decode(request));
                 default -> throw new IllegalArgumentException("Unknown activity event: " + event);
             }
+            if ("DESTROYED".equals(event) || "FINISH_RESULT".equals(event)) {
+                releaseActivityRoute(activityToken);
+            }
             out.putInt(RuntimeKeys.ACTIVITY_COUNT, ledger.activityCount());
             out.putInt(RuntimeKeys.TASK_COUNT, ledger.taskCount());
             persistCheckpoint();
@@ -215,16 +237,23 @@ public final class BrokerActivityRuntime {
     }
 
     public synchronized void recreate(GuestSession stale, GuestSession current) {
-        checkpointTransactions.mutate(() -> coordinator.recreateProcessGeneration(
+        final ProcessRecreationOutcome[] outcome = new ProcessRecreationOutcome[1];
+        checkpointTransactions.mutate(() -> outcome[0] = coordinator.recreateProcessGeneration(
                 stale.virtualUserId(), stale.packageName(), stale.processName(),
                 stale.generation(), current.generation()));
-        purgePending(stale);
+        rebindTransactions(stale, current, outcome[0].recreations());
     }
 
     public synchronized void processDisconnected(GuestSession stale) {
-        routeStore.revokeStaleGenerations(stale.virtualUserId(), stale.packageName(), stale.processName(),
-                stale.generation());
-        purgePending(stale);
+        // The framework may recreate a Stub Activity with the original Intent after the Guest
+        // process dies.  Keep accepted routes bounded by their existing TTL and mark consumed
+        // envelopes replayable only for that exact process recovery.
+        for (Map.Entry<String, ConsumedRoute> entry : consumed.entrySet()) {
+            ActivityLaunchTransaction transaction = pending.get(entry.getKey());
+            if (transaction != null && transaction.routeOwner().equals(owner(stale))) {
+                entry.getValue().recoverable = true;
+            }
+        }
     }
 
     public synchronized void invalidate(GuestSession stale) {
@@ -273,8 +302,73 @@ public final class BrokerActivityRuntime {
             if (entry.getValue().routeOwner().equals(owner(stale)) && pending.remove(entry.getKey(), entry.getValue())) {
                 transport.removeRoute(entry.getKey());
                 routeStore.revoke(entry.getKey());
+                consumed.remove(entry.getKey());
             }
         }
+    }
+
+    /** Returns the original bounded route envelope so Broker recovery can rebuild the Guest. */
+    public synchronized Bundle routeForPreparation(String token) {
+        Bundle route = transport.route(token);
+        if (route != null) return route;
+        ConsumedRoute replay = consumed.get(token);
+        return replay == null ? null : new Bundle(replay.envelope);
+    }
+
+    private void rebindTransactions(
+            GuestSession stale,
+            GuestSession current,
+            java.util.List<ActivityRecreation> recreations) {
+        Map<String, String> tokenMap = new LinkedHashMap<>();
+        for (ActivityRecreation recreation : recreations) {
+            tokenMap.put(recreation.previousActivityToken(), recreation.currentActivityToken());
+        }
+        RouteOwner staleOwner = owner(stale);
+        RouteOwner currentOwner = owner(current);
+        for (Map.Entry<String, ActivityLaunchTransaction> entry : pending.entrySet()) {
+            ActivityLaunchTransaction transaction = entry.getValue();
+            if (!transaction.routeOwner().equals(staleOwner)) continue;
+            String currentActivityToken = tokenMap.get(transaction.decision().activityToken());
+            if (currentActivityToken == null) {
+                launchFailed(entry.getKey());
+                continue;
+            }
+            LaunchDecision decision = new LaunchDecision(
+                    transaction.decision().action(), transaction.decision().taskId(),
+                    currentActivityToken, transaction.decision().routeToken(),
+                    transaction.decision().removedActivityCount(),
+                    transaction.decision().createdNewTask());
+            ActivityLaunchTransaction rebound = new ActivityLaunchTransaction(
+                    decision,
+                    new com.warden.controlledsandbox.framework.routing.RouteToken(
+                            transaction.routeToken().value(), transaction.routeToken().expiresAtMillis()),
+                    currentOwner);
+            pending.put(entry.getKey(), rebound);
+            transport.rebindRoute(entry.getKey(), current.generation(), currentActivityToken);
+            ConsumedRoute consumedRoute = consumed.get(entry.getKey());
+            if (consumedRoute != null) {
+                consumedRoute.envelope.putLong(RuntimeKeys.GENERATION, current.generation());
+                consumedRoute.envelope.putString(RuntimeKeys.ACTIVITY_TOKEN, currentActivityToken);
+                consumedRoute.envelope.putString(RuntimeKeys.SESSION_ID, current.sessionId());
+            }
+        }
+    }
+
+    private void releaseActivityRoute(String activityToken) {
+        for (Map.Entry<String, ActivityLaunchTransaction> entry : pending.entrySet()) {
+            if (!entry.getValue().decision().activityToken().equals(activityToken)) continue;
+            pending.remove(entry.getKey(), entry.getValue());
+            consumed.remove(entry.getKey());
+            transport.removeRoute(entry.getKey());
+            routeStore.revoke(entry.getKey());
+        }
+    }
+
+    private static final class ConsumedRoute {
+        private final Bundle envelope;
+        private volatile boolean recoverable;
+
+        private ConsumedRoute(Bundle envelope) { this.envelope = new Bundle(envelope); }
     }
 
     private static void addDecision(Bundle out, ActivityLaunchTransaction transaction) {

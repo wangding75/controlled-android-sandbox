@@ -184,6 +184,43 @@ public final class OneTimeRouteStore {
         return removed;
     }
 
+    /**
+     * Rebinds routes that belong to a process generation which is being recovered.
+     *
+     * <p>A process restart does not invalidate an Activity launch already accepted by
+     * ActivityTaskManager.  The route remains one-time and bounded, but its owner must move
+     * together with the broker-owned virtual process generation.</p>
+     */
+    public synchronized int rebindStaleGenerations(
+            int virtualUserId,
+            String packageName,
+            String processName,
+            long staleGeneration,
+            long newGeneration) {
+        if (virtualUserId < 0) {
+            throw new IllegalArgumentException("virtualUserId must be non-negative");
+        }
+        String normalizedPackage = requireText(packageName, "packageName");
+        String normalizedProcess = requireText(processName, "processName");
+        if (staleGeneration < 1 || newGeneration <= staleGeneration) {
+            throw new IllegalArgumentException("new generation must be greater than stale generation");
+        }
+        int rebound = 0;
+        for (Map.Entry<String, StoredRoute> entry : routes.entrySet()) {
+            StoredRoute route = entry.getValue();
+            RouteOwner owner = route.owner;
+            if (owner.virtualUserId() == virtualUserId
+                    && owner.packageName().equals(normalizedPackage)
+                    && owner.processName().equals(normalizedProcess)
+                    && owner.processGeneration() <= staleGeneration) {
+                entry.setValue(route.withOwner(new RouteOwner(
+                        virtualUserId, normalizedPackage, normalizedProcess, newGeneration)));
+                rebound++;
+            }
+        }
+        return rebound;
+    }
+
     public synchronized int purgeExpired() {
         return purgeExpiredAt(elapsedRealtimeMillis.getAsLong());
     }
@@ -290,6 +327,11 @@ public final class OneTimeRouteStore {
 
         private RoutePayload toPayload() {
             return new RoutePayload(kind, owner, createdAtMillis, expiresAtMillis, metadata, bytes);
+        }
+
+        private StoredRoute withOwner(RouteOwner replacement) {
+            return new StoredRoute(kind, replacement, createdAtMillis, expiresAtMillis,
+                    expiresAtElapsedMillis, metadata, bytes);
         }
     }
 }

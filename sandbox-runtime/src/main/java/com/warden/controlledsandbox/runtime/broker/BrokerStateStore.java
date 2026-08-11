@@ -51,6 +51,22 @@ public final class BrokerStateStore {
 
     public synchronized void removeRoute(String token) { routePayloads.remove(token); }
 
+    public synchronized Bundle route(String token) {
+        Bundle value = routePayloads.get(token);
+        return value == null ? null : new Bundle(value);
+    }
+
+    public synchronized void rebindRoute(String token, long generation, String activityToken) {
+        Bundle value = routePayloads.get(token);
+        if (value == null) return;
+        Bundle updated = new Bundle(value);
+        updated.putLong(RuntimeKeys.GENERATION, generation);
+        if (activityToken != null && !activityToken.trim().isEmpty()) {
+            updated.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+        }
+        routePayloads.put(token, updated);
+    }
+
     synchronized int purgeRoutes(String sessionId, long generation) {
         int removed = 0;
         for (Map.Entry<String, Bundle> entry : routePayloads.entrySet()) {

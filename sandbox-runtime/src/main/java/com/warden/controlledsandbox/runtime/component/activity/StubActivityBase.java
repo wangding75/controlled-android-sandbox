@@ -83,6 +83,12 @@ public abstract class StubActivityBase extends Activity {
     private void queueGrantedRoute(Bundle route, Bundle state) {
         pendingGrantedRoute = new Bundle(route);
         pendingRouteState = state == null ? null : new Bundle(state);
+        // Broker recovery may have advanced the Guest process generation while Android was
+        // recreating this Host trampoline.  The returned route is authoritative; retaining the
+        // stale Intent extras here would make GuestRuntimeEnvironment.require() reject a valid
+        // recovered session.
+        sessionId = value(route.getString(RuntimeKeys.SESSION_ID, sessionId));
+        generation = route.getLong(RuntimeKeys.GENERATION, generation);
         postGuestCreationIfResumed();
     }
 
