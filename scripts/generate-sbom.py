@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
+import os
 import re
 from pathlib import Path
+import subprocess
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,13 +74,48 @@ def component_identity(module_name: str, directory: Path) -> tuple[str, str]:
     return component_type, role
 
 
-def component(project_path: str, module_name: str, directory: Path) -> dict[str, Any]:
+def component_files(module_name: str, directory: Path) -> list[Path]:
+    """Return the bounded, source-controlled file set for a component.
+
+    A worktree can contain very large generated trees under ``build`` and
+    ``.cxx``.  Walking those trees before filtering them is both needlessly
+    expensive on WSL-mounted repositories and can make an evidence digest
+    depend on untracked generated state.  Git is authoritative when present;
+    the pruned walk is only for source archives without Git metadata.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "ls-files", "-z", "--", f"{module_name}/"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        result = None
+    if result is not None and result.stdout:
+        return sorted(
+            [
+                ROOT / relative
+                for relative in result.stdout.decode("utf-8").split("\0")
+                if relative and (ROOT / relative).is_file()
+            ],
+            key=lambda path: path.relative_to(ROOT).as_posix(),
+        )
+
+
     generated_directories = {"build", ".cxx", ".gradle", ".externalNativeBuild"}
-    files = sorted(
-        path for path in directory.rglob("*")
-        if path.is_file()
-        and not any(part in generated_directories for part in path.relative_to(directory).parts)
-    )
+    files: list[Path] = []
+    for current, directories, names in os.walk(directory):
+        directories[:] = sorted(
+            name for name in directories if name not in generated_directories
+        )
+        files.extend(Path(current) / name for name in sorted(names))
+    return sorted(files, key=lambda path: path.relative_to(ROOT).as_posix())
+
+
+def component(project_path: str, module_name: str, directory: Path) -> dict[str, Any]:
+    files = component_files(module_name, directory)
     digest = sha256()
     languages: set[str] = set()
     for path in files:

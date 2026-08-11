@@ -46,7 +46,7 @@
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "5417ce6a9c4b6c25862cbad3c5a17af19d402a38f4a6b9295954377d3c2bbe10"
+      "sourceDigestSha256": "b8f6dd63bf4f687496387d48214cde98721c25c2fcd8426de1d397e9e4ebf3f0"
     },
     {
       "type": "library",
@@ -63,7 +63,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "720b7966784a058c242ac49258e3080d99782e917f105b0e582b967e16d34730"
+      "sourceDigestSha256": "c4a6d250e6e0bca4faed2af13e3626ad208ad4e85161100566f473c96dda160f"
     },
     {
       "type": "library",
@@ -79,7 +79,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "b45ee0b4e85649e3b96ed45cffeb03a11bfe79662d8e7b38b9c7eba1f785d26d"
+      "sourceDigestSha256": "50b10ef98c267755d548766f94fb8156ab9aaff3a5c0b6838acf07d5821cdd4c"
     },
     {
       "type": "library",
@@ -95,7 +95,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "49f25ef3c171597c09b56fdf6b5b241fb5f334ee60c480845e2aa8d72338c361"
+      "sourceDigestSha256": "d73de1386a1e4677a9b25eb698b63b13948bed8d87a6e6b7cd7732bf383626f6"
     },
     {
       "type": "application",
