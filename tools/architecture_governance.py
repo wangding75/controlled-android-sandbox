@@ -49,16 +49,21 @@ def _production_sources(root: Path, commit: str | None = None) -> dict[str, str]
             if not module.is_dir() or not source_root.is_dir():
                 continue
             for path in source_root.rglob('*.java'):
-                result[str(path.relative_to(root))] = path.read_text(encoding='utf-8', errors='ignore')
+                result[path.relative_to(root).as_posix()] = path.read_text(
+                    encoding='utf-8', errors='ignore')
         return dict(sorted(result.items()))
-    names = subprocess.run(['git', 'ls-tree', '-r', '--name-only', commit], cwd=root,
-                           text=True, capture_output=True, check=True).stdout.splitlines()
+    names = subprocess.run(
+        ['git', 'ls-tree', '-r', '--name-only', commit], cwd=root,
+        text=True, encoding='utf-8', errors='replace',
+        capture_output=True, check=True).stdout.splitlines()
     result = {}
     for name in names:
         if not PRODUCTION_PATTERN.match(name):
             continue
-        result[name] = subprocess.run(['git', 'show', f'{commit}:{name}'], cwd=root,
-                                      text=True, capture_output=True, check=True).stdout
+        result[name] = subprocess.run(
+            ['git', 'show', f'{commit}:{name}'], cwd=root,
+            text=True, encoding='utf-8', errors='replace',
+            capture_output=True, check=True).stdout
     return dict(sorted(result.items()))
 
 
@@ -97,11 +102,15 @@ def _module_graph(root: Path, commit: str | None) -> dict[str, set[str]]:
         settings = (root / 'settings.gradle').read_text(encoding='utf-8')
         reader = lambda name: (root / name).read_text(encoding='utf-8') if (root / name).is_file() else ''
     else:
-        settings = subprocess.run(['git', 'show', f'{commit}:settings.gradle'], cwd=root, text=True,
-                                  capture_output=True, check=True).stdout
+        settings = subprocess.run(
+            ['git', 'show', f'{commit}:settings.gradle'], cwd=root,
+            text=True, encoding='utf-8', errors='replace',
+            capture_output=True, check=True).stdout
         def reader(name: str) -> str:
-            result = subprocess.run(['git', 'show', f'{commit}:{name}'], cwd=root, text=True,
-                                    capture_output=True)
+            result = subprocess.run(
+                ['git', 'show', f'{commit}:{name}'], cwd=root,
+                text=True, encoding='utf-8', errors='replace',
+                capture_output=True)
             return result.stdout if result.returncode == 0 else ''
     modules = sorted(set(re.findall(r"include\s+'(:[^']+)'", settings)))
     graph = {module: set() for module in modules}

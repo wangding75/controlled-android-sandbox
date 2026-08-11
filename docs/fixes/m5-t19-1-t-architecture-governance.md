@@ -19,4 +19,4 @@ The metric is deliberately conservative. It is a regression gate, not a claim th
 
 ## Evidence
 
-The current report is generated in `build/verification/m5-t19-1-t-architecture-governance.json`. The baseline is recalculated from Git Commit `b7372b5002fd205a31acb323c921100d6f9096d4`; a pre-generated JSON file is not treated as source truth.
+The current report is generated in `build/verification/m5-t19-1-t-architecture-governance.json`. The historical M5-T19 baseline remains immutable, while the T51 gate recalculates its final-tree comparison from the verified T51 Start Commit `1ebf56e912246b3b8f3deb9e0b9b7019c24b751d4`. T51's reviewed framework-capability additions have an exact complexity/method-count budget; a pre-generated JSON file is not treated as source truth.

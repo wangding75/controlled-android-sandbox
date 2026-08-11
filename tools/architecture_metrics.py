@@ -18,14 +18,15 @@ def live_large_classes(root: Path, threshold: int = 500) -> list[dict[str, objec
     for path in production_java_paths(root):
         count = len(path.read_text(encoding="utf-8", errors="ignore").splitlines())
         if count > threshold:
-            rows.append({"path": str(path.relative_to(root)), "lines": count})
+            rows.append({"path": path.relative_to(root).as_posix(), "lines": count})
     return sorted(rows, key=lambda item: (-int(item["lines"]), str(item["path"])))
 
 
 def commit_large_classes(root: Path, commit: str, threshold: int = 500) -> list[dict[str, object]]:
     names = subprocess.run(
         ["git", "ls-tree", "-r", "--name-only", commit],
-        cwd=root, text=True, capture_output=True, check=True,
+        cwd=root, text=True, encoding="utf-8", errors="replace",
+        capture_output=True, check=True,
     ).stdout.splitlines()
     rows: list[dict[str, object]] = []
     for name in names:
@@ -34,7 +35,8 @@ def commit_large_classes(root: Path, commit: str, threshold: int = 500) -> list[
             continue
         content = subprocess.run(
             ["git", "show", f"{commit}:{name}"],
-            cwd=root, text=True, capture_output=True, check=True,
+            cwd=root, text=True, encoding="utf-8", errors="replace",
+            capture_output=True, check=True,
         ).stdout
         count = len(content.splitlines())
         if count > threshold:
