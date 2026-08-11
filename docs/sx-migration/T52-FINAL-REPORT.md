@@ -17,8 +17,8 @@ The blockers are runtime compatibility failures, not missing APKs, missing authe
 - migration baseline tag: `sandbox-sx-ready-t51`
 - baseline commit: `1590836e473ad95f1941e98e7108d409f48cdeb9`
 - pre-freeze working commit: `d0496c864532c7f6348de2a5611568cdbb214b40`
-- final code commit: `6d891b726f0ae6eea1187089d86f5f6d27529749`
-- final code tree: `6327a8cacb616ef1d1d536788459b26f8c2cfcfe`
+- final code commit: `cdb804247615a6a68a2de7a10084ee98d24748ea`
+- final code tree: `a4c771b3cc9b06c1fc6831445fccb011210224fa`
 
 ## Migration architecture
 
