@@ -21,6 +21,7 @@ PRODUCTION_ROOTS = [
     ROOT / 'sandbox-runtime/src/main', ROOT / 'sandbox-contract/src/main',
 ]
 TARGET_SPECIAL_CASES = ('com.alibaba.android.rimet', 'com.tencent.wework', 'com.ss.android.lark', 'com.lark')
+ALLOWED_TARGET_GATE_ROOT = 'app/src/main/java/com/warden/controlledsandbox/compatibility/dingtalk/'
 UPSTREAM_NAMES = ('virtualapp', 'newblackbox', 'twoyi')
 
 errors: list[str] = []
@@ -38,8 +39,11 @@ for base in PRODUCTION_ROOTS:
         if not source.is_file() or source.suffix.lower() not in {'.java', '.aidl', '.cpp', '.h', '.xml'}:
             continue
         text = source.read_text(encoding='utf-8', errors='ignore').lower()
+        relative = source.relative_to(ROOT).as_posix()
         for package_name in TARGET_SPECIAL_CASES:
-            if package_name in text:
+            isolated_dingtalk_gate = (package_name == 'com.alibaba.android.rimet'
+                    and relative.startswith(ALLOWED_TARGET_GATE_ROOT))
+            if package_name in text and not isolated_dingtalk_gate:
                 errors.append(f'{source.relative_to(ROOT)} contains target-app package special case {package_name}')
         for upstream in UPSTREAM_NAMES:
             if upstream in text:
