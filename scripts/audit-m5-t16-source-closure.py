@@ -99,5 +99,10 @@ report = {
     "referenceFilesModified": 0,
     "frozenCapabilityCategories": 113,
 }
-OUTPUT.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+rendered = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+# This tracked audit is a deterministic baseline.  Avoid rewriting identical
+# bytes: a no-op write changes timestamps across Windows/WSL and makes an
+# otherwise clean verification worktree look dirty.
+if not OUTPUT.is_file() or OUTPUT.read_text(encoding="utf-8-sig") != rendered:
+    OUTPUT.write_text(rendered, encoding="utf-8")
 print(f"PASS wrote {OUTPUT.relative_to(ROOT)}")
