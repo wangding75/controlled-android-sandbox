@@ -54,7 +54,7 @@ def verified_external_evidence(path: Path) -> list[str]:
     """Validate an opt-in native build proof before a POSIX-only aggregate run."""
     errors: list[str] = []
     try:
-        evidence = json.loads(path.read_text(encoding="utf-8"))
+        evidence = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, json.JSONDecodeError) as error:
         return [f"cannot read external Android build evidence: {error}"]
     if evidence.get("status") != "PASS" or evidence.get("exitCode") != 0:
