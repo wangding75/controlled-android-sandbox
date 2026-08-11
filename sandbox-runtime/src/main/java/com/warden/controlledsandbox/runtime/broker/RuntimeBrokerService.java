@@ -196,7 +196,11 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             Bundle transaction = activityRuntime.launch(session, component, prepared, request);
             issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
             Intent launch = new Intent(RuntimeBrokerService.this, RuntimeStubComponents.activityClassFor(session.processSlot()));
-            launch.addFlags(transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, Intent.FLAG_ACTIVITY_NEW_TASK));
+            // The broker is a Service context. Preserve the virtual launch flags
+            // in the transaction, but always mark the host trampoline as a new
+            // task so Android accepts this Service-originated startActivity call.
+            launch.addFlags(transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0)
+                    | Intent.FLAG_ACTIVITY_NEW_TASK);
             launch.putExtra(RuntimeKeys.ROUTE_TOKEN, issuedRouteToken);
             launch.putExtra(RuntimeKeys.SESSION_ID, session.sessionId());
             launch.putExtra(RuntimeKeys.GENERATION, session.generation());

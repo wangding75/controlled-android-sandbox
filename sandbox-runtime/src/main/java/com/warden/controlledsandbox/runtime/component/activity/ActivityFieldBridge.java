@@ -1,6 +1,8 @@
 package com.warden.controlledsandbox.runtime.component.activity;
 
 import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
+import com.warden.controlledsandbox.runtime.guest.GuestActivityInstrumentation;
+import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 
 import android.app.Activity;
 import android.content.ComponentName;
@@ -44,20 +46,36 @@ public final class ActivityFieldBridge {
     }
 
     static BridgeReport install(Activity host, Activity guest,
-                                GuestRuntimeEnvironment.Session session, String componentClass) {
+                                GuestRuntimeEnvironment.Session session, String componentClass,
+                                int callerTaskId) {
         int api = Build.VERSION.SDK_INT;
         if (api < MIN_API || api > MAX_AUDITED_API) {
             throw new IllegalStateException("UNSUPPORTED_ACTIVITY_BRIDGE_API:" + api);
         }
         LinkedHashMap<String, Object> direct = new LinkedHashMap<>();
         direct.put("mApplication", session.application());
+        direct.put("mInstrumentation", new GuestActivityInstrumentation(session.context(), callerTaskId));
         Intent guestIntent = new Intent(host.getIntent());
         guestIntent.setComponent(new ComponentName(session.spec().packageName, componentClass));
         direct.put("mIntent", guestIntent);
         direct.put("mComponent", new ComponentName(session.spec().packageName, componentClass));
         direct.put("mTitle", componentClass.substring(componentClass.lastIndexOf('.') + 1));
-        direct.put("mActivityInfo", guestActivityInfo(host, session, componentClass));
-        return installFields(host, guest, HOST_FIELDS, OPTIONAL_HOST_FIELDS, direct, api);
+        ActivityInfo projectedInfo = guestActivityInfo(host, session, componentClass);
+        direct.put("mActivityInfo", projectedInfo);
+        BridgeReport report = installFields(host, guest, HOST_FIELDS, OPTIONAL_HOST_FIELDS, direct, api);
+        // ActivityThread's current ActivityClientRecord normally retains the same
+        // ActivityInfo object that the host Stub received at attach time. Project
+        // that internal record too, so framework/app checks observe the virtual
+        // component instead of the private Stub declaration.
+        Field hostInfo = requireField(host.getClass(), "mActivityInfo");
+        hostInfo.setAccessible(true);
+        try {
+            hostInfo.set(host, projectedInfo);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_HOST_INFO_PROJECTION_FAILED", error);
+        }
+        return report;
     }
 
     /**
@@ -83,6 +101,20 @@ public final class ActivityFieldBridge {
             projected.name = componentClass;
             projected.processName = guestApplication.processName == null
                     ? session.spec().packageName : guestApplication.processName;
+            for (VirtualComponentSnapshot component : session.spec().packageState().components()) {
+                if (!"ACTIVITY".equals(component.type())
+                        || !componentClass.equals(component.className())) continue;
+                // A Stub Activity's framework metadata describes the host trampoline,
+                // not the Guest component. Project the virtual package authority's
+                // exported/enabled/security identity onto the Guest Activity.
+                projected.exported = component.exported();
+                projected.enabled = component.enabled();
+                projected.permission = component.permission().isEmpty()
+                        ? null : component.permission();
+                projected.processName = component.processName().isEmpty()
+                        ? projected.processName : component.processName();
+                break;
+            }
             return projected;
         } catch (RuntimeException error) {
             throw error;
@@ -109,7 +141,16 @@ public final class ActivityFieldBridge {
                 source.setAccessible(true);
                 target.setAccessible(true);
                 Object value = source.get(host);
-                ensureAssignable(target, value, name);
+                if (!assignable(target, value)) {
+                    if ("mFragments".equals(name)) {
+                        // AndroidX FragmentActivity owns a different FragmentController type;
+                        // its guest-side controller must not be replaced with the host platform
+                        // controller. Keep the mismatch visible in the bridge report.
+                        optionalMissing.add(name + ":TYPE_MISMATCH");
+                        continue;
+                    }
+                    ensureAssignable(target, value, name);
+                }
                 writes.add(new Write(target, guest, target.get(guest), value));
             }
             for (String name : optionalHostFields) {
@@ -162,10 +203,14 @@ public final class ActivityFieldBridge {
     }
 
     private static void ensureAssignable(Field field, Object value, String name) {
-        if (value != null && !boxed(field.getType()).isInstance(value)) {
+        if (!assignable(field, value)) {
             throw new IllegalStateException("ACTIVITY_FIELD_TYPE_MISMATCH:" + name
                     + ":" + field.getType().getName() + "<-" + value.getClass().getName());
         }
+    }
+
+    private static boolean assignable(Field field, Object value) {
+        return value == null || boxed(field.getType()).isInstance(value);
     }
 
     private static Class<?> boxed(Class<?> type) {

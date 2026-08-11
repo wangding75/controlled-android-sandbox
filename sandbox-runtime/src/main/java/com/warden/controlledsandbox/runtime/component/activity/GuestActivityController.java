@@ -47,7 +47,8 @@ public final class GuestActivityController {
             if (!Activity.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not an Activity: " + componentClass);
             guest = (Activity) type.getDeclaredConstructor().newInstance();
             attachBaseContext(guest);
-            ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(host, guest, session, componentClass);
+            ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(
+                    host, guest, session, componentClass, taskId);
             guest.setIntent(launchIntent == null ? new Intent() : new Intent(launchIntent));
             invokeLifecycle(guest, "onCreate", new Class<?>[]{Bundle.class}, new Object[]{state});
             created = true;

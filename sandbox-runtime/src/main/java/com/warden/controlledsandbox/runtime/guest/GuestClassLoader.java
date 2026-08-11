@@ -2,7 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
-import dalvik.system.DexClassLoader;
+import dalvik.system.PathClassLoader;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Note: This ClassLoader is intentionally NOT registered as parallel-capable and uses instance-level
  * synchronization (synchronized (this)) to maintain consistent non-parallel ClassLoader monitor semantics.
  */
-public final class GuestClassLoader extends DexClassLoader {
+public final class GuestClassLoader extends PathClassLoader {
     private static final String SANDBOX_ROOT = "com.warden.controlledsandbox.";
     private static final List<String> HOST_INTERNAL_PREFIXES = List.of(
             SANDBOX_ROOT + "runtime.",
@@ -42,7 +42,7 @@ public final class GuestClassLoader extends DexClassLoader {
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent, String guestPackageName,
                      List<String> declaredGuestClasses) {
-        super(dexPath, optimizedDirectory, librarySearchPath, parent);
+        super(dexPath, librarySearchPath, parent);
         this.guestPackageName = normalizePackageName(guestPackageName);
         this.declaredGuestNamespaces = guestNamespaces(declaredGuestClasses);
     }
@@ -70,16 +70,21 @@ public final class GuestClassLoader extends DexClassLoader {
             Class<?> loaded = findLoadedClass(name);
             if (loaded == null) {
                 if (isParentFirst(name)) {
-                    loaded = getParent().loadClass(name);
-                } else {
                     try {
-                        loaded = findClass(name);
-                    } catch (ClassNotFoundException guestMiss) {
                         loaded = getParent().loadClass(name);
+                    } catch (ClassNotFoundException hostMiss) {
+                        // Parent-first means the Host version wins when present; a Guest APK
+                        // may still carry its own AndroidX/compat implementation when the Host
+                        // does not provide that API.
+                        loaded = findClass(name);
                     }
+                } else {
+                    // Let the platform PathClassLoader perform its normal APK/multi-dex lookup;
+                    // the explicit policy checks above still run before any guest class request.
+                    loaded = super.loadClass(name, resolve);
                 }
             }
-            if (resolve) resolveClass(loaded);
+            if (resolve && loaded.getClassLoader() == this) resolveClass(loaded);
             return loaded;
         }
     }
@@ -162,7 +167,7 @@ public final class GuestClassLoader extends DexClassLoader {
         if (name == null) return true;
         return name.startsWith("java.") || name.startsWith("javax.")
                 || name.startsWith("android.") || name.startsWith("androidx.")
-                || name.startsWith("kotlin.") || name.startsWith("dalvik.")
+                || name.startsWith("dalvik.")
                 || name.startsWith("sun.") || name.startsWith("com.android.")
                 || name.startsWith("com.warden.controlledsandbox.contract.");
     }

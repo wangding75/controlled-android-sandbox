@@ -150,6 +150,8 @@ public final class GuestPackageSpec {
         }
     }
 
+    public VirtualPackageStateSnapshot packageState() { return packageState; }
+
     File apkFile() { return new File(apkPath); }
     File dataRootFile() { return new File(dataRoot); }
     String dexPath() {

@@ -178,6 +178,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     @Override public void startActivity(Intent intent, Bundle options) {
         componentRouter.startActivity(intent, options);
     }
+    void startActivityFromActivity(Intent intent, Bundle options, int callerTaskId) {
+        componentRouter.startActivity(intent, options, callerTaskId);
+    }
     @Override public void startActivities(Intent[] intents) { startActivities(intents, null); }
     @Override public void startActivities(Intent[] intents, Bundle options) {
         if (intents == null) throw new IllegalArgumentException("intents is required");

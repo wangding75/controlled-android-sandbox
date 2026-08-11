@@ -54,6 +54,8 @@ public final class GuestClassLoaderSelfTest {
                 "Guest-safe runtime contract remains available");
         require(!GuestClassLoader.isParentFirst("com.example.guest.MainActivity"), "Guest child first");
         require(!GuestClassLoader.isParentFirst("org.example.library.Client"), "Guest libraries child first");
+        require(!GuestClassLoader.isParentFirst("kotlin.jvm.internal.Intrinsics"),
+                "Guest Kotlin runtime child first");
         require(!GuestClassLoader.isParentFirst(
                 "com.warden.controlledsandbox.fixture.FixtureApplication"),
                 "official Fixture is child first");

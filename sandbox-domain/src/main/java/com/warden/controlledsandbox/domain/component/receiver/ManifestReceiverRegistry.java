@@ -22,7 +22,12 @@ public final class ManifestReceiverRegistry {
     public static final int MAX_FILTERS_PER_RECEIVER = 128;
     public static final int MAX_ACTIONS_PER_RECEIVER = 128;
     public static final int MAX_CATEGORIES_PER_FILTER = 128;
-    public static final int MAX_DATA_RULES_PER_FILTER = 128;
+    /**
+     * Large production manifests commonly enumerate many scheme/authority/path combinations in
+     * one filter. Keep a hard cap for bounded broker state, but do not reject those valid static
+     * filters at the much smaller legacy fixture-oriented limit.
+     */
+    public static final int MAX_DATA_RULES_PER_FILTER = 1024;
 
     private final Map<String, PackageRecord> packages = new LinkedHashMap<>();
     private final Map<String, List<ReceiverRef>> actionIndex = new LinkedHashMap<>();

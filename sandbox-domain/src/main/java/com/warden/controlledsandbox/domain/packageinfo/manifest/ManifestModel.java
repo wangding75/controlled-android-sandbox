@@ -61,10 +61,21 @@ public final class ManifestModel {
         return Collections.unmodifiableList(instrumentations);
     }
 
-    public void addActivity(Component component) { activities.add(component); }
-    public void addService(Component component) { services.add(component); }
-    public void addReceiver(Component component) { receivers.add(component); }
-    public void addProvider(Component component) { providers.add(component); }
+    public void addActivity(Component component) { addComponent(activities, component); }
+    public void addService(Component component) { addComponent(services, component); }
+    public void addReceiver(Component component) { addComponent(receivers, component); }
+    public void addProvider(Component component) { addComponent(providers, component); }
+
+    private static void addComponent(List<Component> target, Component component) {
+        if (component == null) return;
+        for (Component existing : target) {
+            if (existing.className().equals(component.className())) {
+                existing.mergeFrom(component);
+                return;
+            }
+        }
+        target.add(component);
+    }
 
     /** Backward-compatible shorthand for a required Java uses-library declaration. */
     public void addSharedLibrary(String library) {
@@ -310,6 +321,57 @@ public final class ManifestModel {
         public boolean hasIntentFilter() { return intentFilterDeclared; }
         public boolean launcher() { return launcher; }
         public void launcher(boolean value) { launcher = value; }
+
+        /**
+         * Android package parsing exposes one component record even when an APK
+         * repeats an identical declaration (commonly across split/merged manifests).
+         * Preserve the first declaration's structural attributes and union the
+         * declaration-level actions, filters, and provider rules.
+         */
+        public void mergeFrom(Component other) {
+            if (other == null) return;
+            if (!className.equals(other.className)) {
+                throw new IllegalArgumentException("Cannot merge different components");
+            }
+            if (!processName.equals(other.processName)
+                    || exported != other.exported
+                    || exportedExplicit != other.exportedExplicit
+                    || enabled != other.enabled
+                    || isolatedProcess != other.isolatedProcess
+                    || !authorities.equals(other.authorities)
+                    || !permission.equals(other.permission)
+                    || !readPermission.equals(other.readPermission)
+                    || !writePermission.equals(other.writePermission)
+                    || grantUriPermissions != other.grantUriPermissions) {
+                throw new IllegalArgumentException(
+                        "Conflicting duplicate component declaration: " + className);
+            }
+            for (String action : other.actions) addAction(action);
+            for (IntentFilter filter : other.intentFilters) mergeIntentFilter(filter);
+            for (ProviderPathRule rule : other.providerPathRules) {
+                boolean present = false;
+                for (ProviderPathRule existing : providerPathRules) {
+                    if (existing.sameAs(rule)) {
+                        present = true;
+                        break;
+                    }
+                }
+                if (!present) providerPathRules.add(rule);
+            }
+            launcher |= other.launcher;
+            intentFilterDeclared |= other.intentFilterDeclared;
+        }
+
+        private void mergeIntentFilter(IntentFilter other) {
+            for (IntentFilter existing : intentFilters) {
+                if (existing.sameAs(other)) return;
+            }
+            IntentFilter copy = new IntentFilter(other.priority);
+            copy.actions.addAll(other.actions);
+            copy.categories.addAll(other.categories);
+            copy.dataRules.addAll(other.dataRules);
+            intentFilters.add(copy);
+        }
     }
 
     public static final class ProviderPathRule {
@@ -341,6 +403,15 @@ public final class ManifestModel {
         public String readPermission() { return readPermission; }
         public String writePermission() { return writePermission; }
         public boolean uriGrantRule() { return uriGrantRule; }
+
+        private boolean sameAs(ProviderPathRule other) {
+            return path.equals(other.path)
+                    && pathPrefix.equals(other.pathPrefix)
+                    && pathPattern.equals(other.pathPattern)
+                    && readPermission.equals(other.readPermission)
+                    && writePermission.equals(other.writePermission)
+                    && uriGrantRule == other.uriGrantRule;
+        }
     }
 
     public static final class IntentFilter {
@@ -350,8 +421,12 @@ public final class ManifestModel {
         private final List<DataRule> dataRules = new ArrayList<>();
 
         IntentFilter(int priority) {
-            if (priority < -1000 || priority > 1000) throw new IllegalArgumentException("intent-filter priority out of range");
-            this.priority = priority;
+            // Android's package parser bounds manifest priorities before exposing
+            // them to IntentFilter consumers. Keep the same boundary behavior so
+            // installed APKs with a saturated/resource-backed value remain
+            // importable, while all later resolver and Binder snapshots still
+            // receive a bounded priority.
+            this.priority = Math.max(-1000, Math.min(1000, priority));
         }
 
         public int priority() { return priority; }
@@ -361,6 +436,16 @@ public final class ManifestModel {
         public void addAction(String action) { addNonBlank(actions, action); }
         public void addCategory(String category) { addNonBlank(categories, category); }
         public void addDataRule(DataRule rule) { if (rule != null) dataRules.add(rule); }
+
+        private boolean sameAs(IntentFilter other) {
+            if (other == null || priority != other.priority
+                    || !actions.equals(other.actions) || !categories.equals(other.categories)
+                    || dataRules.size() != other.dataRules.size()) return false;
+            for (int i = 0; i < dataRules.size(); i++) {
+                if (!dataRules.get(i).sameAs(other.dataRules.get(i))) return false;
+            }
+            return true;
+        }
     }
 
     public static final class DataRule {
@@ -390,6 +475,12 @@ public final class ManifestModel {
         public boolean empty() {
             return scheme.isEmpty() && host.isEmpty() && path.isEmpty() && pathPrefix.isEmpty()
                     && pathPattern.isEmpty() && mimeType.isEmpty();
+        }
+
+        private boolean sameAs(DataRule other) {
+            return other != null && scheme.equals(other.scheme) && host.equals(other.host)
+                    && path.equals(other.path) && pathPrefix.equals(other.pathPrefix)
+                    && pathPattern.equals(other.pathPattern) && mimeType.equals(other.mimeType);
         }
     }
 

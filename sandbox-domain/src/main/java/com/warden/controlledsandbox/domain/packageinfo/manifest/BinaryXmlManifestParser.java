@@ -112,8 +112,11 @@ public final class BinaryXmlManifestParser {
                 model.addActivity(component);
             }
             case "activity-alias" -> {
-                String target = element.stringAttr("targetActivity");
-                ManifestModel.Component component = component(model, element, target.trim().isEmpty() ? element.stringAttr("name") : target);
+                // An alias is a distinct manifest component. Using targetActivity
+                // as its identity collapses a legitimate alias+activity pair
+                // (common in browser launchers) into a false duplicate.
+                ManifestModel.Component component = component(model, element,
+                        element.stringAttr("name"));
                 element.component = component;
                 model.addActivity(component);
             }

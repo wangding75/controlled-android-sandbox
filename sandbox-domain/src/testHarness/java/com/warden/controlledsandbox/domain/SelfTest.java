@@ -124,6 +124,9 @@ public final class SelfTest {
         require(model.receivers().get(0).intentFilters().size() == 1, "receiver intent filter");
         ManifestModel.IntentFilter receiverFilter = model.receivers().get(0).intentFilters().get(0);
         require(receiverFilter.priority() == 250, "receiver priority");
+        require(new ManifestModel.Component("com.example.Clamped", "", true, true,
+                        false, "", "").addIntentFilter(Integer.MAX_VALUE).priority() == 1000,
+                "manifest priority is clamped at the Android upper bound");
         require(receiverFilter.categories().contains("android.intent.category.DEFAULT"), "receiver category");
         require(receiverFilter.dataRules().size() == 2
                         && "content".equals(receiverFilter.dataRules().get(0).scheme())
@@ -149,6 +152,22 @@ public final class SelfTest {
         require("com.example.APP_COMPONENT".equals(model.receivers().get(1).permission()),
                 "application permission inheritance");
         require("com.example.guest.data".equals(model.providers().get(0).authorities()), "provider authority");
+
+        ManifestModel duplicateModel = new ManifestModel();
+        ManifestModel.Component first = new ManifestModel.Component(
+                "com.example.guest.DuplicateService", "", false, true, false, "", "");
+        first.addAction("com.example.DUPLICATE");
+        first.addIntentFilter(123).addAction("com.example.DUPLICATE");
+        ManifestModel.Component duplicate = new ManifestModel.Component(
+                "com.example.guest.DuplicateService", "", false, true, false, "", "");
+        duplicate.addAction("com.example.DUPLICATE");
+        duplicate.addIntentFilter(123).addAction("com.example.DUPLICATE");
+        duplicateModel.addService(first);
+        duplicateModel.addService(duplicate);
+        require(duplicateModel.services().size() == 1
+                        && duplicateModel.services().get(0).actions().size() == 1
+                        && duplicateModel.services().get(0).intentFilters().size() == 1,
+                "identical duplicate component declarations merge deterministically");
     }
 
     private static void testSharedLibraryResolution() {

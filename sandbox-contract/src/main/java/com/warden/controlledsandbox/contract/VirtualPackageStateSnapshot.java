@@ -2,12 +2,18 @@ package com.warden.controlledsandbox.contract;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 /** Immutable package/component/permission/AppOps state for one virtual user. */
 public final class VirtualPackageStateSnapshot implements Parcelable {
+    private static final int PARCEL_MAGIC = 0x43535053;
+    private static final int MAX_UNCOMPRESSED_PARCEL_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_COMPRESSED_PARCEL_BYTES = 8 * 1024 * 1024;
     private final String packageName;
     private final int virtualUserId;
     private final String label;
@@ -120,6 +126,10 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     }
 
     private VirtualPackageStateSnapshot(Parcel in) {
+        this(readSnapshot(in));
+    }
+
+    private VirtualPackageStateSnapshot(Parcel in, boolean raw) {
         this(in.readString(), in.readInt(), in.readString(), in.readString(), in.readLong(),
                 in.readString(), in.readString(), in.readString(), in.readString(),
                 in.readInt() != 0, in.readLong(), in.readLong(), in.readString(),
@@ -129,6 +139,15 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                 in.createTypedArrayList(VirtualComponentSnapshot.CREATOR),
                 in.createTypedArrayList(VirtualPermissionSnapshot.CREATOR),
                 in.createTypedArrayList(PackageAppOpSnapshot.CREATOR));
+    }
+
+    private VirtualPackageStateSnapshot(VirtualPackageStateSnapshot source) {
+        this(source.packageName, source.virtualUserId, source.label, source.versionName,
+                source.versionCode, source.signatureSha256, source.apkSha256,
+                source.launchActivity, source.applicationClass, source.enabled,
+                source.firstInstallTime, source.lastUpdateTime, source.installerPackageName,
+                source.splitNames, source.sharedLibraries, source.sharedLibraryDetails,
+                source.instrumentations, source.components, source.permissions, source.appOps);
     }
 
     public String packageName() { return packageName; }
@@ -157,6 +176,26 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     public List<PackageAppOpSnapshot> appOps() { return Collections.unmodifiableList(appOps); }
 
     @Override public void writeToParcel(Parcel out, int flags) {
+        Parcel payload = Parcel.obtain();
+        try {
+            writeRawContents(payload, flags);
+            byte[] raw = payload.marshall();
+            if (raw.length > MAX_UNCOMPRESSED_PARCEL_BYTES) {
+                throw new IllegalArgumentException("Package state parcel is too large");
+            }
+            byte[] compressed = compress(raw);
+            if (compressed.length > MAX_COMPRESSED_PARCEL_BYTES) {
+                throw new IllegalArgumentException("Compressed package state parcel is too large");
+            }
+            out.writeInt(PARCEL_MAGIC);
+            out.writeInt(raw.length);
+            out.writeByteArray(compressed);
+        } finally {
+            payload.recycle();
+        }
+    }
+
+    private void writeRawContents(Parcel out, int flags) {
         out.writeString(packageName); out.writeInt(virtualUserId); out.writeString(label);
         out.writeString(versionName); out.writeLong(versionCode); out.writeString(signatureSha256);
         out.writeString(apkSha256); out.writeString(launchActivity); out.writeString(applicationClass);
@@ -176,6 +215,73 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
             return new VirtualPackageStateSnapshot[size];
         }
     };
+
+    private static VirtualPackageStateSnapshot readSnapshot(Parcel in) {
+        if (in.readInt() != PARCEL_MAGIC) {
+            throw new IllegalArgumentException("Unsupported package state parcel format");
+        }
+        int rawLength = in.readInt();
+        byte[] compressed = in.createByteArray();
+        if (rawLength < 0 || rawLength > MAX_UNCOMPRESSED_PARCEL_BYTES
+                || compressed == null || compressed.length > MAX_COMPRESSED_PARCEL_BYTES) {
+            throw new IllegalArgumentException("Invalid package state parcel bounds");
+        }
+        byte[] raw = decompress(compressed, rawLength);
+        Parcel payload = Parcel.obtain();
+        try {
+            payload.unmarshall(raw, 0, raw.length);
+            payload.setDataPosition(0);
+            return new VirtualPackageStateSnapshot(payload, true);
+        } finally {
+            payload.recycle();
+        }
+    }
+
+    private static byte[] compress(byte[] raw) {
+        Deflater deflater = new Deflater(Deflater.BEST_SPEED);
+        try {
+            deflater.setInput(raw);
+            deflater.finish();
+            ByteArrayOutputStream output = new ByteArrayOutputStream(raw.length);
+            byte[] buffer = new byte[16 * 1024];
+            while (!deflater.finished()) output.write(buffer, 0, deflater.deflate(buffer));
+            return output.toByteArray();
+        } finally {
+            deflater.end();
+        }
+    }
+
+    private static byte[] decompress(byte[] compressed, int expectedLength) {
+        Inflater inflater = new Inflater();
+        try {
+            inflater.setInput(compressed);
+            ByteArrayOutputStream output = new ByteArrayOutputStream(expectedLength);
+            byte[] buffer = new byte[16 * 1024];
+            while (!inflater.finished()) {
+                if (inflater.needsDictionary() || inflater.needsInput()) {
+                    throw new IllegalArgumentException("Invalid compressed package state parcel");
+                }
+                int count = inflater.inflate(buffer);
+                if (count == 0) {
+                    if (output.size() >= expectedLength && inflater.finished()) break;
+                    throw new IllegalArgumentException("Invalid compressed package state parcel");
+                }
+                output.write(buffer, 0, count);
+                if (output.size() > expectedLength) {
+                    throw new IllegalArgumentException("Package state parcel expands beyond bounds");
+                }
+            }
+            byte[] raw = output.toByteArray();
+            if (raw.length != expectedLength) {
+                throw new IllegalArgumentException("Package state parcel length mismatch");
+            }
+            return raw;
+        } catch (java.util.zip.DataFormatException error) {
+            throw new IllegalArgumentException("Invalid compressed package state parcel", error);
+        } finally {
+            inflater.end();
+        }
+    }
 
     private static ArrayList<String> validatedNames(List<String> input, String name, int maximum) {
         ArrayList<String> output = new ArrayList<>();

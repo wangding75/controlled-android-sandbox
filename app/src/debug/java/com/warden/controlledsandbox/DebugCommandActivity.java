@@ -19,12 +19,6 @@ import org.json.JSONObject;
 /** Debug-build-only ADB entrypoint for deterministic emulator gates. */
 public final class DebugCommandActivity extends Activity {
     private static final String TAG = "CS_COMMAND";
-    private static final String DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED =
-            "DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED";
-    private static final String FIXTURE_BASIC_PACKAGE =
-            "com.warden.controlledsandbox.fixture";
-    private static final String FIXTURE_32_PACKAGE =
-            "com.warden.controlledsandbox.fixture32";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
 
     @Override protected void onCreate(Bundle state) {
@@ -48,9 +42,6 @@ public final class DebugCommandActivity extends Activity {
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("startedAt", System.currentTimeMillis());
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
-            if (trustNativeGuest && !isOfficialFixture(packageName)) {
-                throw new SecurityException(DEBUG_NATIVE_TRUST_PACKAGE_NOT_ALLOWED);
-            }
             packages = new PackageServiceClient(this);
             SandboxRecord record = packages.findRecord(packageName);
             boolean importRequested = "import-launch".equals(command)
@@ -59,14 +50,27 @@ public final class DebugCommandActivity extends Activity {
                 ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
                 File source = new File(installed.sourceDir);
                 record = trustNativeGuest
-                        ? trustedNativeFixtureImport(packages, packageName, source)
+                        ? trustedNativeImport(packages, packageName, source)
                         : packages.importApkFile(source);
             }
             result.put("nativeGuestTrust", record.nativeGuestTrust);
             packages.ensureInstance(packageName, virtualUserId);
             runtime = new RuntimeClient(this);
             Bundle operation;
-            if ("import-launch".equals(command) || "launch".equals(command)) {
+            if ("stop".equals(command)) {
+                runtime.stop(record, virtualUserId);
+                operation = new Bundle();
+                operation.putString(RuntimeKeys.STATUS, "STOPPED");
+            } else if ("clear".equals(command)) {
+                packages.clearInstanceData(packageName, virtualUserId);
+                operation = new Bundle();
+                operation.putString(RuntimeKeys.STATUS, "CLEARED");
+            } else if ("delete".equals(command)) {
+                runtime.stop(record, virtualUserId);
+                packages.deleteInstance(packageName, virtualUserId);
+                operation = new Bundle();
+                operation.putString(RuntimeKeys.STATUS, "DELETED");
+            } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
                 requireStatus("launch", operation, "LAUNCH_REQUESTED");
             } else if ("component-suite".equals(command)) {
@@ -88,6 +92,7 @@ public final class DebugCommandActivity extends Activity {
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
             } else if ("prepare".equals(command) || "import-prepare".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
+                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
             } else {
                 throw new IllegalArgumentException("Unsupported command: " + command);
             }
@@ -109,7 +114,7 @@ public final class DebugCommandActivity extends Activity {
                 result.put("status", "FAIL").put("errorType", error.getClass().getName())
                         .put("errorMessage", String.valueOf(error.getMessage()));
             } catch (Exception ignored) { }
-            Log.e(TAG, "FAIL " + command + " " + packageName + " " + error);
+            Log.e(TAG, "FAIL " + command + " " + packageName, error);
         } finally {
             if (runtime != null) runtime.close();
             if (packages != null) packages.close();
@@ -118,12 +123,13 @@ public final class DebugCommandActivity extends Activity {
         }
     }
 
-    private static boolean isOfficialFixture(String packageName) {
-        return FIXTURE_BASIC_PACKAGE.equals(packageName) || FIXTURE_32_PACKAGE.equals(packageName);
-    }
-
-    private static SandboxRecord trustedNativeFixtureImport(PackageServiceClient packages,
-                                                              String packageName, File source)
+    /**
+     * Debug-only management command: the caller must explicitly opt in with
+     * trustNativeGuest=true. The persisted install session still requires
+     * USER_ACTION_REQUIRED, and Runtime keeps enforcing the stored trust state.
+     */
+    private static SandboxRecord trustedNativeImport(PackageServiceClient packages,
+                                                      String packageName, File source)
             throws Exception {
         int sessionId = -1;
         try {

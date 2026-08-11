@@ -33,9 +33,14 @@ final class GuestContextComponentRouter {
     }
 
     void startActivity(Intent intent, Bundle options) {
+        startActivity(intent, options, 0);
+    }
+
+    void startActivity(Intent intent, Bundle options, int callerTaskId) {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.ACTIVITY);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
+        if (callerTaskId > 0) request.putInt(RuntimeKeys.CALLER_TASK_ID, callerTaskId);
         if (options != null) request.putBundle("activityOptions", new Bundle(options));
         bridge.launchActivity(request);
     }

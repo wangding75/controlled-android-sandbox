@@ -9,7 +9,7 @@ import java.util.ArrayList;
 /** Bounded wire encoding for dynamically registered Android IntentFilter metadata. */
 final class GuestIntentFilterWireCodec {
     private static final int MAX_VALUES = 128;
-    private static final int MAX_DATA_RULES = 256;
+    private static final int MAX_DATA_RULES = 1024;
 
     private GuestIntentFilterWireCodec() { }
 

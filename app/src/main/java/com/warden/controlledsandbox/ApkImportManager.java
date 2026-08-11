@@ -531,8 +531,10 @@ final class ApkImportManager {
         ManifestSet out = new ManifestSet();
         for (InspectedArtifact artifact : artifacts) {
             ManifestModel manifest = artifact.manifest;
-            out.activities.addAll(manifest.activities()); out.services.addAll(manifest.services());
-            out.receivers.addAll(manifest.receivers()); out.providers.addAll(manifest.providers());
+            appendComponents(out.activities, manifest.activities());
+            appendComponents(out.services, manifest.services());
+            appendComponents(out.receivers, manifest.receivers());
+            appendComponents(out.providers, manifest.providers());
             out.permissions.addAll(manifest.permissions()); out.sharedLibraries.addAll(manifest.sharedLibraries());
             if (artifact.base()) out.launcherActivity = manifest.launcherActivity();
             else if (out.launcherActivity.isEmpty() && !manifest.launcherActivity().isEmpty()) {
@@ -540,6 +542,15 @@ final class ApkImportManager {
             }
         }
         return out;
+    }
+
+    private static void appendComponents(List<ManifestModel.Component> target,
+                                         List<ManifestModel.Component> incoming) {
+        for (ManifestModel.Component component : incoming) {
+            ManifestModel.Component existing = componentByClass(target, component.className());
+            if (existing == null) target.add(component);
+            else existing.mergeFrom(component);
+        }
     }
 
     private static InspectedArtifact baseArtifact(List<InspectedArtifact> artifacts) {

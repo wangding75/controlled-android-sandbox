@@ -51,7 +51,7 @@ public final class RuntimeOperationTransport {
             String code = errorType.isEmpty() ? "RUNTIME_OPERATION_FAILED" : boundedCode(errorType);
             String message = payload.getString(RuntimeKeys.ERROR_MESSAGE, status);
             return RuntimeOperationResult.failure(request, status,
-                    new SandboxError(code, message, retryable(code)), payload);
+                    new SandboxError(code, boundedMessage(message), retryable(code)), payload);
         }
         return RuntimeOperationResult.success(request, status, payload);
     }
@@ -67,7 +67,7 @@ public final class RuntimeOperationTransport {
         payload.putString(RuntimeKeys.ERROR_TYPE, code);
         payload.putString(RuntimeKeys.ERROR_MESSAGE, message);
         return RuntimeOperationResult.failure(request, "FAILED",
-                new SandboxError(code, message, retryable(code)), payload);
+                new SandboxError(code, boundedMessage(message), retryable(code)), payload);
     }
 
     public static Bundle toLegacyBundle(RuntimeOperationResult result) {
@@ -106,6 +106,11 @@ public final class RuntimeOperationTransport {
                 : value.replaceAll("[^A-Za-z0-9_.-]", "_");
         if (normalized.isEmpty()) normalized = "RUNTIME_OPERATION_FAILED";
         return normalized.length() <= 64 ? normalized : normalized.substring(0, 64);
+    }
+
+    private static String boundedMessage(String value) {
+        String normalized = value == null ? "" : value;
+        return normalized.length() <= 512 ? normalized : normalized.substring(0, 512);
     }
 
     private static boolean retryable(String code) {

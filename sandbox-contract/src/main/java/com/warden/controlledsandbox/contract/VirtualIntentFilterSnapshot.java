@@ -9,6 +9,8 @@ import java.util.List;
 
 /** Typed intent-filter metadata supplied by the Binder-owned package authority. */
 public final class VirtualIntentFilterSnapshot implements Parcelable {
+    public static final int MAX_DATA_RULES = 1024;
+
     private final int priority;
     private final ArrayList<String> actions;
     private final ArrayList<String> categories;
@@ -24,7 +26,9 @@ public final class VirtualIntentFilterSnapshot implements Parcelable {
         this.actions = names(actions, "action", 256);
         this.categories = names(categories, "category", 256);
         this.data = new ArrayList<>(data == null ? List.of() : data);
-        if (this.data.size() > 256) throw new IllegalArgumentException("Too many data rules");
+        if (this.data.size() > MAX_DATA_RULES) {
+            throw new IllegalArgumentException("Too many data rules");
+        }
     }
 
     private VirtualIntentFilterSnapshot(Parcel in) {

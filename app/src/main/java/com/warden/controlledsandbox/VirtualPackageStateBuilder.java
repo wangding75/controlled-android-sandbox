@@ -179,14 +179,31 @@ final class VirtualPackageStateBuilder {
             } else if (set.launcherActivity.isEmpty() && !manifest.launcherActivity().isEmpty()) {
                 set.launcherActivity = manifest.launcherActivity();
             }
-            set.activities.addAll(manifest.activities()); set.services.addAll(manifest.services());
-            set.receivers.addAll(manifest.receivers()); set.providers.addAll(manifest.providers());
+            appendComponents(set.activities, manifest.activities());
+            appendComponents(set.services, manifest.services());
+            appendComponents(set.receivers, manifest.receivers());
+            appendComponents(set.providers, manifest.providers());
             set.permissions.addAll(manifest.permissions()); set.sharedLibraries.addAll(manifest.sharedLibraries());
             set.sharedLibraryDependencies.addAll(manifest.sharedLibraryDependencies());
             set.providedSharedLibraries.addAll(manifest.providedSharedLibraries());
             set.instrumentations.addAll(manifest.instrumentations());
         }
         return set;
+    }
+
+    private static void appendComponents(List<ManifestModel.Component> target,
+                                         List<ManifestModel.Component> incoming) {
+        for (ManifestModel.Component component : incoming) {
+            ManifestModel.Component existing = null;
+            for (ManifestModel.Component candidate : target) {
+                if (candidate.className().equals(component.className())) {
+                    existing = candidate;
+                    break;
+                }
+            }
+            if (existing == null) target.add(component);
+            else existing.mergeFrom(component);
+        }
     }
 
     private List<SharedLibraryResolver.AvailableLibrary> availableLibraries(

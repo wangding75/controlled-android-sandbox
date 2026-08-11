@@ -7,11 +7,12 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
 import android.app.Application;
 import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Process;
 import com.warden.controlledsandbox.framework.core.FrameworkHooks;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
@@ -41,6 +42,9 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 /** Process-local runtime. One Android guest process hosts exactly one generation at a time. */
@@ -51,6 +55,40 @@ public final class GuestRuntimeEnvironment {
     private GuestRuntimeEnvironment() { }
 
     static Bundle prepare(Context host, GuestPackageSpec spec) {
+        if (Looper.myLooper() == Looper.getMainLooper()) return prepareOnCurrentThread(host, spec);
+        Handler mainHandler = new Handler(Looper.getMainLooper());
+        CountDownLatch complete = new CountDownLatch(1);
+        AtomicReference<Bundle> result = new AtomicReference<>();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        if (!mainHandler.post(() -> {
+            try {
+                result.set(prepareOnCurrentThread(host, spec));
+            } catch (Throwable error) {
+                failure.set(error);
+            } finally {
+                complete.countDown();
+            }
+        })) {
+            throw new IllegalStateException("GUEST_PREPARE_MAIN_HANDLER_REJECTED");
+        }
+        try {
+            if (!complete.await(60L, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("GUEST_PREPARE_MAIN_THREAD_TIMEOUT");
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("GUEST_PREPARE_MAIN_THREAD_INTERRUPTED", error);
+        }
+        Throwable error = failure.get();
+        if (error != null) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException(error);
+        }
+        return result.get();
+    }
+
+    private static Bundle prepareOnCurrentThread(Context host, GuestPackageSpec spec) {
         synchronized (GuestRuntimeEnvironment.class) {
             if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
             preparing = true;
@@ -202,7 +240,11 @@ public final class GuestRuntimeEnvironment {
                     + " frontIds=" + cameraProfile.frontCameraIds().size());
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.privilegedServicesProfile());
-            Application application = createApplication(spec, loader, guestContext);
+            // Android creates Application instances and calls attachBaseContext/onCreate on the
+            // process main thread.  Binder-driven preparation must preserve that contract because
+            // real APK constructors commonly allocate a Handler/Looper during initialization.
+            Application application = guestContext.mainThread.call(
+                    () -> createApplication(spec, loader, guestContext));
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
@@ -344,10 +386,32 @@ public final class GuestRuntimeEnvironment {
         Class<?> type = loader.loadClass(className);
         if (!Application.class.isAssignableFrom(type)) throw new IllegalArgumentException("Application class has wrong type: " + className);
         Application application = (Application) type.getDeclaredConstructor().newInstance();
-        Method attach = ContextWrapper.class.getDeclaredMethod("attachBaseContext", Context.class);
+        // Android's real Application base Context already resolves getApplicationContext() to
+        // the Application while attachBaseContext() is running. Publish the pending instance
+        // before invoking guest attach hooks so process-wide libraries observe that contract.
+        context.application(application);
+        invokeNearestAttachBaseContext(application, context);
+        return application;
+    }
+
+    /**
+     * Invokes the closest guest override instead of Application.attach().  The latter unwraps
+     * ContextWrapper into ContextImpl; GuestContext intentionally refuses that unwrap so the
+     * host Context cannot be recovered through getBaseContext().  Walking the guest hierarchy
+     * also makes TinkerApplication's attachBaseContext/onBaseContextAttached path explicit.
+     */
+    private static void invokeNearestAttachBaseContext(Application application, Context context)
+            throws Exception {
+        Method attach = null;
+        for (Class<?> type = application.getClass(); type != null; type = type.getSuperclass()) {
+            try {
+                attach = type.getDeclaredMethod("attachBaseContext", Context.class);
+                break;
+            } catch (NoSuchMethodException ignored) { }
+        }
+        if (attach == null) throw new NoSuchMethodException("attachBaseContext");
         attach.setAccessible(true);
         attach.invoke(application, context);
-        return application;
     }
 
     /** Projects only virtual network data into native policy; no host resolver identity is read. */
