@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -32,6 +33,61 @@ def sdk_root() -> Path | None:
 def write_report(payload: dict) -> None:
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def git_value(*arguments: str) -> str:
+    return subprocess.run(
+        ["git", *arguments], cwd=ROOT, text=True, encoding="utf-8",
+        errors="replace", capture_output=True, check=True,
+    ).stdout.strip()
+
+
+def verified_external_evidence(path: Path) -> list[str]:
+    """Validate an opt-in native build proof before a POSIX-only aggregate run."""
+    errors: list[str] = []
+    try:
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        return [f"cannot read external Android build evidence: {error}"]
+    if evidence.get("status") != "PASS" or evidence.get("exitCode") != 0:
+        errors.append("external Android build evidence is not a successful build")
+    try:
+        if evidence.get("commit") != git_value("rev-parse", "HEAD"):
+            errors.append("external Android build evidence commit does not match HEAD")
+        if evidence.get("tree") != git_value("rev-parse", "HEAD^{tree}"):
+            errors.append("external Android build evidence tree does not match HEAD")
+    except subprocess.CalledProcessError as error:
+        errors.append(f"cannot read current Git identity: {error}")
+    command = evidence.get("command")
+    if not isinstance(command, list) or not command:
+        errors.append("external Android build evidence has no build command")
+    artifacts = evidence.get("artifacts")
+    if not isinstance(artifacts, list) or not artifacts:
+        errors.append("external Android build evidence has no artifact hashes")
+        return errors
+    for item in artifacts:
+        if not isinstance(item, dict):
+            errors.append("external Android build evidence has an invalid artifact row")
+            continue
+        relative = item.get("path")
+        expected = item.get("sha256")
+        if not isinstance(relative, str) or not isinstance(expected, str):
+            errors.append("external Android build evidence has an incomplete artifact row")
+            continue
+        artifact = ROOT / relative
+        if not artifact.is_file():
+            errors.append(f"evidence artifact is missing: {relative}")
+        elif sha256_file(artifact).lower() != expected.lower():
+            errors.append(f"evidence artifact hash mismatch: {relative}")
+    return errors
 
 
 def main() -> int:
@@ -70,6 +126,28 @@ def main() -> int:
         for error in errors:
             print(" - " + error, file=sys.stderr)
         return 1
+
+    evidence_override = os.environ.get("CONTROLLED_ANDROID_GRADLE_EVIDENCE")
+    if evidence_override:
+        evidence_path = Path(evidence_override).expanduser().resolve()
+        evidence_errors = verified_external_evidence(evidence_path)
+        if evidence_errors:
+            payload.update({"status": "FAIL", "errors": evidence_errors})
+            write_report(payload)
+            print("FAIL external Android Gradle build evidence", file=sys.stderr)
+            for error in evidence_errors:
+                print(" - " + error, file=sys.stderr)
+            return 1
+        payload.update({
+            "status": "PASS",
+            "androidBuildEvidence": True,
+            "exitCode": 0,
+            "externalEvidence": str(evidence_path),
+            "errors": [],
+        })
+        write_report(payload)
+        print("PASS verified matching external Android Gradle/APK/AAR build evidence")
+        return 0
 
     command = [str(wrapper), "--no-daemon", "--stacktrace",
                "--dependency-verification=strict", *TASKS]
