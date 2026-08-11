@@ -265,7 +265,7 @@ def validate_reviewed_coordinate_manifest(lock_path: Path, metadata: Path) -> tu
         errors.append(f"cannot compare dependency lock to verification metadata: {exc}")
 
     return errors, {
-        "manifestPath": str(lock_path.relative_to(ROOT)),
+        "manifestPath": lock_path.relative_to(ROOT).as_posix(),
         "manifestSha256": sha256(lock_path),
         "rootPlugin": root_plugin,
         "reviewedCoordinateCount": len(coordinates),
@@ -313,8 +313,12 @@ def validate_reviewed_coordinates(provenance: dict) -> list[str]:
 
 def gradle_source_files() -> Iterable[Path]:
     for pattern in ("*.gradle", "*.gradle.kts", "gradle/libs.versions.toml"):
-        yield from ROOT.glob(pattern)
-        yield from ROOT.glob(f"*/{pattern}")
+        for path in ROOT.glob(pattern):
+            if path.is_file():
+                yield path
+        for path in ROOT.glob(f"*/{pattern}"):
+            if path.is_file():
+                yield path
 
 
 def validate_gradle_configuration() -> list[str]:

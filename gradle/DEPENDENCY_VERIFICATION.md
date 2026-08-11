@@ -17,7 +17,8 @@ CI invokes Gradle with `--dependency-verification=strict` before running the sou
 - `trusted-artifacts` exceptions are forbidden. Resolved artifacts must use a reviewed signature or exact checksum.
 - Dynamic versions, snapshots and changing dependencies are forbidden.
 - Version conflicts fail configuration.
-- The Gradle wrapper distribution URL and SHA-256 are pinned.
+- The Gradle wrapper uses the pinned Aliyun Gradle distribution mirror and verifies
+  the upstream Gradle SHA-256 before extraction.
 
 ## Provenance
 
@@ -52,8 +53,10 @@ environment:
 .\scripts\Generate-Gradle-Lock-State.ps1
 ```
 
-The `resolveAndLockAll` task resolves every resolvable project configuration with strict dependency
-verification and `--write-locks`. CI then runs `tools/gradle_lock_state.py verify --require-clean`;
+The `resolveAndLockAll` task resolves every product-resolvable project configuration with strict
+dependency verification and `--write-locks`. AGP-private `_internal-*` test-platform configurations
+are explicitly excluded because they are plugin-owned tool graphs rather than product dependencies.
+CI then runs `tools/gradle_lock_state.py verify --require-clean`;
 new, missing, modified, malformed, or dynamic lock rows fail the build. Generated `gradle.lockfile`
 files must be reviewed and committed. The local `verify-all.sh` also validates the checked-in Gradle
 lock files and fails closed while they are absent. Source policy checks do not substitute the reviewed

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import stat
 import sys
@@ -150,6 +151,17 @@ def extract_archive(spec: ReferenceSpec, archive: Path, destination: Path) -> No
             output.chmod(archive_mode(info))
 
 
+def windows_backed_filesystem() -> bool:
+    """Return true when the verifier runs on NTFS directly or through WSL/DrvFS."""
+    if os.name == "nt":
+        return True
+    try:
+        mounts = Path("/proc/mounts").read_text(encoding="utf-8", errors="ignore")
+        return str(ROOT).startswith("/mnt/") and "aname=drvfs" in mounts
+    except OSError:
+        return False
+
+
 def write_tree_hashes(path: Path, records: list[dict[str, object]]) -> None:
     lines = [
         f"{record['sha256']}  {record['mode']}  {record['size']}  {record['path']}"
@@ -262,11 +274,15 @@ def verify_source(spec: ReferenceSpec) -> None:
         actual_sha = sha256_file(path)
         if actual_sha != expected["sha256"]:
             raise ValueError(f"{spec.display_name}: extracted file hash mismatch: {relative}")
-        actual_mode = "0755" if path.stat().st_mode & stat.S_IXUSR else "0644"
-        if actual_mode != expected["mode"]:
-            raise ValueError(
-                f"{spec.display_name}: mode mismatch for {relative}: {actual_mode} != {expected['mode']}"
-            )
+        # ZIP records retain the authoritative POSIX mode.  Windows extraction APIs expose
+        # regular files but do not preserve the executable bit in NTFS metadata; compare the
+        # materialized bit only on platforms that can represent it.
+        if not windows_backed_filesystem():
+            actual_mode = "0755" if path.stat().st_mode & stat.S_IXUSR else "0644"
+            if actual_mode != expected["mode"]:
+                raise ValueError(
+                    f"{spec.display_name}: mode mismatch for {relative}: {actual_mode} != {expected['mode']}"
+                )
 
     expected_hashes = "\n".join(
         f"{record['sha256']}  {record['mode']}  {record['size']}  {record['path']}"

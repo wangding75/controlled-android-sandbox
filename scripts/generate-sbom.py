@@ -73,9 +73,11 @@ def component_identity(module_name: str, directory: Path) -> tuple[str, str]:
 
 
 def component(project_path: str, module_name: str, directory: Path) -> dict[str, Any]:
+    generated_directories = {"build", ".cxx", ".gradle", ".externalNativeBuild"}
     files = sorted(
         path for path in directory.rglob("*")
-        if path.is_file() and "build" not in path.relative_to(directory).parts
+        if path.is_file()
+        and not any(part in generated_directories for part in path.relative_to(directory).parts)
     )
     digest = sha256()
     languages: set[str] = set()

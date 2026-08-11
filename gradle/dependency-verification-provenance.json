@@ -12,7 +12,7 @@
     ]
   },
   "files": {
-    "gradle/verification-metadata.xml": "ba8afc8bc106bec9fc7ae1ea7e358c1d7ead52fe595cf9651990fec0fe2a3ef3",
+    "gradle/verification-metadata.xml": "a6181618356a5bff7f1462dee3ddfce055755ccbc4a912828915627a44ddedd4",
     "gradle/verification-keyring.keys": "3549af9040eca933521a27e5b9c08199e5c020ad784a1a5190bcece35f96b438"
   },
   "policy": {
