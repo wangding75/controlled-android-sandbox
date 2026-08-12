@@ -169,7 +169,8 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.compatibilityProfile().webView().providerPackage());
             GuestFrameworkCallRouter frameworkCallRouter = new GuestFrameworkCallRouter(
                     guestContext, spec, virtualServices.pendingIntents(),
-                    new GuestPendingIntentDispatcher(guestContext, spec));
+                    new GuestPendingIntentDispatcher(guestContext, spec),
+                    host.getPackageName());
             virtualServices.alarms().setRecoveredDelivery(alarm ->
                     com.warden.controlledsandbox.contract.VirtualAlarmSnapshot.PENDING_INTENT.equals(alarm.deliveryPath())
                             && !alarm.pendingIntentTokenId().isEmpty()

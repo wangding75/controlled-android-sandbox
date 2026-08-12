@@ -28,7 +28,8 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
     public static void main(String[] args) throws Throwable {
         FakeBroker broker = new FakeBroker();
         GuestPackageSpec spec = new GuestPackageSpec(specBundle(broker));
-        ActivityTaskFrameworkInterceptor interceptor = new ActivityTaskFrameworkInterceptor(spec);
+        ActivityTaskFrameworkInterceptor interceptor = new ActivityTaskFrameworkInterceptor(spec,
+                new GuestActivityTaskClient(spec), "host.pkg");
 
         Method getTasks = FakeAtm.class.getMethod("getTasks", int.class);
         FrameworkCallInterceptor.Interception running = interceptor.intercept(
@@ -85,6 +86,11 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
         require(ActivityTaskRequest.MOVE_TO_FRONT.equals(broker.lastRequest.operation())
                         && moveFront.get() == 1,
                 "AppTask moveToFront returns to Broker and mirrors host task");
+
+        FrameworkCallInterceptor.Interception hostAlias = interceptor.intercept(
+                "activity-task-manager", getAppTasks, new Object[]{"host.pkg"});
+        require(hostAlias.handled(),
+                "Android 16 framework manager host op-package alias remains virtualized");
 
         Method taskForActivity = FakeAtm.class.getMethod(
                 "getTaskForActivity", IBinder.class, boolean.class);

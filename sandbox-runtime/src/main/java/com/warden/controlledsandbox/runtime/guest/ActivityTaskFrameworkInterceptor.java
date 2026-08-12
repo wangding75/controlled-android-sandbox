@@ -16,16 +16,29 @@ import java.util.function.BooleanSupplier;
 final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor, AutoCloseable {
     private final GuestPackageSpec spec;
     private final GuestActivityTaskClient client;
+    /**
+     * Android 16 framework managers can retain the Host op-package name while invoking
+     * getAppTasks() on behalf of a Guest-owned manager (CameraManager is one observed path).
+     * The call is still intercepted and projected from the Guest task ledger; this alias is
+     * never passed through to the Host ActivityTaskManager.
+     */
+    private final String hostPackageName;
     private final Map<IBinder, HostBinding> hostBindings = new IdentityHashMap<>();
     private final ThreadLocal<Boolean> hostBypass = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
     ActivityTaskFrameworkInterceptor(GuestPackageSpec spec) {
-        this(spec, new GuestActivityTaskClient(spec));
+        this(spec, new GuestActivityTaskClient(spec), "");
     }
 
     ActivityTaskFrameworkInterceptor(GuestPackageSpec spec, GuestActivityTaskClient client) {
+        this(spec, client, "");
+    }
+
+    ActivityTaskFrameworkInterceptor(GuestPackageSpec spec, GuestActivityTaskClient client,
+                                     String hostPackageName) {
         this.spec = Objects.requireNonNull(spec, "spec");
         this.client = Objects.requireNonNull(client, "client");
+        this.hostPackageName = hostPackageName == null ? "" : hostPackageName.trim();
     }
 
     synchronized void bindHostActivity(IBinder frameworkToken, String activityToken, int taskId,
@@ -202,7 +215,8 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
 
     private void verifyAppTasksPackage(Object[] arguments) {
         if (arguments == null || arguments.length == 0 || !(arguments[0] instanceof String value)) return;
-        if (!value.isBlank() && !spec.packageName.equals(value)) {
+        if (!value.isBlank() && !spec.packageName.equals(value)
+                && !hostPackageName.equals(value)) {
             throw new SecurityException("VIRTUAL_APP_TASK_PACKAGE_MISMATCH");
         }
     }
