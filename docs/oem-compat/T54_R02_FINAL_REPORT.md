@@ -95,6 +95,9 @@ is used.
 - Broadcast/receiver architecture checks: PASS.
 - JobScheduler policy: PASS.
 - Device-lab APK verifier: PASS for the four APK set.
+- `tools/static_android_compile.py`: known baseline failure (`108` platform-stub errors around
+  Location/PendingIntent/CancellationSignal/Telephony symbols); this is outside the R02 files and
+  was not weakened or hidden.
 - Historical structural gate: `BrokerActivityRuntime` is `412` lines versus the unchanged `330`
   threshold; retained as pre-existing P2 and not weakened.
 
