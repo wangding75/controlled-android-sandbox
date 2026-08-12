@@ -37,7 +37,8 @@ The following remain device-gated or incomplete:
 - WebView renderer-process isolation evidence.
 - A 20-minute zero-crash/zero-ANR Emulator report.
 
-See `docs/M3_GATE.md` and `docs/TEST_REPORT.md`.
+See `docs/M3_GATE.md`, `docs/TEST_REPORT.md`, and the current MuMu resolution rule in
+`docs/runtime/SX_TEST_DEVICE_RESOLUTION.md`.
 
 ## Reference-source baseline
 

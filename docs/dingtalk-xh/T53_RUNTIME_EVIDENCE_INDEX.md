@@ -4,7 +4,10 @@ Evidence root: `D:\controlled-android-sandbox-evidence\T53-R01-20260812-073729\`
 
 Final backup root: `D:\controlled-android-sandbox-evidence\T53-FINAL-20260812-095143\`
 
-All emulator actions in this index used `adb -s 127.0.0.1:16384`. The `adb devices -l` baseline also records other connected endpoints, but none of those endpoints was used for install, launch, logcat, dumpsys, screenshot or acceptance.
+The T53 records below are historical evidence and retain the serial used at that time. T54-R01
+does not treat that serial as device identity: current Controlled Android Sandbox / 闪现2 MuMu
+operations resolve the exact instance `SX测试` dynamically and record the result in
+`docs/runtime/SX_TEST_DEVICE_RESOLUTION.md`.
 
 ## Baseline and audit
 
