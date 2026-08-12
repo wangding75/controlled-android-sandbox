@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.framework.activity;
 
 import com.warden.controlledsandbox.framework.routing.OneTimeRouteStore;
+import com.warden.controlledsandbox.framework.routing.RouteKind;
 import com.warden.controlledsandbox.framework.routing.RouteOwner;
 import com.warden.controlledsandbox.framework.routing.RoutePayload;
 import java.time.Clock;
@@ -18,7 +19,7 @@ public final class ActivityLaunchCoordinatorSelfTest {
         testOwnerMismatchDoesNotBurnTransaction();
         testPollNewIntentConsumesOnePayload();
         testPollNewIntentRejectsWrongOwnerBeforeQueueMutation();
-        testProcessRecreationRevokesStaleRoutes();
+        testProcessRecreationRecoversAcceptedRoutes();
         testInvalidProcessRecreationDoesNotRevokeRoutes();
         testProcessInvalidationRemovesRoutesAndActivities();
         System.out.println("PASS ActivityLaunchCoordinatorSelfTest");
@@ -154,7 +155,7 @@ public final class ActivityLaunchCoordinatorSelfTest {
                 "owner rejection must not remove the queued new Intent");
     }
 
-    private static void testProcessRecreationRevokesStaleRoutes() {
+    private static void testProcessRecreationRecoversAcceptedRoutes() {
         ActivityTaskLedger ledger = new ActivityTaskLedger();
         OneTimeRouteStore store = routeStore();
         ActivityLaunchCoordinator coordinator = new ActivityLaunchCoordinator(ledger, store);
@@ -163,7 +164,7 @@ public final class ActivityLaunchCoordinatorSelfTest {
                 new byte[] {9},
                 Map.of(),
                 Duration.ofSeconds(30));
-        coordinator.launch(
+        ActivityLaunchTransaction second = coordinator.launch(
                 spec(
                         LaunchMode.SINGLE_TOP,
                         LaunchFlags.SINGLE_TOP,
@@ -177,15 +178,18 @@ public final class ActivityLaunchCoordinatorSelfTest {
         ProcessRecreationOutcome outcome = coordinator.recreateProcessGeneration(
                 0, "guest.example", "guest.example:main", 3, 4);
         check(outcome.recreations().size() == 1, "one live Activity should recreate");
-        check(outcome.revokedRouteCount() == 2, "all stale-generation routes should be revoked");
-        check(store.size() == 0, "no stale route may survive process recreation");
+        check(outcome.revokedRouteCount() == 0,
+                "accepted Activity routes must be rebound, not revoked, during process recovery");
+        check(store.size() == 2, "accepted Activity routes must survive process recreation");
         String currentToken = outcome.recreations().get(0).currentActivityToken();
         check(ledger.processIdentity(currentToken).processGeneration() == 4,
                 "recreated Activity should use the new process generation");
-        check(coordinator.pollNewIntent(
-                currentToken,
-                new RouteOwner(0, "guest.example", "guest.example:main", 4)).isEmpty(),
-                "stale new-Intent queue should be empty after process recreation");
+        RouteOwner currentOwner = new RouteOwner(0, "guest.example", "guest.example:main", 4);
+        check(store.consume(first.routeToken().value(), currentOwner, RouteKind.ACTIVITY_INTENT).isPresent(),
+                "accepted initial route should follow the recovered process");
+        check(store.consume(second.routeToken().value(), currentOwner, RouteKind.ACTIVITY_INTENT).isPresent(),
+                "accepted new-Intent route should follow the recovered process");
+        check(store.size() == 0, "recovered routes should remain one-time after delivery");
     }
 
     private static void testInvalidProcessRecreationDoesNotRevokeRoutes() {
