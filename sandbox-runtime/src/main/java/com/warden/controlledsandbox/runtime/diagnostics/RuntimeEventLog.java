@@ -22,6 +22,7 @@ public final class RuntimeEventLog {
             }
             append(line, "windowIdentity", data.getString("windowIdentity", ""));
             append(line, "windowToken", data.getString("windowToken", ""));
+            append(line, "windowLayoutToken", data.getString("windowLayoutToken", ""));
             append(line, "frameworkTask", data.getString("frameworkTask", ""));
             append(line, "frameworkActivityToken", data.getString("frameworkActivityToken", ""));
             append(line, "activityClientRecord", data.getString("activityClientRecord", ""));

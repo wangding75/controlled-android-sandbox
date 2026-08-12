@@ -49,6 +49,7 @@ public abstract class StubActivityBase extends Activity {
     private int virtualUserId = -1;
     private int processSlot = -1;
     private int virtualTaskId;
+    private String windowLayoutToken = "";
 
     @Override protected void onCreate(Bundle state) {
         // This Activity is only a Host trampoline. Its FragmentManager must not restore a Guest
@@ -169,14 +170,15 @@ public abstract class StubActivityBase extends Activity {
     }
     @Override protected void onResume() {
         super.onResume();
-        // ActivityThread performs its final layout/update immediately after this callback. If
-        // the framework/OEM removed the previous root, restore that same current Stub window
-        // before returning; otherwise the framework can update a DecorView absent from WMG.mViews.
-        recoverDetachedWindow();
         if (!diagnosticInstalled) {
             setContentView(diagnostic);
             diagnosticInstalled = true;
         }
+        // ActivityThread performs its final layout/update immediately after this callback. If
+        // the framework/OEM removed the previous root, establish the current Window content
+        // first, then restore that same current Stub window before returning; otherwise the
+        // framework can update a DecorView absent from WMG.mViews.
+        recoverDetachedWindow();
         hostStage = 3;
         if (controller != null) controller.resume();
         if (controller != null && activityResults != null) {
@@ -482,9 +484,11 @@ public abstract class StubActivityBase extends Activity {
         android.view.Window window = getWindow();
         android.view.View decor = window == null ? null : window.getDecorView();
         if (decor == null) throw new IllegalStateException("STUB_WINDOW_DECOR_MISSING");
+        logWindowEvent("STUB_WINDOW_RECOVERY_ATTEMPT", "DETACHED");
         if (!decor.isAttachedToWindow() && !isWindowRegistered(decor)) {
             android.view.WindowManager.LayoutParams attributes = window.getAttributes();
             attributes.type = android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+            windowLayoutToken = String.valueOf(attributes.token);
             getWindowManager().addView(decor, attributes);
             setWindowAddedMarker(true);
             logWindowEvent("STUB_WINDOW_REATTACHED", "ATTACHED");
@@ -590,6 +594,7 @@ public abstract class StubActivityBase extends Activity {
         details.putString("windowToken", String.valueOf(
                 getWindow() == null || getWindow().getDecorView() == null
                         ? null : getWindow().getDecorView().getWindowToken()));
+        details.putString("windowLayoutToken", windowLayoutToken);
         details.putBoolean("windowAttached", getWindow() != null
                 && getWindow().getDecorView() != null
                 && getWindow().getDecorView().isAttachedToWindow());
