@@ -32,6 +32,9 @@ final class SxSandboxAdapter implements SandboxSdk {
     SandboxCatalogState load() throws Exception { return packageService.load(); }
     SandboxRecord findRecord(String packageName) throws Exception { return packageService.findRecord(packageName); }
     SandboxRecord importApk(Uri uri) throws Exception { return packageService.importApk(uri); }
+    SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
+        return packageService.importApk(uri, nativeGuestTrust);
+    }
     int createInstallSession(String expectedPackageName) throws Exception {
         return packageService.createInstallSession(expectedPackageName);
     }

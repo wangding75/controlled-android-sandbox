@@ -23,6 +23,9 @@ final class SandboxApplicationLayer implements AutoCloseable {
     SandboxCatalogState load() throws Exception { return adapter.load(); }
     SandboxRecord findRecord(String packageName) throws Exception { return adapter.findRecord(packageName); }
     SandboxRecord importApk(Uri uri) throws Exception { return adapter.importApk(uri); }
+    SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
+        return adapter.importApk(uri, nativeGuestTrust);
+    }
     int createClone(String packageName) throws Exception { return adapter.createClone(packageName); }
     void updateInstanceStatus(String packageName, int userId, String status) throws Exception {
         adapter.updateInstanceStatus(packageName, userId, status);

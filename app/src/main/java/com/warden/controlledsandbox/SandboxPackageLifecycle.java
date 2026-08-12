@@ -47,9 +47,21 @@ final class SandboxPackageLifecycle {
         return commitImported(current, importer.importApk(uri, current.records()));
     }
 
+    synchronized SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApk(uri, current.records(), nativeGuestTrust));
+    }
+
     synchronized SandboxRecord importApkFile(File source) throws Exception {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current, importer.importApkFile(source, current.records()));
+    }
+
+    synchronized SandboxRecord importApkFile(File source, String nativeGuestTrust) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApkFile(source, current.records(), nativeGuestTrust));
     }
 
     synchronized int createInstallSession(String expectedPackageName) throws Exception {

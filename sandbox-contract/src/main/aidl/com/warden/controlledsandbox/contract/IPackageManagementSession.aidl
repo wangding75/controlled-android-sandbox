@@ -17,7 +17,9 @@ import com.warden.controlledsandbox.contract.VirtualPageRequest;
 interface IPackageManagementSession {
     PackageServiceResult loadCatalog();
     PackageServiceResult importApk(String uri);
+    PackageServiceResult importApkWithNativeTrust(String uri, String nativeGuestTrust);
     PackageServiceResult importApkFile(String sourcePath);
+    PackageServiceResult importApkFileWithNativeTrust(String sourcePath, String nativeGuestTrust);
     PackageServiceResult createInstallSession(String expectedPackageName);
     PackageServiceResult createInstallSessionWithParams(in InstallSessionParamsSnapshot params);
     PackageServiceResult getInstallSessionInfo(int sessionId);

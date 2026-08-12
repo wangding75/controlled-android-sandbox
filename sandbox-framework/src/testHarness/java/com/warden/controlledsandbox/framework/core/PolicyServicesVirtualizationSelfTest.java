@@ -25,6 +25,11 @@ import java.util.Set;
         require(accessibility.isEnabled() && accessibility.isTouchExplorationEnabled(), "accessibility state projected");
         accessibility.addClient(client, 0);
         accessibility.removeClient(client, 0);
+        Object windowToken = new Object();
+        Object interactionConnection = new Object();
+        int windowId = accessibility.addAccessibilityInteractionConnection(windowToken, "guest.pkg", interactionConnection);
+        require(windowId > 0, "accessibility interaction connection is locally owned");
+        accessibility.removeAccessibilityInteractionConnection(windowToken);
         require(accessibility.getRecommendedTimeoutMillis(10L, 0) == 5000L, "accessibility timeout projected");
         AutofillApi autofill = proxy(AutofillApi.class, new AutofillDelegate(), identity, "autofill");
         Object autofillClient = new Object();
@@ -102,6 +107,8 @@ import java.util.Set;
         long getRecommendedTimeoutMillis(long original, int flags);
         void addClient(Object client, int userId);
         void removeClient(Object client, int userId);
+        int addAccessibilityInteractionConnection(Object windowToken, String packageName, Object connection);
+        void removeAccessibilityInteractionConnection(Object windowToken);
     }
     interface AutofillApi {
         int startSession(Object client, String packageName);
@@ -163,6 +170,11 @@ import java.util.Set;
         public void addClient(Object c, int u){
         }
         public void removeClient(Object c, int u){
+        }
+        public int addAccessibilityInteractionConnection(Object w, String p, Object c){
+            return -1;
+        }
+        public void removeAccessibilityInteractionConnection(Object w){
         }
     }
     static final class AutofillDelegate implements AutofillApi {

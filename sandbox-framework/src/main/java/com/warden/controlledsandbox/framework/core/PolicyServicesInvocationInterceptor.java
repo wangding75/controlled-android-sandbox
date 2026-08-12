@@ -23,12 +23,14 @@ import java.util.concurrent.atomic.AtomicInteger;
     private final GuestIdentity identity;
     private final String service;
     private final Set<Object> accessibilityClients = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Map<Object, Integer> accessibilityInteractionConnections = new IdentityHashMap<>();
     private final Set<Object> privacyListeners = Collections.newSetFromMap(new IdentityHashMap<>());
     private final Map<Integer, Long> autofillSessions = new LinkedHashMap<>();
     private final Map<Object, Long> biometricSessions = new IdentityHashMap<>();
     private final Map<Object, WakeLockLease> wakeLocks = new IdentityHashMap<>();
     private final Map<Object, Long> vibrations = new IdentityHashMap<>();
     private final AtomicInteger nextAutofillSession = new AtomicInteger(1);
+    private final AtomicInteger nextAccessibilityWindowId = new AtomicInteger(1);
     PolicyServicesInvocationInterceptor(GuestIdentity identity, String service) {
         this.identity = java.util.Objects.requireNonNull(identity, "identity");
         this.service = normalize(service);
@@ -55,7 +57,7 @@ import java.util.concurrent.atomic.AtomicInteger;
         };
     }
     synchronized int accessibilityClientCount() {
-        return accessibilityClients.size();
+        return accessibilityClients.size() + accessibilityInteractionConnections.size();
     }
     synchronized int autofillSessionCount() {
         return autofillSessions.size();
@@ -101,13 +103,33 @@ import java.util.concurrent.atomic.AtomicInteger;
     private Decision accessibility(Method method, Object[] arguments, VirtualAccessibilityProfileSnapshot profile) {
         String name = normalize(method.getName());
         if (host(profile.mode())) return Decision.passThrough();
-        if (containsAny(name, "removeclient", "unregister", "removeaccessibilityservicesstatelistener")) {
+        if (containsAny(name, "removeclient", "unregister", "removeaccessibilityservicesstatelistener", "removeaccessibilityinteractionconnection")) {
             remove(accessibilityClients, arguments);
+            if (containsAny(name, "removeaccessibilityinteractionconnection")) {
+                Object windowToken = callback(arguments);
+                if (windowToken != null) accessibilityInteractionConnections.remove(windowToken);
+            }
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (blocked(profile.mode())) {
             if (isCleanup(name)) return Decision.handled(successValue(method.getReturnType()));
             return Decision.handled(emptyValue(method.getReturnType()));
+        }
+        if (containsAny(name, "addaccessibilityinteractionconnection")) {
+            Object windowToken = callback(arguments);
+            Object connection = lastCallback(arguments);
+            if (windowToken == null || connection == null || windowToken == connection) {
+                throw new IllegalArgumentException("VIRTUAL_ACCESSIBILITY_INTERACTION_CONNECTION_REQUIRED");
+            }
+            Integer windowId = accessibilityInteractionConnections.get(windowToken);
+            if (windowId == null) {
+                if (accessibilityInteractionConnections.size() >= profile.maximumClients()) {
+                    throw new IllegalStateException("VIRTUAL_ACCESSIBILITY_INTERACTION_CONNECTION_LIMIT_EXCEEDED");
+                }
+                windowId = nextAccessibilityWindowId.getAndIncrement();
+                accessibilityInteractionConnections.put(windowToken, windowId);
+            }
+            return Decision.handled(numeric(method.getReturnType(), windowId));
         }
         if (containsAny(name, "addclient", "register", "addaccessibilityservicesstatelistener")) {
             Object callback = callback(arguments);
@@ -370,6 +392,15 @@ import java.util.concurrent.atomic.AtomicInteger;
             return value;
         }
         return null;
+    }
+    private static Object lastCallback(Object[] arguments){
+        if(arguments==null)return null;
+        Object found=null;
+        for(Object value:arguments){
+            if(value==null||value instanceof String||value instanceof Number||value instanceof Boolean||value.getClass().isEnum()||value.getClass().isArray()||value instanceof Iterable<?>)continue;
+            found=value;
+        }
+        return found;
     }
     private static Object token(Object[] arguments){
         return callback(arguments);

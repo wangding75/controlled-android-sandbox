@@ -14,6 +14,8 @@ import android.widget.ListView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.AlertDialog;
+import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -171,7 +173,25 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         List<Uri> selected = selectedUris(data);
         if (selected.isEmpty()) return;
         appStatus.setText("正在导入…");
-        viewModel.execute(() -> viewModel.application().importApk(selected.get(0)),
+        confirmNativeGuestImport(selected.get(0));
+    }
+
+    private void confirmNativeGuestImport(Uri uri) {
+        new AlertDialog.Builder(this)
+                .setTitle("Native Guest trust")
+                .setMessage("This APK may contain native Guest code. Trust it only after reviewing the APK; PLT/GOT compatibility hooks are not a security boundary.")
+                .setPositiveButton("Trust and import", (dialog, which) -> importSelectedApk(uri,
+                        InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED))
+                .setNegativeButton("Do not trust", (dialog, which) -> importSelectedApk(uri,
+                        InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED))
+                .setOnCancelListener(dialog -> {
+                    if (appStatus != null) appStatus.setText("Import cancelled");
+                })
+                .show();
+    }
+
+    private void importSelectedApk(Uri uri, String nativeGuestTrust) {
+        viewModel.execute(() -> viewModel.application().importApk(uri, nativeGuestTrust),
                 record -> runOnUiThread(() -> {
                     appStatus.setText("已导入 " + record.label);
                     refresh();

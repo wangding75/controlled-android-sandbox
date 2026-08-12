@@ -57,8 +57,20 @@ final class PackageServiceClient implements AutoCloseable {
         return record(requireSession().importApk(uri == null ? "" : uri.toString()));
     }
 
+    SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
+        return record(requireSession().importApkWithNativeTrust(
+                uri == null ? "" : uri.toString(),
+                nativeGuestTrust == null ? "" : nativeGuestTrust));
+    }
+
     SandboxRecord importApkFile(File source) throws Exception {
         return record(requireSession().importApkFile(source == null ? "" : source.getAbsolutePath()));
+    }
+
+    SandboxRecord importApkFile(File source, String nativeGuestTrust) throws Exception {
+        return record(requireSession().importApkFileWithNativeTrust(
+                source == null ? "" : source.getAbsolutePath(),
+                nativeGuestTrust == null ? "" : nativeGuestTrust));
     }
 
     int createInstallSession(String expectedPackageName) throws Exception {
