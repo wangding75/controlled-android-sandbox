@@ -153,7 +153,7 @@ public abstract class StubActivityBase extends Activity {
         // ActivityThread.handleResumeActivity() updates the window when this forward-navigation
         // bit differs from the transaction. A stale Stub window may already be detached at this
         // point, so keep the host attributes aligned before the framework reaches that branch.
-        setForwardNavigationWindowFlag(true);
+        setForwardNavigationWindowFlag(activityClientRecordIsForward());
         repairDetachedActivityRecord();
         // ActivityThread performs its window update immediately after this callback returns.
         // A trampoline can have a detached DecorView after another same-process Stub crosses
@@ -465,6 +465,34 @@ public abstract class StubActivityBase extends Activity {
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
         }
+    }
+
+    private boolean activityClientRecordIsForward() {
+        try {
+            Class<?> threadClass = Class.forName("android.app.ActivityThread");
+            java.lang.reflect.Field current = threadClass.getDeclaredField("sCurrentActivityThread");
+            current.setAccessible(true);
+            Object thread = current.get(null);
+            if (thread == null) return true;
+            java.lang.reflect.Field activities = threadClass.getDeclaredField("mActivities");
+            activities.setAccessible(true);
+            Object records = activities.get(thread);
+            java.lang.reflect.Method size = records.getClass().getMethod("size");
+            java.lang.reflect.Method valueAt = records.getClass().getMethod("valueAt", int.class);
+            for (int index = 0, count = ((Integer) size.invoke(records)); index < count; index++) {
+                Object record = valueAt.invoke(records, index);
+                if (record == null) continue;
+                java.lang.reflect.Field activity = record.getClass().getDeclaredField("activity");
+                activity.setAccessible(true);
+                if (activity.get(record) != this) continue;
+                java.lang.reflect.Field forward = record.getClass().getDeclaredField("isForward");
+                forward.setAccessible(true);
+                return forward.getBoolean(record);
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+        return true;
     }
 
     private boolean isWindowRegistered(android.view.View decor) {
