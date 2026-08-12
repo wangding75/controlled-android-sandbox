@@ -325,6 +325,8 @@ class DeviceLab:
         keep_emulator: bool,
         headless: bool,
         mumu_resolution: dict[str, Any] | None,
+        mumu_instance_name: str,
+        mumu_root: Path | None,
     ):
         self.root = root
         self.sdk_root = sdk_root
@@ -338,6 +340,8 @@ class DeviceLab:
         self.keep_emulator = keep_emulator
         self.headless = headless
         self.mumu_resolution = mumu_resolution
+        self.mumu_instance_name = mumu_instance_name
+        self.mumu_root = mumu_root
         self.lock = load_json(root / "build-environment.lock.json")
         self.lab = self.lock["deviceLab"]
         self.packages = self.lab["packages"]
@@ -388,6 +392,24 @@ class DeviceLab:
             command.extend(("-s", self.serial))
         command.extend(args)
         return self.runner.run(command, check=check, timeout=timeout)
+
+    def refresh_mumu_resolution(self) -> None:
+        if not self.mumu_instance_name:
+            return
+        resolution = resolve_instance(
+            self.mumu_instance_name,
+            mumu_root=self.mumu_root,
+            adb=self.tools.adb,
+        )
+        serial = str(resolution.get("resolvedSerial", ""))
+        if resolution.get("runtimeStatus") != "device" or not serial:
+            raise CommandError("MuMu instance is not an online adb device")
+        self.serial = serial
+        self.mumu_resolution = resolution
+        self.evidence["mumuResolution"] = resolution
+        (self.evidence_dir / "mumu-instance-resolution.json").write_text(
+            json.dumps(resolution, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
 
     def prepare_artifacts(self) -> tuple[dict[str, Any], Path]:
         commit = self.runner.run(["git", "rev-parse", "HEAD"], cwd=self.root).stdout.strip()
@@ -648,6 +670,7 @@ class DeviceLab:
             )
 
     def invoke_guest(self, fixture_id: str, command: str, user: int) -> dict[str, Any]:
+        self.refresh_mumu_resolution()
         package = self.packages[fixture_id]
         host = self.packages["host"]
         start_args = [
@@ -886,6 +909,7 @@ class DeviceLab:
 
     def run(self) -> dict[str, Any]:
         manifest, artifact_dir = self.prepare_artifacts()
+        self.refresh_mumu_resolution()
         self.ensure_device()
         self.evidence["deviceRunCount"] = 1
         self.evidence["device"] = self.device_info()
@@ -988,6 +1012,8 @@ def main() -> int:
         keep_emulator=args.keep_emulator,
         headless=args.headless,
         mumu_resolution=mumu_resolution,
+        mumu_instance_name=args.mumu_instance_name,
+        mumu_root=args.mumu_root,
     )
     try:
         result = lab.run()

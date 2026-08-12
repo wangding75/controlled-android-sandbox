@@ -7,11 +7,15 @@ T53 baseline tree: `ca1b800f50e2ebf745226e8200ad8714ee27b081`
 
 ## Disposition
 
-T54 source and product UI work is implemented on the current Sandbox architecture. The approved
-SX test emulator is now online at `127.0.0.1:16384` and is a Samsung SM-A5260, API 32 / Android 12
-runtime. Flash2 UI and the generic component smoke pass on that runtime. This is recorded as
-`PASS_RUNTIME_API32`, not as Xiaomi HyperOS evidence. Xiaomi HyperOS / Android 16 / API 36 remains
-`REAL_DEVICE_VERIFICATION_PENDING`.
+T54 source and product UI work is implemented on the current Sandbox architecture. The post-restart
+SX测试 resolution selected MuMu index `0` (`MuMuPlayer-12.0-0`) and, for this execution session only,
+used the resolved serial `127.0.0.1:16384`. The runtime is Samsung SM-A5260, API 32 / Android 12;
+the serial is connection data, not the instance identity. Xiaomi HyperOS / Android 16 / API 36
+remains `REAL_DEVICE_VERIFICATION_PENDING`.
+
+This review does not freeze T54 as a runtime PASS: the formal M3 gate remains open because the
+MuMu fixture matrix reproduced target `StubActivity6/7` `WindowManagerGlobal.updateViewLayout`
+FATAL exceptions and did not complete the required 20-minute zero-FATAL/ANR stability window.
 
 One pre-existing structural gate remains open: `check-activity-task-virtualization.py` reports
 `BrokerActivityRuntime` at 412 lines against its historical 330-line threshold. The T54 change did
@@ -64,23 +68,30 @@ hook, BlackBox, LSPosed or package-specific Core branch was copied.
 | Broadcast, JobScheduler, Package Service and Guest boundary gates | PASS |
 | Full `scripts/verify-all.sh` | Not completed: WSL/Windows-mounted `reference_sources.py verify` exceeded the 124-second tool window and was terminated; no failure output was produced before that stage |
 | Activity/Task structural gate | Existing baseline follow-up: 412 lines vs 330 threshold |
-| Approved ADB serial `127.0.0.1:16384` | PASS: Samsung SM-A5260, Android 12 / API 32, Android ID `6af8fde7af55c9b2` |
+| SX测试 one-time resolution | PASS: index `0`, manager `adb_port=16384`, Samsung SM-A5260, Android 12 / API 32, Android ID `6af8fde7af55c9b2`; serial held fixed only for this session |
 | Old SX evidence/uninstall | PASS: APK, package state and screenshot captured before uninstall; `com.sx.app.debug` then removed only on `127.0.0.1:16384` |
 | Flash2 product UI smoke | PASS: Home, Apps, Instance Settings F2-F5/DingTalk, Me and Developer Diagnostics screenshots/XML retained |
 | Generic component smoke | PASS: service start, broadcast delivery, provider readiness and service stop retained in `ui-component-smoke-result.xml` |
-| Targeted M3 command smoke | PASS for explicit-trust u0 import/prepare, component-suite, launch and u1 prepare/launch; formal M3 gate remains open because the reproducible runner snapshot retained only one Guest slot after command isolation and was not a 20-minute run |
-| DingTalk launch attempt | NOT PASS: real route entered Guest startup and reached `checkExportedActivityStartup`/process recovery, but the captured UI remained `Resolving one-time Guest route…`; no success claim |
+| Targeted M3 command matrix | Command results for fixture64/fixture32 × user0/user1 import-prepare, component-suite and launch were PASS; formal gate NOT PASS because target `StubActivity6/7` repeatedly raised `View=DecorView[...] not attached to window manager`, and no 20-minute stability run was completed. Evidence: `T54-R01-M3-DIAG-FIX10-20260812-2130` |
+| Generic Stub window repair | Source/compile/unit checks PASS; the fix repairs detached ActivityClientRecord windows and preserves the real forward-navigation state, but the MuMu matrix still reproduces the OEM lifecycle failure under repeated multi-task pressure |
+| DingTalk product UI flow | NOT PASS / not frozen: no claim of 5/5 launch and 5/5 stop; business session remains `REAL_USER_SESSION_REQUIRED` |
 | Xiaomi HyperOS / Android 16 / API 36 | `REAL_DEVICE_VERIFICATION_PENDING` |
 
-The final device evidence is retained under:
+Historical device evidence is retained under:
 
 ```text
 D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE-20260812-134138\
 ```
 
-The `127.0.0.1:7555` alias was used only for read-only discovery and matched the same SX
-emulator identity; all installation, uninstall, UI and runtime commands used only the approved
-`127.0.0.1:16384` serial.
+The T54-R01 M3 diagnostic evidence is retained under:
+
+```text
+D:\controlled-android-sandbox-evidence\T54-R01-M3-DIAG-FIX10-20260812-2130\
+```
+
+The `127.0.0.1:16416` device observed concurrently was `RD测试` and was not used as SX测试
+evidence. All current-session installation, uninstall, UI and runtime commands used only the
+one-time resolved `127.0.0.1:16384` serial.
 
 ## Commit sequence
 
@@ -100,7 +111,7 @@ runtime trust policy or rewrite history.
 
 ## Final device rule
 
-The T54 OEM status may only move to `PASS_RUNTIME` after the approved Xiaomi HyperOS device is
-available and the evidence plan is executed with serial `127.0.0.1:16384`. The current Samsung
-API32 emulator closes only the API32 runtime/UI portion. API32, source compile, or another ADB
-serial cannot substitute for Xiaomi HyperOS Android 16 evidence.
+Future MuMu operations must exact-match `SX测试` and resolve its current ADB serial before the
+operation. The current Samsung API32 emulator cannot substitute for Xiaomi HyperOS Android 16
+evidence, and the M3 formal gate must not be marked PASS until the target FATAL/ANR issue and the
+20-minute stability requirement are both closed.

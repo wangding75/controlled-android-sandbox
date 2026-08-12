@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +120,28 @@ def run_adb(adb: Path, args: list[str], *, check: bool = True) -> subprocess.Com
     return result
 
 
+def run_manager(manager: Path, index: int | str) -> dict[str, Any]:
+    if not manager.is_file():
+        return {}
+    result = subprocess.run(
+        [str(manager), "info", "--vmindex", str(index)],
+        text=False,
+        capture_output=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        return {
+            "returnCode": result.returncode,
+            "stderr": result.stderr.decode("utf-8", errors="replace").strip(),
+        }
+    stdout = result.stdout.decode("utf-8", errors="replace")
+    try:
+        value = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {"returnCode": result.returncode, "raw": stdout.strip()}
+    return value if isinstance(value, dict) else {"value": value}
+
+
 def resolve_instance(
     instance_name: str = DEFAULT_INSTANCE_NAME,
     *,
@@ -136,15 +159,36 @@ def resolve_instance(
         raise ResolutionError(f"MuMu instance name {instance_name!r} matched {len(matches)} configurations")
     selected = matches[0]
     adb_path = (adb or Path(os.environ.get("ADB", "adb"))).resolve() if adb else Path("adb")
-    serial = selected["configuredSerial"]
+    manager = root / "shell" / "MuMuManager.exe"
+    manager_info = run_manager(manager, selected["index"])
+    if manager_info and str(manager_info.get("name", "")).strip() not in ("", instance_name):
+        raise ResolutionError(
+            f"MuMu manager name mismatch for index {selected['index']}: "
+            f"expected {instance_name!r}, found {manager_info.get('name')!r}"
+        )
+    host = str(manager_info.get("adb_host_ip", "127.0.0.1")).strip() or "127.0.0.1"
+    port_value = manager_info.get("adb_port", selected["configuredHostPort"])
+    try:
+        port = int(port_value)
+    except (TypeError, ValueError) as exc:
+        raise ResolutionError(f"MuMu manager returned invalid ADB port: {port_value!r}") from exc
+    serial = f"{host}:{port}"
     connect_result: dict[str, Any] = {}
     if connect:
-        connected = run_adb(adb_path, ["connect", serial], check=False)
-        connect_result = {
-            "returnCode": connected.returncode,
-            "stdout": connected.stdout.strip(),
-            "stderr": connected.stderr.strip(),
-        }
+        for attempt in range(1, 4):
+            connected = run_adb(adb_path, ["connect", serial], check=False)
+            state_probe = run_adb(adb_path, ["-s", serial, "get-state"], check=False)
+            connect_result = {
+                "attempt": attempt,
+                "returnCode": connected.returncode,
+                "stdout": connected.stdout.strip(),
+                "stderr": connected.stderr.strip(),
+                "getState": state_probe.stdout.strip(),
+            }
+            if state_probe.stdout.strip() == "device":
+                break
+            run_adb(adb_path, ["disconnect", serial], check=False)
+            time.sleep(1)
     devices_result = run_adb(adb_path, ["devices", "-l"])
     state_result = run_adb(adb_path, ["-s", serial, "get-state"], check=False)
     state = state_result.stdout.strip()
@@ -166,6 +210,8 @@ def resolve_instance(
         "instanceId": selected["id"],
         "vmName": selected["vmName"],
         "runtimeStatus": state,
+        "mumuPlayerState": manager_info.get("player_state", ""),
+        "mumuManager": manager_info,
         "resolvedSerial": serial,
         "configuredSerial": selected["configuredSerial"],
         "manufacturer": prop("ro.product.manufacturer"),
@@ -179,6 +225,8 @@ def resolve_instance(
             "extraConfig": selected["extraConfig"],
             "vmConfig": selected["vmConfig"],
             "configuredHostPort": selected["configuredHostPort"],
+            "runtimeHost": host,
+            "runtimeHostPort": port,
             "configuredManufacturer": selected["configuredManufacturer"],
             "configuredModel": selected["configuredModel"],
         },
