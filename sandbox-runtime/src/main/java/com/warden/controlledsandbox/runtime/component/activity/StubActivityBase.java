@@ -451,7 +451,7 @@ public abstract class StubActivityBase extends Activity {
                 if (activity.get(record) != this) continue;
                 java.lang.reflect.Field window = record.getClass().getDeclaredField("window");
                 window.setAccessible(true);
-                if (window.get(record) == getWindow()) {
+                if (window.get(record) != null) {
                     window.set(record, null);
                     try {
                         java.lang.reflect.Field preserve = record.getClass().getDeclaredField("mPreserveWindow");
