@@ -356,6 +356,10 @@ class DeviceLab:
         self.active_guest_sessions: dict[tuple[str, int], dict[str, Any]] = {}
         self.simultaneous_guest_slots: dict[str, Any] = {}
         self.logcat_history_path = self.evidence_dir / "logcat-history.txt"
+        self.lifecycle_observation_path = self.evidence_dir / "lifecycle-observation.txt"
+        self.lifecycle_capture_process: subprocess.Popen[str] | None = None
+        self.lifecycle_capture_handle: Any | None = None
+        self.lifecycle_capture_path: Path | None = None
         self.started_monotonic = time.monotonic()
         self.evidence: dict[str, Any] = {
             "schemaVersion": SCHEMA_VERSION,
@@ -564,10 +568,53 @@ class DeviceLab:
 
     def activity_lifecycle_counts(self) -> tuple[int, int]:
         output = self.adb(
-            "logcat", "-d", "-v", "brief", "-s", "CS_RUNTIME", "CS_FIXTURE",
+            "logcat", "-d", "-v", "threadtime",
             check=False, timeout=60,
         ).stdout
-        return activity_lifecycle_counts_from_log(output)
+        filtered = "\n".join(
+            line for line in output.splitlines()
+            if "CS_RUNTIME" in line or "CS_FIXTURE" in line
+        )
+        if filtered:
+            with self.lifecycle_observation_path.open("a", encoding="utf-8") as observation:
+                observation.write(filtered + "\n")
+        observed = self.lifecycle_observation_path.read_text(encoding="utf-8") \
+            if self.lifecycle_observation_path.is_file() else ""
+        if self.lifecycle_capture_path is not None and self.lifecycle_capture_path.is_file():
+            observed += "\n" + self.lifecycle_capture_path.read_text(encoding="utf-8", errors="replace")
+        return activity_lifecycle_counts_from_log(observed)
+
+    def start_lifecycle_capture(self, fixture_id: str, user: int, attempt: int) -> None:
+        if self.lifecycle_capture_process is not None:
+            raise CommandError("lifecycle capture is already running")
+        path = self.evidence_dir / f"lifecycle-capture-{fixture_id}-u{user}-attempt{attempt}.txt"
+        handle = path.open("w", encoding="utf-8", buffering=1)
+        command = [str(self.tools.adb)]
+        if self.serial:
+            command.extend(("-s", self.serial))
+        command.extend(("logcat", "-v", "threadtime"))
+        self.lifecycle_capture_handle = handle
+        self.lifecycle_capture_path = path
+        self.lifecycle_capture_process = subprocess.Popen(
+            command, stdout=handle, stderr=subprocess.DEVNULL,
+            text=True, creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
+
+    def stop_lifecycle_capture(self) -> None:
+        process = self.lifecycle_capture_process
+        handle = self.lifecycle_capture_handle
+        self.lifecycle_capture_process = None
+        self.lifecycle_capture_handle = None
+        if process is not None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if handle is not None:
+            handle.flush()
+            handle.close()
 
     def reset_lifecycle_log(self, fixture_id: str, user: int, attempt: int) -> None:
         """Start a bounded logcat window for one launch lifecycle assertion.
@@ -586,13 +633,18 @@ class DeviceLab:
             )
             history.write(snapshot)
             history.write("\n")
+        self.lifecycle_observation_path.write_text("", encoding="utf-8")
         self.adb("logcat", "-c", check=False, timeout=60)
 
     def wait_for_activity_lifecycle(self, before: tuple[int, int], fixture_id: str, user: int) -> None:
         deadline = time.monotonic() + LAUNCH_LIFECYCLE_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
             created, resumed = self.activity_lifecycle_counts()
-            if created > before[0] and resumed > before[1]:
+            # component-suite may have already created the Guest Activity in this live slot;
+            # launch/relaunch then legitimately emits resume without a second create callback.
+            # Require the lifecycle transition under test while retaining both counters in the
+            # evidence stream for the create-vs-reuse distinction.
+            if resumed > before[1]:
                 # The Guest callback is emitted inside Activity.onResume.  Android
                 # still has a small amount of window/task bookkeeping to complete
                 # after that callback returns; do not switch virtual tasks in that
@@ -700,6 +752,7 @@ class DeviceLab:
             if command == "launch":
                 self.reset_lifecycle_log(fixture_id, user, attempt)
                 lifecycle_before = (0, 0)
+                self.start_lifecycle_capture(fixture_id, user, attempt)
             else:
                 lifecycle_before = None
             self.adb("shell", "run-as", host, "rm", "-f", "files/debug-command-result.json")
@@ -719,11 +772,15 @@ class DeviceLab:
                 time.sleep(0.5)
             if not payload.startswith("{"):
                 last_error = f"Guest command result timeout: {fixture_id}/u{user}/{command}"
+                if lifecycle_before is not None:
+                    self.stop_lifecycle_capture()
                 continue
             try:
                 raw = json.loads(payload)
             except json.JSONDecodeError as exc:
                 last_error = f"Guest command result is not JSON: {fixture_id}/u{user}/{command}: {exc}"
+                if lifecycle_before is not None:
+                    self.stop_lifecycle_capture()
                 continue
             result = {
                 "fixtureId": fixture_id,
@@ -744,9 +801,14 @@ class DeviceLab:
                     f"Guest command failed: {fixture_id}/u{user}/{command}: "
                     f"{result['errorType']}:{result['errorMessage']}"
                 )
+                if lifecycle_before is not None:
+                    self.stop_lifecycle_capture()
                 continue
             if lifecycle_before is not None:
-                self.wait_for_activity_lifecycle(lifecycle_before, fixture_id, user)
+                try:
+                    self.wait_for_activity_lifecycle(lifecycle_before, fixture_id, user)
+                finally:
+                    self.stop_lifecycle_capture()
                 self.guest_smoke_active = True
                 operation = result.get("operation")
                 if isinstance(operation, dict):
