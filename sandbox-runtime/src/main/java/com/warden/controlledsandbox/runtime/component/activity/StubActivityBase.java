@@ -150,6 +150,12 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onStart() { super.onStart(); hostStage = 2; if (controller != null) controller.start(); }
     @Override protected void onResume() {
         super.onResume();
+        // ActivityThread performs its window update immediately after this callback returns.
+        // A trampoline can have a detached DecorView after another same-process Stub crosses
+        // pause/stop, while the framework-side mWindowAdded marker is still true. Clear that
+        // stale marker here so the framework takes its add-window path instead of updating a
+        // ViewRoot that no longer exists.
+        clearMissingWindowRoot();
         if (!diagnosticInstalled) {
             setContentView(diagnostic);
             diagnosticInstalled = true;
@@ -161,8 +167,18 @@ public abstract class StubActivityBase extends Activity {
         }
         postGuestCreationIfResumed();
     }
-    @Override protected void onPause() { hostStage = 2; if (controller != null) controller.pause(); super.onPause(); }
-    @Override protected void onStop() { hostStage = 1; if (controller != null) controller.stop(); super.onStop(); }
+    @Override protected void onPause() {
+        hostStage = 2;
+        if (controller != null) controller.pause();
+        clearMissingWindowRoot();
+        super.onPause();
+    }
+    @Override protected void onStop() {
+        hostStage = 1;
+        if (controller != null) controller.stop();
+        clearMissingWindowRoot();
+        super.onStop();
+    }
     @Override protected void onDestroy() {
         destroying = true;
         IBinder destroyedToken = frameworkActivityToken;
