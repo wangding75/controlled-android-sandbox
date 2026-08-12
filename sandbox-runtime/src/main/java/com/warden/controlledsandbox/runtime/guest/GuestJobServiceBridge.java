@@ -5,6 +5,7 @@ import android.app.job.JobService;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
@@ -146,6 +147,10 @@ final class GuestJobServiceBridge implements AutoCloseable {
                 setOptionalField(value, "mApplication", session.application);
                 setOptionalField(value, "mClassName", className);
                 value.onCreate();
+                // JobService.jobFinished() delegates through the engine initialized by
+                // onBind().  Guest services are instantiated directly by the bridge, so
+                // reproduce that lifecycle edge before delivering the first callback.
+                value.onBind(new Intent("android.app.job.JobService"));
                 return value;
             });
         } catch (RuntimeException error) { throw error; }
