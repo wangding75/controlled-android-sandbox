@@ -289,12 +289,163 @@ bool install_hidden_api_bridge(JNIEnv* env) {
     return success;
 }
 
+bool clear_detached_activity_record(JNIEnv* env, jobject activity) {
+    if (activity == nullptr) throw std::invalid_argument("activity is required");
+
+    jclass activity_thread = env->FindClass("android/app/ActivityThread");
+    if (activity_thread == nullptr) throw std::runtime_error("ActivityThread class unavailable");
+    const jfieldID current_id = env->GetStaticFieldID(
+            activity_thread, "sCurrentActivityThread", "Landroid/app/ActivityThread;");
+    if (current_id == nullptr) throw std::runtime_error("ActivityThread current instance unavailable");
+    jobject current = env->GetStaticObjectField(activity_thread, current_id);
+    if (current == nullptr) throw std::runtime_error("ActivityThread current instance is null");
+
+    const jfieldID activities_id = env->GetFieldID(
+            activity_thread, "mActivities", "Landroid/util/ArrayMap;");
+    if (activities_id == nullptr) throw std::runtime_error("ActivityThread activity map unavailable");
+    jobject activities = env->GetObjectField(current, activities_id);
+    if (activities == nullptr) throw std::runtime_error("ActivityThread activity map is null");
+
+    jclass array_map = env->FindClass("android/util/ArrayMap");
+    if (array_map == nullptr) throw std::runtime_error("ArrayMap class unavailable");
+    const jmethodID map_get = env->GetMethodID(
+            array_map, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (map_get == nullptr) {
+        env->ExceptionClear();
+        throw std::runtime_error("ActivityThread activity lookup unavailable");
+    }
+    jclass activity_class = env->GetObjectClass(activity);
+    const jfieldID activity_token = env->GetFieldID(
+            activity_class, "mToken", "Landroid/os/IBinder;");
+    if (activity_token == nullptr) throw std::runtime_error("Activity framework token unavailable");
+    jobject token = env->GetObjectField(activity, activity_token);
+    if (token == nullptr) throw std::runtime_error("Activity framework token is null");
+    jobject record = env->CallObjectMethod(activities, map_get, token);
+    if (env->ExceptionCheck()) throw std::runtime_error("ActivityThread activity lookup failed");
+    if (record == nullptr) throw std::runtime_error("ActivityClientRecord for framework token not found");
+    jclass record_class = env->GetObjectClass(record);
+    const jfieldID record_activity = env->GetFieldID(
+            record_class, "activity", "Landroid/app/Activity;");
+    if (record_activity == nullptr) throw std::runtime_error("ActivityClientRecord activity unavailable");
+    jobject record_activity_value = env->GetObjectField(record, record_activity);
+    if (record_activity_value == nullptr || !env->IsSameObject(record_activity_value, activity)) {
+        throw std::runtime_error("ActivityClientRecord framework token points to another Activity");
+    }
+    const jfieldID record_window = env->GetFieldID(
+            record_class, "window", "Landroid/view/Window;");
+    if (record_window == nullptr) throw std::runtime_error("ActivityClientRecord window unavailable");
+    jobject previous_window = env->GetObjectField(record, record_window);
+    if (previous_window == nullptr) throw std::runtime_error("ActivityClientRecord window is already null");
+    env->SetObjectField(record, record_window, nullptr);
+    if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord window clear failed");
+    if (env->GetObjectField(record, record_window) != nullptr) {
+        throw std::runtime_error("ActivityClientRecord window clear was not observed");
+    }
+    const jfieldID preserve = env->GetFieldID(record_class, "mPreserveWindow", "Z");
+    jboolean preserve_value = JNI_FALSE;
+    if (preserve != nullptr) {
+        preserve_value = env->GetBooleanField(record, preserve);
+        env->SetBooleanField(record, preserve, JNI_FALSE);
+        if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord preserve clear failed");
+        if (env->GetBooleanField(record, preserve) != JNI_FALSE) {
+            throw std::runtime_error("ActivityClientRecord preserve clear was not observed");
+        }
+    } else {
+        env->ExceptionClear();
+    }
+    const jfieldID pending_window = env->GetFieldID(
+            record_class, "mPendingRemoveWindow", "Landroid/view/Window;");
+    if (pending_window == nullptr) {
+        throw std::runtime_error("ActivityClientRecord pending window unavailable");
+    }
+    jobject pending_window_value = env->GetObjectField(record, pending_window);
+    env->SetObjectField(record, pending_window, nullptr);
+    if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord pending window clear failed");
+    const jfieldID pending_manager = env->GetFieldID(
+            record_class, "mPendingRemoveWindowManager", "Landroid/view/WindowManager;");
+    if (pending_manager == nullptr) {
+        throw std::runtime_error("ActivityClientRecord pending manager unavailable");
+    }
+    env->SetObjectField(record, pending_manager, nullptr);
+    if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord pending manager clear failed");
+    const jmethodID map_size = env->GetMethodID(array_map, "size", "()I");
+    const jmethodID map_value_at = env->GetMethodID(
+            array_map, "valueAt", "(I)Ljava/lang/Object;");
+    if (map_size == nullptr || map_value_at == nullptr) {
+        throw std::runtime_error("ActivityThread activity map scan unavailable");
+    }
+    jint records_cleared = 1;
+    const jint activity_count = env->CallIntMethod(activities, map_size);
+    if (env->ExceptionCheck()) throw std::runtime_error("ActivityThread activity map size failed");
+    for (jint index = 0; index < activity_count; index++) {
+        jobject candidate = env->CallObjectMethod(activities, map_value_at, index);
+        if (env->ExceptionCheck()) throw std::runtime_error("ActivityThread activity map scan failed");
+        if (candidate == nullptr || env->IsSameObject(candidate, record)) continue;
+        jobject candidate_activity = env->GetObjectField(candidate, record_activity);
+        if (candidate_activity == nullptr || !env->IsSameObject(candidate_activity, activity)) continue;
+        jobject candidate_window = env->GetObjectField(candidate, record_window);
+        if (candidate_window != nullptr) {
+            env->SetObjectField(candidate, record_window, nullptr);
+            if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord replacement window clear failed");
+        }
+        if (preserve != nullptr) {
+            env->SetBooleanField(candidate, preserve, JNI_FALSE);
+            if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord replacement preserve clear failed");
+        }
+        env->SetObjectField(candidate, pending_window, nullptr);
+        if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord replacement pending window clear failed");
+        env->SetObjectField(candidate, pending_manager, nullptr);
+        if (env->ExceptionCheck()) throw std::runtime_error("ActivityClientRecord replacement pending manager clear failed");
+        records_cleared++;
+    }
+    const jfieldID window_added = env->GetFieldID(
+            activity_class, "mWindowAdded", "Z");
+    if (window_added == nullptr) throw std::runtime_error("Activity window marker unavailable");
+    env->SetBooleanField(activity, window_added, JNI_FALSE);
+    if (env->ExceptionCheck()) throw std::runtime_error("Activity window marker clear failed");
+    if (env->GetBooleanField(activity, window_added) != JNI_FALSE) {
+        throw std::runtime_error("Activity window marker clear was not observed");
+    }
+    const jfieldID started_activity = env->GetFieldID(activity_class, "mStartedActivity", "Z");
+    const jfieldID visible_from_client = env->GetFieldID(activity_class, "mVisibleFromClient", "Z");
+    const jfieldID visible_from_server = env->GetFieldID(activity_class, "mVisibleFromServer", "Z");
+    const jfieldID finished = env->GetFieldID(activity_class, "mFinished", "Z");
+    if (started_activity == nullptr || visible_from_client == nullptr
+            || visible_from_server == nullptr || finished == nullptr) {
+        throw std::runtime_error("Activity visibility state unavailable");
+    }
+    const jfieldID hide_for_now = env->GetFieldID(record_class, "hideForNow", "Z");
+    if (hide_for_now == nullptr) throw std::runtime_error("ActivityClientRecord visibility state unavailable");
+    __android_log_print(ANDROID_LOG_INFO, "CS_WINDOW_RECORD",
+            "cleared=1 records=%d preserveWindow=%s pendingRemoveWindow=%s started=%d visibleClient=%d visibleServer=%d finished=%d hideForNow=%d token=%p",
+            records_cleared,
+            preserve_value == JNI_FALSE ? "0" : "1",
+            pending_window_value == nullptr ? "0" : "1",
+            env->GetBooleanField(activity, started_activity),
+            env->GetBooleanField(activity, visible_from_client),
+            env->GetBooleanField(activity, visible_from_server),
+            env->GetBooleanField(activity, finished),
+            env->GetBooleanField(record, hide_for_now), token);
+    return true;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallHiddenApiBridge(
         JNIEnv* env, jclass) {
     return install_hidden_api_bridge(env) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeClearDetachedActivityRecord(
+        JNIEnv* env, jclass, jobject activity) {
+    try {
+        return clear_detached_activity_record(env, activity) ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalStateException", error.what());
+        return JNI_FALSE;
+    }
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

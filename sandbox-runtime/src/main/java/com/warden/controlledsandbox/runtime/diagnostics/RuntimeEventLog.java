@@ -33,6 +33,9 @@ public final class RuntimeEventLog {
             if (data.containsKey("windowRegistered")) {
                 line.append(" windowRegistered=").append(data.getBoolean("windowRegistered", false));
             }
+            if (data.containsKey("windowAddedMarker")) {
+                line.append(" windowAddedMarker=").append(data.getBoolean("windowAddedMarker", false));
+            }
             if (data.containsKey("ownerEpoch")) {
                 line.append(" ownerEpoch=").append(data.getLong("ownerEpoch", 0));
             }

@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.runtime.guest.GuestActivityResultBridge;
 import com.warden.controlledsandbox.runtime.guest.RouteBrokerClient;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.framework.activity.StubActivityWindowOwnership;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -169,6 +170,12 @@ public abstract class StubActivityBase extends Activity {
         if (controller != null) controller.start();
     }
     @Override protected void onResume() {
+        // ActivityThread performs its final window update after this callback returns.  A few
+        // framework/OEM paths remove the WMG root after onPause(), without delivering
+        // onDetachedFromWindow().  Detect that state before super.onResume() so the framework
+        // sees the cleared ActivityClientRecord and takes its normal addView path.
+        detectMissingWindowBeforeFrameworkResume();
+        recoverDetachedWindow();
         super.onResume();
         if (!diagnosticInstalled) {
             setContentView(diagnostic);
@@ -178,7 +185,6 @@ public abstract class StubActivityBase extends Activity {
         // the framework/OEM removed the previous root, establish the current Window content
         // first, then restore that same current Stub window before returning; otherwise the
         // framework can update a DecorView absent from WMG.mViews.
-        recoverDetachedWindow();
         hostStage = 3;
         if (controller != null) controller.resume();
         if (controller != null && activityResults != null) {
@@ -258,7 +264,7 @@ public abstract class StubActivityBase extends Activity {
     @Override public void onDetachedFromWindow() {
         // WindowManagerGlobal has removed this trampoline's root. Remember the ownership loss;
         // the next resume re-adds this current DecorView before ActivityThread's update branch.
-        windowRecoveryRequired = windowWasExpected && !destroying;
+        windowRecoveryRequired = !destroying;
         StubActivityWindowOwnership.Lease currentOwner = ownerLease;
         if (currentOwner != null) {
             windowOwnership.detach(currentOwner, windowIdentity());
@@ -471,14 +477,28 @@ public abstract class StubActivityBase extends Activity {
     private void clearMissingWindowRoot() {
         android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
         if (decor == null || decor.isAttachedToWindow() || isWindowRegistered(decor)) return;
-        if (windowWasExpected && !destroying) windowRecoveryRequired = true;
+        if (!destroying) windowRecoveryRequired = true;
         clearWindowAddedMarker();
         StubActivityWindowOwnership.Lease currentOwner = ownerLease;
         if (currentOwner != null) windowOwnership.detach(currentOwner, windowIdentity());
         logWindowEvent("STUB_WINDOW_ROOT_MISSING", "DETACHED");
     }
 
-    /** Re-registers the current Stub root before ActivityThread can reach updateViewLayout. */
+    private void detectMissingWindowBeforeFrameworkResume() {
+        if (destroying || !diagnosticInstalled || !windowWasExpected) return;
+        android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+        if (decor == null || !windowAddedMarker() || isWindowRegistered(decor)) return;
+        windowRecoveryRequired = true;
+        clearWindowAddedMarker();
+        StubActivityWindowOwnership.Lease currentOwner = ownerLease;
+        if (currentOwner != null) windowOwnership.detach(currentOwner, windowIdentity());
+        logWindowEvent("STUB_WINDOW_ROOT_MISSING_BEFORE_RESUME", "DETACHED");
+    }
+
+    /**
+     * Repairs the framework record before ActivityThread can reach updateViewLayout. The
+     * framework then owns the normal r.window == null -> addView transition for this Activity.
+     */
     private void recoverDetachedWindow() {
         if (!windowRecoveryRequired || destroying) return;
         android.view.Window window = getWindow();
@@ -488,10 +508,14 @@ public abstract class StubActivityBase extends Activity {
         if (!decor.isAttachedToWindow() && !isWindowRegistered(decor)) {
             android.view.WindowManager.LayoutParams attributes = window.getAttributes();
             attributes.type = android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+            int oldSoftInputMode = attributes.softInputMode;
+            attributes.softInputMode &= ~android.view.WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION;
             windowLayoutToken = String.valueOf(attributes.token);
-            getWindowManager().addView(decor, attributes);
-            setWindowAddedMarker(true);
-            logWindowEvent("STUB_WINDOW_REATTACHED", "ATTACHED");
+            NativePolicy.clearDetachedActivityRecord(this);
+            clearWindowAddedMarker();
+            windowLayoutToken = windowLayoutToken + ";softInput=" + oldSoftInputMode
+                    + "->" + attributes.softInputMode;
+            logWindowEvent("STUB_WINDOW_RECORD_REPAIRED", "DETACHED");
         }
         windowRecoveryRequired = false;
         observeWindowOwnership();
@@ -604,8 +628,20 @@ public abstract class StubActivityBase extends Activity {
                 && getWindow().getDecorView() != null
                 && isWindowRegistered(getWindow().getDecorView()));
         details.putString("windowStage", stage);
+        details.putBoolean("windowAddedMarker", windowAddedMarker());
         details.putLong("ownerEpoch", windowOwnership.epoch());
         RuntimeEventLog.event(event, details);
+    }
+
+    private boolean windowAddedMarker() {
+        try {
+            java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
+            added.setAccessible(true);
+            return added.getBoolean(this);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_WINDOW_MARKER_READ_FAILED", error);
+        }
     }
 
     private static String value(String value) { return value == null ? "" : value; }

@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.nativebridge;
 
+import android.app.Activity;
 import android.view.Surface;
 
 /** JNI boundary for the clean-room native path and network policy engine. */
@@ -36,6 +37,16 @@ public final class NativePolicy {
      */
     public static boolean installHiddenApiBridge() {
         return AVAILABLE && nativeInstallHiddenApiBridge();
+    }
+
+    /**
+     * Clears the framework ActivityClientRecord.window for one detached Activity instance so
+     * ActivityThread can perform its normal addView path on the next resume.
+     */
+    public static boolean clearDetachedActivityRecord(Activity activity) {
+        if (!AVAILABLE) throw new IllegalStateException("NATIVE_POLICY_UNAVAILABLE");
+        if (activity == null) throw new IllegalArgumentException("activity is required");
+        return nativeClearDetachedActivityRecord(activity);
     }
 
     public static boolean configure(String sessionId, long generation, String packageName,
@@ -215,6 +226,7 @@ public final class NativePolicy {
 
     private static String[] safe(String[] values) { return values == null ? new String[0] : values.clone(); }
     private static native boolean nativeInstallHiddenApiBridge();
+    private static native boolean nativeClearDetachedActivityRecord(Activity activity);
     private static native boolean nativeConfigure(String sessionId, long generation, String packageName,
                                                   String processName, int virtualUserId, int virtualUid,
                                                   int virtualPid, String abiName, String instanceRoot, String apkPath,
