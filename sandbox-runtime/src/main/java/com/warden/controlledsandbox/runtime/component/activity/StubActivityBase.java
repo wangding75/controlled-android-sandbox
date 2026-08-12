@@ -395,31 +395,19 @@ public abstract class StubActivityBase extends Activity {
 
     /**
      * An emulator can remove a trampoline root while two same-process Stub Activities are
-     * crossing pause/stop. ActivityThread can still leave mWindowAdded=true, so its later destroy
-     * path calls WindowManagerGlobal.removeViewImmediate() for a root that no longer exists. Only
-     * clear the local marker when the DecorView has neither an attachment nor a ViewRoot; a live
-     * root keeps the platform's normal cleanup path.
+     * crossing pause/stop. ActivityThread can still leave mWindowAdded=true, so its next resume
+     * calls WindowManagerGlobal.updateViewLayout() for a root that no longer exists. A removed
+     * root may retain a stale ViewRootImpl object, so attachment is the authoritative signal here.
      */
     private void clearMissingWindowRoot() {
         try {
             android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
-            if (decor == null || decor.isAttachedToWindow() || viewRoot(decor) != null) return;
+            if (decor == null || decor.isAttachedToWindow()) return;
             java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
             added.setAccessible(true);
             if (added.getBoolean(this)) added.setBoolean(this, false);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-        }
-    }
-
-    private static Object viewRoot(android.view.View view) {
-        try {
-            java.lang.reflect.Method method = android.view.View.class.getDeclaredMethod("getViewRootImpl");
-            method.setAccessible(true);
-            return method.invoke(view);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            return null;
         }
     }
 
