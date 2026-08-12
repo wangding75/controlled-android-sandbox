@@ -25,12 +25,16 @@ $EmulatorProcess = $null
 $StartedAt = Get-Date
 
 function Invoke-Adb {
-    param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
+    param(
+        [Parameter(Position = 0)][string]$First,
+        [Parameter(ValueFromRemainingArguments = $true)][string[]]$Remaining
+    )
+    $adbArgs = @($First) + $Remaining
     $all = @()
     if (-not [string]::IsNullOrWhiteSpace($Serial)) { $all += @('-s', $Serial) }
-    $all += $Args
+    $all += $adbArgs
     & $Adb @all
-    if ($LASTEXITCODE -ne 0) { throw "adb failed ($LASTEXITCODE): $($Args -join ' ')" }
+    if ($LASTEXITCODE -ne 0) { throw "adb failed ($LASTEXITCODE): $($adbArgs -join ' ')" }
 }
 
 function Wait-Boot {
@@ -45,21 +49,45 @@ function Wait-Boot {
 
 function Invoke-GuestCommand {
     param([string]$Command, [int]$VirtualUserId = 0)
-    Invoke-Adb shell run-as $HostPackage rm -f files/debug-command-result.json 2>$null | Out-Null
-    Invoke-Adb shell am start -W -n $CommandActivity --es command $Command --es package $FixturePackage --ei user $VirtualUserId |
-        Out-File (Join-Path $Evidence ("command-$Command-u$VirtualUserId-start.txt")) -Encoding utf8
-    $deadline = (Get-Date).AddSeconds(60)
-    do {
-        Start-Sleep -Milliseconds 750
-        $adbPrefix = @()
-        if (-not [string]::IsNullOrWhiteSpace($Serial)) { $adbPrefix += @('-s', $Serial) }
-        $json = (& $Adb @adbPrefix shell run-as $HostPackage cat files/debug-command-result.json 2>$null | Out-String).Trim()
-        if ((Get-Date) -gt $deadline) { throw "Command result timeout: $Command" }
-    } until ($json.StartsWith('{'))
-    $json | Out-File (Join-Path $Evidence ("command-$Command-u$VirtualUserId-result.json")) -Encoding utf8
-    $result = $json | ConvertFrom-Json
-    if ($result.status -ne 'PASS') { throw "Guest command failed: $Command - $($result.errorType): $($result.errorMessage)" }
-    return $result
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Invoke-Adb shell am force-stop $HostPackage | Out-Null
+        Start-Sleep -Milliseconds 500
+        $clearArgs = @('shell', 'run-as', $HostPackage, 'rm', '-f', 'files/debug-command-result.json')
+        Invoke-Adb @clearArgs 2>$null | Out-Null
+
+        $startArgs = @('shell', 'am', 'start', '-W', '-n', $CommandActivity,
+            '--es', 'command', $Command, '--es', 'package', $FixturePackage,
+            '--ei', 'user', "$VirtualUserId")
+        if ($Command -eq 'import-prepare') {
+            $startArgs += @('--ez', 'trustNativeGuest', 'true')
+        }
+        Invoke-Adb @startArgs |
+            Out-File (Join-Path $Evidence ("command-$Command-u$VirtualUserId-start.txt")) -Encoding utf8
+        $deadline = (Get-Date).AddSeconds(60)
+        $json = ''
+        do {
+            Start-Sleep -Milliseconds 750
+            $adbPrefix = @()
+            if (-not [string]::IsNullOrWhiteSpace($Serial)) { $adbPrefix += @('-s', $Serial) }
+            $pollErrorAction = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try {
+                $json = (& $Adb @adbPrefix shell run-as $HostPackage cat files/debug-command-result.json 2>$null | Out-String).Trim()
+            } finally {
+                $ErrorActionPreference = $pollErrorAction
+            }
+            if ((Get-Date) -gt $deadline) { throw "Command result timeout: $Command" }
+        } until ($json.StartsWith('{'))
+        $json | Out-File (Join-Path $Evidence ("command-$Command-u$VirtualUserId-result.json")) -Encoding utf8
+        $result = $json | ConvertFrom-Json
+        if ($result.status -eq 'PASS') { return $result }
+        if ($result.errorMessage -match 'Package management service is unavailable' -and $attempt -lt 3) {
+            Start-Sleep -Seconds 5
+            continue
+        }
+        throw "Guest command failed: $Command - $($result.errorType): $($result.errorMessage)"
+    }
+    throw "Guest command retry budget exhausted: $Command"
 }
 
 try {
