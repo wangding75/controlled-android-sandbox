@@ -201,9 +201,32 @@ final class VirtualPackageStateBuilder {
                     break;
                 }
             }
-            if (existing == null) target.add(component);
-            else existing.mergeFrom(component);
+            if (existing != null) {
+                existing.mergeFrom(component);
+                continue;
+            }
+            if (hasProviderAuthority(target, component)) {
+                // Android package parsing keeps the first provider for a duplicated authority
+                // and skips the later malformed declaration. This also keeps one authority from
+                // being registered to two Guest components during runtime bootstrap.
+                continue;
+            }
+            target.add(component);
         }
+    }
+
+    private static boolean hasProviderAuthority(List<ManifestModel.Component> target,
+                                                 ManifestModel.Component incoming) {
+        for (ManifestModel.Component candidate : target) {
+            for (String existing : candidate.authorities().split(";")) {
+                String normalizedExisting = existing.trim();
+                if (normalizedExisting.isEmpty()) continue;
+                for (String declared : incoming.authorities().split(";")) {
+                    if (normalizedExisting.equals(declared.trim())) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private List<SharedLibraryResolver.AvailableLibrary> availableLibraries(

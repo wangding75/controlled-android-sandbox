@@ -27,11 +27,10 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
             for (String authority : component.authority().split(";")) {
                 String normalized = authority == null ? "" : authority.trim();
                 if (normalized.isEmpty()) continue;
-                ProviderDescriptor prior = descriptors.put(normalized,
+                // Match Android package parsing: the first provider owns a duplicated authority;
+                // a later malformed declaration must not replace or conflict with that owner.
+                descriptors.putIfAbsent(normalized,
                         new ProviderDescriptor(normalized, component.className(), component.exported()));
-                if (prior != null && !prior.componentClass.equals(component.className())) {
-                    throw new IllegalStateException("DUPLICATE_PROVIDER_AUTHORITY:" + normalized);
-                }
             }
         }
     }
