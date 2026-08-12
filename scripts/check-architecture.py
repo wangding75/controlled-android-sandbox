@@ -109,7 +109,8 @@ for source in DOMAIN_PACKAGE_ROOT.rglob('*.java'):
             )
 
 # Prevent a foreign import from shadowing a same-package top-level type.
-java_sources = [source for source in ROOT.rglob('*.java') if REFERENCE_ROOT not in source.parents]
+java_sources = [source for source in ROOT.rglob('*.java')
+                if source.is_file() and REFERENCE_ROOT not in source.parents]
 package_types: dict[str, set[str]] = {}
 source_meta: list[tuple[Path, str, str]] = []
 for source in java_sources:
