@@ -93,10 +93,10 @@ Linux:
 
 Formal mode always requires at least 1,200 seconds. For diagnosis only, use `--diagnostic --stability-seconds 0` on Linux or `-Diagnostic -StabilitySeconds 0` on Windows; diagnostic output cannot satisfy the release gate.
 
-### 4. Run the formal MuMu `SX测试` instance
+### 4. Run the formal MuMu `RD测试` instance
 
 ```powershell
-.\scripts\run-emulator-m5.ps1 -MumuInstanceName 'SX测试' -KeepEmulator
+.\scripts\run-emulator-m5.ps1 -MumuInstanceName 'RD测试' -KeepEmulator
 ```
 
 The runner resolves the selected MuMu instance from its current configuration, connects the

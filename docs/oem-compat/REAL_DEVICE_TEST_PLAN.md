@@ -1,11 +1,11 @@
 # Real-device test plan: Xiaomi HyperOS Android 16 / API 36
 
 Target: Xiaomi phone running HyperOS and Android 16 / API 36.  
-Current MuMu test instance for this project: `SX测试`; ADB serial is dynamically resolved at
-runtime and is not a device identity.  
+Current MuMu test instance for this project: `RD测试`; ADB serial is dynamically resolved at
+runtime and is not a device identity. `SX测试` is historical T54-R01 environment evidence only.
 Evidence root: `D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE\`.
 
-Before every MuMu operation, resolve the exact `SX测试` instance from the current MuMu list,
+Before every MuMu operation, resolve the exact `RD测试` instance from the current MuMu list,
 connect its current ADB endpoint, require `adb -s <resolved-serial> get-state` to return
 `device`, and use that serial for the complete operation. Do not guess historical ports or use
 another MuMu instance. If the Xiaomi device is absent, record
@@ -15,7 +15,7 @@ another MuMu instance. If the Xiaomi device is absent, record
 
 ```powershell
 New-Item -ItemType Directory -Force D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE | Out-Null
-$resolution = python scripts/mumu_instance.py --instance-name 'SX测试' | ConvertFrom-Json
+$resolution = python scripts/mumu_instance.py --instance-name 'RD测试' | ConvertFrom-Json
 $serial = $resolution.resolvedSerial
 adb -s $serial get-state
 adb -s $serial shell getprop ro.product.manufacturer

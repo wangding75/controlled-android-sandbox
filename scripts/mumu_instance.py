@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_SCOPE = "Controlled Android Sandbox / 闪现2"
-DEFAULT_INSTANCE_NAME = "SX测试"
+DEFAULT_INSTANCE_NAME = "RD测试"
 DEFAULT_ROOTS = (
     Path(r"C:\Program Files\Netease\MuMu Player 12"),
     Path(r"C:\Program Files (x86)\Netease\MuMu Player 12"),
