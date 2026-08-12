@@ -120,14 +120,18 @@ def main() -> int:
         required = set(map(str, item["requiredNativeLibraries"]))
         details = inspect_apk(source, allowed, required)
         if aapt2 is not None and apksigner is not None:
-            badging = subprocess.run([str(aapt2), "dump", "badging", str(source)], text=True, capture_output=True)
+            badging = subprocess.run(
+                [str(aapt2), "dump", "badging", str(source)],
+                text=True, encoding="utf-8", errors="replace", capture_output=True)
             if badging.returncode != 0:
                 fail(f"aapt2 rejected APK {source}: {badging.stderr.strip()}")
             match = re.search(r"package: name='([^']+)'", badging.stdout)
             actual_application_id = match.group(1) if match else ""
             if actual_application_id != item["applicationId"]:
                 fail(f"APK applicationId mismatch for {artifact_id}: expected {item['applicationId']}, found {actual_application_id or '<missing>'}")
-            signature = subprocess.run([str(apksigner), "verify", "--verbose", str(source)], text=True, capture_output=True)
+            signature = subprocess.run(
+                [str(apksigner), "verify", "--verbose", str(source)],
+                text=True, encoding="utf-8", errors="replace", capture_output=True)
             if signature.returncode != 0:
                 fail(f"apksigner rejected APK {source}: {(signature.stderr or signature.stdout).strip()}")
             details["applicationIdVerified"] = actual_application_id
