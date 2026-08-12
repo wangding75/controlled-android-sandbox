@@ -12,3 +12,6 @@ __pycache__/
 
 # Local verification working logs (published separately as release artifacts)
 verification/*-working.txt
+
+# Local M5 APK validation outputs; published evidence stays outside the repository.
+artifacts/m5-device-lab-build/
