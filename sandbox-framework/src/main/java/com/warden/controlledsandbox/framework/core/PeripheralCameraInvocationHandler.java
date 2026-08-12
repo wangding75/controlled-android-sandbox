@@ -36,7 +36,7 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
         String name = normalize(method.getName());
         if (containsAny(name, "connect", "connectdevice", "getcameracharacteristics",
                 "createstream", "createinputstream", "submitrequest", "submitrequestlist",
-                "disconnect")) {
+                "getcaptureresultmetadataqueue", "disconnect")) {
             android.util.Log.i("CS_CAMERA_CALL", "method=" + method.getName()
                     + " return=" + method.getReturnType().getName()
                     + " args=" + argumentTypes(arguments)
@@ -225,6 +225,14 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
                             state.cameraSessions.remove(token);
                             return null;
                         }
+                        // Android 16 exposes the optional FMQ result-metadata descriptor during
+                        // CameraDevice setup.  The virtual camera delivers controlled frames
+                        // through the existing request/output adapter, so there is no metadata
+                        // FMQ to publish.  A null descriptor is the platform's optional-queue
+                        // absence contract and lets CameraDeviceImpl continue with Binder results.
+                        if (name.equals("getcaptureresultmetadataqueue")) {
+                            return emptyCaptureResultMetadataQueue(method.getReturnType());
+                        }
                         if (name.equals("getcamerainfo") || name.equals("createdefaultrequest")) {
                             return cameraCharacteristics(method.getReturnType());
                         }
@@ -263,6 +271,53 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("VIRTUAL_CAMERA_SUBMIT_INFO_ADAPTER_FAILED", error);
         }
+    }
+
+    /**
+     * API 36 parcels the optional result-metadata FMQ descriptor during camera open.  The
+     * controlled camera has no metadata queue, but CameraDeviceImpl still requires a parcelable
+     * envelope.  Keep the envelope typed and empty; frame delivery remains on the request/output
+     * path above.
+     */
+    private static Object emptyCaptureResultMetadataQueue(Class<?> returnType) {
+        try {
+            Constructor<?> constructor = returnType.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Object descriptor = constructor.newInstance();
+            setField(descriptor, returnType, "flags", 0);
+            setField(descriptor, returnType, "quantum", 1);
+            Field grantors = field(returnType, "grantors");
+            grantors.set(descriptor, Array.newInstance(grantors.getType().getComponentType(), 0));
+            Field handle = field(returnType, "handle");
+            Object nativeHandle = handle.getType().getDeclaredConstructor().newInstance();
+            setField(nativeHandle, handle.getType(), "fds", Array.newInstance(
+                    field(handle.getType(), "fds").getType().getComponentType(), 0));
+            setField(nativeHandle, handle.getType(), "ints", Array.newInstance(
+                    field(handle.getType(), "ints").getType().getComponentType(), 0));
+            handle.set(descriptor, nativeHandle);
+            return descriptor;
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            throw new IllegalStateException("VIRTUAL_CAMERA_METADATA_QUEUE_ADAPTER_FAILED", error);
+        }
+    }
+
+    private static Field field(Class<?> type, String name) throws NoSuchFieldException {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                Field result = current.getDeclaredField(name);
+                result.setAccessible(true);
+                return result;
+            } catch (NoSuchFieldException missing) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(type.getName() + "." + name);
+    }
+
+    private static void setField(Object target, Class<?> type, String name, Object value)
+            throws ReflectiveOperationException {
+        field(type, name).set(target, value);
     }
 
     private void deliverCameraFrame(Object[] arguments, VirtualCameraProfileSnapshot profile) {
