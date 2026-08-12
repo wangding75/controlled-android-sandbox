@@ -33,10 +33,10 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             String lastFailure) { }
 
     /**
-     * MuMu can take longer than ten seconds to cold-start a service process while
-     * native companions and the package authority are brought up together.
-     * Keep the bounded retry model, but make the default large enough for a
-     * legitimate cold bind to complete instead of reporting a transient outage.
+     * A cold-started service process can take longer than ten seconds while its
+     * native companions and package authority are brought up together. Keep the
+     * bounded retry model, but make the default large enough for a legitimate
+     * cold bind to complete instead of reporting a transient outage.
      */
     private static final long DEFAULT_TIMEOUT_MS = 30_000L;
     private static final long DEFAULT_INITIAL_RETRY_MS = 100L;
