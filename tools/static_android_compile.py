@@ -482,6 +482,7 @@ for main_class in [
     'com.warden.controlledsandbox.framework.activity.ActivityTaskLedgerSelfTest',
     'com.warden.controlledsandbox.framework.activity.ActivityTaskLedgerConcurrencySelfTest',
     'com.warden.controlledsandbox.framework.activity.ActivityLaunchCoordinatorSelfTest',
+    'com.warden.controlledsandbox.framework.activity.StubActivityWindowOwnershipSelfTest',
     'com.warden.controlledsandbox.framework.routing.OneTimeRouteStoreSelfTest',
     'com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistrySelfTest',
 ]:

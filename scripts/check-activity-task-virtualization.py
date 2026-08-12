@@ -75,7 +75,14 @@ require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/gues
  'runtimeBrokerBinder','RUNTIME_BROKER_BINDER')
 require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java',
  'bindActivityTaskHost','consumeActivityTaskFinalized','moveHostTaskToBack',
- 'finishHostAffinity','finishHostAndRemoveTask')
+ 'finishHostAffinity','finishHostAndRemoveTask','StubActivityWindowOwnership',
+ 'recoverDetachedWindow','windowRecoveryRequired','ownerLease')
+require('sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/StubActivityWindowOwnership.java',
+ 'record Owner','record Lease','mayUpdate','generation','virtualUserId','processSlot')
+require('sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/StubActivityWindowOwnershipSelfTest.java',
+ 'case1DetachedCallback','case2SlotReuseGenerationFence','case3RecordReplacement',
+ 'case4VirtualUserOwnership','case5ForwardNavigationOnlyCurrentWindow',
+ 'oldBehavior=REPRODUCED_AND_REJECTED')
 require('sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedgerSelfTest.java',
  'testLaunchFlagValidationMatrix','testDocumentLaunchModes','testFinishMoveBackAndRevisionCleanup',
  'testForwardResultChain','testCheckpointRestoreDropsTransportAndPreservesState',
@@ -106,7 +113,8 @@ require('docs/M4_T15_STAGE_REPORT.md',
 runner=text('tools/static_android_compile.py')
 for test in ['ActivityTaskLedgerSelfTest','ActivityTaskCheckpointStoreSelfTest',
              'ActivityTaskContractSelfTest','ActivityResultContractSelfTest',
-             'BrokerActivityRuntimeSelfTest','ActivityTaskFrameworkInterceptorSelfTest']:
+             'BrokerActivityRuntimeSelfTest','ActivityTaskFrameworkInterceptorSelfTest',
+             'StubActivityWindowOwnershipSelfTest']:
  if runner.count(test)<1: errors.append(f'static compiler does not execute {test}')
 if len(broker.splitlines()) > 1375:
  errors.append(f'RuntimeBrokerService exceeded bounded M4-T15 growth: {len(broker.splitlines())} lines')
