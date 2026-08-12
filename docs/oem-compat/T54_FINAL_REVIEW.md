@@ -7,9 +7,11 @@ T53 baseline tree: `ca1b800f50e2ebf745226e8200ad8714ee27b081`
 
 ## Disposition
 
-T54 source and product UI work is implemented on the current Sandbox architecture. Xiaomi
-HyperOS / Android 16 / API 36 runtime evidence is not available and remains
-`REAL_DEVICE_VERIFICATION_PENDING`. No real-device PASS is claimed.
+T54 source and product UI work is implemented on the current Sandbox architecture. The approved
+SX test emulator is now online at `127.0.0.1:16384` and is a Samsung SM-A5260, API 32 / Android 12
+runtime. Flash2 UI and the generic component smoke pass on that runtime. This is recorded as
+`PASS_RUNTIME_API32`, not as Xiaomi HyperOS evidence. Xiaomi HyperOS / Android 16 / API 36 remains
+`REAL_DEVICE_VERIFICATION_PENDING`.
 
 One pre-existing structural gate remains open: `check-activity-task-virtualization.py` reports
 `BrokerActivityRuntime` at 412 lines against its historical 330-line threshold. The T54 change did
@@ -62,16 +64,23 @@ hook, BlackBox, LSPosed or package-specific Core branch was copied.
 | Broadcast, JobScheduler, Package Service and Guest boundary gates | PASS |
 | Full `scripts/verify-all.sh` | Not completed: WSL/Windows-mounted `reference_sources.py verify` exceeded the 124-second tool window and was terminated; no failure output was produced before that stage |
 | Activity/Task structural gate | Existing baseline follow-up: 412 lines vs 330 threshold |
-| Approved ADB serial `127.0.0.1:16384` | `device not found` |
-| Old SX evidence/uninstall | Not run because the approved device was absent; no alternate serial was used |
+| Approved ADB serial `127.0.0.1:16384` | PASS: Samsung SM-A5260, Android 12 / API 32, Android ID `6af8fde7af55c9b2` |
+| Old SX evidence/uninstall | PASS: APK, package state and screenshot captured before uninstall; `com.sx.app.debug` then removed only on `127.0.0.1:16384` |
+| Flash2 product UI smoke | PASS: Home, Apps, Instance Settings F2-F5/DingTalk, Me and Developer Diagnostics screenshots/XML retained |
+| Generic component smoke | PASS: service start, broadcast delivery, provider readiness and service stop retained in `ui-component-smoke-result.xml` |
+| Targeted M3 command smoke | PASS for explicit-trust u0 import/prepare, component-suite, launch and u1 prepare/launch; formal M3 gate remains open because the reproducible runner snapshot retained only one Guest slot after command isolation and was not a 20-minute run |
+| DingTalk launch attempt | NOT PASS: real route entered Guest startup and reached `checkExportedActivityStartup`/process recovery, but the captured UI remained `Resolving one-time Guest route…`; no success claim |
 | Xiaomi HyperOS / Android 16 / API 36 | `REAL_DEVICE_VERIFICATION_PENDING` |
 
-The exact device preflight attempted only:
+The final device evidence is retained under:
 
 ```text
-adb -s 127.0.0.1:16384 ...
-error: device '127.0.0.1:16384' not found
+D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE-20260812-134138\
 ```
+
+The `127.0.0.1:7555` alias was used only for read-only discovery and matched the same SX
+emulator identity; all installation, uninstall, UI and runtime commands used only the approved
+`127.0.0.1:16384` serial.
 
 ## Commit sequence
 
@@ -85,11 +94,13 @@ The required T54 commits are present without amend, rebase, squash or force-push
 6. This review commit: `docs: finalize T54 review`
 
 Additional narrow follow-up commits preserve scoped profile reset semantics and align stale boundary
-gates with the current application-layer architecture. They do not change the requested T54 commit
-meaning or rewrite history.
+gates with the current application-layer architecture. The M3 runner also carries the explicit
+Native Guest trust decision and deterministic command cleanup; these changes do not weaken the
+runtime trust policy or rewrite history.
 
 ## Final device rule
 
 The T54 OEM status may only move to `PASS_RUNTIME` after the approved Xiaomi HyperOS device is
-available and the evidence plan is executed with serial `127.0.0.1:16384`. Emulator, API32, source
-compile, or another ADB serial cannot substitute for that result.
+available and the evidence plan is executed with serial `127.0.0.1:16384`. The current Samsung
+API32 emulator closes only the API32 runtime/UI portion. API32, source compile, or another ADB
+serial cannot substitute for Xiaomi HyperOS Android 16 evidence.
