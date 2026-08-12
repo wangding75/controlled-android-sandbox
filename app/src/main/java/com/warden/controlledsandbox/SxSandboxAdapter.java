@@ -30,6 +30,7 @@ final class SxSandboxAdapter implements SandboxSdk {
     }
 
     SandboxCatalogState load() throws Exception { return packageService.load(); }
+    SandboxRecord findRecord(String packageName) throws Exception { return packageService.findRecord(packageName); }
     SandboxRecord importApk(Uri uri) throws Exception { return packageService.importApk(uri); }
     int createInstallSession(String expectedPackageName) throws Exception {
         return packageService.createInstallSession(expectedPackageName);
@@ -74,6 +75,42 @@ final class SxSandboxAdapter implements SandboxSdk {
     }
     void stopRuntime(SandboxRecord record, int virtualUserId) throws Exception {
         runtime.stop(record, virtualUserId);
+    }
+
+    com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot deviceServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.deviceServiceProfile(packageName, virtualUserId);
+    }
+    com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(
+            String packageName, int virtualUserId,
+            com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot profile) throws Exception {
+        return packageService.setDeviceServiceProfile(packageName, virtualUserId, profile);
+    }
+    com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.resetDeviceServiceProfile(packageName, virtualUserId);
+    }
+    com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot networkServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.networkServiceProfile(packageName, virtualUserId);
+    }
+    com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot setNetworkServiceProfile(
+            String packageName, int virtualUserId,
+            com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot profile) throws Exception {
+        return packageService.setNetworkServiceProfile(packageName, virtualUserId, profile);
+    }
+    com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.peripheralServicesProfile(packageName, virtualUserId);
+    }
+    com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot setPeripheralServicesProfile(
+            String packageName, int virtualUserId,
+            com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot profile) throws Exception {
+        return packageService.setPeripheralServicesProfile(packageName, virtualUserId, profile);
+    }
+    com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot applicationEnvironmentProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.applicationEnvironmentProfile(packageName, virtualUserId);
     }
 
     @Override public SandboxCatalog catalog() throws Exception {

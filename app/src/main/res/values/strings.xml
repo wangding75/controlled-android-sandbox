@@ -1,3 +1,32 @@
 <resources>
     <string name="app_name">闪现2</string>
+    <string name="app_name_full">闪现2</string>
+    <string name="tab_home">首页</string>
+    <string name="tab_apps">应用</string>
+    <string name="tab_me">我的</string>
+    <string name="module_sandbox">沙箱应用</string>
+    <string name="module_sandbox_desc">导入 App，创建隔离实例并一键启动</string>
+    <string name="module_location">虚拟定位</string>
+    <string name="module_location_desc">坐标、精度、速度与固定/轨迹 Profile</string>
+    <string name="module_camera">虚拟相机</string>
+    <string name="module_camera_desc">图片/视频替换源与 Capture substitution</string>
+    <string name="module_device">设备信息</string>
+    <string name="module_device_desc">Android ID、IMEI、品牌、型号、SIM 与运营商</string>
+    <string name="module_network">网络与基站</string>
+    <string name="module_network_desc">Wi-Fi SSID/BSSID/MAC 与 MCC/MNC/LAC/CID</string>
+    <string name="action_start">启动</string>
+    <string name="action_settings">实例设置</string>
+    <string name="action_clone">克隆</string>
+    <string name="action_delete_instance">删除</string>
+    <string name="action_clear_data">清除数据</string>
+    <string name="action_import">导入 App</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_save">保存</string>
+    <string name="action_reset">恢复默认</string>
+    <string name="action_choose_media">选择媒体</string>
+    <string name="action_clear_media">清除媒体</string>
+    <string name="action_diagnostics">开发者诊断</string>
+    <string name="action_component_smoke">组件烟测</string>
+    <string name="app_icon">App 图标</string>
+    <string name="empty_apps">还没有导入 App</string>
 </resources>

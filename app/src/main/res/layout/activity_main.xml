@@ -1,21 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent" android:layout_height="match_parent"
-    android:orientation="vertical" android:padding="16dp">
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:text="@string/app_name" android:textSize="24sp" android:textStyle="bold" />
-    <TextView android:id="@+id/runtimeStatus" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" android:text="Runtime: connecting…" android:textSize="14sp" />
-    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="4dp" android:text="M3 development build: virtual instances, Guest Application/component bridges, native policy and diagnostics are implemented. A real Emulator gate is still required before release." android:textSize="13sp" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="12dp" android:orientation="horizontal">
-        <Button android:id="@+id/importButton" android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_weight="1" android:text="Import APK" />
-        <Button android:id="@+id/refreshButton" android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginStart="8dp" android:text="Refresh" />
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/surface">
+    <TextView
+        android:id="@+id/mainToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/primary_dark"
+        android:gravity="center_vertical"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:text="@string/app_name_full"
+        android:textColor="@color/white"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+    <FrameLayout
+        android:id="@+id/contentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@color/card"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/navHome"
+            style="@style/FlashTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="@string/tab_home" />
+        <Button
+            android:id="@+id/navApps"
+            style="@style/FlashTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="@string/tab_apps" />
+        <Button
+            android:id="@+id/navMe"
+            style="@style/FlashTabButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="@string/tab_me" />
     </LinearLayout>
-    <TextView android:id="@+id/emptyText" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="24dp" android:gravity="center" android:text="No APK imported" />
-    <ListView android:id="@+id/packageList" android:layout_width="match_parent" android:layout_height="0dp"
-        android:layout_weight="1" android:layout_marginTop="8dp" android:dividerHeight="8dp" />
 </LinearLayout>
