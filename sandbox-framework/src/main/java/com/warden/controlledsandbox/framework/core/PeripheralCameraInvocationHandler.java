@@ -198,6 +198,17 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
 
     private PeripheralServicesInvocationInterceptor.Decision cameraUserSession(
             Class<?> returnType, Object token, VirtualCameraProfileSnapshot profile) {
+        // Some controlled service contracts represent a successful connect with a textual
+        // session token rather than the hidden Binder interface used by CameraManager. Keep that
+        // explicit typed adaptation in the common value policy; never return a textual value for
+        // an interface-shaped platform result.
+        if (returnType == String.class || returnType == Object.class
+                || returnType == void.class || returnType == Void.class
+                || returnType == boolean.class || returnType == Boolean.class
+                || returnType == int.class || returnType == Integer.class
+                || returnType == long.class || returnType == Long.class) {
+            return adaptableSessionResult("CAMERA", returnType, token, state.cameraSessions);
+        }
         if (!returnType.isInterface()) {
             throw new IllegalStateException("VIRTUAL_CAMERA_RESULT_ADAPTER_REQUIRED:" + returnType.getName());
         }

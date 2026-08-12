@@ -164,7 +164,11 @@ final class PeripheralInvocationValues {
 
     static PeripheralServicesInvocationInterceptor.Decision adaptableSessionResult(
             String domain, Method method, Object token, Set<Object> registry) {
-        Class<?> type = method.getReturnType();
+        return adaptableSessionResult(domain, method.getReturnType(), token, registry);
+    }
+
+    static PeripheralServicesInvocationInterceptor.Decision adaptableSessionResult(
+            String domain, Class<?> type, Object token, Set<Object> registry) {
         if (type == void.class || type == Void.class) return handled(null);
         if (type == boolean.class || type == Boolean.class) return handled(true);
         if (type == int.class || type == Integer.class) return handled(0);
