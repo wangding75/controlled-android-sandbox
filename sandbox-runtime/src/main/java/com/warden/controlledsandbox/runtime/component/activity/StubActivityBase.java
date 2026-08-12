@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
 import com.warden.controlledsandbox.runtime.guest.GuestActivityResultBridge;
 import com.warden.controlledsandbox.runtime.guest.RouteBrokerClient;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.framework.activity.StubActivityWindowOwnership;
 
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -40,6 +41,14 @@ public abstract class StubActivityBase extends Activity {
     private Bundle pendingGrantedRoute;
     private Bundle pendingRouteState;
     private boolean guestCreationPosted;
+    private final StubActivityWindowOwnership windowOwnership = new StubActivityWindowOwnership();
+    private StubActivityWindowOwnership.Lease ownerLease;
+    private boolean windowRecoveryRequired;
+    private boolean windowWasExpected;
+    private String packageName = "";
+    private int virtualUserId = -1;
+    private int processSlot = -1;
+    private int virtualTaskId;
 
     @Override protected void onCreate(Bundle state) {
         // This Activity is only a Host trampoline. Its FragmentManager must not restore a Guest
@@ -81,6 +90,8 @@ public abstract class StubActivityBase extends Activity {
     }
 
     private void queueGrantedRoute(Bundle route, Bundle state) {
+        if (destroying) return;
+        bindWindowOwner(route);
         pendingGrantedRoute = new Bundle(route);
         pendingRouteState = state == null ? null : new Bundle(state);
         // Broker recovery may have advanced the Guest process generation while Android was
@@ -94,10 +105,12 @@ public abstract class StubActivityBase extends Activity {
 
     private void postGuestCreationIfResumed() {
         if (pendingGrantedRoute == null || hostStage < 3 || guestCreationPosted || destroying) return;
+        StubActivityWindowOwnership.Lease scheduledOwner = ownerLease;
         guestCreationPosted = true;
         new android.os.Handler(getMainLooper()).postDelayed(() -> {
             guestCreationPosted = false;
-            if (pendingGrantedRoute == null || hostStage < 3 || destroying) return;
+            if (pendingGrantedRoute == null || hostStage < 3 || destroying
+                    || !isCurrentOwner(scheduledOwner)) return;
             Bundle route = pendingGrantedRoute;
             Bundle state = pendingRouteState;
             pendingGrantedRoute = null;
@@ -107,6 +120,7 @@ public abstract class StubActivityBase extends Activity {
     }
 
     private void createGuestActivity(Bundle route, Bundle state) {
+        if (!isCurrentOwner(ownerLease)) return;
         try {
             GuestPackageSpec spec = new GuestPackageSpec(route);
             GuestRuntimeEnvironment.Session session = GuestRuntimeEnvironment.require(spec.sessionId, spec.generation);
@@ -147,20 +161,18 @@ public abstract class StubActivityBase extends Activity {
         }
     }
 
-    @Override protected void onStart() { super.onStart(); hostStage = 2; if (controller != null) controller.start(); }
+    @Override protected void onStart() {
+        super.onStart();
+        windowWasExpected = true;
+        hostStage = 2;
+        if (controller != null) controller.start();
+    }
     @Override protected void onResume() {
         super.onResume();
-        // ActivityThread.handleResumeActivity() updates the window when this forward-navigation
-        // bit differs from the transaction. A stale Stub window may already be detached at this
-        // point, so keep the host attributes aligned before the framework reaches that branch.
-        setForwardNavigationWindowFlag(activityClientRecordIsForward());
-        repairDetachedActivityRecord();
-        // ActivityThread performs its window update immediately after this callback returns.
-        // A trampoline can have a detached DecorView after another same-process Stub crosses
-        // pause/stop, while the framework-side mWindowAdded marker is still true. Clear that
-        // stale marker here so the framework takes its add-window path instead of updating a
-        // ViewRoot that no longer exists.
-        clearMissingWindowRoot();
+        // ActivityThread performs its final layout/update immediately after this callback. If
+        // the framework/OEM removed the previous root, restore that same current Stub window
+        // before returning; otherwise the framework can update a DecorView absent from WMG.mViews.
+        recoverDetachedWindow();
         if (!diagnosticInstalled) {
             setContentView(diagnostic);
             diagnosticInstalled = true;
@@ -170,12 +182,12 @@ public abstract class StubActivityBase extends Activity {
         if (controller != null && activityResults != null) {
             activityResults.drain(controller::activityResult);
         }
+        postWindowAttachmentObservation();
         postGuestCreationIfResumed();
     }
     @Override protected void onPause() {
         hostStage = 2;
         if (controller != null) controller.pause();
-        setForwardNavigationWindowFlag(false);
         clearMissingWindowRoot();
         super.onPause();
     }
@@ -187,6 +199,10 @@ public abstract class StubActivityBase extends Activity {
     }
     @Override protected void onDestroy() {
         destroying = true;
+        windowRecoveryRequired = false;
+        if (ownerLease != null && windowOwnership.accepts(ownerLease)) {
+            windowOwnership.destroy(ownerLease);
+        }
         IBinder destroyedToken = frameworkActivityToken;
         frameworkActivityToken = null;
         boolean brokerFinalized = guestSession != null && destroyedToken != null
@@ -212,7 +228,9 @@ public abstract class StubActivityBase extends Activity {
             showFailure("NEW_INTENT_OWNER_MISMATCH", "New Intent belongs to another Guest generation");
             return;
         }
+        StubActivityWindowOwnership.Lease callbackOwner = ownerLease;
         RouteBrokerClient.consume(this, token, sessionId, generation, route -> {
+            if (!isCurrentOwner(callbackOwner)) return;
             if (!"ROUTE_GRANTED".equals(route.getString(RuntimeKeys.STATUS))) {
                 if (isStaleRouteFailure(route.getString(RuntimeKeys.ERROR_TYPE, ""),
                         route.getString(RuntimeKeys.ERROR_MESSAGE, ""))) return;
@@ -236,9 +254,15 @@ public abstract class StubActivityBase extends Activity {
     }
 
     @Override public void onDetachedFromWindow() {
-        // WindowManagerGlobal has removed this trampoline's root. ActivityThread can otherwise
-        // retain mWindowAdded=true and call updateViewLayout() if the same Stub is resumed again.
+        // WindowManagerGlobal has removed this trampoline's root. Remember the ownership loss;
+        // the next resume re-adds this current DecorView before ActivityThread's update branch.
+        windowRecoveryRequired = windowWasExpected && !destroying;
+        StubActivityWindowOwnership.Lease currentOwner = ownerLease;
+        if (currentOwner != null) {
+            windowOwnership.detach(currentOwner, windowIdentity());
+        }
         clearWindowAddedMarker();
+        logWindowEvent("STUB_WINDOW_DETACHED", "DETACHED");
         super.onDetachedFromWindow();
     }
 
@@ -254,34 +278,40 @@ public abstract class StubActivityBase extends Activity {
                 || permissions.length != grantResults.length) return;
         int[] effective = new int[permissions.length];
         java.util.Arrays.fill(effective, PackageManager.PERMISSION_DENIED);
-        reportPermissionResult(0, requestCode, permissions, grantResults, effective);
+        reportPermissionResult(0, requestCode, permissions, grantResults, effective, ownerLease);
     }
 
     private void reportPermissionResult(int index, int requestCode, String[] permissions,
-                                        int[] hostResults, int[] effective) {
+                                        int[] hostResults, int[] effective,
+                                        StubActivityWindowOwnership.Lease callbackOwner) {
+        if (!isCurrentOwner(callbackOwner)) return;
         if (index >= permissions.length) {
             if (controller != null) controller.permissionResult(requestCode, permissions, effective);
             return;
         }
         String permission = permissions[index] == null ? "" : permissions[index].trim();
         if (permission.isEmpty()) {
-            reportPermissionResult(index + 1, requestCode, permissions, hostResults, effective);
+            reportPermissionResult(index + 1, requestCode, permissions, hostResults, effective,
+                    callbackOwner);
             return;
         }
         boolean hostGranted = hostResults[index] == PackageManager.PERMISSION_GRANTED;
         RouteBrokerClient.requestPermission(this, sessionId, generation, permission, requestCode,
                 requested -> {
+                    if (!isCurrentOwner(callbackOwner)) return;
                     if (requested == null || !requested.successful()) {
-                        reportPermissionResult(index + 1, requestCode, permissions, hostResults, effective);
+                        reportPermissionResult(index + 1, requestCode, permissions, hostResults,
+                                effective, callbackOwner);
                         return;
                     }
                     RouteBrokerClient.reportPermissionResult(this, sessionId, generation, permission,
                             requestCode, hostGranted, "host-permission-callback", result -> {
+                                if (!isCurrentOwner(callbackOwner)) return;
                                 boolean granted = refreshPermissionState(result, permission);
                                 effective[index] = granted ? PackageManager.PERMISSION_GRANTED
                                         : PackageManager.PERMISSION_DENIED;
                                 reportPermissionResult(index + 1, requestCode, permissions,
-                                        hostResults, effective);
+                                        hostResults, effective, callbackOwner);
                             });
                 });
     }
@@ -327,14 +357,24 @@ public abstract class StubActivityBase extends Activity {
         if (activityEventInFlight || activityEvents.isEmpty()) return;
         activityEventInFlight = true;
         Bundle request = activityEvents.peekFirst();
+        StubActivityWindowOwnership.Lease callbackOwner = ownerLease;
         RouteBrokerClient.event(this, request, result -> {
             synchronized (StubActivityBase.this) {
                 activityEventInFlight = false;
+                if (!isCurrentOwner(callbackOwner)) {
+                    activityEvents.clear();
+                    return;
+                }
                 if ("ACTIVITY_EVENT_APPLIED".equals(result.getString(RuntimeKeys.STATUS))) {
                     activityEvents.removeFirst();
                     String currentToken = result.getString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
                     if (!destroying && !currentToken.isEmpty()) {
                         activityToken = currentToken;
+                        if (!currentToken.equals(callbackOwner.owner().activityToken())) {
+                            ownerLease = windowOwnership.replace(callbackOwner,
+                                    callbackOwner.owner().withActivityToken(currentToken));
+                            observeWindowOwnership();
+                        }
                         if (controller != null) controller.updateActivityToken(currentToken);
                         if (activityResults != null) activityResults.updateActivityToken(currentToken);
                         if (guestSession != null && frameworkActivityToken != null) {
@@ -406,96 +446,76 @@ public abstract class StubActivityBase extends Activity {
                 || "ACTIVITY_ROUTE_ENVELOPE_MISSING".equals(value);
     }
 
-    /**
-     * An emulator can remove a trampoline root while two same-process Stub Activities are
-     * crossing pause/stop. ActivityThread can still leave mWindowAdded=true, so its next resume
-     * calls WindowManagerGlobal.updateViewLayout() for a root that no longer exists. A removed
-     * root may retain a stale ViewRootImpl object, so attachment is the authoritative signal here.
-     */
+    private void bindWindowOwner(Bundle route) {
+        packageName = value(route.getString(RuntimeKeys.PACKAGE_NAME, packageName));
+        virtualUserId = route.getInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        processSlot = route.getInt(RuntimeKeys.PROCESS_SLOT, processSlot);
+        String routeSession = value(route.getString(RuntimeKeys.SESSION_ID, sessionId));
+        long routeGeneration = route.getLong(RuntimeKeys.GENERATION, generation);
+        String routeActivityToken = value(route.getString(RuntimeKeys.ACTIVITY_TOKEN, activityToken));
+        int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
+        virtualTaskId = taskId;
+        StubActivityWindowOwnership.Owner next = new StubActivityWindowOwnership.Owner(
+                packageName, virtualUserId, routeSession, routeGeneration, processSlot,
+                routeActivityToken, taskId);
+        ownerLease = windowOwnership.bind(next);
+        logWindowEvent("STUB_OWNER_BOUND", "DETACHED");
+    }
+
+    private boolean isCurrentOwner(StubActivityWindowOwnership.Lease candidate) {
+        return candidate != null && windowOwnership.accepts(candidate);
+    }
+
     private void clearMissingWindowRoot() {
-        try {
-            android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
-            if (decor == null || decor.isAttachedToWindow()) return;
-            clearWindowAddedMarker();
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-        }
+        android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+        if (decor == null || decor.isAttachedToWindow() || isWindowRegistered(decor)) return;
+        if (windowWasExpected && !destroying) windowRecoveryRequired = true;
+        clearWindowAddedMarker();
+        StubActivityWindowOwnership.Lease currentOwner = ownerLease;
+        if (currentOwner != null) windowOwnership.detach(currentOwner, windowIdentity());
+        logWindowEvent("STUB_WINDOW_ROOT_MISSING", "DETACHED");
     }
 
-    /**
-     * ActivityThread keeps its own ActivityClientRecord.window reference. If a MuMu window
-     * manager removes the DecorView during a same-process Stub transition, clearing only the
-     * Activity marker leaves that stale record in place and the next resume still calls
-     * updateViewLayout(). Nulling the matching record lets ActivityThread use its normal addView
-     * recovery path on return from this callback.
-     */
-    private void repairDetachedActivityRecord() {
-        try {
-            android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
-            if (decor == null || isWindowRegistered(decor)) return;
-            Class<?> threadClass = Class.forName("android.app.ActivityThread");
-            java.lang.reflect.Field current = threadClass.getDeclaredField("sCurrentActivityThread");
-            current.setAccessible(true);
-            Object thread = current.get(null);
-            if (thread == null) return;
-            java.lang.reflect.Field activities = threadClass.getDeclaredField("mActivities");
-            activities.setAccessible(true);
-            Object records = activities.get(thread);
-            java.lang.reflect.Method size = records.getClass().getMethod("size");
-            java.lang.reflect.Method valueAt = records.getClass().getMethod("valueAt", int.class);
-            for (int index = 0, count = ((Integer) size.invoke(records)); index < count; index++) {
-                Object record = valueAt.invoke(records, index);
-                if (record == null) continue;
-                java.lang.reflect.Field activity = record.getClass().getDeclaredField("activity");
-                activity.setAccessible(true);
-                if (activity.get(record) != this) continue;
-                java.lang.reflect.Field window = record.getClass().getDeclaredField("window");
-                window.setAccessible(true);
-                if (window.get(record) != null) {
-                    window.set(record, null);
-                    try {
-                        java.lang.reflect.Field preserve = record.getClass().getDeclaredField("mPreserveWindow");
-                        preserve.setAccessible(true);
-                        preserve.setBoolean(record, false);
-                    } catch (NoSuchFieldException ignored) { }
-                    clearWindowAddedMarker();
-                }
-                return;
-            }
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+    /** Re-registers the current Stub root before ActivityThread can reach updateViewLayout. */
+    private void recoverDetachedWindow() {
+        if (!windowRecoveryRequired || destroying) return;
+        android.view.Window window = getWindow();
+        android.view.View decor = window == null ? null : window.getDecorView();
+        if (decor == null) throw new IllegalStateException("STUB_WINDOW_DECOR_MISSING");
+        if (!decor.isAttachedToWindow() && !isWindowRegistered(decor)) {
+            android.view.WindowManager.LayoutParams attributes = window.getAttributes();
+            attributes.type = android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+            getWindowManager().addView(decor, attributes);
+            setWindowAddedMarker(true);
+            logWindowEvent("STUB_WINDOW_REATTACHED", "ATTACHED");
         }
+        windowRecoveryRequired = false;
+        observeWindowOwnership();
     }
 
-    private boolean activityClientRecordIsForward() {
-        try {
-            Class<?> threadClass = Class.forName("android.app.ActivityThread");
-            java.lang.reflect.Field current = threadClass.getDeclaredField("sCurrentActivityThread");
-            current.setAccessible(true);
-            Object thread = current.get(null);
-            if (thread == null) return true;
-            java.lang.reflect.Field activities = threadClass.getDeclaredField("mActivities");
-            activities.setAccessible(true);
-            Object records = activities.get(thread);
-            java.lang.reflect.Method size = records.getClass().getMethod("size");
-            java.lang.reflect.Method valueAt = records.getClass().getMethod("valueAt", int.class);
-            for (int index = 0, count = ((Integer) size.invoke(records)); index < count; index++) {
-                Object record = valueAt.invoke(records, index);
-                if (record == null) continue;
-                java.lang.reflect.Field activity = record.getClass().getDeclaredField("activity");
-                activity.setAccessible(true);
-                if (activity.get(record) != this) continue;
-                java.lang.reflect.Field forward = record.getClass().getDeclaredField("isForward");
-                forward.setAccessible(true);
-                return forward.getBoolean(record);
-            }
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+    private void postWindowAttachmentObservation() {
+        new android.os.Handler(getMainLooper()).post(() -> {
+            if (!destroying) observeWindowOwnership();
+        });
+    }
+
+    private void observeWindowOwnership() {
+        StubActivityWindowOwnership.Lease currentOwner = ownerLease;
+        android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+        if (currentOwner == null || decor == null) return;
+        String identity = windowIdentity();
+        boolean registered = isWindowRegistered(decor);
+        if (decor.isAttachedToWindow() || registered) {
+            windowOwnership.attach(currentOwner, identity);
         }
-        return true;
+        logWindowEvent("STUB_WINDOW_STATE", windowOwnership.stage().name());
     }
 
     private boolean isWindowRegistered(android.view.View decor) {
+        return windowRootContains(decor);
+    }
+
+    private int windowRootCount() {
         try {
             Object windowManager = getWindowManager();
             java.lang.reflect.Field global = windowManager.getClass().getDeclaredField("mGlobal");
@@ -504,36 +524,83 @@ public abstract class StubActivityBase extends Activity {
             java.lang.reflect.Field views = windowManagerGlobal.getClass().getDeclaredField("mViews");
             views.setAccessible(true);
             Object registeredViews = views.get(windowManagerGlobal);
-            return registeredViews instanceof java.util.List
-                    && ((java.util.List<?>) registeredViews).contains(decor);
+            if (!(registeredViews instanceof java.util.List<?>)) {
+                throw new IllegalStateException("WINDOW_MANAGER_ROOT_LIST_UNAVAILABLE");
+            }
+            return ((java.util.List<?>) registeredViews).size();
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            return decor.isAttachedToWindow();
+            throw new IllegalStateException("WINDOW_MANAGER_ROOT_INSPECTION_FAILED", error);
         }
     }
 
-    private void clearWindowAddedMarker() {
+    private boolean windowRootContains(android.view.View decor) {
+        try {
+            Object windowManager = getWindowManager();
+            java.lang.reflect.Field global = windowManager.getClass().getDeclaredField("mGlobal");
+            global.setAccessible(true);
+            Object windowManagerGlobal = global.get(windowManager);
+            java.lang.reflect.Field views = windowManagerGlobal.getClass().getDeclaredField("mViews");
+            views.setAccessible(true);
+            Object registeredViews = views.get(windowManagerGlobal);
+            if (!(registeredViews instanceof java.util.List<?>)) {
+                throw new IllegalStateException("WINDOW_MANAGER_ROOT_LIST_UNAVAILABLE");
+            }
+            return ((java.util.List<?>) registeredViews).contains(decor);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("WINDOW_MANAGER_ROOT_INSPECTION_FAILED", error);
+        }
+    }
+
+    private void clearWindowAddedMarker() { setWindowAddedMarker(false); }
+
+    private void setWindowAddedMarker(boolean value) {
         try {
             java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
             added.setAccessible(true);
-            if (added.getBoolean(this)) added.setBoolean(this, false);
+            added.setBoolean(this, value);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_WINDOW_MARKER_UPDATE_FAILED", error);
         }
     }
 
-    private void setForwardNavigationWindowFlag(boolean enabled) {
-        try {
-            android.view.Window window = getWindow();
-            if (window == null) return;
-            android.view.WindowManager.LayoutParams attributes = window.getAttributes();
-            int flag = android.view.WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION;
-            attributes.softInputMode = enabled
-                    ? attributes.softInputMode | flag
-                    : attributes.softInputMode & ~flag;
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-        }
+    private String windowIdentity() {
+        android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+        return decor == null ? "" : "decor@" + Integer.toHexString(System.identityHashCode(decor));
+    }
+
+    private void logWindowEvent(String event, String stage) {
+        Bundle details = new Bundle();
+        details.putString(RuntimeKeys.PACKAGE_NAME, packageName);
+        details.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        details.putString(RuntimeKeys.SESSION_ID, sessionId);
+        details.putLong(RuntimeKeys.GENERATION, generation);
+        details.putInt(RuntimeKeys.PROCESS_SLOT, processSlot);
+        details.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+        details.putInt(RuntimeKeys.TASK_ID, virtualTaskId);
+        details.putString("virtualTask", String.valueOf(virtualTaskId));
+        details.putString("frameworkTask", String.valueOf(getTaskId()));
+        details.putString("frameworkActivityToken", String.valueOf(frameworkActivityToken));
+        details.putString("activityClientRecord", "activity=" + getClass().getName()
+                + ";frameworkToken=" + String.valueOf(frameworkActivityToken));
+        details.putString("stubClass", getClass().getName());
+        details.putString("windowIdentity", windowIdentity());
+        details.putString("windowToken", String.valueOf(
+                getWindow() == null || getWindow().getDecorView() == null
+                        ? null : getWindow().getDecorView().getWindowToken()));
+        details.putBoolean("windowAttached", getWindow() != null
+                && getWindow().getDecorView() != null
+                && getWindow().getDecorView().isAttachedToWindow());
+        int rootCount = windowRootCount();
+        details.putInt("windowRootCount", rootCount);
+        details.putBoolean("windowRegistered", rootCount >= 0 && getWindow() != null
+                && getWindow().getDecorView() != null
+                && isWindowRegistered(getWindow().getDecorView()));
+        details.putString("windowStage", stage);
+        details.putLong("ownerEpoch", windowOwnership.epoch());
+        RuntimeEventLog.event(event, details);
     }
 
     private static String value(String value) { return value == null ? "" : value; }

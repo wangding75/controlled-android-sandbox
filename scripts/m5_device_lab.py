@@ -922,6 +922,52 @@ class DeviceLab:
         self.collect()
         return self.finish()
 
+    def run_short_gate(self, loops: int) -> dict[str, Any]:
+        """Run the bounded post-fix lifecycle gate without entering the formal stability gate."""
+        if loops < 1:
+            raise CommandError("short gate loop count must be positive")
+        manifest, artifact_dir = self.prepare_artifacts()
+        self.refresh_mumu_resolution()
+        self.ensure_device()
+        self.evidence["deviceRunCount"] = 1
+        self.evidence["device"] = self.device_info()
+        self.install_artifacts(manifest, artifact_dir)
+        rounds: list[dict[str, Any]] = []
+        for round_number in range(1, loops + 1):
+            round_results: list[dict[str, Any]] = []
+            for fixture_id in FIXTURE_IDS:
+                for user in VIRTUAL_USERS:
+                    if round_number == 1:
+                        round_results.append(self.invoke_guest(fixture_id, "import-prepare", user))
+                    round_results.append(self.invoke_guest(fixture_id, "component-suite", user))
+                    round_results.append(self.invoke_guest(fixture_id, "launch", user))
+                    # Launching the other virtual user and returning through the command
+                    # Activity is an actual host task switch, not a branch that disables it.
+                    self.adb("shell", "input", "keyevent", "3", check=False, timeout=30)
+                    round_results.append(self.invoke_guest(fixture_id, "launch", user))
+            snapshot = self.guest_process_snapshot()
+            logcat = self.adb("logcat", "-d", "-v", "threadtime", check=False, timeout=180).stdout
+            findings = fatal_findings(logcat)
+            if findings:
+                raise CommandError(f"target FATAL/ANR during short gate round {round_number}: {findings}")
+            rounds.append({
+                "round": round_number,
+                "commandCount": len(round_results),
+                "guestProcesses": snapshot,
+                "resolvedSerial": self.serial,
+                "mumuResolution": self.mumu_resolution,
+            })
+            self.evidence["shortGate"] = {
+                "requestedLoops": loops,
+                "completedLoops": round_number,
+                "fatalFindings": [],
+                "rounds": rounds,
+            }
+        self.capture_simultaneous_snapshot()
+        self.teardown()
+        self.collect()
+        return self.finish()
+
     def close(self) -> None:
         if self.started_emulator is not None and not self.keep_emulator and self.serial:
             self.adb("emu", "kill", check=False, timeout=30)
@@ -950,6 +996,8 @@ def main() -> int:
     parser.add_argument("--online-build", action="store_true")
     parser.add_argument("--keep-emulator", action="store_true")
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--short-loops", type=int, default=0,
+                        help="run the bounded lifecycle gate instead of formal stability")
     parser.add_argument("--verify-evidence", type=Path, help="validate an existing formal evidence JSON and exit")
     args = parser.parse_args()
 
@@ -1016,7 +1064,7 @@ def main() -> int:
         mumu_root=args.mumu_root,
     )
     try:
-        result = lab.run()
+        result = lab.run_short_gate(args.short_loops) if args.short_loops else lab.run()
         print(f"{result['status']} M5 device lab: {evidence_dir}")
         return 0
     except Exception as error:

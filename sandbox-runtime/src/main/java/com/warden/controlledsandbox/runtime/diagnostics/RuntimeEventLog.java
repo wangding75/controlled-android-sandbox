@@ -16,6 +16,28 @@ public final class RuntimeEventLog {
             append(line, "package", data.getString(RuntimeKeys.PACKAGE_NAME, ""));
             append(line, "session", data.getString(RuntimeKeys.SESSION_ID, ""));
             append(line, "component", data.getString(RuntimeKeys.COMPONENT_CLASS, ""));
+            append(line, "activityToken", data.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
+            if (data.containsKey(RuntimeKeys.TASK_ID)) {
+                line.append(" taskId=").append(data.getInt(RuntimeKeys.TASK_ID, 0));
+            }
+            append(line, "windowIdentity", data.getString("windowIdentity", ""));
+            append(line, "windowToken", data.getString("windowToken", ""));
+            append(line, "frameworkTask", data.getString("frameworkTask", ""));
+            append(line, "frameworkActivityToken", data.getString("frameworkActivityToken", ""));
+            append(line, "activityClientRecord", data.getString("activityClientRecord", ""));
+            append(line, "windowStage", data.getString("windowStage", ""));
+            if (data.containsKey("windowAttached")) {
+                line.append(" windowAttached=").append(data.getBoolean("windowAttached", false));
+            }
+            if (data.containsKey("windowRegistered")) {
+                line.append(" windowRegistered=").append(data.getBoolean("windowRegistered", false));
+            }
+            if (data.containsKey("ownerEpoch")) {
+                line.append(" ownerEpoch=").append(data.getLong("ownerEpoch", 0));
+            }
+            if (data.containsKey("windowRootCount")) {
+                line.append(" windowRootCount=").append(data.getInt("windowRootCount", -1));
+            }
             append(line, "error", data.getString(RuntimeKeys.ERROR_TYPE, ""));
             append(line, "message", data.getString(RuntimeKeys.ERROR_MESSAGE, ""));
             line.append(" generation=").append(data.getLong(RuntimeKeys.GENERATION, 0));

@@ -194,8 +194,14 @@ public final class GuestActivityController {
     }
 
     private void addActivityRecord(Bundle result, String state) {
+        result.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+        result.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+        result.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        result.putLong(RuntimeKeys.GENERATION, session.generation());
+        result.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
         result.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
         result.putInt(RuntimeKeys.TASK_ID, taskId);
+        result.putString("virtualTask", String.valueOf(taskId));
         result.putString("activityState", state);
         result.putString("instanceId", session.instanceId());
     }

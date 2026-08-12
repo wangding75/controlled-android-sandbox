@@ -638,6 +638,11 @@ public final class GuestRuntimeEnvironment {
         public GuestClassLoader classLoader() { return classLoader; }
         public GuestContext context() { return context; }
         public Application application() { return application; }
+        public String sessionId() { return spec.sessionId; }
+        public long generation() { return spec.generation; }
+        public String packageName() { return spec.packageName; }
+        public int virtualUserId() { return spec.virtualUserId; }
+        public int processSlot() { return spec.processSlot; }
 
         public void bindActivityTaskHost(IBinder frameworkToken, String activityToken, int taskId,
                                          Runnable moveToFront, BooleanSupplier moveToBack,
