@@ -154,7 +154,7 @@ public final class InstanceSettingsActivity extends Activity {
         Button map = action("地图选点 · NOT_IMPLEMENTED"); map.setEnabled(false); body.addView(map);
         Button save = action(R.string.action_save); save.setOnClickListener(v -> saveLocation(current, enabled,
                 latitude, longitude, altitude, accuracy, speed, bearing, interval, trajectory)); body.addView(save);
-        Button reset = action(R.string.action_reset); reset.setOnClickListener(v -> resetDevice()); body.addView(reset);
+        Button reset = action(R.string.action_reset); reset.setOnClickListener(v -> resetLocation()); body.addView(reset);
     }
 
     private void saveLocation(VirtualLocationProfileSnapshot current, Switch enabled,
@@ -307,6 +307,17 @@ public final class InstanceSettingsActivity extends Activity {
                 error -> runOnUiThread(() -> showError(error)));
     }
 
+    private void resetLocation() {
+        viewModel.execute(() -> {
+            VirtualDeviceServiceProfileSnapshot defaults = application.defaultDeviceProfile(packageName, userId);
+            VirtualDeviceServiceProfileSnapshot current = application.deviceProfile(packageName, userId);
+            return application.saveDeviceProfile(packageName, userId, new VirtualDeviceServiceProfileSnapshot(
+                    current.policyVersion(), current.updatedAtMs(), defaults.location(), current.identity(),
+                    current.telephony(), current.wifi(), current.bluetooth(), current.sensors()));
+        }, value -> runOnUiThread(() -> { device = value; status.setText("已恢复默认定位 Profile"); renderSection(); }),
+                error -> runOnUiThread(() -> showError(error)));
+    }
+
     private void renderNetwork() {
         VirtualWifiProfileSnapshot wifi = device.wifi();
         VirtualTelephonyProfileSnapshot telephony = device.telephony();
@@ -326,7 +337,7 @@ public final class InstanceSettingsActivity extends Activity {
         scans.setMinLines(4); scans.setGravity(Gravity.TOP);
         body.addView(ssid); body.addView(bssid); body.addView(mac); body.addView(mcc); body.addView(mnc); body.addView(lac); body.addView(cid); body.addView(scans);
         Button save = action(R.string.action_save); save.setOnClickListener(v -> saveNetwork(enabled.isChecked(), ssid, bssid, mac, mcc, mnc, lac, cid, scans)); body.addView(save);
-        Button reset = action(R.string.action_reset); reset.setOnClickListener(v -> resetDevice()); body.addView(reset);
+        Button reset = action(R.string.action_reset); reset.setOnClickListener(v -> resetNetwork()); body.addView(reset);
     }
 
     private void saveNetwork(boolean enabled, EditText ssid, EditText bssid, EditText mac,
@@ -363,6 +374,21 @@ public final class InstanceSettingsActivity extends Activity {
             }, value -> runOnUiThread(() -> { device = nextDevice; network = value; status.setText("网络 / Cell Profile 已保存"); renderSection(); }),
                     error -> runOnUiThread(() -> showError(error)));
         } catch (Exception error) { showError(error); }
+    }
+
+    private void resetNetwork() {
+        viewModel.execute(() -> {
+            VirtualDeviceServiceProfileSnapshot defaults = application.defaultDeviceProfile(packageName, userId);
+            VirtualDeviceServiceProfileSnapshot current = application.deviceProfile(packageName, userId);
+            application.saveDeviceProfile(packageName, userId, new VirtualDeviceServiceProfileSnapshot(
+                    current.policyVersion(), current.updatedAtMs(), current.location(), current.identity(),
+                    defaults.telephony(), defaults.wifi(), current.bluetooth(), current.sensors()));
+            application.resetNetworkProfile(packageName, userId);
+            return Boolean.TRUE;
+        }, ignored -> runOnUiThread(() -> {
+            status.setText("已恢复默认网络 / Cell Profile");
+            loadProfiles();
+        }), error -> runOnUiThread(() -> showError(error)));
     }
 
     private void renderDingTalk() {

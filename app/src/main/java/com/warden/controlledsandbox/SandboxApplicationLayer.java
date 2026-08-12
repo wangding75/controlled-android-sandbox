@@ -52,12 +52,20 @@ final class SandboxApplicationLayer implements AutoCloseable {
     VirtualDeviceServiceProfileSnapshot resetDeviceProfile(String packageName, int userId) throws Exception {
         return adapter.resetDeviceServiceProfile(packageName, userId);
     }
+    VirtualDeviceServiceProfileSnapshot defaultDeviceProfile(String packageName, int userId) throws Exception {
+        VirtualDeviceServiceProfileSnapshot current = deviceProfile(packageName, userId);
+        return VirtualDeviceServiceDefaults.create(packageName, userId,
+                current.policyVersion(), current.updatedAtMs());
+    }
     VirtualNetworkServiceProfileSnapshot networkProfile(String packageName, int userId) throws Exception {
         return adapter.networkServiceProfile(packageName, userId);
     }
     VirtualNetworkServiceProfileSnapshot saveNetworkProfile(String packageName, int userId,
             VirtualNetworkServiceProfileSnapshot profile) throws Exception {
         return adapter.setNetworkServiceProfile(packageName, userId, profile);
+    }
+    VirtualNetworkServiceProfileSnapshot resetNetworkProfile(String packageName, int userId) throws Exception {
+        return adapter.resetNetworkServiceProfile(packageName, userId);
     }
     VirtualPeripheralServicesProfileSnapshot peripheralProfile(String packageName, int userId) throws Exception {
         return adapter.peripheralServicesProfile(packageName, userId);

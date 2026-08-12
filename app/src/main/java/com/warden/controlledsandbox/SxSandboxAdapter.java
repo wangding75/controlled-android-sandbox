@@ -99,6 +99,10 @@ final class SxSandboxAdapter implements SandboxSdk {
             com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot profile) throws Exception {
         return packageService.setNetworkServiceProfile(packageName, virtualUserId, profile);
     }
+    com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot resetNetworkServiceProfile(
+            String packageName, int virtualUserId) throws Exception {
+        return packageService.resetNetworkServiceProfile(packageName, virtualUserId);
+    }
     com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot peripheralServicesProfile(
             String packageName, int virtualUserId) throws Exception {
         return packageService.peripheralServicesProfile(packageName, virtualUserId);
