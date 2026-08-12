@@ -20,6 +20,7 @@ import java.util.List;
 final class PackageAdapter extends BaseAdapter {
     interface Listener {
         void onLaunch(SandboxItem item);
+        void onStop(SandboxItem item);
         void onSettings(SandboxItem item);
         void onClone(SandboxItem item);
         void onClear(SandboxItem item);
@@ -65,6 +66,9 @@ final class PackageAdapter extends BaseAdapter {
         launch.setEnabled(!record.launchActivity.trim().isEmpty()
                 && NativeGuestExecutionPolicy.isRuntimeAllowed(record));
         launch.setOnClickListener(v -> listener.onLaunch(item));
+        Button stop = view.findViewById(R.id.stop);
+        stop.setEnabled(launch.isEnabled());
+        stop.setOnClickListener(v -> listener.onStop(item));
         ((Button) view.findViewById(R.id.settings)).setOnClickListener(v -> listener.onSettings(item));
         ((Button) view.findViewById(R.id.clone)).setOnClickListener(v -> listener.onClone(item));
         ((Button) view.findViewById(R.id.clear)).setOnClickListener(v -> listener.onClear(item));

@@ -15,6 +15,7 @@
     <string name="module_network">网络与基站</string>
     <string name="module_network_desc">Wi-Fi SSID/BSSID/MAC 与 MCC/MNC/LAC/CID</string>
     <string name="action_start">启动</string>
+    <string name="action_stop">停止</string>
     <string name="action_settings">实例设置</string>
     <string name="action_clone">克隆</string>
     <string name="action_delete_instance">删除</string>

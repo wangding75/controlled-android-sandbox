@@ -239,6 +239,20 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         openSettings(item.instance.packageName, item.instance.virtualUserId, "location");
     }
 
+    @Override public void onStop(SandboxItem item) {
+        if (appStatus != null) appStatus.setText("正在停止 " + item.record.label + "…");
+        viewModel.execute(() -> {
+                    viewModel.application().stop(item.record, item.instance.virtualUserId);
+                    viewModel.application().updateInstanceStatus(
+                            item.instance.packageName, item.instance.virtualUserId, "STOPPED");
+                    return null;
+                }, ignored -> runOnUiThread(() -> {
+                    if (appStatus != null) appStatus.setText("停止：STOPPED");
+                    refresh();
+                }),
+                error -> runOnUiThread(() -> showFailure("停止失败", error)));
+    }
+
     @Override public void onClone(SandboxItem item) {
         viewModel.execute(() -> viewModel.application().createClone(item.record.packageName),
                 userId -> runOnUiThread(() -> { appStatus.setText("已创建分身 " + userId); refresh(); }),
