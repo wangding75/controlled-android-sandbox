@@ -393,7 +393,8 @@ public final class InstanceSettingsActivity extends Activity {
 
     private void renderDingTalk() {
         body.addView(title("钉钉兼容模式"));
-        body.addView(note("仅对 com.alibaba.android.rimet 7.8.10 / 1178 开放。按钮只调用 DingTalkCompatibilityManager；不 Hook、改 dex、改 exported 或伪造 Camera/Location。"));
+        body.addView(note("仅对 " + DingTalkCompatibilityManager.PACKAGE_NAME
+                + " 7.8.10 / 1178 开放。按钮只调用 DingTalkCompatibilityManager；不 Hook、改 dex、改 exported 或伪造 Camera/Location。"));
         DingTalkCompatibilityManager manager = new DingTalkCompatibilityManager();
         DingTalkCompatibilityManager.Target target = manager.identify(record.packageName, record.versionName, record.versionCode);
         body.addView(note("目标：" + record.packageName + " · " + record.versionName + " / " + record.versionCode + "\n判定：" + target.reason()));
