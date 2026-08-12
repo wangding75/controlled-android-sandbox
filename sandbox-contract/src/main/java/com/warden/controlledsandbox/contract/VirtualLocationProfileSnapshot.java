@@ -195,7 +195,7 @@ public final class VirtualLocationProfileSnapshot implements Parcelable {
         long sampleTime = TIME_POLICY_PROFILE.equals(timestampPolicy) && timeMs > 0L
                 ? timeMs + offset : nowMs;
         long sampleElapsed = ELAPSED_POLICY_PROFILE.equals(elapsedRealtimePolicy)
-                && elapsedRealtimeNanos > 0L ? elapsedRealtimeNanos + offset * 1_000_000L
+                && nowElapsedRealtimeNanos > 0L ? nowElapsedRealtimeNanos + offset * 1_000_000L
                 : nowElapsedRealtimeNanos;
         return new VirtualLocationProfileSnapshot(mode, provider, providerEnabled,
                 point.latitude(), point.longitude(), point.altitudeMeters(), point.accuracyMeters(),
