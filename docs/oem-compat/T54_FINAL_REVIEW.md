@@ -5,6 +5,24 @@ Branch: `feature/ui-oem-compat`
 T53 baseline commit: `3a8c998ffd58dcb158f548df64d8d80590cf338c`  
 T53 baseline tree: `ca1b800f50e2ebf745226e8200ad8714ee27b081`
 
+## T54-R02 superseding addendum
+
+The original sections below preserve the historical T54-R01/SX review record. The current R02
+execution target and disposition are superseded by
+[T54_R02_FINAL_REPORT.md](D:/github/controlled-android-sandbox/docs/oem-compat/T54_R02_FINAL_REPORT.md):
+
+- Target: exact MuMu instance `RD测试`, index `1`, dynamically resolved session serial
+  `127.0.0.1:16416`, Redmi `22041211A`, Android 12/API 32.
+- Quark `com.quark.browser` was retained in place and not reinstalled.
+- DingTalk was reinstalled once from `C:\Users\wangding\Downloads\dingding.apk`, version `7.8.10`
+  / code `1178`.
+- The generic Stub Activity window ownership fix closed the RD reproduction.
+- M3 short gate: `10/10` PASS; formal M3: `1200/1200` seconds, `18/18` commands PASS,
+  FATAL/ANR `0`, teardown PASS.
+- Post-M3 Quark regression: launch/stop `3/3` PASS; DingTalk UI smoke reached
+  `PrivacyPolicyActivity` with FATAL/ANR `0`.
+- HyperOS/API36 remains `REAL_DEVICE_VERIFICATION_PENDING`.
+
 ## Disposition
 
 T54 source and product UI work is implemented on the current Sandbox architecture. The post-restart

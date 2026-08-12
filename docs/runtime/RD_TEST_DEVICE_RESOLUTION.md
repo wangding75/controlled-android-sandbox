@@ -10,7 +10,7 @@ session and must be resolved again after a MuMu restart, ADB reconnect, or new t
 | --- | --- |
 | MuMu instance name | `RD测试` |
 | MuMu instance index | `1` |
-| MuMu instance id | `ginstance1400581308116493301` |
+| MuMu instance id | `ginstance1400581448817661401` |
 | MuMu VM | `MuMuPlayer-12.0-1` |
 | MuMu player state | `start_finished` |
 | Manager ADB host/port | `127.0.0.1:16416` |
@@ -21,7 +21,7 @@ session and must be resolved again after a MuMu restart, ADB reconnect, or new t
 | Android release | `12` |
 | API level | `32` |
 | Android ID | `398eea33120cd887` |
-| Resolution timestamp | `2026-08-12T08:01:22.472431+00:00` |
+| Resolution timestamp | `2026-08-12T08:06:54.818083+00:00` |
 
 The resolver exact-matched the MuMu instance name `RD测试`, read the current manager ADB port,
 then verified:
