@@ -1,7 +1,7 @@
 # Camera1 native path analysis
 
-Date: 2026-08-12  
-Device: MuMu `127.0.0.1:16384`, Android API 32  
+Date: 2026-08-12
+Device: MuMu `127.0.0.1:16384`, Android API 32
 Evidence root: `D:\controlled-android-sandbox-evidence\T53-R01-20260812-073729\camera1-final\`
 
 ## Conclusion
