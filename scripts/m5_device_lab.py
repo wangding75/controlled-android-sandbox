@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from mumu_instance import ResolutionError, resolve_instance
+
 SCHEMA_VERSION = 1
 COMMANDS = ("import-prepare", "component-suite", "launch")
 FIXTURE_IDS = ("fixture64", "fixture32")
@@ -238,6 +240,19 @@ def validate_formal_evidence(
         errors.append(f"fatal findings are present: {findings}")
     if evidence.get("deviceRunCount") != 1:
         errors.append("formal evidence must represent exactly one device run")
+    simultaneous = evidence.get("simultaneousGuestSlots", {})
+    if not isinstance(simultaneous, dict) or simultaneous.get("observed") is not True:
+        errors.append("simultaneous user0/user1 Guest slot evidence is missing")
+    else:
+        slots = simultaneous.get("slots", [])
+        if not isinstance(slots, list) or len(slots) < 2:
+            errors.append("simultaneous Guest evidence must contain at least two slots")
+        users = {int(item.get("virtualUserId", -1)) for item in slots if isinstance(item, dict)}
+        if not {0, 1}.issubset(users):
+            errors.append("simultaneous Guest evidence must cover virtual users 0 and 1")
+    teardown = evidence.get("teardown", {})
+    if not isinstance(teardown, dict) or teardown.get("status") != "PASS":
+        errors.append("formal Guest stop/teardown evidence is missing")
     return errors
 
 
@@ -309,6 +324,7 @@ class DeviceLab:
         online_build: bool,
         keep_emulator: bool,
         headless: bool,
+        mumu_resolution: dict[str, Any] | None,
     ):
         self.root = root
         self.sdk_root = sdk_root
@@ -321,6 +337,7 @@ class DeviceLab:
         self.online_build = online_build
         self.keep_emulator = keep_emulator
         self.headless = headless
+        self.mumu_resolution = mumu_resolution
         self.lock = load_json(root / "build-environment.lock.json")
         self.lab = self.lock["deviceLab"]
         self.packages = self.lab["packages"]
@@ -332,6 +349,8 @@ class DeviceLab:
         self.started_emulator: subprocess.Popen[str] | None = None
         self.command_results: list[dict[str, Any]] = []
         self.guest_smoke_active = False
+        self.active_guest_sessions: dict[tuple[str, int], dict[str, Any]] = {}
+        self.simultaneous_guest_slots: dict[str, Any] = {}
         self.logcat_history_path = self.evidence_dir / "logcat-history.txt"
         self.started_monotonic = time.monotonic()
         self.evidence: dict[str, Any] = {
@@ -347,6 +366,8 @@ class DeviceLab:
             "fatalFindings": [],
             "environmentNoise": [],
         }
+        if mumu_resolution is not None:
+            self.evidence["mumuResolution"] = mumu_resolution
 
     def _resolve_tools(self) -> ToolPaths:
         exe = ".exe" if os.name == "nt" else ""
@@ -469,11 +490,15 @@ class DeviceLab:
             "abi": "ro.product.cpu.abi",
             "abilistRaw": "ro.product.cpu.abilist",
             "model": "ro.product.model",
+            "manufacturer": "ro.product.manufacturer",
         }
         value: dict[str, Any] = {"serial": self.serial}
         for key, prop in properties.items():
             value[key] = self.adb("shell", "getprop", prop).stdout.strip()
         value["abilist"] = [part.strip() for part in value.pop("abilistRaw").split(",") if part.strip()]
+        value["androidId"] = self.adb(
+            "shell", "settings", "get", "secure", "android_id"
+        ).stdout.strip()
         missing = [abi for abi in self.lab["requiredDeviceAbis"] if abi not in value["abilist"]]
         if missing:
             raise CommandError(f"device does not support required 64/32-bit ABI pair: {missing}")
@@ -558,26 +583,75 @@ class DeviceLab:
             f"before={before} after={self.activity_lifecycle_counts()}"
         )
 
-    def retire_guest_session_after_smoke(self) -> None:
-        """End a completed Guest smoke session before starting another task.
+    def guest_process_snapshot(self) -> list[dict[str, Any]]:
+        output = self.adb("shell", "ps", "-A", check=False, timeout=60).stdout
+        processes: list[dict[str, Any]] = []
+        for line in output.splitlines():
+            match = re.search(r"com\.warden\.controlledsandbox\.debug:guest(\d+)", line)
+            if not match:
+                continue
+            fields = line.split()
+            processes.append(
+                {
+                    "slot": int(match.group(1)),
+                    "pid": fields[1] if len(fields) > 1 else "",
+                    "state": fields[7] if len(fields) > 7 else "",
+                    "line": line,
+                }
+            )
+        return processes
 
-        MuMu API32 can deliver a late resume to an old StubActivity when a new
-        Host command task is started while the old Guest task is still attached.
-        Guest activities and their :guestN processes are components of the Host
-        APK, while Companion owns the 32-bit transport.  Stop Companion first so
-        its transport is quiescent, then stop Host to remove the Guest task and
-        its process-local runtime before the next command is started.
-        """
-        self.adb("shell", "am", "force-stop", self.packages["companion32"], check=False, timeout=60)
-        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
-        self.adb("shell", "am", "force-stop", self.packages["host"], check=False, timeout=60)
-        time.sleep(COMMAND_RESTART_DELAY_SECONDS)
+    def capture_simultaneous_snapshot(self) -> None:
+        slots = []
+        live_slots = {item["slot"] for item in self.guest_process_snapshot()}
+        for (fixture_id, user), operation in self.active_guest_sessions.items():
+            slot = operation.get("processSlot")
+            if not isinstance(slot, int) or slot not in live_slots:
+                continue
+            slots.append(
+                {
+                    "fixtureId": fixture_id,
+                    "virtualUserId": user,
+                    "processSlot": slot,
+                    "sessionId": operation.get("sessionId", ""),
+                    "generation": operation.get("generation", 0),
+                    "processName": f"{self.packages['host']}:guest{slot}",
+                }
+            )
+        users = {item["virtualUserId"] for item in slots}
+        self.simultaneous_guest_slots = {
+            "observed": len(slots) >= 2 and {0, 1}.issubset(users),
+            "observedAtUtc": utc_now(),
+            "slots": slots,
+            "liveProcesses": self.guest_process_snapshot(),
+        }
+        self.evidence["simultaneousGuestSlots"] = self.simultaneous_guest_slots
+        (self.evidence_dir / "simultaneous-processes.txt").write_text(
+            self.adb("shell", "ps", "-A", check=False, timeout=60).stdout,
+            encoding="utf-8",
+        )
+        (self.evidence_dir / "simultaneous-activities.txt").write_text(
+            self.adb("shell", "dumpsys", "activity", "activities", check=False, timeout=120).stdout,
+            encoding="utf-8",
+        )
+
+    def establish_simultaneous_guest_slots(self) -> None:
+        """Create user0/user1 Guest slots without host/Companion force-stop."""
+        self.adb("shell", "input", "keyevent", "3", check=False, timeout=30)
+        self.invoke_guest("fixture64", "launch", 0)
+        self.invoke_guest("fixture64", "launch", 1)
+        self.capture_simultaneous_snapshot()
+        if not self.simultaneous_guest_slots.get("observed"):
+            raise CommandError(
+                "formal simultaneous Guest slot check failed: "
+                + json.dumps(self.simultaneous_guest_slots, sort_keys=True)
+            )
 
     def invoke_guest(self, fixture_id: str, command: str, user: int) -> dict[str, Any]:
         package = self.packages[fixture_id]
         host = self.packages["host"]
         start_args = [
-            "shell", "am", "start", "-W", "-n", self.command_activity,
+            "shell", "am", "start", "-W", "--activity-clear-top", "-n", self.command_activity,
             "--es", "command", command, "--es", "package", package,
             "--ei", "user", str(user),
         ]
@@ -600,9 +674,6 @@ class DeviceLab:
                     time.sleep(PACKAGE_AUTHORITY_RETRY_DELAY_SECONDS)
                 else:
                     self.recover_stale_runtime()
-            elif self.guest_smoke_active:
-                self.retire_guest_session_after_smoke()
-                self.guest_smoke_active = False
             if command == "launch":
                 self.reset_lifecycle_log(fixture_id, user, attempt)
                 lifecycle_before = (0, 0)
@@ -654,6 +725,11 @@ class DeviceLab:
             if lifecycle_before is not None:
                 self.wait_for_activity_lifecycle(lifecycle_before, fixture_id, user)
                 self.guest_smoke_active = True
+                operation = result.get("operation")
+                if isinstance(operation, dict):
+                    self.active_guest_sessions[(fixture_id, user)] = operation
+            elif command == "stop":
+                self.active_guest_sessions.pop((fixture_id, user), None)
             path = self.evidence_dir / f"result-{fixture_id}-u{user}-{command}.json"
             path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
             self.command_results.append(result)
@@ -672,18 +748,44 @@ class DeviceLab:
                 for command in COMMANDS:
                     self.invoke_guest(fixture_id, command, user)
 
+    def teardown(self) -> None:
+        results: list[dict[str, Any]] = []
+        for fixture_id in FIXTURE_IDS:
+            for user in VIRTUAL_USERS:
+                result = self.invoke_guest(fixture_id, "stop", user)
+                results.append(result)
+        self.evidence["teardown"] = {
+            "status": "PASS",
+            "results": results,
+            "guestProcessesAfterStop": self.guest_process_snapshot(),
+        }
+
     def stability_loop(self) -> int:
         started = time.monotonic()
         iteration = 0
-        combinations = [(fixture, user) for fixture in FIXTURE_IDS for user in VIRTUAL_USERS]
+        samples: list[dict[str, Any]] = []
+        stability_log = self.evidence_dir / "stability-logcat.txt"
         while time.monotonic() - started < self.stability_seconds:
-            fixture, user = combinations[iteration % len(combinations)]
-            self.adb("shell", "input", "keyevent", "3")
-            self.invoke_guest(fixture, "launch", user)
-            if iteration % 3 == 0:
-                self.invoke_guest(fixture, "component-suite", user)
+            logcat = self.adb("logcat", "-d", "-v", "threadtime", check=False, timeout=180).stdout
+            with stability_log.open("a", encoding="utf-8") as stream:
+                stream.write(f"=== sample {iteration} {utc_now()} ===\n{logcat}\n")
+            findings = fatal_findings(logcat)
+            if findings:
+                raise CommandError(f"target FATAL/ANR during formal stability: {findings}")
+            processes = self.guest_process_snapshot()
+            samples.append(
+                {
+                    "timestampUtc": utc_now(),
+                    "iteration": iteration,
+                    "guestProcesses": processes,
+                    "trackedSessions": list(self.active_guest_sessions.values()),
+                }
+            )
+            self.evidence["stabilitySamples"] = samples
             iteration += 1
-            time.sleep(5)
+            remaining = self.stability_seconds - (time.monotonic() - started)
+            if remaining > 0:
+                time.sleep(min(60, remaining))
         return int(time.monotonic() - started)
 
     def collect(self) -> None:
@@ -789,8 +891,10 @@ class DeviceLab:
         self.evidence["device"] = self.device_info()
         self.install_artifacts(manifest, artifact_dir)
         self.initial_suite()
+        self.establish_simultaneous_guest_slots()
         observed = self.stability_loop()
         self.evidence["observedStabilitySeconds"] = observed
+        self.teardown()
         self.collect()
         return self.finish()
 
@@ -812,6 +916,8 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--android-sdk", type=Path, default=None)
     parser.add_argument("--serial", default="")
+    parser.add_argument("--mumu-instance-name", default="")
+    parser.add_argument("--mumu-root", type=Path)
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--stability-seconds", type=int)
@@ -841,6 +947,22 @@ def main() -> int:
     if not sdk_text.strip():
         parser.error("--android-sdk or ANDROID_SDK_ROOT/ANDROID_HOME is required")
     sdk_value = Path(sdk_text)
+    if args.mumu_instance_name and args.serial:
+        parser.error("--mumu-instance-name and --serial are mutually exclusive")
+    mumu_resolution: dict[str, Any] | None = None
+    if args.mumu_instance_name:
+        try:
+            mumu_resolution = resolve_instance(
+                args.mumu_instance_name,
+                mumu_root=args.mumu_root,
+                adb=sdk_value / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb"),
+            )
+        except ResolutionError as error:
+            parser.error(str(error))
+        resolved_serial = str(mumu_resolution.get("resolvedSerial", ""))
+        if not resolved_serial or mumu_resolution.get("runtimeStatus") != "device":
+            parser.error("resolved MuMu instance is not an online adb device")
+        args.serial = resolved_serial
     stability = args.stability_seconds
     if stability is None:
         stability = int(lock["deviceLab"]["formalStabilitySeconds"])
@@ -865,6 +987,7 @@ def main() -> int:
         online_build=args.online_build,
         keep_emulator=args.keep_emulator,
         headless=args.headless,
+        mumu_resolution=mumu_resolution,
     )
     try:
         result = lab.run()

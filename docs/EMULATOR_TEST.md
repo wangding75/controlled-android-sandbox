@@ -93,7 +93,18 @@ Linux:
 
 Formal mode always requires at least 1,200 seconds. For diagnosis only, use `--diagnostic --stability-seconds 0` on Linux or `-Diagnostic -StabilitySeconds 0` on Windows; diagnostic output cannot satisfy the release gate.
 
-### 4. Independently validate evidence
+### 4. Run the formal MuMu `SX测试` instance
+
+```powershell
+.\scripts\run-emulator-m5.ps1 -MumuInstanceName 'SX测试' -KeepEmulator
+```
+
+The runner resolves the selected MuMu instance from its current configuration, connects the
+current ADB endpoint, requires `get-state=device`, and uses that resolved serial for this run.
+`RD测试` and AVD evidence are separate environments. The resolution receipt is stored as
+`mumu-instance-resolution.json` in the evidence directory.
+
+### 5. Independently validate evidence
 
 ```bash
 python3 scripts/check-m5-device-evidence.py artifacts/m5-device-lab-*/device-lab-result.json

@@ -56,6 +56,14 @@ def formal_evidence() -> dict:
         },
         "runtimeDiagnostics": [{"file": "runtime.jsonl", "sha256": "f" * 64}],
         "fatalFindings": [],
+        "simultaneousGuestSlots": {
+            "observed": True,
+            "slots": [
+                {"fixtureId": "fixture64", "virtualUserId": 0, "processSlot": 2},
+                {"fixtureId": "fixture64", "virtualUserId": 1, "processSlot": 3},
+            ],
+        },
+        "teardown": {"status": "PASS", "results": []},
     }
 
 
@@ -124,14 +132,12 @@ class DeviceLabUnitTest(unittest.TestCase):
         self.assertIn("self.reset_lifecycle_log(fixture_id, user, attempt)", source)
         self.assertIn('logcat-history.txt', source)
 
-    def test_launch_smoke_teardown_stops_guest_before_host(self) -> None:
+    def test_live_guest_commands_use_clear_top_without_runner_force_stop(self) -> None:
         source = (ROOT / "scripts" / "m5_device_lab.py").read_text(encoding="utf-8")
-        start = source.index("def retire_guest_session_after_smoke")
-        end = source.index("def invoke_guest", start)
-        section = source[start:end]
-        companion = section.index('self.packages["companion32"]')
-        host = section.index('self.packages["host"]')
-        self.assertLess(companion, host)
+        invoke = source[source.index("def invoke_guest"):source.index("def initial_suite")]
+        self.assertIn('"--activity-clear-top"', invoke)
+        self.assertNotIn("retire_guest_session_after_smoke", invoke)
+        self.assertNotIn('force-stop", self.packages["host"]', invoke)
 
     def test_formal_evidence_passes(self) -> None:
         self.assertEqual([], lab.validate_formal_evidence(formal_evidence(), LOCK, COMMIT))
