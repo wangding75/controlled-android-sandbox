@@ -154,6 +154,7 @@ public abstract class StubActivityBase extends Activity {
         // bit differs from the transaction. A stale Stub window may already be detached at this
         // point, so keep the host attributes aligned before the framework reaches that branch.
         setForwardNavigationWindowFlag(true);
+        repairDetachedActivityRecord();
         // ActivityThread performs its window update immediately after this callback returns.
         // A trampoline can have a detached DecorView after another same-process Stub crosses
         // pause/stop, while the framework-side mWindowAdded marker is still true. Clear that
@@ -418,6 +419,68 @@ public abstract class StubActivityBase extends Activity {
             clearWindowAddedMarker();
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    /**
+     * ActivityThread keeps its own ActivityClientRecord.window reference. If a MuMu window
+     * manager removes the DecorView during a same-process Stub transition, clearing only the
+     * Activity marker leaves that stale record in place and the next resume still calls
+     * updateViewLayout(). Nulling the matching record lets ActivityThread use its normal addView
+     * recovery path on return from this callback.
+     */
+    private void repairDetachedActivityRecord() {
+        try {
+            android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+            if (decor == null || isWindowRegistered(decor)) return;
+            Class<?> threadClass = Class.forName("android.app.ActivityThread");
+            java.lang.reflect.Field current = threadClass.getDeclaredField("sCurrentActivityThread");
+            current.setAccessible(true);
+            Object thread = current.get(null);
+            if (thread == null) return;
+            java.lang.reflect.Field activities = threadClass.getDeclaredField("mActivities");
+            activities.setAccessible(true);
+            Object records = activities.get(thread);
+            java.lang.reflect.Method size = records.getClass().getMethod("size");
+            java.lang.reflect.Method valueAt = records.getClass().getMethod("valueAt", int.class);
+            for (int index = 0, count = ((Integer) size.invoke(records)); index < count; index++) {
+                Object record = valueAt.invoke(records, index);
+                if (record == null) continue;
+                java.lang.reflect.Field activity = record.getClass().getDeclaredField("activity");
+                activity.setAccessible(true);
+                if (activity.get(record) != this) continue;
+                java.lang.reflect.Field window = record.getClass().getDeclaredField("window");
+                window.setAccessible(true);
+                if (window.get(record) == getWindow()) {
+                    window.set(record, null);
+                    try {
+                        java.lang.reflect.Field preserve = record.getClass().getDeclaredField("mPreserveWindow");
+                        preserve.setAccessible(true);
+                        preserve.setBoolean(record, false);
+                    } catch (NoSuchFieldException ignored) { }
+                    clearWindowAddedMarker();
+                }
+                return;
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    private boolean isWindowRegistered(android.view.View decor) {
+        try {
+            Object windowManager = getWindowManager();
+            java.lang.reflect.Field global = windowManager.getClass().getDeclaredField("mGlobal");
+            global.setAccessible(true);
+            Object windowManagerGlobal = global.get(windowManager);
+            java.lang.reflect.Field views = windowManagerGlobal.getClass().getDeclaredField("mViews");
+            views.setAccessible(true);
+            Object registeredViews = views.get(windowManagerGlobal);
+            return registeredViews instanceof java.util.List
+                    && ((java.util.List<?>) registeredViews).contains(decor);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return decor.isAttachedToWindow();
         }
     }
 
