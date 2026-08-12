@@ -1,7 +1,7 @@
 # T54-R03 final report
 
-Date: 2026-08-12  
-Branch: `feature/ui-oem-compat`  
+Date: 2026-08-12
+Branch: `feature/ui-oem-compat`
 Result: **PASS_WITH_ENVIRONMENT_LIMITATIONS**
 
 The two acceptance tracks are reported independently. Track B generic API36 validation is closed

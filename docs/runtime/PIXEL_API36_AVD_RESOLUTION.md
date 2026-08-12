@@ -1,6 +1,6 @@
 # Pixel API36 AVD resolution
 
-Date: 2026-08-12  
+Date: 2026-08-12
 Branch scope: `feature/ui-oem-compat`
 
 The Android 16 validation target was resolved by enumerating online ADB devices and matching
@@ -19,4 +19,3 @@ The Android 16 validation target was resolved by enumerating online ADB devices 
 
 The raw resolution record is [pixel-api36-resolution.json](../../build/t54-r03-evidence/track-b/pixel-api36-resolution.json).
 This is Google/Pixel AVD evidence only; it is not Xiaomi HyperOS or physical-device evidence.
-
