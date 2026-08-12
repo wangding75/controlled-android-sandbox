@@ -53,6 +53,5 @@ The immutable revision fix also removes only ART-generated `lib/oat/*.prof` side
 
 There are no unresolved P0/P1 findings. Camera1 native interception is closed for the verified MuMu contract, and all remaining P2 findings are documented non-blocking Android/vendor or real-device boundaries. Final F2-F5, Camera1/Camera2, DingTalk, Quark and Stage A verification are complete. The final source commit is pushed and the independently generated T53 final backup is verified below. No main merge, amend, rebase, squash or force push was performed.
 
-Final source commit: `0e1d6bd792c4013fda7328f633a73661801f1610`
-Final tree: `cb27e95a92315d11adb28b0bb9087364b5e20a99`
+Final source commit and tree are recorded in `global-review/git-final-state.txt` in the final backup.
 Final backup root: `D:\controlled-android-sandbox-evidence\T53-FINAL-20260812-095143\`
