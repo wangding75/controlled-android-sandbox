@@ -12,6 +12,7 @@ public final class ActivityTaskRequest implements Parcelable {
     public static final String REMOVE_TASK = "REMOVE_TASK";
     public static final String FINISH_AFFINITY = "FINISH_AFFINITY";
     public static final String FINISH_AND_REMOVE_TASK = "FINISH_AND_REMOVE_TASK";
+    public static final String QUERY_ACTIVITY_ROOT = "QUERY_ACTIVITY_ROOT";
     public static final String CHECKPOINT_STATUS = "CHECKPOINT_STATUS";
 
     public static final Creator<ActivityTaskRequest> CREATOR = new Creator<>() {
@@ -66,7 +67,7 @@ public final class ActivityTaskRequest implements Parcelable {
             throw new IllegalArgumentException("taskId must be positive for task mutation");
         }
         if (requiresActivityToken(this.operation) && this.activityToken.isEmpty()) {
-            throw new IllegalArgumentException("activityToken is required for Activity finish operation");
+            throw new IllegalArgumentException("activityToken is required for Activity operation");
         }
         if ((QUERY_RUNNING.equals(this.operation) || QUERY_RECENT.equals(this.operation))
                 && (maxCount < 1 || maxCount > 100)) {
@@ -126,7 +127,8 @@ public final class ActivityTaskRequest implements Parcelable {
 
     private static boolean requiresActivityToken(String operation) {
         return FINISH_AFFINITY.equals(operation)
-                || FINISH_AND_REMOVE_TASK.equals(operation);
+                || FINISH_AND_REMOVE_TASK.equals(operation)
+                || QUERY_ACTIVITY_ROOT.equals(operation);
     }
 
     private static String requireOperation(String value) {
@@ -135,6 +137,7 @@ public final class ActivityTaskRequest implements Parcelable {
                 && !MOVE_TO_FRONT.equals(normalized) && !MOVE_TO_BACK.equals(normalized)
                 && !REMOVE_TASK.equals(normalized) && !FINISH_AFFINITY.equals(normalized)
                 && !FINISH_AND_REMOVE_TASK.equals(normalized)
+                && !QUERY_ACTIVITY_ROOT.equals(normalized)
                 && !CHECKPOINT_STATUS.equals(normalized)) {
             throw new IllegalArgumentException("unsupported Activity task operation: " + normalized);
         }

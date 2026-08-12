@@ -32,6 +32,10 @@ final class GuestActivityTaskClient {
         return execute(operation, 0, 0, activityToken);
     }
 
+    boolean isRootActivity(String activityToken) {
+        return execute(ActivityTaskRequest.QUERY_ACTIVITY_ROOT, 0, 0, activityToken).changed();
+    }
+
     private ActivityTaskResult execute(String operation, int taskId, int maxCount,
                                        String activityToken) {
         String requestId = "guest-task-" + spec.generation + "-"

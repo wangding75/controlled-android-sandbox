@@ -731,6 +731,13 @@ public final class ActivityTaskLedger {
         return activitiesByToken.size();
     }
 
+    /** Returns whether the live Activity is the root entry in its virtual task stack. */
+    public synchronized boolean isRootActivity(String activityToken) {
+        ActivityTaskMutableActivity activity = requireActivity(activityToken);
+        ActivityTaskMutableTask task = taskContaining(activity.token);
+        return !task.activities.isEmpty() && task.activities.get(0) == activity;
+    }
+
     public synchronized void clearVirtualUser(int virtualUserId) {
         if (virtualUserId < 0) {
             throw new IllegalArgumentException("virtualUserId must be non-negative");

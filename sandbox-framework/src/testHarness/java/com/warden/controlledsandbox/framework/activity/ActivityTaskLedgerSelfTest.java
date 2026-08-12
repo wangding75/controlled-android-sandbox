@@ -28,6 +28,7 @@ public final class ActivityTaskLedgerSelfTest {
         testForwardResultChain();
         testNoHistoryAndRecentTaskPolicy();
         testRunningRecentMoveAndRemoveQueries();
+        testRootActivityQuery();
         testLaunchFlagValidationMatrix();
         testDocumentLaunchModes();
         testFinishMoveBackAndRevisionCleanup();
@@ -472,6 +473,18 @@ public final class ActivityTaskLedgerSelfTest {
         check(ledger.recentTasks(0, "guest.example", 10).stream()
                         .noneMatch(task -> task.taskId() == first.taskId()),
                 "explicit remove must remove task from recents");
+    }
+
+    private static void testRootActivityQuery() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(request(
+                0, "Root", LaunchMode.STANDARD, 0, null, 1));
+        LaunchDecision child = ledger.launch(request(
+                0, "Child", LaunchMode.STANDARD, 0, root.taskId(), 1));
+        check(ledger.isRootActivity(root.activityToken()),
+                "the first Activity in a task must be reported as root");
+        check(!ledger.isRootActivity(child.activityToken()),
+                "a non-root Activity must not satisfy onlyRoot");
     }
 
     private static void testLaunchFlagValidationMatrix() {

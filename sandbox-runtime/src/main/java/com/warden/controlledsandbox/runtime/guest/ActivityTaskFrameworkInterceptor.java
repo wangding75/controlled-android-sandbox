@@ -152,9 +152,23 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
 
     private Interception taskForActivity(Object[] arguments) {
         IBinder token = requireFrameworkToken(arguments);
+        HostBinding binding;
         synchronized (this) {
-            return Interception.handled(requireBinding(token).taskId);
+            binding = requireBinding(token);
         }
+        if (onlyRoot(arguments) && !client.isRootActivity(binding.activityToken)) {
+            return Interception.handled(-1);
+        }
+        return Interception.handled(binding.taskId);
+    }
+
+    private static boolean onlyRoot(Object[] arguments) {
+        if (arguments != null) {
+            for (Object argument : arguments) {
+                if (argument instanceof Boolean value) return value;
+            }
+        }
+        return false;
     }
 
     private void invokeForTask(int taskId, HostAction action) {

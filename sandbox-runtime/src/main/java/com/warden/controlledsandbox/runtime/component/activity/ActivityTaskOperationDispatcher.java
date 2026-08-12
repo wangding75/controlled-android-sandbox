@@ -67,6 +67,10 @@ final class ActivityTaskOperationDispatcher {
                 verifyOwner(request.activityToken(), session);
                 changed = mutate(() -> ledger.finishAndRemoveTask(request.activityToken()));
             }
+            case ActivityTaskRequest.QUERY_ACTIVITY_ROOT -> {
+                verifyOwner(request.activityToken(), session);
+                changed = ledger.isRootActivity(request.activityToken());
+            }
             case ActivityTaskRequest.CHECKPOINT_STATUS -> { }
             default -> throw new IllegalArgumentException(
                     "Unknown Activity task operation: " + request.operation());
