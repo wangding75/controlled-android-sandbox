@@ -2,6 +2,8 @@
 
 Evidence root: `D:\controlled-android-sandbox-evidence\T53-R01-20260812-073729\`
 
+Final backup root: `D:\controlled-android-sandbox-evidence\T53-FINAL-20260812-095143\`
+
 All emulator actions in this index used `adb -s 127.0.0.1:16384`. The `adb devices -l` baseline also records other connected endpoints, but none of those endpoints was used for install, launch, logcat, dumpsys, screenshot or acceptance.
 
 ## Baseline and audit
@@ -45,7 +47,7 @@ All emulator actions in this index used `adb -s 127.0.0.1:16384`. The `adb devic
 - `quark/quark-final-results.json` and `quark/quark-final-logcat.txt`: final-code import/launch/stop/relaunch/stop 5/5 PASS and zero target FATAL/ANR matches.
 - `stage-a/stage-a-final-results.json` and `stage-a/stage-a-final-logcat.txt`: final-code fixture64/fixture32 × user0/user1 import/prepare/component-suite/launch/stop 16/16 PASS and zero target FATAL/ANR matches.
 - `global-review/`: final source search, diff checks and review receipts.
-- `backup/`: final ZIP, bundle, hashes, restore script and restore verification after final commit.
+- `backup/` under the final backup root: final ZIP, bundle, hashes, restore script and restore verification after final commit.
 
 ## Reports
 
