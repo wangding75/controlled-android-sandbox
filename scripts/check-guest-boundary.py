@@ -29,7 +29,7 @@ if not errors:
     framework_hooks = framework_hooks_path.read_text(encoding='utf-8')
 
     required_context_fragments = {
-        '@Override public Context getBaseContext() { return this; }': 'host Context unwrap is not closed',
+        '@Override public Context getBaseContext() { return unwrapBoundary; }': 'host Context unwrap is not closed',
         '@Override public File getDataDir() { return dataRoot; }': 'Guest data root is not redirected',
         '@Override public File getNoBackupFilesDir()': 'no-backup storage is not redirected',
         '@Override public SQLiteDatabase openOrCreateDatabase(': 'database creation is not redirected',
@@ -85,8 +85,9 @@ if not errors:
         if namespace in parent_first_body:
             errors.append(f'host implementation namespace remains parent-first: {namespace}')
 
-    if 'getBaseContext() == context' not in context_test:
-        errors.append('Guest Context test does not verify host Context unwrap denial')
+    if ('boundary.getBaseContext() == null' not in context_test
+            and 'getBaseContext() == context' not in context_test):
+        errors.append('Guest Context test does not verify finite host Context unwrap denial')
     if 'createPackageContext("com.warden.controlledsandbox", 0)' not in context_test:
         errors.append('Guest Context test does not verify host package Context denial')
     if 'openOrCreateDatabase("guest.db"' not in context_test:

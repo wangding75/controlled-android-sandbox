@@ -73,7 +73,15 @@ for path in [ROOT/'app/src/main/java/com/warden/controlledsandbox/MainActivity.j
              ROOT/'app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java']:
     text=path.read_text(encoding='utf-8-sig')
     if 'new SandboxPackageLifecycle' in text: errors.append(f'{path.relative_to(ROOT)} bypasses Binder package authority')
-    if 'PackageServiceClient' not in text: errors.append(f'{path.relative_to(ROOT)} is not wired to PackageServiceClient')
+    if ('PackageServiceClient' not in text
+            and 'SandboxApplicationLayer' not in text
+            and 'SandboxViewModel' not in text):
+        errors.append(f'{path.relative_to(ROOT)} is not wired to PackageServiceClient or its application-layer boundary')
+
+adapter_path = ROOT/'app/src/main/java/com/warden/controlledsandbox/SxSandboxAdapter.java'
+adapter_text = adapter_path.read_text(encoding='utf-8-sig')
+if 'PackageServiceClient' not in adapter_text:
+    errors.append('SxSandboxAdapter must own the PackageServiceClient boundary')
 
 for path in (ROOT/'app/src/main/java').rglob('*.java'):
     if path.name in {'PackageManagementService.java', 'PackageServiceDependencies.java'}: continue
