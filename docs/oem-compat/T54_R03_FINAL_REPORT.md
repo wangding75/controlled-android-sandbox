@@ -1,24 +1,23 @@
-# T54-R03 final report
+﻿# T54-R03 final report
 
 Date: 2026-08-12
 Branch: `feature/ui-oem-compat`
 Result: **PASS_WITH_ENVIRONMENT_LIMITATIONS**
 
 The two acceptance tracks are reported independently. Track B generic API36 validation is closed
-for the tested 64-bit fixture path. Track A DingTalk formal 5/5 closure is **not** claimed because
-the MuMu session contained external test-runner interference that invalidated part of the product-UI
-round matrix.
+for the tested 64-bit fixture path, including the real JobScheduler device callback. Track A formal
+DingTalk 5/5 closure was completed in the clean R04 session.
 
-## Track A — RD / Android 12 API32 / DingTalk
+## Track A 鈥?RD / Android 12 API32 / DingTalk
 
 ### Dynamic device and app baseline
 
-The RD target was resolved by `scripts/mumu_instance.py --instance-name RD测试`; the serial was
+The RD target was resolved by `scripts/mumu_instance.py --instance-name RD娴嬭瘯`; the serial was
 taken from that resolution, not guessed from historical port data.
 
 | Field | Result |
 |---|---|
-| Project / instance | Controlled Android Sandbox / 闪现2 / `RD测试` |
+| Project / instance | Controlled Android Sandbox / 闂幇2 / `RD娴嬭瘯` |
 | Index / instance id | `1` / `ginstance1400582734232539401` |
 | VM / state | `MuMuPlayer-12.0-1` / `start_finished` |
 | Resolved serial | `127.0.0.1:16416` |
@@ -34,8 +33,8 @@ Quark `com.quark.browser` was retained and not cleared or uninstalled.
 
 ### Product UI evidence
 
-The formal Flash2 product route was used: Home → Apps → Import App → explicit Native Guest trust
-dialog → DingTalk instance → Launch/Stop. Home and import evidence show the Flash2 product shell and
+The formal Flash2 product route was used: Home 鈫?Apps 鈫?Import App 鈫?explicit Native Guest trust
+dialog 鈫?DingTalk instance 鈫?Launch/Stop. Home and import evidence show the Flash2 product shell and
 not `DebugCommandActivity`. The generic trusted-native import path and Android 12 accessibility
 interaction-connection boundary were fixed in commit `1a78466f`.
 
@@ -43,24 +42,26 @@ The import succeeded and the Apps catalog displayed DingTalk `7.8.10` / `com.ali
 The first launch before the accessibility fix produced a real
 `VIRTUAL_ACCESSIBILITY_MUTATION_DENIED:addAccessibilityInteractionConnection` failure; it was
 fixed and not hidden. Subsequent valid DingTalk logs reached Guest generation 2
-`PrivacyPolicyActivity` with target FATAL/ANR count zero. DingTalk’s own
-`checkExportedActivityStartup` calls `System.exit(0)` as part of its launch handoff; this is recorded
-as an expected app exit followed by Guest recovery, not reclassified as a Sandbox FATAL.
+`PrivacyPolicyActivity` with target FATAL/ANR count zero. DingTalk's own
+`checkExportedActivityStartup` calls `System.exit(0)` as part of its launch handoff; each observation
+is classified as `OBSERVED_APP_INITIATED_EXIT`, followed by successful Guest recovery, and is not
+reclassified as a Sandbox FATAL.
 
-The preserved `formal-5x/formal-5x-summary.json` contains four usable DingTalk launch logs with
-generation-2 Activity creation and no target FATAL/ANR. One round contains only an unrelated
-`com.cost.app` runner invocation. Stop evidence is also mixed: external runner activity and a
-Flash2 crash dialog appeared during later rounds, and the Apps catalog was subsequently lost by the
-interfering environment. Therefore the required Track A gate is recorded as:
+The clean R04 evidence is under `build/t54-r04-evidence/track-a/`, with the round matrix in
+`dingtalk-r04/r04-formal-5x-summary.json`. Every formal round used Flash2 Home 鈫?Apps 鈫?DingTalk
+instance 鈫?Launch and the product-defined Apps-row Stop action. The Apps catalog remained present,
+runner packages were stopped before the session, and Guest processes were cleaned after each stop.
+Therefore the required Track A gate is recorded as:
 
 | Gate | Result |
 |---|---|
 | Dynamic RD resolution | PASS |
 | Formal product UI import | PASS |
 | DingTalk 7.8.10 / 1178 | PASS |
-| Launch | 4 usable DingTalk logs; formal 5/5 **NOT CLOSED** |
-| Stop | partial raw evidence; formal 5/5 **NOT CLOSED** |
-| Target FATAL / ANR in usable logs | 0 / 0 |
+| Launch | formal 5/5 PASS |
+| Stop | formal 5/5 PASS |
+| Target FATAL / ANR | 0 / 0 |
+| External runner interference | none in formal session |
 | Logged-in business session | `REAL_USER_SESSION_REQUIRED` |
 
 Raw evidence is under `build/t54-r03-evidence/track-a/`, including the original 5-round records.
@@ -73,7 +74,7 @@ No DingTalk package-name branch was added to the core Runtime. DingTalk-specific
 manager behavior remains outside the generic Activity/Task, Package, accessibility, and native-trust
 boundaries. No logged-in business, camera business, or location business PASS is claimed.
 
-## Track B — Pixel Android 16 / API36 AVD
+## Track B 鈥?Pixel Android 16 / API36 AVD
 
 ### Target resolution
 
@@ -107,8 +108,9 @@ and 1 where applicable:
 - Package import / native trust / prepare;
 - Activity launch, relaunch, task switch, detail Activity and stop;
 - Service start/stop, Receiver delivery and Provider preparation through `component-suite`;
-- JobScheduler source/bridge and ownership checks PASS; no direct Guest JobService callback was
-  claimed as a device result because the existing fixture command surface does not schedule a Job;
+- JobScheduler source/bridge and ownership checks PASS; R04 added the minimal 64-bit fixture JobService
+  entry and observed real API36 schedule → Host JobScheduler → callback → Guest `onStartJob` →
+  `jobFinished`, cancellation/cleanup, user isolation, and stale-session rejection;
 - F2 static location profile, reset, and separate user profiles;
 - F3 camera profile configuration and Camera2 service binding/enumeration/preview-texture path;
 - F4 device profile read/write/reset;
@@ -116,12 +118,13 @@ and 1 where applicable:
 - Product Home UI and normal navigation;
 - 5-minute stability sample: 12 cycles, 36 launch/stop samples, 36/36 PASS, target Sandbox FATAL/ANR 0.
 
-The raw command results and logs are under `build/t54-r03-evidence/track-b/`. The Job result is
-therefore `SOURCE_BRIDGE_PASS_DEVICE_CALLBACK_NOT_RUN`, not a fabricated device PASS.
+The R03 source-only result was closed by R04. Raw device command results, logcat, and
+`dumpsys jobscheduler` evidence are under `build/t54-r04-evidence/track-b/`; the final device result
+is `PASS_RUNTIME_API36`.
 
 ### Android 16 compatibility fix
 
-Camera1 on API36 initially exposed a general Activity/Task boundary problem: Android 16’s
+Camera1 on API36 initially exposed a general Activity/Task boundary problem: Android 16鈥檚
 `CameraManager` path invoked `ActivityManager.getAppTasks()` with the Host op-package name while
 running inside a Guest. The existing strict check raised `VIRTUAL_APP_TASK_PACKAGE_MISMATCH`.
 The generic fix passes the Host package alias into the Guest Activity/Task interceptor only for
@@ -144,7 +147,7 @@ are returned, while IMEI/IMSI/ICCID and other protected physical identifiers can
 
 ### Optional third-party smoke
 
-- Quark on API36: `NOT_RUN_NO_LOCAL_APK`; the task did not copy or reinstall the RD device’s Quark.
+- Quark on API36: `NOT_RUN_NO_LOCAL_APK`; the task did not copy or reinstall the RD device鈥檚 Quark.
 - DingTalk on API36: `NOT_RUN`; Track B generic Runtime evidence does not depend on an ABI-incompatible
   third-party APK and does not replace Track A.
 
@@ -164,3 +167,4 @@ not claim HyperOS, Xiaomi Camera HAL, OEM AppOps/background policy, physical SIM
 or ARM64 OEM behavior.
 
 No merge to main, F6, source ZIP, Git bundle, force push, or unrelated feature was performed.
+
