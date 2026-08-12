@@ -29,6 +29,7 @@ if ($expected -and $expected -ne "T54-source.zip SHA256=$actual") {
 
 Expand-Archive -LiteralPath $zip -DestinationPath $target -Force
 if (Test-Path -LiteralPath $bundle -PathType Leaf) {
-    git -C $target bundle verify $bundle
+    git bundle verify $bundle
+    if ($LASTEXITCODE -ne 0) { throw 'Git bundle verification failed' }
 }
 Write-Output "Restored T54 source to $target"
