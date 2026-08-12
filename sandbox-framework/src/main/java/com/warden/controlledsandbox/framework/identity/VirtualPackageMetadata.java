@@ -324,22 +324,36 @@ public final class VirtualPackageMetadata {
         this.requestedPermissions = immutableList(requestedPermissions);
         this.enabled = enabled;
         List<Component> copy = new ArrayList<>(components == null ? List.of() : components);
-        this.components = Collections.unmodifiableList(copy);
         Map<String, Component> classes = new LinkedHashMap<>();
         Map<String, Component> authorities = new LinkedHashMap<>();
+        List<Component> accepted = new ArrayList<>();
         for (Component component : copy) {
-            if (classes.put(component.className(), component) != null) {
-                throw new IllegalArgumentException("Duplicate component " + component.className());
+            if (classes.containsKey(component.className())) {
+                // PackageManager keeps the first component when a malformed manifest repeats
+                // the same component name. Do not let a duplicate declaration replace it.
+                continue;
             }
             if (component.type() == Type.PROVIDER && !component.authority().isEmpty()) {
+                boolean duplicateAuthority = false;
                 for (String authority : component.authority().split(";")) {
                     String normalized = authority.trim();
-                    if (!normalized.isEmpty() && authorities.put(normalized, component) != null) {
-                        throw new IllegalArgumentException("Duplicate provider authority " + normalized);
+                    if (!normalized.isEmpty() && authorities.containsKey(normalized)) {
+                        duplicateAuthority = true;
+                        break;
                     }
                 }
+                // AOSP package parsing skips a provider whose authority is already owned by
+                // an earlier declaration (the installed Quark APK exercises this contract).
+                if (duplicateAuthority) continue;
+                for (String authority : component.authority().split(";")) {
+                    String normalized = authority.trim();
+                    if (!normalized.isEmpty()) authorities.put(normalized, component);
+                }
             }
+            classes.put(component.className(), component);
+            accepted.add(component);
         }
+        this.components = Collections.unmodifiableList(accepted);
         byClass = Collections.unmodifiableMap(classes);
         providersByAuthority = Collections.unmodifiableMap(authorities);
     }

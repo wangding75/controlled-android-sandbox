@@ -94,6 +94,26 @@ public final class VirtualPackageQuerySelfTest {
         require(metadata.sharedLibraries().contains("org.apache.http.legacy"),
                 "shared library metadata is exposed");
 
+        VirtualPackageMetadata duplicateAuthority = new VirtualPackageMetadata("guest.pkg",
+                "guest.pkg.ViewActivity", application, List.of(
+                new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.PROVIDER,
+                        "guest.pkg.FirstProvider", "guest.pkg", true, true, false,
+                        Set.of(), "guest.shared", "", "DEFAULT", List.of()),
+                new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.PROVIDER,
+                        "guest.pkg.DuplicateProvider", "guest.pkg", true, true, false,
+                        Set.of(), "guest.shared", "", "DEFAULT", List.of()),
+                new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.PROVIDER,
+                        "guest.pkg.UniqueProvider", "guest.pkg", true, true, false,
+                        Set.of(), "guest.unique", "", "DEFAULT", List.of())));
+        require(duplicateAuthority.components().size() == 2,
+                "duplicate provider declaration is skipped like Android PackageManager");
+        require("guest.pkg.FirstProvider".equals(
+                        duplicateAuthority.provider("guest.shared").name),
+                "first provider retains duplicate authority ownership");
+        require("guest.pkg.UniqueProvider".equals(
+                        duplicateAuthority.provider("guest.unique").name),
+                "unique provider authority remains available after duplicate filtering");
+
         application.sourceDir = "/data/app/guest.pkg/base.apk";
         application.nativeLibraryDir = "/data/app/guest.pkg/lib";
         VirtualPackageMetadata extended = new VirtualPackageMetadata("guest.pkg",
