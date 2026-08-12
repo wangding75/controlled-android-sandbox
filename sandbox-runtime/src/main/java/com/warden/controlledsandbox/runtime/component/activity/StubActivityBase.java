@@ -229,6 +229,13 @@ public abstract class StubActivityBase extends Activity {
         if (controller != null) controller.configurationChanged(configuration);
     }
 
+    @Override public void onDetachedFromWindow() {
+        // WindowManagerGlobal has removed this trampoline's root. ActivityThread can otherwise
+        // retain mWindowAdded=true and call updateViewLayout() if the same Stub is resumed again.
+        clearWindowAddedMarker();
+        super.onDetachedFromWindow();
+    }
+
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (controller != null) controller.activityResult(requestCode, resultCode, data);
@@ -403,6 +410,14 @@ public abstract class StubActivityBase extends Activity {
         try {
             android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
             if (decor == null || decor.isAttachedToWindow()) return;
+            clearWindowAddedMarker();
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    private void clearWindowAddedMarker() {
+        try {
             java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
             added.setAccessible(true);
             if (added.getBoolean(this)) added.setBoolean(this, false);
