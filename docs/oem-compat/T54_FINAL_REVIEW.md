@@ -1,5 +1,7 @@
 # T54 final review
 
+> Historical checkpoint only. This file records the pre-R02/R03/R04 state and is retained for audit history. It is superseded by `T54_FINAL_GLOBAL_REVIEW.md` and `T54_FINAL_CAPABILITY_MATRIX.md`; its historical `NOT PASS`/`not frozen` statements are not the final T54 status.
+
 Review date: 2026-08-12  
 Branch: `feature/ui-oem-compat`  
 T53 baseline commit: `3a8c998ffd58dcb158f548df64d8d80590cf338c`  
