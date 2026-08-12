@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
+import java.lang.reflect.Method;
 
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import java.lang.reflect.Array;
@@ -155,5 +156,26 @@ final class PeripheralInvocationValues {
     static String normalize(String value) {
         return value == null ? "" : value.replace("_", "").replace(" ", "")
                 .toLowerCase(Locale.ROOT);
+    }
+
+    static PeripheralServicesInvocationInterceptor.Decision handled(Object value) {
+        return PeripheralServicesInvocationInterceptor.Decision.handled(value);
+    }
+
+    static PeripheralServicesInvocationInterceptor.Decision adaptableSessionResult(
+            String domain, Method method, Object token, Set<Object> registry) {
+        Class<?> type = method.getReturnType();
+        if (type == void.class || type == Void.class) return handled(null);
+        if (type == boolean.class || type == Boolean.class) return handled(true);
+        if (type == int.class || type == Integer.class) return handled(0);
+        if (type == long.class || type == Long.class) return handled(0L);
+        if (type == String.class || type == Object.class) return handled(token.toString());
+        registry.remove(token);
+        throw new IllegalStateException("VIRTUAL_" + domain + "_RESULT_ADAPTER_REQUIRED:" + type.getName());
+    }
+
+    static PeripheralServicesInvocationInterceptor.Decision unsupported(String domain, Method method) {
+        throw new UnsupportedOperationException("VIRTUAL_" + domain.toUpperCase(Locale.ROOT)
+                + "_OPERATION_UNSUPPORTED:" + method.getName());
     }
 }
