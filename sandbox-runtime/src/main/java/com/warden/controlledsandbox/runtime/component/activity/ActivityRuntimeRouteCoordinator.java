@@ -31,6 +31,7 @@ final class ActivityRuntimeRouteCoordinator {
     private final OneTimeRouteStore routeStore;
     private final ActivityLaunchCoordinator coordinator;
     private final BrokerStateStore transport;
+    private final ActivityCheckpointTransaction transactions;
     private final Runnable persistCheckpoint;
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
     /** Consumed routes retained only as process-restart candidates until their task is finalized. */
@@ -40,10 +41,12 @@ final class ActivityRuntimeRouteCoordinator {
             ActivityTaskLedger ledger,
             OneTimeRouteStore routeStore,
             BrokerStateStore transport,
+            ActivityCheckpointTransaction transactions,
             Runnable persistCheckpoint) {
         this.ledger = ledger;
         this.routeStore = routeStore;
         this.transport = transport;
+        this.transactions = transactions;
         this.persistCheckpoint = persistCheckpoint;
         this.coordinator = new ActivityLaunchCoordinator(ledger, routeStore);
     }
@@ -125,7 +128,7 @@ final class ActivityRuntimeRouteCoordinator {
         if (transaction != null) {
             LaunchAction action = transaction.decision().action();
             if (action == LaunchAction.CREATED_ACTIVITY || action == LaunchAction.CREATED_TASK) {
-                ledger.finish(transaction.decision().activityToken());
+                transactions.mutate(() -> ledger.finish(transaction.decision().activityToken()));
             }
             pending.remove(token, transaction);
         }

@@ -33,7 +33,7 @@ public final class BrokerActivityRuntime {
         Objects.requireNonNull(transport, "transport");
         this.checkpoints = new ActivityRuntimeCheckpointCoordinator(ledger);
         this.routes = new ActivityRuntimeRouteCoordinator(
-                ledger, routeStore, transport, this::persistCheckpoint);
+                ledger, routeStore, transport, checkpoints.transactions(), this::persistCheckpoint);
         this.lifecycle = new ActivityRuntimeLifecycleCoordinator(
                 ledger, routes, checkpoints.transactions(), this::persistCheckpoint);
         this.taskOperations = new ActivityTaskOperationDispatcher(
