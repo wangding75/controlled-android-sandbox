@@ -1,32 +1,36 @@
 # Real-device test plan: Xiaomi HyperOS Android 16 / API 36
 
 Target: Xiaomi phone running HyperOS and Android 16 / API 36.  
-Approved ADB serial: `127.0.0.1:16384` only.  
+Current MuMu test instance for this project: `SX测试`; ADB serial is dynamically resolved at
+runtime and is not a device identity.  
 Evidence root: `D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE\`.
 
-Every command must be written as `adb -s 127.0.0.1:16384 ...`. Do not install, launch, inspect,
-or collect logs from `127.0.0.1:7555` or any other serial. If the approved serial is absent, stop
-the device phase and record `REAL_DEVICE_VERIFICATION_PENDING`; do not substitute an emulator or
-another device.
+Before every MuMu operation, resolve the exact `SX测试` instance from the current MuMu list,
+connect its current ADB endpoint, require `adb -s <resolved-serial> get-state` to return
+`device`, and use that serial for the complete operation. Do not guess historical ports or use
+another MuMu instance. If the Xiaomi device is absent, record
+`REAL_DEVICE_VERIFICATION_PENDING`; do not substitute an emulator or another device.
 
 ## Preflight
 
 ```powershell
 New-Item -ItemType Directory -Force D:\controlled-android-sandbox-evidence\T54-REAL-DEVICE | Out-Null
-adb -s 127.0.0.1:16384 get-state
-adb -s 127.0.0.1:16384 shell getprop ro.product.manufacturer
-adb -s 127.0.0.1:16384 shell getprop ro.miui.ui.version.name
-adb -s 127.0.0.1:16384 shell getprop ro.build.version.sdk
-adb -s 127.0.0.1:16384 shell pm path com.sx.app.debug
-adb -s 127.0.0.1:16384 shell pm path com.warden.controlledsandbox.debug
+$resolution = python scripts/mumu_instance.py --instance-name 'SX测试' | ConvertFrom-Json
+$serial = $resolution.resolvedSerial
+adb -s $serial get-state
+adb -s $serial shell getprop ro.product.manufacturer
+adb -s $serial shell getprop ro.miui.ui.version.name
+adb -s $serial shell getprop ro.build.version.sdk
+adb -s $serial shell pm path com.sx.app.debug
+adb -s $serial shell pm path com.warden.controlledsandbox.debug
 ```
 
 Save the output before any uninstall. If the old SX package is installed, save version, label,
 launcher resolution and the required reference screenshots, then uninstall only:
 
 ```powershell
-adb -s 127.0.0.1:16384 uninstall com.sx.app.debug
-adb -s 127.0.0.1:16384 shell pm path com.sx.app.debug
+adb -s $serial uninstall com.sx.app.debug
+adb -s $serial shell pm path com.sx.app.debug
 ```
 
 The second package path must still resolve. No DingTalk, Quark, fixture or unrelated package may
@@ -72,5 +76,5 @@ obscured long-text field is present.
 
 Use stable names such as `hyperos-case-01-deskclock-launch.logcat.txt`,
 `ui-home.png`, `ui-camera.png`, and `oem-preflight.txt`. Each result must include timestamp,
-serial, package revision SHA-256, API level, and whether the result is `PASS_RUNTIME`,
+the resolved serial plus instance name, package revision SHA-256, API level, and whether the result is `PASS_RUNTIME`,
 `PASS_CONTRACT`, or `REAL_DEVICE_VERIFICATION_PENDING`.

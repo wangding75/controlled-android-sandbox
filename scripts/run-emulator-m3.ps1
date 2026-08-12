@@ -1,6 +1,8 @@
 param(
     [string]$AndroidSdk = $env:ANDROID_SDK_ROOT,
     [string]$Serial = '',
+    [string]$MumuInstanceName = '',
+    [string]$MumuRoot = '',
     [string]$AvdName = 'ControlledSandbox_API35',
     [string]$SystemImage = 'system-images;android-35;google_apis;x86_64',
     [int]$StabilityMinutes = 20,
@@ -50,12 +52,10 @@ function Wait-Boot {
 function Invoke-GuestCommand {
     param([string]$Command, [int]$VirtualUserId = 0)
     for ($attempt = 1; $attempt -le 3; $attempt++) {
-        Invoke-Adb shell am force-stop $HostPackage | Out-Null
-        Start-Sleep -Milliseconds 500
         $clearArgs = @('shell', 'run-as', $HostPackage, 'rm', '-f', 'files/debug-command-result.json')
         Invoke-Adb @clearArgs 2>$null | Out-Null
 
-        $startArgs = @('shell', 'am', 'start', '-W', '-n', $CommandActivity,
+        $startArgs = @('shell', 'am', 'start', '-W', '--activity-clear-top', '-n', $CommandActivity,
             '--es', 'command', $Command, '--es', 'package', $FixturePackage,
             '--ei', 'user', "$VirtualUserId")
         if ($Command -eq 'import-prepare') {
@@ -100,6 +100,25 @@ try {
     }
     foreach ($tool in @($Adb, $Emulator)) { if (-not (Test-Path $tool)) { throw "Missing Android tool: $tool" } }
 
+    if (-not [string]::IsNullOrWhiteSpace($MumuInstanceName) -and -not [string]::IsNullOrWhiteSpace($Serial)) {
+        throw '-MumuInstanceName and -Serial are mutually exclusive'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($MumuInstanceName)) {
+        $resolverArgs = @(
+            (Join-Path $Root 'scripts\mumu_instance.py'),
+            '--instance-name', $MumuInstanceName,
+            '--adb', $Adb
+        )
+        if (-not [string]::IsNullOrWhiteSpace($MumuRoot)) { $resolverArgs += @('--mumu-root', $MumuRoot) }
+        $resolutionJson = & python @resolverArgs | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "MuMu instance resolution failed for $MumuInstanceName" }
+        $resolution = $resolutionJson | ConvertFrom-Json
+        if ($resolution.runtimeStatus -ne 'device' -or [string]::IsNullOrWhiteSpace($resolution.resolvedSerial)) {
+            throw "Resolved MuMu instance is not an online adb device: $MumuInstanceName"
+        }
+        $Serial = $resolution.resolvedSerial
+        $resolutionJson | Out-File (Join-Path $Evidence 'mumu-instance-resolution.json') -Encoding utf8
+    }
     if ([string]::IsNullOrWhiteSpace($Serial)) {
         $online = & $Adb devices | Select-String "`tdevice$" | Select-Object -First 1
         if ($online) {

@@ -1,6 +1,8 @@
 param(
     [string]$AndroidSdk = $env:ANDROID_SDK_ROOT,
     [string]$Serial = '',
+    [string]$MumuInstanceName = '',
+    [string]$MumuRoot = '',
     [string]$ArtifactDirectory = '',
     [string]$EvidenceDirectory = '',
     [int]$StabilitySeconds = 1200,
@@ -20,6 +22,8 @@ $ArgsList = @(
     '--stability-seconds', $StabilitySeconds.ToString()
 )
 if (-not [string]::IsNullOrWhiteSpace($Serial)) { $ArgsList += @('--serial', $Serial) }
+if (-not [string]::IsNullOrWhiteSpace($MumuInstanceName)) { $ArgsList += @('--mumu-instance-name', $MumuInstanceName) }
+if (-not [string]::IsNullOrWhiteSpace($MumuRoot)) { $ArgsList += @('--mumu-root', $MumuRoot) }
 if (-not [string]::IsNullOrWhiteSpace($ArtifactDirectory)) { $ArgsList += @('--artifact-dir', $ArtifactDirectory) }
 if (-not [string]::IsNullOrWhiteSpace($EvidenceDirectory)) { $ArgsList += @('--evidence-dir', $EvidenceDirectory) }
 if ($Diagnostic) { $ArgsList += '--diagnostic' }

@@ -5,8 +5,10 @@ Current branch: `feature/ui-oem-compat`
 T53 source baseline: `3a8c998ffd58dcb158f548df64d8d80590cf338c`
 
 This matrix separates generic contract evidence from hardware/OEM evidence. A source-level or
-emulator result never closes a Xiaomi HyperOS item. The approved real-device serial is
-`127.0.0.1:16384`; when it is absent, the result remains `REAL_DEVICE_VERIFICATION_PENDING`.
+emulator result never closes a Xiaomi HyperOS item. For this project, MuMu identity is the exact
+instance name `SX测试`; its ADB serial is dynamically resolved from the current MuMu instance
+list before each operation. The current resolution is recorded in
+`docs/runtime/SX_TEST_DEVICE_RESOLUTION.md`.
 
 ## Status vocabulary
 
@@ -51,11 +53,14 @@ are labeled `NOT_IMPLEMENTED`.
 The target row can move from `REAL_DEVICE_VERIFICATION_PENDING` to `PASS_RUNTIME` only after all of
 the following are retained under the T54 evidence root:
 
-1. `adb -s 127.0.0.1:16384 get-state` and manufacturer/HyperOS/API properties;
+1. Dynamically resolve MuMu instance `SX测试`, run `adb -s <resolved-serial> get-state`, and read
+   manufacturer/HyperOS/API properties through that same resolved serial;
 2. old SX package evidence before any cleanup, followed by an old-package-only uninstall if needed;
 3. DeskClock, fixture, Quark and DingTalk acceptance logs with zero unclassified FATAL/ANR;
 4. UI screenshots at 320dp and 360dp, including F2–F5 and Developer Diagnostics;
 5. camera/window/AppOps logcat for the device/HAL result;
 6. package revision SHA-256 and the exact test timestamp/serial on every result.
 
-No other ADB serial is an acceptable substitute.
+No fixed ADB port is a long-term MuMu identity, and no other emulator or device may be silently
+folded into the `SX测试` evidence. Xiaomi HyperOS/API36 remains
+`REAL_DEVICE_VERIFICATION_PENDING` until a Xiaomi device is resolved and verified.
