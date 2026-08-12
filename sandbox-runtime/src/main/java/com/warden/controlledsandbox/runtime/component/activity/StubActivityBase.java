@@ -150,6 +150,10 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onStart() { super.onStart(); hostStage = 2; if (controller != null) controller.start(); }
     @Override protected void onResume() {
         super.onResume();
+        // ActivityThread.handleResumeActivity() updates the window when this forward-navigation
+        // bit differs from the transaction. A stale Stub window may already be detached at this
+        // point, so keep the host attributes aligned before the framework reaches that branch.
+        setForwardNavigationWindowFlag(true);
         // ActivityThread performs its window update immediately after this callback returns.
         // A trampoline can have a detached DecorView after another same-process Stub crosses
         // pause/stop, while the framework-side mWindowAdded marker is still true. Clear that
@@ -170,6 +174,7 @@ public abstract class StubActivityBase extends Activity {
     @Override protected void onPause() {
         hostStage = 2;
         if (controller != null) controller.pause();
+        setForwardNavigationWindowFlag(false);
         clearMissingWindowRoot();
         super.onPause();
     }
@@ -421,6 +426,20 @@ public abstract class StubActivityBase extends Activity {
             java.lang.reflect.Field added = Activity.class.getDeclaredField("mWindowAdded");
             added.setAccessible(true);
             if (added.getBoolean(this)) added.setBoolean(this, false);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    private void setForwardNavigationWindowFlag(boolean enabled) {
+        try {
+            android.view.Window window = getWindow();
+            if (window == null) return;
+            android.view.WindowManager.LayoutParams attributes = window.getAttributes();
+            int flag = android.view.WindowManager.LayoutParams.SOFT_INPUT_IS_FORWARD_NAVIGATION;
+            attributes.softInputMode = enabled
+                    ? attributes.softInputMode | flag
+                    : attributes.softInputMode & ~flag;
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
         }
