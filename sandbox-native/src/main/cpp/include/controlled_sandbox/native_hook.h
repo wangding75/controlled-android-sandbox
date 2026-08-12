@@ -32,6 +32,8 @@ class NativeHookRuntime final {
 public:
     bool install(std::string guest_library_root);
     bool refresh();
+    bool installCamera1();
+    bool refreshCamera1();
     void reset();
     [[nodiscard]] NativeHookStatus status() const;
 

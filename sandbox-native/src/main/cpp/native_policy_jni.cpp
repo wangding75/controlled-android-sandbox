@@ -1,5 +1,6 @@
 #include "controlled_sandbox/native_policy.h"
 #include "controlled_sandbox/native_audio.h"
+#include "controlled_sandbox/native_camera1.h"
 #include "controlled_sandbox/native_interceptors.h"
 #include "controlled_sandbox/native_loader.h"
 #include "controlled_sandbox/native_network.h"
@@ -38,6 +39,29 @@ std::vector<std::string> string_array(JNIEnv* env, jobjectArray values) {
         auto* value = static_cast<jstring>(env->GetObjectArrayElement(values, i));
         out.push_back(string_value(env, value));
         env->DeleteLocalRef(value);
+    }
+    return out;
+}
+
+std::vector<std::vector<std::uint8_t>> byte_array_2d(JNIEnv* env, jobjectArray values) {
+    std::vector<std::vector<std::uint8_t>> out;
+    if (values == nullptr) return out;
+    const jsize count = env->GetArrayLength(values);
+    if (count < 1 || count > 8) throw std::invalid_argument("camera frame count is invalid");
+    out.reserve(static_cast<std::size_t>(count));
+    for (jsize index = 0; index < count; index++) {
+        auto* value = static_cast<jbyteArray>(env->GetObjectArrayElement(values, index));
+        if (value == nullptr) throw std::invalid_argument("camera frame is null");
+        const jsize length = env->GetArrayLength(value);
+        if (length <= 0 || length > 16 * 1024 * 1024) {
+            env->DeleteLocalRef(value);
+            throw std::invalid_argument("camera frame size is invalid");
+        }
+        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(length));
+        env->GetByteArrayRegion(value, 0, length, reinterpret_cast<jbyte*>(bytes.data()));
+        env->DeleteLocalRef(value);
+        if (env->ExceptionCheck()) throw std::runtime_error("GetByteArrayRegion failed");
+        out.push_back(std::move(bytes));
     }
     return out;
 }
@@ -438,6 +462,75 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeHookStatus(JNI
 extern "C" JNIEXPORT void JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetHooks(JNIEnv*, jclass) {
     controlled_sandbox::global_hooks().reset();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallCamera1Adapter(
+        JNIEnv*, jclass) {
+    return controlled_sandbox::global_hooks().installCamera1() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureCamera1Identity(
+        JNIEnv* env, jclass, jstring guest_package, jint virtual_uid,
+        jstring host_package, jint host_uid, jboolean virtual_camera,
+        jboolean allow_open, jboolean replace_preview, jboolean replace_capture) {
+    try {
+        return controlled_sandbox::global_camera1_adapter().configure_identity(
+                string_value(env, guest_package), virtual_uid, string_value(env, host_package),
+                host_uid, virtual_camera == JNI_TRUE, allow_open == JNI_TRUE,
+                replace_preview == JNI_TRUE, replace_capture == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalArgumentException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureCamera1Frames(
+        JNIEnv* env, jclass, jstring source_kind, jstring source_sha256,
+        jint width, jint height, jobjectArray preview_frames, jobjectArray capture_frames) {
+    try {
+        return controlled_sandbox::global_camera1_adapter().configure_frames(
+                byte_array_2d(env, preview_frames), byte_array_2d(env, capture_frames),
+                string_value(env, source_kind), string_value(env, source_sha256), width, height)
+                ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalArgumentException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeCamera1Status(
+        JNIEnv* env, jclass) {
+    const auto status = controlled_sandbox::global_camera1_adapter().status();
+    std::string value = "symbolsReady=" + std::string(status.symbols_ready ? "true" : "false")
+            + ";hooksReady=" + std::string(status.hooks_ready ? "true" : "false")
+            + ";identityConfigured=" + std::string(status.identity_configured ? "true" : "false")
+            + ";virtualCamera=" + std::string(status.virtual_camera ? "true" : "false")
+            + ";allowOpen=" + std::string(status.allow_open ? "true" : "false")
+            + ";replacePreview=" + std::string(status.replace_preview ? "true" : "false")
+            + ";replaceCapture=" + std::string(status.replace_capture ? "true" : "false")
+            + ";previewFrames=" + std::to_string(status.preview_frames)
+            + ";captureFrames=" + std::to_string(status.capture_frames)
+            + ";previewDeliveries=" + std::to_string(status.preview_deliveries)
+            + ";captureDeliveries=" + std::to_string(status.capture_deliveries)
+            + ";contexts=" + std::to_string(status.context_bindings)
+            + ";hookTargets=" + std::to_string(status.hook_targets)
+            + ";hookPatched=" + std::to_string(status.hook_patched)
+            + ";hookFailures=" + std::to_string(status.hook_failures)
+            + ";guest=" + status.guest_package + ";host=" + status.host_package
+            + ";virtualUid=" + std::to_string(status.virtual_uid)
+            + ";hostUid=" + std::to_string(status.host_uid)
+            + ";error=" + status.last_error;
+    return env->NewStringUTF(value.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetCamera1(
+        JNIEnv* env, jclass) {
+    controlled_sandbox::global_camera1_adapter().reset(env);
 }
 
 extern "C" JNIEXPORT void JNICALL

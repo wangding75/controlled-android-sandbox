@@ -34,6 +34,8 @@ import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkSnapshot;
 import com.warden.controlledsandbox.contract.VirtualVpnProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
+import com.warden.controlledsandbox.contract.VirtualCameraSourceSnapshot;
+import com.warden.controlledsandbox.framework.core.VirtualCameraCaptureEngine;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
@@ -238,6 +240,15 @@ public final class GuestRuntimeEnvironment {
                     + " available=" + cameraProfile.cameraAvailable()
                     + " ids=" + cameraProfile.cameraIds().size()
                     + " frontIds=" + cameraProfile.frontCameraIds().size());
+            boolean camera1AdapterInstalled = nativePolicyConfigured
+                    && NativePolicy.installCamera1Adapter();
+            if (nativePolicyConfigured) {
+                configureCamera1NativeProfile(guestContext.getFilesDir(), spec, host,
+                        cameraProfile);
+                android.util.Log.i("CS_CAMERA1_NATIVE", (camera1AdapterInstalled
+                        ? "ADAPTER_READY" : "ADAPTER_DEFERRED_SYSTEM_LIBRARY_LOAD") + " status="
+                        + NativePolicy.camera1Status());
+            }
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.privilegedServicesProfile());
             // Android creates Application instances and calls attachBaseContext/onCreate on the
@@ -252,6 +263,11 @@ public final class GuestRuntimeEnvironment {
             stagedProcessIdentity = GuestProcessIdentityBridge.install(
                     application, guestContext.getApplicationInfo(), spec);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
+            if (nativePolicyConfigured && !camera1AdapterInstalled) {
+                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
+                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_ATTACH installed="
+                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
+            }
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
@@ -259,7 +275,7 @@ public final class GuestRuntimeEnvironment {
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
                     capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
-                    nativeHooksInstalled, nativeCrashRecorderInstalled, webViewProfile,
+                    nativeHooksInstalled, camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
                     stagedProcessIdentity);
             stagedSession = session;
             stagedProcessIdentity = null;
@@ -281,6 +297,12 @@ public final class GuestRuntimeEnvironment {
             stagedFrameworkCallRouter = null;
             session.components.prepareDeclaredProviders();
             session.mainThread.run(application::onCreate);
+            if (nativePolicyConfigured && !camera1AdapterInstalled) {
+                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
+                session.camera1AdapterInstalled = camera1AdapterInstalled;
+                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_APPLICATION installed="
+                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
+            }
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                         + NativePolicy.hookStatus());
@@ -299,6 +321,7 @@ public final class GuestRuntimeEnvironment {
                     if (stagedFrameworkCallRouter != null) stagedFrameworkCallRouter.close();
                 }
                 NativePolicy.resetAudioCapture();
+                NativePolicy.resetCamera1();
                 NativePolicy.resetHooks();
                 NativePolicy.resetPolicy();
                 synchronized (GuestRuntimeEnvironment.class) {
@@ -458,6 +481,42 @@ public final class GuestRuntimeEnvironment {
                 privateDns, dns);
     }
 
+    private static void configureCamera1NativeProfile(File guestFilesRoot, GuestPackageSpec spec,
+                                                       Context host,
+                                                       VirtualCameraProfileSnapshot profile)
+            throws Exception {
+        boolean virtualCamera = !VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode());
+        boolean allowOpen = profile.cameraAvailable() && profile.allowOpen();
+        VirtualCameraSourceSnapshot source = profile.source();
+        boolean sourceConfigured = source != null && source.isConfigured();
+        boolean replacePreview = virtualCamera && sourceConfigured;
+        boolean replaceCapture = virtualCamera && sourceConfigured && profile.substituteCaptureResult();
+        if (!NativePolicy.configureCamera1Identity(spec.packageName, spec.virtualUid,
+                host.getPackageName(), Process.myUid(), virtualCamera, allowOpen,
+                replacePreview, replaceCapture)) {
+            throw new IllegalStateException("NATIVE_CAMERA1_IDENTITY_CONFIG_FAILED:"
+                    + NativePolicy.camera1Status());
+        }
+        if (!sourceConfigured) return;
+        int frameCount = VirtualCameraSourceSnapshot.VIDEO.equals(source.kind()) ? 4 : 1;
+        byte[][] previewFrames = new byte[frameCount][];
+        byte[][] captureFrames = new byte[frameCount][];
+        for (int index = 0; index < frameCount; index++) {
+            long frameTimeMs = VirtualCameraSourceSnapshot.VIDEO.equals(source.kind())
+                    ? (source.durationMs() > 0L
+                    ? Math.min(source.durationMs() - 1L, index * 33L) : index * 33L) : 0L;
+            previewFrames[index] = VirtualCameraCaptureEngine.read(guestFilesRoot, source,
+                    frameTimeMs, true);
+            captureFrames[index] = VirtualCameraCaptureEngine.read(guestFilesRoot, source,
+                    frameTimeMs, false);
+        }
+        if (!NativePolicy.configureCamera1Frames(source.kind(), source.sha256(),
+                source.width(), source.height(), previewFrames, captureFrames)) {
+            throw new IllegalStateException("NATIVE_CAMERA1_SOURCE_CONFIG_FAILED:"
+                    + NativePolicy.camera1Status());
+        }
+    }
+
     private static String address(java.util.List<String> values, boolean ipv6, String fallback) {
         if (values != null) for (String value : values) {
             String candidate = value == null ? "" : value;
@@ -531,6 +590,7 @@ public final class GuestRuntimeEnvironment {
         volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
+        volatile boolean camera1AdapterInstalled;
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
         final GuestProcessIdentityBridge processIdentity;
@@ -545,7 +605,8 @@ public final class GuestRuntimeEnvironment {
                 GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
                 VirtualSystemServiceState virtualServices,
                 boolean nativePolicyConfigured, boolean nativeHooksInstalled,
-                boolean nativeCrashRecorderInstalled, WebViewProfileManager.Profile webViewProfile,
+                boolean camera1AdapterInstalled, boolean nativeCrashRecorderInstalled,
+                WebViewProfileManager.Profile webViewProfile,
                 GuestProcessIdentityBridge processIdentity) {
             this.spec = spec;
             this.classLoader = classLoader;
@@ -567,6 +628,7 @@ public final class GuestRuntimeEnvironment {
             this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
+            this.camera1AdapterInstalled = camera1AdapterInstalled;
             this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
             this.webViewProfile = webViewProfile;
             this.processIdentity = java.util.Objects.requireNonNull(processIdentity, "processIdentity");
@@ -676,7 +738,9 @@ public final class GuestRuntimeEnvironment {
             out.putBoolean("nativePolicyAvailable", NativePolicy.available());
             out.putBoolean("nativePolicyConfigured", nativePolicyConfigured);
             out.putBoolean("nativeHooksInstalled", nativeHooksInstalled);
+            out.putBoolean("nativeCamera1AdapterInstalled", camera1AdapterInstalled);
             out.putString("nativeHookStatus", NativePolicy.hookStatus());
+            out.putString("nativeCamera1Status", NativePolicy.camera1Status());
             out.putString("nativeNetworkStatus", NativePolicy.networkStatus());
             out.putString("nativeLoaderStatus", NativePolicy.loaderStatus());
             out.putString("nativeAudioCaptureStatus", NativePolicy.audioCaptureStatus());
@@ -708,6 +772,7 @@ public final class GuestRuntimeEnvironment {
             frameworkHooks.close();
             processIdentity.close();
             NativePolicy.resetAudioCapture();
+            NativePolicy.resetCamera1();
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             NativePolicy.resetCrashRecorder();

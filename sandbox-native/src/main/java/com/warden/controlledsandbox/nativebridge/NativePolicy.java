@@ -154,6 +154,45 @@ public final class NativePolicy {
     public static boolean refreshHooks() { return AVAILABLE && nativeRefreshHooks(); }
     public static String hookStatus() { return AVAILABLE ? nativeHookStatus() : "unavailable:" + loadError; }
     public static void resetHooks() { if (AVAILABLE) nativeResetHooks(); }
+    public static boolean installCamera1Adapter() {
+        return AVAILABLE && nativeInstallCamera1Adapter();
+    }
+    public static boolean configureCamera1Identity(String guestPackage, int virtualUid,
+                                                   String hostPackage, int hostUid,
+                                                   boolean virtualCamera, boolean allowOpen,
+                                                   boolean replacePreview, boolean replaceCapture) {
+        if (!AVAILABLE) return false;
+        if (guestPackage == null || guestPackage.trim().isEmpty()) {
+            throw new IllegalArgumentException("guestPackage is required");
+        }
+        if (hostPackage == null || hostPackage.trim().isEmpty()) {
+            throw new IllegalArgumentException("hostPackage is required");
+        }
+        if (virtualUid < 0 || hostUid < 0) throw new IllegalArgumentException("uid is invalid");
+        return nativeConfigureCamera1Identity(guestPackage, virtualUid, hostPackage, hostUid,
+                virtualCamera, allowOpen, replacePreview, replaceCapture);
+    }
+    public static boolean configureCamera1Frames(String sourceKind, String sourceSha256,
+                                                 int width, int height, byte[][] previewFrames,
+                                                 byte[][] captureFrames) {
+        if (!AVAILABLE) return false;
+        if (sourceKind == null || sourceKind.trim().isEmpty()) {
+            throw new IllegalArgumentException("sourceKind is required");
+        }
+        if (sourceSha256 == null || sourceSha256.trim().isEmpty()) {
+            throw new IllegalArgumentException("sourceSha256 is required");
+        }
+        if (width < 0 || height < 0) throw new IllegalArgumentException("dimensions are invalid");
+        if (previewFrames == null || captureFrames == null) {
+            throw new IllegalArgumentException("camera frames are required");
+        }
+        return nativeConfigureCamera1Frames(sourceKind, sourceSha256, width, height,
+                previewFrames, captureFrames);
+    }
+    public static String camera1Status() {
+        return AVAILABLE ? nativeCamera1Status() : "unavailable:" + loadError;
+    }
+    public static void resetCamera1() { if (AVAILABLE) nativeResetCamera1(); }
     public static void resetPolicy() { if (AVAILABLE) nativeResetPolicy(); }
     public static boolean installCrashRecorder(String outputPath) {
         return AVAILABLE && outputPath != null && !outputPath.trim().isEmpty()
@@ -203,6 +242,17 @@ public final class NativePolicy {
     private static native boolean nativeRefreshHooks();
     private static native String nativeHookStatus();
     private static native void nativeResetHooks();
+    private static native boolean nativeInstallCamera1Adapter();
+    private static native boolean nativeConfigureCamera1Identity(String guestPackage, int virtualUid,
+                                                                 String hostPackage, int hostUid,
+                                                                 boolean virtualCamera, boolean allowOpen,
+                                                                 boolean replacePreview, boolean replaceCapture);
+    private static native boolean nativeConfigureCamera1Frames(String sourceKind, String sourceSha256,
+                                                               int width, int height,
+                                                               byte[][] previewFrames,
+                                                               byte[][] captureFrames);
+    private static native String nativeCamera1Status();
+    private static native void nativeResetCamera1();
     private static native void nativeResetPolicy();
     private static native boolean nativeInstallCrashRecorder(String outputPath);
     private static native String nativeCrashStatus();

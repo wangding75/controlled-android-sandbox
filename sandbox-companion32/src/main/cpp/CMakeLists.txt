@@ -12,6 +12,7 @@ add_library(controlled_sandbox_native32 SHARED
     ${SHARED_NATIVE_ROOT}/native_network_interceptors.cpp
     ${SHARED_NATIVE_ROOT}/native_audio.cpp
     ${SHARED_NATIVE_ROOT}/native_interceptors.cpp
+    ${SHARED_NATIVE_ROOT}/native_camera1.cpp
     ${SHARED_NATIVE_ROOT}/native_hook.cpp
     ${SHARED_NATIVE_ROOT}/native_crash.cpp
     ${SHARED_NATIVE_ROOT}/native_policy_jni.cpp)

@@ -10,6 +10,7 @@ add_library(controlled_sandbox_native SHARED
     native_audio.cpp
     native_loader.cpp
     native_interceptors.cpp
+    native_camera1.cpp
     native_hook.cpp
     native_crash.cpp
     native_policy_jni.cpp

@@ -2,7 +2,7 @@
 
 ## Result
 
-The DingTalk-specific control plane is implemented and isolated. The overall T53 acceptance remains `BLOCKED` by the generic native Camera1 boundary documented in the capability matrix; this is not hidden behind a DingTalk branch.
+The DingTalk-specific control plane is implemented and isolated. The generic native Camera1 boundary is now closed for the verified MuMu contract; no DingTalk branch was added to solve it.
 
 ## Actual XH V(D)ing surface
 
@@ -30,6 +30,7 @@ Promoted to General Sandbox:
 
 - virtual location fields, timestamps, callbacks and trajectory sampling;
 - virtual camera source ownership, image/video decode, Camera2 preview and capture substitution;
+- generic native Camera1 connect identity, preview callback and capture-result substitution;
 - device identity/build/SIM/operator profile;
 - Wi-Fi and cell profile projection;
 - Activity/Context/UID/package/task/referrer identity semantics;
@@ -47,17 +48,17 @@ Retained as DingTalk-specific:
 
 Installed target: `com.alibaba.android.rimet`, version `7.8.10`, versionCode `1178`.
 
-- Manager enable: `DINGTALK_COMPATIBILITY_ENABLED`, target reason `SUPPORTED_REVISION`.
+- Manager enable: `dingtalk/profile-final-result.json` reports `PROFILE_CONFIGURED`, target reason `SUPPORTED_REVISION`, static Shanghai location, IMAGE source and source SHA `258c57db...1682ae8f`.
 - Manager disable: `DINGTALK_COMPATIBILITY_DISABLED`.
 - Startup: `LaunchHomeActivity` was prepared and launched; DingTalk's normal process handoff produced a recovering generation and `PrivacyPolicyActivity` was created. No `System.exit` hook or fake READY was used.
-- Final-code MuMu loop: `dingtalk-profile` plus 10/10 `launch-component` and 10/10 `stop` operations passed on `127.0.0.1:16384`; the final log has zero target Sandbox/DingTalk FATAL or ANR matches.
+- Final-code MuMu loop: corrected `dingtalk-profile` plus 10/10 `launch-component` and 10/10 `stop` operations passed on `127.0.0.1:16384`; `dingtalk/dingtalk-final-logcat.txt` has zero target Sandbox/DingTalk FATAL or ANR matches.
 - Early dynamic receiver warnings from `HWReceiverANRCompat` remain recorded as a known startup observation from the T52 path; they are not converted into a false clean result.
-- No real account was used. Protected business pages requiring a session are recorded as `REAL_USER_SESSION_REQUIRED`. Generic location/device/network/camera fixtures were run independently and are not replaced by page-data edits.
-- The DingTalk camera and location business pages were not reachable without a real session. Consequently no DingTalk screenshot/result hash is claimed for those pages.
+- No real account was used. Protected business pages requiring a session are recorded as `REAL_USER_SESSION_REQUIRED`. Generic location/device/network/camera fixtures were run independently and are not replaced by page-data edits. The DingTalk manager can configure the shared Camera1/Camera2 profile for its instance; the generic adapter has no DingTalk package/version knowledge.
+- The DingTalk camera and location business pages were not reachable without a real session. Consequently no DingTalk screenshot/result hash is claimed for those pages; the generic Camera1/Camera2 and Location fixtures provide the data-plane evidence independently.
 
 ## Avoided SX failures
 
-The implementation does not preseed privacy XML, bypass exported checks, rewrite one caller field, suppress process termination, install unbounded global hooks, expose host media paths, return fake READY, or swallow adapter errors. When the generic native Camera1 path could not be intercepted, it was recorded as an explicit blocker.
+The implementation does not preseed privacy XML, bypass exported checks, rewrite DingTalk dex, suppress process termination, install unbounded global hooks, expose host media paths, return fake READY, or swallow adapter errors. The Camera1 fix is at the generic native runtime boundary and retains explicit AppOps/adapter diagnostics; the MuMu shutter-audio warning is not hidden.
 
 ## Remaining real-device work
 

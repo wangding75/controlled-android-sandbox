@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import dalvik.system.PathClassLoader;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -85,6 +86,11 @@ public final class GuestClassLoader extends PathClassLoader {
                 }
             }
             if (resolve && loaded.getClassLoader() == this) resolveClass(loaded);
+            if ("android.hardware.Camera".equals(name)) {
+                boolean camera1Installed = NativePolicy.installCamera1Adapter();
+                android.util.Log.i("CS_CAMERA1_NATIVE", "CAMERA_CLASS_LOADED adapterInstalled="
+                        + camera1Installed + " status=" + NativePolicy.camera1Status());
+            }
             return loaded;
         }
     }

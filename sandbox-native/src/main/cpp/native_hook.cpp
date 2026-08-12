@@ -1,4 +1,5 @@
 #include "controlled_sandbox/native_hook.h"
+#include "controlled_sandbox/native_camera1.h"
 #include "controlled_sandbox/native_interceptors.h"
 #include "controlled_sandbox/native_policy.h"
 
@@ -92,7 +93,8 @@ bool supported_relocation_type(ElfW(Xword) info) {
 template <typename Relocation>
 std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, std::size_t count,
                               const ElfW(Sym)* symbols, const char* strings,
-                              std::size_t& targets, std::size_t& failures) {
+                              std::size_t& targets, std::size_t& failures,
+                              bool camera_system) {
     if (entries == nullptr || symbols == nullptr || strings == nullptr) return 0;
     std::size_t patched = 0;
     for (std::size_t index = 0; index < count; index++) {
@@ -101,8 +103,11 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
         const std::size_t symbol_index = relocation_symbol(relocation.r_info);
         if (symbol_index == 0) continue;
         const char* name = strings + symbols[symbol_index].st_name;
-        if (name == nullptr || !NativeHookRuntime::is_target_symbol(name)) continue;
-        void* replacement = replacement_for_symbol(name);
+        if (name == nullptr) continue;
+        if (camera_system ? !is_camera1_system_symbol(name)
+                          : !NativeHookRuntime::is_target_symbol(name)) continue;
+        void* replacement = camera_system ? replacement_for_camera1_symbol(name)
+                                          : replacement_for_symbol(name);
         if (replacement == nullptr) continue;
         targets++;
         auto** slot = reinterpret_cast<void**>(base + relocation.r_offset);
@@ -119,6 +124,7 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
 struct ScanContext {
     NativeHookRuntime* runtime;
     std::string root;
+    bool camera_system{false};
     std::size_t scanned{0};
     std::size_t matched{0};
     std::size_t patched{0};
@@ -130,7 +136,11 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     auto* context = static_cast<ScanContext*>(opaque);
     context->scanned++;
     const std::string_view path = info->dlpi_name == nullptr ? std::string_view{} : std::string_view(info->dlpi_name);
-    if (!NativeHookRuntime::is_guest_module(path, context->root)) return 0;
+    if (context->camera_system) {
+        if (!is_camera1_system_module(path)) return 0;
+    } else if (!NativeHookRuntime::is_guest_module(path, context->root)) {
+        return 0;
+    }
     context->matched++;
 
     const ElfW(Dyn)* dynamic = nullptr;
@@ -181,14 +191,14 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     if (jump_relocations != nullptr && jump_size > 0) {
         if (jump_type == DT_RELA) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures);
+                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system);
         } else if (jump_type == DT_REL) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures);
+                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system);
         }
     }
-    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures);
-    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures);
+    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system);
+    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system);
     return 0;
 }
 
@@ -237,7 +247,7 @@ bool NativeHookRuntime::refresh() {
             return false;
         }
     }
-    ScanContext context{this, root};
+    ScanContext context{this, root, false};
     const int result = dl_iterate_phdr(scan_module, &context);
     std::lock_guard lock(state.mutex);
     state.status.refresh_count++;
@@ -251,6 +261,19 @@ bool NativeHookRuntime::refresh() {
     const bool success = result == 0 && context.failures == 0;
     if (!success) state.status.installed = false;
     return success;
+}
+
+bool NativeHookRuntime::installCamera1() {
+    if (!global_camera1_adapter().prepare_symbols()) return false;
+    return refreshCamera1();
+}
+
+bool NativeHookRuntime::refreshCamera1() {
+    if (!global_camera1_adapter().prepare_symbols()) return false;
+    ScanContext context{this, {}, true};
+    const int result = dl_iterate_phdr(scan_module, &context);
+    global_camera1_adapter().record_hook_result(context.patched, context.targets, context.failures);
+    return result == 0 && context.failures == 0 && context.targets > 0;
 }
 
 void NativeHookRuntime::reset() {
