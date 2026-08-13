@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
+import java.util.List;
 
 /** Application-facing use cases. Screens never cross this boundary into Binder or runtime code. */
 final class SandboxApplicationLayer implements AutoCloseable {
@@ -26,14 +27,26 @@ final class SandboxApplicationLayer implements AutoCloseable {
     SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
         return adapter.importApk(uri, nativeGuestTrust);
     }
+    List<InstalledApplication> installedApplications() throws Exception {
+        return adapter.installedApplications();
+    }
+    SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
+            throws Exception {
+        return adapter.importInstalledApplication(packageName, nativeGuestTrust);
+    }
     int createClone(String packageName) throws Exception { return adapter.createClone(packageName); }
     void updateInstanceStatus(String packageName, int userId, String status) throws Exception {
         adapter.updateInstanceStatus(packageName, userId, status);
     }
-    void clearData(String packageName, int userId) throws Exception { adapter.clearInstanceData(packageName, userId); }
+    void clearData(String packageName, int userId) throws Exception {
+        SandboxRecord record = requireRecord(packageName);
+        adapter.stopRuntime(record, userId);
+        adapter.clearInstanceData(packageName, userId);
+    }
     void deleteInstance(String packageName, int userId) throws Exception {
         adapter.stopRuntime(requireRecord(packageName), userId);
         adapter.deleteInstance(packageName, userId);
+        SandboxShortcutManager.disable(context, packageName, userId);
     }
     Bundle launch(SandboxRecord record, int userId) throws Exception { return adapter.launchBundle(record, userId); }
     Bundle prepare(SandboxRecord record, int userId) throws Exception { return adapter.prepare(record, userId); }

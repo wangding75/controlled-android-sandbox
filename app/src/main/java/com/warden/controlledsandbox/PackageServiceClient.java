@@ -24,6 +24,8 @@ import com.warden.controlledsandbox.contract.VirtualPolicyServicesProfileSnapsho
 import com.warden.controlledsandbox.contract.VirtualMediaCommunicationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPrivilegedServicesProfileSnapshot;
+
+import java.lang.reflect.InvocationTargetException;
 import com.warden.controlledsandbox.contract.ApplicationEnvironmentProfileSnapshot;
 import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import java.util.List;
@@ -71,6 +73,21 @@ final class PackageServiceClient implements AutoCloseable {
         return record(requireSession().importApkFileWithNativeTrust(
                 source == null ? "" : source.getAbsolutePath(),
                 nativeGuestTrust == null ? "" : nativeGuestTrust));
+    }
+
+    SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
+            throws Exception {
+        try {
+            Object result = requireSession().getClass().getMethod("importInstalledApplication",
+                    String.class, String.class).invoke(requireSession(),
+                    packageName == null ? "" : packageName,
+                    nativeGuestTrust == null ? "" : nativeGuestTrust);
+            return record((PackageServiceResult) result);
+        } catch (InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            throw new IllegalStateException(cause);
+        }
     }
 
     int createInstallSession(String expectedPackageName) throws Exception {

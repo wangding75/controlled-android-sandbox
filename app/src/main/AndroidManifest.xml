@@ -18,6 +18,8 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- API 32 fixture media import still uses the legacy read gate. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- Product installed-app discovery requires visibility of user-installed packages. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <queries>
@@ -59,5 +61,6 @@
         </activity>
         <activity android:name=".InstanceSettingsActivity" android:exported="false" />
         <activity android:name=".DeveloperDiagnosticsActivity" android:exported="false" />
+        <activity android:name=".ShortcutActivity" android:exported="true" android:noHistory="true" />
     </application>
 </manifest>

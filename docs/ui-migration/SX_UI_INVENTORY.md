@@ -8,7 +8,7 @@ Hook, or BlackBox implementation is copied into the current sandbox.
 | --- | --- | --- | --- | --- | --- |
 | Home | `app/src/main/java/com/sx/app/ui/home/HomeFragment.java`, `fragment_home.xml` | Product entry point and feature discovery | Open sandbox apps, location, camera, device, network | `MainActivity` home tab | Rebuilt |
 | Apps | `AppListFragment.java`, `fragment_app_list.xml` | View imported applications and instances | Add/import, launch, clone, remove, open settings | `MainActivity` apps tab + `PackageAdapter` | Rebuilt |
-| App picker | `AppPickerActivity.java`, `activity_app_picker.xml` | Select an installed APK | Select APK and import | Android document picker in `MainActivity` | Rebuilt |
+| App picker | `AppPickerActivity.java`, `activity_app_picker.xml` | Select an installed APK or host source | Installed-app picker uses PackageManager and resolves base/split source; APK file import remains a separate document-picker action | `MainActivity` installed picker + document picker | Rebuilt |
 | App detail / instance settings | `AppDetailActivity.java`, `activity_app_detail.xml` | Operate on one package/user scope | Launch, clone, clear, remove, open independent settings | `InstanceSettingsActivity` | Rebuilt |
 | Location | `LocationSettingsActivity.java`, `activity_location_settings.xml` | Configure virtual location | Enable, coordinates, accuracy, interval, trajectory, save/reset | Instance settings / Location | Rebuilt |
 | Location picker | `LocationPickerActivity.java`, `activity_location_picker.xml` | Pick a location | Search/select a built-in point | Profile-only coordinate editor until a map SDK is adopted | Explicitly not implemented |

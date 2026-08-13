@@ -1,8 +1,12 @@
 package com.warden.controlledsandbox;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -15,18 +19,21 @@ import com.warden.controlledsandbox.sdk.SandboxSdk;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /** SX business adapter. UI calls this class; runtime internals stop here. */
 final class SxSandboxAdapter implements SandboxSdk {
+    private final Context context;
     private final PackageServiceClient packageService;
     private final RuntimeClient runtime;
 
     SxSandboxAdapter(Context context) {
-        packageService = new PackageServiceClient(context);
-        runtime = new RuntimeClient(context);
+        this.context = context.getApplicationContext();
+        packageService = new PackageServiceClient(this.context);
+        runtime = new RuntimeClient(this.context);
     }
 
     SandboxCatalogState load() throws Exception { return packageService.load(); }
@@ -34,6 +41,51 @@ final class SxSandboxAdapter implements SandboxSdk {
     SandboxRecord importApk(Uri uri) throws Exception { return packageService.importApk(uri); }
     SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
         return packageService.importApk(uri, nativeGuestTrust);
+    }
+    SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
+            throws Exception {
+        return packageService.importInstalledApplication(packageName, nativeGuestTrust);
+    }
+    List<InstalledApplication> installedApplications() throws Exception {
+        PackageManager packageManager = context.getPackageManager();
+        SandboxCatalogState state = packageService.load();
+        List<InstalledApplication> applications = new ArrayList<>();
+        List<ApplicationInfo> installed = packageManager.getInstalledApplications(
+                PackageManager.GET_META_DATA);
+        for (ApplicationInfo application : installed) {
+            if (!isCloneCandidate(application, packageManager)) continue;
+            PackageInfo info;
+            try {
+                int flags = Build.VERSION.SDK_INT >= 28
+                        ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+                info = packageManager.getPackageInfo(application.packageName, flags);
+            } catch (PackageManager.NameNotFoundException ignored) {
+                continue;
+            }
+            int instanceCount = 0;
+            for (com.warden.controlledsandbox.SandboxInstance instance : state.instances()) {
+                if (application.packageName.equals(instance.packageName)) instanceCount++;
+            }
+            applications.add(InstalledApplication.from(application, info, packageManager, instanceCount));
+        }
+        applications.sort(Comparator.comparing((InstalledApplication item) -> item.label,
+                String.CASE_INSENSITIVE_ORDER).thenComparing(item -> item.packageName));
+        return applications;
+    }
+
+    private boolean isCloneCandidate(ApplicationInfo application, PackageManager packageManager) {
+        String packageName = application.packageName == null ? "" : application.packageName;
+        if (packageName.isEmpty() || packageName.equals(context.getPackageName())
+                || packageName.equals("com.warden.controlledsandbox.companion32")
+                || packageName.equals("com.warden.controlledsandbox.companion32.debug")) return false;
+        if ((application.flags & ApplicationInfo.FLAG_SYSTEM) != 0) return false;
+        if (application.sourceDir == null || !new java.io.File(application.sourceDir).isFile()) return false;
+        if (application.splitSourceDirs != null) {
+            for (String split : application.splitSourceDirs) {
+                if (split == null || !new java.io.File(split).isFile()) return false;
+            }
+        }
+        return packageManager.getLaunchIntentForPackage(packageName) != null;
     }
     int createInstallSession(String expectedPackageName) throws Exception {
         return packageService.createInstallSession(expectedPackageName);

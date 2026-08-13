@@ -21,6 +21,9 @@
     <string name="action_delete_instance">删除</string>
     <string name="action_clear_data">清除数据</string>
     <string name="action_import">导入 App</string>
+    <string name="action_add_installed">从已安装应用添加</string>
+    <string name="action_add_instance">添加分身</string>
+    <string name="action_shortcut">创建快捷方式</string>
     <string name="action_refresh">刷新</string>
     <string name="action_save">保存</string>
     <string name="action_reset">恢复默认</string>
@@ -29,5 +32,5 @@
     <string name="action_diagnostics">开发者诊断</string>
     <string name="action_component_smoke">组件烟测</string>
     <string name="app_icon">App 图标</string>
-    <string name="empty_apps">还没有导入 App</string>
+    <string name="empty_apps">还没有导入 App。请选择“从已安装应用添加”或“导入 APK 文件”。</string>
 </resources>

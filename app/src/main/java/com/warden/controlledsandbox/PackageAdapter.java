@@ -25,14 +25,17 @@ final class PackageAdapter extends BaseAdapter {
         void onClone(SandboxItem item);
         void onClear(SandboxItem item);
         void onDelete(SandboxItem item);
+        void onShortcut(SandboxItem item);
     }
 
     private final LayoutInflater inflater;
     private final PackageManager packageManager;
+    private final Context context;
     private final Listener listener;
     private final List<SandboxItem> items = new ArrayList<>();
 
     PackageAdapter(Context context, Listener listener) {
+        this.context = context;
         inflater = LayoutInflater.from(context);
         packageManager = context.getPackageManager();
         this.listener = listener;
@@ -73,6 +76,7 @@ final class PackageAdapter extends BaseAdapter {
         ((Button) view.findViewById(R.id.clone)).setOnClickListener(v -> listener.onClone(item));
         ((Button) view.findViewById(R.id.clear)).setOnClickListener(v -> listener.onClear(item));
         ((Button) view.findViewById(R.id.delete)).setOnClickListener(v -> listener.onDelete(item));
+        ((Button) view.findViewById(R.id.shortcut)).setOnClickListener(v -> listener.onShortcut(item));
         return view;
     }
 
@@ -88,7 +92,7 @@ final class PackageAdapter extends BaseAdapter {
                 if (value != null) return value;
             }
         } catch (Exception ignored) { }
-        return packageManager.getDefaultActivityIcon();
+        return context.getPackageManager().getDefaultActivityIcon();
     }
 
     private static String statusText(String value) {

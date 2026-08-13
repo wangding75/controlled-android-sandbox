@@ -1,6 +1,8 @@
 package com.warden.controlledsandbox;
 
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
@@ -62,6 +64,25 @@ final class SandboxPackageLifecycle {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current,
                 importer.importApkFile(source, current.records(), nativeGuestTrust));
+    }
+
+    /** Resolve a physical host-installed application and reuse the normal artifact pipeline. */
+    synchronized SandboxRecord importInstalledApplication(String packageName,
+                                                           String nativeGuestTrust) throws Exception {
+        String normalized = packageName == null ? "" : packageName.trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
+        ApplicationInfo application = context.getPackageManager().getApplicationInfo(
+                normalized, PackageManager.GET_META_DATA);
+        List<File> artifacts = new ArrayList<>();
+        artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
+        if (application.splitSourceDirs != null) {
+            for (String split : application.splitSourceDirs) {
+                artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
+            }
+        }
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApkFiles(artifacts, current.records(), nativeGuestTrust));
     }
 
     synchronized int createInstallSession(String expectedPackageName) throws Exception {
@@ -519,6 +540,16 @@ final class SandboxPackageLifecycle {
     private File instanceDirectory(String packageName, int virtualUserId) {
         return new File(context.getFilesDir(), "instances/u" + virtualUserId
                 + "/" + safeSegment(packageName));
+    }
+
+    private static File requireInstalledArtifact(String path, String field) throws Exception {
+        if (path == null || path.trim().isEmpty()) {
+            throw new IllegalArgumentException("Installed application " + field + " is missing");
+        }
+        File file = new File(path).getCanonicalFile();
+        if (!file.isFile()) throw new IllegalArgumentException(
+                "Installed application " + field + " is unavailable: " + file);
+        return file;
     }
 
     private static String formatMaintenanceWarning(List<String> failures) {

@@ -20,6 +20,7 @@ interface IPackageManagementSession {
     PackageServiceResult importApkWithNativeTrust(String uri, String nativeGuestTrust);
     PackageServiceResult importApkFile(String sourcePath);
     PackageServiceResult importApkFileWithNativeTrust(String sourcePath, String nativeGuestTrust);
+    PackageServiceResult importInstalledApplication(String packageName, String nativeGuestTrust);
     PackageServiceResult createInstallSession(String expectedPackageName);
     PackageServiceResult createInstallSessionWithParams(in InstallSessionParamsSnapshot params);
     PackageServiceResult getInstallSessionInfo(int sessionId);

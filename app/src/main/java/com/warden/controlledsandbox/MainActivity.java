@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -15,6 +16,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.app.AlertDialog;
+import android.text.InputType;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -85,9 +87,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         LinearLayout actions = row(12);
         importButton = actionButton(R.string.action_import);
         importButton.setOnClickListener(v -> chooseApk());
+        Button installed = actionButton(R.string.action_add_installed);
+        installed.setOnClickListener(v -> chooseInstalledApplication());
         Button refresh = actionButton(R.string.action_refresh);
         refresh.setOnClickListener(v -> refresh());
         actions.addView(importButton, weight(1));
+        actions.addView(installed, weight(1));
         actions.addView(refresh, weight(1));
         root.addView(actions, margins(12, 12, 12, 4));
         appStatus = label("正在读取应用列表…", 13, false);
@@ -123,6 +128,9 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         card.setTextColor(getColor(R.color.text_primary));
         card.setBackgroundResource(R.drawable.flash_card);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        int icon = featureIcon(title);
+        if (icon != 0) card.setCompoundDrawablesWithIntrinsicBounds(icon, 0, 0, 0);
+        card.setCompoundDrawablePadding(dp(12));
         card.setClickable(true);
         card.setFocusable(true);
         card.setOnClickListener(v -> action.run());
@@ -188,6 +196,79 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
                     if (appStatus != null) appStatus.setText("Import cancelled");
                 })
                 .show();
+    }
+
+    private void chooseInstalledApplication() {
+        if (!metadataHealthy) {
+            Toast.makeText(this, "应用元数据不可用，请先修复后再添加", Toast.LENGTH_LONG).show();
+            return;
+        }
+        appStatus.setText("正在读取已安装应用…");
+        viewModel.execute(() -> viewModel.application().installedApplications(),
+                (List<InstalledApplication> values) -> runOnUiThread(() -> showInstalledApplications(values)),
+                error -> runOnUiThread(() -> showFailure("读取已安装应用失败", error)));
+    }
+
+    private void showInstalledApplications(List<InstalledApplication> values) {
+        LinearLayout wrapper = column(0);
+        TextView hint = label("选择设备上已安装的 App；闪现2 会读取真实版本、签名、base.apk 与 split APK。",
+                13, false);
+        wrapper.addView(hint, margins(0, 0, 0, 8));
+        ListView list = new ListView(this);
+        list.setDivider(null);
+        InstalledAppAdapter installedAdapter = new InstalledAppAdapter(this, application -> {
+            SandboxRecord existing = findRecord(application.packageName);
+            if (existing != null) {
+                createAdditionalInstance(existing);
+                return;
+            }
+            if (application.containsNativeCode) {
+                confirmInstalledNativeTrust(application);
+            } else {
+                importInstalledApplication(application,
+                        InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED);
+            }
+        });
+        installedAdapter.replace(values);
+        list.setAdapter(installedAdapter);
+        wrapper.addView(list, new LinearLayout.LayoutParams(-1, dp(420)));
+        if (values.isEmpty()) {
+            hint.setText("没有可添加的已安装用户 App；也可以使用 APK 文件导入。\n\n系统 App 和闪现2自身不会出现在此列表。 ");
+        }
+        new AlertDialog.Builder(this).setTitle("已安装应用").setView(wrapper)
+                .setNegativeButton("取消", null).show();
+    }
+
+    private void confirmInstalledNativeTrust(InstalledApplication application) {
+        new AlertDialog.Builder(this)
+                .setTitle("确认导入包含 Native 的 App")
+                .setMessage(application.label + " 包含 native library（ABI: " + application.nativeAbi
+                        + "）。导入会复制真实 base/split APK 并进入统一 Trust / Prepare / Package Record 流程。")
+                .setPositiveButton("信任并导入", (dialog, which) -> importInstalledApplication(
+                        application, InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED))
+                .setNegativeButton("不信任", (dialog, which) -> importInstalledApplication(
+                        application, InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED))
+                .show();
+    }
+
+    private void importInstalledApplication(InstalledApplication application, String trust) {
+        appStatus.setText("正在添加 " + application.label + "…");
+        viewModel.execute(() -> viewModel.application().importInstalledApplication(
+                        application.packageName, trust),
+                record -> runOnUiThread(() -> {
+                    appStatus.setText("已从已安装应用添加 " + record.label);
+                    refresh();
+                }),
+                error -> runOnUiThread(() -> showFailure("已安装应用添加失败", error)));
+    }
+
+    private void createAdditionalInstance(SandboxRecord record) {
+        viewModel.execute(() -> viewModel.application().createClone(record.packageName),
+                userId -> runOnUiThread(() -> {
+                    appStatus.setText("已创建分身 " + userId);
+                    refresh();
+                }),
+                error -> runOnUiThread(() -> showFailure("创建分身失败", error)));
     }
 
     private void importSelectedApk(Uri uri, String nativeGuestTrust) {
@@ -291,8 +372,21 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         confirm("删除实例", "删除“" + item.record.label + " / " + item.instance.displayName + "”？",
                 () -> viewModel.execute(() -> { viewModel.application().deleteInstance(
                                 item.record.packageName, item.instance.virtualUserId); return null; },
-                        ignored -> runOnUiThread(() -> { appStatus.setText("实例已删除"); refresh(); }),
+                        ignored -> runOnUiThread(() -> {
+                            SandboxShortcutManager.disable(this, item.instance.packageName,
+                                    item.instance.virtualUserId);
+                            appStatus.setText("实例已删除，快捷方式已失效");
+                            refresh();
+                        }),
                         error -> runOnUiThread(() -> showFailure("删除失败", error))));
+    }
+
+    @Override public void onShortcut(SandboxItem item) {
+        if (!SandboxShortcutManager.create(this, item)) {
+            Toast.makeText(this, "当前 Launcher 不支持创建快捷方式", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (appStatus != null) appStatus.setText("已请求创建直达 " + item.instance.displayName + " 的快捷方式");
     }
 
     private void completeOperation(SandboxItem item, Bundle result, String operation) {
@@ -349,5 +443,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     @Override protected void onDestroy() {
         if (viewModel != null) viewModel.close();
         super.onDestroy();
+    }
+    private int featureIcon(String title) {
+        if (title.contains("定位")) return R.drawable.ic_feature_location;
+        if (title.contains("相机")) return R.drawable.ic_feature_camera;
+        if (title.contains("设备")) return R.drawable.ic_feature_device;
+        if (title.contains("网络")) return R.drawable.ic_feature_network;
+        return R.drawable.ic_feature_add_app;
     }
 }

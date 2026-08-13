@@ -78,6 +78,13 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
                         lifecycle.importApkFile(new File(required(sourcePath, "sourcePath")),
                                 required(nativeGuestTrust, "nativeGuestTrust")))));
     }
+    public PackageServiceResult importInstalledApplication(
+            String packageName, String nativeGuestTrust) {
+        return execute("importInstalledApplication", () -> PackageServiceResult.successRecord(
+                "importInstalledApplication", PackageServiceMapper.toSnapshot(
+                        lifecycle.importInstalledApplication(required(packageName, "packageName"),
+                                required(nativeGuestTrust, "nativeGuestTrust")))));
+    }
     @Override public PackageServiceResult createInstallSession(String expectedPackageName) {
         return execute("createInstallSession", () -> PackageServiceResult.successInt(
                 "createInstallSession", lifecycle.createInstallSession(
