@@ -25,6 +25,7 @@ final class PackageServiceDependencies implements AutoCloseable {
     final VirtualMediaCommunicationStore mediaCommunication;
     final VirtualPeripheralServicesStore peripheralServices;
     final VirtualPrivilegedServicesStore privilegedServices;
+    final RuntimeClient runtimeClient;
 
     static PackageServiceDependencies create(Service service, File filesDir) {
         Objects.requireNonNull(service, "service");
@@ -43,7 +44,7 @@ final class PackageServiceDependencies implements AutoCloseable {
                 new VirtualPolicyServicesStore(filesDir),
                 new VirtualMediaCommunicationStore(filesDir),
                 new VirtualPeripheralServicesStore(filesDir),
-                new VirtualPrivilegedServicesStore(filesDir));
+                new VirtualPrivilegedServicesStore(filesDir), new RuntimeClient(service));
     }
 
     PackageServiceDependencies(
@@ -64,7 +65,7 @@ final class PackageServiceDependencies implements AutoCloseable {
         this(new File(System.getProperty("java.io.tmpdir"), "controlled-sandbox-tests"),
                 lifecycle, callerVerifier, packageStateBuilder, hostPermissions, systemServices,
                 deviceServices, interactions, networkServices, applicationEnvironment, compatibility,
-                policyServices, mediaCommunication, peripheralServices, privilegedServices);
+                policyServices, mediaCommunication, peripheralServices, privilegedServices, null);
     }
 
     PackageServiceDependencies(File filesDir,
@@ -82,6 +83,27 @@ final class PackageServiceDependencies implements AutoCloseable {
             VirtualMediaCommunicationStore mediaCommunication,
             VirtualPeripheralServicesStore peripheralServices,
             VirtualPrivilegedServicesStore privilegedServices) {
+        this(filesDir, lifecycle, callerVerifier, packageStateBuilder, hostPermissions, systemServices,
+                deviceServices, interactions, networkServices, applicationEnvironment, compatibility,
+                policyServices, mediaCommunication, peripheralServices, privilegedServices, null);
+    }
+
+    PackageServiceDependencies(File filesDir,
+            SandboxPackageLifecycle lifecycle,
+            PackageCallerVerifier callerVerifier,
+            VirtualPackageStateBuilder packageStateBuilder,
+            HostPermissionStateResolver hostPermissions,
+            VirtualSystemServiceStore systemServices,
+            VirtualDeviceServiceStore deviceServices,
+            VirtualInteractionStore interactions,
+            VirtualNetworkServiceStore networkServices,
+            ApplicationEnvironmentStore applicationEnvironment,
+            VirtualCompatibilityStore compatibility,
+            VirtualPolicyServicesStore policyServices,
+            VirtualMediaCommunicationStore mediaCommunication,
+            VirtualPeripheralServicesStore peripheralServices,
+            VirtualPrivilegedServicesStore privilegedServices,
+            RuntimeClient runtimeClient) {
         this.filesDir = Objects.requireNonNull(filesDir, "filesDir");
         this.lifecycle = Objects.requireNonNull(lifecycle, "lifecycle");
         this.callerVerifier = Objects.requireNonNull(callerVerifier, "callerVerifier");
@@ -99,6 +121,7 @@ final class PackageServiceDependencies implements AutoCloseable {
         this.mediaCommunication = Objects.requireNonNull(mediaCommunication, "mediaCommunication");
         this.peripheralServices = Objects.requireNonNull(peripheralServices, "peripheralServices");
         this.privilegedServices = Objects.requireNonNull(privilegedServices, "privilegedServices");
+        this.runtimeClient = runtimeClient;
     }
 
     String maintenanceWarning() {
@@ -130,9 +153,18 @@ final class PackageServiceDependencies implements AutoCloseable {
         privilegedServices.deleteScopeBestEffort(scope);
     }
 
+    void stopGuestBeforeDestructiveOperation(String packageName, int virtualUserId)
+            throws Exception {
+        if (runtimeClient == null) return;
+        SandboxRecord record = lifecycle.findRecord(packageName);
+        if (record == null) throw new IllegalArgumentException("Package is not installed");
+        runtimeClient.stop(record, virtualUserId);
+    }
+
     @Override public void close() {
         capabilityRegistry.close();
         systemServices.close();
+        if (runtimeClient != null) runtimeClient.close();
     }
 
     static String required(String value, String name) {

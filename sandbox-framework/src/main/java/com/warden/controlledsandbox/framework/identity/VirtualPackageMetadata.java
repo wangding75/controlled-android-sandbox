@@ -180,6 +180,24 @@ public final class VirtualPackageMetadata {
         private final List<Filter> filters;
         private final List<ProviderPathRule> providerPathRules;
         private final Bundle metaData;
+        private final String launchMode;
+        private final String taskAffinity;
+        private final String documentLaunchMode;
+        private final int configChanges;
+        private final String screenOrientation;
+        private final int windowSoftInputMode;
+        private final int flags;
+        private final boolean excludeFromRecents;
+        private final boolean noHistory;
+        private final boolean finishOnTaskLaunch;
+        private final boolean clearTaskOnLaunch;
+        private final boolean alwaysRetainTaskState;
+        private final boolean allowTaskReparenting;
+        private final String resizeMode;
+        private final float maxAspectRatio;
+        private final float minAspectRatio;
+        private final boolean supportsPictureInPicture;
+        private final int themeResId;
 
         public Component(Type type, String className, String processName,
                          boolean exported, boolean enabled, boolean isolated,
@@ -209,7 +227,8 @@ public final class VirtualPackageMetadata {
                          List<Filter> filters, List<ProviderPathRule> providerPathRules) {
             this(type, className, processName, exported, enabled, isolated, actions, authority,
                     permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
-                    filters, providerPathRules, null);
+                    filters, providerPathRules, null, "standard", "", "none", 0, "", 0, 0,
+                    false, false, false, false, false, false, "", 0f, 0f, false, 0);
         }
 
         public Component(Type type, String className, String processName,
@@ -218,6 +237,24 @@ public final class VirtualPackageMetadata {
                          String writePermission, boolean grantUriPermissions, String enabledSetting,
                          List<Filter> filters, List<ProviderPathRule> providerPathRules,
                          Bundle metaData) {
+            this(type, className, processName, exported, enabled, isolated, actions, authority,
+                    permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
+                    filters, providerPathRules, metaData, "standard", "", "none", 0, "", 0, 0,
+                    false, false, false, false, false, false, "", 0f, 0f, false, 0);
+        }
+
+        public Component(Type type, String className, String processName,
+                         boolean exported, boolean enabled, boolean isolated, Set<String> actions,
+                         String authority, String permission, String readPermission,
+                         String writePermission, boolean grantUriPermissions, String enabledSetting,
+                         List<Filter> filters, List<ProviderPathRule> providerPathRules,
+                         Bundle metaData, String launchMode, String taskAffinity,
+                         String documentLaunchMode, int configChanges, String screenOrientation,
+                         int windowSoftInputMode, int flags, boolean excludeFromRecents,
+                         boolean noHistory, boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                         boolean alwaysRetainTaskState, boolean allowTaskReparenting, String resizeMode,
+                         float maxAspectRatio, float minAspectRatio, boolean supportsPictureInPicture,
+                         int themeResId) {
             this.type = java.util.Objects.requireNonNull(type, "type");
             this.className = requireText(className, "className");
             this.processName = value(processName);
@@ -235,6 +272,29 @@ public final class VirtualPackageMetadata {
             this.providerPathRules = Collections.unmodifiableList(new ArrayList<>(
                     providerPathRules == null ? List.of() : providerPathRules));
             this.metaData = metaData == null ? null : new Bundle(metaData);
+            this.launchMode = enumValue(launchMode, "standard");
+            this.taskAffinity = value(taskAffinity);
+            this.documentLaunchMode = enumValue(documentLaunchMode, "none");
+            if (configChanges < 0 || windowSoftInputMode < 0 || flags < 0
+                    || maxAspectRatio < 0f || minAspectRatio < 0f) {
+                throw new IllegalArgumentException("activity task contract contains a negative value");
+            }
+            this.configChanges = configChanges;
+            this.screenOrientation = value(screenOrientation);
+            this.windowSoftInputMode = windowSoftInputMode;
+            this.flags = flags;
+            this.excludeFromRecents = excludeFromRecents;
+            this.noHistory = noHistory;
+            this.finishOnTaskLaunch = finishOnTaskLaunch;
+            this.clearTaskOnLaunch = clearTaskOnLaunch;
+            this.alwaysRetainTaskState = alwaysRetainTaskState;
+            this.allowTaskReparenting = allowTaskReparenting;
+            this.resizeMode = value(resizeMode);
+            this.maxAspectRatio = maxAspectRatio;
+            this.minAspectRatio = minAspectRatio;
+            this.supportsPictureInPicture = supportsPictureInPicture;
+            if (themeResId < 0) throw new IllegalArgumentException("themeResId must be non-negative");
+            this.themeResId = themeResId;
         }
 
         public Type type() { return type; }
@@ -253,6 +313,24 @@ public final class VirtualPackageMetadata {
         public List<Filter> filters() { return filters; }
         public List<ProviderPathRule> providerPathRules() { return providerPathRules; }
         public Bundle metaData() { return metaData == null ? null : new Bundle(metaData); }
+        public String launchMode() { return launchMode; }
+        public String taskAffinity() { return taskAffinity; }
+        public String documentLaunchMode() { return documentLaunchMode; }
+        public int configChanges() { return configChanges; }
+        public String screenOrientation() { return screenOrientation; }
+        public int windowSoftInputMode() { return windowSoftInputMode; }
+        public int flags() { return flags; }
+        public boolean excludeFromRecents() { return excludeFromRecents; }
+        public boolean noHistory() { return noHistory; }
+        public boolean finishOnTaskLaunch() { return finishOnTaskLaunch; }
+        public boolean clearTaskOnLaunch() { return clearTaskOnLaunch; }
+        public boolean alwaysRetainTaskState() { return alwaysRetainTaskState; }
+        public boolean allowTaskReparenting() { return allowTaskReparenting; }
+        public String resizeMode() { return resizeMode; }
+        public float maxAspectRatio() { return maxAspectRatio; }
+        public float minAspectRatio() { return minAspectRatio; }
+        public boolean supportsPictureInPicture() { return supportsPictureInPicture; }
+        public int themeResId() { return themeResId; }
     }
 
     private final String packageName;
@@ -272,6 +350,9 @@ public final class VirtualPackageMetadata {
     private final List<Instrumentation> instrumentations;
     private final Map<String, Instrumentation> instrumentationsByClass;
     private final List<String> requestedPermissions;
+    private final Set<String> queryPackages;
+    private final Set<String> queryProviderAuthorities;
+    private final List<Filter> queryIntentFilters;
     private final boolean enabled;
     private final java.util.concurrent.ConcurrentHashMap<String, Integer> enabledSettingOverrides =
             new java.util.concurrent.ConcurrentHashMap<>();
@@ -301,6 +382,22 @@ public final class VirtualPackageMetadata {
                                   List<SharedLibrary> sharedLibraryDetails,
                                   List<Instrumentation> instrumentations,
                                   List<String> requestedPermissions, boolean enabled) {
+        this(packageName, launcherActivity, applicationInfo, components, versionName, versionCode,
+                signatureSha256, firstInstallTime, lastUpdateTime, installerPackageName,
+                sharedLibraries, sharedLibraryDetails, instrumentations, requestedPermissions,
+                enabled, Set.of(), Set.of(), List.of());
+    }
+
+    public VirtualPackageMetadata(String packageName, String launcherActivity,
+                                  ApplicationInfo applicationInfo, List<Component> components,
+                                  String versionName, long versionCode, String signatureSha256,
+                                  long firstInstallTime, long lastUpdateTime,
+                                  String installerPackageName, List<String> sharedLibraries,
+                                  List<SharedLibrary> sharedLibraryDetails,
+                                  List<Instrumentation> instrumentations,
+                                  List<String> requestedPermissions, boolean enabled,
+                                  Set<String> queryPackages, Set<String> queryProviderAuthorities,
+                                  List<Filter> queryIntentFilters) {
         this.packageName = requireText(packageName, "packageName");
         this.launcherActivity = value(launcherActivity);
         this.applicationInfo = new ApplicationInfo(applicationInfo);
@@ -324,6 +421,10 @@ public final class VirtualPackageMetadata {
         }
         this.instrumentationsByClass = Collections.unmodifiableMap(instrumentationMap);
         this.requestedPermissions = immutableList(requestedPermissions);
+        this.queryPackages = immutableSet(queryPackages);
+        this.queryProviderAuthorities = immutableSet(queryProviderAuthorities);
+        this.queryIntentFilters = Collections.unmodifiableList(new ArrayList<>(
+                queryIntentFilters == null ? List.of() : queryIntentFilters));
         this.enabled = enabled;
         List<Component> copy = new ArrayList<>(components == null ? List.of() : components);
         Map<String, Component> classes = new LinkedHashMap<>();
@@ -363,6 +464,9 @@ public final class VirtualPackageMetadata {
     public List<String> sharedLibraries() { return sharedLibraries; }
     public List<SharedLibrary> sharedLibraryDetails() { return sharedLibraryDetails; }
     public List<Instrumentation> instrumentations() { return instrumentations; }
+    public Set<String> queryPackages() { return queryPackages; }
+    public Set<String> queryProviderAuthorities() { return queryProviderAuthorities; }
+    public List<Filter> queryIntentFilters() { return queryIntentFilters; }
     public List<String> resolvedSharedLibraryNames() {
         List<String> names = new ArrayList<>();
         for (SharedLibrary library : sharedLibraryDetails) {
@@ -588,7 +692,10 @@ public final class VirtualPackageMetadata {
         info.exported = component.exported();
         info.enabled = visible(component, 0L);
         info.applicationInfo = applicationInfo();
-        if (info instanceof ActivityInfo) ((ActivityInfo) info).permission = component.permission();
+        if (info instanceof ActivityInfo) {
+            ((ActivityInfo) info).permission = component.permission();
+            projectActivityContract((ActivityInfo) info, component);
+        }
         if (info instanceof ServiceInfo) {
             ((ServiceInfo) info).flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
             ((ServiceInfo) info).permission = component.permission();
@@ -602,6 +709,76 @@ public final class VirtualPackageMetadata {
             provider.metaData = component.metaData();
         }
         return info;
+    }
+
+    /** Projects manifest task semantics without compiling against hidden/API-specific fields. */
+    private static void projectActivityContract(ActivityInfo info, Component component) {
+        setField(info, "launchMode", launchMode(component.launchMode()));
+        setField(info, "documentLaunchMode", documentLaunchMode(component.documentLaunchMode()));
+        setField(info, "taskAffinity", component.taskAffinity());
+        setField(info, "configChanges", component.configChanges());
+        setField(info, "screenOrientation", orientation(component.screenOrientation()));
+        setField(info, "windowSoftInputMode", component.windowSoftInputMode());
+        setField(info, "theme", component.themeResId());
+        setField(info, "maxAspectRatio", component.maxAspectRatio());
+        setField(info, "minAspectRatio", component.minAspectRatio());
+        int flags = component.flags();
+        if (component.excludeFromRecents()) flags |= staticInt(ActivityInfo.class, "FLAG_EXCLUDE_FROM_RECENTS");
+        if (component.noHistory()) flags |= staticInt(ActivityInfo.class, "FLAG_NO_HISTORY");
+        if (component.finishOnTaskLaunch()) flags |= staticInt(ActivityInfo.class, "FLAG_FINISH_ON_TASK_LAUNCH");
+        if (component.clearTaskOnLaunch()) flags |= staticInt(ActivityInfo.class, "FLAG_CLEAR_TASK_ON_LAUNCH");
+        if (component.alwaysRetainTaskState()) flags |= staticInt(ActivityInfo.class, "FLAG_ALWAYS_RETAIN_TASK_STATE");
+        if (component.allowTaskReparenting()) flags |= staticInt(ActivityInfo.class, "FLAG_ALLOW_TASK_REPARENTING");
+        if (component.supportsPictureInPicture()) flags |= staticInt(ActivityInfo.class, "FLAG_SUPPORTS_PICTURE_IN_PICTURE");
+        setField(info, "flags", flags);
+        setField(info, "resizeMode", resizeMode(component.resizeMode()));
+    }
+
+    private static int launchMode(String value) {
+        String name = value(value).toUpperCase(Locale.ROOT);
+        if ("SINGLETOP".equals(name)) return staticInt(ActivityInfo.class, "LAUNCH_SINGLE_TOP");
+        if ("SINGLETASK".equals(name)) return staticInt(ActivityInfo.class, "LAUNCH_SINGLE_TASK");
+        if ("SINGLEINSTANCE".equals(name)) return staticInt(ActivityInfo.class, "LAUNCH_SINGLE_INSTANCE");
+        if ("SINGLEINSTANCEPERTASK".equals(name)) return staticInt(ActivityInfo.class, "LAUNCH_SINGLE_INSTANCE_PER_TASK");
+        return staticInt(ActivityInfo.class, "LAUNCH_MULTIPLE");
+    }
+
+    private static int documentLaunchMode(String value) {
+        String name = value(value).toUpperCase(Locale.ROOT);
+        if ("INTO_EXISTING".equals(name)) return staticInt(ActivityInfo.class, "DOCUMENT_LAUNCH_INTO_EXISTING");
+        if ("ALWAYS".equals(name)) return staticInt(ActivityInfo.class, "DOCUMENT_LAUNCH_ALWAYS");
+        if ("NEVER".equals(name)) return staticInt(ActivityInfo.class, "DOCUMENT_LAUNCH_NEVER");
+        return staticInt(ActivityInfo.class, "DOCUMENT_LAUNCH_NONE");
+    }
+
+    private static int orientation(String value) {
+        String name = value(value).toUpperCase(Locale.ROOT);
+        if (name.isEmpty()) return staticInt(ActivityInfo.class, "SCREEN_ORIENTATION_UNSPECIFIED");
+        return staticInt(ActivityInfo.class, "SCREEN_ORIENTATION_" + name);
+    }
+
+    private static int resizeMode(String value) {
+        String name = value(value).toUpperCase(Locale.ROOT);
+        if (name.isEmpty()) return staticInt(ActivityInfo.class, "RESIZE_MODE_RESIZEABLE");
+        return staticInt(ActivityInfo.class, "RESIZE_MODE_" + name);
+    }
+
+    private static int staticInt(Class<?> type, String name) {
+        try {
+            java.lang.reflect.Field field = type.getField(name);
+            return field.getInt(null);
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    private static void setField(Object target, String name, Object value) {
+        try {
+            java.lang.reflect.Field field = target.getClass().getField(name);
+            field.set(target, value);
+        } catch (Throwable ignored) {
+            // API adapters intentionally leave fields unavailable on older framework releases.
+        }
     }
 
     private static ResolveInfo resolveInfo(Type type, ComponentInfo info, int priority,
@@ -697,6 +874,10 @@ public final class VirtualPackageMetadata {
         return value.trim();
     }
     private static String value(String value) { return value == null ? "" : value; }
+    private static String enumValue(String value, String fallback) {
+        String normalized = value(value).toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? fallback : normalized;
+    }
 
     private static final class Match {
         final Component component; final Filter filter; final int score;

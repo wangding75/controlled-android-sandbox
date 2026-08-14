@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import android.content.Context;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
@@ -103,6 +104,25 @@ final class VirtualPackageStateBuilder {
                     instrumentation.targetProcesses(), instrumentation.handleProfiling(),
                     instrumentation.functionalTest(), instrumentation.enabled()));
         }
+        List<VirtualPackageQuerySnapshot> queries = new ArrayList<>();
+        for (String packageName : set.queryPackages) {
+            queries.add(new VirtualPackageQuerySnapshot(VirtualPackageQuerySnapshot.PACKAGE,
+                    packageName, null));
+        }
+        for (String authority : set.queryProviderAuthorities) {
+            queries.add(new VirtualPackageQuerySnapshot(VirtualPackageQuerySnapshot.PROVIDER,
+                    authority, null));
+        }
+        for (ManifestModel.QueryIntent query : set.queryIntents) {
+            List<VirtualIntentDataSnapshot> data = new ArrayList<>();
+            for (ManifestModel.DataRule rule : query.dataRules()) {
+                data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.path(),
+                        rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
+            }
+            queries.add(new VirtualPackageQuerySnapshot(VirtualPackageQuerySnapshot.INTENT, "",
+                    new VirtualIntentFilterSnapshot(0, new ArrayList<>(query.actions()),
+                            new ArrayList<>(query.categories()), data)));
+        }
         return new VirtualPackageStateSnapshot(record.packageName, virtualUserId,
                 record.label, record.versionName, record.versionCode,
                 record.signatureSha256, record.sha256, set.launcherActivity,
@@ -110,6 +130,7 @@ final class VirtualPackageStateBuilder {
                 record.firstInstallAt, record.lastUpdateAt,
                 "com.warden.virtualinstaller", record.splitNames(),
                 new ArrayList<>(set.sharedLibraries), librarySnapshots, instrumentationSnapshots,
+                queries,
                 components, permissions, appOps);
     }
 
@@ -187,6 +208,9 @@ final class VirtualPackageStateBuilder {
             set.sharedLibraryDependencies.addAll(manifest.sharedLibraryDependencies());
             set.providedSharedLibraries.addAll(manifest.providedSharedLibraries());
             set.instrumentations.addAll(manifest.instrumentations());
+            set.queryPackages.addAll(manifest.queryPackages());
+            set.queryProviderAuthorities.addAll(manifest.queryProviderAuthorities());
+            set.queryIntents.addAll(manifest.queryIntents());
         }
         return set;
     }
@@ -313,7 +337,14 @@ final class VirtualPackageStateBuilder {
                     component.isolatedProcess(), component.authorities(), component.permission(),
                     component.readPermission(), component.writePermission(), component.grantUriPermissions(),
                     enabledSetting, component.actions(), filters, providerPathRules,
-                    component.themeResId()));
+                    component.themeResId(), component.launchMode(), component.taskAffinity(),
+                    component.documentLaunchMode(), component.configChanges(),
+                    component.screenOrientation(), component.windowSoftInputMode(), component.flags(),
+                    component.excludeFromRecents(), component.noHistory(),
+                    component.finishOnTaskLaunch(), component.clearTaskOnLaunch(),
+                    component.alwaysRetainTaskState(), component.allowTaskReparenting(),
+                    component.resizeMode(), component.maxAspectRatio(), component.minAspectRatio(),
+                    component.supportsPictureInPicture()));
         }
     }
 
@@ -343,6 +374,9 @@ final class VirtualPackageStateBuilder {
         final List<ManifestModel.SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
         final Set<String> providedSharedLibraries = new LinkedHashSet<>();
         final List<ManifestModel.Instrumentation> instrumentations = new ArrayList<>();
+        final Set<String> queryPackages = new LinkedHashSet<>();
+        final Set<String> queryProviderAuthorities = new LinkedHashSet<>();
+        final List<ManifestModel.QueryIntent> queryIntents = new ArrayList<>();
         List<ManifestModel.Component> allComponents() {
             List<ManifestModel.Component> values = new ArrayList<>();
             values.addAll(activities); values.addAll(services); values.addAll(receivers); values.addAll(providers);

@@ -21,6 +21,7 @@ public final class BinaryXmlManifestParser {
     private static final int RES_XML_END_ELEMENT_TYPE = 0x0103;
     private static final int UTF8_FLAG = 0x00000100;
     private static final int TYPE_STRING = 0x03;
+    private static final int TYPE_FLOAT = 0x04;
     private static final int TYPE_REFERENCE = 0x01;
     private static final int TYPE_INT_DEC = 0x10;
     private static final int TYPE_INT_BOOLEAN = 0x12;
@@ -59,7 +60,8 @@ public final class BinaryXmlManifestParser {
                 if (strings == null) throw new IOException("Start element encountered before string pool");
                 Element element = parseStartElement(buffer, offset, headerSize, size, strings);
                 onStart(model, stack, element);
-                stack.push(new ElementContext(element.name, element.component, element.intentState));
+                stack.push(new ElementContext(element.name, element.component, element.intentState,
+                        element.queryIntent));
                 finalizeVisibleIntentStates(stack);
             } else if (type == RES_XML_END_ELEMENT_TYPE) {
                 finalizeVisibleIntentStates(stack);
@@ -104,6 +106,10 @@ public final class BinaryXmlManifestParser {
                     element.stringAttr("targetPackage"), element.stringAttr("targetProcesses"),
                     element.boolAttr("handleProfiling", false),
                     element.boolAttr("functionalTest", false), element.boolAttr("enabled", true)));
+            case "package" -> {
+                if (insideQueries(stack)) model.addQueryPackage(element.stringAttr("name"));
+            }
+            case "queries" -> { }
             case "application" -> {
                 model.applicationClass(element.stringAttr("name"));
                 model.applicationPermission(element.stringAttr("permission"));
@@ -144,7 +150,10 @@ public final class BinaryXmlManifestParser {
             case "provider" -> {
                 // Android 11+ <queries><provider android:authorities="..."/></queries>
                 // declares package visibility, not a ContentProvider component.
-                if (insideQueries(stack)) break;
+                if (insideQueries(stack)) {
+                    model.addQueryProviderAuthority(element.stringAttr("authorities"));
+                    break;
+                }
                 ManifestModel.Component component = providerComponent(model, element,
                         requireComponentName("provider", element.stringAttr("name")));
                 component = model.addProvider(component);
@@ -155,17 +164,21 @@ public final class BinaryXmlManifestParser {
             case "action" -> {
                 ManifestModel.Component component = nearestComponent(stack);
                 IntentState state = nearestIntent(stack);
+                ManifestModel.QueryIntent query = nearestQueryIntent(stack);
                 String actionName = element.stringAttr("name");
                 if (component != null) component.addAction(actionName);
                 if (state != null && state.filter != null) state.filter.addAction(actionName);
+                if (query != null) query.addAction(actionName);
                 if (component != null && "android.intent.action.MAIN".equals(actionName)) {
                     if (state != null) state.mainAction = true;
                 }
             }
             case "category" -> {
                 ManifestModel.Component component = nearestComponent(stack);
+                ManifestModel.QueryIntent query = nearestQueryIntent(stack);
+                String value = element.stringAttr("name");
+                if (query != null) query.addCategory(value);
                 if (component != null) {
-                    String value = element.stringAttr("name");
                     IntentState state = nearestIntent(stack);
                     if (state != null && state.filter != null) state.filter.addCategory(value);
                     if (state != null && ("android.intent.category.LAUNCHER".equals(value)
@@ -176,13 +189,18 @@ public final class BinaryXmlManifestParser {
             }
             case "data" -> {
                 IntentState state = nearestIntent(stack);
+                ManifestModel.QueryIntent query = nearestQueryIntent(stack);
+                ManifestModel.DataRule rule = new ManifestModel.DataRule(
+                        element.stringAttr("scheme"), element.stringAttr("host"),
+                        element.stringAttr("path"), element.stringAttr("pathPrefix"),
+                        element.stringAttr("pathPattern"), element.stringAttr("mimeType"));
+                if (query != null) query.addDataRule(rule);
                 if (state != null && state.filter != null) {
-                    ManifestModel.DataRule rule = new ManifestModel.DataRule(
-                            element.stringAttr("scheme"), element.stringAttr("host"),
-                            element.stringAttr("path"), element.stringAttr("pathPrefix"),
-                            element.stringAttr("pathPattern"), element.stringAttr("mimeType"));
                     if (!rule.empty()) state.filter.addDataRule(rule);
                 }
+            }
+            case "intent" -> {
+                if (insideQueries(stack)) element.queryIntent = model.addQueryIntent();
             }
             case "intent-filter" -> {
                 ManifestModel.Component component = nearestComponent(stack);
@@ -258,6 +276,23 @@ public final class BinaryXmlManifestParser {
         component.themeResId(themeExplicit ? element.intAttr("theme", 0)
                 : model.applicationThemeResId());
         component.themeExplicit(themeExplicit);
+        component.launchMode(element.stringAttr("launchMode"));
+        component.taskAffinity(element.stringAttr("taskAffinity"));
+        component.documentLaunchMode(element.stringAttr("documentLaunchMode"));
+        component.configChanges(element.intAttr("configChanges", 0));
+        component.screenOrientation(element.stringAttr("screenOrientation"));
+        component.windowSoftInputMode(element.intAttr("windowSoftInputMode", 0));
+        component.flags(element.intAttr("flags", 0));
+        component.excludeFromRecents(element.boolAttr("excludeFromRecents", false));
+        component.noHistory(element.boolAttr("noHistory", false));
+        component.finishOnTaskLaunch(element.boolAttr("finishOnTaskLaunch", false));
+        component.clearTaskOnLaunch(element.boolAttr("clearTaskOnLaunch", false));
+        component.alwaysRetainTaskState(element.boolAttr("alwaysRetainTaskState", false));
+        component.allowTaskReparenting(element.boolAttr("allowTaskReparenting", false));
+        component.resizeMode(element.stringAttr("resizeMode"));
+        component.maxAspectRatio(element.floatAttr("maxAspectRatio", 0f));
+        component.minAspectRatio(element.floatAttr("minAspectRatio", 0f));
+        component.supportsPictureInPicture(element.boolAttr("supportsPictureInPicture", false));
         return component;
     }
 
@@ -288,6 +323,11 @@ public final class BinaryXmlManifestParser {
 
     private static IntentState nearestIntent(Deque<ElementContext> stack) {
         for (ElementContext context : stack) if (context.intentState != null) return context.intentState;
+        return null;
+    }
+
+    private static ManifestModel.QueryIntent nearestQueryIntent(Deque<ElementContext> stack) {
+        for (ElementContext context : stack) if (context.queryIntent != null) return context.queryIntent;
         return null;
     }
 
@@ -422,6 +462,11 @@ public final class BinaryXmlManifestParser {
                     || dataType == TYPE_INT_BOOLEAN) return data;
             try { return Integer.parseInt(text); } catch (NumberFormatException ignored) { return fallback; }
         }
+        float asFloat(float fallback) {
+            if (dataType == TYPE_FLOAT) return Float.intBitsToFloat(data);
+            if (dataType == TYPE_INT_DEC) return data;
+            try { return Float.parseFloat(text); } catch (NumberFormatException ignored) { return fallback; }
+        }
     }
 
     private static final class Element {
@@ -429,26 +474,29 @@ public final class BinaryXmlManifestParser {
         final Map<String, Value> attributes;
         ManifestModel.Component component;
         IntentState intentState;
+        ManifestModel.QueryIntent queryIntent;
         Element(String name, Map<String, Value> attributes) { this.name = name; this.attributes = attributes; }
         boolean hasAttr(String name) { return attributes.containsKey(name); }
         String stringAttr(String name) { Value value = attributes.get(name); return value == null ? "" : value.text; }
         boolean boolAttr(String name, boolean fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asBoolean(fallback); }
         int intAttr(String name, int fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asInt(fallback); }
+        float floatAttr(String name, float fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asFloat(fallback); }
     }
 
     private static final class ElementContext {
         final String name;
         final ManifestModel.Component component;
         final IntentState intentState;
+        final ManifestModel.QueryIntent queryIntent;
         ElementContext(String name, ManifestModel.Component component) {
-            this.name = name;
-            this.component = component;
-            this.intentState = null;
+            this(name, component, null, null);
         }
-        ElementContext(String name, ManifestModel.Component component, IntentState intentState) {
+        ElementContext(String name, ManifestModel.Component component, IntentState intentState,
+                       ManifestModel.QueryIntent queryIntent) {
             this.name = name;
             this.component = component;
             this.intentState = intentState;
+            this.queryIntent = queryIntent;
         }
     }
 

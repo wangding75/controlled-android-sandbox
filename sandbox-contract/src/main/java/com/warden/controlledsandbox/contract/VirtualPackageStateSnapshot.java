@@ -31,6 +31,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private final ArrayList<String> sharedLibraries;
     private final ArrayList<VirtualSharedLibrarySnapshot> sharedLibraryDetails;
     private final ArrayList<VirtualInstrumentationSnapshot> instrumentations;
+    private final ArrayList<VirtualPackageQuerySnapshot> queries;
     private final ArrayList<VirtualComponentSnapshot> components;
     private final ArrayList<VirtualPermissionSnapshot> permissions;
     private final ArrayList<PackageAppOpSnapshot> appOps;
@@ -45,7 +46,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<PackageAppOpSnapshot> appOps) {
         this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
                 apkSha256, launchActivity, applicationClass, enabled, 0L, 0L, "",
-                List.of(), List.of(), components, permissions, appOps);
+                List.of(), List.of(), List.of(), List.of(), List.of(), components, permissions, appOps);
     }
 
     public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
@@ -59,7 +60,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<PackageAppOpSnapshot> appOps) {
         this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
                 apkSha256, launchActivity, applicationClass, enabled, 0L, 0L, "",
-                splitNames, sharedLibraries, components, permissions, appOps);
+                splitNames, sharedLibraries, List.of(), List.of(), List.of(), components, permissions, appOps);
     }
 
     public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
@@ -75,7 +76,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
                 apkSha256, launchActivity, applicationClass, enabled, firstInstallTime,
                 lastUpdateTime, installerPackageName, splitNames, sharedLibraries, List.of(),
-                List.of(), components, permissions, appOps);
+                List.of(), List.of(), components, permissions, appOps);
     }
 
     public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
@@ -87,6 +88,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<String> splitNames, List<String> sharedLibraries,
                                        List<VirtualSharedLibrarySnapshot> sharedLibraryDetails,
                                        List<VirtualInstrumentationSnapshot> instrumentations,
+                                       List<VirtualPackageQuerySnapshot> queries,
                                        List<VirtualComponentSnapshot> components,
                                        List<VirtualPermissionSnapshot> permissions,
                                        List<PackageAppOpSnapshot> appOps) {
@@ -114,11 +116,15 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         this.sharedLibraries = validatedNames(sharedLibraries, "sharedLibrary", 1024);
         this.sharedLibraryDetails = new ArrayList<>(sharedLibraryDetails == null ? List.of() : sharedLibraryDetails);
         this.instrumentations = new ArrayList<>(instrumentations == null ? List.of() : instrumentations);
+        this.queries = new ArrayList<>(queries == null ? List.of() : queries);
         if (this.sharedLibraryDetails.size() > 1024) {
             throw new IllegalArgumentException("sharedLibraryDetails list is too large");
         }
         if (this.instrumentations.size() > 256) {
             throw new IllegalArgumentException("instrumentations list is too large");
+        }
+        if (this.queries.size() > 1024) {
+            throw new IllegalArgumentException("package query list is too large");
         }
         this.components = new ArrayList<>(components == null ? List.of() : components);
         this.permissions = new ArrayList<>(permissions == null ? List.of() : permissions);
@@ -136,6 +142,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                 in.createStringArrayList(), in.createStringArrayList(),
                 in.createTypedArrayList(VirtualSharedLibrarySnapshot.CREATOR),
                 in.createTypedArrayList(VirtualInstrumentationSnapshot.CREATOR),
+                in.createTypedArrayList(VirtualPackageQuerySnapshot.CREATOR),
                 in.createTypedArrayList(VirtualComponentSnapshot.CREATOR),
                 in.createTypedArrayList(VirtualPermissionSnapshot.CREATOR),
                 in.createTypedArrayList(PackageAppOpSnapshot.CREATOR));
@@ -147,7 +154,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                 source.launchActivity, source.applicationClass, source.enabled,
                 source.firstInstallTime, source.lastUpdateTime, source.installerPackageName,
                 source.splitNames, source.sharedLibraries, source.sharedLibraryDetails,
-                source.instrumentations, source.components, source.permissions, source.appOps);
+                source.instrumentations, source.queries, source.components, source.permissions,
+                source.appOps);
     }
 
     public String packageName() { return packageName; }
@@ -170,6 +178,9 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     }
     public List<VirtualInstrumentationSnapshot> instrumentations() {
         return Collections.unmodifiableList(instrumentations);
+    }
+    public List<VirtualPackageQuerySnapshot> queries() {
+        return Collections.unmodifiableList(queries);
     }
     public List<VirtualComponentSnapshot> components() { return Collections.unmodifiableList(components); }
     public List<VirtualPermissionSnapshot> permissions() { return Collections.unmodifiableList(permissions); }
@@ -202,7 +213,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         out.writeInt(enabled ? 1 : 0); out.writeLong(firstInstallTime); out.writeLong(lastUpdateTime);
         out.writeString(installerPackageName); out.writeStringList(splitNames);
         out.writeStringList(sharedLibraries); out.writeTypedList(sharedLibraryDetails);
-        out.writeTypedList(instrumentations); out.writeTypedList(components);
+        out.writeTypedList(instrumentations); out.writeTypedList(queries);
+        out.writeTypedList(components);
         out.writeTypedList(permissions); out.writeTypedList(appOps);
     }
     @Override public int describeContents() { return 0; }

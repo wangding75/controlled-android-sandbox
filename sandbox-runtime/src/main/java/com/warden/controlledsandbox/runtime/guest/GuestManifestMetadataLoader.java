@@ -31,8 +31,20 @@ public final class GuestManifestMetadataLoader {
         append(components, manifest.packageName(), manifest.services(), VirtualPackageMetadata.Type.SERVICE);
         append(components, manifest.packageName(), manifest.receivers(), VirtualPackageMetadata.Type.RECEIVER);
         append(components, manifest.packageName(), manifest.providers(), VirtualPackageMetadata.Type.PROVIDER);
+        List<VirtualPackageMetadata.Filter> queryIntentFilters = new ArrayList<>();
+        for (ManifestModel.QueryIntent query : manifest.queryIntents()) {
+            List<VirtualPackageMetadata.DataRule> data = new ArrayList<>();
+            for (ManifestModel.DataRule rule : query.dataRules()) {
+                data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(), rule.path(),
+                        rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
+            }
+            queryIntentFilters.add(new VirtualPackageMetadata.Filter(0,
+                    new LinkedHashSet<>(query.actions()), new LinkedHashSet<>(query.categories()), data));
+        }
         return new VirtualPackageMetadata(manifest.packageName(), manifest.launcherActivity(),
-                applicationInfo, components);
+                applicationInfo, components, "", 0L, "", 0L, 0L, "", List.of(), List.of(),
+                List.of(), List.of(), true, manifest.queryPackages(),
+                manifest.queryProviderAuthorities(), queryIntentFilters);
     }
 
     private static void append(List<VirtualPackageMetadata.Component> output, String packageName,

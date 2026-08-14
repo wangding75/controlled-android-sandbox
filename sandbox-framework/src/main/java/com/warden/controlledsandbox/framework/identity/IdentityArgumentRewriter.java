@@ -355,13 +355,23 @@ public final class IdentityArgumentRewriter {
 
     private static Field processNameField(Class<?> type) {
         Field field = findOptionalField(type, "processName");
-        return field != null && field.getType() == String.class ? field : null;
+        if (field == null || field.getType() != String.class) return null;
+        try {
+            field.setAccessible(true);
+            return field;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static Field findOptionalField(Class<?> type, String name) {
         try {
-            return findField(type, name);
+            Field field = findField(type, name);
+            field.setAccessible(true);
+            return field;
         } catch (NoSuchFieldException ignored) {
+            return null;
+        } catch (RuntimeException ignored) {
             return null;
         }
     }

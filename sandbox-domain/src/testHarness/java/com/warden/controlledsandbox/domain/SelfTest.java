@@ -190,8 +190,14 @@ public final class SelfTest {
         byte[] xml = new BinaryXmlFixtureBuilder()
                 .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
                 .start("queries")
+                .start("package", BinaryXmlFixtureBuilder.text("name", "com.oem.calendar")).end("package")
                 .start("provider", BinaryXmlFixtureBuilder.text("authorities", "com.oem.privacy.provider")).end("provider")
                 .start("provider", BinaryXmlFixtureBuilder.text("authorities", "com.oem.pay.SampleProvider")).end("provider")
+                .start("intent")
+                .start("action", BinaryXmlFixtureBuilder.text("name", "com.oem.action.SYNC")).end("action")
+                .start("category", BinaryXmlFixtureBuilder.text("name", "com.oem.category.DEFAULT")).end("category")
+                .start("data", BinaryXmlFixtureBuilder.text("scheme", "oem")).end("data")
+                .end("intent")
                 .end("queries")
                 .start("application")
                 .start("provider", BinaryXmlFixtureBuilder.text("name", ".DataProvider"),
@@ -205,6 +211,15 @@ public final class SelfTest {
         require("com.example.guest.data".equals(model.providers().get(0).authorities()),
                 "application provider authority is preserved");
         require(model.activities().size() == 1, "application activity is preserved");
+        require(model.queryPackages().contains("com.oem.calendar"),
+                "queries package declaration is preserved");
+        require(model.queryProviderAuthorities().contains("com.oem.privacy.provider")
+                        && model.queryProviderAuthorities().contains("com.oem.pay.SampleProvider"),
+                "queries provider authorities are preserved");
+        require(model.queryIntents().size() == 1
+                        && model.queryIntents().get(0).actions().contains("com.oem.action.SYNC")
+                        && model.queryIntents().get(0).dataRules().size() == 1,
+                "queries intent declaration is preserved");
     }
 
     private static void testTypedStringComponentNames() throws Exception {

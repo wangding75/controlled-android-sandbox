@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
@@ -57,9 +58,16 @@ final class GuestPackageMetadataMapper {
                     component.className(), component.processName(), component.exported(),
                     component.enabled(), component.isolated(),
                     new LinkedHashSet<>(component.actions()), component.authority(),
-                    component.permission(), component.readPermission(), component.writePermission(),
-                    component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules,
-                    providerMetadata));
+                     component.permission(), component.readPermission(), component.writePermission(),
+                     component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules,
+                     providerMetadata, component.launchMode(), component.taskAffinity(),
+                     component.documentLaunchMode(), component.configChanges(),
+                     component.screenOrientation(), component.windowSoftInputMode(), component.flags(),
+                     component.excludeFromRecents(), component.noHistory(),
+                     component.finishOnTaskLaunch(), component.clearTaskOnLaunch(),
+                     component.alwaysRetainTaskState(), component.allowTaskReparenting(),
+                     component.resizeMode(), component.maxAspectRatio(), component.minAspectRatio(),
+                     component.supportsPictureInPicture(), component.themeResId()));
         }
         List<String> permissions = new ArrayList<>();
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {
@@ -78,10 +86,30 @@ final class GuestPackageMetadataMapper {
                     instrumentation.targetProcesses(), instrumentation.handleProfiling(),
                     instrumentation.functionalTest(), instrumentation.enabled()));
         }
+        java.util.LinkedHashSet<String> queryPackages = new java.util.LinkedHashSet<>();
+        java.util.LinkedHashSet<String> queryProviderAuthorities = new java.util.LinkedHashSet<>();
+        List<VirtualPackageMetadata.Filter> queryIntentFilters = new ArrayList<>();
+        for (VirtualPackageQuerySnapshot query : state.queries()) {
+            if (VirtualPackageQuerySnapshot.PACKAGE.equals(query.kind())) {
+                queryPackages.add(query.value());
+            } else if (VirtualPackageQuerySnapshot.PROVIDER.equals(query.kind())) {
+                queryProviderAuthorities.add(query.value());
+            } else if (query.intent() != null) {
+                List<VirtualPackageMetadata.DataRule> data = new ArrayList<>();
+                for (VirtualIntentDataSnapshot rule : query.intent().data()) {
+                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(),
+                            rule.path(), rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
+                }
+                queryIntentFilters.add(new VirtualPackageMetadata.Filter(query.intent().priority(),
+                        new LinkedHashSet<>(query.intent().actions()),
+                        new LinkedHashSet<>(query.intent().categories()), data));
+            }
+        }
         return new VirtualPackageMetadata(state.packageName(), state.launchActivity(),
                 applicationInfo, components, state.versionName(), state.versionCode(),
                 state.signatureSha256(), state.firstInstallTime(), state.lastUpdateTime(),
                 state.installerPackageName(), state.sharedLibraries(), sharedLibraryDetails,
-                instrumentations, permissions, state.enabled());
+                instrumentations, permissions, state.enabled(), queryPackages,
+                queryProviderAuthorities, queryIntentFilters);
     }
 }

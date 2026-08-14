@@ -28,6 +28,9 @@ public final class ManifestModel {
     private final List<SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
     private final List<String> providedSharedLibraries = new ArrayList<>();
     private final List<Instrumentation> instrumentations = new ArrayList<>();
+    private final Set<String> queryPackages = new LinkedHashSet<>();
+    private final Set<String> queryProviderAuthorities = new LinkedHashSet<>();
+    private final List<QueryIntent> queryIntents = new ArrayList<>();
 
     public String packageName() { return packageName; }
     public void packageName(String value) { packageName = value == null ? "" : value; }
@@ -65,6 +68,15 @@ public final class ManifestModel {
     }
     public List<Instrumentation> instrumentations() {
         return Collections.unmodifiableList(instrumentations);
+    }
+    public Set<String> queryPackages() {
+        return Collections.unmodifiableSet(queryPackages);
+    }
+    public Set<String> queryProviderAuthorities() {
+        return Collections.unmodifiableSet(queryProviderAuthorities);
+    }
+    public List<QueryIntent> queryIntents() {
+        return Collections.unmodifiableList(queryIntents);
     }
 
     public Component addActivity(Component component) { return addComponent(activities, component); }
@@ -132,17 +144,56 @@ public final class ManifestModel {
         if (!normalized.isEmpty() && !permissions.contains(normalized)) permissions.add(normalized);
     }
 
+    public void addQueryPackage(String packageName) {
+        String normalized = normalize(packageName);
+        if (!normalized.isEmpty()) queryPackages.add(normalized);
+    }
+
+    public void addQueryProviderAuthority(String authorities) {
+        for (String authority : normalize(authorities).split(";")) {
+            String normalized = authority.trim();
+            if (!normalized.isEmpty()) queryProviderAuthorities.add(normalized);
+        }
+    }
+
+    public QueryIntent addQueryIntent() {
+        QueryIntent intent = new QueryIntent();
+        queryIntents.add(intent);
+        return intent;
+    }
+
+    public static final class QueryIntent {
+        private final Set<String> actions = new LinkedHashSet<>();
+        private final Set<String> categories = new LinkedHashSet<>();
+        private final List<DataRule> dataRules = new ArrayList<>();
+
+        public Set<String> actions() { return Collections.unmodifiableSet(actions); }
+        public Set<String> categories() { return Collections.unmodifiableSet(categories); }
+        public List<DataRule> dataRules() { return Collections.unmodifiableList(dataRules); }
+        public void addAction(String action) {
+            String normalized = normalize(action);
+            if (!normalized.isEmpty()) actions.add(normalized);
+        }
+        public void addCategory(String category) {
+            String normalized = normalize(category);
+            if (!normalized.isEmpty()) categories.add(normalized);
+        }
+        public void addDataRule(DataRule rule) {
+            if (rule != null && !rule.empty()) dataRules.add(rule);
+        }
+    }
+
     public String launcherActivity() {
         // A manifest may keep a disabled launcher alias for rollout/feature
         // switches before the enabled launcher alias. Android's resolver does
         // not select the disabled component, so prefer an enabled launcher
         // when projecting the launch entry point.
         for (Component activity : activities) {
-            if (activity.launcher() && activity.enabled()) return activity.launchTargetClass();
+                if (activity.launcher() && activity.enabled()) return activity.className();
         }
         // Preserve a diagnostic fallback for malformed manifests that declare
         // only disabled launcher components.
-        for (Component activity : activities) if (activity.launcher()) return activity.launchTargetClass();
+        for (Component activity : activities) if (activity.launcher()) return activity.className();
         return "";
     }
 
@@ -270,6 +321,23 @@ public final class ManifestModel {
         private int themeResId;
         private boolean themeExplicit;
         private String targetActivity = "";
+        private String launchMode = "standard";
+        private String taskAffinity = "";
+        private String documentLaunchMode = "none";
+        private int configChanges;
+        private String screenOrientation = "";
+        private int windowSoftInputMode;
+        private int flags;
+        private boolean excludeFromRecents;
+        private boolean noHistory;
+        private boolean finishOnTaskLaunch;
+        private boolean clearTaskOnLaunch;
+        private boolean alwaysRetainTaskState;
+        private boolean allowTaskReparenting;
+        private String resizeMode = "";
+        private float maxAspectRatio;
+        private float minAspectRatio;
+        private boolean supportsPictureInPicture;
 
         public Component(String className, String processName, boolean exported, boolean enabled,
                          boolean isolatedProcess) {
@@ -349,6 +417,40 @@ public final class ManifestModel {
         public void themeResId(int value) { themeResId = Math.max(0, value); }
         public boolean themeExplicit() { return themeExplicit; }
         public void themeExplicit(boolean value) { themeExplicit = value; }
+        public String launchMode() { return launchMode; }
+        public void launchMode(String value) { launchMode = enumValue(value, "standard"); }
+        public String taskAffinity() { return taskAffinity; }
+        public void taskAffinity(String value) { taskAffinity = normalize(value); }
+        public String documentLaunchMode() { return documentLaunchMode; }
+        public void documentLaunchMode(String value) { documentLaunchMode = enumValue(value, "none"); }
+        public int configChanges() { return configChanges; }
+        public void configChanges(int value) { configChanges = Math.max(0, value); }
+        public String screenOrientation() { return screenOrientation; }
+        public void screenOrientation(String value) { screenOrientation = normalize(value); }
+        public int windowSoftInputMode() { return windowSoftInputMode; }
+        public void windowSoftInputMode(int value) { windowSoftInputMode = Math.max(0, value); }
+        public int flags() { return flags; }
+        public void flags(int value) { flags = Math.max(0, value); }
+        public boolean excludeFromRecents() { return excludeFromRecents; }
+        public void excludeFromRecents(boolean value) { excludeFromRecents = value; }
+        public boolean noHistory() { return noHistory; }
+        public void noHistory(boolean value) { noHistory = value; }
+        public boolean finishOnTaskLaunch() { return finishOnTaskLaunch; }
+        public void finishOnTaskLaunch(boolean value) { finishOnTaskLaunch = value; }
+        public boolean clearTaskOnLaunch() { return clearTaskOnLaunch; }
+        public void clearTaskOnLaunch(boolean value) { clearTaskOnLaunch = value; }
+        public boolean alwaysRetainTaskState() { return alwaysRetainTaskState; }
+        public void alwaysRetainTaskState(boolean value) { alwaysRetainTaskState = value; }
+        public boolean allowTaskReparenting() { return allowTaskReparenting; }
+        public void allowTaskReparenting(boolean value) { allowTaskReparenting = value; }
+        public String resizeMode() { return resizeMode; }
+        public void resizeMode(String value) { resizeMode = normalize(value); }
+        public float maxAspectRatio() { return maxAspectRatio; }
+        public void maxAspectRatio(float value) { maxAspectRatio = Math.max(0f, value); }
+        public float minAspectRatio() { return minAspectRatio; }
+        public void minAspectRatio(float value) { minAspectRatio = Math.max(0f, value); }
+        public boolean supportsPictureInPicture() { return supportsPictureInPicture; }
+        public void supportsPictureInPicture(boolean value) { supportsPictureInPicture = value; }
 
         /**
          * Android package parsing exposes one component record even when an APK
@@ -396,6 +498,23 @@ public final class ManifestModel {
             launcher |= other.launcher;
             intentFilterDeclared |= other.intentFilterDeclared;
             if (targetActivity.isEmpty()) targetActivity = other.targetActivity;
+            if ("standard".equals(launchMode)) launchMode = other.launchMode;
+            if (taskAffinity.isEmpty()) taskAffinity = other.taskAffinity;
+            if ("none".equals(documentLaunchMode)) documentLaunchMode = other.documentLaunchMode;
+            if (configChanges == 0) configChanges = other.configChanges;
+            if (screenOrientation.isEmpty()) screenOrientation = other.screenOrientation;
+            if (windowSoftInputMode == 0) windowSoftInputMode = other.windowSoftInputMode;
+            if (flags == 0) flags = other.flags;
+            excludeFromRecents |= other.excludeFromRecents;
+            noHistory |= other.noHistory;
+            finishOnTaskLaunch |= other.finishOnTaskLaunch;
+            clearTaskOnLaunch |= other.clearTaskOnLaunch;
+            alwaysRetainTaskState |= other.alwaysRetainTaskState;
+            allowTaskReparenting |= other.allowTaskReparenting;
+            if (resizeMode.isEmpty()) resizeMode = other.resizeMode;
+            if (maxAspectRatio == 0f) maxAspectRatio = other.maxAspectRatio;
+            if (minAspectRatio == 0f) minAspectRatio = other.minAspectRatio;
+            supportsPictureInPicture |= other.supportsPictureInPicture;
         }
 
         private void mergeIntentFilter(IntentFilter other) {
@@ -524,4 +643,8 @@ public final class ManifestModel {
         if (value != null && !value.trim().isEmpty()) target.add(value.trim());
     }
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
+    private static String enumValue(String value, String fallback) {
+        String normalized = normalize(value).toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? fallback : normalized;
+    }
 }

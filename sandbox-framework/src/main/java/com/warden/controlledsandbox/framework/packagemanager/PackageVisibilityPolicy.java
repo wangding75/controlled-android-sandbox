@@ -54,6 +54,9 @@ public final class PackageVisibilityPolicy {
             return PackageVisibilityClass.SYSTEM_PROJECTED;
         }
         if (isExplicitlyDenied(identity, target)) return PackageVisibilityClass.EXPLICITLY_DENIED;
+        if (identity != null && identity.packageMetadata().queryPackages().contains(target)) {
+            return PackageVisibilityClass.QUERY_DECLARED;
+        }
         if (PLATFORM_PACKAGES.contains(target) || SYSTEM_PROJECTED_PACKAGES.contains(target)) {
             return PackageVisibilityClass.SYSTEM_PROJECTED;
         }
@@ -71,6 +74,12 @@ public final class PackageVisibilityPolicy {
     public static boolean deniesIdentity(PackageVisibilityClass visibility) {
         return visibility == PackageVisibilityClass.HOST_USER_APP_HIDDEN
                 || visibility == PackageVisibilityClass.EXPLICITLY_DENIED;
+    }
+
+    /** Returns whether an APK explicitly declared visibility for a package target. */
+    public static boolean allowsDeclaredPackageQuery(GuestIdentity identity, String packageName) {
+        return identity != null && packageName != null
+                && identity.packageMetadata().queryPackages().contains(packageName.trim());
     }
 
     static Set<String> systemProjectedPackages() {

@@ -296,12 +296,21 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     public PackageServiceResult deleteInstance(String packageName, int virtualUserId) {
         return execute("deleteInstance", () -> {
             String normalizedPackage = required(packageName, "packageName");
+            // Destructive catalog/data mutation is behind a broker stop barrier. If the
+            // generation cannot be stopped, execute() returns a failure and the authoritative
+            // catalog remains unchanged.
+            dependencies.stopGuestBeforeDestructiveOperation(normalizedPackage, virtualUserId);
             var catalog = lifecycle.deleteInstance(normalizedPackage, virtualUserId);
             VirtualSystemServiceStore.Scope scope =
                     new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
             dependencies.deleteScopeBestEffort(scope);
+            String warning = dependencies.maintenanceWarning();
+            if (!warning.isEmpty()) {
+                return PackageServiceResult.failure("deleteInstance", "DELETE_PARTIAL_CLEANUP",
+                        warning);
+            }
             return PackageServiceResult.successCatalog("deleteInstance",
-                    PackageServiceMapper.toSnapshot(catalog, dependencies.maintenanceWarning()));
+                    PackageServiceMapper.toSnapshot(catalog, ""));
         });
     }
 
@@ -309,9 +318,15 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     public PackageServiceResult clearInstanceData(String packageName, int virtualUserId) {
         return execute("clearInstanceData", () -> {
             String normalizedPackage = required(packageName, "packageName");
+            dependencies.stopGuestBeforeDestructiveOperation(normalizedPackage, virtualUserId);
             lifecycle.clearInstanceData(normalizedPackage, virtualUserId);
             dependencies.deleteScopeBestEffort(
                     new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId));
+            String warning = dependencies.maintenanceWarning();
+            if (!warning.isEmpty()) {
+                return PackageServiceResult.failure("clearInstanceData", "CLEAR_PARTIAL_CLEANUP",
+                        warning);
+            }
             return PackageServiceResult.success("clearInstanceData");
         });
     }
