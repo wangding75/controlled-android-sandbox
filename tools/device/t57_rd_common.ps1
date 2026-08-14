@@ -7,6 +7,32 @@ function Get-T57AdbProperty([string]$Serial, [string]$Name) {
     return (($value | Out-String).Trim())
 }
 
+function Get-T57MuMuIndexForSerial([string]$Serial) {
+    if ($Serial -notmatch ':(\d+)$') { return '' }
+    $port = [int]$matches[1]
+    $connections = @(Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue)
+    $ownerPids = @($connections | Select-Object -ExpandProperty OwningProcess -Unique)
+    foreach ($ownerPid in $ownerPids) {
+        $vmProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $ownerPid" -ErrorAction SilentlyContinue
+        if ($vmProcess -and $vmProcess.Name -eq 'MuMuVMMHeadless.exe' -and
+            $vmProcess.CommandLine -match '--comment\s+MuMuPlayer-12\.0-(\d+)') {
+            return $matches[1]
+        }
+    }
+    return ''
+}
+
+function Get-T57MuMuWindowTitle([string]$Index) {
+    if ([string]::IsNullOrWhiteSpace($Index)) { return '' }
+    $players = @(Get-CimInstance Win32_Process -Filter "Name = 'MuMuPlayer.exe'" -ErrorAction SilentlyContinue)
+    foreach ($player in $players) {
+        if ($player.CommandLine -notmatch '(?:^|\s)-v\s+' + [regex]::Escape($Index) + '(?:\s|$)') { continue }
+        $process = Get-Process -Id $player.ProcessId -ErrorAction SilentlyContinue
+        if ($process) { return [string]$process.MainWindowTitle }
+    }
+    return ''
+}
+
 function Resolve-T57RdDevice {
     param([string]$InstanceName = '', [string]$Serial = '')
     if ([string]::IsNullOrWhiteSpace($InstanceName)) { $InstanceName = 'RD' + [char]0x6d4b + [char]0x8bd5 }
@@ -27,10 +53,13 @@ function Resolve-T57RdDevice {
         $bootId = ((& adb -s $candidateSerial shell cat /proc/sys/kernel/random/boot_id 2>$null) | Out-String).Trim()
         $avd = Get-T57AdbProperty $candidateSerial 'ro.boot.qemu.avd_name'
         $mumu = Get-T57AdbProperty $candidateSerial 'ro.mumu.instance.name'
-        $identity = "$avd $mumu $model $device $($parts -join ' ')"
+        $mumuIndex = Get-T57MuMuIndexForSerial $candidateSerial
+        $windowTitle = Get-T57MuMuWindowTitle $mumuIndex
+        $identity = "$avd $mumu $windowTitle $model $device $($parts -join ' ')"
         $candidates += [pscustomobject]@{
             InstanceName = $InstanceName; Serial = $candidateSerial; Model = $model
             Device = $device; API = $api; Android = $android; BootId = $bootId
+            MuMuIndex = $mumuIndex; DesktopWindowTitle = $windowTitle
             InstanceMatch = $identity.Contains($InstanceName)
             State = 'device'
         }

@@ -660,19 +660,43 @@ class DeviceLab:
     def guest_process_snapshot(self) -> list[dict[str, Any]]:
         output = self.adb("shell", "ps", "-A", check=False, timeout=60).stdout
         processes: list[dict[str, Any]] = []
+        active_slots_by_fixture: dict[str, list[int]] = {}
+        for (fixture_id, _user), operation in self.active_guest_sessions.items():
+            slot = operation.get("processSlot")
+            if isinstance(slot, int) and slot >= 0:
+                active_slots_by_fixture.setdefault(fixture_id, []).append(slot)
         for line in output.splitlines():
             match = re.search(r"com\.warden\.controlledsandbox\.debug:guest(\d+)", line)
-            if not match:
-                continue
             fields = line.split()
-            processes.append(
-                {
+            if match:
+                processes.append({
                     "slot": int(match.group(1)),
                     "pid": fields[1] if len(fields) > 1 else "",
                     "state": fields[7] if len(fields) > 7 else "",
                     "line": line,
-                }
+                })
+                continue
+
+            # T57 runs Guest code in the real fixture package process rather than
+            # the retired host:guestN process naming convention.  Tie each live
+            # fixture process to an already recorded operation slot; never infer
+            # a slot from ADB ordering or select an arbitrary process.
+            process_name = fields[-1] if fields else ""
+            fixture_id = next(
+                (candidate for candidate in FIXTURE_IDS
+                 if process_name == self.packages[candidate]),
+                None,
             )
+            slots = active_slots_by_fixture.get(fixture_id or "", [])
+            if not slots:
+                continue
+            processes.append({
+                "slot": slots.pop(0),
+                "pid": fields[1] if len(fields) > 1 else "",
+                "state": fields[7] if len(fields) > 7 else "",
+                "package": process_name,
+                "line": line,
+            })
         return processes
 
     def capture_simultaneous_snapshot(self) -> None:
