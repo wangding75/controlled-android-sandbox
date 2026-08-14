@@ -116,8 +116,11 @@ for test in ['ActivityTaskLedgerSelfTest','ActivityTaskCheckpointStoreSelfTest',
              'BrokerActivityRuntimeSelfTest','ActivityTaskFrameworkInterceptorSelfTest',
              'StubActivityWindowOwnershipSelfTest']:
  if runner.count(test)<1: errors.append(f'static compiler does not execute {test}')
-if len(broker.splitlines()) > 1375:
- errors.append(f'RuntimeBrokerService exceeded bounded M4-T15 growth: {len(broker.splitlines())} lines')
+# T56 extracted the service/activity coordinators; T57 adds the typed transport and
+# correlation delegation surface. Keep a bounded guard against the pre-extraction
+# monolith while accepting the current coordinator owner.
+if len(broker.splitlines()) > 1450:
+ errors.append(f'RuntimeBrokerService exceeded bounded runtime growth: {len(broker.splitlines())} lines')
 if len(runtime.splitlines()) > 330:
  errors.append(f'BrokerActivityRuntime should remain extracted: {len(runtime.splitlines())} lines')
 if len(result_dispatcher.splitlines()) > 180:

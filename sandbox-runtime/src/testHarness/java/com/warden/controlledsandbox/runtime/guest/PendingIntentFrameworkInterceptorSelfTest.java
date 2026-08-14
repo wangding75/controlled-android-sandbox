@@ -70,7 +70,7 @@ public final class PendingIntentFrameworkInterceptorSelfTest {
                 "virtual sender dispatches through runtime callback");
         require(request.get().fillInPayload() == fillIn && request.get().flagsMask() == 0x30
                         && request.get().flagsValues() == 0x20,
-                "mutable FillIn Intent and flag mask reach delivery policy");
+                "positional IIntentSender send payload reaches delivery policy");
         Intent merged = GuestPendingIntentDispatcher.selectedIntent(delivered.get().payload(), request.get());
         require("payload".equals(merged.getStringExtra("base"))
                         || "updated".equals(merged.getStringExtra("base")),
@@ -144,7 +144,12 @@ public final class PendingIntentFrameworkInterceptorSelfTest {
 
     public interface FakeIntentSender {
         IBinder asBinder();
-        int send(Intent fillIn, int flagsMask, int flagsValues, String permission) throws Exception;
+        int send(int code, Intent fillIn, String resolvedType, IBinder whitelistToken,
+                 IBinder finishedReceiver, String permission, Bundle options) throws Exception;
+        default int send(Intent fillIn, int flagsMask, int flagsValues, String permission)
+                throws Exception {
+            return send(0, fillIn, "", null, null, permission, null);
+        }
     }
     public interface FakeAms {
         FakeIntentSender getIntentSender(int type, String packageName, int requestCode,

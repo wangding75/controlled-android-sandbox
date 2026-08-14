@@ -103,7 +103,7 @@ public final class RuntimeDiagnostics {
             copyWithPrevious(anrTraceFile, "anr-traces", ".txt", destinationDirectory, exported);
             File manifest = new File(destinationDirectory, "diagnostics-manifest.txt");
             StringBuilder body = new StringBuilder();
-            body.append("schemaVersion=2\n");
+        body.append("schemaVersion=3\n");
             body.append("exportedAtMs=").append(System.currentTimeMillis()).append('\n');
             body.append("role=").append(role).append('\n');
             body.append("pid=").append(Process.myPid()).append('\n');
@@ -319,6 +319,13 @@ public final class RuntimeDiagnostics {
             field(out, "status", data.getString(RuntimeKeys.STATUS, ""), true);
             field(out, "package", data.getString(RuntimeKeys.PACKAGE_NAME, ""), true);
             field(out, "session", data.getString(RuntimeKeys.SESSION_ID, ""), true);
+            field(out, "traceDomain", data.getString("traceDomain", ""), true);
+            field(out, "launchId", data.getString("launchId", ""), true);
+            field(out, "binderToken", data.getString("binderToken", ""), true);
+            field(out, "processName", data.getString(RuntimeKeys.PROCESS_NAME, ""), true);
+            field(out, "virtualUserId", String.valueOf(data.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1)), false);
+            field(out, "physicalPid", String.valueOf(data.getInt("physicalPid", Process.myPid())), false);
+            field(out, "threadTid", String.valueOf(data.getInt("threadTid", -1)), false);
             field(out, "generation", String.valueOf(data.getLong(RuntimeKeys.GENERATION, 0)), false);
             field(out, "slot", String.valueOf(data.getInt(RuntimeKeys.PROCESS_SLOT, -1)), false);
             field(out, "component", data.getString(RuntimeKeys.COMPONENT_CLASS, ""), true);

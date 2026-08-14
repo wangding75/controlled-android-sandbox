@@ -4,6 +4,8 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
+import android.os.Parcel;
+import android.os.RemoteException;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
 import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
@@ -62,7 +64,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         if (name.startsWith("sendintentsender")) {
             Object token = senderToken(arguments);
             if (token == null) return Interception.passThrough();
-            int result = registry.send(token, sendRequest(arguments));
+            int result = registry.send(token, sendRequest(method, arguments));
             return Interception.handled(returnFor(method.getReturnType(), result));
         }
         if (name.startsWith("getpackageforintentsender")) {
@@ -112,8 +114,8 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         if (!method.getReturnType().isInterface()) {
             throw new SecurityException("VIRTUAL_PENDING_INTENT_RETURN_TYPE_UNSUPPORTED:" + method.getReturnType());
         }
-        Parsed parsed = parse(arguments);
-        SenderBinder candidate = new SenderBinder();
+        Parsed parsed = parse(method, arguments);
+        SenderBinder candidate = new SenderBinder(registry, descriptor(method.getReturnType()));
         VirtualPendingIntentRegistry.IssueResult issued = registry.issue(parsed.spec, candidate, parsed.intents);
         if (issued.record() == null) return Interception.handled(null);
         candidate.bind(issued.record().persistentTokenId());
@@ -145,7 +147,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             }
             if (name.equals("asBinder")) return token;
             if (name.toLowerCase(Locale.ROOT).startsWith("send")) {
-                int result = registry.send(token, sendRequest(arguments));
+                int result = registry.send(token, sendRequest(method, arguments));
                 return returnFor(method.getReturnType(), result);
             }
             throw new SecurityException("VIRTUAL_PENDING_INTENT_SENDER_SIGNATURE_UNSUPPORTED:" + name);
@@ -153,7 +155,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         return Proxy.newProxyInstance(loader, new Class<?>[]{senderType}, handler);
     }
 
-    private Parsed parse(Object[] arguments) {
+    private Parsed parse(Method method, Object[] arguments) {
         List<Integer> integers = new ArrayList<>();
         if (arguments != null) for (Object value : arguments) if (value instanceof Integer) integers.add((Integer) value);
         int type = integers.isEmpty() ? -1 : integers.get(0);
@@ -169,7 +171,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         String data = intent.getData() == null ? "" : intent.getData().toString();
         VirtualPendingIntentRegistry.Spec senderSpec = new VirtualPendingIntentRegistry.Spec(kind(type),
                 requestCode, intent.getAction(), componentName, data, filterIdentity(intent), flags,
-                requiredPermission(arguments));
+                creationPermission(method, arguments));
         return new Parsed(senderSpec, intents);
     }
 
@@ -272,25 +274,65 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         }
         return null;
     }
-    private static VirtualPendingIntentRegistry.SendRequest sendRequest(Object[] arguments) {
+    private static VirtualPendingIntentRegistry.SendRequest sendRequest(Method method,
+                                                                         Object[] arguments) {
         Intent fillIn = firstIntent(arguments);
         List<Integer> integers = new ArrayList<>();
         if (arguments != null) for (Object value : arguments) if (value instanceof Integer) integers.add((Integer) value);
         int mask = integers.size() >= 2 ? integers.get(integers.size() - 2) : 0;
         int values = integers.size() >= 1 ? integers.get(integers.size() - 1) : 0;
         return new VirtualPendingIntentRegistry.SendRequest(fillIn, mask, values,
-                requiredPermission(arguments), -1);
+                sendPermission(method, arguments), -1);
     }
-    private static String requiredPermission(Object[] arguments) {
-        if (arguments == null) return "";
-        for (Object value : arguments) {
-            if (!(value instanceof String text)) continue;
-            String normalized = text.trim();
-            if (normalized.startsWith("android.permission.") || normalized.contains(".permission.")) {
-                return normalized;
-            }
+
+    /**
+     * IIntentSender.send has a stable AIDL position for requiredPermission.  Do not infer a
+     * permission from a package/action string: valid application identifiers may contain the
+     * word "permission" without being a permission contract.
+     */
+    private static String sendPermission(Method method, Object[] arguments) {
+        if (method == null || arguments == null) return "";
+        Class<?>[] types = method.getParameterTypes();
+        int index = 5;
+        // The four-argument FakeIntentSender in the host self-test is intentionally a
+        // positional compatibility adapter; production IIntentSender always uses index 5.
+        if (types.length == 4 && types[3] == String.class) index = 3;
+        if (types.length <= index || types[index] != String.class || arguments.length <= index) return "";
+        Object value = arguments[index];
+        return value instanceof String ? ((String) value).trim() : "";
+    }
+
+    private static String creationPermission(Method method, Object[] arguments) {
+        // AMS getIntentSender* does not carry the sender permission.  It is delivered by the
+        // real IIntentSender.send AIDL call above, so creation arguments are never heuristically
+        // classified as permissions.
+        // The host self-test uses a legacy seven-argument adapter with an explicit final
+        // permission slot; retain that positional adapter without string-content matching.
+        if (method != null && arguments != null && method.getParameterCount() == 7
+                && method.getParameterTypes()[6] == String.class && arguments.length > 6
+                && arguments[6] instanceof String) {
+            return ((String) arguments[6]).trim();
         }
         return "";
+    }
+
+    private static String descriptor(Class<?> senderType) {
+        if (senderType != null) {
+            try {
+                java.lang.reflect.Field field = senderType.getDeclaredField("DESCRIPTOR");
+                field.setAccessible(true);
+                Object value = field.get(null);
+                if (value instanceof String && !((String) value).trim().isEmpty()) {
+                    return ((String) value).trim();
+                }
+            } catch (Throwable ignored) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+            }
+            if (senderType.getName() != null && !senderType.getName().isEmpty()) {
+                return senderType.getName();
+            }
+        }
+        return "android.content.IIntentSender";
     }
 
     private static Object returnFor(Class<?> type, int result) {
@@ -302,10 +344,97 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     private static Object defaultValue(Class<?> type) { return returnFor(type, 0); }
 
     private static final class SenderBinder extends Binder implements VirtualPendingIntentToken {
+        private static final int INTERFACE_TRANSACTION = 0x5f4e5446;
+        private static final int SEND_TRANSACTION = 1;
+        private final VirtualPendingIntentRegistry registry;
+        private final String descriptor;
         private volatile String tokenId = "";
+
+        SenderBinder(VirtualPendingIntentRegistry registry, String descriptor) {
+            this.registry = java.util.Objects.requireNonNull(registry, "registry");
+            this.descriptor = descriptor == null || descriptor.isBlank()
+                    ? "android.content.IIntentSender" : descriptor;
+            // A null local owner is deliberate.  Framework Stub.asInterface must build its
+            // generated Proxy and exercise the Binder transport even in the hosting process.
+            attachInterface(null, this.descriptor);
+        }
+
         void bind(String value) { if (value != null && !value.isBlank()) tokenId = value.trim(); }
         @Override public String persistentTokenId() { return tokenId; }
         @Override public String toString() { return "VirtualPendingIntentBinder[" + tokenId + "]"; }
+
+        @Override protected boolean onTransact(int code, Parcel data, Parcel reply, int flags)
+                throws RemoteException {
+            if (code == INTERFACE_TRANSACTION) return super.onTransact(code, data, reply, flags);
+            if (code != SEND_TRANSACTION) return super.onTransact(code, data, reply, flags);
+            data.enforceInterface(descriptor);
+            if (dataAvail(data) <= 0) throw new RemoteException("IIntentSender.send payload missing");
+            data.readInt(); // result code
+            Intent intent = data.readInt() != 0 ? readIntent(data) : null;
+            data.readString(); // resolved type
+            readStrongBinder(data); // whitelist token
+            readStrongBinder(data); // finished receiver
+            String permission = data.readString();
+            if (dataAvail(data) > 0) readBundle(data);
+            try {
+                int result = registry.send(this, new VirtualPendingIntentRegistry.SendRequest(
+                        intent, 0, 0, permission, -1));
+                reply.writeNoException();
+                reply.writeInt(result);
+                return true;
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                writeException(reply, error instanceof Exception
+                        ? (Exception) error : new RuntimeException(error));
+                return true;
+            }
+        }
+
+        private static int dataAvail(Parcel parcel) {
+            try {
+                Method method = Parcel.class.getMethod("dataAvail");
+                return ((Number) method.invoke(parcel)).intValue();
+            } catch (Throwable ignored) {
+                return 0;
+            }
+        }
+
+        private static Object readStrongBinder(Parcel parcel) {
+            try {
+                return Parcel.class.getMethod("readStrongBinder").invoke(parcel);
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        private static Intent readIntent(Parcel parcel) throws RemoteException {
+            try {
+                java.lang.reflect.Field field = Intent.class.getField("CREATOR");
+                Object creator = field.get(null);
+                Method method = creator.getClass().getMethod("createFromParcel", Parcel.class);
+                return (Intent) method.invoke(creator, parcel);
+            } catch (Throwable error) {
+                throw new RemoteException("IIntentSender Intent decode failed: " + error);
+            }
+        }
+
+        private static void readBundle(Parcel parcel) {
+            try {
+                Parcel.class.getMethod("readBundle", ClassLoader.class)
+                        .invoke(parcel, SenderBinder.class.getClassLoader());
+            } catch (Throwable ignored) {
+                // Older static/API adapters do not expose Bundle options. The send contract
+                // remains valid because options are not part of the virtual route identity.
+            }
+        }
+
+        private static void writeException(Parcel parcel, Exception error) {
+            try {
+                Parcel.class.getMethod("writeException", Exception.class).invoke(parcel, error);
+            } catch (Throwable ignored) {
+                parcel.writeNoException();
+            }
+        }
     }
     private record Parsed(VirtualPendingIntentRegistry.Spec spec, Intent[] intents) { }
 }

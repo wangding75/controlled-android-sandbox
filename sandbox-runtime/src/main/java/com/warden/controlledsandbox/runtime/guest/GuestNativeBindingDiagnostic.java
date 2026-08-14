@@ -39,9 +39,6 @@ public final class GuestNativeBindingDiagnostic {
                 + " " + describeLoader(loader));
     }
 
-    public static final String FAILURE_CLASS =
-            "org.chromium.base.memory.DlmallocBlackBerryRepairor";
-
     public static synchronized void recordNativeLoad(String libraryName, Class<?> callerClass,
                                                     ClassLoader loader, String nativeLibraryPath) {
         rememberLoader(loader);
@@ -57,14 +54,6 @@ public final class GuestNativeBindingDiagnostic {
             emit("LOAD_CALLER_DEFINING class=" + callerClass.getName()
                     + " " + describeLoader(callerClass.getClassLoader()));
         }
-        if (nativeLibraryPath != null && nativeLibraryPath.contains("webviewuc")) {
-            dumpMaps("libwebviewuc.so");
-        }
-        probeFailureClass();
-    }
-
-    public static synchronized void probeFailureClass() {
-        probeNamedClass(FAILURE_CLASS);
     }
 
     public static synchronized void probeNamedClass(String className) {
@@ -96,7 +85,7 @@ public final class GuestNativeBindingDiagnostic {
                         + SEEN_LOADERS.size());
             }
         }
-        if (found) dumpMaps("libwebviewuc.so");
+        if (found) emit("PROBE namedClass=" + safe(className) + " found=true");
     }
 
     public static synchronized void dumpMaps(String needle) {
@@ -165,12 +154,6 @@ public final class GuestNativeBindingDiagnostic {
             if (previous != null) previous.uncaughtException(thread, error);
         });
         emit("PROBE uncaughtLinkHandler=installed");
-        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-        Runnable probe = GuestNativeBindingDiagnostic::probeFailureClass;
-        handler.post(probe);
-        handler.postDelayed(probe, 500L);
-        handler.postDelayed(probe, 1500L);
-        handler.postDelayed(probe, 3000L);
     }
 
     private static String identity(ClassLoader loader) {

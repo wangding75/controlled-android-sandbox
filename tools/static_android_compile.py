@@ -303,10 +303,17 @@ def declared_project_dependencies(module):
 def compile_module(name, sources, classpath=()):
     output=module_root/name
     output.mkdir(parents=True, exist_ok=True)
-    cmd=['javac','--release','17','-encoding','UTF-8','-Xlint:all','-d',str(output)]
+    path_arg = lambda value: Path(value).resolve().as_posix()
+    javac_args=['--release','17','-encoding','UTF-8','-Xlint:all','-d',path_arg(output)]
     if classpath:
-        cmd += ['-cp', os.pathsep.join(str(item) for item in classpath)]
-    cmd += [str(item) for item in sources]
+        javac_args += ['-cp', os.pathsep.join(path_arg(item) for item in classpath)]
+    javac_args += [path_arg(item) for item in sources]
+    # Windows CreateProcess rejects the previous one-argument-per-source command once the
+    # framework module grows beyond the shell command-line limit.  Javac argfiles are
+    # supported on every JDK used by this repository and preserve the exact source list.
+    argfile = build / ('javac-' + name.replace('/', '_') + '.args')
+    argfile.write_text('\n'.join(javac_args) + '\n', encoding='utf-8')
+    cmd=['javac','@' + str(argfile)]
     started=time.monotonic()
     result=subprocess.run(cmd, cwd=root, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT, timeout=180)

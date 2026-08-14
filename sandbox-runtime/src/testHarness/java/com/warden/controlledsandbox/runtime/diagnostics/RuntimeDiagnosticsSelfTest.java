@@ -27,7 +27,7 @@ public final class RuntimeDiagnosticsSelfTest {
         require(manifest.isFile(), "manifest exported");
         require(new File(manifest.getParentFile(), "runtime-events.jsonl").isFile(), "events exported");
         String body = Files.readString(manifest.toPath());
-        require(body.contains("schemaVersion=2"), "manifest schema");
+        require(body.contains("schemaVersion=3"), "manifest schema");
         require(body.contains("fileCount="), "manifest count");
         require(body.contains("sha256="), "manifest hashes");
         deleteTree(root);

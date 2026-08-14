@@ -121,8 +121,9 @@ if not errors:
     for fragment in forbidden_activity:
         if fragment in text['activity']:
             errors.append(f'MainActivity bypasses lifecycle authority: {fragment}')
-    for required in ['packageService.importApk(selected.get(0))', 'packageService.createClone(',
-                     'packageService.deleteInstance(', 'packageService.updateInstanceStatus(']:
+    for required in ['viewModel.application().importApk(', 'viewModel.application().createClone(',
+                     'viewModel.application().deleteInstance(',
+                     'viewModel.application().updateInstanceStatus(']:
         if required not in text['activity']:
             errors.append(f'MainActivity lifecycle wiring missing: {required}')
 

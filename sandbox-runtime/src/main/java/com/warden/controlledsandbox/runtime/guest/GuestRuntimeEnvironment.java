@@ -457,7 +457,6 @@ public final class GuestRuntimeEnvironment {
                     apkPath, PackageManager.GET_META_DATA);
             String value = info == null || info.applicationInfo == null
                     ? "" : info.applicationInfo.appComponentFactory;
-            android.util.Log.i("CS_GUEST_FACTORY", "archive factory=" + String.valueOf(value));
             return value == null ? "" : value.trim();
         } catch (Throwable error) {
             android.util.Log.w("CS_GUEST_FACTORY", "archive factory unavailable", error);
