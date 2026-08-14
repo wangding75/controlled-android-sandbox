@@ -15,6 +15,7 @@ Scripts:
 - `tools/device/t57_rd_service_real_path.ps1`
 - `tools/device/t57_rd_provider_real_path.ps1`
 - `tools/device/t57_rd_clear_lifecycle.ps1`
+- `tools/device/t57_rd_framework_transport_probe.ps1`
 - `tools/device/t57_rd_full_regression.ps1`
 
 ## Build and dynamic resolution evidence
@@ -47,6 +48,36 @@ This is intentional. The real PendingIntent `IIntentSender` path has not yet bee
 exercised by a dedicated device fixture; the run is diagnostic rather than the
 required 1200-second formal stability gate; and API 33–36 were not tested. Those
 items remain `DEVICE_REGRESSION_PENDING`.
+
+## T57 execution update
+
+The first real Framework transport probe now passes on the resolved RD API32
+device:
+
+- `ContentResolver.applyBatch()` enters one `IContentProvider` batch transport,
+  executes the Guest provider batch, and returns two typed results.
+- `PendingIntent.getActivity()` creates a mutable virtual sender; `send()` reaches
+  the host `IIntentSender` route and launches the Guest `DetailActivity`.
+- `bindService()` returns a Guest `ServiceConnection` callback with a live Binder.
+- The API32 virtual PMS carries installed Guest package projections. With
+  `fixture32` imported as a peer, Guest `PackageManager` passed
+  `getApplicationInfo`, `getPackageInfo`, launcher intent resolution, and
+  `resolveContentProvider()` under the declaring package's package/provider/intent
+  `<queries>` rules (`FRAMEWORK_PROBE_PACKAGE_UNIVERSE_PASS`).
+- `RemoteActivity` and `RemoteFixtureService` are resolved to the declared
+  `com.warden.controlledsandbox.fixture:remote` process and emit process-scoped
+  Guest lifecycle evidence; the remote Service then emitted `SERVICE_DESTROY` after
+  `stopService()`.
+- The Guest-side probe emits `FRAMEWORK_PROBE_PASS`; the command result remains
+  `LAUNCH_PASS` and the wrapper emits
+  `RESULT: PASS case=RD-06-framework-transport-probe`.
+
+Evidence is captured under `build/t57-rd-evidence/` with the dynamically resolved
+serial and boot ID. This closes the first transport and multi-package PMS batch;
+clear/delete/reinstall recovery, broader process-death/recovery, isolated-slot
+pressure, and the formal stability window remain open before the API32 baseline
+can be promoted to an overall `PASS`. API 33–36 and OEM variants remain
+`DEVICE_REGRESSION_PENDING` by scope.
 
 ## Acceptance record required for a final PASS
 

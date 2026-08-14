@@ -32,11 +32,13 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private final Object delegate;
     private final GuestIdentity identity;
     private final VirtualPackageMetadata metadata;
+    private final com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse universe;
 
     PackageManagerInvocationHandler(Object delegate, GuestIdentity identity) {
         this.delegate = delegate;
         this.identity = identity;
         this.metadata = identity.packageMetadata();
+        this.universe = identity.packageUniverse();
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
@@ -68,8 +70,14 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             Object feature = virtualSystemFeature(args);
             if (feature != NoResult.VALUE) return feature;
         }
-        boolean guestTarget = containsGuestPackage(args) || ownsGuestAuthority(args);
-        String targetPackage = targetPackageName(args);
+        String targetPackage = "resolveContentProvider".equals(methodName) ? ""
+                : targetPackageName(args);
+        boolean virtualTarget = !targetPackage.isEmpty()
+                && universe.isVisibleTo(identity.packageName(), targetPackage);
+        boolean virtualAuthority = "resolveContentProvider".equals(methodName)
+                && universe.provider(identity.packageName(), firstString(args), firstLong(args, 0L)) != null;
+        boolean guestTarget = containsGuestPackage(args) || ownsGuestAuthority(args)
+                || virtualTarget || virtualAuthority;
         PackageVisibilityClass visibility = targetPackage.isEmpty()
                 ? null : PackageVisibilityPolicy.classify(identity, targetPackage);
         if (!guestTarget && containsHostPackage(args)
@@ -117,18 +125,31 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (webViewComponent != NoResult.VALUE) return webViewComponent;
         switch (methodName) {
             case "getApplicationInfo":
-                return guestTarget ? metadata.applicationInfo() : hiddenPackageResult(methodName, returnType);
+            case "getApplicationInfoAsUser":
+                if (!guestTarget) return hiddenPackageResult(methodName, returnType);
+                return identity.packageName().equals(targetPackage) ? metadata.applicationInfo()
+                        : universe.applicationInfo(identity.packageName(), targetPackage);
             case "getPackageInfo":
+            case "getPackageInfoAsUser":
             case "getPackageInfoVersioned":
-                return guestTarget ? metadata.packageInfo(firstLong(args, ~0L))
-                        : hiddenPackageResult(methodName, returnType);
+                if (!guestTarget) return hiddenPackageResult(methodName, returnType);
+                return identity.packageName().equals(targetPackage)
+                        ? metadata.packageInfo(firstLong(args, ~0L))
+                        : universe.packageInfo(identity.packageName(), targetPackage,
+                                firstLong(args, ~0L));
             case "getPackageUid":
             case "getPackageUidAsUser":
-                return guestTarget ? identity.virtualUid() : hiddenPackageResult(methodName, returnType);
+                if (!guestTarget) return hiddenPackageResult(methodName, returnType);
+                return identity.packageName().equals(targetPackage) ? identity.virtualUid()
+                        : universe.packageUid(identity.packageName(), targetPackage);
             case "isPackageAvailable":
-                return guestTarget ? metadata.enabled() : Boolean.FALSE;
+                if (!guestTarget) return Boolean.FALSE;
+                return identity.packageName().equals(targetPackage) ? metadata.enabled()
+                        : universe.applicationInfo(identity.packageName(), targetPackage) != null;
             case "getInstallerPackageName":
-                return guestTarget ? metadata.installerPackageName() : null;
+                if (!guestTarget) return null;
+                VirtualPackageMetadata installerTarget = universe.packageMetadata(targetPackage);
+                return installerTarget == null ? null : installerTarget.installerPackageName();
             case "getInstallSourceInfo":
                 return guestTarget ? installSourceInfo(returnType) : null;
             case "checkPermission":
@@ -137,11 +158,9 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return identity.permissionPolicy().isGranted(permission)
                         ? PackageManager.PERMISSION_GRANTED : PackageManager.PERMISSION_DENIED;
             case "getPackagesForUid":
-                return firstInt(args, -1) == identity.virtualUid()
-                        ? new String[]{identity.packageName()} : new String[0];
+                return universe.packagesForUid(identity.packageName(), firstInt(args, -1));
             case "getNameForUid":
-                return firstInt(args, -1) == identity.virtualUid()
-                        ? identity.packageName() : null;
+                return universe.packageForUid(identity.packageName(), firstInt(args, -1));
             case "getActivityInfo":
                 return component(args, VirtualPackageMetadata.Type.ACTIVITY);
             case "getReceiverInfo":
@@ -169,16 +188,18 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return metadata.adaptCollection(Collections.emptyList(), returnType);
             case "resolveContentProvider": {
                 String authority = firstString(args);
-                return metadata.provider(authority, firstLong(args, 0L));
+                return universe.provider(identity.packageName(), authority, firstLong(args, 0L));
             }
             case "resolveIntent":
             case "resolveActivity": {
                 Intent intent = firstIntent(args);
-                return metadata.resolve(intent, VirtualPackageMetadata.Type.ACTIVITY, firstLong(args, 0L));
+                return universe.resolve(identity.packageName(), intent,
+                        VirtualPackageMetadata.Type.ACTIVITY, firstLong(args, 0L));
             }
             case "resolveService": {
                 Intent intent = firstIntent(args);
-                return metadata.resolve(intent, VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L));
+                return universe.resolve(identity.packageName(), intent,
+                        VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L));
             }
             case "queryIntentActivities":
                 return query(returnType, args, VirtualPackageMetadata.Type.ACTIVITY);
@@ -188,32 +209,24 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             case "queryIntentServices":
                 return query(returnType, args, VirtualPackageMetadata.Type.SERVICE);
             case "getInstalledPackages":
-                return metadata.adaptCollection(Collections.singletonList(
-                        metadata.packageInfo(firstLong(args, ~0L))), returnType);
+                return metadata.adaptCollection(universe.installedPackages(identity.packageName(),
+                        firstLong(args, ~0L)), returnType);
             case "getPackagesHoldingPermissions":
                 return metadata.adaptCollection(holdsAnyPermission(args)
                         ? Collections.singletonList(metadata.packageInfo(firstLong(args, 0x1000L)))
                         : Collections.emptyList(), returnType);
             case "getInstalledApplications": {
                 long flags = firstLong(args, 0L);
-                boolean visible = metadata.enabled()
-                        || (flags & VirtualPackageMetadata.MATCH_DISABLED_COMPONENTS) != 0;
-                return metadata.adaptCollection(visible
-                        ? Collections.singletonList(metadata.applicationInfo())
-                        : Collections.emptyList(), returnType);
+                return metadata.adaptCollection(universe.installedApplications(identity.packageName(), flags),
+                        returnType);
             }
             case "getPackageGids":
             case "getPackageGidsEtc":
                 return new int[0];
             case "queryContentProviders": {
-                List<ProviderInfo> providers = new java.util.ArrayList<>();
                 long flags = firstLong(args, 0L);
-                for (VirtualPackageMetadata.Component item : metadata.components()) {
-                    if (item.type() != VirtualPackageMetadata.Type.PROVIDER) continue;
-                    ProviderInfo provider = metadata.provider(firstAuthority(item.authority()), flags);
-                    if (provider != null) providers.add(provider);
-                }
-                return metadata.adaptCollection(providers, returnType);
+                return metadata.adaptCollection(universe.queryContentProviders(identity.packageName(), flags),
+                        returnType);
             }
             case "getComponentEnabledSetting": {
                 ComponentName component = firstComponent(args);
@@ -535,17 +548,18 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private Object component(Object[] args, VirtualPackageMetadata.Type type) {
         ComponentName name = firstComponent(args);
         if (name == null) throw new IllegalArgumentException("VIRTUAL_COMPONENT_REQUIRED");
-        if (!identity.packageName().equals(name.getPackageName())) {
+        if (!universe.isVisibleTo(identity.packageName(), name.getPackageName())) {
             android.util.Log.w("CS_PM_COMPONENT_BLOCK", "type=" + type + " component="
                     + name.flattenToShortString(), null);
             return null;
         }
-        return metadata.componentInfo(name, type, firstLong(args, 0L));
+        return universe.componentInfo(identity.packageName(), name, type, firstLong(args, 0L));
     }
 
     private Object query(Class<?> returnType, Object[] args, VirtualPackageMetadata.Type type) {
         Intent intent = firstIntent(args);
-        List<ResolveInfo> matches = metadata.query(intent, type, firstLong(args, 0L));
+        List<ResolveInfo> matches = universe.query(identity.packageName(), intent, type,
+                firstLong(args, 0L));
         return metadata.adaptCollection(matches, returnType);
     }
 

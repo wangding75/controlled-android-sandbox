@@ -124,9 +124,129 @@ final class GuestBrokerContentProvider extends ContentProvider {
 
     @Override public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations)
             throws OperationApplicationException {
-        // Android's default implementation preserves operation ordering and back-reference behavior.
-        // Each primitive operation is still routed through the Broker and remains authorization checked.
-        return super.applyBatch(operations);
+        if (operations == null || operations.isEmpty()) {
+            throw new OperationApplicationException("PROVIDER_BATCH_EMPTY");
+        }
+        Bundle request = request(ComponentOperations.PROVIDER_APPLY_BATCH, null);
+        request.putInt(RuntimeKeys.PROVIDER_BATCH_COUNT, operations.size());
+        for (int index = 0; index < operations.size(); index++) {
+            ContentProviderOperation operation = operations.get(index);
+            if (operation == null) {
+                throw new OperationApplicationException("PROVIDER_BATCH_OPERATION_MISSING:" + index);
+            }
+            Bundle wire = encodeBatchOperation(operation, index);
+            request.putBundle(RuntimeKeys.PROVIDER_BATCH_OPERATION_PREFIX + index, wire);
+        }
+        android.util.Log.i("CS_RUNTIME", "GUEST_PROVIDER_TRANSPORT_APPLY_BATCH count="
+                + operations.size() + " authority=" + authority);
+        final Bundle result;
+        try {
+            result = bridge.invokeComponent(request);
+        } catch (RuntimeException error) {
+            throw new OperationApplicationException(
+                    "PROVIDER_BATCH_TRANSPORT_FAILED:" + String.valueOf(error.getMessage()));
+        }
+        int count = result.getInt(RuntimeKeys.PROVIDER_BATCH_RESULT_COUNT, -1);
+        if (!"PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, ""))
+                || count != operations.size()) {
+            throw new OperationApplicationException("PROVIDER_BATCH_RESULT_INVALID count=" + count);
+        }
+        ContentProviderResult[] out = new ContentProviderResult[count];
+        for (int index = 0; index < count; index++) {
+            Bundle item = result.getBundle(RuntimeKeys.PROVIDER_BATCH_RESULT_PREFIX + index);
+            if (item == null) {
+                throw new OperationApplicationException("PROVIDER_BATCH_RESULT_MISSING:" + index);
+            }
+            String uri = item.getString(RuntimeKeys.URI, "");
+            if (!uri.isEmpty()) {
+                out[index] = new ContentProviderResult(Uri.parse(uri));
+            } else if (item.containsKey(RuntimeKeys.PROVIDER_BATCH_AFFECTED_ROWS)) {
+                out[index] = new ContentProviderResult(
+                        item.getInt(RuntimeKeys.PROVIDER_BATCH_AFFECTED_ROWS, 0));
+            } else {
+                out[index] = new ContentProviderResult(0);
+            }
+        }
+        return out;
+    }
+
+    private static Bundle encodeBatchOperation(ContentProviderOperation operation, int index)
+            throws OperationApplicationException {
+        rejectBackReferences(operation, index);
+        Bundle wire = new Bundle();
+        wire.putString(RuntimeKeys.URI, operation.getUri().toString());
+        if (operation.isInsert()) {
+            wire.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, "INSERT");
+            wire.putBundle(RuntimeKeys.PROVIDER_VALUES,
+                    values(field(operation, "mValues")));
+        } else if (operation.isUpdate()) {
+            wire.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, "UPDATE");
+            wire.putBundle(RuntimeKeys.PROVIDER_VALUES,
+                    values(field(operation, "mValues")));
+            putSelection(wire, operation);
+        } else if (operation.isDelete()) {
+            wire.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, "DELETE");
+            putSelection(wire, operation);
+        } else if (operation.isAssertQuery()) {
+            wire.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, "ASSERT");
+            wire.putBundle(RuntimeKeys.PROVIDER_VALUES,
+                    values(field(operation, "mValues")));
+            putSelection(wire, operation);
+            Object expected = field(operation, "mExpectedCount");
+            wire.putInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT,
+                    expected instanceof Number ? ((Number) expected).intValue() : -1);
+        } else {
+            throw new OperationApplicationException(
+                    "PROVIDER_BATCH_OPERATION_UNSUPPORTED:" + index);
+        }
+        return wire;
+    }
+
+    private static void putSelection(Bundle wire, ContentProviderOperation operation) {
+        wire.putString(RuntimeKeys.PROVIDER_SELECTION, (String) field(operation, "mSelection"));
+        String[] args = (String[]) field(operation, "mSelectionArgs");
+        if (args != null) {
+            ArrayList<String> values = new ArrayList<>();
+            java.util.Collections.addAll(values, args);
+            wire.putStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS, values);
+        }
+    }
+
+    private static void rejectBackReferences(ContentProviderOperation operation, int index)
+            throws OperationApplicationException {
+        if (hasBackReferences(field(operation, "mValuesBackReferences"))
+                || hasBackReferences(field(operation, "mSelectionArgsBackReferences"))) {
+            throw new OperationApplicationException(
+                    "PROVIDER_BATCH_BACK_REFERENCES_UNSUPPORTED:" + index);
+        }
+    }
+
+    private static boolean hasBackReferences(Object value) {
+        if (value == null) return false;
+        try {
+            java.lang.reflect.Method size = value.getClass().getMethod("size");
+            Object count = size.invoke(value);
+            return count instanceof Number && ((Number) count).intValue() > 0;
+        } catch (ReflectiveOperationException ignored) {
+            return true;
+        }
+    }
+
+    private static Object field(ContentProviderOperation operation, String name) {
+        Class<?> type = operation.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                return field.get(operation);
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("PROVIDER_BATCH_OPERATION_FIELD_UNAVAILABLE:" + name,
+                        error);
+            }
+        }
+        return null;
     }
 
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode)
@@ -194,11 +314,29 @@ final class GuestBrokerContentProvider extends ContentProvider {
         }
     }
 
-    private static Bundle values(ContentValues values) {
+    private static Bundle values(Object rawValues) {
         Bundle out = new Bundle();
-        if (values == null) return out;
-        for (String key : values.keySet()) {
-            Object value = values.get(key);
+        if (rawValues == null) return out;
+        if (rawValues instanceof ContentValues contentValues) {
+            for (String key : contentValues.keySet()) {
+                putValue(out, key, contentValues.get(key));
+            }
+            return out;
+        }
+        if (!(rawValues instanceof java.util.Map<?, ?> values)) {
+            throw new IllegalArgumentException("Unsupported ContentValues backing type: "
+                    + rawValues.getClass().getName());
+        }
+        for (java.util.Map.Entry<?, ?> entry : values.entrySet()) {
+            if (!(entry.getKey() instanceof String key)) {
+                throw new IllegalArgumentException("ContentValues key must be String");
+            }
+            putValue(out, key, entry.getValue());
+        }
+        return out;
+    }
+
+    private static void putValue(Bundle out, String key, Object value) {
             if (value == null) out.putString(key, null);
             else if (value instanceof String) out.putString(key, (String) value);
             else if (value instanceof Byte) out.putInt(key, ((Byte) value).intValue());
@@ -210,8 +348,6 @@ final class GuestBrokerContentProvider extends ContentProvider {
             else if (value instanceof Double) out.putDouble(key, (Double) value);
             else if (value instanceof byte[]) out.putByteArray(key, (byte[]) value);
             else throw new IllegalArgumentException("Unsupported ContentValues type for " + key);
-        }
-        return out;
     }
 
     private static ArrayList<String> strings(String[] values) {

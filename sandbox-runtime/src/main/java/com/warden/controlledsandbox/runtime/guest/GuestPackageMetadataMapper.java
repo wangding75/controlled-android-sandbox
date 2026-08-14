@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
@@ -111,5 +112,19 @@ final class GuestPackageMetadataMapper {
                 state.installerPackageName(), state.sharedLibraries(), sharedLibraryDetails,
                 instrumentations, permissions, state.enabled(), queryPackages,
                 queryProviderAuthorities, queryIntentFilters);
+    }
+
+    static VirtualPackageMetadata fromProjection(VirtualPackageProjectionSnapshot projection) {
+        VirtualPackageStateSnapshot state = projection.packageState();
+        ApplicationInfo applicationInfo = new ApplicationInfo();
+        applicationInfo.packageName = state.packageName();
+        applicationInfo.name = state.applicationClass().isEmpty() ? null : state.applicationClass();
+        applicationInfo.sourceDir = projection.apkPath();
+        applicationInfo.publicSourceDir = projection.apkPath();
+        applicationInfo.nativeLibraryDir = projection.nativeLibraryDir();
+        applicationInfo.uid = projection.virtualUid();
+        applicationInfo.enabled = state.enabled();
+        applicationInfo.flags = ApplicationInfo.FLAG_HAS_CODE;
+        return fromSnapshot(state, applicationInfo, null);
     }
 }

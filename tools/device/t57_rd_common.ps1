@@ -89,7 +89,7 @@ function Write-T57RdEvidence([object]$Device, [string]$CaseName, [string]$Output
         gitHead = (git rev-parse HEAD); gitTree = (git status --porcelain)
     }
     $record | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$CaseName-device.json")
-    & adb -s $Device.Serial logcat -d -v threadtime -s CS_RUNTIME:V CS_DIAGNOSTICS:V '*:S' |
+    & adb -s $Device.Serial logcat -d -v threadtime -s CS_RUNTIME:V CS_DIAGNOSTICS:V CS_FIXTURE:V CS_COMMAND:V '*:S' |
         Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$CaseName-logcat.txt")
     return $record
 }

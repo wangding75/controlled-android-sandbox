@@ -17,6 +17,7 @@ public final class GuestIdentity {
     private final String hostPackageName;
     private final int hostUid;
     private final VirtualPackageMetadata packageMetadata;
+    private final VirtualPackageUniverse packageUniverse;
     private final String processName;
     private final int virtualUserId;
     private final long generation;
@@ -109,6 +110,23 @@ public final class GuestIdentity {
                          CapabilityLeaseRegistry capabilityLeases,
                          VirtualSystemServiceState virtualServices,
                          String packageRevision) {
+        this(packageName, virtualUid, applicationInfo, requestedPermissions, hostPackageName,
+                hostUid, packageMetadata, processName, virtualUserId, generation,
+                permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases,
+                virtualServices, packageRevision, VirtualPackageUniverse.single(packageMetadata));
+    }
+
+    public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
+                         Set<String> requestedPermissions, String hostPackageName, int hostUid,
+                         VirtualPackageMetadata packageMetadata, String processName,
+                         int virtualUserId, long generation,
+                         VirtualPermissionPolicy permissionPolicy,
+                         SandboxAppOpsPolicy appOpsPolicy,
+                         CapabilityAuditSink capabilityAudit,
+                         CapabilityLeaseRegistry capabilityLeases,
+                         VirtualSystemServiceState virtualServices,
+                         String packageRevision,
+                         VirtualPackageUniverse packageUniverse) {
         if (packageName == null || packageName.trim().isEmpty()) {
             throw new IllegalArgumentException("packageName is required");
         }
@@ -131,6 +149,10 @@ public final class GuestIdentity {
         this.hostPackageName = hostPackageName;
         this.hostUid = hostUid;
         this.packageMetadata = java.util.Objects.requireNonNull(packageMetadata, "packageMetadata");
+        this.packageUniverse = java.util.Objects.requireNonNull(packageUniverse, "packageUniverse");
+        if (this.packageUniverse.packageMetadata(packageName) == null) {
+            throw new IllegalArgumentException("package universe does not contain current package");
+        }
         this.processName = processName;
         this.virtualUserId = virtualUserId;
         this.generation = generation;
@@ -155,6 +177,7 @@ public final class GuestIdentity {
     public String hostPackageName() { return hostPackageName; }
     public int hostUid() { return hostUid; }
     public VirtualPackageMetadata packageMetadata() { return packageMetadata; }
+    public VirtualPackageUniverse packageUniverse() { return packageUniverse; }
     public String processName() { return processName; }
     public int virtualUserId() { return virtualUserId; }
     public long generation() { return generation; }

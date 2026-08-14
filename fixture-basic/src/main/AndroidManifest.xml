@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.warden.controlledsandbox.fixture32" />
+        <provider android:authorities="com.warden.controlledsandbox.fixture32.provider" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -19,6 +27,7 @@
         </activity>
         <activity android:name="com.warden.controlledsandbox.fixture.CapabilityProbeActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.LegacyCameraProbeActivity" android:exported="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FrameworkProbeActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.FixtureJobScheduleActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.FixtureJobCancelActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.FixtureJobDelayedActivity" android:exported="true" />

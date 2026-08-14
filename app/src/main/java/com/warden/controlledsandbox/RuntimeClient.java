@@ -10,6 +10,7 @@ import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
@@ -221,7 +222,32 @@ final class RuntimeClient implements AutoCloseable {
         if (record.permissions != null && !record.permissions.trim().isEmpty()) permissions.addAll(Arrays.asList(record.permissions.split(",")));
         request.putStringArrayList(RuntimeKeys.PERMISSIONS, permissions);
         request.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
+        request.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                packageUniverse(record, virtualUserId));
         return request;
+    }
+
+    private ArrayList<VirtualPackageProjectionSnapshot> packageUniverse(
+            SandboxRecord current, int virtualUserId) throws Exception {
+        ArrayList<VirtualPackageProjectionSnapshot> result = new ArrayList<>();
+        int nextUid = 10000;
+        for (SandboxRecord record : packageService.load().records()) {
+            if (current.packageName.equals(record.packageName)) continue;
+            VirtualPackageStateSnapshot state;
+            try {
+                state = packageService.virtualPackageState(record.packageName, virtualUserId);
+            } catch (Exception unavailableForUser) {
+                // A package without an instance for this virtual user is not installed in that
+                // user's virtual PMS view. Do not fall back to Host PMS metadata.
+                android.util.Log.i("CS_PM_UNIVERSE_SKIP", "package=" + record.packageName
+                        + " user=" + virtualUserId + " reason="
+                        + unavailableForUser.getClass().getSimpleName());
+                continue;
+            }
+            result.add(new VirtualPackageProjectionSnapshot(state, record.apkPath,
+                    record.nativeLibraryDir, nextUid++));
+        }
+        return result;
     }
 
     final class BoundServiceLease implements AutoCloseable {

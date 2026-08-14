@@ -48,6 +48,8 @@ import java.util.concurrent.ConcurrentMap;
 
 /** Guest-side adapter for a scoped Binder-owned virtual system-service capability. */
 public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemServiceAuthority {
+    private static final int PARCEL_PAYLOAD_PARCELABLE = 1;
+    private static final int PARCEL_PAYLOAD_PARCELABLE_ARRAY = 2;
     private static final int MAX_PAYLOAD_BYTES = 512 * 1024;
     private static final int PAGE_MAX_ITEMS = 64;
     private static final int PAGE_MAX_BYTES = 224 * 1024;
@@ -492,12 +494,19 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     private byte[] marshal(Object value) {
         if (value == null) return new byte[0];
-        if (!(value instanceof Parcelable)) {
+        boolean array = value instanceof Parcelable[];
+        if (!(value instanceof Parcelable) && !array) {
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_VALUE_NOT_PARCELABLE:" + value.getClass().getName());
         }
         Parcel parcel = Parcel.obtain();
         try {
-            parcel.writeParcelable((Parcelable) value, 0);
+            if (array) {
+                parcel.writeInt(PARCEL_PAYLOAD_PARCELABLE_ARRAY);
+                parcel.writeParcelableArray((Parcelable[]) value, 0);
+            } else {
+                parcel.writeInt(PARCEL_PAYLOAD_PARCELABLE);
+                parcel.writeParcelable((Parcelable) value, 0);
+            }
             byte[] payload = parcel.marshall();
             if (payload.length > MAX_PAYLOAD_BYTES) {
                 throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_PAYLOAD_TOO_LARGE");
@@ -510,6 +519,15 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         Parcel parcel = Parcel.obtain();
         try {
             parcel.unmarshall(payload, 0, payload.length); parcel.setDataPosition(0);
+            int marker = parcel.readInt();
+            if (marker == PARCEL_PAYLOAD_PARCELABLE_ARRAY) {
+                return parcel.readParcelableArray(classLoader);
+            }
+            if (marker == PARCEL_PAYLOAD_PARCELABLE) {
+                return parcel.readParcelable(classLoader);
+            }
+            // Backward compatibility for payloads written before the explicit envelope.
+            parcel.setDataPosition(0);
             return parcel.readParcelable(classLoader);
         } finally { parcel.recycle(); }
     }

@@ -17,6 +17,7 @@ import android.os.Process;
 import com.warden.controlledsandbox.framework.core.FrameworkHooks;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
@@ -27,6 +28,7 @@ import com.warden.controlledsandbox.runtime.capability.CapabilityProxyReadiness;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDnsProfileSnapshot;
@@ -42,6 +44,8 @@ import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemSer
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -174,6 +178,14 @@ public final class GuestRuntimeEnvironment {
                     guestContext.getApplicationInfo(), spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo(), loadedResources.manifestMetadata);
+            List<VirtualPackageMetadata> packageViews = new ArrayList<>();
+            packageViews.add(packageMetadata);
+            for (VirtualPackageProjectionSnapshot projection : spec.packageUniverse) {
+                if (projection == null || spec.packageName.equals(
+                        projection.packageState().packageName())) continue;
+                packageViews.add(GuestPackageMetadataMapper.fromProjection(projection));
+            }
+            VirtualPackageUniverse packageUniverse = new VirtualPackageUniverse(packageViews);
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
                     new RemoteVirtualSystemServiceAuthority(systemServiceSession, loader));
             loader.configureDetection(virtualServices.compatibilityProfile().detection());
@@ -207,7 +219,7 @@ public final class GuestRuntimeEnvironment {
                             new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
                             permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices,
-                            spec.packageRevision),
+                            spec.packageRevision, packageUniverse),
                     frameworkCallRouter, nativeHooksInstalled);
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());

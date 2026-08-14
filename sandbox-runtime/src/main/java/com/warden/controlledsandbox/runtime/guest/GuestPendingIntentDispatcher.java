@@ -36,6 +36,7 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
         request.putString("pendingIntentKind", record.spec().kind().name());
         request.putString("pendingIntentCreatorPackage", record.packageName());
         request.putInt("pendingIntentCreatorUid", record.creatorUid());
+        Context brokerContext = brokerContext();
         RouteBrokerClient.Callback callback = result -> {
             Bundle event = new Bundle(result);
             event.putString("pendingIntentSenderId", record.persistentTokenId());
@@ -43,20 +44,20 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
             RuntimeEventLog.event("VIRTUAL_PENDING_INTENT_DELIVERY", event);
         };
         switch (record.spec().kind()) {
-            case ACTIVITY -> RouteBrokerClient.launchActivity(context, request, callback);
+            case ACTIVITY -> RouteBrokerClient.launchActivity(brokerContext, request, callback);
             case BROADCAST -> {
                 request.putString(ComponentOperations.OPERATION,
                         intent.getComponent() == null
                                 ? ComponentOperations.SEND_IMPLICIT_BROADCAST
                                 : ComponentOperations.SEND_BROADCAST);
-                RouteBrokerClient.invokeComponent(context, request, callback);
+                RouteBrokerClient.invokeComponent(brokerContext, request, callback);
             }
             case SERVICE, FOREGROUND_SERVICE -> {
                 request.putString(ComponentOperations.OPERATION, ComponentOperations.START_SERVICE);
                 if (record.spec().kind() == VirtualPendingIntentRegistry.Kind.FOREGROUND_SERVICE) {
                     request.putBoolean("foregroundService", true);
                 }
-                RouteBrokerClient.invokeComponent(context, request, callback);
+                RouteBrokerClient.invokeComponent(brokerContext, request, callback);
             }
             case ACTIVITY_RESULT -> throw new AssertionError("handled above");
         }
@@ -81,7 +82,7 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
                 record.spec().requestCode(),
                 0,
                 GuestActivityResultBridge.snapshot(intent));
-        RouteBrokerClient.activityResultOperation(context, request, result -> {
+        RouteBrokerClient.activityResultOperation(brokerContext(), request, result -> {
             Bundle event = new Bundle();
             event.putString("pendingIntentSenderId", record.persistentTokenId());
             event.putString("pendingIntentKind", record.spec().kind().name());
@@ -91,10 +92,18 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
         return 0;
     }
 
+    private Context brokerContext() {
+        return context instanceof GuestContext guest ? guest.hostServiceContext() : context;
+    }
+
     static Intent selectedIntent(Object payload,
             VirtualPendingIntentRegistry.SendRequest request) {
         Intent base = null;
         if (payload instanceof Intent[] intents && intents.length > 0) base = intents[intents.length - 1];
+        else if (payload instanceof android.os.Parcelable[] values && values.length > 0
+                && values[values.length - 1] instanceof Intent) {
+            base = (Intent) values[values.length - 1];
+        }
         else if (payload instanceof Intent) base = (Intent) payload;
         Intent result = base == null ? new Intent() : new Intent(base);
         Object fillPayload = request == null ? null : request.fillInPayload();

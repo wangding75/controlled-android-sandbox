@@ -52,13 +52,20 @@ final class GuestRuntimeBrokerBridge {
     }
 
     private void fillIdentity(Bundle request) {
+        // PROCESS_NAME is also the target process selector for component routes. Preserve a
+        // manifest-declared :remote target supplied by GuestContextComponentRouter; caller
+        // ownership remains in the dedicated CALLER_* fields below.
+        String targetProcess = request.getString(RuntimeKeys.PROCESS_NAME, "");
+        if (targetProcess == null || targetProcess.trim().isEmpty()) {
+            targetProcess = spec.processName;
+        }
         request.putInt(RuntimeKeys.PROTOCOL,
                 com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT);
         request.putString(RuntimeKeys.PACKAGE_NAME, spec.packageName);
         request.putInt(RuntimeKeys.VIRTUAL_USER_ID, spec.virtualUserId);
         request.putString(RuntimeKeys.SESSION_ID, spec.sessionId);
         request.putLong(RuntimeKeys.GENERATION, spec.generation);
-        request.putString(RuntimeKeys.PROCESS_NAME, spec.processName);
+        request.putString(RuntimeKeys.PROCESS_NAME, targetProcess);
         request.putString(RuntimeKeys.CALLER_PACKAGE_NAME, spec.packageName);
         request.putInt(RuntimeKeys.CALLER_VIRTUAL_USER_ID, spec.virtualUserId);
         request.putString(RuntimeKeys.CALLER_SESSION_ID, spec.sessionId);

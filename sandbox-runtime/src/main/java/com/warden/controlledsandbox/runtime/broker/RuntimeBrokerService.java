@@ -358,12 +358,13 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
             call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
             call.putString(RuntimeKeys.PROCESS_NAME, processName);
+            final GuestSession activeSession = session;
+            restoreTargetSessionIdentity(call, base, activeSession);
             if (providerRoute != null) {
                 call.putString(ComponentOperations.AUTHORITY, providerRoute.authority());
                 call.putString(RuntimeKeys.COMPONENT_CLASS, providerRoute.entry().component());
                 call.putString(RuntimeKeys.URI, providerRoute.uri());
             }
-            final GuestSession activeSession = session;
             cursorTargetSession = activeSession;
             fileTargetSession = activeSession;
             ProviderAccess providerAccess = providerRoute != null
@@ -839,6 +840,49 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             throws Exception {
         return RuntimeOperationTransport.toLegacyBundle(
                 RuntimeOperationTransport.execute(guest, operation, payload));
+    }
+
+    private static void restoreTargetSessionIdentity(Bundle target, Bundle prepared,
+                                                     GuestSession session) {
+        target.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        target.putLong(RuntimeKeys.GENERATION, session.generation());
+        target.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        target.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+        copyString(target, prepared, RuntimeKeys.APK_PATH);
+        copyString(target, prepared, RuntimeKeys.APK_SHA256);
+        copyString(target, prepared, RuntimeKeys.BASE_APK_SHA256);
+        copyLong(target, prepared, RuntimeKeys.APK_VERSION_CODE);
+        copyString(target, prepared, RuntimeKeys.PACKAGE_REVISION);
+        copyString(target, prepared, RuntimeKeys.NATIVE_LIBRARY_DIR);
+        copyString(target, prepared, RuntimeKeys.NATIVE_ABI);
+        copyString(target, prepared, RuntimeKeys.NATIVE_GUEST_TRUST);
+        copyString(target, prepared, RuntimeKeys.NATIVE_EXECUTION_MODE);
+        copyString(target, prepared, RuntimeKeys.APPLICATION_CLASS);
+        copyString(target, prepared, RuntimeKeys.DATA_ROOT);
+        if (prepared.containsKey(RuntimeKeys.PERMISSIONS)) {
+            target.putStringArrayList(RuntimeKeys.PERMISSIONS,
+                    prepared.getStringArrayList(RuntimeKeys.PERMISSIONS));
+        }
+        if (prepared.containsKey(RuntimeKeys.PACKAGE_STATE)) {
+            target.putParcelable(RuntimeKeys.PACKAGE_STATE,
+                    prepared.getParcelable(RuntimeKeys.PACKAGE_STATE));
+        }
+        if (prepared.containsKey(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER)) {
+            target.putBinder(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER,
+                    prepared.getBinder(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER));
+        }
+        if (prepared.containsKey(RuntimeKeys.RUNTIME_BROKER_BINDER)) {
+            target.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER,
+                    prepared.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER));
+        }
+    }
+
+    private static void copyString(Bundle target, Bundle source, String key) {
+        if (source.containsKey(key)) target.putString(key, source.getString(key, ""));
+    }
+
+    private static void copyLong(Bundle target, Bundle source, String key) {
+        if (source.containsKey(key)) target.putLong(key, source.getLong(key));
     }
 
     private void stopMismatchedRevisionSessions(String packageName, int userId,

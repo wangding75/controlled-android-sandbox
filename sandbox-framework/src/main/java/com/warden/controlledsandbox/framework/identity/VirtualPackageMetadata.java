@@ -565,6 +565,40 @@ public final class VirtualPackageMetadata {
         return out;
     }
 
+    /** Returns whether an Android 11+ {@code <queries><intent>} declaration can see this APK. */
+    public boolean matchesQueryFilter(Filter query) {
+        if (query == null) return false;
+        for (Component component : components) {
+            for (Filter declared : component.filters()) {
+                if (filtersIntersect(query, declared)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean filtersIntersect(Filter query, Filter declared) {
+        if (!query.actions().isEmpty() && !declared.actions().isEmpty()) {
+            boolean actionMatch = false;
+            for (String action : query.actions()) {
+                if (declared.actions().contains(action)) { actionMatch = true; break; }
+            }
+            if (!actionMatch) return false;
+        }
+        if (!query.categories().isEmpty()
+                && !declared.categories().containsAll(query.categories())) return false;
+        if (query.data().isEmpty() || declared.data().isEmpty()) return query.data().isEmpty();
+        for (DataRule left : query.data()) {
+            for (DataRule right : declared.data()) {
+                boolean scheme = left.scheme().isEmpty() || right.scheme().isEmpty()
+                        || left.scheme().equals(right.scheme());
+                boolean mime = left.mimeType().isEmpty() || right.mimeType().isEmpty()
+                        || left.mimeType().equals(right.mimeType());
+                if (scheme && mime) return true;
+            }
+        }
+        return false;
+    }
+
     public InstrumentationInfo instrumentationInfo(ComponentName name, long flags) {
         if (name == null || !packageName.equals(name.getPackageName())) return null;
         Instrumentation instrumentation = instrumentationsByClass.get(normalizeClass(name.getClassName()));

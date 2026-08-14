@@ -54,7 +54,10 @@ final class GuestIntentResolver {
             if (kind == Kind.ACTIVITY) throw new ActivityNotFoundException(intent.toString());
             throw new IllegalArgumentException("NO_GUEST_" + kind.name() + "_MATCH");
         }
-        return target(resolved, kind);
+        Target target = target(resolved, kind);
+        android.util.Log.i("CS_GUEST_RESOLVE", "kind=" + kind + " component="
+                + target.className() + " process=" + target.processName());
+        return target;
     }
 
     List<Target> resolveReceivers(Intent intent) {

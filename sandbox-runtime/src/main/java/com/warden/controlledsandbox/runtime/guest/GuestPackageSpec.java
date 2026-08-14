@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -45,6 +46,7 @@ public final class GuestPackageSpec {
     final List<String> splitSha256s;
     final List<String> sharedLibraries;
     final VirtualPackageStateSnapshot packageState;
+    final List<VirtualPackageProjectionSnapshot> packageUniverse;
     final IBinder virtualSystemServiceBinder;
     final IBinder runtimeBrokerBinder;
 
@@ -101,6 +103,14 @@ public final class GuestPackageSpec {
         runtimeBrokerBinder = bundle.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER);
         packageState = bundle.getParcelable(RuntimeKeys.PACKAGE_STATE);
         if (packageState == null) throw new IllegalArgumentException("virtual package state is required");
+        ArrayList<VirtualPackageProjectionSnapshot> universe = bundle.getParcelableArrayList(
+                RuntimeKeys.PACKAGE_UNIVERSE);
+        packageUniverse = universe == null
+                ? Collections.emptyList()
+                : Collections.unmodifiableList(new ArrayList<>(universe));
+        if (packageUniverse.size() > 256) {
+            throw new IllegalArgumentException("virtual package universe is too large");
+        }
         if (!packageName.equals(packageState.packageName()) || virtualUserId != packageState.virtualUserId()) {
             throw new SecurityException("VIRTUAL_PACKAGE_STATE_IDENTITY_MISMATCH");
         }
@@ -135,6 +145,8 @@ public final class GuestPackageSpec {
         if (virtualSystemServiceBinder != null) out.putBinder(RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER, virtualSystemServiceBinder);
         out.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER, runtimeBrokerBinder);
         out.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
+        out.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                new ArrayList<>(packageUniverse));
         return out;
     }
 
