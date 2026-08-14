@@ -68,12 +68,42 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             Object feature = virtualSystemFeature(args);
             if (feature != NoResult.VALUE) return feature;
         }
-        boolean guestTarget = containsGuestPackage(args);
-        boolean hiddenTarget = containsHiddenPackage(args);
-        if (hiddenTarget && !guestTarget) {
+        boolean guestTarget = containsGuestPackage(args) || ownsGuestAuthority(args);
+        String targetPackage = targetPackageName(args);
+        PackageVisibilityClass visibility = targetPackage.isEmpty()
+                ? null : PackageVisibilityPolicy.classify(identity, targetPackage);
+        if (!guestTarget && containsHostPackage(args)
+                && "getServiceInfo".equals(methodName)) {
+            // A Guest may probe the host stub service while attaching an Activity. The
+            // stub is not a Guest service and must remain hidden; returning an absent
+            // service lets Android's normal NameNotFound path handle the optional probe.
+            android.util.Log.i("CS_PM_STUB_COMPONENT_ABSENT", "method=" + methodName);
+            return null;
+        }
+        if (visibility != null && !guestTarget
+                && PackageVisibilityPolicy.reportsAbsentWithoutProjector(visibility)
+                && isPackageIdentityMethod(methodName)
+                && !isControlledWebViewProvider(targetPackage)) {
+            // System and shared-dependency roles are not Guest packages. Without a
+            // sanitized projector, report the Android NameNotFound shape. WebView keeps
+            // its existing controlled projector below.
+            android.util.Log.i("CS_PM_OPTIONAL_DEPENDENCY",
+                    "class=" + visibility + " absent=" + targetPackage);
+            return hiddenPackageResult(methodName, returnType);
+        }
+        if (visibility != null && !guestTarget
+                && PackageVisibilityPolicy.deniesIdentity(visibility)
+                && !isSystemFeatureMethod(methodName)) {
             android.util.Log.w("CS_PM_HIDDEN_BLOCK", "method=" + methodName
+                    + " class=" + visibility + " package=" + targetPackage
                     + " first=" + firstString(args), null);
-            return hiddenHostResult(methodName, returnType);
+            return hiddenPackageResult(methodName, returnType);
+        }
+        boolean hiddenTarget = containsHiddenPackage(args);
+        if (hiddenTarget && !guestTarget && !isSystemFeatureMethod(methodName)) {
+            android.util.Log.w("CS_PM_HIDDEN_BLOCK", "method=" + methodName
+                    + " package=" + packageArgument(args) + " first=" + firstString(args), null);
+            return hiddenPackageResult(methodName, returnType);
         }
         if (isControlledUnavailableWebViewDependency(methodName, args)) {
             // IPackageManager is a Binder-shaped interface whose method does not declare
@@ -87,14 +117,14 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (webViewComponent != NoResult.VALUE) return webViewComponent;
         switch (methodName) {
             case "getApplicationInfo":
-                return guestTarget ? metadata.applicationInfo() : hiddenHostResult(methodName, returnType);
+                return guestTarget ? metadata.applicationInfo() : hiddenPackageResult(methodName, returnType);
             case "getPackageInfo":
             case "getPackageInfoVersioned":
                 return guestTarget ? metadata.packageInfo(firstLong(args, ~0L))
-                        : hiddenHostResult(methodName, returnType);
+                        : hiddenPackageResult(methodName, returnType);
             case "getPackageUid":
             case "getPackageUidAsUser":
-                return guestTarget ? identity.virtualUid() : hiddenHostResult(methodName, returnType);
+                return guestTarget ? identity.virtualUid() : hiddenPackageResult(methodName, returnType);
             case "isPackageAvailable":
                 return guestTarget ? metadata.enabled() : Boolean.FALSE;
             case "getInstallerPackageName":
@@ -122,8 +152,9 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return component(args, VirtualPackageMetadata.Type.PROVIDER);
             case "getInstrumentationInfo": {
                 ComponentName name = firstComponent(args);
-                if (name == null || !identity.packageName().equals(name.getPackageName())) {
-                    throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
+                if (name == null) throw new IllegalArgumentException("VIRTUAL_COMPONENT_REQUIRED");
+                if (!identity.packageName().equals(name.getPackageName())) {
+                    return hiddenPackageResult(methodName, returnType);
                 }
                 return metadata.instrumentationInfo(name, firstLong(args, 0L));
             }
@@ -191,11 +222,19 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             }
             case "setApplicationEnabledSetting":
             case "setPackageStoppedState":
-            case "setComponentEnabledSetting":
-                if (guestTarget || firstComponent(args) != null) {
-                    throw new SecurityException("COMPONENT_STATE_REQUIRES_PACKAGE_SERVICE");
+                if (guestTarget) {
+                    return null;
                 }
                 return NoResult.VALUE;
+            case "setComponentEnabledSetting": {
+                ComponentName component = firstComponent(args);
+                if (component != null && identity.packageName().equals(component.getPackageName())) {
+                    metadata.setComponentEnabledSetting(component, firstIntAfterComponent(args));
+                    return null;
+                }
+                if (guestTarget) return null;
+                return NoResult.VALUE;
+            }
             case "hasSigningCertificate":
                 if (!guestTarget) return NoResult.VALUE;
                 return signingDigestMatches(args, metadata.signatureSha256());
@@ -278,14 +317,14 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             return NoResult.VALUE;
         }
         if (VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())) {
-            return hiddenHostResult(methodName, method.getReturnType());
+            return hiddenPackageResult(methodName, method.getReturnType());
         }
         int packageIndex = firstStringIndex(args);
         if (packageIndex < 0) return NoResult.VALUE;
 
         try {
             Object raw = method.invoke(delegate, args);
-            if (raw == null) return hiddenHostResult(methodName, method.getReturnType());
+            if (raw == null) return hiddenPackageResult(methodName, method.getReturnType());
             return projectWebViewPackage(raw, profile);
         } catch (InvocationTargetException error) {
             // A configured provider which is not installed is a real compatibility failure. Do
@@ -309,6 +348,37 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         } catch (IllegalStateException unavailable) {
             return false;
         }
+    }
+
+    private boolean isControlledWebViewProvider(String packageName) {
+        if (packageName == null || packageName.isEmpty()) return false;
+        try {
+            VirtualWebViewProfileSnapshot profile =
+                    identity.virtualServices().compatibilityProfile().webView();
+            return profile.providerPackage() != null && profile.providerPackage().equals(packageName);
+        } catch (RuntimeException unavailable) {
+            return false;
+        }
+    }
+
+    private static boolean isPackageIdentityMethod(String methodName) {
+        return "getApplicationInfo".equals(methodName)
+                || "getApplicationInfoAsUser".equals(methodName)
+                || "getPackageInfo".equals(methodName)
+                || "getPackageInfoAsUser".equals(methodName)
+                || "getPackageInfoVersioned".equals(methodName)
+                || "getPackageUid".equals(methodName)
+                || "getPackageUidAsUser".equals(methodName)
+                || "getActivityInfo".equals(methodName)
+                || "getReceiverInfo".equals(methodName)
+                || "getServiceInfo".equals(methodName)
+                || "getProviderInfo".equals(methodName)
+                || "isPackageAvailable".equals(methodName)
+                || "checkPermission".equals(methodName);
+    }
+
+    private Object hiddenPackageResult(String methodName, Class<?> returnType) {
+        return HiddenPackageResultMapper.map(methodName, returnType, metadata::adaptCollection);
     }
 
     private Object projectWebViewPackage(Object raw, VirtualWebViewProfileSnapshot profile) {
@@ -468,7 +538,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (!identity.packageName().equals(name.getPackageName())) {
             android.util.Log.w("CS_PM_COMPONENT_BLOCK", "type=" + type + " component="
                     + name.flattenToShortString(), null);
-            throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
+            return null;
         }
         return metadata.componentInfo(name, type, firstLong(args, 0L));
     }
@@ -523,45 +593,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         return null;
     }
 
-    private Object hiddenHostResult(String methodName, Class<?> returnType) {
-        switch (methodName) {
-            case "getApplicationInfo":
-            case "getPackageInfo":
-            case "getPackageInfoVersioned":
-            case "getPackageUid":
-            case "getPackageUidAsUser":
-            case "getActivityInfo":
-            case "getReceiverInfo":
-            case "getServiceInfo":
-            case "getProviderInfo":
-            case "getInstrumentationInfo":
-                throw new IllegalArgumentException("HOST_PACKAGE_HIDDEN");
-            case "isPackageAvailable": return false;
-            case "checkPermission": return PackageManager.PERMISSION_DENIED;
-            case "getInstallerPackageName":
-            case "getInstallSourceInfo":
-            case "resolveIntent":
-            case "resolveActivity":
-            case "resolveService":
-            case "resolveContentProvider": return null;
-            case "queryIntentActivities":
-            case "queryIntentReceivers":
-            case "queryBroadcastReceivers":
-            case "queryIntentServices":
-            case "queryContentProviders":
-            case "queryInstrumentation":
-            case "getSharedLibraries":
-            case "getDeclaredSharedLibraries":
-                return metadata.adaptCollection(Collections.emptyList(), returnType);
-            case "setApplicationEnabledSetting":
-            case "setPackageStoppedState":
-            case "setComponentEnabledSetting":
-                throw new SecurityException("HOST_PACKAGE_MUTATION_BLOCKED");
-            default:
-                if (returnType == boolean.class || returnType == Boolean.class) return false;
-                return NoResult.VALUE;
-        }
-    }
+
 
     private boolean containsHiddenPackage(Object[] args) {
         if (args == null) return false;
@@ -583,6 +615,29 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 if (hidden.contains(intent.getPackage())) return true;
                 ComponentName component = intent.getComponent();
                 if (component != null && hidden.contains(component.getPackageName())) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsHostPackage(Object[] args) {
+        if (args == null || identity.hostPackageName() == null
+                || identity.hostPackageName().trim().isEmpty()) return false;
+        for (Object arg : args) {
+            if (arg instanceof ComponentName component
+                    && identity.hostPackageName().equals(component.getPackageName())) return true;
+            if (arg instanceof String value && identity.hostPackageName().equals(value)) return true;
+        }
+        return false;
+    }
+
+    private boolean ownsGuestAuthority(Object[] args) {
+        if (args == null) return false;
+        for (Object arg : args) {
+            if (arg instanceof String value && metadata.ownsAuthority(value)) return true;
+            if (arg instanceof ProviderInfo info
+                    && metadata.ownsAuthority(info.authority == null ? "" : info.authority)) {
+                return true;
             }
         }
         return false;
@@ -634,6 +689,42 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         return "";
     }
 
+    private static String packageArgument(Object[] args) {
+        if (args == null) return "";
+        for (Object arg : args) {
+            if (arg instanceof ComponentName component) return component.getPackageName();
+            if (arg instanceof String value && value.contains(".")) return value;
+            if (arg instanceof android.content.pm.VersionedPackage versioned) {
+                return versioned.getPackageName();
+            }
+        }
+        return "";
+    }
+
+    private static String targetPackageName(Object[] args) {
+        if (args == null) return "";
+        for (Object arg : args) {
+            if (arg instanceof ComponentName component) {
+                String name = component.getPackageName();
+                if (name != null && !name.isEmpty()) return name;
+            }
+            if (arg instanceof android.content.pm.VersionedPackage versioned) {
+                String name = versioned.getPackageName();
+                if (name != null && !name.isEmpty()) return name;
+            }
+        }
+        for (Object arg : args) {
+            if (!(arg instanceof String value) || value.isEmpty()) continue;
+            if ("android".equals(value)) return value;
+            if (!value.contains(".")) continue;
+            if (value.startsWith("android.permission.") || value.startsWith("android.intent.")) {
+                continue;
+            }
+            return value;
+        }
+        return "";
+    }
+
     private static int firstStringIndex(Object[] args) {
         if (args == null) return -1;
         for (int index = 0; index < args.length; index++) {
@@ -670,6 +761,19 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         if (args == null) return null;
         for (Object arg : args) if (arg instanceof ComponentName) return (ComponentName) arg;
         return null;
+    }
+
+    private static int firstIntAfterComponent(Object[] args) {
+        if (args == null) return 0;
+        boolean seenComponent = false;
+        for (Object arg : args) {
+            if (arg instanceof ComponentName) {
+                seenComponent = true;
+                continue;
+            }
+            if (seenComponent && arg instanceof Integer) return (Integer) arg;
+        }
+        return firstInt(args, 0);
     }
     private static Intent firstIntent(Object[] args) {
         if (args == null) return new Intent();

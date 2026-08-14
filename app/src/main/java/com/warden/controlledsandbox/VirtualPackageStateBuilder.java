@@ -205,12 +205,10 @@ final class VirtualPackageStateBuilder {
                 existing.mergeFrom(component);
                 continue;
             }
-            if (hasProviderAuthority(target, component)) {
-                // Android package parsing keeps the first provider for a duplicated authority
-                // and skips the later malformed declaration. This also keeps one authority from
-                // being registered to two Guest components during runtime bootstrap.
-                continue;
-            }
+            // Keep every declared provider for class-based PackageManager queries, including
+            // manifests that repeat an authority. VirtualPackageMetadata and the runtime
+            // provider router retain first-owner semantics for authority lookup, matching the
+            // device PackageManager while preserving both ProviderInfo records.
             target.add(component);
         }
     }

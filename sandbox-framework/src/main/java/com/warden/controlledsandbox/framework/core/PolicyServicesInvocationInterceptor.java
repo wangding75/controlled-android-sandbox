@@ -146,9 +146,23 @@ import java.util.concurrent.atomic.AtomicInteger;
         if (containsAny(name, "getenabledaccessibilityservicelist", "getinstalledaccessibilityservicelist", "getaccessibilityshortcuttargets")) {
             return Decision.handled(stringCollection(method.getReturnType(), profile.enabledServices()));
         }
-        if (containsAny(name, "sendaccessibilityevent", "interrupt")) {
-            if (!profile.allowEventDispatch()) throw new SecurityException("VIRTUAL_ACCESSIBILITY_EVENT_DENIED");
+        AccessibilityInvocationClass kind = AccessibilityInvocationClassifier.classify(method.getName());
+        if (kind == AccessibilityInvocationClass.APP_LOCAL_EVENT) {
+            if (AccessibilityInvocationClassifier.isCrossAppEvent(firstNonPrimitive(arguments),
+                    identity.packageName())) {
+                throw new SecurityException("VIRTUAL_ACCESSIBILITY_CROSS_APP_DENIED:" + method.getName());
+            }
             return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (kind == AccessibilityInvocationClass.APP_LOCAL_WINDOW_METADATA) {
+            return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (kind == AccessibilityInvocationClass.CROSS_APP_ACCESSIBILITY_DATA) {
+            throw new SecurityException("VIRTUAL_ACCESSIBILITY_CROSS_APP_DENIED:" + method.getName());
+        }
+        if (kind == AccessibilityInvocationClass.SECURE_SETTING_MUTATION
+                || kind == AccessibilityInvocationClass.HOST_ACCESSIBILITY_STATE_MUTATION) {
+            throw new SecurityException("VIRTUAL_ACCESSIBILITY_MUTATION_DENIED:" + method.getName());
         }
         if (mutation(name)) throw new SecurityException("VIRTUAL_ACCESSIBILITY_MUTATION_DENIED:" + method.getName());
         return failUnsupported("accessibility", method);
@@ -404,6 +418,16 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
     private static Object token(Object[] arguments){
         return callback(arguments);
+    }
+    private static Object firstNonPrimitive(Object[] arguments) {
+        if (arguments == null) return null;
+        for (Object value : arguments) {
+            if (value == null || value instanceof String || value instanceof Number
+                    || value instanceof Boolean || value.getClass().isEnum()
+                    || value.getClass().isArray()) continue;
+            return value;
+        }
+        return null;
     }
     private static void addBounded(Set<Object> values, Object value, int maximum, String error){
         if(!values.contains(value)&&values.size()>=maximum)throw new IllegalStateException(error);

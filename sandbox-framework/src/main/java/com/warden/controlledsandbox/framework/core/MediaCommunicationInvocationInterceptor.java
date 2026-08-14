@@ -176,6 +176,12 @@ final class MediaCommunicationInvocationInterceptor {
         if (containsAny(name, "ismicrophonemuted")) return Decision.handled(booleanValue(method.getReturnType(), profile.microphoneMuted()));
         if (containsAny(name, "getstreammaxvolume")) return Decision.handled(numeric(method.getReturnType(), profile.musicVolumeMax()));
         if (containsAny(name, "getstreamvolume", "getlastaudible")) return Decision.handled(numeric(method.getReturnType(), profile.musicVolume()));
+        if (containsAny(name, "getparameters", "getcacheparameters")) {
+            // Android 16's AudioManager asks this read-only cache query during some app
+            // startup paths.  Returning an empty guest-owned parameter set preserves the
+            // isolation boundary without exposing host audio state or rejecting startup.
+            return Decision.handled(stringValue(method.getReturnType(), ""));
+        }
         if (containsAny(name, "requestaudiofocus", "registeraudiofocusclient")) {
             if (!profile.allowAudioFocus()) throw new SecurityException("VIRTUAL_AUDIO_FOCUS_DENIED");
             Object owner = firstIdentity(arguments);

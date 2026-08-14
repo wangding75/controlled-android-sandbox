@@ -24,6 +24,7 @@ public final class FrameworkProxySelfTest {
         testUnknownOverloadFailsInstallationAudit();
         testSameCountWrongTypeFailsInstallationAudit();
         testOutboundListPreservesNull();
+        testOutboundProcessRecordUsesGuestProcessName();
         testFailClosedWithoutInterfaces();
         System.out.println("PASS FrameworkProxySelfTest");
     }
@@ -234,6 +235,45 @@ public final class FrameworkProxySelfTest {
         } catch (UnsupportedOperationException expected) {
             // Expected.
         }
+    }
+
+    private static void testOutboundProcessRecordUsesGuestProcessName() {
+        IdentityArgumentRewriter rewriter = new IdentityArgumentRewriter(context());
+        ProcessRecord current = new ProcessRecord();
+        current.pid = android.os.Process.myPid();
+        current.uid = 10001;
+        current.processName = "host.example:guest2";
+        current.pkgList = new String[] {"host.example"};
+        ProcessRecord otherSlot = new ProcessRecord();
+        otherSlot.pid = current.pid + 1;
+        otherSlot.uid = 10001;
+        otherSlot.processName = "host.example:sandbox_server";
+        otherSlot.pkgList = new String[] {"host.example"};
+        List<Object> original = new ArrayList<>();
+        original.add(current);
+        original.add(otherSlot);
+        @SuppressWarnings("unchecked")
+        List<Object> rewritten = (List<Object>) rewriter.rewriteOutbound(original);
+        check(rewritten.size() == 1, "other host slots must not appear as guest processes");
+        ProcessRecord projected = (ProcessRecord) rewritten.get(0);
+        check(projected != current, "process records must be copied");
+        check(projected.processName.equals("guest.example:main"),
+                "current slot must project to the guest process name: " + projected.processName);
+        check(projected.pkgList[0].equals("guest.example"), "pkgList must project to guest");
+        check("host.example:guest2".equals(current.processName), "original record must stay host");
+        ProcessRecord filled = new ProcessRecord();
+        filled.pid = android.os.Process.myPid();
+        filled.processName = "host.example:guest2";
+        rewriter.rewriteOutboundInPlace(filled);
+        check(filled.processName.equals("guest.example:main"),
+                "out-param process name must be overwritten in place");
+    }
+
+    private static final class ProcessRecord {
+        public int pid;
+        public int uid;
+        public String processName;
+        public String[] pkgList;
     }
 
     private static void testFailClosedWithoutInterfaces() {

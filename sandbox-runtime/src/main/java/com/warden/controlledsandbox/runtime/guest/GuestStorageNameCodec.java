@@ -291,11 +291,36 @@ final class GuestStorageNameCodec {
                 continue;
             }
             if (target.exists()) {
+                // Concurrent first-touch can create both names as empty directories. Empty
+                // directories carry no user data, so converge to v2. If only the v2 name is
+                // empty, migrate the populated legacy tree. Both populated stay fail-closed.
+                if (source.isDirectory() && target.isDirectory()) {
+                    boolean sourceEmpty = isEmptyDirectory(source);
+                    boolean targetEmpty = isEmptyDirectory(target);
+                    if (sourceEmpty) {
+                        if (!source.delete()) {
+                            throw new IllegalStateException("LEGACY_NAME_MIGRATION_FAILED:" + source.getName());
+                        }
+                        continue;
+                    }
+                    if (targetEmpty) {
+                        if (!target.delete()) {
+                            throw new IllegalStateException("LEGACY_NAME_MIGRATION_FAILED:" + target.getName());
+                        }
+                        move(source, target, "LEGACY_NAME_MIGRATION_FAILED");
+                        continue;
+                    }
+                }
                 throw new IllegalStateException("LEGACY_AND_V2_BOTH_EXIST:" + source.getName());
             }
             move(source, target, "LEGACY_NAME_MIGRATION_FAILED");
         }
         syncDirectory(parent);
+    }
+
+    private static boolean isEmptyDirectory(File directory) {
+        String[] children = directory.list();
+        return children != null && children.length == 0;
     }
 
     private static void move(File source, File target, String code) {

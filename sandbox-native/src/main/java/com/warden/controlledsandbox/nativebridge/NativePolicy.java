@@ -156,6 +156,24 @@ public final class NativePolicy {
     public static String audioCaptureStatus() { return AVAILABLE ? nativeAudioCaptureStatus() : "unavailable:" + loadError; }
     public static void resetAudioCapture() { if (AVAILABLE) nativeResetAudioCapture(); }
 
+    /**
+     * Guest CrashSDK/splash recycle must not SIGKILL the sandbox-owned slot.
+     * Only GuestProcessService teardown sets this true.
+     */
+    public static void setGuestProcessExitAllowed(boolean allowed) {
+        if (AVAILABLE) nativeSetGuestProcessExitAllowed(allowed);
+    }
+
+    /** Observe-only wrap of Runtime.nativeLoad. Does not change which loader binds the library. */
+    public static boolean installNativeLoadDiagnostic() {
+        return AVAILABLE && nativeInstallNativeLoadDiagnostic();
+    }
+
+    /** Observe-only: dump pending Java exceptions seen by JNI ExceptionCheck. */
+    public static boolean installJniPendingExceptionProbe() {
+        return AVAILABLE && nativeInstallJniPendingExceptionProbe();
+    }
+
     public static boolean installHooks(String guestLibraryRoot) {
         if (!AVAILABLE) return false;
         if (guestLibraryRoot == null || guestLibraryRoot.trim().isEmpty()) return false;
@@ -250,6 +268,9 @@ public final class NativePolicy {
     private static native boolean nativeEndAudioCapture(long token);
     private static native String nativeAudioCaptureStatus();
     private static native void nativeResetAudioCapture();
+    private static native void nativeSetGuestProcessExitAllowed(boolean allowed);
+    private static native boolean nativeInstallNativeLoadDiagnostic();
+    private static native boolean nativeInstallJniPendingExceptionProbe();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
     private static native boolean nativeRefreshHooks();
     private static native String nativeHookStatus();

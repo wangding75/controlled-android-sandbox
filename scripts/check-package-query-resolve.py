@@ -86,7 +86,7 @@ handler = require(
     'case "resolveContentProvider"', 'case "queryContentProviders"',
     'case "getInstallerPackageName"', 'case "getInstallSourceInfo"',
     'case "getComponentEnabledSetting"', 'case "setApplicationEnabledSetting"',
-    'case "setComponentEnabledSetting"', 'HOST_PACKAGE_HIDDEN')
+    'case "setComponentEnabledSetting"', 'HiddenPackageResultMapper.map(')
 if 'method.invoke(delegate' not in handler:
     errors.append('PackageManager handler must retain an explicit host/system fallback path')
 

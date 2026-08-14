@@ -138,13 +138,7 @@ public final class IdentityArgumentRewriter {
             return null;
         }
         if (value instanceof String text) {
-            if (text.equals(context.hostPackage())) {
-                return context.guestPackage();
-            }
-            if (text.startsWith(context.hostPackage() + ":")) {
-                return context.guestPackage() + text.substring(context.hostPackage().length());
-            }
-            return text;
+            return rewriteOutboundString(text, false);
         }
         if (value instanceof Integer number) {
             return number == context.hostUid() ? context.guestUid() : number;
@@ -156,7 +150,31 @@ public final class IdentityArgumentRewriter {
         if (value instanceof List<?> list) {
             return rewriteList(list, visited, false);
         }
+        if (processNameField(type) != null) {
+            return rewriteProcessIdentityRecord(value, visited, false);
+        }
         return value;
+    }
+
+    /**
+     * Binder out-params such as {@code getMyMemoryState} are filled in place. The caller
+     * already holds this instance, so the Host slot process name must be overwritten here.
+     */
+    public void rewriteOutboundInPlace(Object value) {
+        if (value == null || processNameField(value.getClass()) == null) return;
+        rewriteProcessIdentityRecord(value, new IdentityHashMap<>(), true);
+    }
+
+    private String rewriteOutboundString(String text, boolean currentProcess) {
+        if (text.equals(context.hostPackage())) {
+            return currentProcess ? context.guestProcess() : context.guestPackage();
+        }
+        if (text.startsWith(context.hostPackage() + ":")) {
+            return currentProcess
+                    ? context.guestProcess()
+                    : context.guestPackage() + text.substring(context.hostPackage().length());
+        }
+        return text;
     }
 
     private Object rewriteList(List<?> list, Map<Object, Object> visited, boolean inbound) {
@@ -167,6 +185,9 @@ public final class IdentityArgumentRewriter {
         ArrayList<Object> rewritten = new ArrayList<>(list.size());
         visited.put(list, rewritten);
         for (Object item : list) {
+            if (!inbound && item != null && shouldHideHostSlotProcess(item)) {
+                continue;
+            }
             rewritten.add(inbound
                     ? rewriteInboundValue(item, visited)
                     : rewriteOutboundValue(item, visited));
@@ -272,6 +293,77 @@ public final class IdentityArgumentRewriter {
             return cloneAttributionState(originalValue, visited);
         }
         return originalValue;
+    }
+
+    private Object rewriteProcessIdentityRecord(Object value, Map<Object, Object> visited,
+                                                boolean inPlace) {
+        Object existing = visited.get(value);
+        if (existing != null) return existing;
+        Object target = inPlace ? value : copyProcessIdentityRecord(value);
+        if (target == null) return value;
+        visited.put(value, target);
+        try {
+            Field processName = processNameField(target.getClass());
+            Field pid = findOptionalField(target.getClass(), "pid");
+            Field pkgList = findOptionalField(target.getClass(), "pkgList");
+            int recordPid = pid == null ? -1 : pid.getInt(target);
+            boolean current = recordPid == android.os.Process.myPid() || recordPid <= 0;
+            if (processName != null) {
+                Object name = processName.get(target);
+                if (name instanceof String text) {
+                    processName.set(target, rewriteOutboundString(text, current));
+                }
+            }
+            if (pkgList != null) {
+                pkgList.set(target, rewriteOutboundValue(pkgList.get(target), visited));
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return value;
+        }
+        return target;
+    }
+
+    private boolean shouldHideHostSlotProcess(Object value) {
+        Field processName = processNameField(value.getClass());
+        if (processName == null) return false;
+        try {
+            Object name = processName.get(value);
+            if (!(name instanceof String text)) return false;
+            if (!text.startsWith(context.hostPackage() + ":")) return false;
+            Field pid = findOptionalField(value.getClass(), "pid");
+            int recordPid = pid == null ? -1 : pid.getInt(value);
+            return recordPid != android.os.Process.myPid();
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return false;
+        }
+    }
+
+    private static Object copyProcessIdentityRecord(Object value) {
+        try {
+            Constructor<?> constructor = value.getClass().getDeclaredConstructor();
+            constructor.setAccessible(true);
+            Object copy = constructor.newInstance();
+            for (Field field : allInstanceFields(value.getClass())) {
+                field.setAccessible(true);
+                setFieldValue(field, copy, field.get(value));
+            }
+            return copy;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static Field processNameField(Class<?> type) {
+        Field field = findOptionalField(type, "processName");
+        return field != null && field.getType() == String.class ? field : null;
+    }
+
+    private static Field findOptionalField(Class<?> type, String name) {
+        try {
+            return findField(type, name);
+        } catch (NoSuchFieldException ignored) {
+            return null;
+        }
     }
 
     private static List<Field> allInstanceFields(Class<?> type) {

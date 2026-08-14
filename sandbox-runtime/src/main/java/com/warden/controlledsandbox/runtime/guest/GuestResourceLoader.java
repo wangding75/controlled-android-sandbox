@@ -18,7 +18,19 @@ public final class GuestResourceLoader {
         }
         Resources hostResources = host.getResources();
         Resources resources = new Resources(assets, hostResources.getDisplayMetrics(), hostResources.getConfiguration());
-        return new LoadedResources(assets, resources, GuestManifestMetadata.read(assets));
+        // AssetManager resolves a colliding AndroidManifest.xml entry to the last added path on
+        // API 36.  That is usually a configuration split manifest and can omit base application
+        // metadata.  Keep the merged asset/resource view for app resources, but parse manifest
+        // metadata from a base-only AssetManager.
+        AssetManager baseManifestAssets = AssetManager.class.getDeclaredConstructor().newInstance();
+        Method baseAddAssetPath = AssetManager.class.getDeclaredMethod("addAssetPath", String.class);
+        baseAddAssetPath.setAccessible(true);
+        addRequiredAssetPath(baseAddAssetPath, baseManifestAssets, apkPath, "base manifest");
+        GuestManifestMetadata metadata = GuestManifestMetadata.read(baseManifestAssets, resources);
+        android.os.Bundle application = metadata.application();
+        android.util.Log.i("CS_GUEST_METADATA", "applicationMetaData="
+                + (application == null ? 0 : application.size()));
+        return new LoadedResources(assets, resources, metadata);
     }
 
     private static void addRequiredAssetPath(Method addAssetPath, AssetManager assets,

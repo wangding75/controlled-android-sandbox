@@ -79,6 +79,8 @@ struct android_dlextinfo {
 #define RESOLVE_IN_ROOT 0x10ULL
 #endif
 
+#include <android/log.h>
+#include <csignal>
 #include <algorithm>
 #include <atomic>
 #include <map>
@@ -87,6 +89,7 @@ struct android_dlextinfo {
 #include <string_view>
 #include <vector>
 #include <utility>
+#include <sys/types.h>
 
 namespace controlled_sandbox {
 namespace {
@@ -121,6 +124,12 @@ using FreeIfAddrsFn = void (*)(ifaddrs*);
 using AudioCallFn = int (*)(void*);
 using DlopenFn = void* (*)(const char*, int);
 using AndroidDlopenExtFn = void* (*)(const char*, int, const android_dlextinfo*);
+using KillFn = int (*)(pid_t, int);
+using KillPgFn = int (*)(int, int);
+using TgKillFn = int (*)(int, int, int);
+using TKillFn = int (*)(int, int);
+using ExitFn = void (*)(int);
+using AbortFn = void (*)();
 
 std::atomic<OpenFn> real_open{nullptr};
 std::atomic<OpenFn> real_open64{nullptr};
@@ -161,6 +170,14 @@ std::map<void*, std::uint64_t> aaudio_handles;
 std::map<void*, std::uint64_t> media_recorder_handles;
 std::atomic<DlopenFn> real_dlopen{nullptr};
 std::atomic<AndroidDlopenExtFn> real_android_dlopen_ext{nullptr};
+std::atomic<KillFn> real_kill{nullptr};
+std::atomic<KillPgFn> real_killpg{nullptr};
+std::atomic<TgKillFn> real_tgkill{nullptr};
+std::atomic<TKillFn> real_tkill{nullptr};
+std::atomic<ExitFn> real_exit{nullptr};
+std::atomic<ExitFn> real_underscore_exit{nullptr};
+std::atomic<AbortFn> real_abort{nullptr};
+std::atomic<bool> process_exit_allowed{false};
 thread_local bool inside_refresh = false;
 
 void* resolve_next(const char* name) {
@@ -177,6 +194,23 @@ Function require_real(std::atomic<Function>& storage, const char* name) {
     current = reinterpret_cast<Function>(resolve_next(name));
     storage.store(current, std::memory_order_release);
     return current;
+}
+
+void log_native_binding(const char* api, const char* requested, const char* resolved,
+                        int flags, const android_dlextinfo* info, void* handle) {
+    const std::uint64_t extension_flags = info == nullptr ? 0 : info->flags;
+    const void* namespace_ptr = info == nullptr ? nullptr : info->library_namespace;
+    __android_log_print(ANDROID_LOG_INFO, "CS_NATIVE_BIND",
+            "SO api=%s requested=%s resolved=%s flags=0x%x extFlags=0x%llx useNamespace=%d "
+            "namespace=%p handle=%p",
+            api == nullptr ? "" : api,
+            requested == nullptr ? "" : requested,
+            resolved == nullptr ? "" : resolved,
+            flags,
+            static_cast<unsigned long long>(extension_flags),
+            (extension_flags & ANDROID_DLEXT_USE_NAMESPACE) != 0 ? 1 : 0,
+            namespace_ptr,
+            handle);
 }
 
 bool requires_mode(int flags) {
@@ -679,6 +713,7 @@ extern "C" void* controlled_dlopen(const char* name, int flags) {
         const NativeLibraryDecision decision = NativeLibraryLoaderPolicy::resolve(name);
         NativeLibraryLoaderPolicy::validate_library(decision);
         void* handle = function(decision.resolved_name.c_str(), flags);
+        log_native_binding("dlopen", name, decision.resolved_name.c_str(), flags, nullptr, handle);
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
         NativeLibraryLoaderPolicy::record_denial(error.what());
@@ -720,6 +755,7 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
             throw PathPolicyError(EACCES, "ANDROID_DLOPEN_EXT_SOURCE_REQUIRED");
         }
         void* handle = function(call_name, flags, info);
+        log_native_binding("android_dlopen_ext", name, call_name, flags, info, handle);
         return refresh_loaded_handle(handle) ? handle : nullptr;
     } catch (const PathPolicyError& error) {
         NativeLibraryLoaderPolicy::record_denial(error.what());
@@ -730,6 +766,111 @@ extern "C" void* controlled_android_dlopen_ext(const char* name, int flags,
         errno = EACCES;
         return nullptr;
     }
+}
+
+bool terminating_signal(int signal_number) {
+    return signal_number == SIGKILL || signal_number == SIGTERM || signal_number == SIGABRT;
+}
+
+bool self_process_target(pid_t pid) {
+    const pid_t me = getpid();
+    return pid == me || pid == 0 || pid == -me;
+}
+
+bool block_self_termination(pid_t pid, int signal_number) {
+    return !process_exit_allowed.load(std::memory_order_acquire)
+            && self_process_target(pid)
+            && terminating_signal(signal_number);
+}
+
+extern "C" int controlled_kill(pid_t pid, int signal_number) {
+    if (block_self_termination(pid, signal_number)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest self-signal ignored pid=%d sig=%d", static_cast<int>(pid), signal_number);
+        return 0;
+    }
+    KillFn function = require_real(real_kill, "kill");
+    if (function == nullptr) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return function(pid, signal_number);
+}
+
+extern "C" int controlled_killpg(int process_group, int signal_number) {
+    if (block_self_termination(static_cast<pid_t>(-process_group), signal_number)
+            || block_self_termination(static_cast<pid_t>(process_group), signal_number)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest self-killpg ignored pgid=%d sig=%d", process_group, signal_number);
+        return 0;
+    }
+    KillPgFn function = require_real(real_killpg, "killpg");
+    if (function == nullptr) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return function(process_group, signal_number);
+}
+
+extern "C" int controlled_tgkill(int process_id, int thread_id, int signal_number) {
+    if (block_self_termination(static_cast<pid_t>(process_id), signal_number)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest self-tgkill ignored pid=%d tid=%d sig=%d",
+                process_id, thread_id, signal_number);
+        return 0;
+    }
+    TgKillFn function = require_real(real_tgkill, "tgkill");
+    if (function == nullptr) {
+        return static_cast<int>(syscall(SYS_tgkill, process_id, thread_id, signal_number));
+    }
+    return function(process_id, thread_id, signal_number);
+}
+
+extern "C" int controlled_tkill(int thread_id, int signal_number) {
+    if (block_self_termination(getpid(), signal_number)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest self-tkill ignored tid=%d sig=%d", thread_id, signal_number);
+        return 0;
+    }
+    TKillFn function = require_real(real_tkill, "tkill");
+    if (function == nullptr) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return function(thread_id, signal_number);
+}
+
+extern "C" void controlled_exit(int status) {
+    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest exit(%d) ignored", status);
+        return;
+    }
+    ExitFn function = require_real(real_exit, "exit");
+    if (function != nullptr) function(status);
+    _exit(status);
+}
+
+extern "C" void controlled_abort() {
+    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest abort() ignored");
+        return;
+    }
+    AbortFn function = require_real(real_abort, "abort");
+    if (function != nullptr) function();
+    syscall(SYS_exit_group, 134);
+}
+
+extern "C" void controlled_underscore_exit(int status) {
+    if (!process_exit_allowed.load(std::memory_order_acquire)) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest _exit(%d) ignored", status);
+        return;
+    }
+    ExitFn function = require_real(real_underscore_exit, "_exit");
+    if (function != nullptr) function(status);
+    syscall(SYS_exit_group, status);
 }
 
 void* replacement_for(std::string_view name) {
@@ -788,6 +929,13 @@ void* replacement_for(std::string_view name) {
     if (name == "AMediaRecorder_stop") return reinterpret_cast<void*>(&controlled_AMediaRecorder_stop);
     if (name == "dlopen") return reinterpret_cast<void*>(&controlled_dlopen);
     if (name == "android_dlopen_ext") return reinterpret_cast<void*>(&controlled_android_dlopen_ext);
+    if (name == "kill") return reinterpret_cast<void*>(&controlled_kill);
+    if (name == "killpg") return reinterpret_cast<void*>(&controlled_killpg);
+    if (name == "tgkill") return reinterpret_cast<void*>(&controlled_tgkill);
+    if (name == "tkill") return reinterpret_cast<void*>(&controlled_tkill);
+    if (name == "exit") return reinterpret_cast<void*>(&controlled_exit);
+    if (name == "_exit" || name == "_Exit") return reinterpret_cast<void*>(&controlled_underscore_exit);
+    if (name == "abort") return reinterpret_cast<void*>(&controlled_abort);
     return nullptr;
 }
 
@@ -806,6 +954,14 @@ void revoke_native_audio_captures() noexcept {
 
 void* replacement_for_symbol(std::string_view name) noexcept {
     return replacement_for(name);
+}
+
+void set_guest_process_exit_allowed(bool allowed) noexcept {
+    process_exit_allowed.store(allowed, std::memory_order_release);
+}
+
+bool guest_process_exit_allowed() noexcept {
+    return process_exit_allowed.load(std::memory_order_acquire);
 }
 
 }  // namespace controlled_sandbox

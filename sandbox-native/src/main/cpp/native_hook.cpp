@@ -94,7 +94,7 @@ template <typename Relocation>
 std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, std::size_t count,
                               const ElfW(Sym)* symbols, const char* strings,
                               std::size_t& targets, std::size_t& failures,
-                              bool camera_system) {
+                              bool camera_system, bool lifetime_system) {
     if (entries == nullptr || symbols == nullptr || strings == nullptr) return 0;
     std::size_t patched = 0;
     for (std::size_t index = 0; index < count; index++) {
@@ -105,7 +105,8 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
         const char* name = strings + symbols[symbol_index].st_name;
         if (name == nullptr) continue;
         if (camera_system ? !is_camera1_system_symbol(name)
-                          : !NativeHookRuntime::is_target_symbol(name)) continue;
+                : lifetime_system ? !NativeHookRuntime::is_process_lifetime_symbol(name)
+                : !NativeHookRuntime::is_target_symbol(name)) continue;
         void* replacement = camera_system ? replacement_for_camera1_symbol(name)
                                           : replacement_for_symbol(name);
         if (replacement == nullptr) continue;
@@ -125,6 +126,7 @@ struct ScanContext {
     NativeHookRuntime* runtime;
     std::string root;
     bool camera_system{false};
+    bool lifetime_system{false};
     std::size_t scanned{0};
     std::size_t matched{0};
     std::size_t patched{0};
@@ -138,6 +140,8 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     const std::string_view path = info->dlpi_name == nullptr ? std::string_view{} : std::string_view(info->dlpi_name);
     if (context->camera_system) {
         if (!is_camera1_system_module(path)) return 0;
+    } else if (context->lifetime_system) {
+        if (!NativeHookRuntime::is_process_lifetime_system_module(path)) return 0;
     } else if (!NativeHookRuntime::is_guest_module(path, context->root)) {
         return 0;
     }
@@ -191,14 +195,14 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     if (jump_relocations != nullptr && jump_size > 0) {
         if (jump_type == DT_RELA) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system);
+                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
         } else if (jump_type == DT_REL) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system);
+                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
         }
     }
-    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system);
-    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system);
+    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
+    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
     return 0;
 }
 
@@ -247,8 +251,12 @@ bool NativeHookRuntime::refresh() {
             return false;
         }
     }
-    ScanContext context{this, root, false};
+    ScanContext context{this, root, false, false};
     const int result = dl_iterate_phdr(scan_module, &context);
+    ScanContext lifetime{this, root, false, true};
+    (void) dl_iterate_phdr(scan_module, &lifetime);
+    context.patched += lifetime.patched;
+    context.targets += lifetime.targets;
     std::lock_guard lock(state.mutex);
     state.status.refresh_count++;
     state.status.modules_scanned = context.scanned;
@@ -288,8 +296,25 @@ NativeHookStatus NativeHookRuntime::status() const {
     return state.status;
 }
 
+bool NativeHookRuntime::is_process_lifetime_symbol(std::string_view symbol) noexcept {
+    static constexpr std::array<std::string_view, 8> targets{
+            "kill", "killpg", "tgkill", "tkill", "exit", "_exit", "_Exit", "abort"};
+    return std::find(targets.begin(), targets.end(), symbol) != targets.end();
+}
+
+bool NativeHookRuntime::is_process_lifetime_system_module(std::string_view module_path) noexcept {
+    auto ends_with = [](std::string_view path, std::string_view name) {
+        return path == name || (path.size() > name.size()
+                && path.compare(path.size() - name.size(), name.size(), name) == 0);
+    };
+    return ends_with(module_path, "libandroid_runtime.so")
+            || ends_with(module_path, "libopenjdk.so")
+            || ends_with(module_path, "libopenjdkjvm.so")
+            || ends_with(module_path, "libjavacore.so");
+}
+
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 57> targets{
+    static constexpr std::array<std::string_view, 65> targets{
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
             "renameat2", "readlink", "readlinkat", "getdents64", "mmap",
@@ -300,7 +325,8 @@ bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
             "getaddrinfo", "getnameinfo", "gethostname", "uname",
             "getifaddrs", "freeifaddrs", "AAudioStream_requestStart",
             "AAudioStream_requestStop", "AMediaRecorder_start", "AMediaRecorder_stop",
-            "dlopen", "android_dlopen_ext"};
+            "dlopen", "android_dlopen_ext",
+            "kill", "killpg", "tgkill", "tkill", "exit", "_exit", "_Exit", "abort"};
     return std::find(targets.begin(), targets.end(), symbol) != targets.end();
 }
 

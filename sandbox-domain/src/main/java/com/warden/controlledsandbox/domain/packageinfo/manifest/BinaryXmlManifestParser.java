@@ -79,6 +79,7 @@ public final class BinaryXmlManifestParser {
                 model.configForSplit(element.stringAttr("configForSplit"));
                 model.usesSplit(element.stringAttr("usesSplit"));
                 model.featureSplit(element.boolAttr("isFeatureSplit", false));
+                model.versionCode(element.intAttr("versionCode", 0));
             }
             case "uses-sdk" -> {
                 model.minSdk(element.intAttr("minSdkVersion", 0));
@@ -109,33 +110,45 @@ public final class BinaryXmlManifestParser {
                 model.applicationThemeResId(element.intAttr("theme", 0));
             }
             case "activity" -> {
-                ManifestModel.Component component = component(model, element, element.stringAttr("name"));
+                if (insideQueries(stack)) break;
+                ManifestModel.Component component = component(model, element,
+                        requireComponentName("activity", element.stringAttr("name")));
+                component = model.addActivity(component);
                 element.component = component;
-                model.addActivity(component);
             }
             case "activity-alias" -> {
-                // An alias is a distinct manifest component. Using targetActivity
-                // as its identity collapses a legitimate alias+activity pair
-                // (common in browser launchers) into a false duplicate.
+                if (insideQueries(stack)) break;
+                // Some OEM manifests reuse the target activity name for an alias.
+                // Android exposes one component record with the union of filters;
+                // ManifestModel.mergeFrom preserves that behavior.
                 ManifestModel.Component component = component(model, element,
-                        element.stringAttr("name"));
+                        requireComponentName("activity-alias", element.stringAttr("name")));
+                component = model.addActivity(component);
+                component.targetActivity(model.resolveClassName(element.stringAttr("targetActivity")));
                 element.component = component;
-                model.addActivity(component);
             }
             case "service" -> {
-                ManifestModel.Component component = component(model, element, element.stringAttr("name"));
+                if (insideQueries(stack)) break;
+                ManifestModel.Component component = component(model, element,
+                        requireComponentName("service", element.stringAttr("name")));
+                component = model.addService(component);
                 element.component = component;
-                model.addService(component);
             }
             case "receiver" -> {
-                ManifestModel.Component component = component(model, element, element.stringAttr("name"));
+                if (insideQueries(stack)) break;
+                ManifestModel.Component component = component(model, element,
+                        requireComponentName("receiver", element.stringAttr("name")));
+                component = model.addReceiver(component);
                 element.component = component;
-                model.addReceiver(component);
             }
             case "provider" -> {
-                ManifestModel.Component component = providerComponent(model, element, element.stringAttr("name"));
+                // Android 11+ <queries><provider android:authorities="..."/></queries>
+                // declares package visibility, not a ContentProvider component.
+                if (insideQueries(stack)) break;
+                ManifestModel.Component component = providerComponent(model, element,
+                        requireComponentName("provider", element.stringAttr("name")));
+                component = model.addProvider(component);
                 element.component = component;
-                model.addProvider(component);
             }
             case "path-permission" -> addProviderPathPermission(stack, element);
             case "grant-uri-permission" -> addProviderGrantRule(stack, element);
@@ -180,6 +193,20 @@ public final class BinaryXmlManifestParser {
             default -> { }
         }
 
+    }
+
+    private static boolean insideQueries(Deque<ElementContext> stack) {
+        for (ElementContext context : stack) {
+            if ("queries".equals(context.name)) return true;
+        }
+        return false;
+    }
+
+    private static String requireComponentName(String tag, String rawName) {
+        if (rawName == null || rawName.trim().isEmpty()) {
+            throw new IllegalArgumentException("MISSING_COMPONENT_NAME:" + tag);
+        }
+        return rawName;
     }
 
     private static void finalizeVisibleIntentStates(Deque<ElementContext> stack) {
@@ -227,8 +254,10 @@ public final class BinaryXmlManifestParser {
         if (permission.trim().isEmpty()) permission = model.applicationPermission();
         ManifestModel.Component component = new ManifestModel.Component(className, process, exported,
                 exportedExplicit, enabled, isolated, element.stringAttr("authorities"), permission);
-        component.themeResId(element.hasAttr("theme")
-                ? element.intAttr("theme", 0) : model.applicationThemeResId());
+        boolean themeExplicit = element.hasAttr("theme");
+        component.themeResId(themeExplicit ? element.intAttr("theme", 0)
+                : model.applicationThemeResId());
+        component.themeExplicit(themeExplicit);
         return component;
     }
 

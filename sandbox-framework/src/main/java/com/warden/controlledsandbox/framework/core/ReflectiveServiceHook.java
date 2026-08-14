@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.framework.core;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 
 import android.content.Context;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -83,7 +84,7 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             }
         }
         Class<?> stub = Class.forName(descriptor + "$Stub");
-        Object service = findAsInterface(stub).invoke(null, binder);
+        Object service = resolveBinderInterface(stub, binder);
         if (service == null) throw new IllegalStateException(
                 "Binder descriptor has no local interface: " + androidServiceName);
         Object serviceProxy = createProxy(service, identity, logicalServiceName);
@@ -93,6 +94,61 @@ public final class ReflectiveServiceHook implements AutoCloseable {
                 binder.getClass().getClassLoader() == null ? ReflectiveServiceHook.class.getClassLoader()
                         : binder.getClass().getClassLoader(),
                 new Class<?>[] {android.os.IBinder.class}, binderHandler);
+        Field cacheField = findField(managerClass, "sCache");
+        cacheField.setAccessible(true);
+        Object cache = cacheField.get(null);
+        if (!(cache instanceof Map)) throw new IllegalStateException("ServiceManager cache unavailable");
+        @SuppressWarnings("unchecked") Map<String, Object> entries = (Map<String, Object>) cache;
+        Object previous;
+        synchronized (entries) {
+            previous = entries.put(androidServiceName, replacement);
+        }
+        return new ServiceManagerBinding(entries, androidServiceName, previous, replacement);
+    }
+
+    /**
+     * API36's module-owned AIDL Stub can be hidden from application reflection while the
+     * framework manager has already resolved the same interface internally.  Reuse that
+     * descriptor-validated static interface rather than attempting to reconstruct its hidden
+     * Stub/Proxy class from the Guest process.
+     */
+    public static AutoCloseable serviceManagerBindingFromStaticField(
+            String androidServiceName, String logicalServiceName, String descriptor,
+            GuestIdentity identity, String ownerClassName, String fieldName) throws Exception {
+        Class<?> managerClass = Class.forName("android.os.ServiceManager");
+        Method getService = managerClass.getDeclaredMethod("getService", String.class);
+        getService.setAccessible(true);
+        Object original = getService.invoke(null, androidServiceName);
+        if (!(original instanceof android.os.IBinder binder)) {
+            throw new IllegalStateException("ServiceManager binder unavailable: " + androidServiceName);
+        }
+        validateBinderDescriptor(binder, descriptor, androidServiceName);
+        if (binder instanceof Proxy) {
+            InvocationHandler existing = Proxy.getInvocationHandler(binder);
+            if (existing instanceof SyntheticBinderInvocationHandler synthetic
+                    && synthetic.matches(descriptor)) {
+                return () -> { };
+            }
+            if (existing instanceof ServiceManagerBinderInvocationHandler handler
+                    && handler.matches(descriptor, logicalServiceName)) {
+                return () -> { };
+            }
+        }
+
+        Class<?> owner = Class.forName(ownerClassName);
+        Field serviceField = findField(owner, fieldName);
+        serviceField.setAccessible(true);
+        Object service = serviceField.get(null);
+        if (service == null) {
+            throw new IllegalStateException(ownerClassName + "." + fieldName + " is null");
+        }
+        Object serviceProxy = createProxy(service, identity, logicalServiceName);
+        InvocationHandler binderHandler = new ServiceManagerBinderInvocationHandler(
+                binder, descriptor, logicalServiceName, serviceProxy);
+        ClassLoader loader = binder.getClass().getClassLoader();
+        if (loader == null) loader = ReflectiveServiceHook.class.getClassLoader();
+        android.os.IBinder replacement = (android.os.IBinder) Proxy.newProxyInstance(
+                loader, new Class<?>[] {android.os.IBinder.class}, binderHandler);
         Field cacheField = findField(managerClass, "sCache");
         cacheField.setAccessible(true);
         Object cache = cacheField.get(null);
@@ -819,6 +875,11 @@ public final class ReflectiveServiceHook implements AutoCloseable {
     }
 
     private static Method findAsInterface(Class<?> stub) throws NoSuchMethodException {
+        // API36 moves several framework AIDL interfaces, including NFC, into dedicated
+        // framework modules and marks their Stub methods as hidden.  Ensure the native bridge
+        // has been entered before enumerating those methods; otherwise ART can present a
+        // truncated reflective method view and falsely report a missing asInterface method.
+        HiddenApiAccess.ensureExemptions();
         for (Method method : stub.getDeclaredMethods()) {
             if (method.getName().equals("asInterface") && method.getParameterCount() == 1) {
                 method.setAccessible(true);
@@ -826,6 +887,42 @@ public final class ReflectiveServiceHook implements AutoCloseable {
             }
         }
         throw new NoSuchMethodException(stub.getName() + ".asInterface");
+    }
+
+    /**
+     * Resolves a generated Binder interface across framework module layouts.  Some API36
+     * processes hide the generated Stub.asInterface method from reflection even though the
+     * companion Proxy constructor remains available.  Both paths are the platform AIDL
+     * conversion for the already descriptor-validated Binder; no synthetic service is created.
+     */
+    private static Object resolveBinderInterface(Class<?> stub, android.os.IBinder binder)
+            throws Exception {
+        try {
+            return findAsInterface(stub).invoke(null, binder);
+        } catch (NoSuchMethodException missingAsInterface) {
+            HiddenApiAccess.ensureExemptions();
+            Class<?> proxy = Class.forName(stub.getName() + "$Proxy");
+            Constructor<?> constructor = null;
+            for (Constructor<?> candidate : proxy.getDeclaredConstructors()) {
+                Class<?>[] parameters = candidate.getParameterTypes();
+                if (parameters.length == 1
+                        && parameters[0].isAssignableFrom(android.os.IBinder.class)) {
+                    constructor = candidate;
+                    break;
+                }
+            }
+            if (constructor == null) {
+                StringBuilder signatures = new StringBuilder();
+                for (Constructor<?> candidate : proxy.getDeclaredConstructors()) {
+                    if (signatures.length() > 0) signatures.append(';');
+                    signatures.append(candidate.toGenericString());
+                }
+                throw new NoSuchMethodException(proxy.getName() + ".<init>(IBinder) constructors="
+                        + signatures);
+            }
+            constructor.setAccessible(true);
+            return constructor.newInstance(binder);
+        }
     }
 
     private static final class ServiceManagerBinding implements AutoCloseable {

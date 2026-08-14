@@ -18,6 +18,7 @@ public final class ManifestModel {
     private boolean featureSplit;
     private int minSdk;
     private int targetSdk;
+    private long versionCode;
     private final List<Component> activities = new ArrayList<>();
     private final List<Component> services = new ArrayList<>();
     private final List<Component> receivers = new ArrayList<>();
@@ -48,6 +49,8 @@ public final class ManifestModel {
     public void minSdk(int value) { minSdk = value; }
     public int targetSdk() { return targetSdk; }
     public void targetSdk(int value) { targetSdk = value; }
+    public long versionCode() { return versionCode; }
+    public void versionCode(long value) { versionCode = Math.max(0L, value); }
     public List<Component> activities() { return Collections.unmodifiableList(activities); }
     public List<Component> services() { return Collections.unmodifiableList(services); }
     public List<Component> receivers() { return Collections.unmodifiableList(receivers); }
@@ -64,20 +67,21 @@ public final class ManifestModel {
         return Collections.unmodifiableList(instrumentations);
     }
 
-    public void addActivity(Component component) { addComponent(activities, component); }
-    public void addService(Component component) { addComponent(services, component); }
-    public void addReceiver(Component component) { addComponent(receivers, component); }
-    public void addProvider(Component component) { addComponent(providers, component); }
+    public Component addActivity(Component component) { return addComponent(activities, component); }
+    public Component addService(Component component) { return addComponent(services, component); }
+    public Component addReceiver(Component component) { return addComponent(receivers, component); }
+    public Component addProvider(Component component) { return addComponent(providers, component); }
 
-    private static void addComponent(List<Component> target, Component component) {
-        if (component == null) return;
+    private static Component addComponent(List<Component> target, Component component) {
+        if (component == null) return null;
         for (Component existing : target) {
             if (existing.className().equals(component.className())) {
                 existing.mergeFrom(component);
-                return;
+                return existing;
             }
         }
         target.add(component);
+        return component;
     }
 
     /** Backward-compatible shorthand for a required Java uses-library declaration. */
@@ -129,7 +133,16 @@ public final class ManifestModel {
     }
 
     public String launcherActivity() {
-        for (Component activity : activities) if (activity.launcher()) return activity.className();
+        // A manifest may keep a disabled launcher alias for rollout/feature
+        // switches before the enabled launcher alias. Android's resolver does
+        // not select the disabled component, so prefer an enabled launcher
+        // when projecting the launch entry point.
+        for (Component activity : activities) {
+            if (activity.launcher() && activity.enabled()) return activity.launchTargetClass();
+        }
+        // Preserve a diagnostic fallback for malformed manifests that declare
+        // only disabled launcher components.
+        for (Component activity : activities) if (activity.launcher()) return activity.launchTargetClass();
         return "";
     }
 
@@ -255,6 +268,8 @@ public final class ManifestModel {
         private boolean launcher;
         private boolean intentFilterDeclared;
         private int themeResId;
+        private boolean themeExplicit;
+        private String targetActivity = "";
 
         public Component(String className, String processName, boolean exported, boolean enabled,
                          boolean isolatedProcess) {
@@ -325,8 +340,15 @@ public final class ManifestModel {
         public boolean hasIntentFilter() { return intentFilterDeclared; }
         public boolean launcher() { return launcher; }
         public void launcher(boolean value) { launcher = value; }
+        public String targetActivity() { return targetActivity; }
+        public void targetActivity(String value) { targetActivity = normalize(value); }
+        public String launchTargetClass() {
+            return targetActivity.isEmpty() ? className : targetActivity;
+        }
         public int themeResId() { return themeResId; }
         public void themeResId(int value) { themeResId = Math.max(0, value); }
+        public boolean themeExplicit() { return themeExplicit; }
+        public void themeExplicit(boolean value) { themeExplicit = value; }
 
         /**
          * Android package parsing exposes one component record even when an APK
@@ -349,9 +371,15 @@ public final class ManifestModel {
                     || !readPermission.equals(other.readPermission)
                     || !writePermission.equals(other.writePermission)
                     || grantUriPermissions != other.grantUriPermissions
-                    || themeResId != other.themeResId) {
+                    || (!targetActivity.isEmpty() && !other.targetActivity.isEmpty()
+                    && !targetActivity.equals(other.targetActivity))
+                    || (themeExplicit && other.themeExplicit && themeResId != other.themeResId)) {
                 throw new IllegalArgumentException(
                         "Conflicting duplicate component declaration: " + className);
+            }
+            if (!themeExplicit && other.themeExplicit) {
+                themeResId = other.themeResId;
+                themeExplicit = true;
             }
             for (String action : other.actions) addAction(action);
             for (IntentFilter filter : other.intentFilters) mergeIntentFilter(filter);
@@ -367,6 +395,7 @@ public final class ManifestModel {
             }
             launcher |= other.launcher;
             intentFilterDeclared |= other.intentFilterDeclared;
+            if (targetActivity.isEmpty()) targetActivity = other.targetActivity;
         }
 
         private void mergeIntentFilter(IntentFilter other) {

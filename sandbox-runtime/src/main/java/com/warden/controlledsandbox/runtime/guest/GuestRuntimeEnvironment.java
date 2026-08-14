@@ -125,14 +125,24 @@ public final class GuestRuntimeEnvironment {
             File optimized = new File(host.getCodeCacheDir(), "guest/" + safe(spec.packageName)
                     + "/" + safe(spec.packageRevision) + "/" + spec.generation);
             ensureDirectory(optimized);
+            if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
+                throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
+            }
+            boolean jniEx = NativePolicy.installJniPendingExceptionProbe();
+            android.util.Log.i("CS_JNI_EX", "PROBE installed=" + jniEx);
             GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader(),
                     spec.packageName, declaredGuestClasses(spec));
+            GuestNativeBindingDiagnostic.installProcessProbes();
+            GuestNativeBindingDiagnostic.recordLoader("guest.base", loader);
+            GuestNativeBindingDiagnostic.recordLoader("guest.dex", loader.definingLoader());
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
+            String appComponentFactory = archiveAppComponentFactory(processPackageManager, spec.apkPath);
             GuestContext guestContext = new GuestContext(host, spec, loader,
-                    loadedResources.resources, loadedResources.assets, processPackageManager);
+                    loadedResources.resources, loadedResources.assets, processPackageManager,
+                    loadedResources.manifestMetadata.application(), appComponentFactory);
             IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
                     spec.virtualSystemServiceBinder);
             if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
@@ -155,9 +165,13 @@ public final class GuestRuntimeEnvironment {
             if (requiresNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
-            if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
-                throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
-            }
+            boolean nativeLoadDiag = NativePolicy.installNativeLoadDiagnostic();
+            android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag);
+            // handleBindApplication publishes process identity before LoadedApk asks the
+            // AppComponentFactory to wrap the ClassLoader. The hidden-API bridge must be
+            // installed first so Process.setArgV0 is visible.
+            stagedProcessIdentity = GuestProcessIdentityBridge.bind(
+                    guestContext.getApplicationInfo(), spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo(), loadedResources.manifestMetadata);
             VirtualSystemServiceState virtualServices = new VirtualSystemServiceState(
@@ -252,17 +266,21 @@ public final class GuestRuntimeEnvironment {
             }
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.privilegedServicesProfile());
-            // Android creates Application instances and calls attachBaseContext/onCreate on the
-            // process main thread.  Binder-driven preparation must preserve that contract because
-            // real APK constructors commonly allocate a Handler/Looper during initialization.
-            // Project the Guest process identity before attachBaseContext: Tinker-style
-            // Application delegates cache ActivityThread's process name during that hook, and
-            // observing the Host process there silently skips normal startup tasks.
+            // LoadedApk asks AppComponentFactory after bind and after ActivityManager is
+            // proxied so factory process-name reads see the Guest identity, not host:guestN.
+            ClassLoader processLoader = GuestComponentFactory.instantiateClassLoader(
+                    loader, appComponentFactory, guestContext.getApplicationInfo());
+            if (processLoader != loader) guestContext.installProcessClassLoader(processLoader);
+            android.util.Log.i("CS_GUEST_FACTORY", "classLoader factory=" + appComponentFactory
+                    + " base=" + loader.getClass().getName()
+                    + " process=" + processLoader.getClass().getName());
+            GuestNativeBindingDiagnostic.recordLoader("guest.process", processLoader);
             Application application = guestContext.mainThread.call(
-                    () -> instantiateApplication(spec, loader));
+                    () -> instantiateApplication(spec, guestContext.getClassLoader(),
+                            guestContext.getApplicationInfo().appComponentFactory));
             guestContext.application(application);
-            stagedProcessIdentity = GuestProcessIdentityBridge.install(
-                    application, guestContext.getApplicationInfo(), spec);
+            GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
+            stagedProcessIdentity.attachApplication(application);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
             if (nativePolicyConfigured && !camera1AdapterInstalled) {
                 camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
@@ -419,13 +437,32 @@ public final class GuestRuntimeEnvironment {
         return new SandboxAppOpsPolicy(modes);
     }
 
-    private static Application instantiateApplication(GuestPackageSpec spec, ClassLoader loader)
+    private static Application instantiateApplication(GuestPackageSpec spec, ClassLoader loader,
+                                                      String appComponentFactory)
             throws Exception {
         String className = spec.applicationClass == null || spec.applicationClass.trim().isEmpty()
                 ? Application.class.getName() : spec.applicationClass;
         Class<?> type = loader.loadClass(className);
         if (!Application.class.isAssignableFrom(type)) throw new IllegalArgumentException("Application class has wrong type: " + className);
-        return (Application) type.getDeclaredConstructor().newInstance();
+        Application application = GuestComponentFactory.instantiateApplication(loader,
+                appComponentFactory, className);
+        android.util.Log.i("CS_GUEST_FACTORY", "application factory="
+                + String.valueOf(appComponentFactory) + " class=" + className);
+        return application;
+    }
+
+    private static String archiveAppComponentFactory(PackageManager packageManager, String apkPath) {
+        try {
+            android.content.pm.PackageInfo info = packageManager.getPackageArchiveInfo(
+                    apkPath, PackageManager.GET_META_DATA);
+            String value = info == null || info.applicationInfo == null
+                    ? "" : info.applicationInfo.appComponentFactory;
+            android.util.Log.i("CS_GUEST_FACTORY", "archive factory=" + String.valueOf(value));
+            return value == null ? "" : value.trim();
+        } catch (Throwable error) {
+            android.util.Log.w("CS_GUEST_FACTORY", "archive factory unavailable", error);
+            return "";
+        }
     }
 
     /**

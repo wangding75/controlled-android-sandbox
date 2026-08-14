@@ -31,6 +31,47 @@ import java.util.Set;
         require(windowId > 0, "accessibility interaction connection is locally owned");
         accessibility.removeAccessibilityInteractionConnection(windowToken);
         require(accessibility.getRecommendedTimeoutMillis(10L, 0) == 5000L, "accessibility timeout projected");
+        require(AccessibilityInvocationClassifier.classify("sendAccessibilityEvent")
+                        == AccessibilityInvocationClass.APP_LOCAL_EVENT,
+                "sendAccessibilityEvent is APP_LOCAL_EVENT");
+        require(AccessibilityInvocationClassifier.classify("setAccessibilityWindowAttributes")
+                        == AccessibilityInvocationClass.APP_LOCAL_WINDOW_METADATA,
+                "window attributes are APP_LOCAL_WINDOW_METADATA");
+        require(AccessibilityInvocationClassifier.classify("interrupt")
+                        == AccessibilityInvocationClass.HOST_ACCESSIBILITY_STATE_MUTATION,
+                "interrupt is host accessibility mutation");
+        require(AccessibilityInvocationClassifier.classify("getWindows")
+                        == AccessibilityInvocationClass.CROSS_APP_ACCESSIBILITY_DATA,
+                "getWindows is cross-app data");
+        require(AccessibilityInvocationClassifier.classify("setSecureSetting")
+                        == AccessibilityInvocationClass.SECURE_SETTING_MUTATION,
+                "secure setting write is SECURE_SETTING_MUTATION");
+        accessibility.sendAccessibilityEvent(new AccessibilityEvent("guest.pkg"));
+        accessibility.setAccessibilityWindowAttributes(windowToken, new Object());
+        boolean interruptDenied = false;
+        try { accessibility.interrupt(0); }
+        catch (SecurityException expected) {
+            interruptDenied = expected.getMessage().contains("MUTATION_DENIED");
+        }
+        require(interruptDenied, "interrupt is denied, not treated as ViewRoot bookkeeping");
+        boolean crossAppDenied = false;
+        try { accessibility.sendAccessibilityEvent(new AccessibilityEvent("other.pkg")); }
+        catch (SecurityException expected) {
+            crossAppDenied = expected.getMessage().contains("CROSS_APP_DENIED");
+        }
+        require(crossAppDenied, "cross-app accessibility events are denied");
+        boolean windowsDenied = false;
+        try { accessibility.getWindows(); }
+        catch (SecurityException expected) {
+            windowsDenied = expected.getMessage().contains("CROSS_APP_DENIED");
+        }
+        require(windowsDenied, "cross-app window trees are denied");
+        boolean secureDenied = false;
+        try { accessibility.setSecureSetting("enabled_accessibility_services", "x"); }
+        catch (SecurityException expected) {
+            secureDenied = expected.getMessage().contains("MUTATION_DENIED");
+        }
+        require(secureDenied, "secure settings mutation is denied");
         AutofillApi autofill = proxy(AutofillApi.class, new AutofillDelegate(), identity, "autofill");
         Object autofillClient = new Object();
         int session = autofill.startSession(autofillClient, "guest.pkg");
@@ -109,6 +150,17 @@ import java.util.Set;
         void removeClient(Object client, int userId);
         int addAccessibilityInteractionConnection(Object windowToken, String packageName, Object connection);
         void removeAccessibilityInteractionConnection(Object windowToken);
+        void sendAccessibilityEvent(Object event);
+        void setAccessibilityWindowAttributes(Object windowToken, Object attributes);
+        void interrupt(int userId);
+        Object getWindows();
+        void setSecureSetting(String name, String value);
+    }
+
+    static final class AccessibilityEvent {
+        private final String packageName;
+        AccessibilityEvent(String packageName) { this.packageName = packageName; }
+        public String getPackageName() { return packageName; }
     }
     interface AutofillApi {
         int startSession(Object client, String packageName);
@@ -175,6 +227,17 @@ import java.util.Set;
             return -1;
         }
         public void removeAccessibilityInteractionConnection(Object w){
+        }
+        public void sendAccessibilityEvent(Object event){
+        }
+        public void setAccessibilityWindowAttributes(Object windowToken, Object attributes){
+        }
+        public void interrupt(int userId){
+        }
+        public Object getWindows(){
+            return null;
+        }
+        public void setSecureSetting(String name, String value){
         }
     }
     static final class AutofillDelegate implements AutofillApi {

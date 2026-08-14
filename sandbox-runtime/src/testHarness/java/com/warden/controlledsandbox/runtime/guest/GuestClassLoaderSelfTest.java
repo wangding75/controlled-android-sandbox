@@ -60,6 +60,11 @@ public final class GuestClassLoaderSelfTest {
                 "com.warden.controlledsandbox.fixture.FixtureApplication"),
                 "official Fixture is child first");
         GuestClassLoader loader = new GuestClassLoader("", "", null, GuestClassLoaderSelfTest.class.getClassLoader());
+        require(loader.definingLoader() instanceof dalvik.system.PathClassLoader,
+                "defining loader is platform PathClassLoader");
+        require(loader.definingLoader().getClass() == dalvik.system.PathClassLoader.class,
+                "defining loader type is exactly PathClassLoader");
+        require(loader.definingLoader() != loader, "policy wrapper is not the defining loader");
         loader.configureDetection(new VirtualDetectionPolicySnapshot(
                 VirtualLocationProfileSnapshot.MODE_STATIC, true, true, true, true, true, 2,
                 List.of(), List.of("com.example.hidden", "org.example.internal"), List.of()));

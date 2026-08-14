@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -391,6 +392,11 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
 
     private void completeOperation(SandboxItem item, Bundle result, String operation) {
         String status = result == null ? "FAILED" : result.getString("status", "UNKNOWN");
+        if ("启动".equals(operation) && !"LAUNCH_PASS".equals(status)) {
+            showFailure("启动失败", new IllegalStateException(status + ": "
+                    + String.valueOf(result == null ? "" : result.getString("errorMessage", ""))));
+            return;
+        }
         viewModel.execute(() -> { viewModel.application().updateInstanceStatus(
                         item.instance.packageName, item.instance.virtualUserId, status); return null; },
                 ignored -> runOnUiThread(() -> { appStatus.setText(operation + "：" + status); refresh(); }),
@@ -403,7 +409,10 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     private void showFailure(String prefix, Exception error) {
-        if (appStatus != null) appStatus.setText(prefix);
+        String detail = error == null ? "" : error.getClass().getSimpleName() + ": "
+                + String.valueOf(error.getMessage());
+        Log.e("T56-Flash2", prefix + (detail.isEmpty() ? "" : " - " + detail), error);
+        if (appStatus != null) appStatus.setText(prefix + (detail.isEmpty() ? "" : "：" + detail));
         Toast.makeText(this, prefix + "：" + String.valueOf(error.getMessage()), Toast.LENGTH_LONG).show();
     }
 

@@ -71,6 +71,12 @@ final class GuestContextComponentRouter {
         if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (connection == null) throw new IllegalArgumentException("connection is required");
         if (connections.containsKey(connection)) throw new IllegalArgumentException("ServiceConnection already bound");
+        if (resolver.isForeignPackage(intent)) {
+            android.util.Log.i("CS_GUEST_SERVICE",
+                    "cross-package bind ignored package=" + intent.getPackage()
+                            + " component=" + intent.getComponent());
+            return false;
+        }
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
         String connectionId = java.util.UUID.randomUUID().toString();
         Bundle request = bridge.baseRequest();

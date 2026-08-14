@@ -47,7 +47,7 @@ public final class NfcServiceHookSelfTest {
         ServiceManager.sCache.put(NfcServiceContract.SERVICE_NAME, original);
         NfcAdapter.sService = service;
 
-        AutoCloseable hook = NfcServiceHook.install(identity("STATIC", "ON"));
+        AutoCloseable hook = NfcServiceHook.install(null, identity("STATIC", "ON"));
         IBinder replacement = ServiceManager.getService(NfcServiceContract.SERVICE_NAME);
         check(replacement != original, "NFC ServiceManager Binder must be proxied");
         check(NfcServiceContract.DESCRIPTOR.equals(replacement.getInterfaceDescriptor()),
@@ -59,7 +59,7 @@ public final class NfcServiceHookSelfTest {
         check(NfcAdapter.sService != service && NfcAdapter.sService.getState() == 3,
                 "NfcAdapter.sService must be synchronized when populated");
 
-        AutoCloseable second = NfcServiceHook.install(identity("STATIC", "ON"));
+        AutoCloseable second = NfcServiceHook.install(null, identity("STATIC", "ON"));
         check(ServiceManager.getService(NfcServiceContract.SERVICE_NAME) == replacement,
                 "repeated NFC install must be idempotent");
         second.close();
@@ -73,7 +73,7 @@ public final class NfcServiceHookSelfTest {
     private static void testMissingServiceUsesControlledSyntheticAdapter() throws Exception {
         ServiceManager.sCache.clear();
         NfcAdapter.sService = null;
-        AutoCloseable hook = NfcServiceHook.install(identity("STATIC", "ON"));
+        AutoCloseable hook = NfcServiceHook.install(null, identity("STATIC", "ON"));
         IBinder binder = ServiceManager.getService(NfcServiceContract.SERVICE_NAME);
         check(binder != null, "missing host NFC must install a synthetic service");
         check(NfcServiceContract.DESCRIPTOR.equals(binder.getInterfaceDescriptor()),
@@ -82,7 +82,7 @@ public final class NfcServiceHookSelfTest {
         check(projected != null && projected.getState() == 3,
                 "synthetic NFC service must expose the virtual adapter contract");
 
-        AutoCloseable second = NfcServiceHook.install(identity("STATIC", "ON"));
+        AutoCloseable second = NfcServiceHook.install(null, identity("STATIC", "ON"));
         check(ServiceManager.getService(NfcServiceContract.SERVICE_NAME) == binder,
                 "repeated synthetic NFC install must be idempotent");
         second.close();
@@ -98,7 +98,7 @@ public final class NfcServiceHookSelfTest {
         ServiceManager.sCache.put(NfcServiceContract.SERVICE_NAME, invalid);
         boolean rejected = false;
         try {
-            NfcServiceHook.install(identity("STATIC", "ON"));
+            NfcServiceHook.install(null, identity("STATIC", "ON"));
         } catch (IllegalStateException error) {
             rejected = error.getMessage().contains("Unexpected Binder descriptor");
         } catch (Exception error) {
@@ -112,7 +112,7 @@ public final class NfcServiceHookSelfTest {
     private static void testFeatureAndAdapterStateConsistency() throws Exception {
         ServiceManager.sCache.clear();
         NfcAdapter.sService = null;
-        NfcServiceHook.install(identity("STATIC", "OFF")).close();
+        NfcServiceHook.install(null, identity("STATIC", "OFF")).close();
         // The hook is intentionally closed above; inspect the virtual feature policy independently.
         PackageManagerApi delegate = feature -> true;
         PackageManagerApi projected = packageManager(delegate, identity("STATIC", "OFF"));

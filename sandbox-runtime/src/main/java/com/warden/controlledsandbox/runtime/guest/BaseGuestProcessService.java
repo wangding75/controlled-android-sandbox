@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Process;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import com.warden.controlledsandbox.contract.IGuestProcess;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
@@ -65,6 +66,7 @@ public abstract class BaseGuestProcessService extends Service {
                 // Each manifest GuestProcessService owns its entire :guestN process.  Android may
                 // keep a stopped service process cached; terminate it after cleanup so a new
                 // generation cannot create a second GuestClassLoader/native namespace in place.
+                NativePolicy.setGuestProcessExitAllowed(true);
                 Process.killProcess(Process.myPid());
             }
         }
