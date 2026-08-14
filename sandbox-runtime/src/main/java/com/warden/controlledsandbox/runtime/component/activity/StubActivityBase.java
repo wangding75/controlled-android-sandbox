@@ -42,6 +42,7 @@ public abstract class StubActivityBase extends Activity {
     private Bundle pendingGrantedRoute;
     private Bundle pendingRouteState;
     private boolean guestCreationPosted;
+    private boolean windowEvidenceEmitted;
     private final StubActivityWindowOwnership windowOwnership = new StubActivityWindowOwnership();
     private StubActivityWindowOwnership.Lease ownerLease;
     private boolean windowRecoveryRequired;
@@ -109,7 +110,10 @@ public abstract class StubActivityBase extends Activity {
         if (pendingGrantedRoute == null || hostStage < 3 || guestCreationPosted || destroying) return;
         StubActivityWindowOwnership.Lease scheduledOwner = ownerLease;
         guestCreationPosted = true;
-        new android.os.Handler(getMainLooper()).postDelayed(() -> {
+        // Run after onResume returns so ActivityThread can finish the window update, but do
+        // not delay a full second: a splash Activity may start the real UI immediately and
+        // the trampoline would otherwise be destroyed before create runs.
+        new android.os.Handler(getMainLooper()).post(() -> {
             guestCreationPosted = false;
             if (pendingGrantedRoute == null || hostStage < 3 || destroying
                     || !isCurrentOwner(scheduledOwner)) return;
@@ -118,7 +122,7 @@ public abstract class StubActivityBase extends Activity {
             pendingGrantedRoute = null;
             pendingRouteState = null;
             createGuestActivity(route, state);
-        }, 1000L);
+        });
     }
 
     private void createGuestActivity(Bundle route, Bundle state) {
@@ -357,6 +361,10 @@ public abstract class StubActivityBase extends Activity {
         request.putLong(RuntimeKeys.GENERATION, generation);
         request.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
         request.putString(RuntimeKeys.ACTIVITY_EVENT, event);
+        android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
+        request.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
+        request.putBoolean("windowAddedMarker", windowAddedMarker());
+        request.putBoolean("windowRegistered", decor != null && isWindowRegistered(decor));
         activityEvents.addLast(request);
         sendNextActivityEvent();
     }
@@ -431,6 +439,9 @@ public abstract class StubActivityBase extends Activity {
         event.putString(RuntimeKeys.ERROR_TYPE, type);
         event.putString(RuntimeKeys.ERROR_MESSAGE, message);
         RuntimeEventLog.event("GUEST_ACTIVITY_FAILED", event);
+        if (!sessionId.isEmpty() && generation >= 1 && !activityToken.isEmpty()) {
+            enqueueActivityEvent("FAILED", event);
+        }
     }
 
     private void discardStaleRouteTask() {
@@ -535,8 +546,19 @@ public abstract class StubActivityBase extends Activity {
         boolean registered = isWindowRegistered(decor);
         if (decor.isAttachedToWindow() || registered) {
             windowOwnership.attach(currentOwner, identity);
+            emitWindowEvidenceIfNeeded(decor, registered);
         }
         logWindowEvent("STUB_WINDOW_STATE", windowOwnership.stage().name());
+    }
+
+    private void emitWindowEvidenceIfNeeded(android.view.View decor, boolean registered) {
+        if (windowEvidenceEmitted || controller == null || activityToken.isEmpty()) return;
+        windowEvidenceEmitted = true;
+        Bundle details = new Bundle();
+        details.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
+        details.putBoolean("windowRegistered", registered);
+        details.putBoolean("windowAddedMarker", windowAddedMarker());
+        enqueueActivityEvent("WINDOW", details);
     }
 
     private boolean isWindowRegistered(android.view.View decor) {

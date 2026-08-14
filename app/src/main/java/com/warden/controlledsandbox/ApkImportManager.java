@@ -108,9 +108,12 @@ final class ApkImportManager {
     private List<InspectedArtifact> stageAndInspect(List<File> sources, File transactionDir)
             throws Exception {
         List<InspectedArtifact> artifacts = new ArrayList<>();
+        List<File> stagedFiles = new ArrayList<>();
+        List<String> stagedDigests = new ArrayList<>();
         long totalBytes = 0;
         File incoming = new File(transactionDir, "incoming");
         if (!incoming.mkdirs()) throw new IllegalStateException("Cannot create incoming artifact directory");
+        File baseFile = null;
         for (int index = 0; index < sources.size(); index++) {
             File source = sources.get(index);
             if (source == null || !source.isFile()) throw new IllegalArgumentException("Source APK does not exist");
@@ -118,7 +121,19 @@ final class ApkImportManager {
             CopyResult copied = copyFileAndHash(source, staged, MAX_APK_BYTES);
             totalBytes += copied.bytes;
             if (totalBytes > MAX_INSTALL_BYTES) throw new IllegalArgumentException("Install set exceeds 3 GiB limit");
-            artifacts.add(inspect(staged, copied.sha256));
+            ManifestModel manifest = parseManifest(staged);
+            if (manifest.splitName().isEmpty()) {
+                if (baseFile != null) throw new IllegalArgumentException("Install set contains more than one base APK");
+                baseFile = staged;
+            }
+            stagedFiles.add(staged);
+            stagedDigests.add(copied.sha256);
+        }
+        if (baseFile == null) throw new IllegalArgumentException("Install set does not contain a base APK");
+        PackageInfo baseInfo = packageInfoForArchive(baseFile);
+        if (baseInfo == null) throw new IllegalArgumentException("PackageManager rejected the base APK artifact");
+        for (int index = 0; index < stagedFiles.size(); index++) {
+            artifacts.add(inspect(stagedFiles.get(index), stagedDigests.get(index), baseInfo));
         }
         validateArtifactSet(artifacts);
         Collections.sort(artifacts);
@@ -220,29 +235,53 @@ final class ApkImportManager {
                 importedAt, importedAt, "NOT_TESTED", 0);
     }
 
-    private InspectedArtifact inspect(File file, String sha256) throws Exception {
-        ManifestModel manifest;
-        try (ZipFile zip = new ZipFile(file)) {
-            ZipEntry entry = zip.getEntry("AndroidManifest.xml");
-            if (entry == null) throw new IllegalArgumentException("APK does not contain AndroidManifest.xml");
-            try (InputStream input = zip.getInputStream(entry)) {
-                manifest = new BinaryXmlManifestParser().parse(input);
-            }
-        }
-        int archiveFlags = PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES
-                | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS
-                | PackageManager.GET_META_DATA | (Build.VERSION.SDK_INT >= 28
-                ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
-        PackageInfo info = context.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(), archiveFlags);
-        if (info == null) throw new IllegalArgumentException("PackageManager rejected an APK artifact");
+    private InspectedArtifact inspect(File file, String sha256, PackageInfo baseInfo) throws Exception {
+        ManifestModel manifest = parseManifest(file);
+        PackageInfo info = packageInfoForArchive(file);
         if (!manifest.packageName().matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
             throw new IllegalArgumentException("Invalid package name");
+        }
+        if (info == null) {
+            if (manifest.splitName().isEmpty()) {
+                throw new IllegalArgumentException("PackageManager rejected an APK artifact: " + file.getName());
+            }
+            if (manifest.versionCode() <= 0) {
+                throw new IllegalArgumentException("Split APK revision is missing: " + file.getName());
+            }
+            return new InspectedArtifact(file, sha256, manifest, splitIdentity(manifest),
+                    manifest.versionCode(), signingDigestFromApk(file));
         }
         if (!manifest.packageName().equals(info.packageName)) {
             throw new IllegalArgumentException("Manifest and PackageManager package names differ");
         }
         long versionCode = Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
         return new InspectedArtifact(file, sha256, manifest, info, versionCode, signingDigest(info));
+    }
+
+    private static PackageInfo splitIdentity(ManifestModel manifest) {
+        PackageInfo info = new PackageInfo();
+        info.packageName = manifest.packageName();
+        info.versionCode = manifest.versionCode() > Integer.MAX_VALUE
+                ? Integer.MAX_VALUE : (int) manifest.versionCode();
+        return info;
+    }
+
+    private ManifestModel parseManifest(File file) throws Exception {
+        try (ZipFile zip = new ZipFile(file)) {
+            ZipEntry entry = zip.getEntry("AndroidManifest.xml");
+            if (entry == null) throw new IllegalArgumentException("APK does not contain AndroidManifest.xml");
+            try (InputStream input = zip.getInputStream(entry)) {
+                return new BinaryXmlManifestParser().parse(input);
+            }
+        }
+    }
+
+    private PackageInfo packageInfoForArchive(File file) {
+        int archiveFlags = PackageManager.GET_ACTIVITIES | PackageManager.GET_SERVICES
+                | PackageManager.GET_RECEIVERS | PackageManager.GET_PROVIDERS
+                | PackageManager.GET_META_DATA | (Build.VERSION.SDK_INT >= 28
+                ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES);
+        return context.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(), archiveFlags);
     }
 
     private static void validateArtifactSet(List<InspectedArtifact> artifacts) {
@@ -516,6 +555,35 @@ final class ApkImportManager {
         return null;
     }
 
+    private static String signingDigestFromApk(File file) throws Exception {
+        java.security.cert.Certificate[] certificates = null;
+        try (java.util.jar.JarFile jar = new java.util.jar.JarFile(file, true)) {
+            java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+            byte[] buffer = new byte[8192];
+            while (entries.hasMoreElements()) {
+                java.util.jar.JarEntry entry = entries.nextElement();
+                try (InputStream input = jar.getInputStream(entry)) {
+                    while (input.read(buffer) != -1) { }
+                }
+                java.security.cert.Certificate[] found = entry.getCertificates();
+                if (found != null && found.length > 0) {
+                    certificates = found;
+                    break;
+                }
+            }
+        }
+        if (certificates == null || certificates.length == 0) {
+            throw new SecurityException("Split APK signing certificate is missing: " + file.getName());
+        }
+        List<String> digests = new ArrayList<>();
+        for (java.security.cert.Certificate certificate : certificates) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            digests.add(toHex(digest.digest(certificate.getEncoded())));
+        }
+        Collections.sort(digests);
+        return String.join(",", digests);
+    }
+
     private static String signingDigest(PackageInfo info) throws Exception {
         Signature[] signatures;
         if (Build.VERSION.SDK_INT >= 28 && info.signingInfo != null) signatures = info.signingInfo.getApkContentsSigners();
@@ -618,6 +686,11 @@ final class ApkImportManager {
             return;
         }
         if (Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+            // Published revisions are sealed recursively, so a Guest-generated directory
+            // such as lib-compressed may be read-only even though the caller owns the tree.
+            // Deleting a child requires write permission on its parent, not only on the child.
+            // Re-enable the directory before walking it; otherwise Guest Clear fails on dso_lock.
+            file.setWritable(true);
             File[] children = file.listFiles();
             if (children == null) throw new IllegalStateException("Cannot list directory " + file);
             for (File child : children) deleteTreeOrThrow(child);

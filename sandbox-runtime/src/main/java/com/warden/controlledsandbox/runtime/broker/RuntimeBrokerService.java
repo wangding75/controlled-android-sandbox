@@ -9,6 +9,9 @@ import com.warden.controlledsandbox.runtime.component.activity.ActivityResultCon
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.guest.GuestLaunchEvidence;
+import com.warden.controlledsandbox.runtime.guest.GuestLaunchGate;
+import com.warden.controlledsandbox.runtime.guest.GuestLaunchObservation;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -51,6 +54,7 @@ import com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcher;
 import com.warden.controlledsandbox.runtime.status.RuntimeStatusLegacyAdapter;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
     private static final int SLOT_COUNT = 8;
@@ -75,6 +79,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             (processSlot, request) -> callGuest(processSlot, guest -> guestOperation(
                     guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)));
     private final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
+    private final ConcurrentHashMap<String, GuestLaunchObservation> launchObservations =
+            new ConcurrentHashMap<>();
+    private static final long LAUNCH_OBSERVATION_MS = 35_000L;
     private final RuntimeServiceCoordinator serviceCoordinator = new RuntimeServiceCoordinator(brokerState,
             (slot, request) -> callGuest(slot, guest -> guestOperation(
                     guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)), clock);
@@ -207,9 +214,46 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             launch.putExtra(RuntimeKeys.ACTIVITY_TOKEN,
                     transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
             startActivity(launch);
-            Bundle out = sessionBundle(session, "LAUNCH_REQUESTED");
+            String activityToken = transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+            String sessionId = session.sessionId();
+            GuestLaunchObservation existing = sessionId.isEmpty()
+                    ? null : launchObservations.get(sessionId);
+            // A splash Activity may synchronously start the real UI Activity.  Waiting again
+            // on that nested launch blocks the Host main looper, so the second Stub never
+            // reaches onCreate.  Only the first in-flight launch owns the observation window.
+            if (existing != null) {
+                launchObservations.put(activityToken, existing);
+                Bundle nested = sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
+                nested.putAll(transaction);
+                nested.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
+                return nested;
+            }
+            GuestLaunchObservation observation = new GuestLaunchObservation(activityToken, component);
+            if (!sessionId.isEmpty()) launchObservations.put(sessionId, observation);
+            launchObservations.put(activityToken, observation);
+            try {
+                observation.await(LAUNCH_OBSERVATION_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            GuestLaunchEvidence evidence = observation.close();
+            launchObservations.remove(activityToken, observation);
+            if (!sessionId.isEmpty()) launchObservations.remove(sessionId, observation);
+            String gate = GuestLaunchGate.evaluate(evidence);
+            Bundle out = sessionBundle(session, gate);
             out.putAll(transaction);
-            out.putString(RuntimeKeys.STATUS, "LAUNCH_REQUESTED");
+            out.putString(RuntimeKeys.STATUS, gate);
+            out.putBoolean("launcherResolved", evidence.launcherResolved);
+            out.putBoolean("activityCreated", evidence.onCreateCompleted);
+            out.putBoolean("activityResumed", evidence.resumed);
+            out.putBoolean("windowEvidence", evidence.windowEvidence);
+            out.putInt("fatalCount", evidence.fatalCount);
+            out.putInt("anrCount", evidence.anrCount);
+            if (GuestLaunchGate.LAUNCH_FAILED.equals(gate)) {
+                out.putString(RuntimeKeys.ERROR_TYPE, "LAUNCH_GATE_FAILED");
+                out.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
+                        ? "guest Activity create/resume/window not confirmed" : evidence.failure);
+            }
             return out;
         } catch (Throwable error) {
             try {
@@ -656,6 +700,17 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
         try {
             if (request == null) throw new IllegalArgumentException("request is required");
+            String activityToken = request.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+            for (GuestLaunchObservation observation : new java.util.LinkedHashSet<>(
+                    launchObservations.values())) {
+                observation.onActivityEvent(request);
+            }
+            if ("FAILED".equals(request.getString(RuntimeKeys.ACTIVITY_EVENT, ""))) {
+                Bundle acknowledged = new Bundle();
+                acknowledged.putString(RuntimeKeys.STATUS, "ACTIVITY_EVENT_APPLIED");
+                acknowledged.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+                return acknowledged;
+            }
             GuestSession current = findSession(required(request, RuntimeKeys.SESSION_ID),
                     request.getLong(RuntimeKeys.GENERATION, -1));
             return activityRuntime.event(current, request);

@@ -49,21 +49,77 @@ public final class GuestComponentRuntime {
      * lazy for providers in other processes and for components not selected by this process.
      */
     void prepareDeclaredProviders() throws Exception {
+        int fromSnapshot = 0;
+        int fromManifest = 0;
+        int skippedOtherProcess = 0;
+        java.util.Set<String> preparedClasses = new java.util.LinkedHashSet<>();
         for (VirtualComponentSnapshot component : session.spec.packageState().components()) {
-            if (!"PROVIDER".equals(component.type()) || !component.enabled()
-                    || !currentProcess(component.processName())) continue;
-            for (String authority : component.authority().split(";")) {
-                String normalized = authority == null ? "" : authority.trim();
-                if (normalized.isEmpty()) continue;
-                prepareProvider(component.className(), normalized);
+            if (!"PROVIDER".equals(component.type()) || !component.enabled()) continue;
+            if (!sameProcess(component.processName())) {
+                skippedOtherProcess++;
+                continue;
             }
+            fromSnapshot += prepareProviderAuthorities(component.className(), component.authority());
+            preparedClasses.add(component.className());
+        }
+        com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel manifest =
+                parseBaseManifest();
+        if (manifest != null) {
+            for (com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel.Component
+                    component : manifest.providers()) {
+                if (!component.enabled() || preparedClasses.contains(component.className())) continue;
+                if (!sameProcess(component.processName())) {
+                    skippedOtherProcess++;
+                    continue;
+                }
+                fromManifest += prepareProviderAuthorities(component.className(), component.authorities());
+                preparedClasses.add(component.className());
+            }
+        }
+        android.util.Log.i("CS_RUNTIME", "GUEST_PROVIDERS_BOUND snapshot=" + fromSnapshot
+                + " manifestExtra=" + fromManifest + " skippedOtherProcess=" + skippedOtherProcess
+                + " classes=" + preparedClasses.size());
+    }
+
+    private int prepareProviderAuthorities(String className, String authorities) throws Exception {
+        int prepared = 0;
+        if (authorities == null || authorities.trim().isEmpty()) {
+            throw new IllegalStateException("PROVIDER_AUTHORITY_REQUIRED:" + className);
+        }
+        for (String authority : authorities.split(";")) {
+            String normalized = authority == null ? "" : authority.trim();
+            if (normalized.isEmpty()) continue;
+            prepareProvider(className, normalized);
+            prepared++;
+        }
+        return prepared;
+    }
+
+    private com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel parseBaseManifest() {
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(session.spec.apkFile())) {
+            java.util.zip.ZipEntry entry = zip.getEntry("AndroidManifest.xml");
+            if (entry == null) return null;
+            try (java.io.InputStream input = zip.getInputStream(entry)) {
+                return new com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser()
+                        .parse(input);
+            }
+        } catch (Exception error) {
+            android.util.Log.w("CS_RUNTIME", "base manifest providers unavailable", error);
+            return null;
         }
     }
 
-    private boolean currentProcess(String componentProcess) {
+    private boolean sameProcess(String componentProcess) {
         String declared = componentProcess == null ? "" : componentProcess.trim();
-        String effective = declared.isEmpty() ? session.spec.processName : declared;
-        return session.spec.processName.equals(effective);
+        String packageProcess = session.spec.packageName;
+        String sessionProcess = session.spec.processName == null || session.spec.processName.isEmpty()
+                ? packageProcess : session.spec.processName;
+        String effective;
+        if (declared.isEmpty()) effective = packageProcess;
+        else if (declared.startsWith(":")) effective = packageProcess + declared;
+        else effective = declared;
+        return sessionProcess.equals(effective) || packageProcess.equals(effective)
+                && sessionProcess.equals(packageProcess);
     }
 
     Bundle invoke(Bundle request) {
@@ -379,7 +435,8 @@ public final class GuestComponentRuntime {
         if (record != null) return record;
         Class<?> type = session.classLoader.loadClass(className);
         if (!Service.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not a Service: " + className);
-        Service service = (Service) type.getDeclaredConstructor().newInstance();
+        Service service = GuestComponentFactory.instantiateService(session.context.getClassLoader(),
+                factoryClass(), className, new Intent());
         attachBaseContext(service, session.context);
         setOptionalField(service, "mApplication", session.application);
         setOptionalField(service, "mClassName", className);
@@ -552,40 +609,50 @@ public final class GuestComponentRuntime {
         if (!BroadcastReceiver.class.isAssignableFrom(type)) {
             throw new IllegalArgumentException("Component is not a BroadcastReceiver: " + className);
         }
-        return (BroadcastReceiver) type.getDeclaredConstructor().newInstance();
+        return GuestComponentFactory.instantiateReceiver(session.context.getClassLoader(), factoryClass(),
+                className, new Intent());
+    }
+
+    private String factoryClass() {
+        return session.context.getApplicationInfo().appComponentFactory;
     }
 
     private Bundle prepareProvider(String className, String authority) throws Exception {
         ProviderRecord existing;
         synchronized (providerLock) { existing = providersByAuthority.get(authority); }
-        if (existing != null) {
-            if (!existing.className.equals(className)) throw new IllegalStateException("PROVIDER_AUTHORITY_COLLISION");
+        if (existing != null && existing.className.equals(className)) {
             return providerResult("PROVIDER_ALREADY_READY", existing);
         }
         ProviderRecord byClass;
         synchronized (providerLock) { byClass = providersByClass.get(className); }
         if (byClass != null) {
-            synchronized (providerLock) { providersByAuthority.put(authority, byClass); }
+            synchronized (providerLock) { providersByAuthority.putIfAbsent(authority, byClass); }
             return providerResult("PROVIDER_AUTHORITY_ATTACHED", byClass);
         }
         Class<?> type = session.classLoader.loadClass(className);
         if (!ContentProvider.class.isAssignableFrom(type)) {
             throw new IllegalArgumentException("Component is not a ContentProvider: " + className);
         }
-        ContentProvider provider = (ContentProvider) type.getDeclaredConstructor().newInstance();
+        ContentProvider provider = GuestComponentFactory.instantiateProvider(session.context.getClassLoader(),
+                factoryClass(), className);
         requireNativeHookRefresh("PROVIDER_CREATE");
-        ProviderInfo info = session.packageMetadata.provider(authority);
+        ProviderInfo info = session.packageMetadata.providerForClass(className);
+        if (info == null) info = session.packageMetadata.provider(authority);
         if (info == null || !className.equals(info.name)) {
-            throw new SecurityException("PROVIDER_METADATA_MISMATCH:" + authority);
+            throw new SecurityException("PROVIDER_METADATA_MISMATCH:" + className + ":" + authority);
         }
         info.applicationInfo = session.context.getApplicationInfo();
-        android.os.Bundle metadata = session.resources.manifestMetadata.provider(authority);
+        android.os.Bundle metadata = session.resources.manifestMetadata.providerForClass(className);
+        if (metadata == null || metadata.isEmpty()) {
+            metadata = session.resources.manifestMetadata.provider(authority);
+        }
         if (metadata != null && !metadata.isEmpty()) info.metaData = metadata;
         provider.attachInfo(session.context, info);
         ProviderRecord record = new ProviderRecord(className, authority, provider);
         synchronized (providerLock) {
             providersByClass.put(className, record);
-            providersByAuthority.put(authority, record);
+            // First installed class owns a duplicated authority for resolver lookup.
+            providersByAuthority.putIfAbsent(authority, record);
         }
         Bundle out = providerResult("PROVIDER_READY", record);
         RuntimeEventLog.event("GUEST_PROVIDER_PREPARE", out);

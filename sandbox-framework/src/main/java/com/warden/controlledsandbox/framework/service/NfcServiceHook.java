@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.service;
 
+import android.content.Context;
 import com.warden.controlledsandbox.framework.core.DeviceServiceBindingRegistry;
 import com.warden.controlledsandbox.framework.contract.NfcServiceContract;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
@@ -9,7 +10,7 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 public final class NfcServiceHook {
     private NfcServiceHook() { }
 
-    public static AutoCloseable install(GuestIdentity identity) throws Exception {
+    public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
         String descriptor;
         try {
             descriptor = ReflectiveServiceHook.serviceManagerDescriptor(NfcServiceContract.SERVICE_NAME);
@@ -33,11 +34,30 @@ public final class NfcServiceHook {
                         + NfcServiceContract.SERVICE_NAME + ": " + descriptor + " expected="
                         + NfcServiceContract.DESCRIPTOR);
             }
-            serviceBinding = ReflectiveServiceHook.serviceManagerBinding(
-                    NfcServiceContract.SERVICE_NAME, NfcServiceContract.LOGICAL_SERVICE,
-                    NfcServiceContract.DESCRIPTOR, identity);
+            AutoCloseable cachedBinding = null;
+            try {
+                // API36 resolves the module-owned AIDL interface through NfcAdapter's internal
+                // ServiceRegisterer.  Trigger that official path first so the hidden Stub class
+                // never needs to be reconstructed from the Guest process.
+                if (context != null) android.nfc.NfcAdapter.getDefaultAdapter(context);
+                cachedBinding = ReflectiveServiceHook.serviceManagerBindingFromStaticField(
+                        NfcServiceContract.SERVICE_NAME, NfcServiceContract.LOGICAL_SERVICE,
+                        NfcServiceContract.DESCRIPTOR, identity,
+                        "android.nfc.NfcAdapter", NfcServiceContract.ADAPTER_CACHE_FIELD);
+                serviceBinding = cachedBinding;
+                method = "descriptor-validated ServiceManager proxy via NfcAdapter.sService";
+            } catch (Throwable cachedFailure) {
+                if (cachedBinding != null) {
+                    try { cachedBinding.close(); } catch (Throwable rollback) {
+                        cachedFailure.addSuppressed(rollback);
+                    }
+                }
+                serviceBinding = ReflectiveServiceHook.serviceManagerBinding(
+                        NfcServiceContract.SERVICE_NAME, NfcServiceContract.LOGICAL_SERVICE,
+                        NfcServiceContract.DESCRIPTOR, identity);
+                method = "descriptor-validated ServiceManager proxy";
+            }
             resolvedService = NfcServiceContract.SERVICE_NAME;
-            method = "descriptor-validated ServiceManager proxy";
         }
 
         AutoCloseable cacheBinding;

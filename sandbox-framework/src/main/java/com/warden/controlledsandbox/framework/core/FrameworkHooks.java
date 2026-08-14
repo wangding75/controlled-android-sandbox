@@ -14,6 +14,7 @@ import com.warden.controlledsandbox.framework.service.AlarmManagerHook;
 import com.warden.controlledsandbox.framework.service.ClipboardManagerHook;
 import com.warden.controlledsandbox.framework.service.AccountManagerHook;
 import com.warden.controlledsandbox.framework.service.TelephonyServiceHook;
+import com.warden.controlledsandbox.framework.service.TelecomServiceHook;
 import com.warden.controlledsandbox.framework.service.WifiServiceHook;
 import com.warden.controlledsandbox.framework.service.BluetoothServiceHook;
 import com.warden.controlledsandbox.framework.service.SensorServiceHook;
@@ -185,6 +186,8 @@ public final class FrameworkHooks implements AutoCloseable {
         // avoids turning a manager materialization detail into a false binding failure.
         attempt("telephonyGuestManager", installed, failures, hooks,
                 () -> TelephonyServiceHook.installGuestManager(guestContext, identity));
+        attempt("telecom", installed, failures, hooks,
+                () -> TelecomServiceHook.install(guestContext, hostServiceContext));
         attempt("phoneSubInfo", installed, failures, hooks, bindingDetails,
                 () -> TelephonyServiceHook.installSubscriberInfo(hostServiceContext, identity));
         attempt("telephonyRegistry", installed, failures, hooks, bindingDetails,
@@ -242,7 +245,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("dropBox", installed, failures, hooks,
                 () -> DropBoxManagerServiceHook.install(identity));
         attempt("nfc", installed, failures, hooks, bindingDetails,
-                () -> NfcServiceHook.install(identity));
+                () -> NfcServiceHook.install(hostServiceContext, identity));
         attempt("usb", installed, failures, hooks,
                 () -> UsbServiceHook.install(identity));
         attempt("print", installed, failures, hooks,

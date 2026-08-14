@@ -102,7 +102,12 @@ require(
 require(
     'sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java',
     'identity.permissionPolicy().isGranted(permission)',
-    'HOST_PACKAGE_HIDDEN',
+    'HiddenPackageResultMapper.map(',
+)
+require(
+    'sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/HiddenPackageResultMapper.java',
+    'isNamedInfoLookup',
+    'NameNotFoundException',
 )
 require(
     'sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java',
@@ -127,7 +132,7 @@ require(
 )
 require(
     'sandbox-framework/src/testHarness/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityProxySelfTest.java',
-    'HOST_PACKAGE_HIDDEN',
+    'NameNotFound-shaped',
     'SandboxAppOpsPolicy',
 )
 compile_tool = require(

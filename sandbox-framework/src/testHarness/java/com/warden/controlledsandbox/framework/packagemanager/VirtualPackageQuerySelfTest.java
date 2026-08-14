@@ -89,6 +89,8 @@ public final class VirtualPackageQuerySelfTest {
         require(detailed.firstInstallTime == 100L && detailed.lastUpdateTime == 200L,
                 "install timestamps are stable");
         require(metadata.provider("guest.two") != null, "multi-authority Provider resolution");
+        require(metadata.ownsAuthority("guest.two") && metadata.ownsAuthority("guest.one"),
+                "owned authorities are recognized for PackageManager resolveContentProvider");
         require("com.warden.virtualinstaller".equals(metadata.installerPackageName()),
                 "synthetic install source is stable");
         require(metadata.sharedLibraries().contains("org.apache.http.legacy"),
@@ -105,8 +107,12 @@ public final class VirtualPackageQuerySelfTest {
                 new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.PROVIDER,
                         "guest.pkg.UniqueProvider", "guest.pkg", true, true, false,
                         Set.of(), "guest.unique", "", "DEFAULT", List.of())));
-        require(duplicateAuthority.components().size() == 2,
-                "duplicate provider declaration is skipped like Android PackageManager");
+        require(duplicateAuthority.components().size() == 3,
+                "class-distinct providers are kept even when an authority is repeated");
+        require(duplicateAuthority.componentInfo(
+                        new ComponentName("guest.pkg", "guest.pkg.DuplicateProvider"),
+                        VirtualPackageMetadata.Type.PROVIDER, 0L) != null,
+                "second provider class remains queryable by ComponentName");
         require("guest.pkg.FirstProvider".equals(
                         duplicateAuthority.provider("guest.shared").name),
                 "first provider retains duplicate authority ownership");

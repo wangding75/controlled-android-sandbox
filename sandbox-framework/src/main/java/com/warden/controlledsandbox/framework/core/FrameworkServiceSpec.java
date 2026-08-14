@@ -70,6 +70,7 @@ public record FrameworkServiceSpec(
                         policy("peekService", 3, pkg(2))),
                 Set.of(
                         "getRunningAppProcesses",
+                        "getMyMemoryState",
                         "getRunningExternalApplications",
                         "getProcessesInErrorState"));
     }

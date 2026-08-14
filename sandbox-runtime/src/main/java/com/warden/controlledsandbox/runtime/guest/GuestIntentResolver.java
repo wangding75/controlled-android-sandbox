@@ -84,6 +84,16 @@ final class GuestIntentResolver {
         requireGuestScope(intent);
     }
 
+    boolean isForeignPackage(Intent intent) {
+        if (intent == null) return false;
+        String packageName = intent.getPackage();
+        if (packageName != null && !packageName.isEmpty() && !spec.packageName.equals(packageName)) {
+            return true;
+        }
+        ComponentName component = intent.getComponent();
+        return component != null && !spec.packageName.equals(component.getPackageName());
+    }
+
     private void requireGuestScope(Intent intent) {
         String packageName = intent.getPackage();
         if (packageName != null && !packageName.isEmpty() && !spec.packageName.equals(packageName)) {

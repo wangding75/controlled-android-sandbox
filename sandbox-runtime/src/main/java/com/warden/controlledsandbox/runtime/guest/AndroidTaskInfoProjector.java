@@ -57,6 +57,10 @@ final class AndroidTaskInfoProjector {
         }
     }
 
+    static Object emptySlice(Method frameworkMethod) {
+        return wrap(new ArrayList<>(), frameworkMethod.getReturnType());
+    }
+
     private static Object invokeAppTask(ActivityTaskSnapshot task, Object recent,
                                         AppTaskOperations operations, IBinder binder, Method method) {
         return switch (method.getName()) {

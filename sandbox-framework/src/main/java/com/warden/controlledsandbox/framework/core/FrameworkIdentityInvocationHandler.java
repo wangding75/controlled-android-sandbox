@@ -77,6 +77,11 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
 
         try {
             Object result = method.invoke(delegate, rewrittenArguments);
+            if (rewrittenArguments != null) {
+                for (Object argument : rewrittenArguments) {
+                    rewriter.rewriteOutboundInPlace(argument);
+                }
+            }
             if (spec.outboundMethods().contains(methodName)) {
                 Object rewritten = rewriter.rewriteOutbound(result);
                 safeRecord(ProxyEvent.now(

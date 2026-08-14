@@ -70,6 +70,15 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("AMediaRecorder_start"), "MediaRecorder capture target");
     require_hook(NativeHookRuntime::is_target_symbol("dlopen"), "dynamic loader target");
     require_hook(NativeHookRuntime::is_target_symbol("android_dlopen_ext"), "Android loader target");
+    require_hook(NativeHookRuntime::is_target_symbol("kill"), "process lifetime kill target");
+    require_hook(NativeHookRuntime::is_target_symbol("_exit"), "process lifetime exit target");
+    require_hook(NativeHookRuntime::is_target_symbol("abort"), "process lifetime abort target");
+    require_hook(NativeHookRuntime::is_process_lifetime_symbol("tgkill"), "lifetime tgkill");
+    require_hook(NativeHookRuntime::is_process_lifetime_system_module(
+            "/apex/com.android.runtime/lib64/libandroid_runtime.so"),
+            "android_runtime lifetime module");
+    require_hook(!NativeHookRuntime::is_process_lifetime_system_module("/system/lib64/libc.so"),
+            "libc is not a lifetime system module");
     require_hook(!NativeHookRuntime::is_target_symbol("fork"), "non-target");
     require_hook(NativeHookRuntime::is_guest_module(fixture_path.string(), fixture_root.string()),
             "guest module");

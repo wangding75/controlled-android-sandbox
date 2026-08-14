@@ -94,6 +94,7 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
             case "getTasks", "getRunningTasks" -> running(method, arguments);
             case "getRecentTasks" -> recent(method, arguments);
             case "getAppTasks" -> appTasks(method, arguments);
+            case "getHistoricalProcessExitReasons" -> historicalProcessExitReasons(method);
             case "moveTaskToFront" -> taskMutation(method, arguments,
                     ActivityTaskRequest.MOVE_TO_FRONT, HostAction.MOVE_FRONT);
             case "removeTask" -> taskMutation(method, arguments,
@@ -107,6 +108,12 @@ final class ActivityTaskFrameworkInterceptor implements FrameworkCallInterceptor
             case "getTaskForActivity" -> taskForActivity(arguments);
             default -> Interception.passThrough();
         };
+    }
+
+    private Interception historicalProcessExitReasons(Method method) {
+        // Android 16 protects this host-wide diagnostic history with DUMP. Keep the
+        // ActivityManager proxy Guest-scoped instead of forwarding the host query.
+        return Interception.handled(AndroidTaskInfoProjector.emptySlice(method));
     }
 
     private Interception running(Method method, Object[] arguments) {

@@ -40,7 +40,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final Context hostServiceContext;
     private final PackageManager packageManager;
     private final GuestPackageSpec spec;
-    private final ClassLoader classLoader;
+    private ClassLoader classLoader;
     private final Resources resources;
     private final AssetManager assets;
     private final File instanceRoot;
@@ -62,19 +62,34 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
         this(host, spec, classLoader, resources, assets, host.getPackageManager(), false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader));
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader), null, "");
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets, PackageManager packageManager) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader));
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader), null, "");
+    }
+
+    GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                 Resources resources, AssetManager assets, PackageManager packageManager,
+                 Bundle applicationMetadata) {
+        this(host, spec, classLoader, resources, assets, packageManager, applicationMetadata, "");
+    }
+
+    GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                 Resources resources, AssetManager assets, PackageManager packageManager,
+                 Bundle applicationMetadata, String appComponentFactory) {
+        this(host, spec, classLoader, resources, assets, packageManager, false,
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
+                applicationMetadata, appComponentFactory);
     }
 
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                          Resources resources, AssetManager assets, PackageManager packageManager,
                          boolean deviceProtected,
-                         SharedState sharedState) {
+                         SharedState sharedState, Bundle applicationMetadata,
+                         String appComponentFactory) {
         // ContextWrapper has a small set of hidden framework helpers (for example
         // getDisplayNoVerify(), used while PhoneWindow tears down a DecorView) that call the
         // private base field directly. Keep that field on the host's application transport so
@@ -100,7 +115,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 deviceProtected ? "device_protected" : "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot);
-        this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath());
+        this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
+                applicationMetadata, appComponentFactory);
         this.dynamicReceivers = sharedState.dynamicReceivers;
         this.mainThread = sharedState.mainThread;
         this.capabilityGate = sharedState.capabilityGate;
@@ -151,6 +167,16 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return sharedState.application == null ? this : sharedState.application;
     }
     @Override public ClassLoader getClassLoader() { return classLoader; }
+
+    /**
+     * LoadedApk wraps the process ClassLoader after BoundApplication identity is published.
+     * The base Guest loader stays as the factory's input; this publishes the factory result.
+     */
+    void installProcessClassLoader(ClassLoader processLoader) {
+        if (processLoader == null) throw new IllegalArgumentException("process ClassLoader is required");
+        this.classLoader = processLoader;
+        GuestNativeBindingDiagnostic.recordLoader("process.install", processLoader);
+    }
     @Override public Resources getResources() { return resources; }
     @Override public AssetManager getAssets() { return assets; }
     @Override public Resources.Theme getTheme() { return frameworkTheme; }
@@ -171,6 +197,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SERVICE;
         if (serviceClass != null && "android.telephony.SubscriptionManager"
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SUBSCRIPTION_SERVICE;
+        if (serviceClass != null && "android.telecom.TelecomManager"
+                .equals(serviceClass.getName())) return "telecom";
         return null;
     }
     @Override public ApplicationInfo getApplicationInfo() { return new ApplicationInfo(applicationInfo); }
@@ -473,7 +501,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     private GuestContext storageContext(boolean targetDeviceProtected) {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
-                packageManager, targetDeviceProtected, sharedState);
+                packageManager, targetDeviceProtected, sharedState, applicationInfo.metaData,
+                applicationInfo.appComponentFactory);
     }
 
     private synchronized SandboxSharedPreferences cachedPreferences(String name) {

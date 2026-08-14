@@ -73,6 +73,7 @@ final class GuestSystemServiceBoundary {
         result.put("camera", "camera");
         result.put("location", "location");
         result.put("phone", "telephony");
+        result.put("telecom", "telecom");
         result.put("telephony_subscription_service", "subscription");
         result.put("wifi", "wifi");
         result.put("wifiscanner", "wifiScanner");

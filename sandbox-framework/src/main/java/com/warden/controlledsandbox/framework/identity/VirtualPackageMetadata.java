@@ -273,6 +273,8 @@ public final class VirtualPackageMetadata {
     private final Map<String, Instrumentation> instrumentationsByClass;
     private final List<String> requestedPermissions;
     private final boolean enabled;
+    private final java.util.concurrent.ConcurrentHashMap<String, Integer> enabledSettingOverrides =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public VirtualPackageMetadata(String packageName, String launcherActivity,
                                   ApplicationInfo applicationInfo, List<Component> components) {
@@ -334,20 +336,15 @@ public final class VirtualPackageMetadata {
                 continue;
             }
             if (component.type() == Type.PROVIDER && !component.authority().isEmpty()) {
-                boolean duplicateAuthority = false;
                 for (String authority : component.authority().split(";")) {
                     String normalized = authority.trim();
-                    if (!normalized.isEmpty() && authorities.containsKey(normalized)) {
-                        duplicateAuthority = true;
-                        break;
+                    // Keep the first authority owner for resolver routing, but retain every
+                    // ProviderInfo by class for PackageManager queries. Real APKs can declare
+                    // multiple providers with the same authority and the platform exposes both
+                    // component records even though only the first owns the authority.
+                    if (!normalized.isEmpty() && !authorities.containsKey(normalized)) {
+                        authorities.put(normalized, component);
                     }
-                }
-                // AOSP package parsing skips a provider whose authority is already owned by
-                // an earlier declaration (the installed Quark APK exercises this contract).
-                if (duplicateAuthority) continue;
-                for (String authority : component.authority().split(";")) {
-                    String normalized = authority.trim();
-                    if (!normalized.isEmpty()) authorities.put(normalized, component);
                 }
             }
             classes.put(component.className(), component);
@@ -382,11 +379,23 @@ public final class VirtualPackageMetadata {
     }
     public int componentEnabledSetting(ComponentName name) {
         if (name == null || !packageName.equals(name.getPackageName())) return 0;
+        Integer override = enabledSettingOverrides.get(normalizeClass(name.getClassName()));
+        if (override != null) return override;
         Component item = byClass.get(normalizeClass(name.getClassName()));
         if (item == null) return 0;
         if ("ENABLED".equals(item.enabledSetting())) return 1;
         if ("DISABLED".equals(item.enabledSetting())) return 2;
         return 0;
+    }
+
+    public void setComponentEnabledSetting(ComponentName name, int newState) {
+        if (name == null || !packageName.equals(name.getPackageName())) {
+            throw new SecurityException("COMPONENT_STATE_FOREIGN_PACKAGE");
+        }
+        if (newState < 0 || newState > 4) {
+            throw new IllegalArgumentException("COMPONENT_ENABLED_STATE_INVALID");
+        }
+        enabledSettingOverrides.put(normalizeClass(name.getClassName()), newState);
     }
 
     public PackageInfo packageInfo() { return packageInfo(~0L); }
@@ -493,6 +502,18 @@ public final class VirtualPackageMetadata {
         return component == null || !visible(component, flags) ? null : (ProviderInfo) toInfo(component);
     }
 
+    public ProviderInfo providerForClass(String className) {
+        return providerForClass(className, MATCH_DISABLED_COMPONENTS);
+    }
+
+    public ProviderInfo providerForClass(String className, long flags) {
+        Component component = byClass.get(normalizeClass(className));
+        if (component == null || component.type() != Type.PROVIDER || !visible(component, flags)) {
+            return null;
+        }
+        return (ProviderInfo) toInfo(component);
+    }
+
     public Object adaptCollection(List<?> values, Class<?> returnType) {
         if (List.class.isAssignableFrom(returnType)) return values;
         if (returnType.isArray()) {
@@ -550,7 +571,11 @@ public final class VirtualPackageMetadata {
         return out.toArray(new ProviderInfo[0]);
     }
     private boolean visible(Component component, long flags) {
-        return (enabled && component.enabled()) || (flags & MATCH_DISABLED_COMPONENTS) != 0;
+        if ((flags & MATCH_DISABLED_COMPONENTS) != 0) return true;
+        if (!enabled) return false;
+        Integer override = enabledSettingOverrides.get(normalizeClass(component.className()));
+        if (override == null || override == 0) return component.enabled();
+        return override == 1;
     }
 
     private ComponentInfo toInfo(Component component) {
@@ -560,7 +585,9 @@ public final class VirtualPackageMetadata {
         else info = new ActivityInfo();
         info.packageName = packageName; info.name = component.className();
         info.processName = component.processName().isEmpty() ? packageName : component.processName();
-        info.exported = component.exported(); info.enabled = component.enabled(); info.applicationInfo = applicationInfo();
+        info.exported = component.exported();
+        info.enabled = visible(component, 0L);
+        info.applicationInfo = applicationInfo();
         if (info instanceof ActivityInfo) ((ActivityInfo) info).permission = component.permission();
         if (info instanceof ServiceInfo) {
             ((ServiceInfo) info).flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;

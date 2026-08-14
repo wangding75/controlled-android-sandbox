@@ -37,6 +37,7 @@ public final class GuestStorageNameCodecSelfTest {
         testIndependentOsProcessesMergeRegistryUpdates();
         testShortNamesDoNotGrowRegistry();
         testLongNameRestartStabilityAndClaimCleanup();
+        testLegacyV2DirectoryRace();
         System.out.println("PASS Guest storage name codec transactional mapping self-test");
     }
 
@@ -310,6 +311,56 @@ public final class GuestStorageNameCodecSelfTest {
             require(restarted.deleteFile(secondName), "long-name file deletion failed");
             require(!Arrays.asList(restarted.fileList()).contains(secondName),
                     "deleted long-name claim was not reclaimed");
+        } finally {
+            deleteRecursively(root);
+        }
+    }
+
+    private static void testLegacyV2DirectoryRace() throws Exception {
+        File root = Files.createTempDirectory("guest-name-codec-dir-race").toFile();
+        try {
+            File instance = new File(root, "instance");
+            File parent = new File(instance, "data");
+            require(parent.mkdirs(), "race fixture parent");
+            String logical = "minidumps" + "x".repeat(200);
+            String legacyName = "app_" + logical;
+            GuestStorageNameCodec probe = new GuestStorageNameCodec(instance);
+            File v2 = probe.resolve(parent, "dir", logical, "app_", "");
+            require(v2.getName().startsWith("app_v2h_"), "long dir name must use hashed v2 form");
+            if (v2.isDirectory()) require(v2.delete(), "clear probe v2 dir");
+
+            File legacy = new File(parent, legacyName);
+            require(legacy.mkdirs() && v2.mkdirs(), "empty+empty fixtures");
+            File converged = new GuestStorageNameCodec(instance).resolve(parent, "dir", logical, "app_", "");
+            require(converged.getCanonicalFile().equals(v2.getCanonicalFile()), "empty+empty keeps v2");
+            require(!legacy.exists(), "empty legacy is removed");
+            require(v2.isDirectory(), "empty v2 remains");
+
+            require(legacy.mkdirs(), "empty-legacy fixture");
+            write(new File(v2, "keep"), "v2-data");
+            File keepV2 = new GuestStorageNameCodec(instance).resolve(parent, "dir", logical, "app_", "");
+            require("v2-data".equals(read(new File(keepV2, "keep"))), "empty legacy does not overwrite v2");
+            require(!legacy.exists(), "empty legacy deleted when v2 has data");
+
+            require(new File(v2, "keep").delete() && v2.delete(), "reset v2");
+            require(legacy.mkdirs(), "populated-legacy fixture");
+            write(new File(legacy, "marker"), "legacy-data");
+            require(v2.mkdirs(), "empty v2 opposite race");
+            File migrated = new GuestStorageNameCodec(instance).resolve(parent, "dir", logical, "app_", "");
+            require("legacy-data".equals(read(new File(migrated, "marker"))),
+                    "populated legacy migrates onto empty v2");
+            require(!legacy.exists(), "populated legacy is consumed");
+
+            write(new File(migrated, "v2-extra"), "v2-populated");
+            require(legacy.mkdirs(), "both-populated legacy");
+            write(new File(legacy, "legacy-extra"), "legacy-populated");
+            boolean bothPopulated = false;
+            try {
+                new GuestStorageNameCodec(instance).resolve(parent, "dir", logical, "app_", "");
+            } catch (IllegalStateException expected) {
+                bothPopulated = String.valueOf(expected.getMessage()).contains("LEGACY_AND_V2_BOTH_EXIST");
+            }
+            require(bothPopulated, "both populated directories fail closed");
         } finally {
             deleteRecursively(root);
         }

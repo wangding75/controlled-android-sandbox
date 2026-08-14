@@ -90,6 +90,8 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         }
         if (delegate == null && "asBinder".equals(method.getName())
                 && method.getParameterCount() == 0) return null;
+        Object activityManagerResult = activityManagerResult(method);
+        if (activityManagerResult != NoResult.VALUE) return activityManagerResult;
         Object virtual = virtualDecision(method, arguments);
         if (virtual != NoResult.VALUE) return virtual;
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
@@ -195,6 +197,17 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             virtualCall.close();
             interactionCall.close();
         }
+    }
+
+    private Object activityManagerResult(Method method) {
+        if (!"activityManager".equalsIgnoreCase(serviceName)
+                || !"getHistoricalProcessExitReasons".equals(method.getName())) {
+            return NoResult.VALUE;
+        }
+        // Android 16 protects this host-wide diagnostic history with DUMP. A Guest must not
+        // read host process history; an empty Guest-owned history is the safe read-only view.
+        android.util.Log.i("CS_ACTIVITY_MANAGER", "historicalProcessExitReasons=guest-empty");
+        return Collections.emptyList();
     }
 
     String serviceName() { return serviceName; }

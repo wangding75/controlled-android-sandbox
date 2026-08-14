@@ -576,6 +576,8 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetAudioCapt
 }
 
 #include "controlled_sandbox/native_hook.h"
+#include "controlled_sandbox/native_interceptors.h"
+#include "controlled_sandbox/native_jni_exception_probe.h"
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallHooks(
@@ -613,6 +615,161 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeHookStatus(JNI
 extern "C" JNIEXPORT void JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeResetHooks(JNIEnv*, jclass) {
     controlled_sandbox::global_hooks().reset();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeSetGuestProcessExitAllowed(
+        JNIEnv*, jclass, jboolean allowed) {
+    controlled_sandbox::set_guest_process_exit_allowed(allowed == JNI_TRUE);
+}
+
+namespace {
+
+using NativeLoadStatic3 = jstring (*)(JNIEnv*, jclass, jstring, jobject, jobject);
+using NativeLoadStatic2 = jstring (*)(JNIEnv*, jclass, jstring, jobject);
+using NativeLoadInstance3 = jstring (*)(JNIEnv*, jobject, jstring, jobject, jobject);
+using NativeLoadInstance2 = jstring (*)(JNIEnv*, jobject, jstring, jobject);
+
+NativeLoadStatic3 orig_native_load_static3 = nullptr;
+NativeLoadStatic2 orig_native_load_static2 = nullptr;
+NativeLoadInstance3 orig_native_load_instance3 = nullptr;
+NativeLoadInstance2 orig_native_load_instance2 = nullptr;
+bool native_load_diag_installed = false;
+
+void* lookup_native_load(const char* symbol) {
+    if (symbol == nullptr) return nullptr;
+    dlerror();
+    void* value = dlsym(RTLD_DEFAULT, symbol);
+    (void) dlerror();
+    return value;
+}
+
+void report_native_load(JNIEnv* env, jstring filename, jobject loader, jobject caller) {
+    if (env == nullptr) return;
+    jclass diagnostic = env->FindClass(
+            "com/warden/controlledsandbox/runtime/guest/GuestNativeBindingDiagnostic");
+    if (diagnostic == nullptr) {
+        env->ExceptionClear();
+        return;
+    }
+    jmethodID record = env->GetStaticMethodID(diagnostic, "recordNativeLoad",
+            "(Ljava/lang/String;Ljava/lang/Class;Ljava/lang/ClassLoader;Ljava/lang/String;)V");
+    if (record == nullptr) {
+        env->ExceptionClear();
+        env->DeleteLocalRef(diagnostic);
+        return;
+    }
+    env->CallStaticVoidMethod(diagnostic, record, filename, caller, loader, filename);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(diagnostic);
+}
+
+jstring diag_native_load_static3(JNIEnv* env, jclass clazz, jstring filename, jobject loader,
+                                 jobject caller) {
+    report_native_load(env, filename, loader, caller);
+    if (orig_native_load_static3 == nullptr) return nullptr;
+    return orig_native_load_static3(env, clazz, filename, loader, caller);
+}
+
+jstring diag_native_load_static2(JNIEnv* env, jclass clazz, jstring filename, jobject loader) {
+    report_native_load(env, filename, loader, nullptr);
+    if (orig_native_load_static2 == nullptr) return nullptr;
+    return orig_native_load_static2(env, clazz, filename, loader);
+}
+
+jstring diag_native_load_instance3(JNIEnv* env, jobject runtime, jstring filename, jobject loader,
+                                   jobject caller) {
+    report_native_load(env, filename, loader, caller);
+    if (orig_native_load_instance3 == nullptr) return nullptr;
+    return orig_native_load_instance3(env, runtime, filename, loader, caller);
+}
+
+jstring diag_native_load_instance2(JNIEnv* env, jobject runtime, jstring filename, jobject loader) {
+    report_native_load(env, filename, loader, nullptr);
+    if (orig_native_load_instance2 == nullptr) return nullptr;
+    return orig_native_load_instance2(env, runtime, filename, loader);
+}
+
+bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature, void* replacement,
+                             void** original_slot, const char* symbol_a, const char* symbol_b) {
+    if (env->GetStaticMethodID(runtime, "nativeLoad", signature) != nullptr) {
+        *original_slot = lookup_native_load(symbol_a);
+        if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+        if (*original_slot == nullptr) {
+            env->ExceptionClear();
+            return false;
+        }
+        JNINativeMethod method{"nativeLoad", signature, replacement};
+        const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
+        if (!ok) env->ExceptionClear();
+        return ok;
+    }
+    env->ExceptionClear();
+    if (env->GetMethodID(runtime, "nativeLoad", signature) != nullptr) {
+        *original_slot = lookup_native_load(symbol_a);
+        if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+        if (*original_slot == nullptr) return false;
+        JNINativeMethod method{"nativeLoad", signature, replacement};
+        const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
+        if (!ok) env->ExceptionClear();
+        return ok;
+    }
+    env->ExceptionClear();
+    return false;
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallJniPendingExceptionProbe(
+        JNIEnv* env, jclass) {
+    return controlled_sandbox::install_jni_pending_exception_probe(env) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallNativeLoadDiagnostic(
+        JNIEnv* env, jclass) {
+    if (native_load_diag_installed) return JNI_TRUE;
+    jclass runtime = env->FindClass("java/lang/Runtime");
+    if (runtime == nullptr) {
+        env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    bool installed = install_one_native_load(env, runtime,
+            "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
+            reinterpret_cast<void*>(&diag_native_load_static3),
+            reinterpret_cast<void**>(&orig_native_load_static3),
+            "Java_java_lang_Runtime_nativeLoad",
+            "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2Ljava_lang_Class_2");
+    if (!installed) {
+        installed = install_one_native_load(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&diag_native_load_instance3),
+                reinterpret_cast<void**>(&orig_native_load_instance3),
+                "Java_java_lang_Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2Ljava_lang_Class_2");
+    }
+    if (!installed) {
+        installed = install_one_native_load(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&diag_native_load_static2),
+                reinterpret_cast<void**>(&orig_native_load_static2),
+                "Java_java_lang_Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2");
+    }
+    if (!installed) {
+        installed = install_one_native_load(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&diag_native_load_instance2),
+                reinterpret_cast<void**>(&orig_native_load_instance2),
+                "Java_java_lang_Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2");
+    }
+    env->DeleteLocalRef(runtime);
+    native_load_diag_installed = installed;
+    __android_log_print(ANDROID_LOG_INFO, "CS_NATIVE_BIND",
+            "PROBE nativeLoadWrap installed=%d", installed ? 1 : 0);
+    return installed ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

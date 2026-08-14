@@ -1,0 +1,78 @@
+package com.warden.controlledsandbox.runtime.guest;
+
+import android.os.Bundle;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+
+public final class GuestLaunchGateSelfTest {
+    public static void main(String[] args) {
+        require(!GuestLaunchGate.isLaunchPass(GuestLaunchGate.prepareStatus(true)),
+                "PREPARE_PASS is not LAUNCH_PASS");
+        require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
+                        evidence(true, false, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
+                "prepared process without Activity is not LAUNCH_PASS");
+        require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
+                        evidence(true, true, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
+                "stub/process presence is not LAUNCH_PASS");
+        require(GuestLaunchGate.LAUNCH_PENDING.equals(GuestLaunchGate.evaluate(
+                        evidence(true, true, true, true, true, true, true, true, false, 0, 0, true, true, ""))),
+                "observation window must complete");
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(
+                        evidence(true, true, true, true, true, true, true, true, true, 0, 0, true, true, ""))),
+                "full real Activity evidence is LAUNCH_PASS");
+        require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
+                        evidence(true, true, true, true, true, true, true, true, true, 1, 0, true, true, "fatal"))),
+                "FATAL rejects LAUNCH_PASS");
+        require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
+                        evidence(true, true, true, true, true, true, true, true, true, 0, 1, true, true, ""))),
+                "ANR rejects LAUNCH_PASS");
+
+        Bundle created = new Bundle();
+        created.putString(RuntimeKeys.ACTIVITY_EVENT, "CREATED");
+        created.putBoolean("windowAttached", true);
+        GuestLaunchObservation live = new GuestLaunchObservation("tok", "guest.Main");
+        live.onActivityEvent(created);
+        Bundle resumed = new Bundle();
+        resumed.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        resumed.putBoolean("windowAttached", true);
+        live.onActivityEvent(resumed);
+        GuestLaunchEvidence pass = live.close();
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(pass)),
+                "CREATED+RESUMED+window is LAUNCH_PASS");
+
+        GuestLaunchObservation delayedWindow = new GuestLaunchObservation("tok", "guest.Main");
+        Bundle createdOnly = new Bundle();
+        createdOnly.putString(RuntimeKeys.ACTIVITY_EVENT, "CREATED");
+        delayedWindow.onActivityEvent(createdOnly);
+        Bundle resumedOnly = new Bundle();
+        resumedOnly.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        delayedWindow.onActivityEvent(resumedOnly);
+        Bundle window = new Bundle();
+        window.putString(RuntimeKeys.ACTIVITY_EVENT, "WINDOW");
+        window.putBoolean("windowAttached", true);
+        delayedWindow.onActivityEvent(window);
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(delayedWindow.close())),
+                "window evidence may arrive after resume");
+
+        GuestLaunchObservation failed = new GuestLaunchObservation("tok", "guest.Main");
+        Bundle fail = new Bundle();
+        fail.putString(RuntimeKeys.ACTIVITY_EVENT, "FAILED");
+        fail.putString(RuntimeKeys.ERROR_MESSAGE, "IgSessionManager_not_initialized");
+        failed.onActivityEvent(fail);
+        require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(failed.close())),
+                "FAILED event is not LAUNCH_PASS");
+        System.out.println("PASS guest launch acceptance gate self-test");
+    }
+
+    private static GuestLaunchEvidence evidence(boolean prepared, boolean launcher, boolean loaded,
+                                                boolean instantiated, boolean attached, boolean created,
+                                                boolean resumed, boolean window, boolean observed,
+                                                int fatal, int anr, boolean stub, boolean process,
+                                                String failure) {
+        return new GuestLaunchEvidence(prepared, launcher, loaded, instantiated, attached, created,
+                resumed, window, observed, fatal, anr, stub, process, failure);
+    }
+
+    private static void require(boolean condition, String label) {
+        if (!condition) throw new AssertionError(label);
+    }
+}

@@ -11,11 +11,16 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Child-first loader for Guest code with explicit platform sharing and policy-driven host-internal denial.
- * Note: This ClassLoader is intentionally NOT registered as parallel-capable and uses instance-level
- * synchronization (synchronized (this)) to maintain consistent non-parallel ClassLoader monitor semantics.
+ * Policy wrapper around a platform {@link PathClassLoader}.
+ *
+ * <p>Guest classes are defined by the inner {@code PathClassLoader} so Android's NativeLoader
+ * can associate one stable namespace with a loader type it recognizes. This wrapper only
+ * applies host-internal denial and detection policy; it does not {@code defineClass} Guest
+ * types. Native library search paths are fixed on the inner loader at construction.
+ *
+ * <p>Not parallel-capable; uses {@code synchronized (this)}.
  */
-public final class GuestClassLoader extends PathClassLoader {
+public final class GuestClassLoader extends ClassLoader {
     private static final String SANDBOX_ROOT = "com.warden.controlledsandbox.";
     private static final List<String> HOST_INTERNAL_PREFIXES = List.of(
             SANDBOX_ROOT + "runtime.",
@@ -29,6 +34,10 @@ public final class GuestClassLoader extends PathClassLoader {
     private final AtomicInteger suspiciousQueries = new AtomicInteger();
     private final String guestPackageName;
     private final List<String> declaredGuestNamespaces;
+    private final PathClassLoader dex;
+    private final java.lang.reflect.Method dexFindClass;
+    private final java.lang.reflect.Method dexFindLoaded;
+    private final java.lang.reflect.Method dexFindLibrary;
 
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent) {
@@ -43,10 +52,17 @@ public final class GuestClassLoader extends PathClassLoader {
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent, String guestPackageName,
                      List<String> declaredGuestClasses) {
-        super(dexPath, librarySearchPath, parent);
+        super(parent);
         this.guestPackageName = normalizePackageName(guestPackageName);
         this.declaredGuestNamespaces = guestNamespaces(declaredGuestClasses);
+        this.dex = new PathClassLoader(dexPath == null ? "" : dexPath, librarySearchPath, parent);
+        this.dexFindClass = requireClassLoaderMethod("findClass", String.class);
+        this.dexFindLoaded = requireClassLoaderMethod("findLoadedClass", String.class);
+        this.dexFindLibrary = requireClassLoaderMethod("findLibrary", String.class);
     }
+
+    /** Platform loader that actually defines Guest classes and owns the NativeLoader namespace. */
+    public ClassLoader definingLoader() { return dex; }
 
     void configureDetection(VirtualDetectionPolicySnapshot policy) {
         if (policy == null || VirtualLocationProfileSnapshot.MODE_HOST.equals(policy.mode())) {
@@ -69,20 +85,22 @@ public final class GuestClassLoader extends PathClassLoader {
                 throw new ClassNotFoundException("Class is hidden by Guest detection policy: " + name);
             }
             Class<?> loaded = findLoadedClass(name);
+            if (loaded == null) loaded = dexFindLoaded(name);
             if (loaded == null) {
+                ClassLoader parent = getParent();
                 if (isParentFirst(name)) {
                     try {
-                        loaded = getParent().loadClass(name);
+                        loaded = parent == null ? Class.forName(name, false, null) : parent.loadClass(name);
                     } catch (ClassNotFoundException hostMiss) {
-                        // Parent-first means the Host version wins when present; a Guest APK
-                        // may still carry its own AndroidX/compat implementation when the Host
-                        // does not provide that API.
-                        loaded = findClass(name);
+                        loaded = dexFindClass(name);
                     }
                 } else {
-                    // Let the platform PathClassLoader perform its normal APK/multi-dex lookup;
-                    // the explicit policy checks above still run before any guest class request.
-                    loaded = super.loadClass(name, resolve);
+                    try {
+                        loaded = dexFindClass(name);
+                    } catch (ClassNotFoundException guestMiss) {
+                        if (parent == null) throw guestMiss;
+                        loaded = parent.loadClass(name);
+                    }
                 }
             }
             if (resolve && loaded.getClassLoader() == this) resolveClass(loaded);
@@ -137,6 +155,52 @@ public final class GuestClassLoader extends PathClassLoader {
             }
         }
         return List.copyOf(new ArrayList<>(namespaces));
+    }
+
+    @Override public String findLibrary(String name) {
+        String resolved = dexFindLibrary(name);
+        GuestNativeBindingDiagnostic.recordLibraryLookup(dex, name, resolved);
+        GuestNativeBindingDiagnostic.probeFailureClass();
+        return resolved;
+    }
+
+    private Class<?> dexFindClass(String name) throws ClassNotFoundException {
+        try {
+            return (Class<?>) dexFindClass.invoke(dex, name);
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof ClassNotFoundException missing) throw missing;
+            throw new ClassNotFoundException(name, cause);
+        } catch (ReflectiveOperationException error) {
+            throw new ClassNotFoundException(name, error);
+        }
+    }
+
+    private Class<?> dexFindLoaded(String name) {
+        try {
+            return (Class<?>) dexFindLoaded.invoke(dex, name);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private String dexFindLibrary(String name) {
+        try {
+            Object value = dexFindLibrary.invoke(dex, name);
+            return value instanceof String path ? path : null;
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private static java.lang.reflect.Method requireClassLoaderMethod(String name, Class<?>... types) {
+        try {
+            java.lang.reflect.Method method = ClassLoader.class.getDeclaredMethod(name, types);
+            method.setAccessible(true);
+            return method;
+        } catch (NoSuchMethodException error) {
+            throw new IllegalStateException("CLASS_LOADER_METHOD_UNAVAILABLE:" + name, error);
+        }
     }
 
     int suspiciousQueryCount() { return suspiciousQueries.get(); }

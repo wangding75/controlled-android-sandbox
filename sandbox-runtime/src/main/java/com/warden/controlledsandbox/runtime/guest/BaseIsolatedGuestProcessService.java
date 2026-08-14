@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Process;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
 
 import com.warden.controlledsandbox.contract.IIsolatedGuestProcess;
 import com.warden.controlledsandbox.contract.IsolatedProcessRequest;
@@ -141,6 +142,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 clearLease();
                 super.onDestroy();
             } finally {
+                NativePolicy.setGuestProcessExitAllowed(true);
                 Process.killProcess(Process.myPid());
             }
         }

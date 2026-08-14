@@ -44,9 +44,12 @@ final class GuestPackageMetadataMapper {
             Bundle providerMetadata = null;
             if (VirtualPackageMetadata.Type.PROVIDER == VirtualPackageMetadata.Type.valueOf(component.type())
                     && manifestMetadata != null) {
-                for (String authority : component.authority().split(";")) {
-                    providerMetadata = manifestMetadata.provider(authority);
-                    if (providerMetadata != null) break;
+                providerMetadata = manifestMetadata.providerForClass(component.className());
+                if (providerMetadata == null) {
+                    for (String authority : component.authority().split(";")) {
+                        providerMetadata = manifestMetadata.provider(authority);
+                        if (providerMetadata != null) break;
+                    }
                 }
             }
             components.add(new VirtualPackageMetadata.Component(

@@ -37,6 +37,9 @@ import com.warden.controlledsandbox.domain.session.SessionState;
 public final class SelfTest {
     public static void main(String[] args) throws Exception {
         testManifestParser();
+        testQueriesProviderIsNotComponent();
+        testTypedStringComponentNames();
+        testMissingApplicationComponentNameFailsClosed();
         testSharedLibraryResolution();
         testSlotPool();
         testLaunchPolicy();
@@ -65,7 +68,8 @@ public final class SelfTest {
     private static void testManifestParser() throws Exception {
         BinaryXmlFixtureBuilder f = new BinaryXmlFixtureBuilder();
         byte[] xml = f
-                .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
+                .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"),
+                        BinaryXmlFixtureBuilder.integer("versionCode", 42))
                 .start("uses-sdk", BinaryXmlFixtureBuilder.integer("minSdkVersion", 26), BinaryXmlFixtureBuilder.integer("targetSdkVersion", 35)).end("uses-sdk")
                 .start("uses-permission", BinaryXmlFixtureBuilder.text("name", "android.permission.INTERNET")).end("uses-permission")
                 .start("uses-library", BinaryXmlFixtureBuilder.text("name", "org.apache.http.legacy"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-library")
@@ -78,6 +82,12 @@ public final class SelfTest {
                 .start("action", BinaryXmlFixtureBuilder.text("name", "android.intent.action.MAIN")).end("action")
                 .start("category", BinaryXmlFixtureBuilder.text("name", "android.intent.category.LAUNCHER")).end("category")
                 .end("intent-filter").end("activity")
+                .start("activity-alias", BinaryXmlFixtureBuilder.text("name", ".MainActivity"),
+                        BinaryXmlFixtureBuilder.text("targetActivity", ".MainActivity"),
+                        BinaryXmlFixtureBuilder.bool("exported", true))
+                .start("intent-filter")
+                .start("action", BinaryXmlFixtureBuilder.text("name", "com.example.ALIAS")).end("action")
+                .end("intent-filter").end("activity-alias")
                 .start("service", BinaryXmlFixtureBuilder.text("name", ".SyncService"), BinaryXmlFixtureBuilder.text("process", ":remote"), BinaryXmlFixtureBuilder.bool("isolatedProcess", true)).end("service")
                 .start("receiver", BinaryXmlFixtureBuilder.text("name", ".BootReceiver"), BinaryXmlFixtureBuilder.text("permission", "com.example.SEND_BOOT"))
                 .start("intent-filter", BinaryXmlFixtureBuilder.integer("priority", 250))
@@ -106,7 +116,11 @@ public final class SelfTest {
         require("com.example.guest.GuestApp".equals(model.applicationClass()), "application class");
         require(model.applicationThemeResId() == 0x7f120001, "application theme resource");
         require(model.minSdk() == 26 && model.targetSdk() == 35, "sdk values");
+        require(model.versionCode() == 42, "manifest versionCode");
         require("com.example.guest.MainActivity".equals(model.launcherActivity()), "launcher activity");
+        require(model.activities().size() == 1
+                        && model.activities().get(0).actions().contains("com.example.ALIAS"),
+                "same-name activity alias is merged without losing filters");
         require(model.activities().get(0).themeResId() == 0x7f120002, "activity theme resource");
         require(model.isolatedProcessCount() == 1, "isolated process");
         require(model.permissions().contains("android.permission.INTERNET"), "permission");
@@ -170,6 +184,63 @@ public final class SelfTest {
                         && duplicateModel.services().get(0).actions().size() == 1
                         && duplicateModel.services().get(0).intentFilters().size() == 1,
                 "identical duplicate component declarations merge deterministically");
+    }
+
+    private static void testQueriesProviderIsNotComponent() throws Exception {
+        byte[] xml = new BinaryXmlFixtureBuilder()
+                .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
+                .start("queries")
+                .start("provider", BinaryXmlFixtureBuilder.text("authorities", "com.oem.privacy.provider")).end("provider")
+                .start("provider", BinaryXmlFixtureBuilder.text("authorities", "com.oem.pay.SampleProvider")).end("provider")
+                .end("queries")
+                .start("application")
+                .start("provider", BinaryXmlFixtureBuilder.text("name", ".DataProvider"),
+                        BinaryXmlFixtureBuilder.text("authorities", "com.example.guest.data")).end("provider")
+                .start("activity", BinaryXmlFixtureBuilder.text("name", ".MainActivity")).end("activity")
+                .end("application").end("manifest").build();
+        ManifestModel model = new BinaryXmlManifestParser().parse(xml);
+        require(model.providers().size() == 1, "queries providers are not application components");
+        require("com.example.guest.DataProvider".equals(model.providers().get(0).className()),
+                "application provider name is preserved");
+        require("com.example.guest.data".equals(model.providers().get(0).authorities()),
+                "application provider authority is preserved");
+        require(model.activities().size() == 1, "application activity is preserved");
+    }
+
+    private static void testTypedStringComponentNames() throws Exception {
+        byte[] xml = new BinaryXmlFixtureBuilder()
+                .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
+                .start("application")
+                .start("activity", BinaryXmlFixtureBuilder.text("name", ".TypedActivity")).end("activity")
+                .start("activity-alias", BinaryXmlFixtureBuilder.text("name", ".TypedAlias"),
+                        BinaryXmlFixtureBuilder.text("targetActivity", ".TypedActivity")).end("activity-alias")
+                .start("service", BinaryXmlFixtureBuilder.text("name", "com.example.guest.TypedService")).end("service")
+                .start("receiver", BinaryXmlFixtureBuilder.text("name", ".TypedReceiver")).end("receiver")
+                .start("provider", BinaryXmlFixtureBuilder.text("name", ".TypedProvider"),
+                        BinaryXmlFixtureBuilder.text("authorities", "com.example.guest.typed")).end("provider")
+                .end("application").end("manifest").build();
+        ManifestModel model = new BinaryXmlManifestParser().parse(xml);
+        require(model.activities().size() == 2, "P02/P05 activity and alias keep distinct names");
+        require("com.example.guest.TypedActivity".equals(model.activities().get(0).className()), "P02 activity typed name");
+        require("com.example.guest.TypedAlias".equals(model.activities().get(1).className()), "P05 alias typed name");
+        require("com.example.guest.TypedService".equals(model.services().get(0).className()), "P03/P07 service FQCN");
+        require("com.example.guest.TypedReceiver".equals(model.receivers().get(0).className()), "P04 receiver relative");
+        require("com.example.guest.TypedProvider".equals(model.providers().get(0).className()), "P01/P06 provider relative");
+    }
+
+    private static void testMissingApplicationComponentNameFailsClosed() throws Exception {
+        byte[] xml = new BinaryXmlFixtureBuilder()
+                .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
+                .start("application")
+                .start("provider", BinaryXmlFixtureBuilder.text("authorities", "com.example.guest.orphan")).end("provider")
+                .end("application").end("manifest").build();
+        try {
+            new BinaryXmlManifestParser().parse(xml);
+            throw new AssertionError("P08 missing application provider name must fail closed");
+        } catch (IllegalArgumentException error) {
+            require(error.getMessage() != null && error.getMessage().startsWith("MISSING_COMPONENT_NAME:provider"),
+                    "P08 missing name uses MISSING_COMPONENT_NAME");
+        }
     }
 
     private static void testSharedLibraryResolution() {

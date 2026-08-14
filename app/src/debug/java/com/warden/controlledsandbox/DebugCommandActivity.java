@@ -124,10 +124,10 @@ public final class DebugCommandActivity extends Activity {
                     throw new IllegalArgumentException("component extra is required");
                 }
                 operation = runtime.launchComponent(record, virtualUserId, component);
-                requireStatus("launch-component", operation, "LAUNCH_REQUESTED");
+                requireStatus("launch-component", operation, "LAUNCH_PASS");
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
-                requireStatus("launch", operation, "LAUNCH_REQUESTED");
+                requireStatus("launch", operation, "LAUNCH_PASS");
             } else if ("component-suite".equals(command)) {
                 Bundle serviceStart = runtime.startService(record, virtualUserId);
                 requireStatus("serviceStart", serviceStart, "SERVICE_STARTED");
