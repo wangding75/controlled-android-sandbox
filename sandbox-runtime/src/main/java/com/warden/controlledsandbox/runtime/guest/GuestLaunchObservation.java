@@ -36,7 +36,14 @@ public final class GuestLaunchObservation {
         String event = request.getString(RuntimeKeys.ACTIVITY_EVENT, "");
         if (request.getBoolean("windowAttached", false)
                 || request.getBoolean("windowAddedMarker", false)
-                || request.getBoolean("windowRegistered", false)) {
+                || request.getBoolean("windowRegistered", false)
+                // Framework-owned Activities can legitimately be paused before the first
+                // DecorView is attached (for example an onCreate() that immediately launches a
+                // child Activity). In that case the authoritative ActivityThread record and its
+                // Window object are still present; require the stronger attached/registered
+                // signal whenever it is available, but do not reject a valid invisible launch.
+                || request.getBoolean("frameworkOwnedActivity", false)
+                        && request.getBoolean("windowCreated", false)) {
             windowEvidence = true;
         }
         if ("CREATED".equals(event)) {

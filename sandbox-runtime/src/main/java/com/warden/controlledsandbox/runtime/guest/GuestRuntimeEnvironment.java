@@ -4,6 +4,9 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 
 import android.app.Application;
 import android.content.Context;
@@ -60,6 +63,29 @@ public final class GuestRuntimeEnvironment {
 
     private GuestRuntimeEnvironment() { }
 
+    static Bundle consumeActivityRoute(Session session, String token) throws Exception {
+        if (session == null) throw new IllegalArgumentException("session is required");
+        if (token == null || token.trim().isEmpty()) throw new IllegalArgumentException("token is required");
+        Bundle request = new Bundle();
+        request.putInt(RuntimeKeys.PROTOCOL,
+                com.warden.controlledsandbox.domain.protocol.RuntimeProtocol.CURRENT);
+        request.putString(RuntimeKeys.ROUTE_TOKEN, token);
+        request.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        request.putLong(RuntimeKeys.GENERATION, session.generation());
+        IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(session.spec.runtimeBrokerBinder);
+        if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_BINDER_UNAVAILABLE");
+        return RuntimeOperationTransport.toLegacyBundle(RuntimeOperationTransport.execute(
+                broker, RuntimeOperationRequest.CONSUME_ROUTE, request));
+    }
+
+    static Bundle dispatchActivityEvent(Session session, Bundle request) throws Exception {
+        if (session == null) throw new IllegalArgumentException("session is required");
+        IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(session.spec.runtimeBrokerBinder);
+        if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_BINDER_UNAVAILABLE");
+        return RuntimeOperationTransport.toLegacyBundle(RuntimeOperationTransport.execute(
+                broker, RuntimeOperationRequest.ACTIVITY_EVENT, request));
+    }
+
     static Bundle prepare(Context host, GuestPackageSpec spec) {
         if (Looper.myLooper() == Looper.getMainLooper()) return prepareOnCurrentThread(host, spec);
         Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -107,8 +133,13 @@ public final class GuestRuntimeEnvironment {
         GuestProcessIdentityBridge stagedProcessIdentity = null;
         try {
             RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot);
-            boolean nativeCrashRecorderInstalled = RuntimeDiagnostics.nativeCrashFile() != null
-                    && NativePolicy.installCrashRecorder(RuntimeDiagnostics.nativeCrashFile().getAbsolutePath());
+            File nativeCrashFile = RuntimeDiagnostics.nativeCrashFile();
+            // Do not install a second signal-chain handler in a foreign-ABI process.  The
+            // platform bridge and Quark's CrashSDK already own that chain; CAS's recorder is
+            // retained for native-ABI guests where the calling convention is ours.
+            boolean nativeCrashRecorderInstalled = !isTranslatedGuestAbi(spec.nativeAbi)
+                    && nativeCrashFile != null
+                    && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
             com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
                     PackageRevisionSetVerifier.verify(spec.apkFile(), spec.baseApkSha256,
                             spec.splitArtifacts(), spec.apkVersionCode, spec.apkSha256);
@@ -132,11 +163,21 @@ public final class GuestRuntimeEnvironment {
             if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
                 throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
             }
-            boolean jniEx = NativePolicy.installJniPendingExceptionProbe();
-            android.util.Log.i("CS_JNI_EX", "PROBE installed=" + jniEx);
+            // A translated guest ABI (for example ARM64 guest code on the x86_64 RD
+            // emulator) must not receive a rewritten JNIEnv/JVM function table. The
+            // probe is diagnostic only; disabling it for an ABI mismatch preserves the
+            // native bridge's calling convention while retaining the probe for native
+            // guests running with the host ABI.
+            boolean translatedGuestAbi = isTranslatedGuestAbi(spec.nativeAbi);
+            boolean jniEx = !translatedGuestAbi && NativePolicy.installJniPendingExceptionProbe();
+            android.util.Log.i("CS_JNI_EX", "PROBE installed=" + jniEx
+                    + " translatedAbi=" + translatedGuestAbi
+                    + " guestAbi=" + safe(spec.nativeAbi)
+                    + " hostAbi=" + safe(hostAbi()));
             GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
                     emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader(),
                     spec.packageName, declaredGuestClasses(spec));
+            loader.configureNativeCompatibility(translatedGuestAbi);
             GuestNativeBindingDiagnostic.installProcessProbes();
             GuestNativeBindingDiagnostic.recordLoader("guest.base", loader);
             GuestNativeBindingDiagnostic.recordLoader("guest.dex", loader.definingLoader());
@@ -162,15 +203,41 @@ public final class GuestRuntimeEnvironment {
                     new String[0], new String[0],
                     nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
             boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
+            // A foreign-ABI guest is executed by Android's native bridge. The host process
+            // cannot safely rewrite that guest ELF's PLT/GOT, so the platform bridge remains
+            // the loader boundary and Java framework proxies provide the compatibility path.
+            // Keep the host-ABI lifetime boundary even for a translated guest. NativeHookRuntime
+            // rejects foreign guest ELFs, but it can still safely protect host framework/runtime
+            // modules from guest self-termination (the same recovery boundary used by VA/NBB).
+            // A foreign-ABI module is executed by the platform native bridge.  Until the
+            // translated syscall boundary is available, do not patch host PLT/lifetime symbols
+            // from the guest process: the bridge can legitimately enter those host modules with
+            // translated register state, and a host-side replacement is not ABI-transparent.
+            boolean enableNativeHooks = requiresNativeHooks && !translatedGuestAbi;
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
             }
-            boolean nativeHooksInstalled = requiresNativeHooks && NativePolicy.installHooks(spec.nativeLibraryDir);
-            if (requiresNativeHooks && !nativeHooksInstalled) {
+            boolean nativeHooksInstalled = enableNativeHooks && NativePolicy.installHooks(spec.nativeLibraryDir);
+            if (enableNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
-            boolean nativeLoadDiag = NativePolicy.installNativeLoadDiagnostic();
-            android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag);
+            boolean nativeBoundaryAvailable = nativeHooksInstalled || translatedGuestAbi;
+            // Runtime.nativeLoad is an ART native-method registration boundary. Replacing that
+            // method in an ARM64 guest running through the x86_64 native bridge is not safe: the
+            // bridge owns the foreign-ABI load path and may call it from a translated frame.
+            // Native guests keep the diagnostic wrapper; translated guests use the platform
+            // loader unchanged and rely on the structured loader evidence around it.
+            boolean nativeLoadDiag = !translatedGuestAbi
+                    && NativePolicy.installNativeLoadDiagnostic();
+            // RegisterNatives on java.lang.Runtime is deliberately disabled for translated
+            // guests while the platform bridge owns the foreign-ABI native entry.  The VA
+            // crash history shows that any ART native-entry mutation can surface later as an
+            // apparently unrelated libexpat/register corruption in WebView.  Native guests keep
+            // the observe-only diagnostic below; translated guests use the untouched bridge.
+            boolean nativeLoadRedirect = false;
+            android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag
+                    + " nativeLoadRedirect=" + nativeLoadRedirect
+                    + " translatedAbi=" + translatedGuestAbi);
             // handleBindApplication publishes process identity before LoadedApk asks the
             // AppComponentFactory to wrap the ClassLoader. The hidden-API bridge must be
             // installed first so Process.setArgV0 is visible.
@@ -220,7 +287,7 @@ public final class GuestRuntimeEnvironment {
                             packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
                             permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices,
                             spec.packageRevision, packageUniverse),
-                    frameworkCallRouter, nativeHooksInstalled);
+                    frameworkCallRouter, nativeBoundaryAvailable);
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());
             frameworkHooks.report().requireMandatoryReady();
@@ -243,7 +310,7 @@ public final class GuestRuntimeEnvironment {
             InteractionProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.interactionProfile());
             NetworkServiceProxyReadiness.require(frameworkHooks.report().installedServices(),
-                    virtualServices.networkServiceProfile(), nativeHooksInstalled);
+                    virtualServices.networkServiceProfile(), nativeBoundaryAvailable);
             ApplicationEnvironmentProxyReadiness.require(frameworkHooks.report().installedServices(),
                     virtualServices.applicationEnvironmentProfile());
             CompatibilityProxyReadiness.require(frameworkHooks.report().installedServices(),
@@ -267,7 +334,7 @@ public final class GuestRuntimeEnvironment {
                     + " available=" + cameraProfile.cameraAvailable()
                     + " ids=" + cameraProfile.cameraIds().size()
                     + " frontIds=" + cameraProfile.frontCameraIds().size());
-            boolean camera1AdapterInstalled = nativePolicyConfigured
+            boolean camera1AdapterInstalled = nativePolicyConfigured && !translatedGuestAbi
                     && NativePolicy.installCamera1Adapter();
             if (nativePolicyConfigured) {
                 configureCamera1NativeProfile(guestContext.getFilesDir(), spec, host,
@@ -280,11 +347,19 @@ public final class GuestRuntimeEnvironment {
                     virtualServices.privilegedServicesProfile());
             // LoadedApk asks AppComponentFactory after bind and after ActivityManager is
             // proxied so factory process-name reads see the Guest identity, not host:guestN.
+            // Android's LoadedApk/NativeLoader path only recognizes a platform dex loader.  The
+            // policy facade remains the loader used by CAS-owned lookups, but Framework-owned
+            // Application/component construction must receive the actual PathClassLoader.  VA
+            // and NBB both make this distinction implicitly by letting LoadedApk own the loader;
+            // passing the facade here makes VMRuntime report "Unsupported class loader" and
+            // breaks native-bridge startup in apps such as Quark/Tinker.
+            ClassLoader frameworkLoader = loader.definingLoader();
             ClassLoader processLoader = GuestComponentFactory.instantiateClassLoader(
-                    loader, appComponentFactory, guestContext.getApplicationInfo());
-            if (processLoader != loader) guestContext.installProcessClassLoader(processLoader);
+                    frameworkLoader, appComponentFactory, guestContext.getApplicationInfo());
+            guestContext.installProcessClassLoader(processLoader);
             android.util.Log.i("CS_GUEST_FACTORY", "classLoader factory=" + appComponentFactory
                     + " base=" + loader.getClass().getName()
+                    + " frameworkBase=" + frameworkLoader.getClass().getName()
                     + " process=" + processLoader.getClass().getName());
             GuestNativeBindingDiagnostic.recordLoader("guest.process", processLoader);
             Application application = guestContext.mainThread.call(
@@ -294,7 +369,7 @@ public final class GuestRuntimeEnvironment {
             GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
             stagedProcessIdentity.attachApplication(application);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
-            if (nativePolicyConfigured && !camera1AdapterInstalled) {
+            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
                 camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
                 android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_ATTACH installed="
                         + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
@@ -310,6 +385,7 @@ public final class GuestRuntimeEnvironment {
                     stagedProcessIdentity);
             stagedSession = session;
             stagedProcessIdentity = null;
+            session.loadedApkBridge = GuestLoadedApkBridge.install(session);
             session.components = new GuestComponentRuntime(session);
             session.jobServices = new GuestJobServiceBridge(session);
             virtualServices.jobs().setExecutionListener(new com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecutionListener() {
@@ -324,11 +400,21 @@ public final class GuestRuntimeEnvironment {
                 }
             });
             synchronized (GuestRuntimeEnvironment.class) { current = session; }
+            // Service CREATE_SERVICE/BIND/SERVICE_ARGS/STOP messages are owned by Android's
+            // ActivityThread. Install this before Application.onCreate so services started from
+            // application bootstrap take the same framework path as Activity launches.
+            session.serviceFrameworkBridge = GuestActivityThreadServiceBridge.install(session);
+            guestContext.installServiceFrameworkBridge(session.serviceFrameworkBridge);
+            // Install before Application.onCreate so launches triggered by Application startup
+            // enter the real ActivityThread Instrumentation path as well. The bridge is restored
+            // during Session.shutdown and is generation-owned just like native hooks and Binder
+            // callbacks.
+            session.activityThreadInstrumentation = GuestActivityThreadInstrumentation.install(session);
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
             session.components.prepareDeclaredProviders();
             session.mainThread.run(application::onCreate);
-            if (nativePolicyConfigured && !camera1AdapterInstalled) {
+            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
                 camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
                 session.camera1AdapterInstalled = camera1AdapterInstalled;
                 android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_APPLICATION installed="
@@ -592,6 +678,33 @@ public final class GuestRuntimeEnvironment {
     private static String emptyToNull(String value) { return value == null || value.trim().isEmpty() ? null : value; }
     private static String safe(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
 
+    private static boolean isTranslatedGuestAbi(String guestAbi) {
+        if (guestAbi == null || guestAbi.trim().isEmpty()) return false;
+        String normalizedGuest = guestAbi.trim().toLowerCase(java.util.Locale.ROOT);
+        String actualHostAbi = hostAbi();
+        return !actualHostAbi.isEmpty()
+                && !normalizedGuest.equals(actualHostAbi.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    private static String hostAbi() {
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.FileReader("/proc/self/maps"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.contains("controlled_sandbox_native.so")) continue;
+                int marker = line.lastIndexOf("/lib/");
+                if (marker < 0) continue;
+                int start = marker + "/lib/".length();
+                int end = line.indexOf('/', start);
+                if (end > start) return line.substring(start, end);
+            }
+        } catch (Throwable ignored) {
+            // Fall back to the platform-reported ABI list on devices without readable maps.
+        }
+        String[] hostAbis = Build.SUPPORTED_ABIS;
+        return hostAbis == null || hostAbis.length == 0 || hostAbis[0] == null ? "" : hostAbis[0];
+    }
+
     /**
      * Valid APKs may use an applicationId that differs from their Java component namespace.
      * Derive compatibility exemptions only from this APK's manifest declarations; never add a
@@ -643,6 +756,9 @@ public final class GuestRuntimeEnvironment {
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
         final GuestProcessIdentityBridge processIdentity;
+        GuestActivityThreadInstrumentation activityThreadInstrumentation;
+        GuestActivityThreadServiceBridge serviceFrameworkBridge;
+        GuestLoadedApkBridge loadedApkBridge;
         GuestComponentRuntime components;
         GuestJobServiceBridge jobServices;
 
@@ -692,6 +808,9 @@ public final class GuestRuntimeEnvironment {
         public String packageName() { return spec.packageName; }
         public int virtualUserId() { return spec.virtualUserId; }
         public int processSlot() { return spec.processSlot; }
+        public Object loadedApkProjection() {
+            return loadedApkBridge == null ? null : loadedApkBridge.loadedApk();
+        }
 
         public void bindActivityTaskHost(IBinder frameworkToken, String activityToken, int taskId,
                                          Runnable moveToFront, BooleanSupplier moveToBack,
@@ -813,6 +932,13 @@ public final class GuestRuntimeEnvironment {
 
         void shutdown() {
             if (jobServices != null) jobServices.close();
+            // Finish framework-owned activities while ActivityThread still owns the Guest
+            // instrumentation.  The broker clears its task ledger as part of the same stop
+            // transaction, but Android must also observe the concrete host StubActivity task
+            // finishing or it may recreate the slot process after clear/delete.
+            if (activityThreadInstrumentation != null) {
+                mainThread.run(activityThreadInstrumentation::finishAllActivities);
+            }
             // Stop accepting Guest-side component unbinds before the Broker-side component
             // runtime and WebView provider are torn down.  Chromium may issue one final unbind
             // asynchronously; GuestContextComponentRouter handles that late call explicitly.
@@ -821,6 +947,9 @@ public final class GuestRuntimeEnvironment {
             capabilityLeases.close(capabilityAudit);
             webViewProfile.renderers.close();
             context.closeWebViewProviderServices();
+            if (activityThreadInstrumentation != null) activityThreadInstrumentation.close();
+            if (serviceFrameworkBridge != null) serviceFrameworkBridge.close();
+            if (loadedApkBridge != null) loadedApkBridge.close();
             virtualServices.close();
             frameworkCallRouter.close();
             frameworkHooks.close();

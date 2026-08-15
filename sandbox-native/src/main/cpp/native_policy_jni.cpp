@@ -635,13 +635,109 @@ NativeLoadStatic2 orig_native_load_static2 = nullptr;
 NativeLoadInstance3 orig_native_load_instance3 = nullptr;
 NativeLoadInstance2 orig_native_load_instance2 = nullptr;
 bool native_load_diag_installed = false;
+bool native_load_redirect_installed = false;
+
+struct LoadedSymbolLookup {
+    const char* symbol = nullptr;
+    void* address = nullptr;
+};
+
+std::uint32_t gnu_hash(const char* name) {
+    std::uint32_t hash = 5381;
+    for (const unsigned char* cursor = reinterpret_cast<const unsigned char*>(name);
+         *cursor != '\0'; cursor++) {
+        hash = (hash * 33) + *cursor;
+    }
+    return hash;
+}
+
+bool find_gnu_hash_symbol(const link_map* map, const ElfW(Dyn)* dynamic,
+                          const char* symbol, void** result) {
+    const ElfW(Addr) load_bias = static_cast<ElfW(Addr)>(map->l_addr);
+    const std::uint32_t* hash_table = nullptr;
+    const ElfW(Sym)* symbols = nullptr;
+    const char* strings = nullptr;
+    for (const ElfW(Dyn)* entry = dynamic; entry->d_tag != DT_NULL; entry++) {
+        if (entry->d_tag == DT_SYMTAB) symbols = reinterpret_cast<const ElfW(Sym)*>(load_bias + entry->d_un.d_ptr);
+        if (entry->d_tag == DT_STRTAB) strings = reinterpret_cast<const char*>(load_bias + entry->d_un.d_ptr);
+        if (entry->d_tag == DT_GNU_HASH) hash_table = reinterpret_cast<const std::uint32_t*>(load_bias + entry->d_un.d_ptr);
+    }
+    if (hash_table == nullptr || symbols == nullptr || strings == nullptr) return false;
+    const std::uint32_t bucket_count = hash_table[0];
+    const std::uint32_t symbol_offset = hash_table[1];
+    const std::uint32_t bloom_count = hash_table[2];
+    const std::uint32_t bloom_shift = hash_table[3];
+    if (bucket_count == 0 || bloom_count == 0) return false;
+    const auto* bloom = reinterpret_cast<const ElfW(Addr)*>(hash_table + 4);
+    const auto* buckets = reinterpret_cast<const std::uint32_t*>(bloom + bloom_count);
+    const auto* chains = buckets + bucket_count;
+    const std::uint32_t hash = gnu_hash(symbol);
+    const ElfW(Addr) word = bloom[(hash / (sizeof(ElfW(Addr)) * 8)) % bloom_count];
+    const ElfW(Addr) mask = (static_cast<ElfW(Addr)>(1) << (hash % (sizeof(ElfW(Addr)) * 8)))
+            | (static_cast<ElfW(Addr)>(1) << ((hash >> bloom_shift) % (sizeof(ElfW(Addr)) * 8)));
+    if ((word & mask) != mask) return false;
+    std::uint32_t index = buckets[hash % bucket_count];
+    if (index < symbol_offset) return false;
+    for (;;) {
+        const std::uint32_t chain_hash = chains[index - symbol_offset];
+        if ((chain_hash | 1U) == (hash | 1U)
+                && std::strcmp(strings + symbols[index].st_name, symbol) == 0
+                && symbols[index].st_shndx != SHN_UNDEF) {
+            *result = reinterpret_cast<void*>(load_bias + symbols[index].st_value);
+            return *result != nullptr;
+        }
+        if ((chain_hash & 1U) != 0) break;
+        index++;
+    }
+    return false;
+}
+
+int find_loaded_openjdk_symbol(struct dl_phdr_info* info, size_t, void* opaque) {
+    auto* lookup = static_cast<LoadedSymbolLookup*>(opaque);
+    if (info == nullptr || info->dlpi_name == nullptr || lookup == nullptr
+            || std::strstr(info->dlpi_name, "libopenjdk.so") == nullptr) return 0;
+    for (int index = 0; index < info->dlpi_phnum; index++) {
+        const ElfW(Phdr)& header = info->dlpi_phdr[index];
+        if (header.p_type != PT_DYNAMIC) continue;
+        const auto* dynamic = reinterpret_cast<const ElfW(Dyn)*>(info->dlpi_addr + header.p_vaddr);
+        link_map map{};
+        map.l_addr = info->dlpi_addr;
+        if (find_gnu_hash_symbol(&map, dynamic, lookup->symbol, &lookup->address)) return 1;
+    }
+    return 0;
+}
 
 void* lookup_native_load(const char* symbol) {
     if (symbol == nullptr) return nullptr;
     dlerror();
     void* value = dlsym(RTLD_DEFAULT, symbol);
+    if (value != nullptr) return value;
     (void) dlerror();
-    return value;
+
+    LoadedSymbolLookup loaded{symbol, nullptr};
+    dl_iterate_phdr(find_loaded_openjdk_symbol, &loaded);
+    if (loaded.address != nullptr) return loaded.address;
+
+    // Runtime.nativeLoad is registered by libopenjdk through JNI_OnLoad.  On API 32
+    // the exported symbol is Runtime_nativeLoad, but the APEX linker namespace does
+    // not always expose it through RTLD_DEFAULT to an app-owned JNI library.  Probe
+    // the loaded/openjdk handles explicitly before giving up.  This is only a symbol
+    // lookup; no ArtMethod entry point or access flags are modified.
+    constexpr const char* kOpenJdkLibraries[] = {
+            "libopenjdk.so",
+            "/apex/com.android.art/lib64/libopenjdk.so",
+            "/system/lib64/libopenjdk.so",
+    };
+    for (const char* library : kOpenJdkLibraries) {
+        void* handle = dlopen(library, RTLD_NOW | RTLD_NOLOAD);
+        if (handle == nullptr) handle = dlopen(library, RTLD_NOW | RTLD_LOCAL);
+        if (handle == nullptr) continue;
+        value = dlsym(handle, symbol);
+        if (value != nullptr) return value;
+    }
+    __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
+            "nativeLoad symbol unavailable symbol=%s", symbol);
+    return nullptr;
 }
 
 void report_native_load(JNIEnv* env, jstring filename, jobject loader, jobject caller) {
@@ -690,6 +786,70 @@ jstring diag_native_load_instance2(JNIEnv* env, jobject runtime, jstring filenam
     return orig_native_load_instance2(env, runtime, filename, loader);
 }
 
+jstring redirect_native_load_argument(JNIEnv* env, jstring filename) {
+    if (env == nullptr || filename == nullptr
+            || !controlled_sandbox::global_policy().configured()) {
+        return filename;
+    }
+    const char* chars = env->GetStringUTFChars(filename, nullptr);
+    if (chars == nullptr) return filename;
+    std::string original(chars);
+    env->ReleaseStringUTFChars(filename, chars);
+    if (original.empty() || original.front() != '/') return filename;
+    try {
+        const std::string mapped = controlled_sandbox::global_policy().map_path(original);
+        if (mapped == original) return filename;
+        jstring replacement = env->NewStringUTF(mapped.c_str());
+        if (replacement != nullptr) {
+            __android_log_print(ANDROID_LOG_DEBUG, "CS_NATIVE_BIND",
+                    "translated nativeLoad path=%s -> %s", original.c_str(), mapped.c_str());
+            return replacement;
+        }
+    } catch (const controlled_sandbox::PathPolicyError& error) {
+        // Runtime.nativeLoad returns a non-null error string to its Java caller. Returning the
+        // policy error preserves that contract and fails closed without invoking the linker.
+        return env->NewStringUTF(error.what());
+    } catch (const std::exception& error) {
+        return env->NewStringUTF(error.what());
+    }
+    return filename;
+}
+
+jstring redirect_native_load_static3(JNIEnv* env, jclass clazz, jstring filename, jobject loader,
+                                     jobject caller) {
+    jstring mapped = redirect_native_load_argument(env, filename);
+    if (orig_native_load_static3 == nullptr) return nullptr;
+    jstring result = orig_native_load_static3(env, clazz, mapped, loader, caller);
+    if (mapped != filename && mapped != nullptr) env->DeleteLocalRef(mapped);
+    return result;
+}
+
+jstring redirect_native_load_static2(JNIEnv* env, jclass clazz, jstring filename, jobject loader) {
+    jstring mapped = redirect_native_load_argument(env, filename);
+    if (orig_native_load_static2 == nullptr) return nullptr;
+    jstring result = orig_native_load_static2(env, clazz, mapped, loader);
+    if (mapped != filename && mapped != nullptr) env->DeleteLocalRef(mapped);
+    return result;
+}
+
+jstring redirect_native_load_instance3(JNIEnv* env, jobject runtime, jstring filename,
+                                       jobject loader, jobject caller) {
+    jstring mapped = redirect_native_load_argument(env, filename);
+    if (orig_native_load_instance3 == nullptr) return nullptr;
+    jstring result = orig_native_load_instance3(env, runtime, mapped, loader, caller);
+    if (mapped != filename && mapped != nullptr) env->DeleteLocalRef(mapped);
+    return result;
+}
+
+jstring redirect_native_load_instance2(JNIEnv* env, jobject runtime, jstring filename,
+                                       jobject loader) {
+    jstring mapped = redirect_native_load_argument(env, filename);
+    if (orig_native_load_instance2 == nullptr) return nullptr;
+    jstring result = orig_native_load_instance2(env, runtime, mapped, loader);
+    if (mapped != filename && mapped != nullptr) env->DeleteLocalRef(mapped);
+    return result;
+}
+
 bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature, void* replacement,
                              void** original_slot, const char* symbol_a, const char* symbol_b) {
     if (env->GetStaticMethodID(runtime, "nativeLoad", signature) != nullptr) {
@@ -718,6 +878,21 @@ bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature,
     return false;
 }
 
+// Hidden-api policy may deny GetMethodID even after the process-local exemption bridge has
+// succeeded. RegisterNatives is the supported JNI registration boundary and only needs the
+// class/name/signature tuple; it does not require reflective lookup of the hidden method.
+bool register_native_load_unchecked(JNIEnv* env, jclass runtime, const char* signature,
+                                    void* replacement, void** original_slot,
+                                    const char* symbol_a, const char* symbol_b) {
+    *original_slot = lookup_native_load(symbol_a);
+    if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+    if (*original_slot == nullptr) return false;
+    JNINativeMethod method{"nativeLoad", signature, replacement};
+    const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
+    if (!ok) env->ExceptionClear();
+    return ok;
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -739,36 +914,82 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallNativeL
             "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
             reinterpret_cast<void*>(&diag_native_load_static3),
             reinterpret_cast<void**>(&orig_native_load_static3),
-            "Java_java_lang_Runtime_nativeLoad",
-            "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2Ljava_lang_Class_2");
+            "Runtime_nativeLoad",
+            "Java_java_lang_Runtime_nativeLoad");
     if (!installed) {
         installed = install_one_native_load(env, runtime,
                 "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
                 reinterpret_cast<void*>(&diag_native_load_instance3),
                 reinterpret_cast<void**>(&orig_native_load_instance3),
-                "Java_java_lang_Runtime_nativeLoad",
-                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2Ljava_lang_Class_2");
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
     }
     if (!installed) {
         installed = install_one_native_load(env, runtime,
                 "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
                 reinterpret_cast<void*>(&diag_native_load_static2),
                 reinterpret_cast<void**>(&orig_native_load_static2),
-                "Java_java_lang_Runtime_nativeLoad",
-                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2");
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
     }
     if (!installed) {
         installed = install_one_native_load(env, runtime,
                 "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
                 reinterpret_cast<void*>(&diag_native_load_instance2),
                 reinterpret_cast<void**>(&orig_native_load_instance2),
-                "Java_java_lang_Runtime_nativeLoad",
-                "Java_java_lang_Runtime_nativeLoad__Ljava_lang_String_2Ljava_lang_ClassLoader_2");
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
     }
     env->DeleteLocalRef(runtime);
     native_load_diag_installed = installed;
     __android_log_print(ANDROID_LOG_INFO, "CS_NATIVE_BIND",
             "PROBE nativeLoadWrap installed=%d", installed ? 1 : 0);
+    return installed ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallNativeLoadRedirect(
+        JNIEnv* env, jclass) {
+    if (native_load_redirect_installed) return JNI_TRUE;
+    jclass runtime = env->FindClass("java/lang/Runtime");
+    if (runtime == nullptr) {
+        env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    bool installed = register_native_load_unchecked(env, runtime,
+            "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
+            reinterpret_cast<void*>(&redirect_native_load_static3),
+            reinterpret_cast<void**>(&orig_native_load_static3),
+            "Runtime_nativeLoad",
+            "Java_java_lang_Runtime_nativeLoad");
+    if (!installed) {
+        installed = register_native_load_unchecked(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&redirect_native_load_instance3),
+                reinterpret_cast<void**>(&orig_native_load_instance3),
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
+    }
+    if (!installed) {
+        installed = register_native_load_unchecked(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&redirect_native_load_static2),
+                reinterpret_cast<void**>(&orig_native_load_static2),
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
+    }
+    if (!installed) {
+        installed = register_native_load_unchecked(env, runtime,
+                "(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String;",
+                reinterpret_cast<void*>(&redirect_native_load_instance2),
+                reinterpret_cast<void**>(&orig_native_load_instance2),
+                "Runtime_nativeLoad",
+                "Java_java_lang_Runtime_nativeLoad");
+    }
+    env->DeleteLocalRef(runtime);
+    native_load_redirect_installed = installed;
+    __android_log_print(ANDROID_LOG_INFO, "CS_NATIVE_BIND",
+            "translated nativeLoadRedirect installed=%d", installed ? 1 : 0);
     return installed ? JNI_TRUE : JNI_FALSE;
 }
 

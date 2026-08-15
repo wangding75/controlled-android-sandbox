@@ -54,6 +54,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final SharedState sharedState;
     private final Context unwrapBoundary;
     private final Resources.Theme frameworkTheme;
+    private volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
     final GuestDynamicReceiverRegistry dynamicReceivers;
     final GuestMainThreadDispatcher mainThread;
     private final boolean deviceProtected;
@@ -153,6 +154,14 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         componentRouter.close();
     }
 
+    void installServiceFrameworkBridge(GuestActivityThreadServiceBridge bridge) {
+        serviceFrameworkBridge = bridge;
+    }
+
+    GuestActivityThreadServiceBridge serviceFrameworkBridge() {
+        return serviceFrameworkBridge;
+    }
+
     /** Prevents ordinary Guest code from unwrapping this Context into the host Context. */
     /**
      * Return a finite Guest-only unwrap boundary. Returning this object here used to satisfy
@@ -187,6 +196,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     void installProcessClassLoader(ClassLoader processLoader) {
         if (processLoader == null) throw new IllegalArgumentException("process ClassLoader is required");
         this.classLoader = processLoader;
+        sharedState.mainThread.installFrameworkClassLoader(processLoader);
         GuestNativeBindingDiagnostic.recordLoader("process.install", processLoader);
     }
     @Override public Resources getResources() { return resources; }
@@ -242,7 +252,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             return android.view.LayoutInflater.from(hostServiceContext).cloneInContext(this);
         }
         if (!sharedState.systemServices.isKnownService(name)) return null;
-        capabilityGate.requireService(name);
+        // Android service lookup is discovery, not permission grant. Camera and
+        // location managers must be obtainable before a runtime permission is
+        // granted; the actual operation proxies enforce permission/AppOps when
+        // the service is used. This matches Framework/VA/NBB semantics and
+        // prevents Chromium's CameraAvailabilityObserver from crashing during
+        // application startup.
         sharedState.systemServices.requireAvailable(name);
         Object override = com.warden.controlledsandbox.framework.core.GuestSystemServiceOverrideRegistry
                 .get(this, name);

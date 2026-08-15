@@ -67,7 +67,7 @@ public final class GuestPackageSpec {
         virtualUid = bundle.getInt(RuntimeKeys.VIRTUAL_UID, -1);
         if (virtualUid < 0) throw new IllegalArgumentException("virtualUid must be non-negative");
         processSlot = bundle.getInt(RuntimeKeys.PROCESS_SLOT, -1);
-        if (processSlot < 0 || processSlot > 7) throw new IllegalArgumentException("processSlot out of range");
+        if (processSlot < 0 || processSlot > 31) throw new IllegalArgumentException("processSlot out of range");
         processName = bundle.getString(RuntimeKeys.PROCESS_NAME, packageName);
         if (processName == null || processName.trim().isEmpty()) throw new IllegalArgumentException("processName is required");
         apkPath = required(bundle, RuntimeKeys.APK_PATH);
@@ -163,6 +163,8 @@ public final class GuestPackageSpec {
     }
 
     public VirtualPackageStateSnapshot packageState() { return packageState; }
+
+    public String processName() { return processName; }
 
     File apkFile() { return new File(apkPath); }
     File dataRootFile() { return new File(dataRoot); }

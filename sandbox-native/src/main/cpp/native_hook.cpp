@@ -43,6 +43,31 @@ int protection_for_address(std::uintptr_t address) {
     return protection;
 }
 
+bool is_host_elf(const dl_phdr_info* info) {
+    if (info == nullptr) return false;
+    const auto* header = reinterpret_cast<const ElfW(Ehdr)*>(info->dlpi_addr);
+    if (header == nullptr
+            || header->e_ident[EI_MAG0] != ELFMAG0
+            || header->e_ident[EI_MAG1] != ELFMAG1
+            || header->e_ident[EI_MAG2] != ELFMAG2
+            || header->e_ident[EI_MAG3] != ELFMAG3) {
+        // Some linker-owned entries do not expose an ELF header at dlpi_addr. Keep
+        // their existing behavior; only reject a positively identified foreign ELF.
+        return true;
+    }
+#if defined(__x86_64__)
+    return header->e_machine == EM_X86_64;
+#elif defined(__i386__)
+    return header->e_machine == EM_386;
+#elif defined(__aarch64__)
+    return header->e_machine == EM_AARCH64;
+#elif defined(__arm__)
+    return header->e_machine == EM_ARM;
+#else
+    return true;
+#endif
+}
+
 bool make_writable(void* address, int& original_protection) {
     const long page_size = sysconf(_SC_PAGESIZE);
     if (page_size <= 0) return false;
@@ -132,12 +157,22 @@ struct ScanContext {
     std::size_t patched{0};
     std::size_t targets{0};
     std::size_t failures{0};
+    bool foreign_guest_module{false};
 };
 
 int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     auto* context = static_cast<ScanContext*>(opaque);
     context->scanned++;
     const std::string_view path = info->dlpi_name == nullptr ? std::string_view{} : std::string_view(info->dlpi_name);
+    const bool guest_module = !context->camera_system && !context->lifetime_system
+            && NativeHookRuntime::is_guest_module(path, context->root);
+    // The Android native bridge may expose a foreign-ABI module through the host
+    // linker's module walk. Its ELF tables and relocation types are not parseable by
+    // this library, and patching them corrupts translated calls (notably WebView).
+    if (!is_host_elf(info)) {
+        if (guest_module) context->foreign_guest_module = true;
+        return 0;
+    }
     if (context->camera_system) {
         if (!is_camera1_system_module(path)) return 0;
     } else if (context->lifetime_system) {
@@ -254,7 +289,7 @@ bool NativeHookRuntime::refresh() {
     ScanContext context{this, root, false, false};
     const int result = dl_iterate_phdr(scan_module, &context);
     ScanContext lifetime{this, root, false, true};
-    (void) dl_iterate_phdr(scan_module, &lifetime);
+    if (!context.foreign_guest_module) (void) dl_iterate_phdr(scan_module, &lifetime);
     context.patched += lifetime.patched;
     context.targets += lifetime.targets;
     std::lock_guard lock(state.mutex);

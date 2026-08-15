@@ -148,6 +148,20 @@ public final class DebugCommandActivity extends Activity {
             } else if ("prepare".equals(command) || "import-prepare".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+            } else if ("hold-prepare".equals(command)) {
+                // RD crash/recovery probe only: keep the RuntimeClient/Broker binding alive long
+                // enough for the external harness to SIGKILL the concrete Guest process before
+                // the normal client teardown path releases the slot.
+                operation = runtime.prepare(record, virtualUserId);
+                requireStatus("hold-prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                long holdMs = Math.max(5_000L, Math.min(60_000L,
+                        extras.getLong("holdMs", 30_000L)));
+                try {
+                    Thread.sleep(holdMs);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("HOLD_PREPARE_INTERRUPTED", interrupted);
+                }
             } else {
                 throw new IllegalArgumentException("Unsupported command: " + command);
             }
@@ -173,7 +187,10 @@ public final class DebugCommandActivity extends Activity {
         } finally {
             if (runtime != null) runtime.close();
             if (packages != null) packages.close();
-            writeResult(result);
+            // hold-prepare is intentionally concurrent with the follow-up recovery
+            // command; never let its delayed finally block overwrite the result file
+            // owned by the replacement launch.
+            if (!"hold-prepare".equals(command)) writeResult(result);
             runOnUiThread(() -> { finish(); worker.shutdown(); });
         }
     }

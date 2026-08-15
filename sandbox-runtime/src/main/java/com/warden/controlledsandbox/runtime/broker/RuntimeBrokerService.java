@@ -57,7 +57,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
-    private static final int SLOT_COUNT = 8;
+    private static final int SLOT_COUNT = 32;
     private final Clock clock = new SystemMonotonicClock();
     private final TokenGenerator tokenGenerator = new UuidTokenGenerator();
     private final AuditSink auditSink = new RuntimeAuditSink();
@@ -213,7 +213,43 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             launch.putExtra(RuntimeKeys.GENERATION, session.generation());
             launch.putExtra(RuntimeKeys.ACTIVITY_TOKEN,
                     transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
+            // Keep the bounded Guest intent projection on the host launch envelope. VA/NBB
+            // rewrite the framework launch transaction before ActivityThread instantiation; the
+            // CAS Instrumentation bridge needs the same data before a Stub object exists. The
+            // one-time route token remains authoritative and the copied fields are only a
+            // transport projection, never a second route authority.
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.COMPONENT_CLASS);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.TASK_ID);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.TARGET_PACKAGE_NAME);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.INTENT_COMPONENT_PACKAGE);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.INTENT_COMPONENT_CLASS);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.ACTIVITY_ACTION);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.ACTIVITY_FLAGS);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.URI);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.BROADCAST_SCHEME);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.BROADCAST_HOST);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.BROADCAST_PATH);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.BROADCAST_MIME_TYPE);
+            copyActivityFrameworkField(launch, transaction, RuntimeKeys.BROADCAST_CATEGORIES);
+            if (transaction.containsKey(RuntimeKeys.INTENT_EXTRAS)) {
+                Bundle extras = transaction.getBundle(RuntimeKeys.INTENT_EXTRAS);
+                if (extras != null) launch.putExtra(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+            }
             startActivity(launch);
+            // A Guest Activity callback runs on the same process main looper that the Android
+            // framework uses to deliver the next launch transaction.  Waiting here for the
+            // nested Activity to reach CREATED/RESUMED would block that looper through the
+            // Broker call path (Guest main -> Broker -> ActivityThread), producing the same
+            // re-entrant deadlock that VA/NBB avoid by acknowledging the transaction first.
+            // The route and ledger remain pending and the target process reports lifecycle
+            // evidence asynchronously through ACTIVITY_EVENT.
+            if (request != null && request.getInt(RuntimeKeys.CALLER_TASK_ID, 0) > 0) {
+                Bundle nested = sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
+                nested.putAll(transaction);
+                nested.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
+                nested.putBoolean("launcherResolved", true);
+                return nested;
+            }
             String activityToken = transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
             String sessionId = session.sessionId();
             GuestLaunchObservation existing = sessionId.isEmpty()
@@ -262,6 +298,18 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
             return failure(error);
+        }
+    }
+
+    private static void copyActivityFrameworkField(Intent target, Bundle source, String key) {
+        if (target == null || source == null || key == null || !source.containsKey(key)) return;
+        Object value = source.get(key);
+        if (value instanceof String string) target.putExtra(key, string);
+        else if (value instanceof Integer integer) target.putExtra(key, integer);
+        else if (value instanceof ArrayList<?> list) {
+            ArrayList<String> strings = new ArrayList<>();
+            for (Object item : list) if (item instanceof String string) strings.add(string);
+            target.putStringArrayListExtra(key, strings);
         }
     }
 
@@ -353,6 +401,28 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             String processName = session.processName();
             Bundle base = brokerState.prepared(processKey(packageName, userId, processName));
             if (base == null) throw new IllegalStateException("PREPARED_SPEC_MISSING");
+
+            // Service component calls use the same Broker allocation path as the existing
+            // virtual Service runtime, but the actual callbacks are delivered by the Android
+            // ActivityThread in the target process.  Returning the lease here lets the Guest
+            // Context start/bind a predeclared StubService without constructing the Guest
+            // Service on the Broker thread.
+            if (ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(operation)) {
+                Bundle routed = new Bundle();
+                routed.putString(RuntimeKeys.STATUS, "FRAMEWORK_SERVICE_ROUTE");
+                routed.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+                routed.putLong(RuntimeKeys.GENERATION, session.generation());
+                routed.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+                routed.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+                routed.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+                routed.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+                routed.putString(RuntimeKeys.COMPONENT_CLASS,
+                        required(request, RuntimeKeys.COMPONENT_CLASS));
+                routed.putString("frameworkServiceStubPackage", getPackageName());
+                routed.putString("frameworkServiceStubClass",
+                        RuntimeStubComponents.componentServiceClassFor(session.processSlot()).getName());
+                return routed;
+            }
             Bundle call = new Bundle(base);
             call.putAll(request);
             call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
@@ -632,6 +702,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             return out;
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.e("CS_ACTIVITY_EVENT", "activity event rejected", error);
             return failure(error);
         }
     }
@@ -717,6 +788,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             return activityRuntime.event(current, request);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.e("CS_ACTIVITY_EVENT", "activity event rejected", error);
             return failure(error);
         }
     }
@@ -760,11 +832,39 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                         cached.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
                     throw new IllegalStateException("PREPARED_SPEC_REVISION_MISMATCH");
                 }
-                receiverCoordinator.bindSession(session);
-                Bundle out = new Bundle(cached);
-                out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
-                        ? "ALREADY_PREPARED_DEGRADED" : "ALREADY_PREPARED");
-                return out;
+                // A persisted READY/ACTIVE session is only a broker-side lease.  After a
+                // process death Android may recreate the declared Guest service with an empty
+                // GuestRuntimeEnvironment while the old session record and prepared spec still
+                // exist.  Do not return the cached spec until the newly bound Binder proves that
+                // bindApplication/LoadedApk/Application bootstrap is actually READY.
+                Bundle runtimeStatus = null;
+                Throwable statusFailure = null;
+                try {
+                    runtimeStatus = callGuest(session.processSlot(), guest -> guestOperation(
+                            guest, RuntimeOperationRequest.GUEST_RUNTIME_STATUS, new Bundle()));
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                    statusFailure = error;
+                }
+                if (runtimeStatus != null
+                        && "READY".equals(runtimeStatus.getString(RuntimeKeys.STATUS, ""))) {
+                    receiverCoordinator.bindSession(session);
+                    Bundle out = new Bundle(cached);
+                    out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
+                            ? "ALREADY_PREPARED_DEGRADED" : "ALREADY_PREPARED");
+                    return out;
+                }
+                GuestSession observed = sessions.get(packageName, userId, processName);
+                if (observed != null && (observed.state() == SessionState.READY
+                        || observed.state() == SessionState.ACTIVE)) {
+                    String reason = statusFailure == null
+                            ? "GUEST_RUNTIME_STATUS_" + (runtimeStatus == null
+                                    ? "MISSING" : runtimeStatus.getString(RuntimeKeys.STATUS, "UNKNOWN"))
+                            : "GUEST_RUNTIME_STATUS_FAILED:" + statusFailure.getClass().getSimpleName();
+                    sessions.markProcessDied(packageName, userId, processName,
+                            observed.generation(), now(), reason);
+                }
+                session = sessions.get(packageName, userId, processName);
             }
             if (session.state() == SessionState.RECOVERING) {
                 staleRecovery = session;

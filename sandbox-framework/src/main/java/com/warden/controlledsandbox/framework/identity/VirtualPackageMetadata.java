@@ -528,6 +528,17 @@ public final class VirtualPackageMetadata {
         return toInfo(component);
     }
 
+    /** Internal PMS policy view used when another virtual package resolves this component. */
+    public Component component(String className, Type expected) {
+        Component component = byClass.get(normalizeClass(className));
+        return component == null || component.type() != expected ? null : component;
+    }
+
+    /** Returns the manifest provider owning an authority, including non-exported providers. */
+    public Component providerComponent(String authority) {
+        return providersByAuthority.get(value(authority));
+    }
+
     public ResolveInfo resolve(Intent intent, Type type) { return resolve(intent, type, 0L); }
     public ResolveInfo resolve(Intent intent, Type type, long flags) {
         List<ResolveInfo> matches = query(intent, type, flags);
@@ -548,6 +559,7 @@ public final class VirtualPackageMetadata {
         for (Component component : components) {
             if (component.type() != type || !visible(component, flags)) continue;
             for (Filter filter : component.filters()) {
+                if ((flags & MATCH_DEFAULT_ONLY) != 0 && !filter.defaultCategory()) continue;
                 Match match = match(value, filter, flags);
                 if (match != null) matches.add(new Match(component, filter, match.score));
             }

@@ -169,6 +169,16 @@ public final class NativePolicy {
         return AVAILABLE && nativeInstallNativeLoadDiagnostic();
     }
 
+    /**
+     * Installs the translated-ABI native loader boundary.  This uses ART's supported
+     * RegisterNatives path and redirects absolute Guest paths before Runtime.nativeLoad reaches
+     * the platform linker.  It deliberately does not mutate ArtMethod access flags, which would
+     * break the ARM64-to-x86_64 native bridge calling convention.
+     */
+    public static boolean installNativeLoadRedirect() {
+        return AVAILABLE && nativeInstallNativeLoadRedirect();
+    }
+
     /** Observe-only: dump pending Java exceptions seen by JNI ExceptionCheck. */
     public static boolean installJniPendingExceptionProbe() {
         return AVAILABLE && nativeInstallJniPendingExceptionProbe();
@@ -270,6 +280,7 @@ public final class NativePolicy {
     private static native void nativeResetAudioCapture();
     private static native void nativeSetGuestProcessExitAllowed(boolean allowed);
     private static native boolean nativeInstallNativeLoadDiagnostic();
+    private static native boolean nativeInstallNativeLoadRedirect();
     private static native boolean nativeInstallJniPendingExceptionProbe();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
     private static native boolean nativeRefreshHooks();

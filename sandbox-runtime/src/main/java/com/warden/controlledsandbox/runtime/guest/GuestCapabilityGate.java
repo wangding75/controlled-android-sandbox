@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Fail-closed gate for host system-service handles that expose dangerous capabilities. */
+/** Fail-closed gate for protected system-service operations. */
 final class GuestCapabilityGate {
     private static final Map<String, List<String>> REQUIRED_ANY = requirements();
     private volatile Map<String, Boolean> effectivePermissions = Map.of();

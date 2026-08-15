@@ -10,8 +10,10 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,6 +83,205 @@ public final class ActivityFieldBridge {
     }
 
     /**
+     * Projects Guest identity onto an Activity that was instantiated by the real
+     * ActivityThread/Instrumentation path.  Unlike the legacy host-trampoline bridge this
+     * method does not copy a host Activity's token, window or Fragment controller: ActivityThread
+     * has already attached those framework-owned objects to the Guest instance.
+     */
+    public static BridgeReport installGuest(Activity guest,
+                                            GuestRuntimeEnvironment.Session session,
+                                            String componentClass, Intent intent,
+                                            int callerTaskId) {
+        if (guest == null) throw new IllegalArgumentException("guest is required");
+        if (session == null) throw new IllegalArgumentException("session is required");
+        if (componentClass == null || componentClass.trim().isEmpty()) {
+            throw new IllegalArgumentException("componentClass is required");
+        }
+        int api = Build.VERSION.SDK_INT;
+        if (api < MIN_API || api > MAX_AUDITED_API) {
+            throw new IllegalStateException("UNSUPPORTED_ACTIVITY_BRIDGE_API:" + api);
+        }
+        Intent guestIntent = intent == null ? new Intent() : new Intent(intent);
+        guestIntent.setComponent(new ComponentName(session.spec().packageName, componentClass));
+        LinkedHashMap<String, Object> direct = new LinkedHashMap<>();
+        direct.put("mBase", session.context());
+        direct.put("mTheme", session.context().getTheme());
+        direct.put("mResources", session.context().getResources());
+        direct.put("mApplication", session.application());
+        direct.put("mIntent", guestIntent);
+        direct.put("mComponent", new ComponentName(session.spec().packageName, componentClass));
+        direct.put("mTitle", componentClass.substring(componentClass.lastIndexOf('.') + 1));
+        direct.put("mActivityInfo", guestActivityInfo(session, componentClass));
+        BridgeReport report = installFields(guest, guest, List.of(), OPTIONAL_HOST_FIELDS,
+                direct, api);
+        applyGuestTheme(guest, session, componentClass);
+        return report;
+    }
+
+    /**
+     * Updates the ActivityClientRecord after Instrumentation has created the Guest object.
+     * ActivityThread owns the record; CAS only validates the token and projects the Guest
+     * component metadata into it. This is the ownership boundary used by the RD trace.
+     */
+    public static Bundle promoteFrameworkRecord(Activity guest,
+                                                 GuestRuntimeEnvironment.Session session,
+                                                 String componentClass, Intent intent) {
+        if (guest == null || session == null) throw new IllegalArgumentException("Activity/session required");
+        Bundle evidence = frameworkEvidence(guest);
+        try {
+            Object record = findActivityClientRecord(guest);
+            if (record == null) throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_UNAVAILABLE");
+            Field recordClassField = findField(record.getClass(), "activityInfo");
+            if (recordClassField != null) {
+                recordClassField.setAccessible(true);
+                recordClassField.set(record, guestActivityInfo(session, componentClass));
+            }
+            Field intentField = findField(record.getClass(), "intent");
+            if (intentField != null) {
+                intentField.setAccessible(true);
+                intentField.set(record, intent == null ? new Intent() : new Intent(intent));
+            }
+            if (session.loadedApkProjection() != null) {
+                Field packageInfoField = findField(record.getClass(), "packageInfo");
+                if (packageInfoField != null) {
+                    packageInfoField.setAccessible(true);
+                    packageInfoField.set(record, session.loadedApkProjection());
+                }
+            }
+            Field activityField = findField(record.getClass(), "activity");
+            if (activityField != null) {
+                activityField.setAccessible(true);
+                Object current = activityField.get(record);
+                if (current != guest) {
+                    throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_ACTIVITY_MISMATCH");
+                }
+            }
+            // Activity.attach() accepts ActivityClientRecord's preserved window. A Stub route
+            // can arrive with that slot populated by a previous host trampoline, while the
+            // newly instantiated Guest has never registered that DecorView with WMG. Clear the
+            // preserved record so ActivityThread.handleResumeActivity obtains the Guest window
+            // through its normal r.window == null branch and owns addView/removeView symmetrically.
+            clearStaleFrameworkWindow(record, guest);
+            evidence.putBoolean("frameworkRecordPromoted", true);
+            evidence.putString("frameworkComponentClass", componentClass);
+            evidence.putString("frameworkPackageName", session.spec().packageName);
+            return evidence;
+        } catch (RuntimeException error) {
+            throw error;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_PROMOTION_FAILED", error);
+        }
+    }
+
+    /** Returns framework-owned ActivityClientRecord evidence for the Activity token. */
+    public static Bundle frameworkEvidence(Activity activity) {
+        if (activity == null) throw new IllegalArgumentException("activity is required");
+        try {
+            Object record = findActivityClientRecord(activity);
+            if (record == null) throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_NOT_FOUND");
+            Field tokenField = findField(activity.getClass(), "mToken");
+            tokenField.setAccessible(true);
+            Object token = tokenField.get(activity);
+            Field recordActivity = findField(record.getClass(), "activity");
+            recordActivity.setAccessible(true);
+            if (recordActivity.get(record) != activity) {
+                throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_ACTIVITY_MISMATCH");
+            }
+            Bundle evidence = new Bundle();
+            evidence.putString("frameworkRecordClass", record.getClass().getName());
+            evidence.putString("frameworkActivityClass", activity.getClass().getName());
+            evidence.putString("frameworkToken", String.valueOf(token));
+            Field info = findField(record.getClass(), "activityInfo");
+            if (info != null) {
+                info.setAccessible(true);
+                Object value = info.get(record);
+                if (value instanceof ActivityInfo activityInfo) {
+                    evidence.putString("frameworkRecordPackage", activityInfo.packageName);
+                    evidence.putString("frameworkRecordName", activityInfo.name);
+                }
+            }
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            evidence.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
+            evidence.putBoolean("windowCreated", window != null);
+            return evidence;
+        } catch (RuntimeException error) {
+            throw error;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("ACTIVITY_FRAMEWORK_EVIDENCE_FAILED", error);
+        }
+    }
+
+    private static Object findActivityClientRecord(Activity activity) throws Exception {
+        Class<?> activityThreadType = Class.forName("android.app.ActivityThread");
+        Field currentField = findField(activityThreadType, "sCurrentActivityThread");
+        if (currentField == null) throw new NoSuchFieldException("ActivityThread.sCurrentActivityThread");
+        currentField.setAccessible(true);
+        Object thread = currentField.get(null);
+        if (thread == null) throw new IllegalStateException("ACTIVITY_THREAD_CURRENT_NULL");
+        Field activitiesField = findField(thread.getClass(), "mActivities");
+        if (activitiesField == null) throw new NoSuchFieldException("ActivityThread.mActivities");
+        activitiesField.setAccessible(true);
+        Object activities = activitiesField.get(thread);
+        if (activities == null) throw new IllegalStateException("ACTIVITY_THREAD_ACTIVITIES_NULL");
+        Field tokenField = findField(activity.getClass(), "mToken");
+        if (tokenField == null) throw new NoSuchFieldException("Activity.mToken");
+        tokenField.setAccessible(true);
+        Object token = tokenField.get(activity);
+        if (token == null) throw new IllegalStateException("ACTIVITY_FRAMEWORK_TOKEN_NULL");
+        Method get = activities.getClass().getMethod("get", Object.class);
+        Object record = get.invoke(activities, token);
+        if (record == null) throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_NOT_FOUND");
+        Field recordActivity = findField(record.getClass(), "activity");
+        if (recordActivity == null) throw new NoSuchFieldException("ActivityClientRecord.activity");
+        recordActivity.setAccessible(true);
+        if (recordActivity.get(record) != activity) {
+            throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_ACTIVITY_MISMATCH");
+        }
+        return record;
+    }
+
+    /**
+     * Prevents ActivityThread from asking WindowManager to remove a DecorView that never made it
+     * through addView (for example an Activity that starts another Activity from onCreate and is
+     * hidden before its first visible frame). This only clears framework bookkeeping when the
+     * current DecorView is demonstrably not attached or registered; visible Guest windows are
+     * left entirely to Android's normal destroy path.
+     */
+    public static void repairFrameworkWindowBeforeDestroy(Activity activity) {
+        if (activity == null) return;
+        try {
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            if (decor == null || decor.isAttachedToWindow() || isWindowRegistered(decor)) return;
+            setOptionalBoolean(activity, "mWindowAdded", false);
+            setOptionalObject(activity, "mDecor", null);
+            Class<?> threadType = Class.forName("android.app.ActivityThread");
+            Field current = findField(threadType, "sCurrentActivityThread");
+            if (current == null) return;
+            current.setAccessible(true);
+            Object thread = current.get(null);
+            if (thread == null) return;
+            Field activities = findField(thread.getClass(), "mActivities");
+            activities.setAccessible(true);
+            Object map = activities.get(thread);
+            Field token = findField(activity.getClass(), "mToken");
+            token.setAccessible(true);
+            Object record = map.getClass().getMethod("get", Object.class).invoke(map, token.get(activity));
+            if (record == null) return;
+            setOptionalObject(record, "window", null);
+            setOptionalBoolean(record, "mPreserveWindow", false);
+            setOptionalObject(record, "mPendingRemoveWindow", null);
+            setOptionalObject(record, "mPendingRemoveWindowManager", null);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "window destroy repair skipped", error);
+        }
+    }
+
+    /**
      * Activity.attach() may initialize ContextThemeWrapper's theme bookkeeping from the Host
      * transport before the audited field projection runs. Re-apply the Guest component theme
      * through the public API after projection so AndroidX/AppCompat sees the Guest style parent
@@ -98,6 +299,51 @@ public final class ActivityFieldBridge {
             }
         }
         if (themeResId != 0) guest.setTheme(themeResId);
+    }
+
+    private static void clearStaleFrameworkWindow(Object record, Activity activity) throws Exception {
+        android.view.Window window = activity.getWindow();
+        android.view.View decor = window == null ? null : window.getDecorView();
+        if (decor != null && (decor.isAttachedToWindow() || isWindowRegistered(decor))) return;
+        Field recordWindow = findField(record.getClass(), "window");
+        if (recordWindow != null) {
+            recordWindow.setAccessible(true);
+            recordWindow.set(record, null);
+        }
+        setOptionalBoolean(record, "mPreserveWindow", false);
+        setOptionalObject(record, "mPendingRemoveWindow", null);
+        setOptionalObject(record, "mPendingRemoveWindowManager", null);
+        setOptionalBoolean(activity, "mWindowAdded", false);
+        setOptionalObject(activity, "mDecor", null);
+    }
+
+    private static boolean isWindowRegistered(android.view.View decor) {
+        try {
+            Object global = Class.forName("android.view.WindowManagerGlobal")
+                    .getDeclaredMethod("getInstance").invoke(null);
+            Field views = requireField(global.getClass(), "mViews");
+            views.setAccessible(true);
+            Object value = views.get(global);
+            if (!(value instanceof java.util.List<?> list)) return false;
+            for (Object item : list) if (item == decor) return true;
+        } catch (Throwable ignored) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+        }
+        return false;
+    }
+
+    private static void setOptionalBoolean(Object target, String name, boolean value) throws Exception {
+        Field field = findField(target.getClass(), name);
+        if (field == null) return;
+        field.setAccessible(true);
+        field.setBoolean(target, value);
+    }
+
+    private static void setOptionalObject(Object target, String name, Object value) throws Exception {
+        Field field = findField(target.getClass(), name);
+        if (field == null) return;
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     /**
@@ -147,6 +393,29 @@ public final class ActivityFieldBridge {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new IllegalStateException("ACTIVITY_INFO_GUEST_PROJECTION_FAILED", error);
         }
+    }
+
+    private static ActivityInfo guestActivityInfo(GuestRuntimeEnvironment.Session session,
+                                                  String componentClass) {
+        ActivityInfo projected = new ActivityInfo();
+        ApplicationInfo application = new ApplicationInfo(session.context().getApplicationInfo());
+        application.packageName = session.spec().packageName;
+        application.processName = session.spec().processName();
+        projected.applicationInfo = application;
+        projected.packageName = session.spec().packageName;
+        projected.name = componentClass;
+        projected.processName = session.spec().processName();
+        for (VirtualComponentSnapshot component : session.spec().packageState().components()) {
+            if (!"ACTIVITY".equals(component.type()) || !componentClass.equals(component.className())) continue;
+            projected.exported = component.exported();
+            projected.enabled = component.enabled();
+            projected.permission = component.permission().isEmpty() ? null : component.permission();
+            projected.processName = component.processName().isEmpty()
+                    ? projected.processName : component.processName();
+            projected.theme = component.themeResId();
+            break;
+        }
+        return projected;
     }
 
     static BridgeReport installFields(Object host, Object guest, List<String> requiredHostFields,

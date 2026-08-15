@@ -11,6 +11,8 @@ public final class ComponentOperations {
     public static final String SET_SERVICE_FOREGROUND = "SET_SERVICE_FOREGROUND";
     public static final String BIND_SERVICE = "BIND_SERVICE";
     public static final String UNBIND_SERVICE = "UNBIND_SERVICE";
+    /** Requests a Broker-owned process slot for the ActivityThread Service transport. */
+    public static final String ROUTE_FRAMEWORK_SERVICE = "ROUTE_FRAMEWORK_SERVICE";
     public static final String REGISTER_RECEIVER = "REGISTER_RECEIVER";
     public static final String UNREGISTER_RECEIVER = "UNREGISTER_RECEIVER";
     public static final String SEND_BROADCAST = "SEND_BROADCAST";
@@ -44,7 +46,8 @@ public final class ComponentOperations {
                 || STOP_SERVICE_START_ID.equals(operation)
                 || SET_SERVICE_FOREGROUND.equals(operation)
                 || BIND_SERVICE.equals(operation)
-                || UNBIND_SERVICE.equals(operation);
+                || UNBIND_SERVICE.equals(operation)
+                || ROUTE_FRAMEWORK_SERVICE.equals(operation);
     }
 
     public static void requireKnownServiceOperation(String operation) {

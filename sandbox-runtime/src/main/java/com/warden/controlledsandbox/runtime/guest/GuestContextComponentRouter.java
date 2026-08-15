@@ -51,6 +51,8 @@ final class GuestContextComponentRouter {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
+        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+        if (framework != null) return framework.start(request, target.className(), foreground);
         request.putString(ComponentOperations.OPERATION, foreground
                 ? ComponentOperations.START_FOREGROUND_SERVICE : ComponentOperations.START_SERVICE);
         bridge.invokeComponent(request);
@@ -61,6 +63,8 @@ final class GuestContextComponentRouter {
         GuestIntentResolver.Target target = resolver.resolveOne(intent, GuestIntentResolver.Kind.SERVICE);
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
+        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+        if (framework != null) return framework.stop(request, target.className());
         request.putString(ComponentOperations.OPERATION, ComponentOperations.STOP_SERVICE);
         Bundle result = bridge.invokeComponent(request);
         return !"SERVICE_NOT_RUNNING".equals(result.getString(RuntimeKeys.STATUS, ""));
@@ -81,6 +85,15 @@ final class GuestContextComponentRouter {
         String connectionId = java.util.UUID.randomUUID().toString();
         Bundle request = bridge.baseRequest();
         request.putAll(resolver.request(intent, target));
+        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+        if (framework != null) {
+            boolean accepted = framework.bind(request, target.className(), connection, flags, executor);
+            if (!accepted) {
+                android.util.Log.w("CS_GUEST_SERVICE", "framework bind rejected component="
+                        + target.className());
+            }
+            return accepted;
+        }
         request.putString(ComponentOperations.OPERATION, ComponentOperations.BIND_SERVICE);
         request.putString(RuntimeKeys.CONNECTION_ID, connectionId);
         request.putInt(RuntimeKeys.SERVICE_BIND_FLAGS, flags);
@@ -102,6 +115,11 @@ final class GuestContextComponentRouter {
     }
 
     synchronized void unbindService(ServiceConnection connection) {
+        GuestActivityThreadServiceBridge framework = context.serviceFrameworkBridge();
+        if (framework != null) {
+            framework.unbind(connection);
+            return;
+        }
         ConnectionRecord record = connections.remove(connection);
         if (record == null) {
             // WebView can deliver a late unbind after the concrete Guest service has already

@@ -16,6 +16,14 @@ import com.warden.controlledsandbox.runtime.guest.GuestProcessService4;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService5;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService6;
 import com.warden.controlledsandbox.runtime.guest.GuestProcessService7;
+import com.warden.controlledsandbox.runtime.component.service.StubService0;
+import com.warden.controlledsandbox.runtime.component.service.StubService1;
+import com.warden.controlledsandbox.runtime.component.service.StubService2;
+import com.warden.controlledsandbox.runtime.component.service.StubService3;
+import com.warden.controlledsandbox.runtime.component.service.StubService4;
+import com.warden.controlledsandbox.runtime.component.service.StubService5;
+import com.warden.controlledsandbox.runtime.component.service.StubService6;
+import com.warden.controlledsandbox.runtime.component.service.StubService7;
 
 /** Immutable mapping from logical ordinary Guest slots to predeclared Android components. */
 final class RuntimeStubComponents {
@@ -31,7 +39,7 @@ final class RuntimeStubComponents {
             case 5: return GuestProcessService5.class;
             case 6: return GuestProcessService6.class;
             case 7: return GuestProcessService7.class;
-            default: throw new IllegalArgumentException("Invalid process slot: " + slot);
+            default: return load("com.warden.controlledsandbox.runtime.guest.GuestProcessService" + slot);
         }
     }
 
@@ -45,7 +53,26 @@ final class RuntimeStubComponents {
             case 5: return StubActivity5.class;
             case 6: return StubActivity6.class;
             case 7: return StubActivity7.class;
-            default: throw new IllegalArgumentException("Invalid process slot: " + slot);
+            default: return load("com.warden.controlledsandbox.runtime.component.activity.StubActivity" + slot);
         }
+    }
+
+    static Class<?> componentServiceClassFor(int slot) {
+        switch (slot) {
+            case 0: return StubService0.class;
+            case 1: return StubService1.class;
+            case 2: return StubService2.class;
+            case 3: return StubService3.class;
+            case 4: return StubService4.class;
+            case 5: return StubService5.class;
+            case 6: return StubService6.class;
+            case 7: return StubService7.class;
+            default: return load("com.warden.controlledsandbox.runtime.component.service.StubService" + slot);
+        }
+    }
+
+    private static Class<?> load(String name) {
+        try { return Class.forName(name); }
+        catch (ClassNotFoundException error) { throw new IllegalArgumentException("Missing process slot stub: " + name, error); }
     }
 }

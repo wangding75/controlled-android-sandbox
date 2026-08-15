@@ -38,6 +38,7 @@ public final class GuestClassLoader extends ClassLoader {
     private final java.lang.reflect.Method dexFindClass;
     private final java.lang.reflect.Method dexFindLoaded;
     private final java.lang.reflect.Method dexFindLibrary;
+    private volatile boolean translatedGuestAbi;
 
     GuestClassLoader(String dexPath, String optimizedDirectory, String librarySearchPath,
                      ClassLoader parent) {
@@ -63,6 +64,15 @@ public final class GuestClassLoader extends ClassLoader {
 
     /** Platform loader that actually defines Guest classes and owns the NativeLoader namespace. */
     public ClassLoader definingLoader() { return dex; }
+
+    /**
+     * Foreign-ABI code is executed by Android's native bridge. Host-ABI PLT patching and
+     * Camera1 symbol replacement cannot safely cross that bridge, so translated guests use the
+     * Java/framework camera route and leave platform native tables untouched.
+     */
+    void configureNativeCompatibility(boolean translatedGuestAbi) {
+        this.translatedGuestAbi = translatedGuestAbi;
+    }
 
     void configureDetection(VirtualDetectionPolicySnapshot policy) {
         if (policy == null || VirtualLocationProfileSnapshot.MODE_HOST.equals(policy.mode())) {
@@ -104,7 +114,7 @@ public final class GuestClassLoader extends ClassLoader {
                 }
             }
             if (resolve && loaded.getClassLoader() == this) resolveClass(loaded);
-            if ("android.hardware.Camera".equals(name)) {
+            if ("android.hardware.Camera".equals(name) && !translatedGuestAbi) {
                 boolean camera1Installed = NativePolicy.installCamera1Adapter();
                 android.util.Log.i("CS_CAMERA1_NATIVE", "CAMERA_CLASS_LOADED adapterInstalled="
                         + camera1Installed + " status=" + NativePolicy.camera1Status());

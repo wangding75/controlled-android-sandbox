@@ -39,7 +39,10 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
             new ConcurrentHashMap<>();
     private final ThreadLocal<Handler> activeHandler = new ThreadLocal<>();
     private final ExecutorService brokerWorkers;
-    private final ClassLoader guestClassLoader;
+    // Framework-owned Guest callbacks must expose the platform PathClassLoader.  CAS-owned
+    // broker operations can still use the policy facade explicitly; a facade as TCCL makes
+    // WebView/U4 and native-bridge loader checks reject an otherwise valid Guest process.
+    private volatile ClassLoader guestClassLoader;
     private volatile boolean closed;
 
     GuestMainThreadDispatcher(ClassLoader guestClassLoader) {
@@ -50,6 +53,11 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    void installFrameworkClassLoader(ClassLoader frameworkClassLoader) {
+        this.guestClassLoader = Objects.requireNonNull(frameworkClassLoader,
+                "frameworkClassLoader");
     }
 
     <T> T call(Callable<T> action) {

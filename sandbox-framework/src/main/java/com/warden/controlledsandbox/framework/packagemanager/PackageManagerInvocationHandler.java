@@ -188,18 +188,21 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return metadata.adaptCollection(Collections.emptyList(), returnType);
             case "resolveContentProvider": {
                 String authority = firstString(args);
-                return universe.provider(identity.packageName(), authority, firstLong(args, 0L));
+                return universe.provider(identity.packageName(), authority, firstLong(args, 0L),
+                        identity.permissionPolicy().effectiveGrants());
             }
             case "resolveIntent":
             case "resolveActivity": {
                 Intent intent = firstIntent(args);
                 return universe.resolve(identity.packageName(), intent,
-                        VirtualPackageMetadata.Type.ACTIVITY, firstLong(args, 0L));
+                        VirtualPackageMetadata.Type.ACTIVITY, firstLong(args, 0L),
+                        identity.permissionPolicy().effectiveGrants());
             }
             case "resolveService": {
                 Intent intent = firstIntent(args);
                 return universe.resolve(identity.packageName(), intent,
-                        VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L));
+                        VirtualPackageMetadata.Type.SERVICE, firstLong(args, 0L),
+                        identity.permissionPolicy().effectiveGrants());
             }
             case "queryIntentActivities":
                 return query(returnType, args, VirtualPackageMetadata.Type.ACTIVITY);
@@ -225,7 +228,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return new int[0];
             case "queryContentProviders": {
                 long flags = firstLong(args, 0L);
-                return metadata.adaptCollection(universe.queryContentProviders(identity.packageName(), flags),
+                return metadata.adaptCollection(universe.queryContentProviders(identity.packageName(), flags,
+                                identity.permissionPolicy().effectiveGrants()),
                         returnType);
             }
             case "getComponentEnabledSetting": {
@@ -559,7 +563,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private Object query(Class<?> returnType, Object[] args, VirtualPackageMetadata.Type type) {
         Intent intent = firstIntent(args);
         List<ResolveInfo> matches = universe.query(identity.packageName(), intent, type,
-                firstLong(args, 0L));
+                firstLong(args, 0L), identity.permissionPolicy().effectiveGrants());
         return metadata.adaptCollection(matches, returnType);
     }
 

@@ -86,7 +86,19 @@ public final class VirtualPackageUniverse {
     }
 
     public ProviderInfo provider(String callerPackage, String authority, long flags) {
+        return provider(callerPackage, authority, flags, Collections.emptySet());
+    }
+
+    public ProviderInfo provider(String callerPackage, String authority, long flags,
+                                 java.util.Set<String> callerPermissions) {
         for (VirtualPackageMetadata target : visibleTargets(callerPackage)) {
+            VirtualPackageMetadata.Component component = target.providerComponent(authority);
+            // PackageManager.resolveContentProvider() exposes provider metadata after package
+            // visibility has been established.  exported/read/write permissions are enforced
+            // by the provider transport when the caller actually acquires or uses it; applying
+            // that check here hides legitimate non-exported provider metadata and diverges from
+            // Android's PMS/ContentResolver split.
+            if (component == null) continue;
             ProviderInfo provider = target.provider(authority, flags);
             if (provider != null) return provider;
         }
@@ -95,15 +107,32 @@ public final class VirtualPackageUniverse {
 
     public ResolveInfo resolve(String callerPackage, Intent intent,
                                VirtualPackageMetadata.Type type, long flags) {
-        List<ResolveInfo> values = query(callerPackage, intent, type, flags);
+        List<ResolveInfo> values = query(callerPackage, intent, type, flags, Collections.emptySet());
+        return values.isEmpty() ? null : values.get(0);
+    }
+
+    public ResolveInfo resolve(String callerPackage, Intent intent,
+                               VirtualPackageMetadata.Type type, long flags,
+                               java.util.Set<String> callerPermissions) {
+        List<ResolveInfo> values = query(callerPackage, intent, type, flags, callerPermissions);
         return values.isEmpty() ? null : values.get(0);
     }
 
     public List<ResolveInfo> query(String callerPackage, Intent intent,
                                    VirtualPackageMetadata.Type type, long flags) {
+        return query(callerPackage, intent, type, flags, Collections.emptySet());
+    }
+
+    public List<ResolveInfo> query(String callerPackage, Intent intent,
+                                   VirtualPackageMetadata.Type type, long flags,
+                                   java.util.Set<String> callerPermissions) {
         ArrayList<ResolveInfo> result = new ArrayList<>();
         for (VirtualPackageMetadata target : visibleTargets(callerPackage)) {
-            result.addAll(target.query(intent, type, flags));
+            for (ResolveInfo value : target.query(intent, type, flags)) {
+                if (isAccessible(callerPackage, target, value, type, callerPermissions)) {
+                    result.add(value);
+                }
+            }
         }
         result.sort(Comparator.comparingInt((ResolveInfo value) -> value.priority).reversed()
                 .thenComparing(Comparator.comparingInt((ResolveInfo value) -> value.match).reversed())
@@ -140,10 +169,16 @@ public final class VirtualPackageUniverse {
     }
 
     public List<ProviderInfo> queryContentProviders(String callerPackage, long flags) {
+        return queryContentProviders(callerPackage, flags, Collections.emptySet());
+    }
+
+    public List<ProviderInfo> queryContentProviders(String callerPackage, long flags,
+                                                    java.util.Set<String> callerPermissions) {
         ArrayList<ProviderInfo> result = new ArrayList<>();
         for (VirtualPackageMetadata target : visibleTargets(callerPackage)) {
             for (VirtualPackageMetadata.Component component : target.components()) {
                 if (component.type() != VirtualPackageMetadata.Type.PROVIDER) continue;
+                if (!isAccessible(callerPackage, target, component, callerPermissions)) continue;
                 ProviderInfo provider = target.provider(component.authority().split(";")[0], flags);
                 if (provider != null) result.add(provider);
             }
@@ -179,6 +214,31 @@ public final class VirtualPackageUniverse {
             if (isVisibleTo(callerPackage, target.packageName())) result.add(target);
         }
         return result;
+    }
+
+    private static boolean isAccessible(String callerPackage, VirtualPackageMetadata target,
+                                        ResolveInfo value, VirtualPackageMetadata.Type type,
+                                        java.util.Set<String> callerPermissions) {
+        if (target.packageName().equals(callerPackage)) return true;
+        String className;
+        if (type == VirtualPackageMetadata.Type.SERVICE) {
+            className = value.serviceInfo == null ? "" : value.serviceInfo.name;
+        } else {
+            className = value.activityInfo == null ? "" : value.activityInfo.name;
+        }
+        return isAccessible(callerPackage, target, target.component(className, type), callerPermissions);
+    }
+
+    private static boolean isAccessible(String callerPackage, VirtualPackageMetadata target,
+                                        VirtualPackageMetadata.Component component,
+                                        java.util.Set<String> callerPermissions) {
+        if (component == null) return false;
+        if (target.packageName().equals(callerPackage)) return true;
+        if (!component.exported()) return false;
+        String permission = component.type() == VirtualPackageMetadata.Type.PROVIDER
+                ? component.readPermission() : component.permission();
+        return permission == null || permission.isEmpty()
+                || (callerPermissions != null && callerPermissions.contains(permission));
     }
 
     private static String componentName(ResolveInfo value, VirtualPackageMetadata.Type type) {

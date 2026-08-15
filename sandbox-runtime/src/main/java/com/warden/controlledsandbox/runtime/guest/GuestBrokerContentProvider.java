@@ -6,8 +6,9 @@ import android.content.ContentProviderResult;
 import android.content.ContentValues;
 import android.content.OperationApplicationException;
 import android.content.res.AssetFileDescriptor;
+import android.database.AbstractCursor;
+import android.database.CharArrayBuffer;
 import android.database.Cursor;
-import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
@@ -52,27 +53,17 @@ final class GuestBrokerContentProvider extends ContentProvider {
         Bundle page = bridge.invokeComponent(request);
         String token = required(page, RuntimeKeys.CURSOR_TOKEN);
         ArrayList<String> columns = page.getStringArrayList(RuntimeKeys.CURSOR_COLUMNS);
-        MatrixCursor cursor = new MatrixCursor(
-                columns == null ? new String[0] : columns.toArray(new String[0]),
-                Math.max(0, page.getInt(RuntimeKeys.CURSOR_TOTAL_ROWS, 0)));
         try {
-            appendRows(cursor, page);
-            while (!page.getBoolean(RuntimeKeys.CURSOR_END_REACHED, true)) {
-                Bundle next = request(ComponentOperations.PROVIDER_CURSOR_PAGE, null);
-                next.putString(RuntimeKeys.CURSOR_TOKEN, token);
-                next.putInt(RuntimeKeys.CURSOR_OFFSET,
-                        page.getInt(RuntimeKeys.CURSOR_NEXT_OFFSET, cursor.getCount()));
-                next.putLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE,
-                        page.getLong(RuntimeKeys.CURSOR_NEXT_SEQUENCE, 0L));
-                next.putInt(RuntimeKeys.CURSOR_PAGE_SIZE, PAGE_SIZE);
-                page = bridge.invokeComponent(next);
-                appendRows(cursor, page);
-            }
-            return cursor;
-        } finally {
+            return new RemoteCursor(bridge, request(ComponentOperations.PROVIDER_CURSOR_PAGE, null),
+                    columns == null ? new String[0] : columns.toArray(new String[0]),
+                    Math.max(0, page.getInt(RuntimeKeys.CURSOR_TOTAL_ROWS, 0)), token, page);
+        } catch (Throwable error) {
             Bundle close = request(ComponentOperations.PROVIDER_CURSOR_CLOSE, null);
             close.putString(RuntimeKeys.CURSOR_TOKEN, token);
             try { bridge.invokeComponent(close); } catch (RuntimeException ignored) { }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException ? (RuntimeException) error
+                    : new IllegalStateException("PROVIDER_CURSOR_CREATE_FAILED", error);
         }
     }
 
@@ -302,15 +293,125 @@ final class GuestBrokerContentProvider extends ContentProvider {
         return false;
     }
 
-    private static void appendRows(MatrixCursor cursor, Bundle page) {
-        int count = page.getInt(RuntimeKeys.CURSOR_ROWS_RETURNED, 0);
-        for (int rowIndex = 0; rowIndex < count; rowIndex++) {
-            ArrayList<String> wire = page.getStringArrayList(RuntimeKeys.CURSOR_ROW_PREFIX + rowIndex);
-            Object[] row = new Object[wire == null ? 0 : wire.size()];
-            for (int column = 0; column < row.length; column++) {
-                row[column] = CursorWireCodec.decode(wire.get(column));
+    /** Framework Cursor facade backed by the Broker's ordered page lease. */
+    private static final class RemoteCursor extends AbstractCursor {
+        private final GuestRuntimeBrokerBridge bridge;
+        private final Bundle pageRequest;
+        private final String[] columns;
+        private final int totalRows;
+        private final String token;
+        private final ArrayList<Object[]> rows = new ArrayList<>();
+        private int nextOffset;
+        private long nextSequence;
+        private boolean endReached;
+        private boolean closed;
+
+        RemoteCursor(GuestRuntimeBrokerBridge bridge, Bundle pageRequest, String[] columns,
+                     int totalRows, String token, Bundle firstPage) {
+            this.bridge = java.util.Objects.requireNonNull(bridge, "bridge");
+            this.pageRequest = new Bundle(pageRequest);
+            this.columns = columns.clone();
+            this.totalRows = totalRows;
+            this.token = token;
+            append(firstPage);
+        }
+
+        @Override public int getCount() { return totalRows; }
+        @Override public String[] getColumnNames() { return columns.clone(); }
+        @Override public boolean onMove(int oldPosition, int newPosition) {
+            if (closed) return false;
+            ensureLoaded(newPosition);
+            return newPosition < rows.size();
+        }
+        @Override public String getString(int column) {
+            Object value = value(column);
+            if (value == null) return null;
+            if (value instanceof byte[]) return new String((byte[]) value,
+                    java.nio.charset.StandardCharsets.UTF_8);
+            return String.valueOf(value);
+        }
+        @Override public short getShort(int column) { return (short) getLong(column); }
+        @Override public int getInt(int column) { return (int) getLong(column); }
+        @Override public long getLong(int column) {
+            Object value = value(column);
+            return value instanceof Number ? ((Number) value).longValue()
+                    : Long.parseLong(String.valueOf(value));
+        }
+        @Override public float getFloat(int column) { return (float) getDouble(column); }
+        @Override public double getDouble(int column) {
+            Object value = value(column);
+            return value instanceof Number ? ((Number) value).doubleValue()
+                    : Double.parseDouble(String.valueOf(value));
+        }
+        @Override public byte[] getBlob(int column) {
+            Object value = value(column);
+            return value instanceof byte[] ? (byte[]) value : null;
+        }
+        @Override public boolean isNull(int column) { return value(column) == null; }
+        @Override public int getType(int column) {
+            Object value = value(column);
+            if (value == null) return FIELD_TYPE_NULL;
+            if (value instanceof byte[]) return FIELD_TYPE_BLOB;
+            if (value instanceof Float || value instanceof Double) return FIELD_TYPE_FLOAT;
+            if (value instanceof Number) return FIELD_TYPE_INTEGER;
+            return FIELD_TYPE_STRING;
+        }
+        @Override public void copyStringToBuffer(int column, CharArrayBuffer buffer) {
+            String value = getString(column);
+            if (value == null) { buffer.sizeCopied = 0; return; }
+            char[] chars = value.toCharArray();
+            if (buffer.data == null || buffer.data.length < chars.length) buffer.data = new char[chars.length];
+            System.arraycopy(chars, 0, buffer.data, 0, chars.length);
+            buffer.sizeCopied = chars.length;
+        }
+        @Override public boolean requery() { return !closed; }
+
+        @Override public void close() {
+            if (closed) return;
+            closed = true;
+            Bundle close = new Bundle(pageRequest);
+            close.putString(ComponentOperations.OPERATION, ComponentOperations.PROVIDER_CURSOR_CLOSE);
+            close.putString(RuntimeKeys.CURSOR_TOKEN, token);
+            try { bridge.invokeComponent(close); } catch (RuntimeException ignored) { }
+            rows.clear();
+            super.close();
+        }
+
+        private Object value(int column) {
+            checkPosition();
+            if (column < 0 || column >= columns.length) {
+                throw new android.database.CursorIndexOutOfBoundsException(column, columns.length);
             }
-            cursor.addRow(row);
+            return rows.get(getPosition())[column];
+        }
+
+        private void ensureLoaded(int position) {
+            if (position < 0 || position >= totalRows) return;
+            while (rows.size() <= position && !endReached) {
+                Bundle request = new Bundle(pageRequest);
+                request.putString(RuntimeKeys.CURSOR_TOKEN, token);
+                request.putInt(RuntimeKeys.CURSOR_OFFSET, nextOffset);
+                request.putLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, nextSequence);
+                request.putInt(RuntimeKeys.CURSOR_PAGE_SIZE, PAGE_SIZE);
+                append(bridge.invokeComponent(request));
+            }
+        }
+
+        private void append(Bundle page) {
+            int count = page.getInt(RuntimeKeys.CURSOR_ROWS_RETURNED, 0);
+            for (int rowIndex = 0; rowIndex < count; rowIndex++) {
+                ArrayList<String> wire = page.getStringArrayList(RuntimeKeys.CURSOR_ROW_PREFIX + rowIndex);
+                Object[] row = new Object[columns.length];
+                for (int column = 0; column < row.length; column++) {
+                    row[column] = wire == null || column >= wire.size()
+                            ? null : CursorWireCodec.decode(wire.get(column));
+                }
+                rows.add(row);
+            }
+            nextOffset = page.getInt(RuntimeKeys.CURSOR_NEXT_OFFSET, rows.size());
+            nextSequence = page.getLong(RuntimeKeys.CURSOR_NEXT_SEQUENCE, nextSequence);
+            endReached = page.getBoolean(RuntimeKeys.CURSOR_END_REACHED, nextOffset >= totalRows);
+            if (count == 0 && !endReached) throw new IllegalStateException("PROVIDER_CURSOR_EMPTY_PAGE");
         }
     }
 
