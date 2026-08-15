@@ -54,6 +54,16 @@ public final class VirtualPackageUniverse {
         VirtualPackageMetadata target = packageMetadata(targetPackage);
         if (caller == null || target == null) return false;
         if (caller.packageName().equals(target.packageName())) return true;
+        // Android's package visibility is not only an explicit <queries> graph.  Packages
+        // sharing an UID/signature are visible to one another, and legacy applications below
+        // the Android 11 target level retain the broad legacy query behavior.  Keep these rules
+        // in the virtual universe so PackageManager, resolver and provider lookups agree.
+        ApplicationInfo callerInfo = caller.applicationInfo();
+        ApplicationInfo targetInfo = target.applicationInfo();
+        if (callerInfo.uid > 0 && callerInfo.uid == targetInfo.uid) return true;
+        if (sameSignature(caller, target)) return true;
+        if (callerInfo.targetSdkVersion > 0 && callerInfo.targetSdkVersion < 30) return true;
+        if ((targetInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0) return true;
         if (caller.queryPackages().contains(target.packageName())) return true;
         for (VirtualPackageMetadata.Component component : target.components()) {
             if (component.type() == VirtualPackageMetadata.Type.PROVIDER) {
@@ -168,6 +178,26 @@ public final class VirtualPackageUniverse {
         return Collections.unmodifiableList(result);
     }
 
+    public List<PackageInfo> packagesHoldingPermissions(String callerPackage,
+                                                        String[] requested, long flags) {
+        if (requested == null || requested.length == 0) return List.of();
+        LinkedHashSet<String> wanted = new LinkedHashSet<>();
+        for (String permission : requested) if (permission != null && !permission.isEmpty()) {
+            wanted.add(permission);
+        }
+        if (wanted.isEmpty()) return List.of();
+        ArrayList<PackageInfo> result = new ArrayList<>();
+        for (VirtualPackageMetadata target : visibleTargets(callerPackage)) {
+            for (String permission : target.requestedPermissions()) {
+                if (wanted.contains(permission)) {
+                    result.add(target.packageInfo(flags));
+                    break;
+                }
+            }
+        }
+        return Collections.unmodifiableList(result);
+    }
+
     public List<ProviderInfo> queryContentProviders(String callerPackage, long flags) {
         return queryContentProviders(callerPackage, flags, Collections.emptySet());
     }
@@ -199,8 +229,18 @@ public final class VirtualPackageUniverse {
     }
 
     public String[] packagesForUid(String callerPackage, int uid) {
-        String packageName = packageForUid(callerPackage, uid);
-        return packageName == null ? new String[0] : new String[]{packageName};
+        ArrayList<String> result = new ArrayList<>();
+        for (VirtualPackageMetadata target : visibleTargets(callerPackage)) {
+            if (target.applicationInfo().uid == uid) result.add(target.packageName());
+        }
+        return result.toArray(new String[0]);
+    }
+
+    private static boolean sameSignature(VirtualPackageMetadata left,
+                                         VirtualPackageMetadata right) {
+        String first = left.signatureSha256();
+        String second = right.signatureSha256();
+        return first != null && !first.isEmpty() && first.equalsIgnoreCase(second);
     }
 
     private VirtualPackageMetadata visibleTarget(String callerPackage, String targetPackage) {

@@ -37,6 +37,7 @@ import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
+import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import com.warden.controlledsandbox.domain.port.AuditSink;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
@@ -57,7 +58,7 @@ import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
-    private static final int SLOT_COUNT = 32;
+    private static final int SLOT_COUNT = ProcessSlotContract.ORDINARY_SLOT_COUNT;
     private final Clock clock = new SystemMonotonicClock();
     private final TokenGenerator tokenGenerator = new UuidTokenGenerator();
     private final AuditSink auditSink = new RuntimeAuditSink();

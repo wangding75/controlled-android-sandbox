@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <dlfcn.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
 #include <netdb.h>
@@ -106,6 +107,14 @@ using StatFn = int (*)(const char*, struct stat*);
 using FstatAtFn = int (*)(int, const char*, struct stat*, int);
 using StatxFn = int (*)(int, const char*, int, unsigned int, struct statx*);
 using RenameAt2Fn = int (*)(int, const char*, int, const char*, unsigned int);
+using RenameFn = int (*)(const char*, const char*);
+using RenameAtFn = int (*)(int, const char*, int, const char*);
+using UnlinkFn = int (*)(const char*);
+using UnlinkAtFn = int (*)(int, const char*, int);
+using MkdirFn = int (*)(const char*, mode_t);
+using MkdirAtFn = int (*)(int, const char*, mode_t);
+using RmdirFn = int (*)(const char*);
+using OpendirFn = DIR* (*)(const char*);
 using Getdents64Fn = ssize_t (*)(int, void*, std::size_t);
 using MmapFn = void* (*)(void*, std::size_t, int, int, int, off_t);
 using ReadlinkFn = ssize_t (*)(const char*, char*, size_t);
@@ -146,6 +155,14 @@ std::atomic<StatFn> real_lstat{nullptr};
 std::atomic<FstatAtFn> real_fstatat{nullptr};
 std::atomic<StatxFn> real_statx{nullptr};
 std::atomic<RenameAt2Fn> real_renameat2{nullptr};
+std::atomic<RenameFn> real_rename{nullptr};
+std::atomic<RenameAtFn> real_renameat{nullptr};
+std::atomic<UnlinkFn> real_unlink{nullptr};
+std::atomic<UnlinkAtFn> real_unlinkat{nullptr};
+std::atomic<MkdirFn> real_mkdir{nullptr};
+std::atomic<MkdirAtFn> real_mkdirat{nullptr};
+std::atomic<RmdirFn> real_rmdir{nullptr};
+std::atomic<OpendirFn> real_opendir{nullptr};
 std::atomic<Getdents64Fn> real_getdents64{nullptr};
 std::atomic<MmapFn> real_mmap{nullptr};
 std::atomic<ReadlinkFn> real_readlink{nullptr};
@@ -473,6 +490,102 @@ extern "C" int controlled_renameat2(int old_directory, const char* old_path,
     errno = ENOSYS;
     return -1;
 #endif
+}
+
+extern "C" int controlled_rename(const char* old_path, const char* new_path) {
+    RenameFn function = require_real(real_rename, "rename");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath old_resolved;
+    NativeResolvedPath new_resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(old_path); }, false,
+                         old_resolved)) return -1;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(new_path); }, false,
+                         new_resolved)) return -1;
+    try {
+        NativeFileSystemResolver::validate_same_confinement(old_resolved, new_resolved);
+    } catch (const PathPolicyError& error) {
+        errno = error.error_number();
+        return -1;
+    }
+    return function(old_resolved.path.c_str(), new_resolved.path.c_str());
+}
+
+extern "C" int controlled_renameat(int old_directory, const char* old_path,
+                                    int new_directory, const char* new_path) {
+    RenameAtFn function = require_real(real_renameat, "renameat");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath old_resolved;
+    NativeResolvedPath new_resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(old_directory, old_path); }, false,
+                         old_resolved)) return -1;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(new_directory, new_path); }, false,
+                         new_resolved)) return -1;
+    try {
+        NativeFileSystemResolver::validate_same_confinement(old_resolved, new_resolved);
+    } catch (const PathPolicyError& error) {
+        errno = error.error_number();
+        return -1;
+    }
+    return function(old_resolved.directory_fd, old_resolved.path.c_str(),
+            new_resolved.directory_fd, new_resolved.path.c_str());
+}
+
+extern "C" int controlled_unlink(const char* path) {
+    UnlinkFn function = require_real(real_unlink, "unlink");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
+        return -1;
+    }
+    return function(resolved.path.c_str());
+}
+
+extern "C" int controlled_unlinkat(int directory, const char* path, int flags) {
+    UnlinkAtFn function = require_real(real_unlinkat, "unlinkat");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, false,
+                         resolved)) return -1;
+    return function(resolved.directory_fd, resolved.path.c_str(), flags);
+}
+
+extern "C" int controlled_mkdir(const char* path, mode_t mode) {
+    MkdirFn function = require_real(real_mkdir, "mkdir");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
+        return -1;
+    }
+    return function(resolved.path.c_str(), mode);
+}
+
+extern "C" int controlled_mkdirat(int directory, const char* path, mode_t mode) {
+    MkdirAtFn function = require_real(real_mkdirat, "mkdirat");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve_at(directory, path); }, false,
+                         resolved)) return -1;
+    return function(resolved.directory_fd, resolved.path.c_str(), mode);
+}
+
+extern "C" int controlled_rmdir(const char* path) {
+    RmdirFn function = require_real(real_rmdir, "rmdir");
+    if (function == nullptr) { errno = ENOSYS; return -1; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
+        return -1;
+    }
+    return function(resolved.path.c_str());
+}
+
+extern "C" DIR* controlled_opendir(const char* path) {
+    OpendirFn function = require_real(real_opendir, "opendir");
+    if (function == nullptr) { errno = ENOSYS; return nullptr; }
+    NativeResolvedPath resolved;
+    if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) {
+        return nullptr;
+    }
+    return function(resolved.path.c_str());
 }
 
 extern "C" ssize_t controlled_getdents64(int directory, void* buffer, std::size_t size) {
@@ -889,6 +1002,14 @@ void* replacement_for(std::string_view name) {
     if (name == "fstatat") return reinterpret_cast<void*>(&controlled_fstatat);
     if (name == "statx") return reinterpret_cast<void*>(&controlled_statx);
     if (name == "renameat2") return reinterpret_cast<void*>(&controlled_renameat2);
+    if (name == "rename") return reinterpret_cast<void*>(&controlled_rename);
+    if (name == "renameat") return reinterpret_cast<void*>(&controlled_renameat);
+    if (name == "unlink") return reinterpret_cast<void*>(&controlled_unlink);
+    if (name == "unlinkat") return reinterpret_cast<void*>(&controlled_unlinkat);
+    if (name == "mkdir") return reinterpret_cast<void*>(&controlled_mkdir);
+    if (name == "mkdirat") return reinterpret_cast<void*>(&controlled_mkdirat);
+    if (name == "rmdir") return reinterpret_cast<void*>(&controlled_rmdir);
+    if (name == "opendir") return reinterpret_cast<void*>(&controlled_opendir);
     if (name == "getdents64") return reinterpret_cast<void*>(&controlled_getdents64);
     if (name == "readlink") return reinterpret_cast<void*>(&controlled_readlink);
     if (name == "readlinkat") return reinterpret_cast<void*>(&controlled_readlinkat);

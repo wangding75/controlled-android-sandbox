@@ -349,10 +349,11 @@ bool NativeHookRuntime::is_process_lifetime_system_module(std::string_view modul
 }
 
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 65> targets{
+    static constexpr std::array<std::string_view, 73> targets{
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
-            "renameat2", "readlink", "readlinkat", "getdents64", "mmap",
+            "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir", "opendir",
+            "readlink", "readlinkat", "getdents64", "mmap",
             "socket", "close", "dup", "dup2", "dup3", "fcntl", "fcntl64", "bind", "connect",
             "send", "sendto", "sendmsg", "recv", "recvfrom", "recvmsg", "read", "write",
             "accept", "accept4", "getsockname",

@@ -19,6 +19,7 @@ import com.warden.controlledsandbox.runtime.component.service.GuestServiceStubNa
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -332,8 +333,11 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         Intent hostIntent = (Intent) field(data, "intent");
         Intent intent = decodeGuestIntent(hostIntent);
         boolean rebind = record.service.onUnbind(intent);
-        if (rebind) unbindFinished(record.token, hostIntent, true);
-        else serviceDone(record.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
+        // ActivityThread.handleUnbindService acknowledges both branches through
+        // IActivityManager.unbindFinished().  serviceDoneExecuting() is only the
+        // execution completion path for CREATE/START/STOP and leaves AMS's bind
+        // record unfinished for the ordinary onUnbind(false) case.
+        unbindFinished(record.token, hostIntent, rebind);
         logLifecycle("GUEST_SERVICE_FRAMEWORK_UNBOUND", record, rebind ? "REBIND" : "UNBIND");
     }
 
@@ -341,9 +345,15 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         Intent intent = decodeGuestIntent((Intent) field(data, "args"));
         int startId = intField(data, "startId");
         int flags = intField(data, "flags");
-        int result = booleanField(data, "taskRemoved")
-                ? START_TASK_REMOVED_COMPLETE
-                : record.service.onStartCommand(intent, flags, startId);
+        int result;
+        if (booleanField(data, "taskRemoved")) {
+            // This is a distinct Service callback in the platform contract.  Calling
+            // onStartCommand() here loses the task-removal signal used by sticky services.
+            record.service.onTaskRemoved(intent);
+            result = START_TASK_REMOVED_COMPLETE;
+        } else {
+            result = record.service.onStartCommand(intent, flags, startId);
+        }
         serviceDone(record.token, SERVICE_DONE_EXECUTING_START, startId, result);
         logLifecycle("GUEST_SERVICE_FRAMEWORK_STARTED", record, "START:" + startId);
     }
@@ -372,6 +382,10 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
                     com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
                 try { detach(record.service); } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                }
+                try { serviceDone(record.token, SERVICE_DONE_EXECUTING_STOP, 0, 0); }
+                catch (Throwable error) {
                     com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 }
                 mapRemove(servicesData, record.token);
@@ -428,9 +442,24 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         Object original = field(data, "info");
         ServiceInfo info = original instanceof ServiceInfo
                 ? new ServiceInfo((ServiceInfo) original) : new ServiceInfo();
+        VirtualPackageMetadata.Component component = session.packageMetadata.component(
+                guestClass, VirtualPackageMetadata.Type.SERVICE);
+        if (component == null) {
+            throw new IllegalArgumentException("SERVICE_NOT_DECLARED:" + guestClass);
+        }
         info.name = guestClass;
         info.packageName = session.spec.packageName;
-        info.processName = session.spec.processName;
+        info.processName = component.processName().isEmpty()
+                ? session.spec.processName : component.processName();
+        info.exported = component.exported();
+        info.enabled = component.enabled();
+        info.permission = component.permission();
+        info.flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
+        if (component.stopWithTask()) {
+            info.flags |= optionalStaticInt(ServiceInfo.class, "FLAG_STOP_WITH_TASK");
+        }
+        setOptional(info, "foregroundServiceType", component.foregroundServiceType());
+        setOptional(info, "directBootAware", component.directBootAware());
         info.applicationInfo = new ApplicationInfo(session.context.getApplicationInfo());
         return info;
     }
@@ -532,6 +561,29 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         Field field = findField(target.getClass(), name);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static void setOptional(Object target, String name, Object value) {
+        try {
+            Field field = findField(target.getClass(), name);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (NoSuchFieldException ignored) {
+            // API/OEM field shape differs; the declared manifest contract remains available
+            // through the virtual PackageManager even when the local framework omits a field.
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Optional service metadata must not break an otherwise valid Service lifecycle.
+        }
+    }
+
+    private static int optionalStaticInt(Class<?> type, String name) {
+        try {
+            Field field = type.getDeclaredField(name);
+            field.setAccessible(true);
+            return field.getInt(null);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return 0;
+        }
     }
 
     private static boolean booleanField(Object target, String name) { return Boolean.TRUE.equals(field(target, name)); }

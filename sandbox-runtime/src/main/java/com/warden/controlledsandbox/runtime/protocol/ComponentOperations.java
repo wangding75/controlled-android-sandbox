@@ -25,6 +25,7 @@ public final class ComponentOperations {
     public static final String PROVIDER_CURSOR_CANCEL = "PROVIDER_CURSOR_CANCEL";
     public static final String PROVIDER_GET_TYPE = "PROVIDER_GET_TYPE";
     public static final String PROVIDER_INSERT = "PROVIDER_INSERT";
+    public static final String PROVIDER_BULK_INSERT = "PROVIDER_BULK_INSERT";
     public static final String PROVIDER_UPDATE = "PROVIDER_UPDATE";
     public static final String PROVIDER_DELETE = "PROVIDER_DELETE";
     public static final String PROVIDER_CALL = "PROVIDER_CALL";
@@ -76,6 +77,7 @@ public final class ComponentOperations {
         return PROVIDER_QUERY.equals(operation)
                 || PROVIDER_GET_TYPE.equals(operation)
                 || PROVIDER_INSERT.equals(operation)
+                || PROVIDER_BULK_INSERT.equals(operation)
                 || PROVIDER_UPDATE.equals(operation)
                 || PROVIDER_DELETE.equals(operation)
                 || PROVIDER_CALL.equals(operation)
@@ -108,7 +110,8 @@ public final class ComponentOperations {
     }
 
     public static boolean requiresProviderWrite(String operation) {
-        return PROVIDER_INSERT.equals(operation) || PROVIDER_UPDATE.equals(operation)
+        return PROVIDER_INSERT.equals(operation) || PROVIDER_BULK_INSERT.equals(operation)
+                || PROVIDER_UPDATE.equals(operation)
                 || PROVIDER_DELETE.equals(operation) || PROVIDER_CALL.equals(operation);
     }
 }

@@ -15,6 +15,7 @@ import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.provider.CursorWireCodec;
+import com.warden.controlledsandbox.runtime.provider.ProviderBulkInsertRuntime;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 
@@ -54,7 +55,7 @@ final class GuestBrokerContentProvider extends ContentProvider {
         String token = required(page, RuntimeKeys.CURSOR_TOKEN);
         ArrayList<String> columns = page.getStringArrayList(RuntimeKeys.CURSOR_COLUMNS);
         try {
-            return new RemoteCursor(bridge, request(ComponentOperations.PROVIDER_CURSOR_PAGE, null),
+            return new RemoteCursor(bridge, request, request(ComponentOperations.PROVIDER_CURSOR_PAGE, null),
                     columns == null ? new String[0] : columns.toArray(new String[0]),
                     Math.max(0, page.getInt(RuntimeKeys.CURSOR_TOTAL_ROWS, 0)), token, page);
         } catch (Throwable error) {
@@ -81,9 +82,13 @@ final class GuestBrokerContentProvider extends ContentProvider {
 
     @Override public int bulkInsert(Uri uri, ContentValues[] values) {
         if (values == null) return 0;
-        int inserted = 0;
-        for (ContentValues value : values) if (insert(uri, value) != null) inserted++;
-        return inserted;
+        Bundle request = request(ComponentOperations.PROVIDER_BULK_INSERT, uri);
+        request.putInt(RuntimeKeys.PROVIDER_BULK_VALUE_COUNT, values.length);
+        for (int index = 0; index < values.length; index++) {
+            request.putBundle(RuntimeKeys.PROVIDER_BULK_VALUE_PREFIX + index, values(values[index]));
+        }
+        ProviderBulkInsertRuntime.validate(request);
+        return bridge.invokeComponent(request).getInt("affectedRows", 0);
     }
 
     @Override public int delete(Uri uri, String selection, String[] selectionArgs) {
@@ -296,19 +301,24 @@ final class GuestBrokerContentProvider extends ContentProvider {
     /** Framework Cursor facade backed by the Broker's ordered page lease. */
     private static final class RemoteCursor extends AbstractCursor {
         private final GuestRuntimeBrokerBridge bridge;
+        private final Bundle queryRequest;
         private final Bundle pageRequest;
-        private final String[] columns;
-        private final int totalRows;
-        private final String token;
+        private String[] columns;
+        private int totalRows;
+        private String token;
+        private Bundle extras;
+        private Uri notificationUri;
         private final ArrayList<Object[]> rows = new ArrayList<>();
         private int nextOffset;
         private long nextSequence;
         private boolean endReached;
         private boolean closed;
 
-        RemoteCursor(GuestRuntimeBrokerBridge bridge, Bundle pageRequest, String[] columns,
+        RemoteCursor(GuestRuntimeBrokerBridge bridge, Bundle queryRequest, Bundle pageRequest,
+                     String[] columns,
                      int totalRows, String token, Bundle firstPage) {
             this.bridge = java.util.Objects.requireNonNull(bridge, "bridge");
+            this.queryRequest = new Bundle(queryRequest);
             this.pageRequest = new Bundle(pageRequest);
             this.columns = columns.clone();
             this.totalRows = totalRows;
@@ -364,7 +374,33 @@ final class GuestBrokerContentProvider extends ContentProvider {
             System.arraycopy(chars, 0, buffer.data, 0, chars.length);
             buffer.sizeCopied = chars.length;
         }
-        @Override public boolean requery() { return !closed; }
+        @Override public Bundle getExtras() {
+            return extras == null ? Bundle.EMPTY : new Bundle(extras);
+        }
+        public Uri getNotificationUri() { return notificationUri; }
+
+        @Override public boolean requery() {
+            if (closed) return false;
+            Bundle close = new Bundle(pageRequest);
+            close.putString(ComponentOperations.OPERATION, ComponentOperations.PROVIDER_CURSOR_CLOSE);
+            close.putString(RuntimeKeys.CURSOR_TOKEN, token);
+            try { bridge.invokeComponent(close); } catch (RuntimeException ignored) { }
+            Bundle page = bridge.invokeComponent(queryRequest);
+            ArrayList<String> freshColumns = page.getStringArrayList(RuntimeKeys.CURSOR_COLUMNS);
+            columns = freshColumns == null ? new String[0]
+                    : freshColumns.toArray(new String[0]);
+            totalRows = Math.max(0, page.getInt(RuntimeKeys.CURSOR_TOTAL_ROWS, 0));
+            token = required(page, RuntimeKeys.CURSOR_TOKEN);
+            rows.clear();
+            nextOffset = 0;
+            nextSequence = 0;
+            endReached = false;
+            extras = null;
+            notificationUri = null;
+            mPos = -1;
+            append(page);
+            return true;
+        }
 
         @Override public void close() {
             if (closed) return;
@@ -398,6 +434,10 @@ final class GuestBrokerContentProvider extends ContentProvider {
         }
 
         private void append(Bundle page) {
+            Bundle pageExtras = page.getBundle(RuntimeKeys.CURSOR_EXTRAS);
+            if (pageExtras != null) extras = new Bundle(pageExtras);
+            String notification = page.getString(RuntimeKeys.CURSOR_NOTIFICATION_URI, "");
+            if (!notification.isEmpty()) notificationUri = Uri.parse(notification);
             int count = page.getInt(RuntimeKeys.CURSOR_ROWS_RETURNED, 0);
             for (int rowIndex = 0; rowIndex < count; rowIndex++) {
                 ArrayList<String> wire = page.getStringArrayList(RuntimeKeys.CURSOR_ROW_PREFIX + rowIndex);

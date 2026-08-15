@@ -10,6 +10,7 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -184,10 +185,27 @@ public final class GuestRuntimeEnvironment {
             GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
                     host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
+            ApplicationInfo parsedApplicationInfo = null;
+            try {
+                android.content.pm.PackageInfo parsed = processPackageManager.getPackageArchiveInfo(
+                        spec.apkPath, PackageManager.GET_META_DATA);
+                if (parsed != null && parsed.applicationInfo != null) {
+                    parsedApplicationInfo = new ApplicationInfo(parsed.applicationInfo);
+                }
+            } catch (Throwable error) {
+                // The custom binary manifest parser remains authoritative for the virtual PMS.
+                // This optional platform projection only supplies framework ApplicationInfo
+                // fields (targetSdk/flags/largeHeap/etc.) when the device parser accepts the APK.
+                android.util.Log.w("CS_GUEST_METADATA", "applicationInfo projection unavailable", error);
+            }
+            if (parsedApplicationInfo == null) {
+                parsedApplicationInfo = spec.packageState.applicationInfo();
+            }
             String appComponentFactory = archiveAppComponentFactory(processPackageManager, spec.apkPath);
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager,
-                    loadedResources.manifestMetadata.application(), appComponentFactory);
+                    loadedResources.manifestMetadata.application(), appComponentFactory,
+                    parsedApplicationInfo);
             IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
                     spec.virtualSystemServiceBinder);
             if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
@@ -229,15 +247,20 @@ public final class GuestRuntimeEnvironment {
             // loader unchanged and rely on the structured loader evidence around it.
             boolean nativeLoadDiag = !translatedGuestAbi
                     && NativePolicy.installNativeLoadDiagnostic();
-            // RegisterNatives on java.lang.Runtime is deliberately disabled for translated
-            // guests while the platform bridge owns the foreign-ABI native entry.  The VA
-            // crash history shows that any ART native-entry mutation can surface later as an
-            // apparently unrelated libexpat/register corruption in WebView.  Native guests keep
-            // the observe-only diagnostic below; translated guests use the untouched bridge.
-            boolean nativeLoadRedirect = false;
+            // A translated guest cannot safely receive host-ABI PLT/GOT patches, but the
+            // platform nativeLoad entry itself is a supported JNI registration boundary.  Use
+            // the narrow redirect there so absolute guest library paths still enter the native
+            // policy before the Android native bridge loads them.  Ordinary native guests keep
+            // the full PLT/IO hook path above.
+            boolean nativeLoadRedirect = translatedGuestAbi
+                    && NativePolicy.installNativeLoadRedirect();
+            String nativeBoundaryMode = translatedGuestAbi
+                    ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
+                    : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
             android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag
                     + " nativeLoadRedirect=" + nativeLoadRedirect
-                    + " translatedAbi=" + translatedGuestAbi);
+                    + " translatedAbi=" + translatedGuestAbi
+                    + " boundaryMode=" + nativeBoundaryMode);
             // handleBindApplication publishes process identity before LoadedApk asks the
             // AppComponentFactory to wrap the ClassLoader. The hidden-API bridge must be
             // installed first so Process.setArgV0 is visible.
@@ -381,7 +404,8 @@ public final class GuestRuntimeEnvironment {
             Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
                     frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
                     capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
-                    nativeHooksInstalled, camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
+                    nativeHooksInstalled, nativeLoadRedirect, nativeBoundaryMode,
+                    camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
                     stagedProcessIdentity);
             stagedSession = session;
             stagedProcessIdentity = null;
@@ -752,6 +776,8 @@ public final class GuestRuntimeEnvironment {
         volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
+        final boolean nativeLoadRedirectInstalled;
+        final String nativeBoundaryMode;
         volatile boolean camera1AdapterInstalled;
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
@@ -770,6 +796,7 @@ public final class GuestRuntimeEnvironment {
                 GuestCapabilityAuditLog capabilityAudit, CapabilityLeaseRegistry capabilityLeases,
                 VirtualSystemServiceState virtualServices,
                 boolean nativePolicyConfigured, boolean nativeHooksInstalled,
+                boolean nativeLoadRedirectInstalled, String nativeBoundaryMode,
                 boolean camera1AdapterInstalled, boolean nativeCrashRecorderInstalled,
                 WebViewProfileManager.Profile webViewProfile,
                 GuestProcessIdentityBridge processIdentity) {
@@ -793,6 +820,8 @@ public final class GuestRuntimeEnvironment {
             this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
+            this.nativeLoadRedirectInstalled = nativeLoadRedirectInstalled;
+            this.nativeBoundaryMode = nativeBoundaryMode == null ? "unknown" : nativeBoundaryMode;
             this.camera1AdapterInstalled = camera1AdapterInstalled;
             this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
             this.webViewProfile = webViewProfile;
@@ -897,6 +926,16 @@ public final class GuestRuntimeEnvironment {
             }
             out.putStringArrayList("frameworkHooksInstalled", installedHooks);
             out.putStringArrayList("frameworkHooksFailed", failedHooks);
+            out.putBoolean("frameworkActivityTransportInstalled", activityThreadInstrumentation != null);
+            out.putBoolean("frameworkServiceTransportInstalled", serviceFrameworkBridge != null);
+            out.putBoolean("frameworkLoadedApkInstalled", loadedApkBridge != null
+                    && loadedApkBridge.loadedApk() != null);
+            out.putBoolean("frameworkGuestApplicationBound", application != null
+                    && context.getApplicationInfo() != null
+                    && spec.packageName.equals(context.getApplicationInfo().packageName));
+            out.putBoolean("frameworkComponentLifecycleReady", activityThreadInstrumentation != null
+                    && serviceFrameworkBridge != null && loadedApkBridge != null);
+            out.putInt("virtualComponentCount", packageMetadata.components().size());
             java.util.ArrayList<String> deviceServiceBindings = new java.util.ArrayList<>();
             for (java.util.Map.Entry<String, String> item : frameworkHooks.report().bindingDetails().entrySet()) {
                 deviceServiceBindings.add(item.getKey() + "=" + item.getValue());
@@ -911,6 +950,9 @@ public final class GuestRuntimeEnvironment {
             out.putBoolean("nativePolicyAvailable", NativePolicy.available());
             out.putBoolean("nativePolicyConfigured", nativePolicyConfigured);
             out.putBoolean("nativeHooksInstalled", nativeHooksInstalled);
+            out.putBoolean("nativeLoadRedirectInstalled", nativeLoadRedirectInstalled);
+            out.putBoolean("nativeIoVirtualizationInstalled", nativeHooksInstalled);
+            out.putString("nativeBoundaryMode", nativeBoundaryMode);
             out.putBoolean("nativeCamera1AdapterInstalled", camera1AdapterInstalled);
             out.putString("nativeHookStatus", NativePolicy.hookStatus());
             out.putString("nativeCamera1Status", NativePolicy.camera1Status());

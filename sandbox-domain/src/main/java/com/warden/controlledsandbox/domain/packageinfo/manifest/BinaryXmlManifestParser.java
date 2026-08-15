@@ -113,6 +113,16 @@ public final class BinaryXmlManifestParser {
             case "application" -> {
                 model.applicationClass(element.stringAttr("name"));
                 model.applicationPermission(element.stringAttr("permission"));
+                model.applicationProcessName(element.stringAttr("process"));
+                model.applicationComponentFactory(element.stringAttr("appComponentFactory"));
+                model.applicationDebuggable(element.boolAttr("debuggable", false));
+                model.applicationDirectBootAware(element.boolAttr("directBootAware", false));
+                model.applicationExtractNativeLibs(element.boolAttr("extractNativeLibs", true));
+                model.applicationUsesCleartextTraffic(element.boolAttr("usesCleartextTraffic", true));
+                model.applicationLargeHeap(element.boolAttr("largeHeap", false));
+                model.applicationHardwareAccelerated(element.boolAttr("hardwareAccelerated", true));
+                model.applicationNetworkSecurityConfigResId(
+                        element.intAttr("networkSecurityConfig", 0));
                 model.applicationThemeResId(element.intAttr("theme", 0));
             }
             case "activity" -> {
@@ -293,6 +303,9 @@ public final class BinaryXmlManifestParser {
         component.maxAspectRatio(element.floatAttr("maxAspectRatio", 0f));
         component.minAspectRatio(element.floatAttr("minAspectRatio", 0f));
         component.supportsPictureInPicture(element.boolAttr("supportsPictureInPicture", false));
+        component.foregroundServiceType(element.intAttr("foregroundServiceType", 0));
+        component.stopWithTask(element.boolAttr("stopWithTask", false));
+        component.directBootAware(element.boolAttr("directBootAware", false));
         return component;
     }
 
@@ -311,9 +324,15 @@ public final class BinaryXmlManifestParser {
         String writePermission = element.stringAttr("writePermission");
         if (readPermission.trim().isEmpty()) readPermission = permission;
         if (writePermission.trim().isEmpty()) writePermission = permission;
-        return new ManifestModel.Component(className, process, exported, exportedExplicit, enabled, isolated,
+        ManifestModel.Component component = new ManifestModel.Component(className, process, exported,
+                exportedExplicit, enabled, isolated,
                 element.stringAttr("authorities"), permission, readPermission, writePermission,
                 element.boolAttr("grantUriPermissions", false));
+        component.multiprocess(element.boolAttr("multiprocess", false));
+        component.initOrder(element.intAttr("initOrder", 0));
+        component.syncable(element.boolAttr("syncable", false));
+        component.directBootAware(element.boolAttr("directBootAware", false));
+        return component;
     }
 
     private static ManifestModel.Component nearestComponent(Deque<ElementContext> stack) {

@@ -68,7 +68,10 @@ final class GuestPackageMetadataMapper {
                      component.finishOnTaskLaunch(), component.clearTaskOnLaunch(),
                      component.alwaysRetainTaskState(), component.allowTaskReparenting(),
                      component.resizeMode(), component.maxAspectRatio(), component.minAspectRatio(),
-                     component.supportsPictureInPicture(), component.themeResId()));
+                     component.supportsPictureInPicture(), component.themeResId(),
+                     component.foregroundServiceType(), component.stopWithTask(),
+                     component.directBootAware(), component.multiprocess(), component.initOrder(),
+                     component.syncable()));
         }
         List<String> permissions = new ArrayList<>();
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {
@@ -116,7 +119,9 @@ final class GuestPackageMetadataMapper {
 
     static VirtualPackageMetadata fromProjection(VirtualPackageProjectionSnapshot projection) {
         VirtualPackageStateSnapshot state = projection.packageState();
-        ApplicationInfo applicationInfo = new ApplicationInfo();
+        ApplicationInfo applicationInfo = projection.parsedApplicationInfo();
+        if (applicationInfo == null) applicationInfo = state.applicationInfo();
+        if (applicationInfo == null) applicationInfo = new ApplicationInfo();
         applicationInfo.packageName = state.packageName();
         applicationInfo.name = state.applicationClass().isEmpty() ? null : state.applicationClass();
         applicationInfo.sourceDir = projection.apkPath();
@@ -124,7 +129,7 @@ final class GuestPackageMetadataMapper {
         applicationInfo.nativeLibraryDir = projection.nativeLibraryDir();
         applicationInfo.uid = projection.virtualUid();
         applicationInfo.enabled = state.enabled();
-        applicationInfo.flags = ApplicationInfo.FLAG_HAS_CODE;
+        applicationInfo.flags |= ApplicationInfo.FLAG_HAS_CODE;
         return fromSnapshot(state, applicationInfo, null);
     }
 }

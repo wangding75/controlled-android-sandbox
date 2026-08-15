@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.guest;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.provider.ProviderBulkInsertRuntime;
 import com.warden.controlledsandbox.runtime.provider.GuestProviderFileTransport;
 import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderCursorTransport;
@@ -210,6 +211,7 @@ public final class GuestComponentRuntime {
             case ComponentOperations.PROVIDER_QUERY -> queryProvider(componentClass, request);
             case ComponentOperations.PROVIDER_GET_TYPE -> getProviderType(componentClass, request);
             case ComponentOperations.PROVIDER_INSERT -> insertProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_BULK_INSERT -> bulkInsertProvider(componentClass, request);
             case ComponentOperations.PROVIDER_UPDATE -> updateProvider(componentClass, request);
             case ComponentOperations.PROVIDER_DELETE -> deleteProvider(componentClass, request);
             case ComponentOperations.PROVIDER_CALL -> callProvider(componentClass, request);
@@ -694,6 +696,24 @@ public final class GuestComponentRuntime {
         Bundle out = providerResult("PROVIDER_INSERTED", record);
         out.putString(RuntimeKeys.URI, inserted == null ? "" : inserted.toString());
         RuntimeEventLog.event("GUEST_PROVIDER_INSERT", out);
+        return out;
+    }
+
+    private Bundle bulkInsertProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        ProviderBulkInsertRuntime.validate(request);
+        int count = request.getInt(RuntimeKeys.PROVIDER_BULK_VALUE_COUNT, 0);
+        ContentValues[] values = new ContentValues[count];
+        for (int index = 0; index < count; index++) {
+            Bundle wire = request.getBundle(RuntimeKeys.PROVIDER_BULK_VALUE_PREFIX + index);
+            if (wire == null) throw new IllegalArgumentException("PROVIDER_BULK_VALUE_MISSING:" + index);
+            values[index] = contentValues(wire);
+        }
+        int inserted = record.provider.bulkInsert(uri, values);
+        Bundle out = providerResult("PROVIDER_BULK_INSERTED", record);
+        out.putInt("affectedRows", inserted);
+        RuntimeEventLog.event("GUEST_PROVIDER_BULK_INSERT", out);
         return out;
     }
 

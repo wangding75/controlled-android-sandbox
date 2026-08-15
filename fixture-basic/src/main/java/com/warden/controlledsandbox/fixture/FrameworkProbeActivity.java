@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.fixture;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.ResolveInfo;
@@ -32,12 +33,29 @@ public final class FrameworkProbeActivity extends Activity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         Log.i(TAG, "FRAMEWORK_PROBE_BEGIN package=" + getPackageName());
+        providerBulkInsertProbe();
         providerBatchProbe();
         pendingIntentProbe();
         serviceBindingProbe();
         packageUniverseProbe();
         multiProcessProbe();
         new Handler(Looper.getMainLooper()).postDelayed(this::finishProbe, 1500L);
+    }
+
+    private void providerBulkInsertProbe() {
+        ContentResolver resolver = getContentResolver();
+        Uri uri = Uri.parse("content://" + getPackageName() + ".provider");
+        ContentValues first = new ContentValues();
+        first.put("value", "bulk-one");
+        ContentValues second = new ContentValues();
+        second.put("value", "bulk-two");
+        try {
+            int inserted = resolver.bulkInsert(uri, new ContentValues[]{first, second});
+            if (inserted != 2) throw new AssertionError("PROVIDER_BULK_RESULT_COUNT=" + inserted);
+            Log.i(TAG, "FRAMEWORK_PROBE_PROVIDER_BULK_PASS count=" + inserted);
+        } catch (Exception error) {
+            throw new AssertionError("PROVIDER_BULK_FAILED:" + error, error);
+        }
     }
 
     private void providerBatchProbe() {

@@ -53,6 +53,17 @@ public final class FixtureProvider extends ContentProvider {
         return Uri.parse(uri.toString() + "/" + id);
     }
 
+    @Override public synchronized int bulkInsert(Uri uri, ContentValues[] values) {
+        int inserted = 0;
+        if (values != null) {
+            for (ContentValues value : values) {
+                if (insert(uri, value) != null) inserted++;
+            }
+        }
+        Log.i("CS_FIXTURE", "PROVIDER_BULK_INSERT count=" + inserted);
+        return inserted;
+    }
+
     @Override public synchronized int delete(Uri uri, String selection, String[] selectionArgs) {
         int count = rows.size();
         rows.clear();

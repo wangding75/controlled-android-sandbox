@@ -17,7 +17,18 @@ final class GuestApplicationInfoFactory {
 
     static ApplicationInfo create(GuestPackageSpec spec, String dataDir, Bundle metaData,
                                   String appComponentFactory) {
-        ApplicationInfo info = new ApplicationInfo();
+        return create(spec, dataDir, metaData, appComponentFactory, null);
+    }
+
+    /**
+     * Projects the platform-parsed APK ApplicationInfo instead of rebuilding a partial record.
+     * The source object is guest APK metadata; all identity-bearing fields are overwritten below
+     * so no host UID/data/process path can cross the sandbox boundary.
+     */
+    static ApplicationInfo create(GuestPackageSpec spec, String dataDir, Bundle metaData,
+                                  String appComponentFactory, ApplicationInfo parsed) {
+        ApplicationInfo info = parsed == null
+                ? new ApplicationInfo() : new ApplicationInfo(parsed);
         info.packageName = spec.packageName;
         info.name = emptyToNull(spec.applicationClass);
         info.className = emptyToNull(spec.applicationClass);
@@ -31,7 +42,11 @@ final class GuestApplicationInfoFactory {
         info.uid = spec.virtualUid;
         info.enabled = spec.packageState.enabled();
         info.appComponentFactory = emptyToNull(appComponentFactory);
-        if (metaData != null && !metaData.isEmpty()) info.metaData = new Bundle(metaData);
+        if (metaData != null && !metaData.isEmpty()) {
+            Bundle merged = info.metaData == null ? new Bundle() : new Bundle(info.metaData);
+            merged.putAll(metaData);
+            info.metaData = merged;
+        }
         return info;
     }
 

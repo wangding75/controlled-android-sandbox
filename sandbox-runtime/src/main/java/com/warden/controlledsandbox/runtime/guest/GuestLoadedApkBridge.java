@@ -87,6 +87,7 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         setOptional(loadedApk, "mDefaultClassLoader", processLoader);
         setOptional(loadedApk, "mResources", session.resources.resources);
         setOptional(loadedApk, "mApplication", session.application);
+        verifyFrameworkApplicationOwnership(loadedApk, activityThread, session.application);
 
         Field packagesField = findField(activityThreadType, "mPackages");
         packagesField.setAccessible(true);
@@ -103,6 +104,42 @@ final class GuestLoadedApkBridge implements AutoCloseable {
     }
 
     Object loadedApk() { return loadedApk; }
+
+    /**
+     * Force the platform LoadedApk API to observe the already-created Guest Application.  The
+     * host process cannot safely let LoadedApk instantiate a second Application (its ContextImpl
+     * would be host-owned), so the controlled bootstrap creates and attaches the Guest object;
+     * this call then makes the framework's own makeApplication lookup the same object and catches
+     * a split-brain Application early.
+     */
+    private static void verifyFrameworkApplicationOwnership(Object loadedApk,
+                                                             Object activityThread,
+                                                             Application expected) {
+        try {
+            Method make = findMethod(loadedApk.getClass(), "makeApplication", boolean.class,
+                    Class.forName("android.app.Instrumentation"));
+            if (make == null) return;
+            Field instrumentationField = findField(activityThread.getClass(), "mInstrumentation");
+            instrumentationField.setAccessible(true);
+            Object instrumentation = instrumentationField.get(activityThread);
+            Object actual = make.invoke(loadedApk, false, instrumentation);
+            if (actual != expected) {
+                throw new IllegalStateException("GUEST_LOADED_APK_APPLICATION_SPLIT_BRAIN");
+            }
+            android.util.Log.i("CS_GUEST_LOADED_APK", "frameworkMakeApplication=OWNED_BY_GUEST");
+        } catch (ClassNotFoundException ignored) {
+            // Impossible on a normal Android runtime; leave the projection usable on test stubs.
+        } catch (NoSuchFieldException ignored) {
+            // ActivityThread instrumentation field shape varies across preview/OEM builds.
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            throw new IllegalStateException("GUEST_LOADED_APK_MAKE_APPLICATION_FAILED", cause);
+        } catch (ReflectiveOperationException error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("GUEST_LOADED_APK_MAKE_APPLICATION_FAILED", error);
+        }
+    }
 
     @Override public synchronized void close() {
         if (closed) return;
@@ -129,6 +166,20 @@ final class GuestLoadedApkBridge implements AutoCloseable {
             catch (NoSuchFieldException ignored) { cursor = cursor.getSuperclass(); }
         }
         throw new NoSuchFieldException(type.getName() + "." + name);
+    }
+
+    private static Method findMethod(Class<?> type, String name, Class<?>... parameterTypes) {
+        Class<?> cursor = type;
+        while (cursor != null) {
+            try {
+                Method method = cursor.getDeclaredMethod(name, parameterTypes);
+                method.setAccessible(true);
+                return method;
+            } catch (NoSuchMethodException ignored) {
+                cursor = cursor.getSuperclass();
+            }
+        }
+        return null;
     }
 
     private static void setOptional(Object target, String name, Object value) {

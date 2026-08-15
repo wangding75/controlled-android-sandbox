@@ -63,13 +63,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets) {
         this(host, spec, classLoader, resources, assets, host.getPackageManager(), false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader), null, "");
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
+                null, "", null);
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                  Resources resources, AssetManager assets, PackageManager packageManager) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
-                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader), null, "");
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
+                null, "", null);
     }
 
     GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
@@ -83,14 +85,24 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                  Bundle applicationMetadata, String appComponentFactory) {
         this(host, spec, classLoader, resources, assets, packageManager, false,
                 new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
-                applicationMetadata, appComponentFactory);
+                applicationMetadata, appComponentFactory, null);
+    }
+
+    GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
+                 Resources resources, AssetManager assets, PackageManager packageManager,
+                 Bundle applicationMetadata, String appComponentFactory,
+                 ApplicationInfo parsedApplicationInfo) {
+        this(host, spec, classLoader, resources, assets, packageManager, false,
+                new SharedState(new GuestCapabilityGate(spec.packageState.permissions()), classLoader),
+                applicationMetadata, appComponentFactory, parsedApplicationInfo);
     }
 
     private GuestContext(Context host, GuestPackageSpec spec, ClassLoader classLoader,
                          Resources resources, AssetManager assets, PackageManager packageManager,
                          boolean deviceProtected,
                          SharedState sharedState, Bundle applicationMetadata,
-                         String appComponentFactory) {
+                         String appComponentFactory,
+                         ApplicationInfo parsedApplicationInfo) {
         // ContextWrapper has a small set of hidden framework helpers (for example
         // getDisplayNoVerify(), used while PhoneWindow tears down a DecorView) that call the
         // private base field directly. Keep that field on the host's application transport so
@@ -117,7 +129,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
         this.storageNames = new GuestStorageNameCodec(instanceRoot);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
-                applicationMetadata, appComponentFactory);
+                applicationMetadata, appComponentFactory, parsedApplicationInfo);
         this.dynamicReceivers = sharedState.dynamicReceivers;
         this.mainThread = sharedState.mainThread;
         this.capabilityGate = sharedState.capabilityGate;
@@ -529,7 +541,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private GuestContext storageContext(boolean targetDeviceProtected) {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 packageManager, targetDeviceProtected, sharedState, applicationInfo.metaData,
-                applicationInfo.appComponentFactory);
+                applicationInfo.appComponentFactory, applicationInfo);
     }
 
     private synchronized SandboxSharedPreferences cachedPreferences(String name) {

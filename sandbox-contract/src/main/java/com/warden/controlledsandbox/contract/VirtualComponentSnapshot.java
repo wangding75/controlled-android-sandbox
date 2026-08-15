@@ -39,6 +39,12 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final float maxAspectRatio;
     private final float minAspectRatio;
     private final boolean supportsPictureInPicture;
+    private final int foregroundServiceType;
+    private final boolean stopWithTask;
+    private final boolean directBootAware;
+    private final boolean multiprocess;
+    private final int initOrder;
+    private final boolean syncable;
     private final ArrayList<String> actions;
     private final ArrayList<VirtualIntentFilterSnapshot> intentFilters;
     private final ArrayList<VirtualProviderPathRuleSnapshot> providerPathRules;
@@ -101,6 +107,58 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                     boolean alwaysRetainTaskState, boolean allowTaskReparenting,
                                     String resizeMode, float maxAspectRatio, float minAspectRatio,
                                     boolean supportsPictureInPicture) {
+        this(type, className, processName, exported, enabled, isolated, authority, permission,
+                readPermission, writePermission, grantUriPermissions, enabledSetting, actions,
+                intentFilters, providerPathRules, themeResId, launchMode, taskAffinity,
+                documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                minAspectRatio, supportsPictureInPicture, 0, false, false);
+    }
+
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                    boolean exported, boolean enabled, boolean isolated,
+                                    String authority, String permission, String readPermission,
+                                    String writePermission, boolean grantUriPermissions,
+                                    String enabledSetting, List<String> actions,
+                                    List<VirtualIntentFilterSnapshot> intentFilters,
+                                    List<VirtualProviderPathRuleSnapshot> providerPathRules,
+                                    int themeResId, String launchMode, String taskAffinity,
+                                    String documentLaunchMode, int configChanges,
+                                    String screenOrientation, int windowSoftInputMode, int flags,
+                                    boolean excludeFromRecents, boolean noHistory,
+                                    boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                                    boolean alwaysRetainTaskState, boolean allowTaskReparenting,
+                                     String resizeMode, float maxAspectRatio, float minAspectRatio,
+                                     boolean supportsPictureInPicture, int foregroundServiceType,
+                                     boolean stopWithTask, boolean directBootAware) {
+         this(type, className, processName, exported, enabled, isolated, authority, permission,
+                 readPermission, writePermission, grantUriPermissions, enabledSetting, actions,
+                 intentFilters, providerPathRules, themeResId, launchMode, taskAffinity,
+                 documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                 excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                 alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                 minAspectRatio, supportsPictureInPicture, foregroundServiceType, stopWithTask,
+                 directBootAware, false, 0, false);
+    }
+
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                     boolean exported, boolean enabled, boolean isolated,
+                                     String authority, String permission, String readPermission,
+                                     String writePermission, boolean grantUriPermissions,
+                                     String enabledSetting, List<String> actions,
+                                     List<VirtualIntentFilterSnapshot> intentFilters,
+                                     List<VirtualProviderPathRuleSnapshot> providerPathRules,
+                                     int themeResId, String launchMode, String taskAffinity,
+                                     String documentLaunchMode, int configChanges,
+                                     String screenOrientation, int windowSoftInputMode, int flags,
+                                     boolean excludeFromRecents, boolean noHistory,
+                                     boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                                     boolean alwaysRetainTaskState, boolean allowTaskReparenting,
+                                     String resizeMode, float maxAspectRatio, float minAspectRatio,
+                                     boolean supportsPictureInPicture, int foregroundServiceType,
+                                     boolean stopWithTask, boolean directBootAware,
+                                     boolean multiprocess, int initOrder, boolean syncable) {
         this.type = componentType(type);
         this.className = required(className, "className");
         this.processName = value(processName);
@@ -136,6 +194,14 @@ public final class VirtualComponentSnapshot implements Parcelable {
         this.maxAspectRatio = maxAspectRatio;
         this.minAspectRatio = minAspectRatio;
         this.supportsPictureInPicture = supportsPictureInPicture;
+        if (foregroundServiceType < 0) throw new IllegalArgumentException("foregroundServiceType must be non-negative");
+        this.foregroundServiceType = foregroundServiceType;
+        this.stopWithTask = stopWithTask;
+        this.directBootAware = directBootAware;
+        this.multiprocess = multiprocess;
+        if (initOrder < 0) throw new IllegalArgumentException("initOrder must be non-negative");
+        this.initOrder = initOrder;
+        this.syncable = syncable;
         this.intentFilters = new ArrayList<>(intentFilters == null ? List.of() : intentFilters);
         if (this.intentFilters.size() > 256) throw new IllegalArgumentException("Too many intent filters");
         this.providerPathRules = new ArrayList<>(providerPathRules == null ? List.of() : providerPathRules);
@@ -160,8 +226,10 @@ public final class VirtualComponentSnapshot implements Parcelable {
                 in.readString(), in.readString(), in.readString(), in.readInt(), in.readString(),
                 in.readInt(), in.readInt(), in.readInt() != 0, in.readInt() != 0,
                 in.readInt() != 0, in.readInt() != 0, in.readInt() != 0, in.readInt() != 0,
-                in.readString(), Float.intBitsToFloat(in.readInt()),
-                Float.intBitsToFloat(in.readInt()), in.readInt() != 0);
+                 in.readString(), Float.intBitsToFloat(in.readInt()),
+                 Float.intBitsToFloat(in.readInt()), in.readInt() != 0, in.readInt(),
+                 in.readInt() != 0, in.readInt() != 0, in.readInt() != 0, in.readInt(),
+                 in.readInt() != 0);
     }
 
     public String type() { return type; }
@@ -194,6 +262,12 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public float maxAspectRatio() { return maxAspectRatio; }
     public float minAspectRatio() { return minAspectRatio; }
     public boolean supportsPictureInPicture() { return supportsPictureInPicture; }
+    public int foregroundServiceType() { return foregroundServiceType; }
+    public boolean stopWithTask() { return stopWithTask; }
+    public boolean directBootAware() { return directBootAware; }
+    public boolean multiprocess() { return multiprocess; }
+    public int initOrder() { return initOrder; }
+    public boolean syncable() { return syncable; }
     public List<String> actions() { return Collections.unmodifiableList(actions); }
     public List<VirtualIntentFilterSnapshot> intentFilters() { return Collections.unmodifiableList(intentFilters); }
     public List<VirtualProviderPathRuleSnapshot> providerPathRules() {
@@ -216,6 +290,12 @@ public final class VirtualComponentSnapshot implements Parcelable {
          out.writeString(resizeMode); out.writeInt(Float.floatToIntBits(maxAspectRatio));
          out.writeInt(Float.floatToIntBits(minAspectRatio));
          out.writeInt(supportsPictureInPicture ? 1 : 0);
+          out.writeInt(foregroundServiceType);
+          out.writeInt(stopWithTask ? 1 : 0);
+          out.writeInt(directBootAware ? 1 : 0);
+          out.writeInt(multiprocess ? 1 : 0);
+          out.writeInt(initOrder);
+          out.writeInt(syncable ? 1 : 0);
     }
     @Override public int describeContents() { return 0; }
 

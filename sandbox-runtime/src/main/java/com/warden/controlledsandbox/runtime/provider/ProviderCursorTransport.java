@@ -71,6 +71,7 @@ public final class ProviderCursorTransport {
                     rowCount, generation, now(), ttlMs, maxActiveLeases);
             cursors.put(lease.token(), cursor);
             Bundle out = metadata(lease);
+            attachCursorMetadata(out, cursor);
             int pageSize = normalizePageSize(requestedPageSize);
             if (pageSize > 0 && rowCount > 0) {
                 try {
@@ -149,6 +150,7 @@ public final class ProviderCursorTransport {
         }
 
         Bundle out = metadata(lease);
+        attachCursorMetadata(out, cursor);
         out.putInt(RuntimeKeys.CURSOR_OFFSET, offset);
         out.putInt(RuntimeKeys.CURSOR_PAGE_SIZE, limit);
         out.putLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, sequence);
@@ -238,6 +240,17 @@ public final class ProviderCursorTransport {
         return out;
     }
 
+    private static void attachCursorMetadata(Bundle out, Cursor cursor) {
+        Bundle extras = cursor.getExtras();
+        if (extras != null && !extras.isEmpty()) {
+            out.putBundle(RuntimeKeys.CURSOR_EXTRAS, new Bundle(extras));
+        }
+        String notificationUri = notificationUri(cursor);
+        if (!notificationUri.isEmpty()) {
+            out.putString(RuntimeKeys.CURSOR_NOTIFICATION_URI, notificationUri);
+        }
+    }
+
     private static int normalizePageSize(int requested) {
         if (requested < 0) throw new IllegalArgumentException("page size must be non-negative");
         return Math.min(requested, MAX_PAGE_SIZE);
@@ -257,6 +270,16 @@ public final class ProviderCursorTransport {
             case Cursor.FIELD_TYPE_STRING: return CursorWireCodec.text(cursor.getString(column));
             case Cursor.FIELD_TYPE_NULL: return CursorWireCodec.nullValue();
             default: throw new IllegalStateException("Unsupported cursor field type");
+        }
+    }
+
+    private static String notificationUri(Cursor cursor) {
+        try {
+            java.lang.reflect.Method method = cursor.getClass().getMethod("getNotificationUri");
+            Object value = method.invoke(cursor);
+            return value instanceof android.net.Uri ? value.toString() : "";
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return "";
         }
     }
 

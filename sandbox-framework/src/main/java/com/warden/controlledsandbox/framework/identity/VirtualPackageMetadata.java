@@ -8,6 +8,8 @@ import android.content.pm.ComponentInfo;
 import android.content.pm.InstrumentationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.ProviderInfo;
+import android.content.pm.PathPermission;
+import android.os.PatternMatcher;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.os.Bundle;
@@ -198,6 +200,12 @@ public final class VirtualPackageMetadata {
         private final float minAspectRatio;
         private final boolean supportsPictureInPicture;
         private final int themeResId;
+        private final int foregroundServiceType;
+        private final boolean stopWithTask;
+        private final boolean directBootAware;
+        private final boolean multiprocess;
+        private final int initOrder;
+        private final boolean syncable;
 
         public Component(Type type, String className, String processName,
                          boolean exported, boolean enabled, boolean isolated,
@@ -228,7 +236,8 @@ public final class VirtualPackageMetadata {
             this(type, className, processName, exported, enabled, isolated, actions, authority,
                     permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
                     filters, providerPathRules, null, "standard", "", "none", 0, "", 0, 0,
-                    false, false, false, false, false, false, "", 0f, 0f, false, 0);
+                    false, false, false, false, false, false, "", 0f, 0f, false, 0,
+                    0, false, false);
         }
 
         public Component(Type type, String className, String processName,
@@ -240,7 +249,8 @@ public final class VirtualPackageMetadata {
             this(type, className, processName, exported, enabled, isolated, actions, authority,
                     permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
                     filters, providerPathRules, metaData, "standard", "", "none", 0, "", 0, 0,
-                    false, false, false, false, false, false, "", 0f, 0f, false, 0);
+                    false, false, false, false, false, false, "", 0f, 0f, false, 0,
+                    0, false, false);
         }
 
         public Component(Type type, String className, String processName,
@@ -255,6 +265,52 @@ public final class VirtualPackageMetadata {
                          boolean alwaysRetainTaskState, boolean allowTaskReparenting, String resizeMode,
                          float maxAspectRatio, float minAspectRatio, boolean supportsPictureInPicture,
                          int themeResId) {
+            this(type, className, processName, exported, enabled, isolated, actions, authority,
+                    permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
+                    filters, providerPathRules, metaData, launchMode, taskAffinity,
+                    documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                    excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                    alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                    minAspectRatio, supportsPictureInPicture, themeResId, 0, false, false);
+        }
+
+        public Component(Type type, String className, String processName,
+                         boolean exported, boolean enabled, boolean isolated, Set<String> actions,
+                         String authority, String permission, String readPermission,
+                         String writePermission, boolean grantUriPermissions, String enabledSetting,
+                         List<Filter> filters, List<ProviderPathRule> providerPathRules,
+                         Bundle metaData, String launchMode, String taskAffinity,
+                         String documentLaunchMode, int configChanges, String screenOrientation,
+                         int windowSoftInputMode, int flags, boolean excludeFromRecents,
+                         boolean noHistory, boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                         boolean alwaysRetainTaskState, boolean allowTaskReparenting, String resizeMode,
+                          float maxAspectRatio, float minAspectRatio, boolean supportsPictureInPicture,
+                          int themeResId, int foregroundServiceType, boolean stopWithTask,
+                          boolean directBootAware) {
+            this(type, className, processName, exported, enabled, isolated, actions, authority,
+                    permission, readPermission, writePermission, grantUriPermissions, enabledSetting,
+                    filters, providerPathRules, metaData, launchMode, taskAffinity,
+                    documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                    excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                    alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                    minAspectRatio, supportsPictureInPicture, themeResId, foregroundServiceType,
+                    stopWithTask, directBootAware, false, 0, false);
+        }
+
+        public Component(Type type, String className, String processName,
+                         boolean exported, boolean enabled, boolean isolated, Set<String> actions,
+                         String authority, String permission, String readPermission,
+                         String writePermission, boolean grantUriPermissions, String enabledSetting,
+                         List<Filter> filters, List<ProviderPathRule> providerPathRules,
+                         Bundle metaData, String launchMode, String taskAffinity,
+                         String documentLaunchMode, int configChanges, String screenOrientation,
+                         int windowSoftInputMode, int flags, boolean excludeFromRecents,
+                         boolean noHistory, boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                         boolean alwaysRetainTaskState, boolean allowTaskReparenting, String resizeMode,
+                         float maxAspectRatio, float minAspectRatio, boolean supportsPictureInPicture,
+                         int themeResId, int foregroundServiceType, boolean stopWithTask,
+                         boolean directBootAware, boolean multiprocess, int initOrder,
+                         boolean syncable) {
             this.type = java.util.Objects.requireNonNull(type, "type");
             this.className = requireText(className, "className");
             this.processName = value(processName);
@@ -295,6 +351,16 @@ public final class VirtualPackageMetadata {
             this.supportsPictureInPicture = supportsPictureInPicture;
             if (themeResId < 0) throw new IllegalArgumentException("themeResId must be non-negative");
             this.themeResId = themeResId;
+            if (foregroundServiceType < 0) {
+                throw new IllegalArgumentException("foregroundServiceType must be non-negative");
+            }
+            this.foregroundServiceType = foregroundServiceType;
+            this.stopWithTask = stopWithTask;
+            this.directBootAware = directBootAware;
+            this.multiprocess = multiprocess;
+            if (initOrder < 0) throw new IllegalArgumentException("initOrder must be non-negative");
+            this.initOrder = initOrder;
+            this.syncable = syncable;
         }
 
         public Type type() { return type; }
@@ -331,6 +397,12 @@ public final class VirtualPackageMetadata {
         public float minAspectRatio() { return minAspectRatio; }
         public boolean supportsPictureInPicture() { return supportsPictureInPicture; }
         public int themeResId() { return themeResId; }
+        public int foregroundServiceType() { return foregroundServiceType; }
+        public boolean stopWithTask() { return stopWithTask; }
+        public boolean directBootAware() { return directBootAware; }
+        public boolean multiprocess() { return multiprocess; }
+        public int initOrder() { return initOrder; }
+        public boolean syncable() { return syncable; }
     }
 
     private final String packageName;
@@ -473,6 +545,10 @@ public final class VirtualPackageMetadata {
             if (library.resolved() && !names.contains(library.name())) names.add(library.name());
         }
         return Collections.unmodifiableList(names);
+    }
+
+    public List<String> requestedPermissions() {
+        return requestedPermissions;
     }
     public String signatureSha256() { return signatureSha256; }
     public boolean enabled() { return enabled; }
@@ -743,9 +819,13 @@ public final class VirtualPackageMetadata {
             projectActivityContract((ActivityInfo) info, component);
         }
         if (info instanceof ServiceInfo) {
-            ((ServiceInfo) info).flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
-            ((ServiceInfo) info).permission = component.permission();
+            ServiceInfo service = (ServiceInfo) info;
+            service.flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
+            if (component.stopWithTask()) service.flags |= staticInt(ServiceInfo.class, "FLAG_STOP_WITH_TASK");
+            service.permission = component.permission();
+            setField(service, "foregroundServiceType", component.foregroundServiceType());
         }
+        setField(info, "directBootAware", component.directBootAware());
         if (info instanceof ProviderInfo) {
             ProviderInfo provider = (ProviderInfo) info;
             provider.authority = component.authority();
@@ -753,6 +833,28 @@ public final class VirtualPackageMetadata {
             provider.writePermission = component.writePermission();
             provider.grantUriPermissions = component.grantUriPermissions();
             provider.metaData = component.metaData();
+            setField(provider, "multiprocess", component.multiprocess());
+            setField(provider, "initOrder", component.initOrder());
+            setField(provider, "isSyncable", component.syncable());
+            List<ProviderPathRule> pathRules = component.providerPathRules().stream()
+                    .filter(rule -> !rule.uriGrantRule())
+                    .collect(java.util.stream.Collectors.toList());
+            if (!pathRules.isEmpty()) {
+                PathPermission[] pathPermissions = new PathPermission[pathRules.size()];
+                for (int index = 0; index < pathPermissions.length; index++) {
+                    ProviderPathRule rule = pathRules.get(index);
+                    int kind = rule.path().isEmpty()
+                            ? (rule.pathPrefix().isEmpty()
+                            ? PatternMatcher.PATTERN_SIMPLE_GLOB : PatternMatcher.PATTERN_PREFIX)
+                            : PatternMatcher.PATTERN_LITERAL;
+                    String pattern = rule.path().isEmpty()
+                            ? (rule.pathPrefix().isEmpty() ? rule.pathPattern() : rule.pathPrefix())
+                            : rule.path();
+                    pathPermissions[index] = new PathPermission(pattern, kind,
+                            rule.readPermission(), rule.writePermission());
+                }
+                provider.pathPermissions = pathPermissions;
+            }
         }
         return info;
     }

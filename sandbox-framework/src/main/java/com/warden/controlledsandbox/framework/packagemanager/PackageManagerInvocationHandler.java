@@ -215,9 +215,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 return metadata.adaptCollection(universe.installedPackages(identity.packageName(),
                         firstLong(args, ~0L)), returnType);
             case "getPackagesHoldingPermissions":
-                return metadata.adaptCollection(holdsAnyPermission(args)
-                        ? Collections.singletonList(metadata.packageInfo(firstLong(args, 0x1000L)))
-                        : Collections.emptyList(), returnType);
+                return metadata.adaptCollection(universe.packagesHoldingPermissions(identity.packageName(),
+                                firstStringArray(args), firstLong(args, 0x1000L)), returnType);
             case "getInstalledApplications": {
                 long flags = firstLong(args, 0L);
                 return metadata.adaptCollection(universe.installedApplications(identity.packageName(), flags),
@@ -583,6 +582,12 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
             }
         }
         return false;
+    }
+
+    private static String[] firstStringArray(Object[] args) {
+        if (args == null) return null;
+        for (Object arg : args) if (arg instanceof String[]) return (String[]) arg;
+        return null;
     }
 
     private Object installSourceInfo(Class<?> returnType) {

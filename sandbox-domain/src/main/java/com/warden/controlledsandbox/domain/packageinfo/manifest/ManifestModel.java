@@ -11,6 +11,15 @@ public final class ManifestModel {
     private String packageName = "";
     private String applicationClass = "";
     private String applicationPermission = "";
+    private String applicationProcessName = "";
+    private String applicationComponentFactory = "";
+    private boolean applicationDebuggable;
+    private boolean applicationDirectBootAware;
+    private boolean applicationExtractNativeLibs = true;
+    private boolean applicationUsesCleartextTraffic = true;
+    private boolean applicationLargeHeap;
+    private boolean applicationHardwareAccelerated = true;
+    private int applicationNetworkSecurityConfigResId;
     private String splitName = "";
     private String configForSplit = "";
     private String usesSplit = "";
@@ -37,6 +46,26 @@ public final class ManifestModel {
     public String applicationClass() { return applicationClass; }
     public void applicationClass(String value) { applicationClass = resolveClassName(value); }
     public String applicationPermission() { return applicationPermission; }
+    public String applicationProcessName() { return applicationProcessName; }
+    public void applicationProcessName(String value) { applicationProcessName = normalize(value); }
+    public String applicationComponentFactory() { return applicationComponentFactory; }
+    public void applicationComponentFactory(String value) { applicationComponentFactory = normalize(value); }
+    public boolean applicationDebuggable() { return applicationDebuggable; }
+    public void applicationDebuggable(boolean value) { applicationDebuggable = value; }
+    public boolean applicationDirectBootAware() { return applicationDirectBootAware; }
+    public void applicationDirectBootAware(boolean value) { applicationDirectBootAware = value; }
+    public boolean applicationExtractNativeLibs() { return applicationExtractNativeLibs; }
+    public void applicationExtractNativeLibs(boolean value) { applicationExtractNativeLibs = value; }
+    public boolean applicationUsesCleartextTraffic() { return applicationUsesCleartextTraffic; }
+    public void applicationUsesCleartextTraffic(boolean value) { applicationUsesCleartextTraffic = value; }
+    public boolean applicationLargeHeap() { return applicationLargeHeap; }
+    public void applicationLargeHeap(boolean value) { applicationLargeHeap = value; }
+    public boolean applicationHardwareAccelerated() { return applicationHardwareAccelerated; }
+    public void applicationHardwareAccelerated(boolean value) { applicationHardwareAccelerated = value; }
+    public int applicationNetworkSecurityConfigResId() { return applicationNetworkSecurityConfigResId; }
+    public void applicationNetworkSecurityConfigResId(int value) {
+        applicationNetworkSecurityConfigResId = Math.max(0, value);
+    }
     public String splitName() { return splitName; }
     public void splitName(String value) { splitName = normalize(value); }
     public String configForSplit() { return configForSplit; }
@@ -338,6 +367,12 @@ public final class ManifestModel {
         private float maxAspectRatio;
         private float minAspectRatio;
         private boolean supportsPictureInPicture;
+        private int foregroundServiceType;
+        private boolean stopWithTask;
+        private boolean directBootAware;
+        private boolean multiprocess;
+        private int initOrder;
+        private boolean syncable;
 
         public Component(String className, String processName, boolean exported, boolean enabled,
                          boolean isolatedProcess) {
@@ -451,6 +486,18 @@ public final class ManifestModel {
         public void minAspectRatio(float value) { minAspectRatio = Math.max(0f, value); }
         public boolean supportsPictureInPicture() { return supportsPictureInPicture; }
         public void supportsPictureInPicture(boolean value) { supportsPictureInPicture = value; }
+        public int foregroundServiceType() { return foregroundServiceType; }
+        public void foregroundServiceType(int value) { foregroundServiceType = Math.max(0, value); }
+        public boolean stopWithTask() { return stopWithTask; }
+        public void stopWithTask(boolean value) { stopWithTask = value; }
+        public boolean directBootAware() { return directBootAware; }
+        public void directBootAware(boolean value) { directBootAware = value; }
+        public boolean multiprocess() { return multiprocess; }
+        public void multiprocess(boolean value) { multiprocess = value; }
+        public int initOrder() { return initOrder; }
+        public void initOrder(int value) { initOrder = Math.max(0, value); }
+        public boolean syncable() { return syncable; }
+        public void syncable(boolean value) { syncable = value; }
 
         /**
          * Android package parsing exposes one component record even when an APK
@@ -515,6 +562,12 @@ public final class ManifestModel {
             if (maxAspectRatio == 0f) maxAspectRatio = other.maxAspectRatio;
             if (minAspectRatio == 0f) minAspectRatio = other.minAspectRatio;
             supportsPictureInPicture |= other.supportsPictureInPicture;
+            if (foregroundServiceType == 0) foregroundServiceType = other.foregroundServiceType;
+            stopWithTask |= other.stopWithTask;
+            directBootAware |= other.directBootAware;
+            multiprocess |= other.multiprocess;
+            if (initOrder == 0) initOrder = other.initOrder;
+            syncable |= other.syncable;
         }
 
         private void mergeIntentFilter(IntentFilter other) {

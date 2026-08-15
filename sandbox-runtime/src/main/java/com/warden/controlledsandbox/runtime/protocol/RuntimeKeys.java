@@ -181,6 +181,8 @@ public final class RuntimeKeys {
     public static final String PROVIDER_SELECTION_ARGS = "providerSelectionArgs";
     public static final String PROVIDER_SORT_ORDER = "providerSortOrder";
     public static final String PROVIDER_VALUES = "providerValues";
+    public static final String PROVIDER_BULK_VALUE_COUNT = "providerBulkValueCount";
+    public static final String PROVIDER_BULK_VALUE_PREFIX = "providerBulkValue.";
     public static final String PROVIDER_EXPORTED = "providerExported";
     public static final String PROVIDER_METHOD = "providerMethod";
     public static final String PROVIDER_ARGUMENT = "providerArgument";
@@ -236,6 +238,8 @@ public final class RuntimeKeys {
     public static final String CURSOR_TTL_MS = "cursorTtlMs";
     public static final String CURSOR_OWNER_SESSION_ID = "cursorOwnerSessionId";
     public static final String CURSOR_OWNER_GENERATION = "cursorOwnerGeneration";
+    public static final String CURSOR_EXTRAS = "cursorExtras";
+    public static final String CURSOR_NOTIFICATION_URI = "cursorNotificationUri";
     public static final String CURSOR_ROW_PREFIX = "cursorRow.";
 
     private RuntimeKeys() { }

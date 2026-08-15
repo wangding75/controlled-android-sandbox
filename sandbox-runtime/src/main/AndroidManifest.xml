@@ -34,6 +34,38 @@
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService29" android:exported="false" android:process=":guest29" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService30" android:exported="false" android:process=":guest30" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService31" android:exported="false" android:process=":guest31" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService32" android:exported="false" android:process=":guest32" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService33" android:exported="false" android:process=":guest33" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService34" android:exported="false" android:process=":guest34" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService35" android:exported="false" android:process=":guest35" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService36" android:exported="false" android:process=":guest36" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService37" android:exported="false" android:process=":guest37" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService38" android:exported="false" android:process=":guest38" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService39" android:exported="false" android:process=":guest39" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService40" android:exported="false" android:process=":guest40" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService41" android:exported="false" android:process=":guest41" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService42" android:exported="false" android:process=":guest42" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService43" android:exported="false" android:process=":guest43" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService44" android:exported="false" android:process=":guest44" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService45" android:exported="false" android:process=":guest45" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService46" android:exported="false" android:process=":guest46" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService47" android:exported="false" android:process=":guest47" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService48" android:exported="false" android:process=":guest48" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService49" android:exported="false" android:process=":guest49" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService50" android:exported="false" android:process=":guest50" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService51" android:exported="false" android:process=":guest51" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService52" android:exported="false" android:process=":guest52" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService53" android:exported="false" android:process=":guest53" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService54" android:exported="false" android:process=":guest54" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService55" android:exported="false" android:process=":guest55" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService56" android:exported="false" android:process=":guest56" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService57" android:exported="false" android:process=":guest57" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService58" android:exported="false" android:process=":guest58" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService59" android:exported="false" android:process=":guest59" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService60" android:exported="false" android:process=":guest60" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService61" android:exported="false" android:process=":guest61" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService62" android:exported="false" android:process=":guest62" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService63" android:exported="false" android:process=":guest63" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService0" android:exported="false" android:process=":guest0" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService1" android:exported="false" android:process=":guest1" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService2" android:exported="false" android:process=":guest2" android:stopWithTask="false" />
@@ -66,6 +98,38 @@
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService29" android:exported="false" android:process=":guest29" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService30" android:exported="false" android:process=":guest30" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService31" android:exported="false" android:process=":guest31" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService32" android:exported="false" android:process=":guest32" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService33" android:exported="false" android:process=":guest33" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService34" android:exported="false" android:process=":guest34" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService35" android:exported="false" android:process=":guest35" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService36" android:exported="false" android:process=":guest36" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService37" android:exported="false" android:process=":guest37" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService38" android:exported="false" android:process=":guest38" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService39" android:exported="false" android:process=":guest39" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService40" android:exported="false" android:process=":guest40" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService41" android:exported="false" android:process=":guest41" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService42" android:exported="false" android:process=":guest42" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService43" android:exported="false" android:process=":guest43" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService44" android:exported="false" android:process=":guest44" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService45" android:exported="false" android:process=":guest45" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService46" android:exported="false" android:process=":guest46" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService47" android:exported="false" android:process=":guest47" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService48" android:exported="false" android:process=":guest48" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService49" android:exported="false" android:process=":guest49" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService50" android:exported="false" android:process=":guest50" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService51" android:exported="false" android:process=":guest51" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService52" android:exported="false" android:process=":guest52" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService53" android:exported="false" android:process=":guest53" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService54" android:exported="false" android:process=":guest54" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService55" android:exported="false" android:process=":guest55" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService56" android:exported="false" android:process=":guest56" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService57" android:exported="false" android:process=":guest57" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService58" android:exported="false" android:process=":guest58" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService59" android:exported="false" android:process=":guest59" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService60" android:exported="false" android:process=":guest60" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService61" android:exported="false" android:process=":guest61" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService62" android:exported="false" android:process=":guest62" android:stopWithTask="false" />
+        <service android:name="com.warden.controlledsandbox.runtime.component.service.StubService63" android:exported="false" android:process=":guest63" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService0" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService1" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService2" android:exported="false" android:isolatedProcess="true" android:stopWithTask="false" />
@@ -102,6 +166,38 @@
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity29" android:exported="false" android:process=":guest29" android:theme="@style/ControlledSandbox.Stub" />
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity30" android:exported="false" android:process=":guest30" android:theme="@style/ControlledSandbox.Stub" />
         <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity31" android:exported="false" android:process=":guest31" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity32" android:exported="false" android:process=":guest32" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity33" android:exported="false" android:process=":guest33" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity34" android:exported="false" android:process=":guest34" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity35" android:exported="false" android:process=":guest35" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity36" android:exported="false" android:process=":guest36" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity37" android:exported="false" android:process=":guest37" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity38" android:exported="false" android:process=":guest38" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity39" android:exported="false" android:process=":guest39" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity40" android:exported="false" android:process=":guest40" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity41" android:exported="false" android:process=":guest41" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity42" android:exported="false" android:process=":guest42" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity43" android:exported="false" android:process=":guest43" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity44" android:exported="false" android:process=":guest44" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity45" android:exported="false" android:process=":guest45" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity46" android:exported="false" android:process=":guest46" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity47" android:exported="false" android:process=":guest47" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity48" android:exported="false" android:process=":guest48" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity49" android:exported="false" android:process=":guest49" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity50" android:exported="false" android:process=":guest50" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity51" android:exported="false" android:process=":guest51" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity52" android:exported="false" android:process=":guest52" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity53" android:exported="false" android:process=":guest53" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity54" android:exported="false" android:process=":guest54" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity55" android:exported="false" android:process=":guest55" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity56" android:exported="false" android:process=":guest56" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity57" android:exported="false" android:process=":guest57" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity58" android:exported="false" android:process=":guest58" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity59" android:exported="false" android:process=":guest59" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity60" android:exported="false" android:process=":guest60" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity61" android:exported="false" android:process=":guest61" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity62" android:exported="false" android:process=":guest62" android:theme="@style/ControlledSandbox.Stub" />
+        <activity android:name="com.warden.controlledsandbox.runtime.component.activity.StubActivity63" android:exported="false" android:process=":guest63" android:theme="@style/ControlledSandbox.Stub" />
         <provider android:name="com.warden.controlledsandbox.runtime.diagnostics.RuntimeInitProvider" android:authorities="${applicationId}.controlledsandbox.runtime" android:exported="false" android:initOrder="90" />
     </application>
 </manifest>

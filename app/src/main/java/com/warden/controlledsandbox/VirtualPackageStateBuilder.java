@@ -11,6 +11,7 @@ import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
@@ -131,7 +132,7 @@ final class VirtualPackageStateBuilder {
                 "com.warden.virtualinstaller", record.splitNames(),
                 new ArrayList<>(set.sharedLibraries), librarySnapshots, instrumentationSnapshots,
                 queries,
-                components, permissions, appOps);
+                components, permissions, appOps, applicationInfoTemplate(record, set));
     }
 
     static boolean effectivePackageEnabled(String state) {
@@ -197,6 +198,17 @@ final class VirtualPackageStateBuilder {
             if (artifact.base()) {
                 set.applicationClass = manifest.applicationClass();
                 set.launcherActivity = manifest.launcherActivity();
+                set.applicationProcessName = manifest.applicationProcessName();
+                set.applicationComponentFactory = manifest.applicationComponentFactory();
+                set.applicationDebuggable = manifest.applicationDebuggable();
+                set.applicationDirectBootAware = manifest.applicationDirectBootAware();
+                set.applicationExtractNativeLibs = manifest.applicationExtractNativeLibs();
+                set.applicationUsesCleartextTraffic = manifest.applicationUsesCleartextTraffic();
+                set.applicationLargeHeap = manifest.applicationLargeHeap();
+                set.applicationHardwareAccelerated = manifest.applicationHardwareAccelerated();
+                set.applicationNetworkSecurityConfigResId = manifest.applicationNetworkSecurityConfigResId();
+                set.minSdk = manifest.minSdk();
+                set.targetSdk = manifest.targetSdk();
             } else if (set.launcherActivity.isEmpty() && !manifest.launcherActivity().isEmpty()) {
                 set.launcherActivity = manifest.launcherActivity();
             }
@@ -344,7 +356,9 @@ final class VirtualPackageStateBuilder {
                     component.finishOnTaskLaunch(), component.clearTaskOnLaunch(),
                     component.alwaysRetainTaskState(), component.allowTaskReparenting(),
                     component.resizeMode(), component.maxAspectRatio(), component.minAspectRatio(),
-                    component.supportsPictureInPicture()));
+                    component.supportsPictureInPicture(), component.foregroundServiceType(),
+                    component.stopWithTask(), component.directBootAware(), component.multiprocess(),
+                    component.initOrder(), component.syncable()));
         }
     }
 
@@ -365,6 +379,11 @@ final class VirtualPackageStateBuilder {
 
     private static final class ManifestSet {
         String packageName = ""; String applicationClass = ""; String launcherActivity = "";
+        String applicationProcessName = ""; String applicationComponentFactory = "";
+        boolean applicationDebuggable; boolean applicationDirectBootAware;
+        boolean applicationExtractNativeLibs = true; boolean applicationUsesCleartextTraffic = true;
+        boolean applicationLargeHeap; boolean applicationHardwareAccelerated = true;
+        int applicationNetworkSecurityConfigResId; int minSdk; int targetSdk;
         final List<ManifestModel.Component> activities = new ArrayList<>();
         final List<ManifestModel.Component> services = new ArrayList<>();
         final List<ManifestModel.Component> receivers = new ArrayList<>();
@@ -382,5 +401,53 @@ final class VirtualPackageStateBuilder {
             values.addAll(activities); values.addAll(services); values.addAll(receivers); values.addAll(providers);
             return values;
         }
+    }
+
+    private static ApplicationInfo applicationInfoTemplate(SandboxRecord record, ManifestSet set) {
+        ApplicationInfo info = new ApplicationInfo();
+        info.packageName = record.packageName;
+        info.name = set.applicationClass.isEmpty() ? null : set.applicationClass;
+        info.processName = applicationProcessName(record.packageName, set.applicationProcessName);
+        info.sourceDir = baseArtifactPath(record);
+        info.publicSourceDir = info.sourceDir;
+        info.minSdkVersion = set.minSdk;
+        info.targetSdkVersion = set.targetSdk;
+        info.flags = ApplicationInfo.FLAG_HAS_CODE;
+        if (set.applicationDebuggable) info.flags |= ApplicationInfo.FLAG_DEBUGGABLE;
+        if (set.applicationLargeHeap) info.flags |= ApplicationInfo.FLAG_LARGE_HEAP;
+        if (set.applicationHardwareAccelerated) info.flags |= ApplicationInfo.FLAG_HARDWARE_ACCELERATED;
+        if (set.applicationExtractNativeLibs) info.flags |= ApplicationInfo.FLAG_EXTRACT_NATIVE_LIBS;
+        if (set.applicationUsesCleartextTraffic) info.flags |= ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC;
+        info.appComponentFactory = set.applicationComponentFactory;
+        setOptionalApplicationField(info, "directBootAware", set.applicationDirectBootAware);
+        info.enabled = true;
+        setOptionalApplicationField(info, "networkSecurityConfigRes",
+                set.applicationNetworkSecurityConfigResId);
+        return info;
+    }
+
+    private static String applicationProcessName(String packageName, String declared) {
+        if (declared == null || declared.trim().isEmpty()) return packageName;
+        return declared.startsWith(":") ? packageName + declared : declared;
+    }
+
+    private static void setOptionalApplicationField(ApplicationInfo info, String name, Object value) {
+        try {
+            java.lang.reflect.Field field = ApplicationInfo.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(info, value);
+        } catch (NoSuchFieldException ignored) {
+            // API 32 compile stubs omit some API 33+ fields; the runtime parser projection
+            // supplies them when the platform exposes them.
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Optional metadata must not make an otherwise valid virtual package unloadable.
+        }
+    }
+
+    private static String baseArtifactPath(SandboxRecord record) {
+        for (PackageArtifactRecord artifact : record.artifacts) {
+            if (artifact.base()) return artifact.path;
+        }
+        return record.apkPath;
     }
 }

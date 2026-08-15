@@ -8,6 +8,7 @@ import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.contract.NativeGuestPolicyContract;
+import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -67,7 +68,9 @@ public final class GuestPackageSpec {
         virtualUid = bundle.getInt(RuntimeKeys.VIRTUAL_UID, -1);
         if (virtualUid < 0) throw new IllegalArgumentException("virtualUid must be non-negative");
         processSlot = bundle.getInt(RuntimeKeys.PROCESS_SLOT, -1);
-        if (processSlot < 0 || processSlot > 31) throw new IllegalArgumentException("processSlot out of range");
+        if (!ProcessSlotContract.isOrdinarySlot(processSlot)) {
+            throw new IllegalArgumentException("processSlot out of range");
+        }
         processName = bundle.getString(RuntimeKeys.PROCESS_NAME, packageName);
         if (processName == null || processName.trim().isEmpty()) throw new IllegalArgumentException("processName is required");
         apkPath = required(bundle, RuntimeKeys.APK_PATH);

@@ -244,8 +244,19 @@ final class RuntimeClient implements AutoCloseable {
                         + unavailableForUser.getClass().getSimpleName());
                 continue;
             }
+            android.content.pm.ApplicationInfo parsedApplicationInfo = null;
+            try {
+                android.content.pm.PackageInfo packageInfo = context.getPackageManager()
+                        .getPackageArchiveInfo(record.apkPath, android.content.pm.PackageManager.GET_META_DATA);
+                if (packageInfo != null && packageInfo.applicationInfo != null) {
+                    parsedApplicationInfo = new android.content.pm.ApplicationInfo(packageInfo.applicationInfo);
+                }
+            } catch (RuntimeException ignored) {
+                // The package authority state remains authoritative if the platform parser
+                // cannot read an optional projection APK on this device image.
+            }
             result.add(new VirtualPackageProjectionSnapshot(state, record.apkPath,
-                    record.nativeLibraryDir, nextUid++));
+                    record.nativeLibraryDir, nextUid++, parsedApplicationInfo));
         }
         return result;
     }
