@@ -24,5 +24,12 @@ final class FixtureNative {
         if (filesDir == null) return "JNI_INVALID_FILES_DIR";
         return nativeProbe(new File(filesDir, "native-probe.txt").getAbsolutePath());
     }
+
+    static void crash(String mode) {
+        if (!AVAILABLE) throw new IllegalStateException(loadStatus());
+        nativeCrash(mode == null ? "segv" : mode);
+    }
+
     private static native String nativeProbe(String path);
+    private static native void nativeCrash(String mode);
 }

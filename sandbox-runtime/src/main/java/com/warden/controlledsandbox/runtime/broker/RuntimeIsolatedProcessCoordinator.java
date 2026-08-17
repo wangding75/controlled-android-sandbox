@@ -101,6 +101,8 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     private final ConcurrentMap<Integer, IsolatedConnection> connections = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> capabilities = new ConcurrentHashMap<>();
     private final RuntimeIsolatedPeerRegistry peerRegistry = new RuntimeIsolatedPeerRegistry();
+    private final RuntimeOwnershipSweep ownershipSweep = new RuntimeOwnershipSweep(
+            new IsolatedOwnershipHooks());
 
     RuntimeIsolatedProcessCoordinator(Service host, BrokerStateStore brokerState, Clock clock,
             TokenGenerator tokenGenerator, InputValidator inputValidator, SpecFactory specFactory,
@@ -379,9 +381,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         } finally {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(),
                     original.processName()));
-            services.stopSession(original);
-            RuntimeSystemServiceCoordinator system = systemServices.get();
-            if (system != null) system.stop(original);
+            ownershipSweep.stop(original, "ISOLATED_SESSION_STOPPED");
             shareCleaner.accept(original);
             removeCapabilities(original.sessionId());
             releaseConnection(original.processSlot());
@@ -598,11 +598,10 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
             }
         }
         if (affected != null) {
+            ownershipSweep.death(affected, reason);
             removeCapabilities(affected.sessionId());
             brokerState.removePrepared(processKey(affected.packageName(), affected.virtualUserId(),
                     affected.processName()));
-            RuntimeSystemServiceCoordinator system = systemServices.get();
-            if (system != null) system.stop(affected);
             shareCleaner.accept(affected);
         }
         source.unlinkDeath();
@@ -773,6 +772,26 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
             if (token != null) {
                 try { token.unlinkToDeath(this, 0); } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
+        }
+    }
+
+    private final class IsolatedOwnershipHooks implements RuntimeOwnershipSweep.Hooks {
+        @Override public void sweepService(GuestSession session, RuntimeOwnershipGraph.Event event) {
+            if (event == RuntimeOwnershipGraph.Event.STOP) services.stopSession(session);
+            else services.disconnectSession(session);
+        }
+
+        @Override public void sweepSystemServiceCallback(GuestSession session) {
+            RuntimeSystemServiceCoordinator system = systemServices.get();
+            if (system != null) system.stop(session);
+        }
+
+        @Override public void revokeIsolatedPeer(GuestSession session) {
+            peerRegistry.revoke(session.sessionId(), session.generation());
+        }
+
+        @Override public void revokeNativeCapability(GuestSession session) {
+            capabilities.remove(capabilityKey(session));
         }
     }
 }

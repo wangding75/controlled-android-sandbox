@@ -69,6 +69,25 @@
             android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkActivityResultChildActivity"
             android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FaultJavaCrashActivity"
+            android:exported="true" android:process=":fault_java" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FaultMainThreadCrashActivity"
+            android:exported="true" android:process=":fault_main" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FaultAnrActivity"
+            android:exported="true" android:process=":fault_anr" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FaultNativeCrashActivity"
+            android:exported="true" android:process=":fault_native" />
+        <activity android:name="com.warden.controlledsandbox.fixture.FaultNativeAbortActivity"
+            android:exported="true" android:process=":fault_abort" />
+        <service android:name="com.warden.controlledsandbox.fixture.FaultCrashService"
+            android:exported="true" android:process=":fault_svc" />
+        <service android:name="com.warden.controlledsandbox.fixture.FaultAnrService"
+            android:exported="true" android:process=":fault_anr_svc" />
+        <provider
+            android:name="com.warden.controlledsandbox.fixture.FaultAnrProvider"
+            android:authorities="${applicationId}.fault.anr"
+            android:exported="false"
+            android:process=":fault_anr_provider" />
         <activity android:name="com.warden.controlledsandbox.fixture.RecoveryServiceKickoffActivity"
             android:exported="false" android:noHistory="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.ForegroundServiceKickoffActivity"
@@ -84,6 +103,10 @@
         </service>
         <service android:name="com.warden.controlledsandbox.fixture.RemoteFixtureService" android:exported="false" android:process=":remote" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
+        <service android:name="com.warden.controlledsandbox.fixture.IsolatedFaultNativeService"
+            android:exported="true"
+            android:isolatedProcess="true"
+            android:process=":fault_iso_native" />
         <service android:name="com.warden.controlledsandbox.fixture.FixtureJobService"
             android:exported="true" android:permission="android.permission.BIND_JOB_SERVICE" />
         <receiver android:name="com.warden.controlledsandbox.fixture.FixtureReceiver" android:exported="true">

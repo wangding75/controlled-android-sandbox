@@ -87,6 +87,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     private RuntimePermissionCoordinator runtimePermissionCoordinator;
     RuntimeSystemServiceCoordinator systemServiceCoordinator;
     RuntimeComponentRecoveryCoordinator componentRecoveryCoordinator;
+    RuntimeOwnershipSweep ownershipSweep;
     final UriGrantRegistry uriGrants = new UriGrantRegistry();
     final BrokerStateStore brokerState = new BrokerStateStore();
     final RuntimeIsolatedShareManager isolatedShares =
@@ -170,6 +171,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         componentRecoveryCoordinator = new RuntimeComponentRecoveryCoordinator(
                 sessions, clock, activityRuntime, serviceCoordinator, receiverCoordinator,
                 providerResources, systemServiceCoordinator);
+        ownershipSweep = new RuntimeOwnershipSweep(new OrdinaryOwnershipHooks());
         RuntimePeerPolicy.installIsolatedPeerRegistry(isolatedProcessCoordinator.peerRegistry());
     }
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
@@ -1141,20 +1143,11 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         GuestSession affected;
         synchronized (this) {
             affected = sessions.markSlotDisconnected(slot, now(), reason);
-            if (affected != null) {
-                activityRuntime.processDisconnected(affected);
-                serviceCoordinator.disconnectSession(affected);
-                receiverCoordinator.disconnectSession(affected,
-                        "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + reason);
-                crossAbiProviderRelay.invalidateCaller(affected.packageName(),
-                        affected.virtualUserId(), affected.sessionId(), affected.generation());
-                RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
-                        sessionBundle(affected, affected.state().name()));
-            }
         }
-        if (affected != null) {
-            providerResources.disconnectSession(affected);
-        }
+        if (affected == null) return;
+        if (ownershipSweep != null) ownershipSweep.death(affected, reason);
+        RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
+                sessionBundle(affected, affected.state().name()));
     }
 
     GuestSession findSession(String sessionId, long generation) {
@@ -1172,9 +1165,13 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
 
     @Override public void onDestroy() {
         for (GuestSession session : sessions.snapshot()) {
-            receiverCoordinator.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
-            serviceCoordinator.stopSession(session);
-            providerResources.stopSession(session);
+            if (ownershipSweep != null) {
+                ownershipSweep.stop(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
+            } else {
+                receiverCoordinator.stopSession(session, "ORDERED_RECEIVER_BROKER_DESTROYED");
+                serviceCoordinator.stopSession(session);
+                providerResources.stopSession(session);
+            }
         }
         if (guestConnections != null) guestConnections.close();
         receiverCoordinator.invalidateAll("ORDERED_RECEIVER_BROKER_DESTROYED");
@@ -1210,6 +1207,56 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         VirtualUidRegistry registry = virtualUids;
         if (registry == null) throw new IllegalStateException("VIRTUAL_UID_REGISTRY_NOT_INITIALIZED");
         return registry;
+    }
+
+    private final class OrdinaryOwnershipHooks implements RuntimeOwnershipSweep.Hooks {
+        @Override public void sweepActivity(GuestSession session, RuntimeOwnershipGraph.Event event) {
+            if (event == RuntimeOwnershipGraph.Event.STOP
+                    || event == RuntimeOwnershipGraph.Event.RECOVERY_FAILED) {
+                activityRuntime.invalidate(session);
+            } else {
+                activityRuntime.processDisconnected(session);
+            }
+        }
+
+        @Override public void sweepService(GuestSession session, RuntimeOwnershipGraph.Event event) {
+            if (event == RuntimeOwnershipGraph.Event.STOP) serviceCoordinator.stopSession(session);
+            else serviceCoordinator.disconnectSession(session);
+        }
+
+        @Override public void sweepReceiver(GuestSession session, RuntimeOwnershipGraph.Event event,
+                                            String reason) {
+            String token = reason == null || reason.isEmpty()
+                    ? "ORDERED_RECEIVER_GUEST_DISCONNECTED" : reason;
+            if (event == RuntimeOwnershipGraph.Event.STOP) {
+                receiverCoordinator.stopSession(session, token);
+            } else {
+                receiverCoordinator.disconnectSession(session,
+                        token.startsWith("ORDERED_RECEIVER_")
+                                ? token : "ORDERED_RECEIVER_GUEST_DISCONNECTED:" + token);
+            }
+        }
+
+        @Override public void sweepProviderLease(GuestSession session,
+                                                 RuntimeOwnershipGraph.Event event) {
+            crossAbiProviderRelay.invalidateCaller(session.packageName(), session.virtualUserId(),
+                    session.sessionId(), session.generation());
+            if (event == RuntimeOwnershipGraph.Event.STOP) providerResources.stopSession(session);
+            else providerResources.disconnectSession(session);
+        }
+
+        @Override public void revokeProviderGrant(GuestSession session) {
+            providerResources.stopSession(session);
+        }
+
+        @Override public void sweepSystemServiceCallback(GuestSession session) {
+            if (systemServiceCoordinator != null) systemServiceCoordinator.stop(session);
+        }
+
+        @Override public void revokeIsolatedPeer(GuestSession session) {
+            isolatedProcessCoordinator.peerRegistry()
+                    .revoke(session.sessionId(), session.generation());
+        }
     }
 
     static boolean isPrepared(Bundle bundle) {

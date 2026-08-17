@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -43,4 +44,22 @@ Java_com_warden_controlledsandbox_fixture_FixtureNative_nativeProbe(
     status += self != nullptr ? ";DLOPEN_OK" : ";DLOPEN_FAIL";
     if (self != nullptr) dlclose(self);
     return env->NewStringUTF(status.c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_warden_controlledsandbox_fixture_FixtureNative_nativeCrash(
+        JNIEnv* env, jclass, jstring mode) {
+    std::string requested = "segv";
+    if (mode != nullptr) {
+        const char* raw = env->GetStringUTFChars(mode, nullptr);
+        if (raw != nullptr) {
+            requested = raw;
+            env->ReleaseStringUTFChars(mode, raw);
+        }
+    }
+    if (requested == "abort") {
+        abort();
+    }
+    volatile int* dead = nullptr;
+    *dead = 0x434153;
 }

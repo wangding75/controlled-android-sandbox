@@ -166,6 +166,22 @@ final class RuntimeClient implements AutoCloseable {
     Bundle sendBroadcast(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.SEND_BROADCAST, record.receiverClass, record.receiverProcess, record.receiverAction, ""); }
     Bundle prepareProvider(SandboxRecord record) throws Exception { return prepareProvider(record, 0); }
     Bundle prepareProvider(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.PREPARE_PROVIDER, record.providerClass, record.providerProcess, "", record.providerAuthority); }
+    Bundle prepareProvider(SandboxRecord record, int virtualUserId, String component,
+                           String authority) throws Exception {
+        return component(record, virtualUserId, ComponentOperations.PREPARE_PROVIDER,
+                component, "", "", authority);
+    }
+    Bundle queryProvider(SandboxRecord record, int virtualUserId, String component,
+                         String authority) throws Exception {
+        String resolvedAuthority = (authority == null || authority.trim().isEmpty())
+                ? record.providerAuthority : authority.trim();
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.PROVIDER_QUERY,
+                component, "", "", resolvedAuthority);
+        request.putString(RuntimeKeys.URI, "content://" + resolvedAuthority + "/rows?stall=anr");
+        request.putString(RuntimeKeys.PROVIDER_SELECTION, "cas.anr");
+        request.putString(RuntimeKeys.CURSOR_TOKEN, "p2a-anr-" + UUID.randomUUID());
+        return invoke(record, virtualUserId, request);
+    }
     void stop(SandboxRecord record) throws Exception { stop(record, 0); }
     void stop(SandboxRecord record, int virtualUserId) throws Exception {
         if (companionRoute(record)) nativeCompanion.stopGuest(record, virtualUserId);

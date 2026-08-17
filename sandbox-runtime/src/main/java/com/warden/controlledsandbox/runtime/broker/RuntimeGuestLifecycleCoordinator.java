@@ -268,13 +268,19 @@ final class RuntimeGuestLifecycleCoordinator {
         } finally {
             owner.brokerState.removePrepared(RuntimeBrokerService.processKey(
                     original.packageName(), original.virtualUserId(), original.processName()));
-            owner.receiverCoordinator.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
-            owner.activityRuntime.invalidate(original);
-            owner.serviceCoordinator.stopSession(original);
-            owner.providerResources.stopSession(original);
-            owner.crossAbiProviderRelay.invalidateCaller(original.packageName(),
-                    original.virtualUserId(), original.sessionId(), original.generation());
-            if (owner.systemServiceCoordinator != null) owner.systemServiceCoordinator.stop(original);
+            if (owner.ownershipSweep != null) {
+                owner.ownershipSweep.stop(original, "ORDERED_RECEIVER_SESSION_STOPPED");
+            } else {
+                owner.receiverCoordinator.stopSession(original, "ORDERED_RECEIVER_SESSION_STOPPED");
+                owner.activityRuntime.invalidate(original);
+                owner.serviceCoordinator.stopSession(original);
+                owner.providerResources.stopSession(original);
+                owner.crossAbiProviderRelay.invalidateCaller(original.packageName(),
+                        original.virtualUserId(), original.sessionId(), original.generation());
+                if (owner.systemServiceCoordinator != null) {
+                    owner.systemServiceCoordinator.stop(original);
+                }
+            }
             owner.releaseGuestConnection(original.processSlot());
         }
         if (stopFailure != null) {

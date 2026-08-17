@@ -261,6 +261,51 @@ public final class DebugCommandActivity extends Activity {
                 result.put("slotPadCount", slotPad);
                 result.put("slotTarget", slotTarget);
                 result.put("processName", processName);
+            } else if ("fault-probe".equals(command)) {
+                String mode = extras.getString("mode", "").trim().toLowerCase(java.util.Locale.ROOT);
+                operation = runtime.prepare(record, virtualUserId);
+                requireStatus("fault-prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "ALREADY_PREPARED_DEGRADED");
+                result.put("generationBefore", operation.getLong(RuntimeKeys.GENERATION, -1L));
+                result.put("slotBefore", operation.getInt(RuntimeKeys.PROCESS_SLOT, -1));
+                if ("java".equals(mode) || "uncaught".equals(mode)) {
+                    operation = runtime.launchComponent(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultJavaCrashActivity");
+                } else if ("main".equals(mode)) {
+                    operation = runtime.launchComponent(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultMainThreadCrashActivity");
+                } else if ("service".equals(mode)) {
+                    operation = runtime.startService(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultCrashService",
+                            extras.getString("processName", "").trim());
+                } else if ("anr-activity".equals(mode)) {
+                    operation = runtime.launchComponent(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultAnrActivity");
+                } else if ("anr-service".equals(mode)) {
+                    operation = runtime.startService(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultAnrService", "");
+                } else if ("anr-provider".equals(mode)) {
+                    runtime.prepareProvider(record, virtualUserId);
+                    operation = runtime.queryProvider(record, virtualUserId,
+                            extras.getString("component",
+                                    "com.warden.controlledsandbox.fixture.FixtureProvider"),
+                            extras.getString("authority", record.providerAuthority));
+                } else if ("native-segv".equals(mode) || "segv".equals(mode)) {
+                    operation = runtime.launchComponent(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultNativeCrashActivity");
+                } else if ("native-abort".equals(mode) || "abort".equals(mode)) {
+                    operation = runtime.launchComponent(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.FaultNativeAbortActivity");
+                } else if ("isolated-native-segv".equals(mode) || "isolated-native-abort".equals(mode)) {
+                    operation = runtime.startService(record, virtualUserId,
+                            "com.warden.controlledsandbox.fixture.IsolatedFaultNativeService",
+                            extras.getString("processName",
+                                    "com.warden.controlledsandbox.fixture:fault_iso_native").trim());
+                } else {
+                    throw new IllegalArgumentException("Unsupported fault mode: " + mode);
+                }
+                result.put("faultMode", mode);
+                result.put("faultOperation", bundleJson(operation));
             } else if ("pi-system-holder".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("pi-system-holder-prepare", operation, "PREPARED", "ALREADY_PREPARED",
