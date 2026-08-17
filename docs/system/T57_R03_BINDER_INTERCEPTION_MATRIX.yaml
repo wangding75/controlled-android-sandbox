@@ -1,0 +1,62 @@
+schema_version: 1
+campaign: T57-R03-P1F
+title: SystemService Binder interception
+classes:
+  A: Java dynamic proxy / InvocationHandler
+  B: typed Binder adapter / service-specific bridge
+  C: transaction-level Binder relay
+  D: kernel binder driver mediation
+services:
+  PackageManager:
+    mechanism: A
+    class: PackageManagerInvocationHandler
+    hidden_api: low
+    class_presence: IPackageManager always present
+    api_drift: method-name switch
+    parcel: ApplicationPackageManager
+    callback: none
+    keep: true
+    reason: Visibility/query surface is already typed above the proxy.
+  Alarm/Notification/Job/Account/Clipboard/Settings/UsageStats/Shortcut/AppWidget:
+    mechanism: B
+    class: VirtualSystemServiceAuthority
+    hidden_api: low
+    keep: true
+    reason: State already lives in the shared store, not a Hook Map.
+  Settings provider identity:
+    mechanism: A
+    class: SettingsProviderIdentityHook
+    keep: true
+    reason: No API-drift failure proven in P1E.
+  ServiceManager:
+    mechanism: A
+    class: ServiceManagerBinderHook
+    keep: true
+  Reflective generic services:
+    mechanism: A
+    class: ReflectiveServiceHook
+    keep: true
+    reason: Decision rule not met for a blanket typed-adapter rewrite.
+  InputManager:
+    mechanism: A
+    class: InputManagerServiceHook
+    keep: true
+  Camera user callbacks:
+    mechanism: A
+    class: PeripheralCameraInvocationHandler
+    keep: true
+  Binder driver /dev/binder:
+    mechanism: D
+    status: PARTIAL
+    classification: REQUIRES_PRIVILEGE
+    note: P1F does not add root/system binder driver hacks.
+va_pro_signals:
+  VA-604: compatibility_signal_only
+  VA-619: compatibility_signal_only
+  VA-629: compatibility_signal_only
+  VA-631: compatibility_signal_only
+  VA-683: compatibility_signal_only
+dynamic_proxy_count_production: 15
+migrated_this_campaign: 0
+decision: No service was migrated. Java Proxy remains where P1E did not prove
+  API drift, class absence, parcel instability, or callback/death failure.
