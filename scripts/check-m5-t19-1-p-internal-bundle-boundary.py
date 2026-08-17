@@ -99,7 +99,7 @@ else:
             encoding="utf-8")
         result = subprocess.run(
             ["javac", "--release", "17", "-cp", str(classes), str(source)],
-            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         if result.returncode == 0:
             errors.append("external package can compile against internal Bundle handler")
 

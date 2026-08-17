@@ -146,12 +146,8 @@ final class GuestNativeRuntimeProjection {
                 if (entry == null || entry.getMethod() != ZipEntry.STORED
                         || entry.getSize() != size) return "";
             }
-            try {
-                Files.move(temporary.toPath(), target.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
-                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
+            com.warden.controlledsandbox.domain.persistence.DurableAtomicFile.replacePrepared(
+                    temporary.toPath(), target.toPath());
             return target.getCanonicalPath();
         } catch (IOException | RuntimeException ignored) {
             try { Files.deleteIfExists(temporary.toPath()); } catch (IOException ignoredDelete) { }
