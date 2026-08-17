@@ -115,12 +115,12 @@
       "lines": 1367
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java",
-      "lines": 1283
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+      "lines": 1327
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
-      "lines": 1280
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java",
+      "lines": 1283
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
@@ -163,16 +163,20 @@
       "lines": 831
     },
     {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+      "lines": 797
+    },
+    {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java",
       "lines": 794
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
-      "lines": 778
-    },
-    {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceLifecycle.java",
       "lines": 754
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
+      "lines": 728
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
@@ -187,20 +191,16 @@
       "lines": 654
     },
     {
-      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
-      "lines": 645
-    },
-    {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderBatchRuntime.java",
       "lines": 641
     },
     {
-      "path": "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
-      "lines": 605
+      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
+      "lines": 610
     },
     {
-      "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
-      "lines": 598
+      "path": "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+      "lines": 605
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
@@ -241,6 +241,10 @@
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java",
       "lines": 522
+    },
+    {
+      "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java",
+      "lines": 520
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivitySlotVariants0.java",
