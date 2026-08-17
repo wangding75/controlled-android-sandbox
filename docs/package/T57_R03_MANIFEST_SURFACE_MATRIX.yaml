@@ -1,0 +1,95 @@
+schema_version: 1
+campaign: T57-R03-P1A
+title: Manifest / PackageParser typed surface
+rule: typed ManifestModel completeness, not unknown-attribute passthrough
+status_enum: [IMPLEMENTED, PARTIAL, MISSING, NOT_NEEDED_WITH_REASON, UNVERIFIED]
+surfaces:
+  root_application:
+    versionCode: IMPLEMENTED
+    versionName: IMPLEMENTED
+    compileSdk: IMPLEMENTED
+    minSdk: IMPLEMENTED
+    targetSdk: IMPLEMENTED
+    sharedUser: IMPLEMENTED
+    installLocation: IMPLEMENTED
+    isolatedSplits: IMPLEMENTED
+    extractNativeLibs: IMPLEMENTED
+    usesCleartextTraffic: IMPLEMENTED
+    networkSecurityConfig: IMPLEMENTED
+    appComponentFactory: IMPLEMENTED
+    backup_data_extraction: NOT_NEEDED_WITH_REASON
+    localeConfig: NOT_NEEDED_WITH_REASON
+    profileable: NOT_NEEDED_WITH_REASON
+    requestLegacyExternalStorage: NOT_NEEDED_WITH_REASON
+    preserveLegacyExternalStorage: NOT_NEEDED_WITH_REASON
+    nativeHeapZeroInitialized: NOT_NEEDED_WITH_REASON
+    enableOnBackInvokedCallback: NOT_NEEDED_WITH_REASON
+    allowCrossUidActivitySwitchFromBelow: NOT_NEEDED_WITH_REASON
+    knownActivityEmbeddingCerts: NOT_NEEDED_WITH_REASON
+    property: IMPLEMENTED
+  components:
+    exported: IMPLEMENTED
+    enabled: IMPLEMENTED
+    process: IMPLEMENTED
+    permission: IMPLEMENTED
+    directBootAware: IMPLEMENTED
+    isolatedProcess: IMPLEMENTED
+    foregroundServiceType: IMPLEMENTED
+    stopWithTask: IMPLEMENTED
+    launchMode: IMPLEMENTED
+    taskAffinity: IMPLEMENTED
+    documentLaunchMode: IMPLEMENTED
+    resizeable: IMPLEMENTED
+    supportsPictureInPicture: IMPLEMENTED
+    configChanges: IMPLEMENTED
+    screenOrientation: IMPLEMENTED
+    persistableMode: IMPLEMENTED
+    maxRecents: IMPLEMENTED
+    lockTaskMode: IMPLEMENTED
+    turnScreenOn: IMPLEMENTED
+    showWhenLocked: IMPLEMENTED
+    attributionTags: IMPLEMENTED
+    visibleToInstantApps: IMPLEMENTED
+  intent_filters:
+    action: IMPLEMENTED
+    category: IMPLEMENTED
+    scheme_host_port_path: IMPLEMENTED
+    pathPrefix: IMPLEMENTED
+    pathPattern: IMPLEMENTED
+    advancedPattern: IMPLEMENTED
+    pathSuffix: IMPLEMENTED
+    mimeType: IMPLEMENTED
+    mimeGroup: IMPLEMENTED
+    ssp: IMPLEMENTED
+    autoVerify: IMPLEMENTED
+    order: IMPLEMENTED
+    priority: IMPLEMENTED
+  package_level:
+    uses-permission: IMPLEMENTED
+    uses-feature: IMPLEMENTED
+    uses-configuration: NOT_NEEDED_WITH_REASON
+    uses-library: IMPLEMENTED
+    uses-native-library: IMPLEMENTED
+    queries: IMPLEMENTED
+    provider_grant_and_path_permission: IMPLEMENTED
+    instrumentation: IMPLEMENTED
+    permission: IMPLEMENTED
+    permission-group: IMPLEMENTED
+    permission-tree: IMPLEMENTED
+    overlay: NOT_NEEDED_WITH_REASON
+    key-set: NOT_NEEDED_WITH_REASON
+    supports-screens: NOT_NEEDED_WITH_REASON
+    compatible-screens: NOT_NEEDED_WITH_REASON
+    package_visibility: IMPLEMENTED
+    static_shared_sdk_library: IMPLEMENTED
+reasons:
+  backup_data_extraction: Host backup is not a guest runtime contract in P1.
+  localeConfig: Resources follow LoadedApk; localeConfig is not required for typed PM.
+  profileable: Host profiling of the stub process is not a guest package observable.
+  requestLegacyExternalStorage: Guest storage is virtualized independently of this flag.
+  overlay_keyset_screens: Runtime/PMS do not consume these attributes in this campaign.
+counts:
+  implemented: 52
+  partial: 0
+  missing: 0
+  not_needed: 12

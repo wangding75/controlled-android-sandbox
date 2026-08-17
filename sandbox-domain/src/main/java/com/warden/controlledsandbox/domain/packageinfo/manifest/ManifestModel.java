@@ -27,7 +27,14 @@ public final class ManifestModel {
     private boolean featureSplit;
     private int minSdk;
     private int targetSdk;
+    private int compileSdk;
     private long versionCode;
+    private String versionName = "";
+    private String sharedUserId = "";
+    private String installLocation = "";
+    private boolean isolatedSplits;
+    private final List<UsesFeature> usesFeatures = new ArrayList<>();
+    private final List<ManifestProperty> properties = new ArrayList<>();
     private final List<Component> activities = new ArrayList<>();
     private final List<Component> services = new ArrayList<>();
     private final List<Component> receivers = new ArrayList<>();
@@ -85,6 +92,34 @@ public final class ManifestModel {
     public void targetSdk(int value) { targetSdk = value; }
     public long versionCode() { return versionCode; }
     public void versionCode(long value) { versionCode = Math.max(0L, value); }
+    public String versionName() { return versionName; }
+    public void versionName(String value) { versionName = normalize(value); }
+    public int compileSdk() { return compileSdk; }
+    public void compileSdk(int value) { compileSdk = Math.max(0, value); }
+    public String sharedUserId() { return sharedUserId; }
+    public void sharedUserId(String value) { sharedUserId = normalize(value); }
+    public String installLocation() { return installLocation; }
+    public void installLocation(String value) { installLocation = normalize(value); }
+    public boolean isolatedSplits() { return isolatedSplits; }
+    public void isolatedSplits(boolean value) { isolatedSplits = value; }
+    public List<UsesFeature> usesFeatures() { return Collections.unmodifiableList(usesFeatures); }
+    public List<ManifestProperty> properties() { return Collections.unmodifiableList(properties); }
+    public void addUsesFeature(UsesFeature feature) {
+        if (feature == null || feature.name().isEmpty()) return;
+        for (UsesFeature existing : usesFeatures) {
+            if (existing.name().equals(feature.name()) && existing.glEsVersion() == feature.glEsVersion()) {
+                return;
+            }
+        }
+        usesFeatures.add(feature);
+    }
+    public void addProperty(ManifestProperty property) {
+        if (property == null || property.name().isEmpty()) return;
+        for (ManifestProperty existing : properties) {
+            if (existing.name().equals(property.name())) return;
+        }
+        properties.add(property);
+    }
     public List<Component> activities() { return Collections.unmodifiableList(activities); }
     public List<Component> services() { return Collections.unmodifiableList(services); }
     public List<Component> receivers() { return Collections.unmodifiableList(receivers); }
@@ -519,6 +554,12 @@ public final class ManifestModel {
         private int foregroundServiceType;
         private boolean stopWithTask;
         private boolean directBootAware;
+        private boolean visibleToInstantApps;
+        private String attributionTags = "";
+        private String lockTaskMode = "";
+        private int maxRecents;
+        private boolean turnScreenOn;
+        private boolean showWhenLocked;
         private boolean multiprocess;
         private int initOrder;
         private boolean syncable;
@@ -583,8 +624,12 @@ public final class ManifestModel {
             if (action != null && !action.trim().isEmpty() && !actions.contains(action)) actions.add(action);
         }
         public IntentFilter addIntentFilter(int priority) {
+            return addIntentFilter(priority, 0, false);
+        }
+
+        public IntentFilter addIntentFilter(int priority, int order, boolean autoVerify) {
             intentFilterDeclared = true;
-            IntentFilter filter = new IntentFilter(priority);
+            IntentFilter filter = new IntentFilter(priority, order, autoVerify);
             intentFilters.add(filter);
             return filter;
         }
@@ -649,6 +694,18 @@ public final class ManifestModel {
         public void initOrder(int value) { initOrder = Math.max(0, value); }
         public boolean syncable() { return syncable; }
         public void syncable(boolean value) { syncable = value; }
+        public boolean visibleToInstantApps() { return visibleToInstantApps; }
+        public void visibleToInstantApps(boolean value) { visibleToInstantApps = value; }
+        public String attributionTags() { return attributionTags; }
+        public void attributionTags(String value) { attributionTags = normalize(value); }
+        public String lockTaskMode() { return lockTaskMode; }
+        public void lockTaskMode(String value) { lockTaskMode = normalize(value); }
+        public int maxRecents() { return maxRecents; }
+        public void maxRecents(int value) { maxRecents = Math.max(0, value); }
+        public boolean turnScreenOn() { return turnScreenOn; }
+        public void turnScreenOn(boolean value) { turnScreenOn = value; }
+        public boolean showWhenLocked() { return showWhenLocked; }
+        public void showWhenLocked(boolean value) { showWhenLocked = value; }
 
         /**
          * Android package parsing exposes one component record even when an APK
@@ -720,13 +777,19 @@ public final class ManifestModel {
             multiprocess |= other.multiprocess;
             if (initOrder == 0) initOrder = other.initOrder;
             syncable |= other.syncable;
+            visibleToInstantApps |= other.visibleToInstantApps;
+            if (attributionTags.isEmpty()) attributionTags = other.attributionTags;
+            if (lockTaskMode.isEmpty()) lockTaskMode = other.lockTaskMode;
+            if (maxRecents == 0) maxRecents = other.maxRecents;
+            turnScreenOn |= other.turnScreenOn;
+            showWhenLocked |= other.showWhenLocked;
         }
 
         private void mergeIntentFilter(IntentFilter other) {
             for (IntentFilter existing : intentFilters) {
                 if (existing.sameAs(other)) return;
             }
-            IntentFilter copy = new IntentFilter(other.priority);
+            IntentFilter copy = new IntentFilter(other.priority, other.order, other.autoVerify);
             copy.actions.addAll(other.actions);
             copy.categories.addAll(other.categories);
             copy.dataRules.addAll(other.dataRules);
@@ -776,20 +839,30 @@ public final class ManifestModel {
 
     public static final class IntentFilter {
         private final int priority;
+        private final int order;
+        private final boolean autoVerify;
         private final Set<String> actions = new LinkedHashSet<>();
         private final Set<String> categories = new LinkedHashSet<>();
         private final List<DataRule> dataRules = new ArrayList<>();
 
         IntentFilter(int priority) {
+            this(priority, 0, false);
+        }
+
+        IntentFilter(int priority, int order, boolean autoVerify) {
             // Android's package parser bounds manifest priorities before exposing
             // them to IntentFilter consumers. Keep the same boundary behavior so
             // installed APKs with a saturated/resource-backed value remain
             // importable, while all later resolver and Binder snapshots still
             // receive a bounded priority.
             this.priority = Math.max(-1000, Math.min(1000, priority));
+            this.order = order;
+            this.autoVerify = autoVerify;
         }
 
         public int priority() { return priority; }
+        public int order() { return order; }
+        public boolean autoVerify() { return autoVerify; }
         public Set<String> actions() { return Collections.unmodifiableSet(actions); }
         public Set<String> categories() { return Collections.unmodifiableSet(categories); }
         public List<DataRule> dataRules() { return Collections.unmodifiableList(dataRules); }
@@ -798,7 +871,8 @@ public final class ManifestModel {
         public void addDataRule(DataRule rule) { if (rule != null) dataRules.add(rule); }
 
         private boolean sameAs(IntentFilter other) {
-            if (other == null || priority != other.priority
+            if (other == null || priority != other.priority || order != other.order
+                    || autoVerify != other.autoVerify
                     || !actions.equals(other.actions) || !categories.equals(other.categories)
                     || dataRules.size() != other.dataRules.size()) return false;
             for (int i = 0; i < dataRules.size(); i++) {
@@ -815,7 +889,13 @@ public final class ManifestModel {
         private final String path;
         private final String pathPrefix;
         private final String pathPattern;
+        private final String pathSuffix;
+        private final String advancedPattern;
         private final String mimeType;
+        private final String mimeGroup;
+        private final String ssp;
+        private final String sspPrefix;
+        private final String sspPattern;
 
         public DataRule(String scheme, String host, String path, String pathPrefix,
                          String pathPattern, String mimeType) {
@@ -824,6 +904,14 @@ public final class ManifestModel {
 
         public DataRule(String scheme, String host, int port, String path, String pathPrefix,
                         String pathPattern, String mimeType) {
+            this(scheme, host, port, path, pathPrefix, pathPattern, "", "", mimeType, "",
+                    "", "", "");
+        }
+
+        public DataRule(String scheme, String host, int port, String path, String pathPrefix,
+                        String pathPattern, String pathSuffix, String advancedPattern,
+                        String mimeType, String mimeGroup, String ssp, String sspPrefix,
+                        String sspPattern) {
             this.scheme = normalize(scheme);
             this.host = normalize(host);
             if (port < -1 || port > 65535) throw new IllegalArgumentException("data port out of range");
@@ -831,7 +919,13 @@ public final class ManifestModel {
             this.path = normalize(path);
             this.pathPrefix = normalize(pathPrefix);
             this.pathPattern = normalize(pathPattern);
+            this.pathSuffix = normalize(pathSuffix);
+            this.advancedPattern = normalize(advancedPattern);
             this.mimeType = normalize(mimeType);
+            this.mimeGroup = normalize(mimeGroup);
+            this.ssp = normalize(ssp);
+            this.sspPrefix = normalize(sspPrefix);
+            this.sspPattern = normalize(sspPattern);
         }
 
         public String scheme() { return scheme; }
@@ -840,18 +934,64 @@ public final class ManifestModel {
         public String path() { return path; }
         public String pathPrefix() { return pathPrefix; }
         public String pathPattern() { return pathPattern; }
+        public String pathSuffix() { return pathSuffix; }
+        public String advancedPattern() { return advancedPattern; }
         public String mimeType() { return mimeType; }
+        public String mimeGroup() { return mimeGroup; }
+        public String ssp() { return ssp; }
+        public String sspPrefix() { return sspPrefix; }
+        public String sspPattern() { return sspPattern; }
         public boolean empty() {
             return scheme.isEmpty() && host.isEmpty() && path.isEmpty() && pathPrefix.isEmpty()
-                    && pathPattern.isEmpty() && mimeType.isEmpty() && port < 0;
+                    && pathPattern.isEmpty() && pathSuffix.isEmpty() && advancedPattern.isEmpty()
+                    && mimeType.isEmpty() && mimeGroup.isEmpty() && ssp.isEmpty()
+                    && sspPrefix.isEmpty() && sspPattern.isEmpty() && port < 0;
         }
 
         private boolean sameAs(DataRule other) {
             return other != null && scheme.equals(other.scheme) && host.equals(other.host)
                     && port == other.port
                     && path.equals(other.path) && pathPrefix.equals(other.pathPrefix)
-                    && pathPattern.equals(other.pathPattern) && mimeType.equals(other.mimeType);
+                    && pathPattern.equals(other.pathPattern)
+                    && pathSuffix.equals(other.pathSuffix)
+                    && advancedPattern.equals(other.advancedPattern)
+                    && mimeType.equals(other.mimeType)
+                    && mimeGroup.equals(other.mimeGroup)
+                    && ssp.equals(other.ssp) && sspPrefix.equals(other.sspPrefix)
+                    && sspPattern.equals(other.sspPattern);
         }
+    }
+
+    public static final class UsesFeature {
+        private final String name;
+        private final int glEsVersion;
+        private final boolean required;
+
+        public UsesFeature(String name, int glEsVersion, boolean required) {
+            this.name = normalize(name);
+            this.glEsVersion = Math.max(0, glEsVersion);
+            this.required = required;
+        }
+
+        public String name() { return name; }
+        public int glEsVersion() { return glEsVersion; }
+        public boolean required() { return required; }
+    }
+
+    public static final class ManifestProperty {
+        private final String name;
+        private final String value;
+        private final int resource;
+
+        public ManifestProperty(String name, String value, int resource) {
+            this.name = normalize(name);
+            this.value = normalize(value);
+            this.resource = Math.max(0, resource);
+        }
+
+        public String name() { return name; }
+        public String value() { return value; }
+        public int resource() { return resource; }
     }
 
     private static void addNonBlank(Set<String> target, String value) {

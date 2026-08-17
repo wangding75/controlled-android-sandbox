@@ -82,12 +82,28 @@ public final class BinaryXmlManifestParser {
                 model.usesSplit(element.stringAttr("usesSplit"));
                 model.featureSplit(element.boolAttr("isFeatureSplit", false));
                 model.versionCode(element.intAttr("versionCode", 0));
+                model.versionName(element.stringAttr("versionName"));
+                model.compileSdk(element.intAttr("compileSdkVersion", 0));
+                model.sharedUserId(element.stringAttr("sharedUserId"));
+                model.installLocation(element.stringAttr("installLocation"));
+                model.isolatedSplits(element.boolAttr("isolatedSplits", false));
             }
             case "uses-sdk" -> {
                 model.minSdk(element.intAttr("minSdkVersion", 0));
                 model.targetSdk(element.intAttr("targetSdkVersion", 0));
             }
             case "uses-permission", "uses-permission-sdk-23" -> model.addPermission(element.stringAttr("name"));
+            case "uses-feature" -> model.addUsesFeature(new ManifestModel.UsesFeature(
+                    element.stringAttr("name"), element.intAttr("glEsVersion", 0),
+                    element.boolAttr("required", true)));
+            case "property" -> {
+                if (stack.isEmpty() || "application".equals(stack.peek().name)
+                        || "manifest".equals(stack.peek().name)) {
+                    model.addProperty(new ManifestModel.ManifestProperty(
+                            element.stringAttr("name"), element.stringAttr("value"),
+                            element.intAttr("resource", 0)));
+                }
+            }
             case "permission", "permission-tree" -> model.addPermissionDeclaration(
                     new ManifestModel.PermissionDeclaration(
                             model.resolveClassName(element.stringAttr("name")),
@@ -219,7 +235,10 @@ public final class BinaryXmlManifestParser {
                         element.stringAttr("scheme"), element.stringAttr("host"),
                         dataPort(element),
                         element.stringAttr("path"), element.stringAttr("pathPrefix"),
-                        element.stringAttr("pathPattern"), element.stringAttr("mimeType"));
+                        element.stringAttr("pathPattern"), element.stringAttr("pathSuffix"),
+                        element.stringAttr("advancedPattern"), element.stringAttr("mimeType"),
+                        element.stringAttr("mimeGroup"), element.stringAttr("ssp"),
+                        element.stringAttr("sspPrefix"), element.stringAttr("sspPattern"));
                 if (query != null) query.addDataRule(rule);
                 if (state != null && state.filter != null) {
                     if (!rule.empty()) state.filter.addDataRule(rule);
@@ -231,7 +250,9 @@ public final class BinaryXmlManifestParser {
             case "intent-filter" -> {
                 ManifestModel.Component component = nearestComponent(stack);
                 ManifestModel.IntentFilter filter = component == null ? null
-                        : component.addIntentFilter(element.intAttr("priority", 0));
+                        : component.addIntentFilter(element.intAttr("priority", 0),
+                                element.intAttr("order", 0),
+                                element.boolAttr("autoVerify", false));
                 element.intentState = new IntentState(component, filter);
             }
             default -> { }
@@ -336,6 +357,12 @@ public final class BinaryXmlManifestParser {
         component.foregroundServiceType(element.intAttr("foregroundServiceType", 0));
         component.stopWithTask(element.boolAttr("stopWithTask", false));
         component.directBootAware(element.boolAttr("directBootAware", false));
+        component.visibleToInstantApps(element.boolAttr("visibleToInstantApps", false));
+        component.attributionTags(element.stringAttr("attributionTags"));
+        component.lockTaskMode(element.stringAttr("lockTaskMode"));
+        component.maxRecents(element.intAttr("maxRecents", 0));
+        component.turnScreenOn(element.boolAttr("turnScreenOn", false));
+        component.showWhenLocked(element.boolAttr("showWhenLocked", false));
         return component;
     }
 

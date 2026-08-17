@@ -69,9 +69,18 @@ public final class SelfTest {
         BinaryXmlFixtureBuilder f = new BinaryXmlFixtureBuilder();
         byte[] xml = f
                 .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"),
-                        BinaryXmlFixtureBuilder.integer("versionCode", 42))
+                        BinaryXmlFixtureBuilder.integer("versionCode", 42),
+                        BinaryXmlFixtureBuilder.text("versionName", "1.2.3"),
+                        BinaryXmlFixtureBuilder.integer("compileSdkVersion", 35),
+                        BinaryXmlFixtureBuilder.text("sharedUserId", "com.example.shared"),
+                        BinaryXmlFixtureBuilder.text("installLocation", "auto"),
+                        BinaryXmlFixtureBuilder.bool("isolatedSplits", true))
                 .start("uses-sdk", BinaryXmlFixtureBuilder.integer("minSdkVersion", 26), BinaryXmlFixtureBuilder.integer("targetSdkVersion", 35)).end("uses-sdk")
                 .start("uses-permission", BinaryXmlFixtureBuilder.text("name", "android.permission.INTERNET")).end("uses-permission")
+                .start("uses-feature", BinaryXmlFixtureBuilder.text("name", "android.hardware.camera"),
+                        BinaryXmlFixtureBuilder.bool("required", false)).end("uses-feature")
+                .start("property", BinaryXmlFixtureBuilder.text("name", "android.cts.PROPERTY"),
+                        BinaryXmlFixtureBuilder.text("value", "typed")).end("property")
                 .start("permission-group", BinaryXmlFixtureBuilder.text("name", "com.example.PERM_GROUP"),
                         BinaryXmlFixtureBuilder.text("label", "Guest permissions"),
                         BinaryXmlFixtureBuilder.integer("priority", 7)).end("permission-group")
@@ -100,13 +109,17 @@ public final class SelfTest {
                 .end("intent-filter").end("activity-alias")
                 .start("service", BinaryXmlFixtureBuilder.text("name", ".SyncService"), BinaryXmlFixtureBuilder.text("process", ":remote"), BinaryXmlFixtureBuilder.bool("isolatedProcess", true)).end("service")
                 .start("receiver", BinaryXmlFixtureBuilder.text("name", ".BootReceiver"), BinaryXmlFixtureBuilder.text("permission", "com.example.SEND_BOOT"))
-                .start("intent-filter", BinaryXmlFixtureBuilder.integer("priority", 250))
+                .start("intent-filter", BinaryXmlFixtureBuilder.integer("priority", 250),
+                        BinaryXmlFixtureBuilder.integer("order", 3),
+                        BinaryXmlFixtureBuilder.bool("autoVerify", true))
                 .start("action", BinaryXmlFixtureBuilder.text("name", "com.example.TEST")).end("action")
                 .start("category", BinaryXmlFixtureBuilder.text("name", "android.intent.category.DEFAULT")).end("category")
                 .start("data", BinaryXmlFixtureBuilder.text("scheme", "content"),
                         BinaryXmlFixtureBuilder.text("host", "example.test")).end("data")
                 .start("data", BinaryXmlFixtureBuilder.text("pathPrefix", "/items"),
-                        BinaryXmlFixtureBuilder.text("mimeType", "text/*")).end("data")
+                        BinaryXmlFixtureBuilder.text("pathSuffix", ".json"),
+                        BinaryXmlFixtureBuilder.text("mimeType", "text/*"),
+                        BinaryXmlFixtureBuilder.text("mimeGroup", "image")).end("data")
                 .end("intent-filter").end("receiver")
                 .start("receiver", BinaryXmlFixtureBuilder.text("name", ".InheritedPermissionReceiver"), BinaryXmlFixtureBuilder.bool("exported", false)).end("receiver")
                 .start("provider", BinaryXmlFixtureBuilder.text("name", ".DataProvider"),
@@ -127,6 +140,18 @@ public final class SelfTest {
         require(model.applicationThemeResId() == 0x7f120001, "application theme resource");
         require(model.minSdk() == 26 && model.targetSdk() == 35, "sdk values");
         require(model.versionCode() == 42, "manifest versionCode");
+        require("1.2.3".equals(model.versionName()), "manifest versionName");
+        require(model.compileSdk() == 35, "manifest compileSdkVersion");
+        require("com.example.shared".equals(model.sharedUserId()), "sharedUserId");
+        require("auto".equals(model.installLocation()), "installLocation");
+        require(model.isolatedSplits(), "isolatedSplits");
+        require(model.usesFeatures().size() == 1
+                        && "android.hardware.camera".equals(model.usesFeatures().get(0).name())
+                        && !model.usesFeatures().get(0).required(),
+                "uses-feature typed model");
+        require(model.properties().size() == 1
+                        && "android.cts.PROPERTY".equals(model.properties().get(0).name()),
+                "manifest property typed model");
         require("com.example.guest.MainActivity".equals(model.launcherActivity()), "launcher activity");
         require(model.activities().size() == 1
                         && model.activities().get(0).actions().contains("com.example.ALIAS"),
@@ -163,6 +188,8 @@ public final class SelfTest {
         require(model.receivers().get(0).intentFilters().size() == 1, "receiver intent filter");
         ManifestModel.IntentFilter receiverFilter = model.receivers().get(0).intentFilters().get(0);
         require(receiverFilter.priority() == 250, "receiver priority");
+        require(receiverFilter.order() == 3 && receiverFilter.autoVerify(),
+                "intent-filter order and autoVerify");
         require(new ManifestModel.Component("com.example.Clamped", "", true, true,
                         false, "", "").addIntentFilter(Integer.MAX_VALUE).priority() == 1000,
                 "manifest priority is clamped at the Android upper bound");
@@ -171,7 +198,9 @@ public final class SelfTest {
                         && "content".equals(receiverFilter.dataRules().get(0).scheme())
                         && "example.test".equals(receiverFilter.dataRules().get(0).host())
                         && "/items".equals(receiverFilter.dataRules().get(1).pathPrefix())
-                        && "text/*".equals(receiverFilter.dataRules().get(1).mimeType()),
+                        && ".json".equals(receiverFilter.dataRules().get(1).pathSuffix())
+                        && "text/*".equals(receiverFilter.dataRules().get(1).mimeType())
+                        && "image".equals(receiverFilter.dataRules().get(1).mimeGroup()),
                 "receiver data filter aggregation");
         require("com.example.SEND_BOOT".equals(model.receivers().get(0).permission()), "receiver permission");
         require(model.receivers().get(0).exported(), "legacy intent-filter exported default");
