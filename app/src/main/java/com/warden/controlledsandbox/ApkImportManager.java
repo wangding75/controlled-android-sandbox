@@ -40,7 +40,7 @@ final class ApkImportManager {
     private static final long MAX_APK_BYTES = 1536L * 1024 * 1024;
     private static final long MAX_INSTALL_BYTES = 3L * 1024 * 1024 * 1024;
     private static final long MAX_NATIVE_BYTES = 1024L * 1024 * 1024;
-    private static final int MAX_ZIP_ENTRIES = 20_000;
+    private static final int MAX_ZIP_ENTRIES = 200_000;
     private static final int MAX_ARTIFACTS = 256;
     private final Context context;
     private final PackageStorageLayout storageLayout;
