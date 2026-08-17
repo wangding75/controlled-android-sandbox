@@ -1227,468 +1227,179 @@ extern "C" long controlled_syscall(long number, ...) {
     va_list values;
     va_start(values, number);
 
+#define CS_CALL1(fn, t1) { t1 a1 = va_arg(values, t1); va_end(values); return fn(a1); }
+#define CS_CALL2(fn, t1, t2) { t1 a1 = va_arg(values, t1); t2 a2 = va_arg(values, t2); va_end(values); return fn(a1, a2); }
+#define CS_CALL3(fn, t1, t2, t3) { t1 a1 = va_arg(values, t1); t2 a2 = va_arg(values, t2); t3 a3 = va_arg(values, t3); va_end(values); return fn(a1, a2, a3); }
+#define CS_CALL4(fn, t1, t2, t3, t4) { t1 a1 = va_arg(values, t1); t2 a2 = va_arg(values, t2); t3 a3 = va_arg(values, t3); t4 a4 = va_arg(values, t4); va_end(values); return fn(a1, a2, a3, a4); }
+#define CS_CALL5(fn, t1, t2, t3, t4, t5) { t1 a1 = va_arg(values, t1); t2 a2 = va_arg(values, t2); t3 a3 = va_arg(values, t3); t4 a4 = va_arg(values, t4); t5 a5 = va_arg(values, t5); va_end(values); return fn(a1, a2, a3, a4, a5); }
+#define CS_CALL6(fn, t1, t2, t3, t4, t5, t6) { t1 a1 = va_arg(values, t1); t2 a2 = va_arg(values, t2); t3 a3 = va_arg(values, t3); t4 a4 = va_arg(values, t4); t5 a5 = va_arg(values, t5); t6 a6 = va_arg(values, t6); va_end(values); return fn(a1, a2, a3, a4, a5, a6); }
+
 #if defined(SYS_open)
     if (number == SYS_open) {
-        const char* path = va_arg(values, const char*);
-        const int flags = va_arg(values, int);
-        if (requires_mode(flags)) {
-            const mode_t mode = static_cast<mode_t>(va_arg(values, int));
-            va_end(values);
-            return controlled_open(path, flags, mode);
-        }
-        va_end(values);
-        return controlled_open(path, flags);
+        const char* p = va_arg(values, const char*);
+        const int f = va_arg(values, int);
+        if (requires_mode(f)) { const mode_t m = static_cast<mode_t>(va_arg(values, int)); va_end(values); return controlled_open(p, f, m); }
+        va_end(values); return controlled_open(p, f);
     }
 #endif
 #if defined(SYS_openat)
     if (number == SYS_openat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const int flags = va_arg(values, int);
-        if (requires_mode(flags)) {
-            const mode_t mode = static_cast<mode_t>(va_arg(values, int));
-            va_end(values);
-            return controlled_openat(directory, path, flags, mode);
-        }
-        va_end(values);
-        return controlled_openat(directory, path, flags);
+        const int d = va_arg(values, int);
+        const char* p = va_arg(values, const char*);
+        const int f = va_arg(values, int);
+        if (requires_mode(f)) { const mode_t m = static_cast<mode_t>(va_arg(values, int)); va_end(values); return controlled_openat(d, p, f, m); }
+        va_end(values); return controlled_openat(d, p, f);
     }
 #endif
 #if defined(SYS_openat2)
-    if (number == SYS_openat2) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const struct open_how* how = va_arg(values, const struct open_how*);
-        const std::size_t size = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_openat2(directory, path, how, size);
-    }
+    if (number == SYS_openat2) CS_CALL4(controlled_openat2, int, const char*, const struct open_how*, std::size_t)
 #endif
 #if defined(SYS_access)
-    if (number == SYS_access) {
-        const char* path = va_arg(values, const char*);
-        const int mode = va_arg(values, int);
-        va_end(values);
-        return controlled_access(path, mode);
-    }
+    if (number == SYS_access) CS_CALL2(controlled_access, const char*, int)
 #endif
 #if defined(SYS_faccessat)
-    if (number == SYS_faccessat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const int mode = va_arg(values, int);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_faccessat(directory, path, mode, flags);
-    }
+    if (number == SYS_faccessat) CS_CALL4(controlled_faccessat, int, const char*, int, int)
 #endif
 #if defined(SYS_faccessat2)
-    if (number == SYS_faccessat2) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const int mode = va_arg(values, int);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_faccessat2(directory, path, mode, flags);
-    }
+    if (number == SYS_faccessat2) CS_CALL4(controlled_faccessat2, int, const char*, int, int)
 #endif
 #if defined(SYS_stat)
-    if (number == SYS_stat) {
-        const char* path = va_arg(values, const char*);
-        struct stat* value = va_arg(values, struct stat*);
-        va_end(values);
-        return controlled_stat(path, value);
-    }
+    if (number == SYS_stat) CS_CALL2(controlled_stat, const char*, struct stat*)
 #endif
 #if defined(SYS_lstat)
-    if (number == SYS_lstat) {
-        const char* path = va_arg(values, const char*);
-        struct stat* value = va_arg(values, struct stat*);
-        va_end(values);
-        return controlled_lstat(path, value);
-    }
+    if (number == SYS_lstat) CS_CALL2(controlled_lstat, const char*, struct stat*)
 #endif
 #if defined(SYS_newfstatat)
-    if (number == SYS_newfstatat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        struct stat* value = va_arg(values, struct stat*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_fstatat(directory, path, value, flags);
-    }
+    if (number == SYS_newfstatat) CS_CALL4(controlled_fstatat, int, const char*, struct stat*, int)
 #endif
 #if defined(SYS_fstatat64)
-    if (number == SYS_fstatat64) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        struct stat* value = va_arg(values, struct stat*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_fstatat(directory, path, value, flags);
-    }
+    if (number == SYS_fstatat64) CS_CALL4(controlled_fstatat, int, const char*, struct stat*, int)
 #endif
 #if defined(SYS_statx)
-    if (number == SYS_statx) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const int flags = va_arg(values, int);
-        const unsigned int mask = va_arg(values, unsigned int);
-        struct statx* value = va_arg(values, struct statx*);
-        va_end(values);
-        return controlled_statx(directory, path, flags, mask, value);
-    }
+    if (number == SYS_statx) CS_CALL5(controlled_statx, int, const char*, int, unsigned int, struct statx*)
 #endif
 #if defined(SYS_rename)
-    if (number == SYS_rename) {
-        const char* oldPath = va_arg(values, const char*);
-        const char* newPath = va_arg(values, const char*);
-        va_end(values);
-        return controlled_rename(oldPath, newPath);
-    }
+    if (number == SYS_rename) CS_CALL2(controlled_rename, const char*, const char*)
 #endif
 #if defined(SYS_renameat)
-    if (number == SYS_renameat) {
-        const int oldDirectory = va_arg(values, int);
-        const char* oldPath = va_arg(values, const char*);
-        const int newDirectory = va_arg(values, int);
-        const char* newPath = va_arg(values, const char*);
-        va_end(values);
-        return controlled_renameat(oldDirectory, oldPath, newDirectory, newPath);
-    }
+    if (number == SYS_renameat) CS_CALL4(controlled_renameat, int, const char*, int, const char*)
 #endif
 #if defined(SYS_renameat2)
-    if (number == SYS_renameat2) {
-        const int oldDirectory = va_arg(values, int);
-        const char* oldPath = va_arg(values, const char*);
-        const int newDirectory = va_arg(values, int);
-        const char* newPath = va_arg(values, const char*);
-        const unsigned int flags = va_arg(values, unsigned int);
-        va_end(values);
-        return controlled_renameat2(oldDirectory, oldPath, newDirectory, newPath, flags);
-    }
+    if (number == SYS_renameat2) CS_CALL5(controlled_renameat2, int, const char*, int, const char*, unsigned int)
 #endif
 #if defined(SYS_unlink)
-    if (number == SYS_unlink) {
-        const char* path = va_arg(values, const char*);
-        va_end(values);
-        return controlled_unlink(path);
-    }
+    if (number == SYS_unlink) CS_CALL1(controlled_unlink, const char*)
 #endif
 #if defined(SYS_unlinkat)
-    if (number == SYS_unlinkat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_unlinkat(directory, path, flags);
-    }
+    if (number == SYS_unlinkat) CS_CALL3(controlled_unlinkat, int, const char*, int)
 #endif
 #if defined(SYS_mkdir)
-    if (number == SYS_mkdir) {
-        const char* path = va_arg(values, const char*);
-        const mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return controlled_mkdir(path, mode);
-    }
+    if (number == SYS_mkdir) CS_CALL2(controlled_mkdir, const char*, mode_t)
 #endif
 #if defined(SYS_mkdirat)
-    if (number == SYS_mkdirat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        const mode_t mode = static_cast<mode_t>(va_arg(values, int));
-        va_end(values);
-        return controlled_mkdirat(directory, path, mode);
-    }
+    if (number == SYS_mkdirat) CS_CALL3(controlled_mkdirat, int, const char*, mode_t)
 #endif
 #if defined(SYS_rmdir)
-    if (number == SYS_rmdir) {
-        const char* path = va_arg(values, const char*);
-        va_end(values);
-        return controlled_rmdir(path);
-    }
+    if (number == SYS_rmdir) CS_CALL1(controlled_rmdir, const char*)
 #endif
 #if defined(SYS_readlink)
-    if (number == SYS_readlink) {
-        const char* path = va_arg(values, const char*);
-        char* buffer = va_arg(values, char*);
-        const std::size_t size = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_readlink(path, buffer, size);
-    }
+    if (number == SYS_readlink) CS_CALL3(controlled_readlink, const char*, char*, std::size_t)
 #endif
 #if defined(SYS_readlinkat)
-    if (number == SYS_readlinkat) {
-        const int directory = va_arg(values, int);
-        const char* path = va_arg(values, const char*);
-        char* buffer = va_arg(values, char*);
-        const std::size_t size = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_readlinkat(directory, path, buffer, size);
-    }
+    if (number == SYS_readlinkat) CS_CALL4(controlled_readlinkat, int, const char*, char*, std::size_t)
 #endif
 #if defined(SYS_getdents64)
-    if (number == SYS_getdents64) {
-        const int directory = va_arg(values, int);
-        void* buffer = va_arg(values, void*);
-        const std::size_t size = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_getdents64(directory, buffer, size);
-    }
+    if (number == SYS_getdents64) CS_CALL3(controlled_getdents64, int, void*, std::size_t)
 #endif
 #if defined(SYS_mmap)
     if (number == SYS_mmap) {
-        void* address = va_arg(values, void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        const int protection = va_arg(values, int);
-        const int flags = va_arg(values, int);
-        const int descriptor = va_arg(values, int);
-        const off_t offset = va_arg(values, off_t);
+        void* addr = va_arg(values, void*);
+        const std::size_t len = va_arg(values, std::size_t);
+        const int prot = va_arg(values, int);
+        const int fl = va_arg(values, int);
+        const int fd = va_arg(values, int);
+        const off_t off = va_arg(values, off_t);
         va_end(values);
-        return reinterpret_cast<long>(controlled_mmap(address, length, protection, flags,
-                descriptor, offset));
+        return reinterpret_cast<long>(controlled_mmap(addr, len, prot, fl, fd, off));
     }
 #endif
 #if defined(SYS_socket)
-    if (number == SYS_socket) {
-        const int domain = va_arg(values, int);
-        const int type = va_arg(values, int);
-        const int protocol = va_arg(values, int);
-        va_end(values);
-        return controlled_socket(domain, type, protocol);
-    }
+    if (number == SYS_socket) CS_CALL3(controlled_socket, int, int, int)
 #endif
 #if defined(SYS_fcntl)
-    if (number == SYS_fcntl) {
-        const int descriptor = va_arg(values, int);
-        const int command = va_arg(values, int);
-        const long argument = va_arg(values, long);
-        va_end(values);
-        return controlled_fcntl(descriptor, command, argument);
-    }
+    if (number == SYS_fcntl) CS_CALL3(controlled_fcntl, int, int, long)
 #endif
 #if defined(SYS_fcntl64)
-    if (number == SYS_fcntl64) {
-        const int descriptor = va_arg(values, int);
-        const int command = va_arg(values, int);
-        const long argument = va_arg(values, long);
-        va_end(values);
-        return controlled_fcntl(descriptor, command, argument);
-    }
+    if (number == SYS_fcntl64) CS_CALL3(controlled_fcntl, int, int, long)
 #endif
 #if defined(SYS_close)
-    if (number == SYS_close) {
-        const int descriptor = va_arg(values, int);
-        va_end(values);
-        return controlled_close(descriptor);
-    }
+    if (number == SYS_close) CS_CALL1(controlled_close, int)
 #endif
 #if defined(SYS_dup)
-    if (number == SYS_dup) {
-        const int descriptor = va_arg(values, int);
-        va_end(values);
-        return controlled_dup(descriptor);
-    }
+    if (number == SYS_dup) CS_CALL1(controlled_dup, int)
 #endif
 #if defined(SYS_dup2)
-    if (number == SYS_dup2) {
-        const int descriptor = va_arg(values, int);
-        const int target = va_arg(values, int);
-        va_end(values);
-        return controlled_dup2(descriptor, target);
-    }
+    if (number == SYS_dup2) CS_CALL2(controlled_dup2, int, int)
 #endif
 #if defined(SYS_dup3)
-    if (number == SYS_dup3) {
-        const int descriptor = va_arg(values, int);
-        const int target = va_arg(values, int);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_dup3(descriptor, target, flags);
-    }
+    if (number == SYS_dup3) CS_CALL3(controlled_dup3, int, int, int)
 #endif
 #if defined(SYS_bind)
-    if (number == SYS_bind) {
-        const int descriptor = va_arg(values, int);
-        const sockaddr* address = va_arg(values, const sockaddr*);
-        const socklen_t length = va_arg(values, socklen_t);
-        va_end(values);
-        return controlled_bind(descriptor, address, length);
-    }
+    if (number == SYS_bind) CS_CALL3(controlled_bind, int, const sockaddr*, socklen_t)
 #endif
 #if defined(SYS_connect)
-    if (number == SYS_connect) {
-        const int descriptor = va_arg(values, int);
-        const sockaddr* address = va_arg(values, const sockaddr*);
-        const socklen_t length = va_arg(values, socklen_t);
-        va_end(values);
-        return controlled_connect(descriptor, address, length);
-    }
+    if (number == SYS_connect) CS_CALL3(controlled_connect, int, const sockaddr*, socklen_t)
 #endif
 #if defined(SYS_send)
-    if (number == SYS_send) {
-        const int descriptor = va_arg(values, int);
-        const void* buffer = va_arg(values, const void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_send(descriptor, buffer, length, flags);
-    }
+    if (number == SYS_send) CS_CALL4(controlled_send, int, const void*, std::size_t, int)
 #endif
 #if defined(SYS_sendto)
-    if (number == SYS_sendto) {
-        const int descriptor = va_arg(values, int);
-        const void* buffer = va_arg(values, const void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        const int flags = va_arg(values, int);
-        const sockaddr* destination = va_arg(values, const sockaddr*);
-        const socklen_t destinationLength = va_arg(values, socklen_t);
-        va_end(values);
-        return controlled_sendto(descriptor, buffer, length, flags, destination,
-                destinationLength);
-    }
+    if (number == SYS_sendto) CS_CALL6(controlled_sendto, int, const void*, std::size_t, int, const sockaddr*, socklen_t)
 #endif
 #if defined(SYS_sendmsg)
-    if (number == SYS_sendmsg) {
-        const int descriptor = va_arg(values, int);
-        const msghdr* message = va_arg(values, const msghdr*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_sendmsg(descriptor, message, flags);
-    }
+    if (number == SYS_sendmsg) CS_CALL3(controlled_sendmsg, int, const msghdr*, int)
 #endif
 #if defined(SYS_recvfrom)
-    if (number == SYS_recvfrom) {
-        const int descriptor = va_arg(values, int);
-        void* buffer = va_arg(values, void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        const int flags = va_arg(values, int);
-        sockaddr* source = va_arg(values, sockaddr*);
-        socklen_t* sourceLength = va_arg(values, socklen_t*);
-        va_end(values);
-        return controlled_recvfrom(descriptor, buffer, length, flags, source, sourceLength);
-    }
+    if (number == SYS_recvfrom) CS_CALL6(controlled_recvfrom, int, void*, std::size_t, int, sockaddr*, socklen_t*)
 #endif
 #if defined(SYS_recv)
-    if (number == SYS_recv) {
-        const int descriptor = va_arg(values, int);
-        void* buffer = va_arg(values, void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_recv(descriptor, buffer, length, flags);
-    }
+    if (number == SYS_recv) CS_CALL4(controlled_recv, int, void*, std::size_t, int)
 #endif
 #if defined(SYS_recvmsg)
-    if (number == SYS_recvmsg) {
-        const int descriptor = va_arg(values, int);
-        msghdr* message = va_arg(values, msghdr*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_recvmsg(descriptor, message, flags);
-    }
+    if (number == SYS_recvmsg) CS_CALL3(controlled_recvmsg, int, msghdr*, int)
 #endif
 #if defined(SYS_setsockopt)
-    if (number == SYS_setsockopt) {
-        const int descriptor = va_arg(values, int);
-        const int level = va_arg(values, int);
-        const int option = va_arg(values, int);
-        const void* optionValue = va_arg(values, const void*);
-        const socklen_t optionLength = va_arg(values, socklen_t);
-        va_end(values);
-        return controlled_setsockopt(descriptor, level, option, optionValue, optionLength);
-    }
+    if (number == SYS_setsockopt) CS_CALL5(controlled_setsockopt, int, int, int, const void*, socklen_t)
 #endif
 #if defined(SYS_getsockopt)
-    if (number == SYS_getsockopt) {
-        const int descriptor = va_arg(values, int);
-        const int level = va_arg(values, int);
-        const int option = va_arg(values, int);
-        void* optionValue = va_arg(values, void*);
-        socklen_t* optionLength = va_arg(values, socklen_t*);
-        va_end(values);
-        return controlled_getsockopt(descriptor, level, option, optionValue, optionLength);
-    }
+    if (number == SYS_getsockopt) CS_CALL5(controlled_getsockopt, int, int, int, void*, socklen_t*)
 #endif
 #if defined(SYS_read)
-    if (number == SYS_read) {
-        const int descriptor = va_arg(values, int);
-        void* buffer = va_arg(values, void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_read(descriptor, buffer, length);
-    }
+    if (number == SYS_read) CS_CALL3(controlled_read, int, void*, std::size_t)
 #endif
 #if defined(SYS_write)
-    if (number == SYS_write) {
-        const int descriptor = va_arg(values, int);
-        const void* buffer = va_arg(values, const void*);
-        const std::size_t length = va_arg(values, std::size_t);
-        va_end(values);
-        return controlled_write(descriptor, buffer, length);
-    }
+    if (number == SYS_write) CS_CALL3(controlled_write, int, const void*, std::size_t)
 #endif
 #if defined(SYS_accept)
-    if (number == SYS_accept) {
-        const int descriptor = va_arg(values, int);
-        sockaddr* address = va_arg(values, sockaddr*);
-        socklen_t* length = va_arg(values, socklen_t*);
-        va_end(values);
-        return controlled_accept(descriptor, address, length);
-    }
+    if (number == SYS_accept) CS_CALL3(controlled_accept, int, sockaddr*, socklen_t*)
 #endif
 #if defined(SYS_accept4)
-    if (number == SYS_accept4) {
-        const int descriptor = va_arg(values, int);
-        sockaddr* address = va_arg(values, sockaddr*);
-        socklen_t* length = va_arg(values, socklen_t*);
-        const int flags = va_arg(values, int);
-        va_end(values);
-        return controlled_accept4(descriptor, address, length, flags);
-    }
+    if (number == SYS_accept4) CS_CALL4(controlled_accept4, int, sockaddr*, socklen_t*, int)
 #endif
 #if defined(SYS_getsockname)
-    if (number == SYS_getsockname) {
-        const int descriptor = va_arg(values, int);
-        sockaddr* address = va_arg(values, sockaddr*);
-        socklen_t* length = va_arg(values, socklen_t*);
-        va_end(values);
-        return controlled_getsockname(descriptor, address, length);
-    }
+    if (number == SYS_getsockname) CS_CALL3(controlled_getsockname, int, sockaddr*, socklen_t*)
 #endif
 #if defined(SYS_getpeername)
-    if (number == SYS_getpeername) {
-        const int descriptor = va_arg(values, int);
-        sockaddr* address = va_arg(values, sockaddr*);
-        socklen_t* length = va_arg(values, socklen_t*);
-        va_end(values);
-        return controlled_getpeername(descriptor, address, length);
-    }
+    if (number == SYS_getpeername) CS_CALL3(controlled_getpeername, int, sockaddr*, socklen_t*)
 #endif
 #if defined(SYS_kill)
-    if (number == SYS_kill) {
-        const pid_t process = va_arg(values, pid_t);
-        const int signalNumber = va_arg(values, int);
-        va_end(values);
-        return controlled_kill(process, signalNumber);
-    }
+    if (number == SYS_kill) CS_CALL2(controlled_kill, pid_t, int)
 #endif
 #if defined(SYS_tgkill)
-    if (number == SYS_tgkill) {
-        const int process = va_arg(values, int);
-        const int thread = va_arg(values, int);
-        const int signalNumber = va_arg(values, int);
-        va_end(values);
-        return controlled_tgkill(process, thread, signalNumber);
-    }
+    if (number == SYS_tgkill) CS_CALL3(controlled_tgkill, int, int, int)
 #endif
 #if defined(SYS_tkill)
-    if (number == SYS_tkill) {
-        const int thread = va_arg(values, int);
-        const int signalNumber = va_arg(values, int);
-        va_end(values);
-        return controlled_tkill(thread, signalNumber);
-    }
+    if (number == SYS_tkill) CS_CALL2(controlled_tkill, int, int)
 #endif
 #if defined(SYS_exit)
     if (number == SYS_exit
@@ -1699,8 +1410,7 @@ extern "C" long controlled_syscall(long number, ...) {
         const int status = va_arg(values, int);
         va_end(values);
         if (!process_exit_allowed.load(std::memory_order_acquire)) {
-            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
-                    "guest direct syscall exit(%d) ignored", status);
+            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME", "guest direct syscall exit(%d) ignored", status);
             return 0;
         }
         SyscallFn function = require_real(real_syscall, "syscall");
@@ -1711,8 +1421,7 @@ extern "C" long controlled_syscall(long number, ...) {
         const int status = va_arg(values, int);
         va_end(values);
         if (!process_exit_allowed.load(std::memory_order_acquire)) {
-            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
-                    "guest direct syscall exit(%d) ignored", status);
+            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME", "guest direct syscall exit(%d) ignored", status);
             return 0;
         }
         SyscallFn function = require_real(real_syscall, "syscall");
@@ -1720,9 +1429,13 @@ extern "C" long controlled_syscall(long number, ...) {
     }
 #endif
 
-    // libc's syscall() is variadic and has no argument-count metadata.  The Linux ABI reserves
-    // six argument registers/slots, so forwarding all six preserves ordinary non-sensitive calls
-    // such as futex and clock_gettime without trying to reinterpret their payloads.
+#undef CS_CALL1
+#undef CS_CALL2
+#undef CS_CALL3
+#undef CS_CALL4
+#undef CS_CALL5
+#undef CS_CALL6
+
     long arguments[6]{};
     for (long& argument : arguments) argument = va_arg(values, long);
     va_end(values);
