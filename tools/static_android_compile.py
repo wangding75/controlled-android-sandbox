@@ -647,6 +647,7 @@ run_java('com.warden.controlledsandbox.runtime.guest.GuestProcessIdentityBridgeS
 run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessRoutePolicySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessContractSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.IsolatedProcessArchitectureSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.broker.ProcessSlotConcurrencySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.hostile.HostileCapabilityRegistrySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityFieldBridgeSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskContractSelfTest', assertions=True)

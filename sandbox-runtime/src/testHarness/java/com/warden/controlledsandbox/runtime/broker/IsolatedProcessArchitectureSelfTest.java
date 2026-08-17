@@ -11,19 +11,21 @@ public final class IsolatedProcessArchitectureSelfTest {
 
     public static void main(String[] args) {
         AtomicInteger counter = new AtomicInteger();
-        SessionRegistry ordinary = new SessionRegistry(8, purpose -> purpose + "-ordinary-" + counter.incrementAndGet());
+        SessionRegistry ordinary = new SessionRegistry(ProcessSlotContract.ORDINARY_SLOT_COUNT,
+                purpose -> purpose + "-ordinary-" + counter.incrementAndGet());
         SessionRegistry isolated = new SessionRegistry(ProcessSlotContract.ISOLATED_SLOT_COUNT,
                 purpose -> purpose + "-isolated-" + counter.incrementAndGet());
 
         GuestSession ordinarySession = ordinary.allocate("com.example", 0, "com.example", "rev", 1L);
         GuestSession isolatedSession = isolated.allocate("com.example", 0,
                 "com.example:isolated_service", "rev", 2L);
-        check(ordinarySession.processSlot() >= 0 && ordinarySession.processSlot() < 8,
+        check(ordinarySession.processSlot() >= 0
+                        && ordinarySession.processSlot() < ProcessSlotContract.ORDINARY_SLOT_COUNT,
                 "ordinary slot must remain in ordinary pool");
         check(isolatedSession.processSlot() >= 0
                         && isolatedSession.processSlot() < ProcessSlotContract.ISOLATED_SLOT_COUNT,
                 "isolated slot must remain in isolated pool");
-        check(ordinary.capacity() == 8
+        check(ordinary.capacity() == ProcessSlotContract.ORDINARY_SLOT_COUNT
                         && isolated.capacity() == ProcessSlotContract.ISOLATED_SLOT_COUNT,
                 "slot capacities changed");
         check(ordinary.used() == 1 && isolated.used() == 1, "slot use must remain independent");
