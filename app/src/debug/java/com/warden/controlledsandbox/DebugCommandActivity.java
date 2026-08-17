@@ -165,6 +165,23 @@ public final class DebugCommandActivity extends Activity {
                 }
                 result.put("isolatedComponent", component);
                 result.put("isolatedServiceOperation", serviceOperation);
+            } else if ("native-adversarial".equals(command)) {
+                operation = runtime.prepare(record, virtualUserId);
+                requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                String component = extras.getString("component",
+                        "com.warden.controlledsandbox.fixture.NativeAdversarialProbeService")
+                        .trim();
+                Bundle started = runtime.startService(record, virtualUserId, component, "");
+                requireStatus("native-adversarial-service", started,
+                        "SERVICE_STARTED", "SERVICE_RECOVERED");
+                result.put("nativeAdversarial", bundleJson(started));
+                try {
+                    Thread.sleep(12_000L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("NATIVE_ADV_WAIT_INTERRUPTED", interrupted);
+                }
+                operation = started;
             } else if ("prepare".equals(command) || "import-prepare".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");

@@ -120,6 +120,12 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-022]
+  - id: native-boundary-matrix
+    group: native_self_test
+    command: [python, scripts/check-native-boundary-matrix.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

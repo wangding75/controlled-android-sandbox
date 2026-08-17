@@ -18,6 +18,11 @@
         <activity android:name="com.warden.controlledsandbox.fixture.RemoteActivity" android:exported="false" android:process=":remote" />
         <!-- Cross-package component transport fixture: the virtual PMS must still enforce the
              exported boundary, while an explicitly exported peer Service is routable. -->
+        <activity android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeActivity"
+            android:exported="true"
+            android:noHistory="true" />
+        <service android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeService"
+            android:exported="true" />
         <service android:name="com.warden.controlledsandbox.fixture.FixtureService" android:exported="true">
             <meta-data android:name="cas.fixture.service_meta" android:value="service-peer" />
         </service>

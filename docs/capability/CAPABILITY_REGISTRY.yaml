@@ -222,13 +222,18 @@ capabilities:
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+      - docs/native/T57_R03_NATIVE_BOUNDARY_DECISION.md
       - scripts/check-native-file-hooks.py
       - scripts/check-m5-t19-1-a-native-trust-boundary.py
+      - scripts/check-native-boundary-matrix.py
     known_gaps:
       - PLT/GOT compatibility is not a hostile native security boundary.
       - Direct syscall / raw SVC / custom loader remain an architecture gap.
       - native_interceptors.cpp exceeds the 1600-line source-closure threshold.
       - GuestNativeRuntimeProjection durability needs reproduction after M10 rollback.
+      - Identity syscalls, ptrace, execve, Binder device nodes, and incomplete procfs are ARCHITECTURE_GAP.
   - id: process_death_recovery
     title: Process death / generation recovery
     implementation_status: PARTIAL

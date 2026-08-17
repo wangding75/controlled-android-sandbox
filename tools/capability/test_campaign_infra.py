@@ -83,6 +83,15 @@ class CampaignInfraTests(unittest.TestCase):
         self.assertIn("campaign_id", schema["required"])
         self.assertIn("maturity_level", schema["required"])
 
+    def test_native_campaign_alias_selects_native_gates(self) -> None:
+        from run_local_capability_audit import select_gates
+
+        selected = select_gates("native", False)
+        ids = [gate["id"] for gate in selected]
+        self.assertIn("native-boundary-matrix", ids)
+        self.assertIn("native-file-hooks", ids)
+        self.assertTrue(all("native_loader_jni_io" in (gate.get("capabilities") or []) for gate in selected))
+
 
 if __name__ == "__main__":
     unittest.main()

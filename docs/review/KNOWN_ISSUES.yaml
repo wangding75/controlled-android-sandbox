@@ -502,3 +502,176 @@ issues:
       LAUNCH_GATE_FAILED. This is a baseline/device finding, not a new
       infrastructure defect. First-version runner smoke uses the existing
       import-prepare DebugCommand.
+
+  - issue_id: KI-R03-NATIVE-001
+    title: Raw syscall instruction / raw SVC bypasses PLT/GOT
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
+      - sandbox-native/src/main/cpp/native_interceptors.cpp
+      - sandbox-native/src/test/cpp/native_syscall_boundary_self_test.cpp
+    match_patterns:
+      - raw SVC
+      - BYPASS_CONFIRMED
+    blocks_current_campaign: false
+    fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
+    notes: >
+      Userspace PLT rewrite cannot observe architecture raw syscall/SVC.
+      libc syscall() PLT is only TRUSTED_COMPAT. Expected architecture gap.
+
+  - issue_id: KI-R03-NATIVE-002
+    title: Process identity syscalls and ptrace/execve/clone are not intercepted
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+      - sandbox-native/src/main/cpp/native_hook.cpp
+    match_patterns:
+      - getpid
+      - ptrace
+      - execve
+    blocks_current_campaign: false
+    fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
+    notes: getpid/getuid/prctl/ptrace/clone/fork/execve are absent from the 74-symbol table.
+
+  - issue_id: KI-R03-NATIVE-003
+    title: Procfs virtualization covers known leaves only
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - sandbox-native/src/main/cpp/native_procfs.cpp
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+    match_patterns:
+      - map_files
+      - /proc/net
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: >
+      maps/cmdline/status/mountinfo/stat/statm/io are projected on hooked open.
+      fd, task listing, map_files, and /proc/net are not.
+
+  - issue_id: KI-R03-NATIVE-004
+    title: Filesystem metadata and cwd APIs are not hooked
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+    match_patterns:
+      - setxattr
+      - getcwd
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: chmod/chown/xattr/getcwd/chdir/realpath/mprotect are not guest targets.
+
+  - issue_id: KI-R03-NATIVE-005
+    title: Custom loader and linker namespace are outside current admission
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - sandbox-native/src/main/cpp/native_loader.cpp
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+    match_patterns:
+      - custom loader
+      - FOREIGN_LINKER_NAMESPACE_DENIED
+    blocks_current_campaign: false
+    fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
+    notes: dlopen/android_dlopen_ext are mediated. mmap custom ELF and JNI_OnLoad wrap are not.
+
+  - issue_id: KI-R03-NATIVE-006
+    title: Native guest can observe Binder device nodes
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+    match_patterns:
+      - /dev/binder
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Observation-only inventory. No transaction is issued by the fixture.
+
+  - issue_id: KI-R03-NATIVE-007
+    title: Translated-ABI guests skip PLT/GOT install
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java
+    match_patterns:
+      - translatedGuestAbi
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Host-ABI PLT rewrite is not ABI-transparent for the platform native bridge.
+
+  - issue_id: KI-R03-NATIVE-008
+    title: seccomp-BPF / user-notify is not implemented
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_ENFORCEMENT_OPTIONS.md
+      - docs/capability/VA_PRO_COMPATIBILITY_CORPUS.yaml
+    match_patterns:
+      - seccomp
+    blocks_current_campaign: false
+    fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
+    notes: >
+      VA-555/572/600/601/637/640/647/676 are commercial signals only.
+      CAS has no seccomp installer. User-notify is REQUIRES_PRIVILEGE.
+
+  - issue_id: KI-R03-NATIVE-009
+    title: FD escape via /proc/self/fd, dup, and inherited FDs
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01
+    evidence:
+      - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
+    match_patterns:
+      - /proc/self/fd
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Hooked open of /proc/self/fd is denied; readlink of own fd and raw open remain.
+
+  - issue_id: KI-R03-NATIVE-010
+    title: In-sandbox native-adversarial service resolved against host APK
+    capability: native_loader_jni_io
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-P0A-01 RD campaign
+    evidence:
+      - artifacts/capability-audit/native/20260817T065551Z/sandbox.json
+    match_patterns:
+      - NativeAdversarialProbeService
+      - Didn't find class
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: >
+      DebugCommand native-adversarial imported the guest with explicit trust and
+      startService then failed with ClassNotFoundException against the host
+      debug APK DexPathList. Direct fixture execution still produced RD Native
+      evidence. Do not rewrite Activity/runtime in this campaign.

@@ -284,6 +284,7 @@ entries:
   cas_status: GAP
   required_test: seccomp/user-notify or isolated supervisor design
   rd_status: UNVERIFIED
+  # T57-R03-P0A-01: CAS has no seccomp installer. Commercial signal only.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: VA commercial release exposed a kernel-level intercept domain CAS does not
@@ -417,7 +418,7 @@ entries:
   commercial_release_signal: VA commercial changelog recorded this compatibility domain
   cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
   cas_mapping: native_loader_jni_io
-  cas_status: NEEDS_TEST
+  cas_status: GAP
   required_test: procfd/map_files probe
   rd_status: UNVERIFIED
   android_matrix_status: UNVERIFIED

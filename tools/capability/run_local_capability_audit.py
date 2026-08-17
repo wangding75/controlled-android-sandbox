@@ -39,13 +39,21 @@ def load_issues() -> list[dict[str, Any]]:
     return list(load_yaml(ISSUES_PATH).get("issues") or [])
 
 
+NATIVE_CAMPAIGN_ALIASES = {
+    "native",
+    "T57-R03-P0A-01",
+    "native_loader_jni_io",
+}
+
+
 def select_gates(campaign: str, all_requested: bool) -> list[dict[str, Any]]:
     gates = load_catalog()
     if all_requested or campaign in {"all", "T57-R03-01", CAMPAIGN_ID}:
         return gates
-    if campaign not in REQUIRED_CAPABILITY_IDS:
+    requested = "native_loader_jni_io" if campaign in NATIVE_CAMPAIGN_ALIASES else campaign
+    if requested not in REQUIRED_CAPABILITY_IDS:
         raise SystemExit(f"unknown campaign/capability: {campaign}")
-    selected = [gate for gate in gates if campaign in (gate.get("capabilities") or [])]
+    selected = [gate for gate in gates if requested in (gate.get("capabilities") or [])]
     if not selected:
         raise SystemExit(f"no gates mapped to capability {campaign}")
     return selected

@@ -1,0 +1,830 @@
+schema_version: 1
+campaign: T57-R03-P0A-01
+title: CAS Native boundary matrix
+security_statement: >
+  PLT/GOT and libc syscall() mediation prove TRUSTED_COMPAT only.
+  They do not prove ISOLATED_HOSTILE enforcement.
+modes:
+  TRUSTED_COMPAT: compatibility interception for ordinary native apps
+  ISOLATED_HOSTILE: requires a provable kernel/supervisor/process-authority boundary
+status_enum:
+  - INTERCEPTED
+  - PARTIAL
+  - NOT_INTERCEPTED
+  - NOT_APPLICABLE
+  - UNKNOWN
+bypass_risk_enum:
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+entries:
+  - id: FS-OPEN
+    domain: filesystem
+    operation: open
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_open / SYS_open in controlled_syscall
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Guest PLT open/open64/__open_2. Raw SVC bypasses.
+
+  - id: FS-OPENAT
+    domain: filesystem
+    operation: openat
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_openat / SYS_openat
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-002
+    required_rd_test: NATIVE-ADV-002
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Common NDK escape hatch. libc syscall() is mediated; raw instruction is not.
+
+  - id: FS-OPENAT2
+    domain: filesystem
+    operation: openat2
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_openat2 / SYS_openat2
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-648
+    notes: RESOLVE_BENEATH/IN_ROOT stripped. Kernel availability varies.
+
+  - id: FS-ACCESS
+    domain: filesystem
+    operation: access/faccessat/faccessat2
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_access / controlled_faccessat / controlled_faccessat2
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-648
+    notes: faccessat2 is a VA commercial signal; CAS has PLT only.
+
+  - id: FS-STAT
+    domain: filesystem
+    operation: stat/lstat/fstatat/statx
+    libc_path: PARTIAL
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_stat / lstat / fstatat / statx
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: fstat/fstat64 on an already-open FD are not targets.
+
+  - id: FS-READLINK
+    domain: filesystem
+    operation: readlink/readlinkat
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_readlink / controlled_readlinkat
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-009
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-674
+    notes: Own /proc/self/fd/N readlink skips path rewrite so FD inspect can run.
+
+  - id: FS-UNLINK
+    domain: filesystem
+    operation: unlink/unlinkat
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_unlink / controlled_unlinkat
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Includes rmdir via unlinkat AT_REMOVEDIR.
+
+  - id: FS-RENAME
+    domain: filesystem
+    operation: rename/renameat/renameat2
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_rename / renameat / renameat2
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Cross-root rename becomes EXDEV.
+
+  - id: FS-MKDIR
+    domain: filesystem
+    operation: mkdir/mkdirat
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_mkdir / controlled_mkdirat
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Path projection only.
+
+  - id: FS-CHMOD
+    domain: filesystem
+    operation: chmod/fchmodat
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: chmod used only internally for proc snapshots.
+
+  - id: FS-CHOWN
+    domain: filesystem
+    operation: chown/fchownat
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: No wrapper or SYS_chown branch.
+
+  - id: FS-XATTR
+    domain: filesystem
+    operation: xattr family
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: VA commercial row mentions setxattr/lsetxattr. CAS has none.
+
+  - id: FS-CWD
+    domain: filesystem
+    operation: getcwd/chdir
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: getcwd returns host instance path. Used internally for AT_FDCWD.
+
+  - id: FS-REALPATH
+    domain: filesystem
+    operation: realpath
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Internal confinement helper only.
+
+  - id: FS-MMAP
+    domain: filesystem
+    operation: mmap/mprotect
+    libc_path: PARTIAL
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_mmap
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: ""
+    notes: mmap confines mapped FDs. mmap64/mmap2/mprotect are not guest targets.
+
+  - id: PROC-GETPID
+    domain: process
+    operation: getpid
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Virtual pid exists only in policy / procfs text.
+
+  - id: PROC-GETPPID
+    domain: process
+    operation: getppid
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Host parent pid leaks.
+
+  - id: PROC-GETTID
+    domain: process
+    operation: gettid
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: SYS_gettid used internally by crash/JNI probes.
+
+  - id: ID-GETUID
+    domain: identity
+    operation: getuid/geteuid
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Virtual uid is Java/policy/procfs text only.
+
+  - id: ID-GETGID
+    domain: identity
+    operation: getgid/getegid
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Same as getuid.
+
+  - id: PROC-KILL
+    domain: process
+    operation: kill/tgkill
+    libc_path: PARTIAL
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_kill / tgkill / tkill / killpg
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-006
+    required_rd_test: NATIVE-ADV-006
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Only swallows self SIGKILL/SIGTERM/SIGABRT unless teardown allows.
+
+  - id: PROC-PRCTL
+    domain: process
+    operation: prctl
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-006
+    required_rd_test: NATIVE-ADV-006
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-555
+    notes: Includes PR_SET_SECCOMP / PR_SET_NAME / dumpable.
+
+  - id: PROC-PTRACE
+    domain: process
+    operation: ptrace
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-006
+    required_rd_test: NATIVE-ADV-006
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-640
+    notes: TracerPid 0 in status snapshot is synthetic text.
+
+  - id: PROC-CLONE
+    domain: process
+    operation: clone/fork/vfork
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-007
+    required_rd_test: NATIVE-ADV-007
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: ""
+    notes: native_hook_self_test explicitly asserts fork is not a target.
+
+  - id: PROC-EXECVE
+    domain: process
+    operation: execve
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-007
+    required_rd_test: NATIVE-ADV-007
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-637
+    notes: VA commercial seccomp execve support. CAS has none.
+
+  - id: PROCFS-SELF
+    domain: procfs
+    operation: /proc/self
+    libc_path: PARTIAL
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: NativeProcFileSystem known leaves
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Directory itself is not virtualized.
+
+  - id: PROCFS-PID
+    domain: procfs
+    operation: /proc/<pid>
+    libc_path: PARTIAL
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: host pid or virtual_pid + known leaves
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Foreign pids are not projected.
+
+  - id: PROCFS-TASK
+    domain: procfs
+    operation: /proc/<pid>/task
+    libc_path: PARTIAL
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: task/<tid>/{maps,cmdline,status,mountinfo,stat,statm,io}
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-674
+    notes: Task directory listing is not projected.
+
+  - id: PROCFS-FD
+    domain: procfs
+    operation: /proc/<pid>/fd
+    libc_path: PARTIAL
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: readlink of own numeric fd only
+    current_status: PARTIAL
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-009
+    required_rd_test: NATIVE-ADV-009
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-674
+    notes: No synthetic fd table. Hooked open of /proc/self/fd is denied.
+
+  - id: PROCFS-MAPS
+    domain: procfs
+    operation: /proc/<pid>/maps
+    libc_path: INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: NativeProcFileSystem::sanitize_maps
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-693
+    notes: Line-oriented rewrite already exists. Raw open sees host maps.
+
+  - id: PROCFS-MAP-FILES
+    domain: procfs
+    operation: /proc/<pid>/map_files
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-674
+    notes: Hooked open denied as generic /proc. Unhooked open sees host inodes.
+
+  - id: PROCFS-NET
+    domain: procfs
+    operation: /proc/net
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-005
+    required_rd_test: NATIVE-ADV-005
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-686
+    notes: Hooked path APIs deny. Raw open reads host tcp/udp tables.
+
+  - id: NET-SOCKET
+    domain: network
+    operation: socket
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_socket
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: AF_INET/INET6/UNIX only. AF_NETLINK/PACKET rejected on libc path.
+
+  - id: NET-CONNECT
+    domain: network
+    operation: connect
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_connect
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: native_syscall_boundary_self_test asserts unhooked SYS_connect bypass.
+
+  - id: NET-BIND
+    domain: network
+    operation: bind
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_bind
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Address projection on libc/syscall PLT only.
+
+  - id: NET-GETSOCKNAME
+    domain: network
+    operation: getsockname
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_getsockname
+    current_status: INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Projects host local addr to virtual identity.
+
+  - id: NET-GETPEERNAME
+    domain: network
+    operation: getpeername
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_getpeername
+    current_status: INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Policy-checks peer.
+
+  - id: NET-SENDTO
+    domain: network
+    operation: sendto/recvfrom
+    libc_path: INTERCEPTED
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: controlled_sendto / controlled_recvfrom
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-004
+    required_rd_test: NATIVE-ADV-004
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Unhooked SYS_sendto bypass is characterized in-tree.
+
+  - id: LDR-DLOPEN
+    domain: loader
+    operation: dlopen
+    libc_path: INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: controlled_dlopen
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: dlopen(nullptr) denied. Custom mmap loader not seen.
+
+  - id: LDR-DLOPEN-EXT
+    domain: loader
+    operation: android_dlopen_ext
+    libc_path: INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: controlled_android_dlopen_ext
+    current_status: INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Foreign linker namespace denied.
+
+  - id: LDR-DLSYM
+    domain: loader
+    operation: dlsym
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Hook runtime uses dlsym(RTLD_NEXT) itself.
+
+  - id: LDR-CUSTOM
+    domain: loader
+    operation: custom loader path
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: ""
+    notes: mmap + hand-rolled ELF is outside every current hook.
+
+  - id: LDR-JNI-ONLOAD
+    domain: loader
+    operation: JNI_OnLoad
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Product does not wrap guest JNI_OnLoad.
+
+  - id: LDR-SYSTEM-LOAD
+    domain: loader
+    operation: System.load / System.loadLibrary
+    libc_path: PARTIAL
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: Runtime.nativeLoad diagnostic wrapper
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: installNativeLoadRedirect is hard-disabled.
+
+  - id: LDR-NAMESPACE
+    domain: loader
+    operation: linker namespace
+    libc_path: PARTIAL
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: FOREIGN_LINKER_NAMESPACE_DENIED
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Deny-only. CAS does not create a guest namespace.
+
+  - id: LDR-SEARCH
+    domain: loader
+    operation: native library search path
+    libc_path: PARTIAL
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: NativeLibraryLoaderPolicy + GuestNativeRuntimeProjection
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-008
+    required_rd_test: NATIVE-ADV-008
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Soname under native_library_root or 22-name system allowlist.
+
+  - id: BINDER-DEV
+    domain: binder
+    operation: /dev/binder /dev/vndbinder /dev/hwbinder
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-010
+    required_rd_test: NATIVE-ADV-010
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: ""
+    notes: Observation only. No transaction. libbinder_ndk.so is an allowed soname.
+
+  - id: SYS-LIBC
+    domain: syscall
+    operation: libc wrapper
+    libc_path: INTERCEPTED
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: NativeHookRuntime 74-symbol table
+    current_status: INTERCEPTED
+    bypass_risk: MEDIUM
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Guest-root ELF only. Host and foreign-ABI ELFs skipped.
+
+  - id: SYS-SYSCALL
+    domain: syscall
+    operation: syscall()
+    libc_path: PARTIAL
+    syscall_path: PARTIAL
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: controlled_syscall
+    current_status: PARTIAL
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-002
+    required_rd_test: NATIVE-ADV-002
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: VA-616
+    notes: Listed FS/net/lifetime numbers mediated. Unknown numbers forwarded.
+
+  - id: SYS-UNDERSCORE
+    domain: syscall
+    operation: __syscall
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-002
+    required_rd_test: NATIVE-ADV-002
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-616
+    notes: Bionic private stubs are not rebound.
+
+  - id: SYS-RAW
+    domain: syscall
+    operation: architecture raw instruction
+    libc_path: NOT_APPLICABLE
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-003
+    required_rd_test: NATIVE-ADV-003
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-555
+    notes: x86_64 syscall / arm64 svc #0 / x86 int 0x80 / ARM swi 0.
+
+  - id: SYS-INLINE
+    domain: syscall
+    operation: inline asm
+    libc_path: NOT_APPLICABLE
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-003
+    required_rd_test: NATIVE-ADV-003
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-555
+    notes: Same as raw instruction. PLT cannot observe it.
+
+  - id: SYS-SECCOMP
+    domain: syscall
+    operation: seccomp-BPF / user-notify
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: CRITICAL
+    required_fixture: NATIVE-ADV-003
+    required_rd_test: NATIVE-ADV-003
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: VA-555
+    notes: Product has no seccomp installer. /proc/self/status Seccomp:2 is fake text.
+
+  - id: SYS-TRANSLATED
+    domain: syscall
+    operation: translated-ABI guest PLT skip
+    libc_path: NOT_APPLICABLE
+    syscall_path: NOT_APPLICABLE
+    raw_instruction_path: NOT_APPLICABLE
+    current_interceptor: GuestRuntimeEnvironment enableNativeHooks=false
+    current_status: NOT_APPLICABLE
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-001
+    required_rd_test: NATIVE-ADV-001
+    target_mode: TRUSTED_COMPAT
+    va_pro_signal: ""
+    notes: Foreign-ABI guests executed by the platform native bridge skip PLT install.
