@@ -67,6 +67,7 @@ capabilities:
       - tools/device/t57_rd_service_real_path.ps1
       - tools/device/t57_rd_framework_foreground_service_probe.ps1
       - scripts/check-service-lifecycle.py
+      - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
     known_gaps:
       - Isolated/OEM fallback still uses GuestComponentRuntime.
       - JobService ANR/unbind and API 17 startService package-name checks remain VA commercial signals, not CAS proof.
@@ -167,9 +168,10 @@ capabilities:
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - scripts/check-m5-t6-isolated-process.py
+      - artifacts/capability-audit/p1-00/20260817T093213Z/ordinary_slots.json
     known_gaps:
       - Production contract is 64 ordinary + 16 isolated; some tests still assume 8 ordinary slots.
-      - High-slot exhaustion and concurrent recycle are not device-proven.
+      - Isolated live high-slot start is fail-closed on UNTRUSTED_RUNTIME_PEER_UID.
   - id: provider_transport
     title: Provider transport
     implementation_status: PARTIAL
@@ -193,7 +195,7 @@ capabilities:
     title: ClassLoader / ART / split loading
     implementation_status: PARTIAL
     static_status: PASS
-    rd_api32_status: PARTIAL
+    rd_api32_status: PASS
     api33_status: UNVERIFIED
     api34_status: UNVERIFIED
     api35_status: UNVERIFIED
@@ -204,6 +206,8 @@ capabilities:
     last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/runtime/T57_R03_CLASSLOADER_MATRIX.yaml
+      - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
     known_gaps:
       - Split APK, plugin same-name libraries, relocation, and linker namespace isolation are unproven.
   - id: native_loader_jni_io

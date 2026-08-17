@@ -1,6 +1,11 @@
 # T57-R03-P1-00 P0 evidence and ClassLoader closure
 
-RESULT: PASS (static + contract). RD session recorded separately when RD测试 is available.
+RESULT: PASS
+
+RD API32 (`artifacts/capability-audit/p1-00/20260817T093213Z`):
+`native-adversarial` started `NativeAdversarialProbeService` with
+`SERVICE_STARTED` (classification FIXED). Ordinary slots 1/7/8/31/32/62/63
+prepared and started the guest Service on the targeted `GuestProcessServiceN`.
 
 ## Why Service used host DexPathList
 
