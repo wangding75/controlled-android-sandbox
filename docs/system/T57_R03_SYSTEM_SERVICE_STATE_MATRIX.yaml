@@ -1,0 +1,50 @@
+schema_version: 1
+campaign: T57-R03-P1E
+title: Core SystemService virtualization
+owner: VirtualSystemServiceAuthority / Package-Service store
+services:
+  Alarm:
+    mode: VIRTUAL_STATE
+    state_owner: Package Service durable store
+    pending_intent: broker IIntentSender
+    process_death: recovered delivery
+    package_clear_delete: yes
+    generation: yes
+    rd: P1-00 system-holder + existing alarm self-test
+  Notification:
+    mode: VIRTUAL_STATE
+    channels: yes
+    package_identity: rewritten
+    pending_intent_actions: yes
+    fgs: yes
+    process_death: system-holder fixture
+  JobScheduler:
+    mode: VIRTUAL_STATE
+    persist: yes
+    constraints: typed
+    jobservice_callback: GuestJobServiceBridge
+    note: auto-finish bridge is not full Job semantics
+  Account:
+    mode: VIRTUAL_STATE
+    isolation: per virtual user
+    permission_boundary: recorded
+  Clipboard:
+    mode: VIRTUAL_STATE
+    isolation: per virtual user
+    callback_death: observer binder
+  Settings:
+    mode: VIRTUAL_STATE
+    identity_rewrite: SettingsProviderIdentityHook
+    host_passthrough: denied for guest-owned namespaces
+  UsageStats:
+    mode: VIRTUAL_STATE
+    permission_boundary: PACKAGE_USAGE_STATS
+  Shortcut:
+    mode: VIRTUAL_STATE
+    visibility: package scoped
+  AppWidget:
+    mode: VIRTUAL_STATE
+    bind: hostId scoped
+notes:
+  - New hooks must not add a private Map; they use the authority/store.
+  - HOST_PASSTHROUGH_WITH_IDENTITY_REWRITE is only used when virtualization is not reasonable.
