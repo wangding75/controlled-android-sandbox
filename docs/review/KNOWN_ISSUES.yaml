@@ -659,22 +659,25 @@ issues:
   - issue_id: KI-R03-NATIVE-010
     title: In-sandbox native-adversarial service resolved against host APK
     capability: native_loader_jni_io
-    classification: TEST_EVIDENCE_GAP
+    classification: CURRENT_DEFECT
     severity: MEDIUM
-    status: RECORDED
+    status: OPEN
     discovered_by: T57-R03-P0A-01 RD campaign
     evidence:
       - artifacts/capability-audit/native/20260817T065551Z/sandbox.json
+      - docs/review/T57_R03_P0C_FRAMEWORK_OWNERSHIP_RESULT.md
     match_patterns:
       - NativeAdversarialProbeService
       - Didn't find class
     blocks_current_campaign: false
-    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    fix_policy: FRAMEWORK_OWNED_GUEST_SERVICE_CLASSLOADER_P1
     notes: >
-      DebugCommand native-adversarial imported the guest with explicit trust and
-      startService then failed with ClassNotFoundException against the host
-      debug APK DexPathList. Direct fixture execution still produced RD Native
-      evidence. Do not rewrite Activity/runtime in this campaign.
+      P0C re-evaluated the P0A-01 DexPathList evidence. startService of a guest
+      fixture Service still resolved the class against the host debug APK, not
+      the guest LoadedApk/ClassLoader. That is a production class-resolution
+      defect. P0A-03 isolated-hostile Native evidence does not use this path.
+      A framework-owned fix is deferred to P1 so this campaign does not revert
+      to manual Service lifecycle.
 
   - issue_id: KI-R03-NATIVE-ENF-001
     title: Isolated process can still create sockets and connect
