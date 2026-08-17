@@ -276,6 +276,17 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                     return false;
                 }
                 return signingDigestMatches(args, signingMetadata.signatureSha256());
+            case "getChangedPackages":
+                // Sequence numbers are virtual-package-local. A host ChangedPackages object
+                // would leak host-installed package names.
+                return null;
+            case "canPackageQuery": {
+                String source = firstString(args);
+                String target = secondString(args);
+                if (source.isEmpty() || target.isEmpty()) return false;
+                if (!identity.packageName().equals(source)) return false;
+                return universe.isVisibleTo(source, target);
+            }
             default:
                 return NoResult.VALUE;
         }
@@ -1006,6 +1017,17 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private static String firstString(Object[] args) {
         if (args == null) return "";
         for (Object arg : args) if (arg instanceof String) return (String) arg;
+        return "";
+    }
+
+    private static String secondString(Object[] args) {
+        if (args == null) return "";
+        int seen = 0;
+        for (Object arg : args) {
+            if (!(arg instanceof String)) continue;
+            seen++;
+            if (seen == 2) return (String) arg;
+        }
         return "";
     }
 

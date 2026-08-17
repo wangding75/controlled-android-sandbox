@@ -1,0 +1,58 @@
+schema_version: 1
+campaign: T57-R03-P1B
+title: Virtual Package Manager surface
+rule: every collection/info result passes package universe + visibility first
+status_enum: [IMPLEMENTED, PARTIAL, MISSING, NOT_NEEDED_WITH_REASON, UNVERIFIED]
+surfaces:
+  getPackageInfo: IMPLEMENTED
+  getApplicationInfo: IMPLEMENTED
+  getActivityInfo: IMPLEMENTED
+  getServiceInfo: IMPLEMENTED
+  getReceiverInfo: IMPLEMENTED
+  getProviderInfo: IMPLEMENTED
+  resolveActivity: IMPLEMENTED
+  queryIntentActivities: IMPLEMENTED
+  queryIntentServices: IMPLEMENTED
+  queryBroadcastReceivers: IMPLEMENTED
+  resolveContentProvider: IMPLEMENTED
+  queryContentProviders: IMPLEMENTED
+  getInstalledPackages: IMPLEMENTED
+  getInstalledApplications: IMPLEMENTED
+  getPackagesForUid: IMPLEMENTED
+  getNameForUid: IMPLEMENTED
+  checkPermission: IMPLEMENTED
+  checkSignatures: IMPLEMENTED
+  getPermissionInfo: IMPLEMENTED
+  getPermissionGroupInfo: IMPLEMENTED
+  getInstrumentationInfo: IMPLEMENTED
+  queryInstrumentation: IMPLEMENTED
+  signingInfo_hasSigningCertificate: IMPLEMENTED
+  installer_source: IMPLEMENTED
+  split_source_dirs: IMPLEMENTED
+  shared_libraries: IMPLEMENTED
+  shared_uid: IMPLEMENTED
+  package_properties: PARTIAL
+  enabled_stopped_suspended: PARTIAL
+  changed_packages: IMPLEMENTED
+  component_enabled_state: IMPLEMENTED
+  home_browser_launcher: PARTIAL
+  domain_verification: NOT_NEEDED_WITH_REASON
+  storage_stats_linkage: NOT_NEEDED_WITH_REASON
+  instant_archive: NOT_NEEDED_WITH_REASON
+  PackageInfoFlags: IMPLEMENTED
+  canPackageQuery: IMPLEMENTED
+  HOST_PACKAGE_HIDDEN: IMPLEMENTED
+reasons:
+  domain_verification: No guest-owned Digital Asset Links owner in P1.
+  storage_stats_linkage: StorageStats is a later SystemService campaign.
+  home_browser_launcher: Resolved via queryIntentActivities MAIN/LAUNCHER, not a dedicated RoleManager store.
+  package_properties: Manifest properties are typed; PMS property query API remains ApplicationInfo/meta-data based.
+  enabled_stopped_suspended: Enabled/component settings exist; suspended/distracting flags are not virtualized.
+visibility:
+  queries: enforced
+  same_package: enforced
+  explicit_package: enforced
+  provider_authority: enforced
+  intent_based: enforced
+  hidden_package_fail_closed: HiddenPackageResultMapper
+  host_package_leakage: denied

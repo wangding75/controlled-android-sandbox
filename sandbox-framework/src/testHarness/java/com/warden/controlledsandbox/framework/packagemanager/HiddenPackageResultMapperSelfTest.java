@@ -25,6 +25,8 @@ public final class HiddenPackageResultMapperSelfTest {
                 "getInstrumentationInfo is null / NameNotFound-shaped");
         require(HiddenPackageResultMapper.map("resolveActivity", Object.class, lists) == null,
                 "resolveActivity is null");
+        require(HiddenPackageResultMapper.map("getChangedPackages", Object.class, lists) == null,
+                "getChangedPackages stays fail-closed");
         require(Integer.valueOf(-1).equals(
                         HiddenPackageResultMapper.map("getPackageUid", int.class, lists)),
                 "getPackageUid is absent uid");
