@@ -3,14 +3,14 @@ plugins { id 'com.android.application' }
 apply from: rootProject.file('gradle/release-signing.gradle')
 
 android {
-    namespace 'com.warden.controlledsandbox'
-    compileSdk rootProject.ext.controlledCompileSdk
+    namespace = 'com.warden.controlledsandbox'
+    compileSdk = rootProject.ext.controlledCompileSdk
     buildToolsVersion rootProject.ext.controlledBuildTools
 
     defaultConfig {
         applicationId 'com.warden.controlledsandbox'
-        minSdk rootProject.ext.controlledMinSdk
-        targetSdk rootProject.ext.controlledTargetSdk
+        minSdk = rootProject.ext.controlledMinSdk
+        targetSdk = rootProject.ext.controlledTargetSdk
         versionCode rootProject.ext.controlledVersionCode
         versionName rootProject.ext.controlledVersionName
         testInstrumentationRunner 'com.warden.controlledsandbox.SourceBaselineInstrumentation'

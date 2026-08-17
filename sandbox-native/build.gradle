@@ -1,13 +1,13 @@
 plugins { id 'com.android.library' }
 
 android {
-    namespace 'com.warden.controlledsandbox.nativebridge'
-    compileSdk rootProject.ext.controlledCompileSdk
+    namespace = 'com.warden.controlledsandbox.nativebridge'
+    compileSdk = rootProject.ext.controlledCompileSdk
     buildToolsVersion rootProject.ext.controlledBuildTools
-    ndkVersion rootProject.ext.controlledNdkVersion
+    ndkVersion = rootProject.ext.controlledNdkVersion
 
     defaultConfig {
-        minSdk rootProject.ext.controlledMinSdk
+        minSdk = rootProject.ext.controlledMinSdk
         externalNativeBuild {
             cmake { cppFlags '-std=c++20 -Wall -Wextra -Werror' }
         }
@@ -16,7 +16,7 @@ android {
     externalNativeBuild {
         cmake {
             path 'src/main/cpp/CMakeLists.txt'
-            version rootProject.ext.controlledCmakeVersion
+            version = rootProject.ext.controlledCmakeVersion
         }
     }
     compileOptions {

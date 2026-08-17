@@ -1,10 +1,10 @@
 plugins { id 'com.android.library' }
 
 android {
-    namespace 'com.warden.controlledsandbox.runtime'
-    compileSdk rootProject.ext.controlledCompileSdk
+    namespace = 'com.warden.controlledsandbox.runtime'
+    compileSdk = rootProject.ext.controlledCompileSdk
     buildToolsVersion rootProject.ext.controlledBuildTools
-    defaultConfig { minSdk rootProject.ext.controlledMinSdk }
+    defaultConfig { minSdk = rootProject.ext.controlledMinSdk }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17

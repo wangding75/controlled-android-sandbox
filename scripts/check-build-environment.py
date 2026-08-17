@@ -95,11 +95,18 @@ def main() -> int:
 
     for module in ("app", "fixture-basic", "fixture-compat32", "sandbox-companion32", "sandbox-contract", "sandbox-framework", "sandbox-native", "sandbox-runtime"):
         path = root / module / "build.gradle"
-        require_text(path, "compileSdk rootProject.ext.controlledCompileSdk")
-        require_text(path, "buildToolsVersion rootProject.ext.controlledBuildTools")
+        text = path.read_text(encoding="utf-8")
+        if "compileSdk = rootProject.ext.controlledCompileSdk" not in text and "compileSdk rootProject.ext.controlledCompileSdk" not in text:
+            fail(f"Missing locked compileSdk declaration in {path}")
+        if "buildToolsVersion rootProject.ext.controlledBuildTools" not in text and "buildToolsVersion = rootProject.ext.controlledBuildTools" not in text:
+            fail(f"Missing locked buildToolsVersion declaration in {path}")
     for module in ("fixture-basic", "fixture-compat32", "sandbox-companion32", "sandbox-native"):
-        require_text(root / module / "build.gradle", "ndkVersion rootProject.ext.controlledNdkVersion")
-        require_text(root / module / "build.gradle", "version rootProject.ext.controlledCmakeVersion")
+        path = root / module / "build.gradle"
+        text = path.read_text(encoding="utf-8")
+        if "ndkVersion = rootProject.ext.controlledNdkVersion" not in text and "ndkVersion rootProject.ext.controlledNdkVersion" not in text:
+            fail(f"Missing locked ndkVersion declaration in {path}")
+        if "version = rootProject.ext.controlledCmakeVersion" not in text and "version rootProject.ext.controlledCmakeVersion" not in text:
+            fail(f"Missing locked cmake version declaration in {path}")
 
     expected_sdk_packages = [
         "platform-tools",
