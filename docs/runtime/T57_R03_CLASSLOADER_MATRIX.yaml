@@ -1,0 +1,41 @@
+schema_version: 1
+campaign: T57-R03-P1D
+title: LoadedApk / ClassLoader / ART compatibility
+defining_contract: GuestDefiningLoader
+surfaces:
+  PathClassLoader: IMPLEMENTED
+  DelegateLastClassLoader: PARTIAL
+  InMemoryDexClassLoader: IMPLEMENTED
+  split_apk: IMPLEMENTED
+  dynamic_feature: PARTIAL
+  shared_library_loader: IMPLEMENTED
+  duplicate_java_dependency: PARTIAL
+  same_class_host_guest: IMPLEMENTED
+  same_so_multiple_paths: PARTIAL
+  plugin_loader: PARTIAL
+  custom_child_loader: IMPLEMENTED
+  webview_provider_loader: PARTIAL
+  jni_defining_loader: IMPLEMENTED
+  nativeLibraryDir: IMPLEMENTED
+  splitSourceDirs: IMPLEMENTED
+  android_dlopen_ext: PARTIAL
+  linker_namespace: PARTIAL
+  DexFile_OAT_VDEX: UNVERIFIED
+  page_size_16kb: UNVERIFIED
+loaded_apk:
+  sourceDir: IMPLEMENTED
+  publicSourceDir: IMPLEMENTED
+  splitSourceDirs: IMPLEMENTED
+  nativeLibraryDir: IMPLEMENTED
+  dataDir: IMPLEMENTED
+  classLoader: IMPLEMENTED
+  appComponentFactory: IMPLEMENTED
+  ApplicationInfo: IMPLEMENTED
+  processName: IMPLEMENTED
+  shared_library_info: IMPLEMENTED
+  attach_no_host_drift: IMPLEMENTED
+gaps:
+  - DelegateLast is used only when a factory installs it; CAS does not invent one.
+  - WebView provider smoke requires RD WebView package.
+  - ART/OAT/VDEX and 16KB page size need non-API32 device evidence.
+  - API33-36 field drift is audited not to hardcode API32-only names.
