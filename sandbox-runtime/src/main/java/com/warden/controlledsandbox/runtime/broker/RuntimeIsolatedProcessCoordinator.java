@@ -37,6 +37,7 @@ import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService12;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService13;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService14;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService15;
+import com.warden.controlledsandbox.contract.NativeExecutionProfile;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
@@ -99,6 +100,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     private final RuntimeServiceCoordinator services;
     private final ConcurrentMap<Integer, IsolatedConnection> connections = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, String> capabilities = new ConcurrentHashMap<>();
+    private final RuntimeIsolatedPeerRegistry peerRegistry = new RuntimeIsolatedPeerRegistry();
 
     RuntimeIsolatedProcessCoordinator(Service host, BrokerStateStore brokerState, Clock clock,
             TokenGenerator tokenGenerator, InputValidator inputValidator, SpecFactory specFactory,
@@ -124,6 +126,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
 
     SessionMetricsRepository sessionMetrics() { return sessions; }
     ServiceMetricsSource serviceMetrics() { return services; }
+    RuntimeIsolatedPeerRegistry peerRegistry() { return peerRegistry; }
 
     /**
      * Resolves an isolated lease for capability transports which terminate in the main Broker
@@ -143,7 +146,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         return null;
     }
 
-    synchronized Bundle invoke(Bundle request, IsolatedProcessRoutePolicy.Match suppliedMatch)
+    Bundle invoke(Bundle request, IsolatedProcessRoutePolicy.Match suppliedMatch)
             throws Exception {
         Bundle input = new Bundle(request);
         IsolatedProcessRoutePolicy.Match match = IsolatedProcessRoutePolicy.requireIsolatedService(input);
@@ -158,106 +161,138 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         input.putString(RuntimeKeys.PROCESS_NAME, processName);
         input.putString(RuntimeKeys.COMPONENT_CLASS, match.componentClass());
         input.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
-        stopMismatchedSessions(packageName, userId, revision);
-        padIsolatedSlots(packageName, userId, revision, processName,
-                input.getInt(RuntimeKeys.SLOT_PAD_COUNT, 0),
-                input.getInt(RuntimeKeys.SLOT_TARGET, -1));
 
-        GuestSession session = sessions.allocate(packageName, userId, processName, revision, now());
+        GuestSession session;
         GuestSession staleRecovery = null;
-        boolean prepareRequired = session.state() != SessionState.READY
-                && session.state() != SessionState.ACTIVE;
-        if (session.state() == SessionState.RECOVERING) {
-            staleRecovery = session;
-            removeCapabilities(session.sessionId());
-            session = sessions.beginRecovery(packageName, userId, processName,
-                    session.generation(), now());
-        } else if (session.state() == SessionState.ALLOCATED) {
-            session = sessions.transition(packageName, userId, processName,
-                    session.generation(), SessionState.PREPARING, now(), "");
-        } else if (prepareRequired && session.state() != SessionState.PREPARING) {
-            throw new IllegalStateException("ISOLATED_SESSION_BUSY:" + session.state());
+        boolean prepareRequired;
+        String key;
+        Bundle spec;
+        String capability;
+        synchronized (this) {
+            stopMismatchedSessions(packageName, userId, revision);
+            padIsolatedSlots(packageName, userId, revision, processName,
+                    input.getInt(RuntimeKeys.SLOT_PAD_COUNT, 0),
+                    input.getInt(RuntimeKeys.SLOT_TARGET, -1));
+
+            session = sessions.allocate(packageName, userId, processName, revision, now());
+            prepareRequired = session.state() != SessionState.READY
+                    && session.state() != SessionState.ACTIVE;
+            if (session.state() == SessionState.RECOVERING) {
+                staleRecovery = session;
+                removeCapabilities(session.sessionId());
+                session = sessions.beginRecovery(packageName, userId, processName,
+                        session.generation(), now());
+            } else if (session.state() == SessionState.ALLOCATED) {
+                session = sessions.transition(packageName, userId, processName,
+                        session.generation(), SessionState.PREPARING, now(), "");
+            } else if (prepareRequired && session.state() != SessionState.PREPARING) {
+                throw new IllegalStateException("ISOLATED_SESSION_BUSY:" + session.state());
+            }
+
+            key = processKey(packageName, userId, processName);
+            spec = brokerState.prepared(key);
+            capability = capability(session, prepareRequired);
+            if (prepareRequired) {
+                spec = specFactory.create(input, session);
+                spec.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
+                spec.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
+                publishPeerAdmission(session, capability, spec);
+                systemServices().attach(session, spec);
+            } else {
+                if (spec == null) throw new IllegalStateException("ISOLATED_PREPARED_SPEC_MISSING");
+                if (!revision.equals(spec.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
+                    throw new IllegalStateException("ISOLATED_PREPARED_SPEC_REVISION_MISMATCH");
+                }
+            }
         }
 
-        String key = processKey(packageName, userId, processName);
-        Bundle spec = brokerState.prepared(key);
-        String capability = capability(session, prepareRequired);
+        // Isolated workers call back into the Broker during prepare/invoke. Do not hold the
+        // coordinator monitor across those Binder transactions.
         if (prepareRequired) {
-            spec = specFactory.create(input, session);
-            spec.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
-            spec.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
-            systemServices().attach(session, spec);
             final GuestSession preparingSession = session;
             final Bundle preparingSpec = new Bundle(spec);
             final String isolatedComponent = match.componentClass();
+            final GuestSession recovery = staleRecovery;
             try {
                 IsolatedProcessResult prepared = call(preparingSession.processSlot(), worker ->
                         worker.prepare(request(preparingSession, isolatedComponent,
                                 "PREPARE_ISOLATED_SERVICE", capability, preparingSpec)));
-                Bundle preparedPayload = requireResult(preparingSession, isolatedComponent, prepared);
-                if ("FAILED".equals(preparedPayload.getString(RuntimeKeys.STATUS, ""))) {
-                    throw new IllegalStateException("ISOLATED_GUEST_PREPARE_FAILED:"
-                            + preparedPayload.getString(RuntimeKeys.ERROR_MESSAGE, ""));
+                synchronized (this) {
+                    Bundle preparedPayload = requireResult(preparingSession, isolatedComponent, prepared);
+                    if (prepared.successful()) {
+                        peerRegistry.requireRegisteredUid(prepared.platformUid(),
+                                preparingSession.sessionId(), preparingSession.generation());
+                    }
+                    if ("FAILED".equals(preparedPayload.getString(RuntimeKeys.STATUS, ""))) {
+                        throw new IllegalStateException("ISOLATED_GUEST_PREPARE_FAILED:"
+                                + preparedPayload.getString(RuntimeKeys.ERROR_MESSAGE, ""));
+                    }
+                    if (recovery != null) services.recoverSession(recovery, session, spec);
+                    session = sessions.transition(packageName, userId, processName,
+                            session.generation(), SessionState.READY, now(), "");
+                    Bundle cached = new Bundle(spec);
+                    cached.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
+                    brokerState.putPrepared(key, cached);
                 }
-                if (staleRecovery != null) services.recoverSession(staleRecovery, session, spec);
             } catch (Throwable error) {
-                try {
-                    if (staleRecovery != null) services.invalidate(staleRecovery);
-                    systemServices().stop(session);
-                    shareCleaner.accept(session);
-                    sessions.transition(packageName, userId, processName, session.generation(),
-                            SessionState.FAILED, now(), String.valueOf(error.getMessage()));
-                    removeCapabilities(session.sessionId());
-                    releaseConnection(session.processSlot());
-                } finally {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                synchronized (this) {
+                    try {
+                        if (recovery != null) services.invalidate(recovery);
+                        systemServices().stop(session);
+                        shareCleaner.accept(session);
+                        sessions.transition(packageName, userId, processName, session.generation(),
+                                SessionState.FAILED, now(), String.valueOf(error.getMessage()));
+                        removeCapabilities(session.sessionId());
+                        releaseConnection(session.processSlot());
+                    } finally {
+                        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                    }
                 }
                 throw error;
             }
-            session = sessions.transition(packageName, userId, processName,
-                    session.generation(), SessionState.READY, now(), "");
-            Bundle cached = new Bundle(spec);
-            cached.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
-            brokerState.putPrepared(key, cached);
-        } else {
-            if (spec == null) throw new IllegalStateException("ISOLATED_PREPARED_SPEC_MISSING");
-            if (!revision.equals(spec.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
-                throw new IllegalStateException("ISOLATED_PREPARED_SPEC_REVISION_MISMATCH");
-            }
         }
 
-        Bundle call = new Bundle(spec);
-        call.putAll(request);
-        call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
-        call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
-        call.putString(RuntimeKeys.PROCESS_NAME, processName);
-        call.putString(RuntimeKeys.COMPONENT_CLASS, match.componentClass());
-        call.putString(RuntimeKeys.SESSION_ID, session.sessionId());
-        call.putLong(RuntimeKeys.GENERATION, session.generation());
-        call.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
-        call.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
-        call.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
+        final GuestSession invokingSession;
+        final Bundle isolatedCall;
+        final String operation;
+        final String component;
+        synchronized (this) {
+            Bundle call = new Bundle(spec);
+            call.putAll(request);
+            call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
+            call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
+            call.putString(RuntimeKeys.PROCESS_NAME, processName);
+            call.putString(RuntimeKeys.COMPONENT_CLASS, match.componentClass());
+            call.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+            call.putLong(RuntimeKeys.GENERATION, session.generation());
+            call.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+            call.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
+            call.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, capability);
+            attachPeerAdmission(session, capability, call);
+            invokingSession = session;
+            isolatedCall = new Bundle(call);
+            operation = required(isolatedCall, ComponentOperations.OPERATION);
+            component = match.componentClass();
+        }
 
-        final GuestSession invokingSession = session;
-        final Bundle isolatedCall = new Bundle(call);
-        final String operation = required(isolatedCall, ComponentOperations.OPERATION);
-        final String component = match.componentClass();
         IsolatedProcessResult isolated = call(invokingSession.processSlot(), worker -> worker.invoke(
                 request(invokingSession, component, operation, capability, isolatedCall)));
-        Bundle result = requireResult(invokingSession, component, isolated);
-        result.putString(RuntimeKeys.SESSION_ID, session.sessionId());
-        result.putLong(RuntimeKeys.GENERATION, session.generation());
-        result.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
-        result.putString(RuntimeKeys.PROCESS_NAME, session.processName());
-        result.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
-        if (!"FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
-            services.applySuccessfulOperation(session, request, result);
-            if (session.state() == SessionState.READY) {
-                sessions.transition(packageName, userId, processName, session.generation(),
-                        SessionState.ACTIVE, now(), "");
+        synchronized (this) {
+            Bundle result = requireResult(invokingSession, component, isolated);
+            result.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+            result.putLong(RuntimeKeys.GENERATION, session.generation());
+            result.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+            result.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+            result.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
+            if (!"FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+                services.applySuccessfulOperation(session, request, result);
+                if (session.state() == SessionState.READY) {
+                    sessions.transition(packageName, userId, processName, session.generation(),
+                            SessionState.ACTIVE, now(), "");
+                }
             }
+            return result;
         }
-        return result;
     }
 
     synchronized void stopGuest(String packageName, int userId) {
@@ -436,6 +471,35 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         if (sessionId == null || sessionId.isEmpty()) return;
         String prefix = sessionId + "@";
         capabilities.keySet().removeIf(key -> key.startsWith(prefix));
+        peerRegistry.revokeSession(sessionId);
+    }
+
+    private void publishPeerAdmission(GuestSession session, String capability, Bundle spec) {
+        RuntimeIsolatedPeerRegistry.Kind kind =
+                NativeExecutionProfile.isHostile(spec.getString(RuntimeKeys.NATIVE_EXECUTION_PROFILE, ""))
+                        ? RuntimeIsolatedPeerRegistry.Kind.HOSTILE_ISOLATED_WORKER
+                        : RuntimeIsolatedPeerRegistry.Kind.ISOLATED_GUEST;
+        peerRegistry.publishPending(new RuntimeIsolatedPeerRegistry.Lease(
+                session.sessionId(), session.generation(), session.processSlot(), capability,
+                session.processName(), session.packageName(), kind, 0));
+        spec.putBinder(RuntimeKeys.ISOLATED_PEER_ADMISSION,
+                new IsolatedPeerAdmissionBinder(peerRegistry, host.getApplicationInfo().uid));
+    }
+
+    private void attachPeerAdmission(GuestSession session, String capability, Bundle spec) {
+        if (spec.getBinder(RuntimeKeys.ISOLATED_PEER_ADMISSION) != null) return;
+        spec.putBinder(RuntimeKeys.ISOLATED_PEER_ADMISSION,
+                new IsolatedPeerAdmissionBinder(peerRegistry, host.getApplicationInfo().uid));
+        if (!peerRegistry.isRegisteredIsolatedPeer(
+                spec.getInt(RuntimeKeys.ISOLATED_PLATFORM_UID, 0))) {
+            RuntimeIsolatedPeerRegistry.Kind kind =
+                    NativeExecutionProfile.isHostile(spec.getString(RuntimeKeys.NATIVE_EXECUTION_PROFILE, ""))
+                            ? RuntimeIsolatedPeerRegistry.Kind.HOSTILE_ISOLATED_WORKER
+                            : RuntimeIsolatedPeerRegistry.Kind.ISOLATED_GUEST;
+            peerRegistry.publishPending(new RuntimeIsolatedPeerRegistry.Lease(
+                    session.sessionId(), session.generation(), session.processSlot(), capability,
+                    session.processName(), session.packageName(), kind, 0));
+        }
     }
 
     private IsolatedProcessResult call(int slot, IsolatedCall call) throws Exception {
@@ -589,6 +653,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         synchronized (this) { slots = connections.keySet().toArray(new Integer[0]); }
         for (int slot : slots) releaseConnection(slot);
         capabilities.clear();
+        peerRegistry.clear();
         services.close();
     }
 

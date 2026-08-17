@@ -202,7 +202,7 @@ def probe_system_holder(serial: str) -> dict[str, Any]:
             "--ei", "user", "0",
             "--ez", "trustNativeGuest", "true",
         ],
-        deadline_sec=90,
+        deadline_sec=150,
     )
     notifications = run_adb(
         serial, ["shell", "dumpsys", "notification", "--noredact"], check=False

@@ -59,7 +59,11 @@ public final class SystemHolderPendingIntentActivity extends Activity {
         } catch (Exception error) {
             Log.e(TAG, "ARM_FAILED", error);
         }
-        finish();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        new android.os.Handler(getMainLooper()).postDelayed(this::finish, 2_500L);
     }
 
     private void postNotification(PendingIntent content) throws Exception {

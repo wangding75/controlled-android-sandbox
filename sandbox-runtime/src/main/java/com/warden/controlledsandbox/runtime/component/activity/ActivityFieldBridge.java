@@ -949,7 +949,9 @@ public final class ActivityFieldBridge {
                 projected.processName = component.processName().isEmpty()
                         ? projected.processName : component.processName();
                 projected.theme = component.themeResId();
-                setOptionalObjectUnchecked(projected, "metaData", component.metaData());
+                setOptionalObjectUnchecked(projected, "metaData",
+                        com.warden.controlledsandbox.runtime.guest.GuestPackageMetadataMapper
+                                .toMetadataBundle(component.metaData()));
                 projectActivityContract(projected, component);
                 break;
             }
@@ -982,7 +984,9 @@ public final class ActivityFieldBridge {
             projected.processName = component.processName().isEmpty()
                     ? projected.processName : component.processName();
             projected.theme = component.themeResId();
-            setOptionalObjectUnchecked(projected, "metaData", component.metaData());
+            setOptionalObjectUnchecked(projected, "metaData",
+                    com.warden.controlledsandbox.runtime.guest.GuestPackageMetadataMapper
+                            .toMetadataBundle(component.metaData()));
             projectActivityContract(projected, component);
             break;
         }

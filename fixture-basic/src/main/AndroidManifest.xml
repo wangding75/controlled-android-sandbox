@@ -38,8 +38,7 @@
         <service android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeService"
             android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity"
-            android:exported="true"
-            android:noHistory="true" />
+            android:exported="true" />
         <receiver android:name="com.warden.controlledsandbox.fixture.SystemHolderPendingIntentReceiver"
             android:exported="true">
             <intent-filter>

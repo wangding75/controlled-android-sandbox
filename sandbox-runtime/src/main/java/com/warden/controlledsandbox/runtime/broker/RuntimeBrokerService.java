@@ -170,6 +170,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         componentRecoveryCoordinator = new RuntimeComponentRecoveryCoordinator(
                 sessions, clock, activityRuntime, serviceCoordinator, receiverCoordinator,
                 providerResources, systemServiceCoordinator);
+        RuntimePeerPolicy.installIsolatedPeerRegistry(isolatedProcessCoordinator.peerRegistry());
     }
     private final IRuntimeBroker.Stub binder = new IRuntimeBroker.Stub() {
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
@@ -1185,6 +1186,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         serviceCoordinator.close();
         isolatedProcessCoordinator.close();
         isolatedShares.close();
+        RuntimePeerPolicy.installIsolatedPeerRegistry(null);
         super.onDestroy();
     }
 

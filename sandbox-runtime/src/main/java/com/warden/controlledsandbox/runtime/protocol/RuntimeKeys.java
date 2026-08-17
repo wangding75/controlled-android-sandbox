@@ -24,6 +24,8 @@ public final class RuntimeKeys {
     public static final String PROCESS_NAME = "processName";
     public static final String ISOLATED_PROCESS = "isolatedProcess";
     public static final String ISOLATED_CAPABILITY_TOKEN = "isolatedCapabilityToken";
+    /** Broker-owned admission Binder used by isolated workers to register their platform UID. */
+    public static final String ISOLATED_PEER_ADMISSION = "isolatedPeerAdmission";
     public static final String ISOLATED_PLATFORM_PID = "isolatedPlatformPid";
     public static final String ISOLATED_PLATFORM_UID = "isolatedPlatformUid";
     /** Binder-transferred file capabilities used by platform isolated_app workers. */

@@ -121,6 +121,9 @@ public final class IsolatedProcessRequest implements Parcelable {
             case "SET_SERVICE_FOREGROUND":
             case "BIND_SERVICE":
             case "UNBIND_SERVICE":
+            case "ROUTE_FRAMEWORK_SERVICE":
+            case "FRAMEWORK_SERVICE_EVENT":
+            case "RECOVER_FRAMEWORK_SERVICE":
             case "STATUS_ISOLATED_SERVICE":
                 return normalized;
             default:

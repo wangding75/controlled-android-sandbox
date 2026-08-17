@@ -80,6 +80,8 @@ require(
     "ISOLATED_OUTER_INNER_IDENTITY_MISMATCH",
     "ISOLATED_CAPABILITY_MISMATCH",
     "payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER)",
+    "registerIsolatedPeer",
+    "ISOLATED_PEER_ADMISSION_MISSING",
     "stopSelf()",
 )
 for slot in range(16):
@@ -107,6 +109,8 @@ require(
     "services.recoverSession",
     "handleDisconnect",
     "ISOLATED_CAPABILITY_TOKEN_COLLISION",
+    "publishPeerAdmission",
+    "RuntimeIsolatedPeerRegistry",
 )
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessRoutePolicy.java",

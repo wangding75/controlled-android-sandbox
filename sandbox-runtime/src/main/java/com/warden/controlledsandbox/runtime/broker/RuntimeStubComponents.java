@@ -73,7 +73,11 @@ final class RuntimeStubComponents {
         String base = activityClassFor(slot).getName();
         int variant = activityVariant(guestComponent, packageState);
         if (variant == 0) return base;
-        if (variant < 0 || variant > 63) {
+        if (variant < 0) {
+            throw new IllegalArgumentException("GUEST_ACTIVITY_NOT_IN_PACKAGE_STATE:"
+                    + guestComponent);
+        }
+        if (variant > 63) {
             throw new IllegalArgumentException("Guest Activity alias pool exhausted: "
                     + guestComponent + " index=" + variant);
         }

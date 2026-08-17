@@ -17,8 +17,10 @@ import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSna
 import com.warden.controlledsandbox.compatibility.dingtalk.DingTalkCompatibilityManager;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
@@ -100,7 +102,8 @@ public final class DebugCommandActivity extends Activity {
             SandboxRecord record = packages.findRecord(packageName);
             Log.i(TAG, "PACKAGE_LOOKUP_RETURN command=" + command + " package=" + packageName);
             boolean importRequested = "import-launch".equals(command)
-                    || "import-prepare".equals(command) || record == null;
+                    || "import-prepare".equals(command) || record == null
+                    || installedApkRevisionChanged(record, packageName);
             if (importRequested) {
                 ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
                 File source = new File(installed.sourceDir);
@@ -442,6 +445,33 @@ public final class DebugCommandActivity extends Activity {
                 }
             }
             throw error;
+        }
+    }
+
+    private boolean installedApkRevisionChanged(SandboxRecord record, String packageName) {
+        if (record == null || packageName == null || packageName.trim().isEmpty()) return false;
+        try {
+            ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
+            File source = new File(installed.sourceDir);
+            if (!source.isFile()) return false;
+            String digest = sha256Hex(source);
+            return digest != null && !digest.equalsIgnoreCase(record.sha256);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static String sha256Hex(File file) {
+        try (FileInputStream input = new FileInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) > 0) digest.update(buffer, 0, read);
+            StringBuilder hex = new StringBuilder(64);
+            for (byte value : digest.digest()) hex.append(String.format("%02x", value));
+            return hex.toString();
+        } catch (Exception error) {
+            return null;
         }
     }
 

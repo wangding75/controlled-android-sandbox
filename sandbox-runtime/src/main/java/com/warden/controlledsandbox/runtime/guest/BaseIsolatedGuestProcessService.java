@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Parcel;
 import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
@@ -22,6 +23,7 @@ import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.runtime.broker.CallerGuard;
+import com.warden.controlledsandbox.runtime.broker.IsolatedPeerAdmissionBinder;
 import com.warden.controlledsandbox.runtime.broker.FrameworkServiceRelay;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -66,6 +68,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(
                         payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER));
                 if (broker == null) throw new SecurityException("ISOLATED_RUNTIME_BROKER_MISSING");
+                registerIsolatedPeer(payload, request);
                 // The Guest runtime still needs a Binder transport for framework component
                 // routes. Expose only a generation/package-scoped facade; the raw Broker Binder
                 // never enters Guest code and every typed request is revalidated here.
@@ -121,6 +124,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(
                         payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER));
                 if (broker == null) throw new SecurityException("ISOLATED_RUNTIME_BROKER_MISSING");
+                registerIsolatedPeer(payload, request);
                 payload.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER,
                         new ScopedRuntimeBroker(broker, request).asBinder());
                 Bundle result = GuestRuntimeEnvironment.require(
@@ -252,6 +256,28 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
         if (!"PREPARE_ISOLATED_SERVICE".equals(request.operation())
                 && !"STATUS_ISOLATED_SERVICE".equals(request.operation())) {
             payload.putString(ComponentOperations.OPERATION, request.operation());
+        }
+    }
+
+    private static void registerIsolatedPeer(Bundle payload, IsolatedProcessRequest request)
+            throws android.os.RemoteException {
+        IBinder admission = payload == null ? null : payload.getBinder(RuntimeKeys.ISOLATED_PEER_ADMISSION);
+        if (admission == null) throw new SecurityException("ISOLATED_PEER_ADMISSION_MISSING");
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        try {
+            data.writeInterfaceToken(IsolatedPeerAdmissionBinder.DESCRIPTOR);
+            data.writeString(request.sessionId());
+            data.writeLong(request.generation());
+            data.writeInt(request.processSlot());
+            data.writeString(request.capabilityToken());
+            if (!admission.transact(IsolatedPeerAdmissionBinder.TRANSACTION_REGISTER, data, reply, 0)) {
+                throw new SecurityException("ISOLATED_PEER_ADMISSION_FAILED");
+            }
+            reply.readException();
+        } finally {
+            data.recycle();
+            reply.recycle();
         }
     }
 

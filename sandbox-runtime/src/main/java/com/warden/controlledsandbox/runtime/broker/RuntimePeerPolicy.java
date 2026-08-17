@@ -16,13 +16,22 @@ public final class RuntimePeerPolicy {
 
     private RuntimePeerPolicy() { }
 
+    private static volatile RuntimeIsolatedPeerRegistry isolatedPeers;
+
+    public static void installIsolatedPeerRegistry(RuntimeIsolatedPeerRegistry registry) {
+        isolatedPeers = registry;
+    }
+
     public static void requireTrustedBinderCaller(Context context) {
         int callerUid = Binder.getCallingUid();
         if (callerUid == Process.myUid()) return;
-        if (context == null || context.checkCallingPermission(SIGNATURE_PERMISSION)
-                != PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("UNTRUSTED_RUNTIME_PEER_UID:" + callerUid);
+        if (context != null && context.checkCallingPermission(SIGNATURE_PERMISSION)
+                == PackageManager.PERMISSION_GRANTED) {
+            return;
         }
+        RuntimeIsolatedPeerRegistry registry = isolatedPeers;
+        if (registry != null && registry.isRegisteredIsolatedPeer(callerUid)) return;
+        throw new SecurityException("UNTRUSTED_RUNTIME_PEER_UID:" + callerUid);
     }
 
     public static String hostPackageFor(Context context) {

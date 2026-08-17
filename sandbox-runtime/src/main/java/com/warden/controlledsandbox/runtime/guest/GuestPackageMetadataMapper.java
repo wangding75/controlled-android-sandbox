@@ -183,7 +183,7 @@ public final class GuestPackageMetadataMapper {
         return fromSnapshot(state, applicationInfo, null);
     }
 
-    static Bundle toMetadataBundle(List<VirtualComponentMetadataSnapshot> entries) {
+    public static Bundle toMetadataBundle(List<VirtualComponentMetadataSnapshot> entries) {
         if (entries == null || entries.isEmpty()) return null;
         Bundle bundle = new Bundle();
         for (VirtualComponentMetadataSnapshot entry : entries) {

@@ -237,6 +237,10 @@ public final class GuestComponentRuntime {
                     startServiceThroughFramework(componentClass, request, false);
             case ComponentOperations.START_FOREGROUND_SERVICE ->
                     startServiceThroughFramework(componentClass, request, true);
+            case ComponentOperations.ROUTE_FRAMEWORK_SERVICE ->
+                    routeIsolatedOrFrameworkService(componentClass, request);
+            case ComponentOperations.FRAMEWORK_SERVICE_EVENT ->
+                    applyIsolatedFrameworkServiceEvent(componentClass, request);
             case ComponentOperations.RECOVER_FRAMEWORK_SERVICE -> {
                 GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
                 if (framework == null) throw new IllegalStateException(
@@ -340,6 +344,8 @@ public final class GuestComponentRuntime {
                 || ComponentOperations.SET_SERVICE_FOREGROUND.equals(operation)
                 || ComponentOperations.BIND_SERVICE.equals(operation)
                 || ComponentOperations.UNBIND_SERVICE.equals(operation)
+                || ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(operation)
+                || ComponentOperations.FRAMEWORK_SERVICE_EVENT.equals(operation)
                 || ComponentOperations.SEND_BROADCAST.equals(operation)
                 || ComponentOperations.PREPARE_PROVIDER.equals(operation);
     }
@@ -369,10 +375,31 @@ public final class GuestComponentRuntime {
         }
     }
 
+    private Bundle routeIsolatedOrFrameworkService(String className, Bundle request)
+            throws Exception {
+        if (session.spec.isolatedProcess) {
+            // Isolated workers already occupy the dedicated isolated UID process. A second
+            // ROUTE_FRAMEWORK_SERVICE hop back to the Broker would deadlock the same slot.
+            return startService(className, request,
+                    request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false));
+        }
+        return startServiceThroughFramework(className, request, false);
+    }
+
+    private Bundle applyIsolatedFrameworkServiceEvent(String className, Bundle request) {
+        if (session.spec.isolatedProcess) {
+            Bundle out = success("SERVICE_EVENT_APPLIED", className);
+            out.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
+            return out;
+        }
+        throw new IllegalArgumentException("Unknown Service operation: "
+                + ComponentOperations.FRAMEWORK_SERVICE_EVENT);
+    }
+
     private Bundle startServiceThroughFramework(String className, Bundle request,
                                                 boolean foregroundRequested) throws Exception {
         GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
-        if (framework == null) {
+        if (framework == null || session.spec.isolatedProcess) {
             return startService(className, request, foregroundRequested);
         }
         boolean recovery = request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
@@ -394,7 +421,7 @@ public final class GuestComponentRuntime {
 
     private Bundle stopServiceThroughFramework(String className, Bundle request) {
         GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
-        if (framework == null) return stopService(className);
+        if (framework == null || session.spec.isolatedProcess) return stopService(className);
         boolean stopped = framework.stop(request, className);
         Bundle out = success(stopped ? "SERVICE_STOPPED" : "SERVICE_NOT_RUNNING", className);
         out.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);

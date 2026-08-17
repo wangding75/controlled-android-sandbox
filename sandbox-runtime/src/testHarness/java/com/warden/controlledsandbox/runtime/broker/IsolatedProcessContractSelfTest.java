@@ -22,6 +22,12 @@ public final class IsolatedProcessContractSelfTest {
         check("com.example".equals(request.payload().getString(RuntimeKeys.PACKAGE_NAME)),
                 "payload getter must return a copy");
 
+        IsolatedProcessRequest frameworkRoute = new IsolatedProcessRequest(1, "session-1", 2L, 3, 7,
+                "com.example", "com.example:isolated_service", "com.example.IsolatedService",
+                "revision-1", ComponentOperations.ROUTE_FRAMEWORK_SERVICE, "capability-1", payload());
+        check(ComponentOperations.ROUTE_FRAMEWORK_SERVICE.equals(frameworkRoute.operation()),
+                "framework Service route must be a legal isolated operation");
+
         IsolatedProcessResult result = IsolatedProcessResult.success(request, "ISOLATED_READY", 4321, 99001, new Bundle());
         check(result.successful(), "successful result expected");
         check(result.generation() == 2L && result.processSlot() == 3, "result must bind generation and slot");
