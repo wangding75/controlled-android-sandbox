@@ -10,5 +10,10 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+        <service
+            android:name=".NativeEnforcementIsolatedService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":native_enf_iso" />
     </application>
 </manifest>

@@ -90,7 +90,26 @@ class CampaignInfraTests(unittest.TestCase):
         ids = [gate["id"] for gate in selected]
         self.assertIn("native-boundary-matrix", ids)
         self.assertIn("native-file-hooks", ids)
+        self.assertIn("native-enforcement-poc", ids)
         self.assertTrue(all("native_loader_jni_io" in (gate.get("capabilities") or []) for gate in selected))
+
+    def test_native_enforcement_alias(self) -> None:
+        from run_local_capability_audit import select_gates
+
+        selected = select_gates("native-enforcement", False)
+        ids = [gate["id"] for gate in selected]
+        self.assertIn("native-enforcement-poc", ids)
+
+    def test_native_enforcement_rd_dry_run(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(HERE / "run_native_enforcement_rd.py"), "--dry-run"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("native-enforcement", completed.stdout)
 
 
 if __name__ == "__main__":

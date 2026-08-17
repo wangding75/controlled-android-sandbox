@@ -41,7 +41,9 @@ def load_issues() -> list[dict[str, Any]]:
 
 NATIVE_CAMPAIGN_ALIASES = {
     "native",
+    "native-enforcement",
     "T57-R03-P0A-01",
+    "T57-R03-P0A-02",
     "native_loader_jni_io",
 }
 

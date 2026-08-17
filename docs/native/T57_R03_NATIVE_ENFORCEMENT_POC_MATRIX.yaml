@@ -1,0 +1,185 @@
+schema_version: 1
+campaign: T57-R03-P0A-02
+title: Isolated hostile boundary POC matrix
+security_statement: >
+  This matrix records ordinary-APK isolated-process + Broker-only capability
+  measurements. It is RD_BASELINE_NATIVE_ENFORCEMENT_POC. It is not a VA Pro
+  equivalent claim and not production guest wiring.
+process_mode: host_debug_isolated
+fd_delegation: DEFERRED_TO_P0A_03
+rd_session: artifacts/capability-audit/native-enforcement/20260817T073257Z
+conclusions:
+  filesystem: PROVEN
+  BROKER_FS_CAPABILITY: PROVEN_ON_RD
+  network: PARTIAL
+  BROKER_NET_CAPABILITY: PARTIAL/NOT_ENFORCED
+  seccomp: FEASIBLE
+  SECCOMP_FILTER_FEASIBLE_ON_RD: true
+cases:
+  - case_id: NATIVE-ENF-FS-001
+    domain: filesystem
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: DENIED_BY_KERNEL_POLICY
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: ENOENT_ON_LIBC_OPEN
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DENIED_BY_KERNEL_POLICY
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/fs_results.json
+
+  - case_id: NATIVE-ENF-FS-002
+    domain: filesystem
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: DENIED_BY_KERNEL_POLICY
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: EPERM_ON_SYS_OPENAT
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DENIED_BY_KERNEL_POLICY
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/fs_results.json
+
+  - case_id: NATIVE-ENF-FS-003
+    domain: filesystem
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: DENIED_BY_KERNEL_POLICY
+    broker_result: NOT_APPLICABLE
+    kernel_policy: ENOENT_ON_RAW_OPENAT
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DENIED_BY_KERNEL_POLICY
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/fs_results.json
+
+  - case_id: NATIVE-ENF-FS-004
+    domain: filesystem
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: PASS_CAPABILITY
+    kernel_policy: BROKER_MEDIATED
+    seccomp_result: NOT_APPLICABLE
+    conclusion: PASS_CAPABILITY
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/fs_results.json
+
+  - case_id: NATIVE-ENF-FS-005
+    domain: filesystem
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: DENIED
+    syscall_result: DENIED
+    raw_result: DENIED
+    broker_result: DENIED
+    kernel_policy: PATH_GUESS_AND_CAPABILITY_MISMATCH_DENIED
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DENIED
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/fs_results.json
+
+  - case_id: NATIVE-ENF-NET-001
+    domain: network
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: DIRECT_ALLOWED
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: ISOLATED_UID_STILL_HAS_INTERNET
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DIRECT_ALLOWED
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/network_results.json
+
+  - case_id: NATIVE-ENF-NET-002
+    domain: network
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: DIRECT_ALLOWED
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: ISOLATED_UID_STILL_HAS_INTERNET
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DIRECT_ALLOWED
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/network_results.json
+
+  - case_id: NATIVE-ENF-NET-003
+    domain: network
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: DIRECT_ALLOWED
+    broker_result: NOT_APPLICABLE
+    kernel_policy: ISOLATED_UID_STILL_HAS_INTERNET
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DIRECT_ALLOWED
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/network_results.json
+
+  - case_id: NATIVE-ENF-NET-004
+    domain: network
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: PASS_CAPABILITY
+    kernel_policy: BROKER_MEDIATED
+    seccomp_result: NOT_APPLICABLE
+    conclusion: PASS_CAPABILITY
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/network_results.json
+
+  - case_id: NATIVE-ENF-SECCOMP-64
+    domain: seccomp
+    process_mode: host_debug_isolated
+    uid: "99024"
+    abi: x86_64
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: NOT_APPLICABLE
+    seccomp_result: SECCOMP_FILTER_FEASIBLE
+    conclusion: FEASIBLE
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/seccomp_results.json
+
+  - case_id: NATIVE-ENF-SECCOMP-32
+    domain: seccomp
+    process_mode: fixture32_isolated
+    uid: "99026"
+    abi: x86
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: NOT_APPLICABLE
+    seccomp_result: SECCOMP_FILTER_FEASIBLE
+    conclusion: FEASIBLE
+    evidence: artifacts/capability-audit/native-enforcement/20260817T073257Z/seccomp_results.json
+
+  - case_id: NATIVE-ENF-FD-001
+    domain: fd
+    process_mode: deferred
+    uid: n/a
+    abi: n/a
+    libc_result: NOT_APPLICABLE
+    syscall_result: NOT_APPLICABLE
+    raw_result: NOT_APPLICABLE
+    broker_result: NOT_APPLICABLE
+    kernel_policy: NOT_APPLICABLE
+    seccomp_result: NOT_APPLICABLE
+    conclusion: DEFERRED_TO_P0A_03
+    evidence: docs/native/T57_R03_NATIVE_ENFORCEMENT_POC_MATRIX.yaml

@@ -675,3 +675,25 @@ issues:
       startService then failed with ClassNotFoundException against the host
       debug APK DexPathList. Direct fixture execution still produced RD Native
       evidence. Do not rewrite Activity/runtime in this campaign.
+
+  - issue_id: KI-R03-NATIVE-ENF-001
+    title: Isolated process can still create sockets and connect
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-R03-P0A-02 RD campaign
+    evidence:
+      - artifacts/capability-audit/native-enforcement/20260817T073257Z/network_results.json
+      - docs/native/T57_R03_NATIVE_ENFORCEMENT_POC_MATRIX.yaml
+    match_patterns:
+      - DIRECT_ALLOWED
+      - PARTIAL/NOT_ENFORCED
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_SPLIT_NETWORK_BOUNDARY
+    notes: >
+      Isolated UID 99024 on RD API32 still completed libc, syscall, and raw
+      socket+connect to 127.0.0.1. Broker-mediated connect also worked.
+      This is an architecture finding: Option B isolated process is not a
+      network hostile boundary on an ordinary INTERNET APK. Do not add a
+      production connect hook to fake the result.

@@ -62,6 +62,23 @@ public final class DebugCommandActivity extends Activity {
             result.put("command", command).put("package", packageName)
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("startedAt", System.currentTimeMillis());
+            if ("native-enforcement".equals(command)) {
+                // Host debug isolated process. Do not touch guest Activity/Service runtime
+                // (KI-R03-NATIVE-010). No production Broker/policy path.
+                JSONObject campaign = NativeEnforcementCampaign.run(this);
+                result.put("nativeEnforcement", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pocValid", false)
+                                ? "NATIVE_ENFORCEMENT_RAN" : "NATIVE_ENFORCEMENT_INVALID"));
+                if (!campaign.optBoolean("pocValid", false)) {
+                    throw new IllegalStateException("ISOLATED_UID_POC_INVALID:"
+                            + campaign.optString("error", "uid not distinct"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS native-enforcement isolatedUid="
+                        + campaign.optJSONObject("isolated"));
+                return;
+            }
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
             Log.i(TAG, "PACKAGE_LOOKUP_BEGIN command=" + command + " package=" + packageName);
             packages = new PackageServiceClient(this);

@@ -30,8 +30,15 @@
         <activity android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeActivity"
             android:exported="true"
             android:noHistory="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.NativeEnforcementSeccompActivity"
+            android:exported="true"
+            android:noHistory="true" />
         <service android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeService"
             android:exported="true" />
+        <service android:name="com.warden.controlledsandbox.fixture.NativeEnforcementSeccompService"
+            android:exported="true"
+            android:isolatedProcess="true"
+            android:process=":native_enf_iso" />
         <activity android:name="com.warden.controlledsandbox.fixture.CapabilityProbeActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.LegacyCameraProbeActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkProbeActivity" android:exported="false" />

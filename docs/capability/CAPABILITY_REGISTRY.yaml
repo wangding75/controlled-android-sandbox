@@ -225,12 +225,18 @@ capabilities:
       - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
       - docs/native/T57_R03_NATIVE_BOUNDARY_DECISION.md
+      - docs/native/T57_R03_NATIVE_ENFORCEMENT_POC_MATRIX.yaml
       - scripts/check-native-file-hooks.py
       - scripts/check-m5-t19-1-a-native-trust-boundary.py
       - scripts/check-native-boundary-matrix.py
+      - scripts/check-native-enforcement-poc.py
+    hostile_fs_boundary_rd: PASS
+    hostile_network_boundary_rd: PARTIAL
+    seccomp_filter_feasibility_rd: PASS
     known_gaps:
       - PLT/GOT compatibility is not a hostile native security boundary.
       - Direct syscall / raw SVC / custom loader remain an architecture gap.
+      - P0A-02 isolated Broker POC is not production guest wiring.
       - native_interceptors.cpp exceeds the 1600-line source-closure threshold.
       - GuestNativeRuntimeProjection durability needs reproduction after M10 rollback.
       - Identity syscalls, ptrace, execve, Binder device nodes, and incomplete procfs are ARCHITECTURE_GAP.

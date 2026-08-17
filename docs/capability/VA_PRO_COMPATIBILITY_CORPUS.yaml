@@ -281,10 +281,11 @@ entries:
   commercial_release_signal: VA commercial changelog recorded this compatibility domain
   cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
   cas_mapping: native_loader_jni_io
-  cas_status: GAP
+  cas_status: NEEDS_TEST
   required_test: seccomp/user-notify or isolated supervisor design
-  rd_status: UNVERIFIED
-  # T57-R03-P0A-01: CAS has no seccomp installer. Commercial signal only.
+  rd_status: PARTIAL
+  # T57-R03-P0A-02: fixture classic BPF on getppid is FEASIBLE on RD isolated
+  # process. That is not VA-555 CAS_ALREADY_COVERS and not a product installer.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: VA commercial release exposed a kernel-level intercept domain CAS does not
@@ -298,9 +299,11 @@ entries:
   commercial_release_signal: VA commercial changelog recorded this compatibility domain
   cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
   cas_mapping: native_loader_jni_io
-  cas_status: GAP
+  cas_status: NEEDS_TEST
   required_test: 32-bit seccomp probe
-  rd_status: UNVERIFIED
+  rd_status: PARTIAL
+  # T57-R03-P0A-02: x86 isolated fixture32 installed a classic getppid errno
+  # filter. Not a 32-bit product seccomp mode.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: 32-bit seccomp is a VA commercial native domain.
@@ -316,6 +319,7 @@ entries:
   cas_status: GAP
   required_test: seccomp-only mode design
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: fixture filter feasibility does not implement seccomp-only.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: seccomp-only vs inline-hook is a VA commercial native domain.
@@ -331,6 +335,7 @@ entries:
   cas_status: GAP
   required_test: seccomp redirect probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: no redirect / user-notify. REQUIRES_PRIVILEGE unchanged.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: seccomp redirect is a VA commercial native domain.
@@ -361,6 +366,7 @@ entries:
   cas_status: GAP
   required_test: seccomp execve probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: filter targeted getppid only. execve not in scope.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: seccomp execve is a VA commercial native domain.
@@ -376,6 +382,7 @@ entries:
   cas_status: GAP
   required_test: seccomp ptrace probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: ptrace not filtered.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: seccomp ptrace is a VA commercial native domain.
@@ -391,6 +398,7 @@ entries:
   cas_status: GAP
   required_test: guest seccomp self-install probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: dedicated test process only. Not guest self-install.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: Guest-installed seccomp is a VA commercial native domain.
@@ -421,6 +429,7 @@ entries:
   cas_status: GAP
   required_test: procfd/map_files probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: NATIVE-ENF-FD-001 deferred to P0A-03.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: procfs traversal is a VA commercial anti-detect domain.
@@ -436,6 +445,7 @@ entries:
   cas_status: GAP
   required_test: trusted-syscall reentry probe
   rd_status: UNVERIFIED
+  # T57-R03-P0A-02: no trusted-syscall reentry path.
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
   va_pro_equivalence_effect: seccomp reentry is a VA commercial native domain.

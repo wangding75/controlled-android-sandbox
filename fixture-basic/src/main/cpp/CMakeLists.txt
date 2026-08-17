@@ -12,3 +12,10 @@ target_link_libraries(controlled_sandbox_fixture PRIVATE log dl)
 add_library(fixture_adv_payload SHARED adversarial_payload.cpp)
 target_compile_features(fixture_adv_payload PRIVATE cxx_std_20)
 target_compile_options(fixture_adv_payload PRIVATE -Wall -Wextra -Werror)
+
+add_library(cas_native_enf SHARED
+    ../../../../verification/native-enforcement/enforcement_native.cpp
+)
+target_compile_features(cas_native_enf PRIVATE cxx_std_20)
+target_compile_options(cas_native_enf PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(cas_native_enf PRIVATE log)
