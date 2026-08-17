@@ -95,10 +95,6 @@
   ],
   "productionClassesOver500Lines": [
     {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
-      "lines": 1908
-    },
-    {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
       "lines": 1561
     },
@@ -124,7 +120,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
-      "lines": 1167
+      "lines": 1168
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestBrokerContentProvider.java",
@@ -141,6 +137,10 @@
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",
       "lines": 1038
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
+      "lines": 1024
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
