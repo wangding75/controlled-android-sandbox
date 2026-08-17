@@ -132,6 +132,12 @@ gates:
     capabilities: [native_loader_jni_io]
     required: true
     timeout_sec: 180
+  - id: native-hostile-profile
+    group: native_self_test
+    command: [python, scripts/check-native-hostile-profile.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

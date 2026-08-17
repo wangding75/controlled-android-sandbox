@@ -1317,3 +1317,24 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeQueueJpeg(
     ANativeWindow_release(window);
     return result;
 }
+
+#include "controlled_sandbox/hostile_seccomp.h"
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallHostileSeccomp(
+        JNIEnv* env, jclass) {
+    std::string status;
+    controlled_sandbox::install_hostile_seccomp(&status);
+    return env->NewStringUTF(status.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeHostileSeccompDenyNames(
+        JNIEnv* env, jclass) {
+    std::string joined;
+    for (const auto& name : controlled_sandbox::hostile_seccomp_deny_names()) {
+        if (!joined.empty()) joined += ",";
+        joined += name;
+    }
+    return env->NewStringUTF(joined.c_str());
+}

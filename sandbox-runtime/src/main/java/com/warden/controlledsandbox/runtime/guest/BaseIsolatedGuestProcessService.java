@@ -16,6 +16,7 @@ import com.warden.controlledsandbox.contract.ActivityTaskResult;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.IsolatedProcessRequest;
 import com.warden.controlledsandbox.contract.IsolatedProcessResult;
+import com.warden.controlledsandbox.contract.NativeExecutionProfile;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
@@ -91,6 +92,16 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 prepared.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
                 prepared.putInt(RuntimeKeys.ISOLATED_PLATFORM_PID, Process.myPid());
                 prepared.putInt(RuntimeKeys.ISOLATED_PLATFORM_UID, Process.myUid());
+                String profile = payload.getString(RuntimeKeys.NATIVE_EXECUTION_PROFILE, "");
+                if (NativeExecutionProfile.isHostile(profile)) {
+                    if (Process.myUid() == getApplicationInfo().uid) {
+                        throw new SecurityException("HOSTILE_REQUIRES_ISOLATED_UID");
+                    }
+                    String seccomp = NativePolicy.installHostileSeccomp();
+                    prepared.putString("hostileSeccomp", seccomp);
+                    prepared.putString(RuntimeKeys.NATIVE_EXECUTION_PROFILE,
+                            NativeExecutionProfile.ISOLATED_HOSTILE);
+                }
                 return IsolatedProcessResult.success(request, "ISOLATED_READY",
                         Process.myPid(), Process.myUid(), prepared);
             } catch (Throwable error) {

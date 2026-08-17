@@ -234,6 +234,20 @@ public final class NativePolicy {
         return AVAILABLE && nativeInstallJniPendingExceptionProbe();
     }
 
+    /**
+     * Installs the ISOLATED_HOSTILE classic BPF filter in the calling process only.
+     * Must never be invoked from Host, Broker, or TRUSTED_COMPAT guests.
+     */
+    public static String installHostileSeccomp() {
+        if (!AVAILABLE) return "NATIVE_POLICY_UNAVAILABLE:" + loadError;
+        return nativeInstallHostileSeccomp();
+    }
+
+    public static String hostileSeccompDenyNames() {
+        if (!AVAILABLE) return "";
+        return nativeHostileSeccompDenyNames();
+    }
+
     public static boolean installHooks(String guestLibraryRoot) {
         if (!AVAILABLE) return false;
         if (guestLibraryRoot == null || guestLibraryRoot.trim().isEmpty()) return false;
@@ -343,6 +357,8 @@ public final class NativePolicy {
     private static native boolean nativeInstallNativeLoadDiagnostic();
     private static native boolean nativeInstallNativeLoadRedirect();
     private static native boolean nativeInstallJniPendingExceptionProbe();
+    private static native String nativeInstallHostileSeccomp();
+    private static native String nativeHostileSeccompDenyNames();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
     private static native boolean nativeInstallSystemIoHooks();
     private static native boolean nativeRefreshHooks();

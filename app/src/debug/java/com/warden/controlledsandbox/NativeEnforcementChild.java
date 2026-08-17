@@ -3,9 +3,15 @@ package com.warden.controlledsandbox;
 import android.content.Context;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import android.util.Log;
+import com.warden.controlledsandbox.contract.HostileCapabilityRequest;
+import com.warden.controlledsandbox.contract.HostileCapabilityResult;
+import com.warden.controlledsandbox.contract.IHostileCapabilityBroker;
+import com.warden.controlledsandbox.runtime.hostile.HostileSeccompInstaller;
 import java.io.File;
+import java.io.FileInputStream;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -17,12 +23,19 @@ public final class NativeEnforcementChild {
 
     static String run(Context context, IBinder broker, String session, String fsCap, String netCap,
             String realPath, String loopbackHost, int loopbackPort) {
+        return run(context, broker, session, fsCap, netCap, realPath, loopbackHost, loopbackPort,
+                1L, context.getPackageName(), "", false);
+    }
+
+    static String run(Context context, IBinder broker, String session, String fsCap, String netCap,
+            String realPath, String loopbackHost, int loopbackPort, long generation,
+            String guestPackage, String fdCap, boolean production) {
         JSONObject out = new JSONObject();
+        JSONArray cases = new JSONArray();
         try {
             out.put("identity", NativeEnforcementIsolatedService.identityJson());
             out.put("uid", Process.myUid());
             out.put("pid", Process.myPid());
-            JSONArray cases = new JSONArray();
             JSONObject open = parse(NativeEnforcementNative.probeOpen(realPath));
             cases.put(fsCase("NATIVE-ENF-FS-001", "libc", open.optJSONObject("libc"),
                     expectedDenied(open.optJSONObject("libc"))));
@@ -39,8 +52,15 @@ public final class NativeEnforcementChild {
                 cases.put(fsCase("NATIVE-ENF-FS-003", "raw", rawOpen, expectedDenied(rawOpen)));
             }
 
-            JSONObject brokerFs = callBroker(broker, NativeEnforcementBroker.TX_READ_FS,
-                    session, fsCap);
+            JSONObject brokerFs;
+            try {
+                brokerFs = production
+                        ? callProduction(broker, session, generation, guestPackage, fsCap,
+                                HostileCapabilityRequest.OP_READ_RESOURCE)
+                        : callBroker(broker, NativeEnforcementBroker.TX_READ_FS, session, fsCap);
+            } catch (Exception error) {
+                brokerFs = new JSONObject().put("ok", 0).put("reason", error.toString());
+            }
             cases.put(brokerCase("NATIVE-ENF-FS-004", brokerFs, true));
 
             JSONArray guesses = new JSONArray();
@@ -50,9 +70,18 @@ public final class NativeEnforcementChild {
             if (files != null) {
                 guesses.put(guessOpen(new File(files, "native-enf-should-not-exist").getAbsolutePath()));
             }
-            guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, session, "wrong-cap"));
-            guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, session, "/etc/passwd"));
-            guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, "wrong-session", fsCap));
+            if (production) {
+                guesses.put(safeProduction(broker, session, generation, guestPackage, "wrong-cap",
+                        HostileCapabilityRequest.OP_READ_RESOURCE));
+                guesses.put(safeProduction(broker, session, generation, guestPackage, "/etc/passwd",
+                        HostileCapabilityRequest.OP_READ_RESOURCE));
+                guesses.put(safeProduction(broker, "wrong-session", generation, guestPackage, fsCap,
+                        HostileCapabilityRequest.OP_READ_RESOURCE));
+            } else {
+                guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, session, "wrong-cap"));
+                guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, session, "/etc/passwd"));
+                guesses.put(callBroker(broker, NativeEnforcementBroker.TX_READ_FS, "wrong-session", fsCap));
+            }
             boolean guessDenied = true;
             for (int i = 0; i < guesses.length(); i++) {
                 JSONObject item = guesses.getJSONObject(i);
@@ -67,6 +96,11 @@ public final class NativeEnforcementChild {
             fs005.put("guesses", guesses);
             cases.put(fs005);
 
+            String seccompStatus = "";
+            if (production) {
+                seccompStatus = HostileSeccompInstaller.installInCallingProcess();
+                out.put("seccompStatus", seccompStatus);
+            }
             JSONObject net = parse(NativeEnforcementNative.probeConnect(loopbackHost, loopbackPort));
             cases.put(netCase("NATIVE-ENF-NET-001", net.optJSONObject("libc")));
             cases.put(netCase("NATIVE-ENF-NET-002", net.optJSONObject("syscall")));
@@ -76,9 +110,14 @@ public final class NativeEnforcementChild {
             } else {
                 cases.put(netCase("NATIVE-ENF-NET-003", rawNet));
             }
-            JSONObject brokerNet = callBroker(broker, NativeEnforcementBroker.TX_NET,
-                    session, netCap);
+            JSONObject brokerNet = production
+                    ? callProduction(broker, session, generation, guestPackage, netCap,
+                            HostileCapabilityRequest.OP_NETWORK_REQUEST)
+                    : callBroker(broker, NativeEnforcementBroker.TX_NET, session, netCap);
             cases.put(brokerCase("NATIVE-ENF-NET-004", brokerNet, false));
+            if (production && fdCap != null && !fdCap.isEmpty()) {
+                cases.put(fdCase(broker, session, generation, guestPackage, fdCap));
+            }
 
             JSONObject seccomp = parse(NativeEnforcementNative.probeSeccomp());
             JSONObject seccompCase = new JSONObject();
@@ -93,6 +132,7 @@ public final class NativeEnforcementChild {
             cases.put(seccompCase);
 
             out.put("cases", cases);
+            out.put("production", production);
             out.put("openProbe", open);
             out.put("netProbe", net);
             out.put("brokerFs", brokerFs);
@@ -102,6 +142,7 @@ public final class NativeEnforcementChild {
             Log.e(TAG, "child run failed", error);
             try {
                 out.put("error", error.getClass().getName() + ":" + error.getMessage());
+                if (!out.has("cases") && cases != null) out.put("cases", cases);
             } catch (Exception ignored) { }
         }
         return out.toString();
@@ -129,8 +170,75 @@ public final class NativeEnforcementChild {
         item.put("domain", "network");
         String outcome = attempt == null ? "UNVERIFIED_RUNTIME" : attempt.optString("outcome",
                 "UNVERIFIED_RUNTIME");
+        if ("DIRECT_DENIED".equals(outcome)) outcome = "DIRECT_DENIED_BY_SECCOMP";
         item.put("status", outcome);
         item.put("detail", attempt == null ? JSONObject.NULL : attempt);
+        return item;
+    }
+
+    private static JSONObject safeProduction(IBinder binder, String session, long generation,
+            String pkg, String token, String operation) {
+        try {
+            return callProduction(binder, session, generation, pkg, token, operation);
+        } catch (Exception error) {
+            try {
+                return new JSONObject().put("ok", 0).put("reason", error.toString());
+            } catch (Exception ignored) {
+                return new JSONObject();
+            }
+        }
+    }
+
+    private static JSONObject callProduction(IBinder binder, String session, long generation,
+            String pkg, String token, String operation) throws Exception {
+        JSONObject out = new JSONObject();
+        int code = HostileCapabilityRequest.OP_NETWORK_REQUEST.equals(operation)
+                ? IBinder.FIRST_CALL_TRANSACTION + 1 : IBinder.FIRST_CALL_TRANSACTION;
+        HostileCapabilityRequest request = new HostileCapabilityRequest(token, session, generation,
+                pkg, 0, operation);
+        Parcel data = Parcel.obtain();
+        Parcel reply = Parcel.obtain();
+        try {
+            data.writeInterfaceToken("com.warden.controlledsandbox.contract.IHostileCapabilityBroker");
+            data.writeInt(1);
+            request.writeToParcel(data, 0);
+            binder.transact(code, data, reply, 0);
+            reply.readException();
+            HostileCapabilityResult result = reply.readInt() != 0
+                    ? HostileCapabilityResult.CREATOR.createFromParcel(reply)
+                    : HostileCapabilityResult.denied("EMPTY_RESULT");
+            out.put("ok", result.successful() ? 1 : 0);
+            out.put("body", result.body());
+            if (!result.successful()) out.put("reason", result.errorType());
+            return out;
+        } finally {
+            data.recycle();
+            reply.recycle();
+        }
+    }
+
+    private static JSONObject fdCase(IBinder binder, String session, long generation, String pkg,
+            String token) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", "NATIVE-ENF-FD-001");
+        item.put("domain", "fd");
+        IHostileCapabilityBroker broker = IHostileCapabilityBroker.Stub.asInterface(binder);
+        HostileCapabilityResult result = broker.delegateReadOnlyFd(
+                new HostileCapabilityRequest(token, session, generation, pkg, 0,
+                        HostileCapabilityRequest.OP_DELEGATE_FD));
+        boolean readable = false;
+        String proc = "";
+        if (result.successful() && result.delegatedFd() != null) {
+            int raw = result.delegatedFd().getFd();
+            try (FileInputStream input = new FileInputStream(result.delegatedFd().getFileDescriptor())) {
+                readable = input.read() >= 0;
+            }
+            File link = new File("/proc/self/fd/" + raw);
+            proc = link.getCanonicalPath();
+        }
+        item.put("status", readable ? "PASS_FD" : "FD_DENIED");
+        item.put("procPath", proc);
+        item.put("errorType", result.errorType());
         return item;
     }
 

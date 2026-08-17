@@ -62,6 +62,21 @@ public final class DebugCommandActivity extends Activity {
             result.put("command", command).put("package", packageName)
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("startedAt", System.currentTimeMillis());
+            if ("native-hostile".equals(command)) {
+                JSONObject campaign = HostileProductionCampaign.run(this);
+                result.put("nativeHostile", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pocValid", false)
+                                ? "NATIVE_HOSTILE_RAN" : "NATIVE_HOSTILE_INVALID"));
+                if (!campaign.optBoolean("pocValid", false)) {
+                    throw new IllegalStateException("ISOLATED_UID_POC_INVALID:"
+                            + campaign.optString("error", "uid not distinct"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS native-hostile isolatedUid="
+                        + campaign.optJSONObject("isolated"));
+                return;
+            }
             if ("native-enforcement".equals(command)) {
                 // Host debug isolated process. Do not touch guest Activity/Service runtime
                 // (KI-R03-NATIVE-010). No production Broker/policy path.

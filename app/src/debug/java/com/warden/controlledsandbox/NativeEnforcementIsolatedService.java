@@ -46,8 +46,19 @@ public final class NativeEnforcementIsolatedService extends Service {
                 String realPath = data.readString();
                 String loopbackHost = data.readString();
                 int loopbackPort = data.readInt();
+                long generation = 1L;
+                String guestPackage = getPackageName();
+                String fdCap = "";
+                boolean production = false;
+                if (data.dataAvail() > 0) {
+                    generation = data.readLong();
+                    guestPackage = data.readString();
+                    fdCap = data.readString();
+                    production = data.readInt() == 1;
+                }
                 String result = NativeEnforcementChild.run(NativeEnforcementIsolatedService.this,
-                        broker, session, fsCap, netCap, realPath, loopbackHost, loopbackPort);
+                        broker, session, fsCap, netCap, realPath, loopbackHost, loopbackPort,
+                        generation, guestPackage, fdCap, production);
                 reply.writeNoException();
                 reply.writeString(result);
                 return true;

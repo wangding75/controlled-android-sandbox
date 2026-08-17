@@ -15,6 +15,7 @@ add_library(controlled_sandbox_native SHARED
     native_crash.cpp
     native_policy_jni.cpp
     native_jni_exception_probe.cpp
+    hostile_seccomp.cpp
 )
 target_include_directories(controlled_sandbox_native PRIVATE include)
 target_compile_features(controlled_sandbox_native PRIVATE cxx_std_20)

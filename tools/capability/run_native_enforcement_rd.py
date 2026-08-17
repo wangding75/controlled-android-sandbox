@@ -87,7 +87,7 @@ def invoke_host_campaign(serial: str) -> dict[str, Any]:
             DEBUG_ACTIVITY,
             "--es",
             "command",
-            "native-enforcement",
+            "native-hostile",
         ],
         check=False,
     )

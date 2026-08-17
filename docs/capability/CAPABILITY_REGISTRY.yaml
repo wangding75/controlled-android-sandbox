@@ -231,7 +231,7 @@ capabilities:
       - scripts/check-native-boundary-matrix.py
       - scripts/check-native-enforcement-poc.py
     hostile_fs_boundary_rd: PASS
-    hostile_network_boundary_rd: PARTIAL
+    hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS
     known_gaps:
       - PLT/GOT compatibility is not a hostile native security boundary.

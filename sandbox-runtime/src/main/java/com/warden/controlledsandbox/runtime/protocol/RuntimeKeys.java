@@ -55,6 +55,8 @@ public final class RuntimeKeys {
     public static final String NATIVE_CODE_PRESENT = "nativeCodePresent";
     public static final String NATIVE_GUEST_TRUST = "nativeGuestTrust";
     public static final String NATIVE_EXECUTION_MODE = "nativeExecutionMode";
+    public static final String NATIVE_EXECUTION_PROFILE = "nativeExecutionProfile";
+    public static final String HOSTILE_CAPABILITY_BROKER = "hostileCapabilityBroker";
     public static final String APPLICATION_CLASS = "applicationClass";
     public static final String COMPONENT_CLASS = "componentClass";
     public static final String DATA_ROOT = "dataRoot";
