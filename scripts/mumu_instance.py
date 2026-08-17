@@ -219,6 +219,8 @@ def resolve_instance(
         "release": prop("ro.build.version.release"),
         "api": prop("ro.build.version.sdk"),
         "androidId": android_id,
+        "abiList": prop("ro.product.cpu.abilist"),
+        "bootId": run_adb(adb_path, ["-s", serial, "shell", "cat", "/proc/sys/kernel/random/boot_id"]).stdout.strip(),
         "timestamp": now_iso(),
         "mumuRoot": str(root),
         "config": {

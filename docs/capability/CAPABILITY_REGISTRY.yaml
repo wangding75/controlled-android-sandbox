@@ -1,0 +1,310 @@
+schema_version: 1
+campaign: T57-R03-01
+title: Controlled Android Sandbox Capability Registry
+maturity_model:
+  level_1: RD_BASELINE
+  level_2: ANDROID_MATRIX
+  level_3: OEM_COMMERCIAL_MATRIX
+status_enum:
+  - PASS
+  - PARTIAL
+  - GAP
+  - UNVERIFIED
+  - BLOCKED_ENV
+  - NOT_APPLICABLE
+  - EXPECTED
+  - NOT_PROVEN
+rules:
+  - RD测试/API32 PASS only updates rd_api32_status.
+  - API33-36 must stay UNVERIFIED until those environments are executed.
+  - OEM PASS requires an OEM matrix, not a single historical Xiaomi or MuMu run.
+  - commercial_app_status requires named commercial-app evidence.
+  - va_pro_equivalent remains NOT_PROVEN until ANDROID_MATRIX and OEM_COMMERCIAL_MATRIX complete.
+  - Native hostile/direct-syscall/raw-SVC/custom-loader is not PASS.
+  - compileSdk/targetSdk must not be treated as API matrix evidence.
+baseline_commit: 9e5d3e73628d80872c21776897898493925c7a97
+authoritative_handoff: docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+capabilities:
+  - id: activity_framework
+    title: Activity / task framework ownership
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
+      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - tools/device/t57_rd_framework_transport_probe.ps1
+      - scripts/check-activity-task-virtualization.py
+    known_gaps:
+      - Normal path is framework-owned ActivityThread/LoadedApk; GuestComponentRuntime remains an isolated/OEM fallback.
+      - Dedicated launch-mode/task-field fixture is still pending.
+      - API/OEM ActivityTaskManager variants are untested.
+  - id: service_framework
+    title: Service framework ownership
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - tools/device/t57_rd_service_real_path.ps1
+      - tools/device/t57_rd_framework_foreground_service_probe.ps1
+      - scripts/check-service-lifecycle.py
+    known_gaps:
+      - Isolated/OEM fallback still uses GuestComponentRuntime.
+      - JobService ANR/unbind and API 17 startService package-name checks remain VA commercial signals, not CAS proof.
+  - id: bind_application_loaded_apk_component_factory
+    title: bindApplication / LoadedApk / AppComponentFactory bootstrap
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - tools/device/t57_rd_framework_transport_probe.ps1
+    known_gaps:
+      - Fallback bootstrap must still be proven not to double-create Application/components.
+      - API 33-36 ActivityThread bindApplication differences are unverified.
+  - id: pending_intent_intent_sender
+    title: PendingIntent / IIntentSender broker
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
+      - docs/runtime/T57_R02_P1_FIX_MATRIX.md
+      - tools/device/t57_rd_pending_intent_real_path.ps1
+      - scripts/check-pending-intent-lifecycle.py
+    known_gaps:
+      - SystemUI/Alarm/NMS cross-process sender matrix is not proven.
+      - Mutable/immutable/one-shot/cancel/update matrix is incomplete.
+  - id: manifest_package_parser
+    title: Manifest / package parser
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - scripts/check-package-query-resolve.py
+    known_gaps:
+      - Split/dynamic-feature and some OEM manifest extensions remain unproven.
+  - id: virtual_pms_package_visibility
+    title: Virtual PMS / package visibility
+    implementation_status: PARTIAL
+    static_status: PARTIAL
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_RD_TEST_ACCEPTANCE.md
+      - scripts/check-virtual-package-state.py
+      - scripts/check-package-query-resolve.py
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+    known_gaps:
+      - VirtualPackageMetadata exceeds the 1800-line source-closure threshold.
+      - HOST_PACKAGE_HIDDEN token vs HiddenPackageResultMapper needs reproduction.
+      - Commercial signature/installer/multi-user visibility pressure is unproven.
+  - id: multi_process_process_name_slot
+    title: Multi-process / processName / slot
+    implementation_status: PARTIAL
+    static_status: PARTIAL
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - scripts/check-m5-t6-isolated-process.py
+    known_gaps:
+      - Production contract is 64 ordinary + 16 isolated; some tests still assume 8 ordinary slots.
+      - High-slot exhaustion and concurrent recycle are not device-proven.
+  - id: provider_transport
+    title: Provider transport
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
+      - tools/device/t57_rd_provider_real_path.ps1
+      - tools/device/t57_rd_framework_transport_probe.ps1
+    known_gaps:
+      - Large CursorWindow, persistable URI grant revoke, FD leak, and ANR pressure remain open.
+  - id: classloader
+    title: ClassLoader / ART / split loading
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PARTIAL
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    known_gaps:
+      - Split APK, plugin same-name libraries, relocation, and linker namespace isolation are unproven.
+  - id: native_loader_jni_io
+    title: Native loader / JNI / IO
+    implementation_status: PARTIAL
+    static_status: PARTIAL
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - scripts/check-native-file-hooks.py
+      - scripts/check-m5-t19-1-a-native-trust-boundary.py
+    known_gaps:
+      - PLT/GOT compatibility is not a hostile native security boundary.
+      - Direct syscall / raw SVC / custom loader remain an architecture gap.
+      - native_interceptors.cpp exceeds the 1600-line source-closure threshold.
+      - GuestNativeRuntimeProjection durability needs reproduction after M10 rollback.
+  - id: process_death_recovery
+    title: Process death / generation recovery
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
+      - tools/device/t57_rd_recovery_probe.ps1
+      - scripts/check-m5-t19-1-c-rebind-timeout-recovery.py
+    known_gaps:
+      - SIGSEGV, native abort, ANR, LMK, reboot restore, and late-callback matrices remain open.
+  - id: package_lifecycle_clear_delete_reinstall
+    title: Package lifecycle clear / delete / reinstall
+    implementation_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
+      - tools/device/t57_rd_lifecycle_probe.ps1
+      - scripts/check-package-lifecycle-transaction.py
+    known_gaps:
+      - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
+  - id: system_service_virtualization
+    title: System service virtualization
+    implementation_status: PARTIAL
+    static_status: PARTIAL
+    rd_api32_status: PARTIAL
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - scripts/check-binder-system-services.py
+      - scripts/check-system-services-broker-split.py
+    known_gaps:
+      - Alarm/NMS/Job/Account/Settings/UsageStats full framework semantics are not proven.
+      - OEM manager transaction and callback variants are untested.
+  - id: android_oem_compatibility
+    title: Android version and OEM compatibility
+    implementation_status: GAP
+    static_status: UNVERIFIED
+    rd_api32_status: NOT_APPLICABLE
+    api33_status: UNVERIFIED
+    api34_status: UNVERIFIED
+    api35_status: UNVERIFIED
+    api36_status: UNVERIFIED
+    oem_status: UNVERIFIED
+    commercial_app_status: UNVERIFIED
+    va_pro_equivalent: NOT_PROVEN
+    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/oem-compat/T55_FINAL_CAPABILITY_MATRIX.md
+      - docs/product/T56_XIAOMI_DEVICE_RESOLUTION.md
+    known_gaps:
+      - API 33-36 device/emulator matrix has not been executed in T57.
+      - Historical Xiaomi/T54-T56 evidence is not an OEM_COMMERCIAL_MATRIX PASS.
+      - VA Pro same-device A/B comparison does not exist.

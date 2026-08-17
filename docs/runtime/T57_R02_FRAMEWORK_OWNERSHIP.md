@@ -1,5 +1,9 @@
 # T57-R02 Framework Ownership
 
+> Historical / Superseded. This file records the earlier `HOST_TRAMPOLINE_MANUAL_LIFECYCLE` / `MANUAL_COMPONENT_RUNTIME` ownership bar. It is not the current T57 source conclusion.
+>
+> Current T57 status: normal Activity/Service paths are framework-owned (`ActivityThread`, `LoadedApk`, `AppComponentFactory`, Service record/token). PendingIntent `IIntentSender` is brokered and has RD API32 transport evidence. Fallback/manual paths remain for isolated or OEM cases. Authoritative handoff: `T57_R02_ARCHITECTURE_HANDOFF.md`. Capability ledger: `docs/capability/CAPABILITY_REGISTRY.yaml`.
+
 ## Activity
 
 Current implementation is explicitly classified as `HOST_TRAMPOLINE_MANUAL_LIFECYCLE`. `StubActivityBase` is the host Activity; it schedules Guest creation after host resume and `GuestActivityController` reflectively attaches and invokes Guest lifecycle callbacks. The launch gate can prove prepared/created/resumed/window evidence, but that does not prove an Android `ActivityClientRecord` for the Guest class.

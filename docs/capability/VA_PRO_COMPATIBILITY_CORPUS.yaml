@@ -1,0 +1,1265 @@
+schema_version: 1
+title: VA Pro Compatibility / Regression Corpus
+campaign: T57-R03-01
+disclaimer: Entries record that a VA commercial changelog exposed or handled a compatibility domain. They
+  are not CAS implementation evidence and are not a claim that CAS matches VA Pro internals.
+source_policy:
+  source_reference: locked public VirtualApp README commercial changelog
+  commercial_release_signal: VA commercial update mentioned this domain
+  cas_evidence: only CAS tests/handoff/RD evidence, never VA README
+cas_status_enum:
+- CAS_ALREADY_COVERS
+- NEEDS_TEST
+- GAP
+- IMPLEMENTED
+- NOT_APPLICABLE
+- UNVERIFIED
+entries:
+- id: VA-147
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 重新实现Service的运行机制
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: NEEDS_TEST
+  required_test: service framework real-path probe
+  rd_status: PASS
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Commercial signal that Service must be a real runtime, not a stub.
+- id: VA-279
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 重写Service实现，Service生命周期更准确，不容易被杀死
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: NEEDS_TEST
+  required_test: service start/stop/unbind/death probe
+  rd_status: PASS
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Lifecycle accuracy is a VA commercial compatibility domain.
+- id: VA-449
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复JobService unbind崩溃问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: GAP
+  required_test: JobService unbind crash probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: JobService unbind remains a VA commercial crash domain.
+- id: VA-480
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复启动前台service crash
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: NEEDS_TEST
+  required_test: foreground service probe
+  rd_status: PASS
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Foreground Service start is a VA commercial crash domain.
+- id: VA-514
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复Service中getApplicationContext返回Null的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: bind_application_loaded_apk_component_factory
+  cas_status: NEEDS_TEST
+  required_test: Service getApplicationContext probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Service Application context wiring is a VA commercial domain.
+- id: VA-524
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复 startprocess启动App后再次进入VActivityManagerService导致死锁的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: process_death_recovery
+  cas_status: GAP
+  required_test: start-process reentry deadlock probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Process start reentry deadlock is a VA commercial domain.
+- id: VA-525
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 调整stopService不再走initProcess流程，解决了某些情况下的死锁问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: NEEDS_TEST
+  required_test: stopService without re-init probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: stopService path isolation is a VA commercial domain.
+- id: VA-541
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复publishService crash问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: GAP
+  required_test: publishService crash probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: publishService crash is a VA commercial domain.
+- id: VA-566
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复release打包后IJobService中的onNetworkChanged等几个函数被混淆导致找不到crash的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: GAP
+  required_test: IJobService keep/obfuscation probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: IJobService release keep rules are a VA commercial domain.
+- id: VA-700
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复启动JobService时acore进程容易出现ANR
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: JobService acore ANR probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: JobService ANR is a VA commercial domain.
+- id: VA-704
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配17.0上startService API增加了包名检测
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: service_framework
+  cas_status: GAP
+  required_test: API36+ startService package-name check probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 17 startService package check is a VA commercial Android-version
+    domain.
+- id: VA-705
+  category: Service
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配17.0 beta5上的IJobCallback
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: API36+ IJobCallback probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 17 IJobCallback is a VA commercial Android-version domain.
+- id: VA-281
+  category: PendingIntent
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 重写PendingIntent, IntentSender的实现
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: pending_intent_intent_sender
+  cas_status: CAS_ALREADY_COVERS
+  required_test: IIntentSender real-path probe
+  rd_status: PASS
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: PendingIntent/IIntentSender rewrite is a VA commercial domain; CAS has RD
+    API32 sender evidence.
+- id: VA-418
+  category: PendingIntent
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配12.0+上PendingIntent Flags必须为FLAG_UPDATE_CURRENT/FLAG_IMMUTABLE
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: pending_intent_intent_sender
+  cas_status: NEEDS_TEST
+  required_test: PendingIntent flag probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: API12+ PendingIntent flags are a VA commercial domain.
+- id: VA-433
+  category: PendingIntent
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复PendingIntent flag处理问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: pending_intent_intent_sender
+  cas_status: NEEDS_TEST
+  required_test: PendingIntent flag handling probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: PendingIntent flag handling is a VA commercial domain.
+- id: VA-568
+  category: PendingIntent
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复startIntentSenderFoeResult无法工作的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: pending_intent_intent_sender
+  cas_status: NEEDS_TEST
+  required_test: startIntentSenderForResult probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: startIntentSenderForResult is a VA commercial domain.
+- id: VA-578
+  category: PendingIntent
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复pending intent数据丢失问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: pending_intent_intent_sender
+  cas_status: NEEDS_TEST
+  required_test: PendingIntent payload retention probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: PendingIntent payload retention is a VA commercial domain.
+- id: VA-555
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新功能：增加Seccomp-Bpf支持，实现更底层的拦截
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: seccomp/user-notify or isolated supervisor design
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: VA commercial release exposed a kernel-level intercept domain CAS does not
+    claim.
+- id: VA-572
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Seccomp-bpf支持32位
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: 32-bit seccomp probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: 32-bit seccomp is a VA commercial native domain.
+- id: VA-600
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加配置可以让APP只使用seccomp-bpf,不使用inline hook
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: seccomp-only mode design
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: seccomp-only vs inline-hook is a VA commercial native domain.
+- id: VA-601
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 完善seccomp-bpf重定向相关的功能
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: seccomp redirect probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: seccomp redirect is a VA commercial native domain.
+- id: VA-616
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加对setxattr/lsetxattr/bind/connect/syscall等几个libc api处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: setxattr/bind/connect/syscall probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: libc/syscall coverage is a VA commercial native domain; CAS has PLT/GOT only.
+- id: VA-637
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新功能:Seccomp-Bpf下增加了对execve的调用支持
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: seccomp execve probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: seccomp execve is a VA commercial native domain.
+- id: VA-640
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: seccomp-bpf对ptrace的一些处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: seccomp ptrace probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: seccomp ptrace is a VA commercial native domain.
+- id: VA-647
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配APP中对seccomp-bpf的调用
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: guest seccomp self-install probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Guest-installed seccomp is a VA commercial native domain.
+- id: VA-648
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 从处理openat2与faccessat2，seccomp等调用
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: openat2/faccessat2 probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: openat2/faccessat2 is a VA commercial native domain.
+- id: VA-674
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加对/proc/self/pid/fd和/proc/pid/task/map_files的遍历处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: procfd/map_files probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: procfs traversal is a VA commercial anti-detect domain.
+- id: VA-676
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复seccomp-bpf调用CallTrustedSyscall后的重入问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: GAP
+  required_test: trusted-syscall reentry probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: seccomp reentry is a VA commercial native domain.
+- id: VA-686
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加对proc文件系统的更多特征处理，包括inline hook&seccomp-bpf模式
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: procfs feature probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: procfs masking is a VA commercial native domain.
+- id: VA-693
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 将maps文件调整为按行处理,避免bad alloc
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: maps line-oriented rewrite probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: maps rewrite robustness is a VA commercial native domain.
+- id: VA-709
+  category: Native
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Not present in locked VirtualApp README snapshot (changelog ends at 708 / 2026-07-16).
+  source_reference: T57-R03-01 required corpus ID; absent from locked README snapshot
+  commercial_release_signal: ID required by T57-R03-01; no locked-snapshot changelog text
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: UNVERIFIED
+  required_test: identify commercial 709 text after snapshot refresh
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Required corpus ID; no locked-snapshot commercial text.
+- id: VA-587
+  category: process
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复多个进程同时启动同一个进程时的crash问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: multi_process_process_name_slot
+  cas_status: NEEDS_TEST
+  required_test: concurrent same-process start probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Concurrent process start is a VA commercial process domain.
+- id: VA-707
+  category: process
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 调整ext插件的进程号，避免p0进程过早启动导致未初始化完全
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: multi_process_process_name_slot
+  cas_status: GAP
+  required_test: companion/plugin process boot order probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Plugin process ordinal is a VA commercial process domain.
+- id: VA-597
+  category: process death
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 启动进程的时候增加重试，避免在某些机型上由于进程死亡太频繁导致无法启动进程
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: process_death_recovery
+  cas_status: NEEDS_TEST
+  required_test: rapid-death restart probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Rapid death restart is a VA commercial OEM/process domain.
+- id: VA-690
+  category: process death
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 处理有些加固APP的进程在部分设备上无法kill进程
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: process_death_recovery
+  cas_status: GAP
+  required_test: hardened-app kill probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Hardened-app kill is a VA commercial process domain.
+- id: VA-389
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: PackageInfo中增加对requestedPermissionsFlags字段的处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: virtual_pms_package_visibility
+  cas_status: NEEDS_TEST
+  required_test: requestedPermissionsFlags probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: PackageInfo flags are a VA commercial PMS domain.
+- id: VA-430
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复queryIntentServices过滤规则
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: virtual_pms_package_visibility
+  cas_status: NEEDS_TEST
+  required_test: queryIntentServices filter probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: queryIntentServices filtering is a VA commercial PMS domain.
+- id: VA-436
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复13.0上PackageManager几个flags参数导致的crash
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: virtual_pms_package_visibility
+  cas_status: GAP
+  required_test: API33 PackageManager flags probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: API13 PM flags are a VA commercial Android-version domain.
+- id: VA-497
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: PackageManager相关API适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: virtual_pms_package_visibility
+  cas_status: NEEDS_TEST
+  required_test: PackageManager API surface probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: PackageManager API surface is a VA commercial PMS domain.
+- id: VA-589
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加对DomainVerificationManager的适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: DomainVerificationManager probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: DomainVerificationManager is a VA commercial SystemService domain.
+- id: VA-614
+  category: PMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加可对application中的全部路径模拟为系统安装路径
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: native_loader_jni_io
+  cas_status: NEEDS_TEST
+  required_test: system-install path projection probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: System-install path spoof is a VA commercial package/native domain.
+- id: VA-553
+  category: package lifecycle
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 系统OTA升级时对Split Apks重新安装
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: package_lifecycle_clear_delete_reinstall
+  cas_status: GAP
+  required_test: OTA split reinstall probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: OTA split reinstall is a VA commercial package-lifecycle domain.
+- id: VA-712
+  category: package lifecycle
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Not present in locked VirtualApp README snapshot (changelog ends at 708 / 2026-07-16).
+  source_reference: T57-R03-01 required corpus ID; absent from locked README snapshot
+  commercial_release_signal: ID required by T57-R03-01; no locked-snapshot changelog text
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: package_lifecycle_clear_delete_reinstall
+  cas_status: UNVERIFIED
+  required_test: identify commercial 712 text after snapshot refresh
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Required corpus ID; no locked-snapshot commercial text.
+- id: VA-713
+  category: package lifecycle
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Not present in locked VirtualApp README snapshot (changelog ends at 708 / 2026-07-16).
+  source_reference: T57-R03-01 required corpus ID; absent from locked README snapshot
+  commercial_release_signal: ID required by T57-R03-01; no locked-snapshot changelog text
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: package_lifecycle_clear_delete_reinstall
+  cas_status: UNVERIFIED
+  required_test: identify commercial 713 text after snapshot refresh
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Required corpus ID; no locked-snapshot commercial text.
+- id: VA-327
+  category: split APK
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: split apk 支持
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: NEEDS_TEST
+  required_test: split APK install/load probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Split APK is a VA commercial package domain.
+- id: VA-671
+  category: split APK
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复通过google play安装后 split_config APK is writeable导致无法加载问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: Play split_config writable probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Play-installed split writability is a VA commercial split/GMS domain.
+- id: VA-475
+  category: ClassLoader
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复了13.0+上的class linker偏移检测问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: API33+ class linker offset probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: ART class-linker offset is a VA commercial ClassLoader domain.
+- id: VA-529
+  category: ClassLoader
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: class_linker适配android 15
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: API35 class linker probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 15 class linker is a VA commercial ClassLoader domain.
+- id: VA-539
+  category: ClassLoader
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复微信等APP因为webview导致的crash问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: WebView classloader crash probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: WebView crash is a VA commercial ClassLoader/WebView domain.
+- id: VA-627
+  category: ClassLoader
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Android 16kb page size 适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: 16KB page-size probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: 16KB pages are a VA commercial Android-version domain.
+- id: VA-567
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复GMS由于StatsManager无法hook导致crash的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: StatsManager GMS probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: StatsManager is a VA commercial SystemService/GMS domain.
+- id: VA-584
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新增对StorageStatsManager的适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: StorageStatsManager probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: StorageStatsManager is a VA commercial SystemService domain.
+- id: VA-610
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 增加对INetworkScoreService的处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: INetworkScoreService probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: INetworkScoreService is a VA commercial SystemService domain.
+- id: VA-620
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配LockSettings/WifiScanner/NetworkScoreManager/WifiManager/SensitiveContentProtectionManager等几个manager
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: multi-manager probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Multiple managers are a VA commercial SystemService domain.
+- id: VA-654
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 16.0上AdvancedProtectionService以及ISupervisionManager适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: API36 AdvancedProtection/Supervision probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 16 privileged managers are a VA commercial SystemService domain.
+- id: VA-670
+  category: SystemService
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配IStatusBarService的相关API
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: IStatusBarService probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: IStatusBarService is a VA commercial SystemService domain.
+- id: VA-604
+  category: Binder
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新功能开发:基于拦截Binder的方式来实现对系统AIDL调用的拦截
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: binder-intercept architecture review
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Binder AIDL intercept is a VA commercial architecture domain.
+- id: VA-619
+  category: Binder
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新功能模式下BinderProxyInjectManager.addInjector增加判断，避免有些因为class不存在导致crash
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: missing Binder injector class probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Binder injector class absence is a VA commercial domain.
+- id: VA-629
+  category: Binder
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: binderproxy模式支持IBatteryStats
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: IBatteryStats binderproxy probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: IBatteryStats is a VA commercial Binder/SystemService domain.
+- id: VA-631
+  category: Binder
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复15.0+上isDirectlyHandlingTransaction()的多线程处理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: system_service_virtualization
+  cas_status: GAP
+  required_test: API35 binder transaction thread probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Binder transaction threading is a VA commercial domain.
+- id: VA-683
+  category: Binder
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复appendFrom的时候crash,使用setDataSize()来清空所有数据
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: provider_transport
+  cas_status: GAP
+  required_test: Parcel appendFrom/setDataSize probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Parcel appendFrom is a VA commercial Binder domain.
+- id: VA-289
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 优化对Google服务框架的支持
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: GMS framework probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: GMS framework is a VA commercial compatibility domain.
+- id: VA-309
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 兼容Android 11运行Google Service
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: API30 GMS probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 11 GMS is a VA commercial compatibility domain.
+- id: VA-440
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复Youtube,WhatsApp等APP无法登录Google账号的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: Youtube/WhatsApp Google login probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Commercial Google login is a VA commercial GMS domain.
+- id: VA-441
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复GooglePlay无法登录Google账号的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: Play login probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Play login is a VA commercial GMS domain.
+- id: VA-442
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复GooglePlay无法打开的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: Play launch probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Play launch is a VA commercial GMS domain.
+- id: VA-443
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复GMS支持，修复各种crash，权限等问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: GMS crash/permission probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: GMS crash/permission is a VA commercial domain.
+- id: VA-594
+  category: GMS
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复GMS无法调起登录的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: GMS login launch probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: GMS login launch is a VA commercial domain.
+- id: VA-346
+  category: OEM
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复VIVO系统服务bug
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: VIVO system-service probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: VIVO system service is a VA commercial OEM domain.
+- id: VA-379
+  category: AndroidVersion
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Android 12.0第一轮适配已完成
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: NEEDS_TEST
+  required_test: API32 Android 12 matrix
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 12 commercial signal; CAS RD API32 is not a full version matrix.
+- id: VA-391
+  category: OEM
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复华为手机上StorageManager没有被hook的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: Huawei StorageManager probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Huawei StorageManager is a VA commercial OEM domain.
+- id: VA-402
+  category: AndroidVersion
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Android 13.0适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: API33 matrix
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 13 is a VA commercial Android-version domain.
+- id: VA-413
+  category: AndroidVersion
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: Android 13.0继续适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: API33 follow-up matrix
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 13 follow-up is a VA commercial Android-version domain.
+- id: VA-444
+  category: AndroidVersion
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 适配Android 14.0
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: API34 matrix
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 14 is a VA commercial Android-version domain.
+- id: VA-602
+  category: AndroidVersion
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 对Android 16.0 beta 4 适配
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: android_oem_compatibility
+  cas_status: GAP
+  required_test: API36 matrix
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Android 16 is a VA commercial Android-version domain.
+- id: VA-226
+  category: Activity
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 添加 Android P 下 ActivityTaskManager 丢失的 Hook
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: activity_framework
+  cas_status: NEEDS_TEST
+  required_test: ActivityTaskManager probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: ActivityTaskManager is a VA commercial Activity domain.
+- id: VA-225
+  category: Activity
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复 Android P 下 Activity Top Resume 异常
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: activity_framework
+  cas_status: NEEDS_TEST
+  required_test: top-resume probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Top-resume is a VA commercial Activity domain.
+- id: VA-127
+  category: Activity
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 新的ActivityStack以提高app运行质量
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: activity_framework
+  cas_status: NEEDS_TEST
+  required_test: ActivityStack/task probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: ActivityStack is a VA commercial Activity domain.
+- id: VA-201
+  category: Manifest
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 重构组件状态管理
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: manifest_package_parser
+  cas_status: NEEDS_TEST
+  required_test: component enabled-state probe
+  rd_status: PARTIAL
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: Component state management is a VA commercial Manifest/PMS domain.
+- id: VA-208
+  category: Provider
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复部分 ContentProvider 找不到的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: provider_transport
+  cas_status: NEEDS_TEST
+  required_test: provider resolution probe
+  rd_status: PASS
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: ContentProvider resolution is a VA commercial Provider domain.
+- id: VA-200
+  category: Provider
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 优化 MIUI/EMUI ContentProvider 兼容性
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: provider_transport
+  cas_status: GAP
+  required_test: OEM ContentProvider probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: OEM ContentProvider is a VA commercial Provider/OEM domain.
+- id: VA-185
+  category: WebView
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复部分设备WebView包名获取失败的问题
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: WebView package-name probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: WebView package identity is a VA commercial WebView domain.
+- id: VA-182
+  category: WebView
+  source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation
+    evidence)
+  summary: 修复WebView在少数机型加载失败的情况
+  source_reference: ref/upstream/VirtualApp/README.md
+  commercial_release_signal: VA commercial changelog recorded this compatibility domain
+  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_mapping: classloader
+  cas_status: GAP
+  required_test: WebView load failure probe
+  rd_status: UNVERIFIED
+  android_matrix_status: UNVERIFIED
+  oem_status: UNVERIFIED
+  va_pro_equivalence_effect: WebView load failure is a VA commercial OEM/WebView domain.

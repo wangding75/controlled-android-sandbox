@@ -44,6 +44,13 @@ The overall RD acceptance remains:
 
 `RESULT: BLOCKED`
 
+> Historical / Superseded for the IIntentSender clause only. Current T57 status:
+> the dedicated framework transport probe later reached the real
+> `PendingIntent` / `IIntentSender` route on RD API32 (`RD-03 PASS` /
+> `RD-06-framework-transport-probe PASS`). The remaining BLOCKED reasons in this
+> paragraph are still current: the 1200-second formal stability gate was not the
+> diagnostic run, and API 33–36 were not tested.
+
 This is intentional. The real PendingIntent `IIntentSender` path has not yet been
 exercised by a dedicated device fixture; the run is diagnostic rather than the
 required 1200-second formal stability gate; and API 33–36 were not tested. Those

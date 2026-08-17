@@ -7,7 +7,7 @@
 
 - 工作目录：`D:\github\controlled-android-sandbox-t57-runtime-review`
 - 分支：`feature/t57-runtime-deep-review-observability`
-- RD 设备：`127.0.0.1:16416`，MuMu `RD测试`，API 32 / Android 12，x86
+- RD 设备：MuMu 实例名 `RD测试`，API 32 / Android 12，x86。交接当时的会话 serial `127.0.0.1:16416` 只是历史连接数据，不是设备身份；后续每次验证必须重新解析。
 - 目标：在 API32 RD 测试模拟器中达到 VA/NBB 商业实现的 Framework 虚拟化成熟度，并以 VA Pro 的执行链、生命周期和稳定性作为追赶目标；API33–36 与 OEM 运行环境按任务约定后续补测。
 
 当前结论是：

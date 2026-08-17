@@ -121,6 +121,8 @@ Virtual UIDs preserve a stable app ID across virtual users while changing the us
 
 ## Component bridges
 
+> Historical / Superseded for the T57 normal path. The paragraph below is retained as the pre-T57 development description. Current T57 status is in `docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md` and `docs/capability/CAPABILITY_REGISTRY.yaml`.
+
 Current bridges are intentionally explicit:
 
 - Activity: a Stub Activity owns the system token/window; a Guest Activity receives mirrored framework fields and forwarded lifecycle callbacks.
@@ -129,6 +131,13 @@ Current bridges are intentionally explicit:
 - Provider: direct `attachInfo`/`onCreate`, broker-routed CRUD/file operations, Cursor/FileDescriptor leases and broker-owned observer callbacks.
 
 These are development implementations, not yet proof of complete Android compatibility. Provider Batch, ContentObserver, Session-bound URI Grant, explicit/implicit manifest Receiver routing and a bounded `BroadcastReceiver.PendingResult` completion bridge are locally wired. Generation-bound PendingIntent senders now route Activity, Service and Broadcast delivery through the Broker; Activity-result senders, protected/background broadcasts and full task semantics remain open.
+
+Current T57 status:
+
+- Activity and Service normal paths are framework-owned (`ActivityThread` / `LoadedApk` / `AppComponentFactory` / Service record and token). `GuestComponentRuntime` is an isolated or OEM fallback, not the normal path.
+- PendingIntent `IIntentSender` is brokered. RD API32 reached the real sender route. This is `rd_api32_status=PASS` only, not VA Pro equivalent.
+- Manifest parsing includes `<queries>`. Ordinary production slots are 64 plus 16 isolated.
+- clear/delete/reinstall uses generation/revision fencing. API 33-36, OEM, and commercial-app matrices remain `UNVERIFIED`.
 
 ## Framework adapters
 

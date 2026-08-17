@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://controlled-android-sandbox.local/capability/evidence.schema.json",
+  "title": "T57-R03 Capability Campaign Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "campaign_id",
+    "capability",
+    "branch",
+    "commit",
+    "tree",
+    "timestamp",
+    "host_os",
+    "android_environment",
+    "device_name",
+    "adb_serial",
+    "api_level",
+    "abi",
+    "build_result",
+    "static_result",
+    "targeted_result",
+    "rd_result",
+    "regression_result",
+    "failures",
+    "known_issues",
+    "evidence_files",
+    "maturity_level"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capability": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commit": {
+      "type": "string",
+      "minLength": 7
+    },
+    "tree": {
+      "type": "string",
+      "minLength": 7
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1
+    },
+    "host_os": {
+      "type": "string",
+      "minLength": 1
+    },
+    "android_environment": {
+      "type": "string",
+      "minLength": 1
+    },
+    "device_name": {
+      "type": "string"
+    },
+    "adb_serial": {
+      "type": "string",
+      "description": "Session-resolved ADB serial. Must never be a hard-coded historical endpoint."
+    },
+    "api_level": {
+      "type": ["string", "integer", "null"]
+    },
+    "abi": {
+      "type": "string"
+    },
+    "boot_id": {
+      "type": "string"
+    },
+    "android_id": {
+      "type": "string"
+    },
+    "instance_name": {
+      "type": "string"
+    },
+    "build_result": {
+      "$ref": "#/$defs/result_value"
+    },
+    "static_result": {
+      "$ref": "#/$defs/result_value"
+    },
+    "targeted_result": {
+      "$ref": "#/$defs/result_value"
+    },
+    "rd_result": {
+      "$ref": "#/$defs/result_value"
+    },
+    "regression_result": {
+      "$ref": "#/$defs/result_value"
+    },
+    "failures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "classification", "summary"],
+        "properties": {
+          "id": { "type": "string" },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "NEW_REGRESSION",
+              "KNOWN_ISSUE",
+              "EXPECTED_WARNING",
+              "UNVERIFIED",
+              "FAIL",
+              "ENVIRONMENT_BLOCKED"
+            ]
+          },
+          "summary": { "type": "string" },
+          "known_issue_id": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "known_issues": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence_files": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "maturity_level": {
+      "type": "string",
+      "enum": ["RD_BASELINE", "ANDROID_MATRIX", "OEM_COMMERCIAL_MATRIX"]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "rd_api32_only": {
+      "type": "boolean"
+    },
+    "va_pro_equivalent": {
+      "type": "string",
+      "enum": [
+        "NOT_PROVEN",
+        "PASS",
+        "PARTIAL",
+        "GAP",
+        "UNVERIFIED",
+        "BLOCKED_ENV",
+        "NOT_APPLICABLE"
+      ]
+    }
+  },
+  "$defs": {
+    "result_value": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "PARTIAL",
+        "GAP",
+        "UNVERIFIED",
+        "BLOCKED_ENV",
+        "NOT_APPLICABLE",
+        "EXPECTED",
+        "FAIL",
+        "SKIPPED",
+        "DRY_RUN"
+      ]
+    }
+  }
+}

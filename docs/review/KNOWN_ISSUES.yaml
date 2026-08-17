@@ -1,0 +1,504 @@
+schema_version: 1
+title: Controlled Android Sandbox Known Issue Registry
+campaign: T57-R03-01
+classification_enum:
+  - CURRENT_DEFECT
+  - ARCHITECTURE_GAP
+  - COMPATIBILITY_GAP
+  - TEST_EVIDENCE_GAP
+  - KNOWN_DEBT
+  - EXPECTED_BEHAVIOR
+  - ENVIRONMENT_BLOCKED
+  - APP_OR_SDK_SPECIFIC
+  - NEEDS_REPRODUCTION_AND_CLASSIFICATION
+  - NEEDS_GATE_AND_CODE_REVIEW
+rules:
+  - T57-M10 findings must not be auto-labeled CURRENT_DEFECT.
+  - T57-R03-01 must record, not fix, runtime/framework/native business defects.
+  - CXX5202 is EXPECTED_BEHAVIOR. Do not delete 32-bit ABI to clear the warning.
+  - M10 production fixes were reverted by 9e5d3e73 and must not be silently restored.
+source: docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+issues:
+  - issue_id: KI-M10-001
+    title: VirtualPackageMetadata exceeds source-closure line threshold
+    capability: virtual_pms_package_visibility
+    classification: KNOWN_DEBT
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java
+      - scripts/check-m4-t18-source-closure.py
+    match_patterns:
+      - VirtualPackageMetadata.java
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_NO_M10_STYLE_COMPRESSION
+    notes: CONFIRMED in M10. About 1908 lines versus 1800. Keep original M10 record; do not format-compress.
+
+  - issue_id: KI-M10-002
+    title: native_interceptors.cpp exceeds source-closure line threshold
+    capability: native_loader_jni_io
+    classification: KNOWN_DEBT
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - sandbox-native/src/main/cpp/native_interceptors.cpp
+      - scripts/check-m4-t18-source-closure.py
+    match_patterns:
+      - native_interceptors.cpp
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_NO_MACRO_COMPRESSION
+    notes: CONFIRMED in M10. About 1838/1839 lines versus 1600. Macro compression was reverted and is forbidden.
+
+  - issue_id: KI-M10-003
+    title: Gradle unsafe cross-project configuration resolution
+    capability: android_oem_compatibility
+    classification: KNOWN_DEBT
+    severity: HIGH
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - build.gradle
+    match_patterns:
+      - Resolution of the configuration
+      - androidApis
+      - different than the project context
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_FUTURE_GRADLE9_BLOCKER
+    notes: CONFIRMED / BUILD_DEBT. Warning on Gradle 8.13; error in Gradle 9.0.
+
+  - issue_id: KI-M10-004
+    title: CXX5202 32-bit native architecture warning
+    capability: native_loader_jni_io
+    classification: EXPECTED_BEHAVIOR
+    severity: INFO
+    status: KEEP_AS_IS
+    discovered_by: T57-M08/T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - fixture-compat32/build.gradle
+      - sandbox-companion32/build.gradle
+    match_patterns:
+      - CXX5202
+      - only has 32-bit
+    blocks_current_campaign: false
+    fix_policy: KEEP_AS_IS_DO_NOT_REMOVE_32BIT_ABI
+    notes: CONFIRMED_EXPECTED architectural warning for the 32-bit companion/fixture. Not a defect.
+
+  - issue_id: KI-M10-005
+    title: GuestNativeRuntimeProjection durability gate
+    capability: native_loader_jni_io
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestNativeRuntimeProjection.java
+      - scripts/check-m5-t19-1-s-durable-atomic-persistence.py
+    match_patterns:
+      - GuestNativeRuntimeProjection
+      - AtomicMoveNotSupportedException
+    blocks_current_campaign: false
+    fix_policy: REPRODUCE_BEFORE_DESIGN_DO_NOT_RESTORE_M10_PATCH
+    notes: M10 DurableAtomicFile adoption was reverted. Reproduce against dlibs/overlay lifecycle before any fix.
+
+  - issue_id: KI-M10-006
+    title: HOST_PACKAGE_HIDDEN ownership marker mismatch
+    capability: virtual_pms_package_visibility
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java
+      - scripts/check-m4-t18-ownership-cleanup.py
+    match_patterns:
+      - HOST_PACKAGE_HIDDEN
+      - HiddenPackageResultMapper
+    blocks_current_campaign: false
+    fix_policy: REVIEW_VISIBILITY_CONTRACT_DO_NOT_RESTORE_OLD_THROW
+    notes: Old HOST_PACKAGE_HIDDEN marker vs HiddenPackageResultMapper. Do not restore old throw semantics.
+
+  - issue_id: KI-M10-007
+    title: Internal Bundle boundary gate host encoding conflict
+    capability: pending_intent_intent_sender
+    classification: NEEDS_GATE_AND_CODE_REVIEW
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-M10
+    evidence:
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+      - scripts/check-m5-t19-1-p-internal-bundle-boundary.py
+    match_patterns:
+      - internal-bundle
+      - RuntimeBrokerOperation
+      - M5-T19.1-P
+      - UnicodeEncodeError
+      - charmap
+    blocks_current_campaign: false
+    fix_policy: DISTINGUISH_GATE_ENCODING_FROM_PRODUCTION_LEAK
+    notes: M10 changed subprocess encoding and that change was reverted. Do not weaken the security gate.
+
+  - issue_id: KI-T57-008
+    title: Ordinary 64-slot high-index / exhaustion tests lag production contract
+    capability: multi_process_process_name_slot
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
+    match_patterns:
+      - SessionRegistry(8
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Production is 64+16. IsolatedProcessArchitectureSelfTest still uses an 8-slot assumption.
+
+  - issue_id: KI-T57-009
+    title: Native hostile boundary is not kernel-enforced
+    capability: native_loader_jni_io
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/ARCHITECTURE.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
+    notes: Direct syscall/raw SVC/custom loader can bypass PLT/GOT. Not a CURRENT_DEFECT of the compatibility path.
+
+  - issue_id: KI-T57-010
+    title: SystemService full Android Framework semantics unproven
+    capability: system_service_virtualization
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Stores exist; Alarm/NMS/Job/Account/Settings/UsageStats full semantics are not proven.
+
+  - issue_id: KI-T57-011
+    title: PendingIntent SystemUI/Alarm/NMS cross-process matrix unproven
+    capability: pending_intent_intent_sender
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: RD API32 IIntentSender path is not a full commercial sender matrix.
+
+  - issue_id: KI-T57-012
+    title: Framework fallback path not end-to-end proven
+    capability: activity_framework
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Normal path is framework-owned; fallback trigger/cleanup contracts remain open.
+
+  - issue_id: KI-T57-013
+    title: Provider high-pressure FD/URI-grant/ANR matrix unproven
+    capability: provider_transport
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: applyBatch/query/bulkInsert RD API32 evidence exists; pressure matrix does not.
+
+  - issue_id: KI-T57-014
+    title: ClassLoader split/plugin/linker-namespace isolation unproven
+    capability: classloader
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Guest-first PathClassLoader exists; split/plugin isolation is not proven.
+
+  - issue_id: KI-T57-015
+    title: SIGSEGV/ANR/LMK/reboot recovery matrix unproven
+    capability: process_death_recovery
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: killProcess/generation recovery on RD API32 is not the full death matrix.
+
+  - issue_id: KI-T57-016
+    title: Package upgrade/rollback/clone/identity-reset unproven
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: clear/delete/reinstall RD API32 evidence exists; upgrade/rollback/clone do not.
+
+  - issue_id: KI-T57-017
+    title: Android API 33-36 behavior matrix not executed
+    capability: android_oem_compatibility
+    classification: COMPATIBILITY_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: compileSdk/targetSdk must not be treated as matrix PASS.
+
+  - issue_id: KI-T57-018
+    title: OEM (MIUI/ColorOS/OriginOS) compatibility matrix not executed
+    capability: android_oem_compatibility
+    classification: COMPATIBILITY_GAP
+    severity: HIGH
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - docs/oem-compat/T55_FINAL_CAPABILITY_MATRIX.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Historical Xiaomi T54-T56 evidence is not OEM_COMMERCIAL_MATRIX PASS.
+
+  - issue_id: KI-T57-019
+    title: VA/NBB/VA Pro same-device A/B comparison missing
+    capability: android_oem_compatibility
+    classification: TEST_EVIDENCE_GAP
+    severity: MEDIUM
+    status: NOT_PROVEN
+    discovered_by: T57-R02
+    evidence:
+      - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+    match_patterns: []
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: Commercial README/changelog is not CAS implementation evidence.
+
+  - issue_id: KI-R03-020
+    title: M5-T19 architecture-decoupling critical-owner map lags T57 owners
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-m5-t19-architecture-decoupling.py
+      - artifacts/capability-audit/all/20260817T061507Z/architecture-decoupling.json
+    match_patterns:
+      - original twelve owners
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing on 9e5d3e73. Gate expects the original twelve owners plus a direct map for added owners.
+
+  - issue_id: KI-R03-021
+    title: SBOM source digest stale after T57-M10 revert
+    capability: android_oem_compatibility
+    classification: KNOWN_DEBT
+    severity: LOW
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/generate-sbom.py
+      - verification/sbom.json
+      - artifacts/capability-audit/all/20260817T061507Z/sbom-check.json
+    match_patterns:
+      - sourceDigestSha256 mismatch
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY
+    notes: 9e5d3e73 reverted M10 source without regenerating SBOM. Not a runtime defect.
+
+  - issue_id: KI-R03-022
+    title: Broadcast-model Receiver coordinator tokens lag T57 Broker
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-broadcast-model.py
+      - artifacts/capability-audit/all/20260817T061507Z/broadcast-model.json
+    match_patterns:
+      - Receiver coordinator delegation
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing gate/source token drift on the T57-M09 baseline.
+
+  - issue_id: KI-R03-023
+    title: Native trust-boundary requireAllowed token missing in Broker
+    capability: native_loader_jni_io
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-m5-t19-1-a-native-trust-boundary.py
+      - artifacts/capability-audit/all/20260817T061507Z/native-trust-boundary.json
+    match_patterns:
+      - NativeGuestPolicyContract.requireAllowed
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing token drift. Do not restore M10-style patches blindly.
+
+  - issue_id: KI-R03-024
+    title: Runtime/Framework package-boundary imports after T57 framework ownership
+    capability: bind_application_loaded_apk_component_factory
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-package-boundaries.py
+      - artifacts/capability-audit/all/20260817T061507Z/package-boundaries.json
+    match_patterns:
+      - imports disallowed internal package
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: T57 Guest ActivityThread bridges import component packages the older boundary gate forbids.
+
+  - issue_id: KI-R03-025
+    title: Isolated-process coordinator stopGuest token missing
+    capability: multi_process_process_name_slot
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-m5-t6-isolated-process.py
+      - artifacts/capability-audit/all/20260817T061507Z/isolated-process.json
+    match_patterns:
+      - isolatedProcessCoordinator.stopGuest
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing isolated-process gate token drift.
+
+  - issue_id: KI-R03-026
+    title: APK revision-binding Broker tokens missing
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-apk-revision-binding.py
+      - artifacts/capability-audit/all/20260817T061507Z/apk-revision-binding.json
+    match_patterns:
+      - Broker does not derive authoritative PACKAGE_REVISION
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing revision-binding gate token drift.
+
+  - issue_id: KI-R03-027
+    title: System-service/Broker split coordinator tokens missing
+    capability: system_service_virtualization
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-system-services-broker-split.py
+      - artifacts/capability-audit/all/20260817T061507Z/system-services-split.json
+    match_patterns:
+      - VIRTUAL_PENDING_INTENT_CROSS_PACKAGE_DENIED
+      - receiverCoordinator.dispatchManifestBroadcast
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing M4-T10 split-gate token drift after T57 Broker evolution.
+
+  - issue_id: KI-R03-028
+    title: Binder system-service coordinator attach/stop tokens missing
+    capability: system_service_virtualization
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-binder-system-services.py
+      - artifacts/capability-audit/all/20260817T061507Z/binder-system-services.json
+    match_patterns:
+      - systemServiceCoordinator.attach
+      - systemServiceCoordinator.stop
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing M4-T11 gate token drift.
+
+  - issue_id: KI-R03-029
+    title: Split-install session evidence tokens missing
+    capability: classloader
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 collect-all
+    evidence:
+      - scripts/check-split-install-sessions.py
+      - artifacts/capability-audit/all/20260817T061507Z/split-install.json
+    match_patterns:
+      - packageService.createInstallSession
+      - Split metadata arrays must have identical sizes
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: Pre-existing split-install gate token drift. Not a new runtime regression from this campaign.
+
+  - issue_id: KI-R03-030
+    title: RD API32 framework transport launch-component gate not confirmed
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: T57-R03-01 RD campaign
+    evidence:
+      - tools/device/t57_rd_framework_transport_probe.ps1
+      - artifacts/capability-audit/T57-R03-01/20260817T062211Z/smoke.json
+    match_patterns:
+      - LAUNCH_GATE_FAILED
+      - guest Activity create/resume/window not confirmed
+    blocks_current_campaign: false
+    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
+    notes: >
+      Campaign runner resolved RD测试 and installed APKs. The existing transport
+      probe reached import-prepare then failed launch-component with
+      LAUNCH_GATE_FAILED. This is a baseline/device finding, not a new
+      infrastructure defect. First-version runner smoke uses the existing
+      import-prepare DebugCommand.

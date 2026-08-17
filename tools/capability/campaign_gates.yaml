@@ -1,0 +1,264 @@
+schema_version: 1
+title: T57-R03 local collect-all gate catalog
+diagnostic_only: true
+forbidden_actions:
+  - modify_source
+  - modify_tests
+  - modify_gates
+  - format_source
+  - delete_files
+  - write_git_index
+gates:
+  - id: architecture
+    group: architecture
+    command: [python, scripts/check-architecture.py]
+    capabilities: [activity_framework, service_framework]
+    required: true
+    timeout_sec: 180
+  - id: architecture-quality
+    group: architecture
+    command: [python, scripts/check-m5-t18-architecture-quality.py]
+    capabilities: [activity_framework, system_service_virtualization]
+    required: true
+    timeout_sec: 180
+  - id: architecture-decoupling
+    group: architecture
+    command: [python, scripts/check-m5-t19-architecture-decoupling.py]
+    capabilities: [activity_framework, system_service_virtualization]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-020]
+  - id: typed-contract
+    group: typed_contract
+    command: [python, scripts/check-contracts.py]
+    capabilities: [pending_intent_intent_sender, system_service_virtualization]
+    required: true
+    timeout_sec: 180
+  - id: ports-dispatchers
+    group: typed_contract
+    command: [python, scripts/check-ports-dispatchers.py]
+    capabilities: [system_service_virtualization]
+    required: true
+    timeout_sec: 180
+  - id: source-closure-m4
+    group: source_closure
+    command: [python, scripts/check-m4-t18-source-closure.py]
+    capabilities: [virtual_pms_package_visibility, native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-M10-001, KI-M10-002]
+  - id: source-closure-m5-t16
+    group: source_closure
+    command: [python, scripts/check-m5-t16-source-closure.py]
+    capabilities: [virtual_pms_package_visibility]
+    required: true
+    timeout_sec: 180
+  - id: static-android-compile
+    group: static_compile
+    command: [python, tools/static_android_compile.py]
+    capabilities:
+      - activity_framework
+      - service_framework
+      - provider_transport
+      - classloader
+      - native_loader_jni_io
+    required: true
+    timeout_sec: 1800
+  - id: build-environment
+    group: gradle_configuration
+    command: [python, scripts/check-build-environment.py]
+    capabilities: [android_oem_compatibility]
+    required: true
+    timeout_sec: 120
+  - id: gradle-lock-state
+    group: dependency
+    command: [python, tools/gradle_lock_state.py, verify]
+    capabilities: [android_oem_compatibility]
+    required: true
+    timeout_sec: 180
+  - id: sbom-check
+    group: dependency
+    command: [python, scripts/generate-sbom.py, --check]
+    capabilities: [android_oem_compatibility]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-021]
+  - id: m5-build-baseline
+    group: gradle_configuration
+    command: [python, scripts/check-m5-build-baseline.py]
+    capabilities: [android_oem_compatibility]
+    required: true
+    timeout_sec: 180
+  - id: runtime-hardening
+    group: runtime_self_test
+    command: [python, scripts/check-pre-device-runtime-hardening.py]
+    capabilities: [process_death_recovery, bind_application_loaded_apk_component_factory]
+    required: true
+    timeout_sec: 180
+  - id: guest-boundary
+    group: runtime_self_test
+    command: [python, scripts/check-guest-boundary.py]
+    capabilities: [classloader, native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+  - id: activity-task
+    group: framework_self_test
+    command: [python, scripts/check-activity-task-virtualization.py]
+    capabilities: [activity_framework]
+    required: true
+    timeout_sec: 180
+  - id: service-lifecycle
+    group: framework_self_test
+    command: [python, scripts/check-service-lifecycle.py]
+    capabilities: [service_framework]
+    required: true
+    timeout_sec: 180
+  - id: broadcast-model
+    group: framework_self_test
+    command: [python, scripts/check-broadcast-model.py]
+    capabilities: [activity_framework]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-022]
+  - id: native-file-hooks
+    group: native_self_test
+    command: [python, scripts/check-native-file-hooks.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+  - id: native-files-loader
+    group: native_self_test
+    command: [python, scripts/check-native-files-loader.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+  - id: native-network-audio
+    group: native_self_test
+    command: [python, scripts/check-native-network-audio.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+  - id: native-abi-companion
+    group: native_self_test
+    command: [python, scripts/check-native-abi-companion.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+  - id: native-trust-boundary
+    group: native_self_test
+    command: [python, scripts/check-m5-t19-1-a-native-trust-boundary.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-023]
+  - id: package-visibility
+    group: package_visibility
+    command: [python, scripts/check-package-query-resolve.py]
+    capabilities: [virtual_pms_package_visibility, manifest_package_parser]
+    required: true
+    timeout_sec: 180
+  - id: virtual-package-state
+    group: package_visibility
+    command: [python, scripts/check-virtual-package-state.py]
+    capabilities: [virtual_pms_package_visibility]
+    required: true
+    timeout_sec: 180
+  - id: package-boundaries
+    group: package_visibility
+    command: [python, scripts/check-package-boundaries.py]
+    capabilities: [virtual_pms_package_visibility]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-024]
+  - id: package-service-boundary
+    group: package_visibility
+    command: [python, scripts/check-package-service-boundary.py]
+    capabilities: [virtual_pms_package_visibility]
+    required: true
+    timeout_sec: 180
+  - id: pending-intent
+    group: pending_intent
+    command: [python, scripts/check-pending-intent-lifecycle.py]
+    capabilities: [pending_intent_intent_sender]
+    required: true
+    timeout_sec: 180
+  - id: isolated-process
+    group: process_generation
+    command: [python, scripts/check-m5-t6-isolated-process.py]
+    capabilities: [multi_process_process_name_slot]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-025]
+  - id: rebind-timeout
+    group: process_generation
+    command: [python, scripts/check-m5-t19-1-c-rebind-timeout-recovery.py]
+    capabilities: [process_death_recovery]
+    required: true
+    timeout_sec: 180
+  - id: binder-death
+    group: process_generation
+    command: [python, scripts/check-m5-t19-1-d-binder-death-registration.py]
+    capabilities: [process_death_recovery, provider_transport]
+    required: true
+    timeout_sec: 180
+  - id: package-lifecycle
+    group: clear_delete_reinstall
+    command: [python, scripts/check-package-lifecycle-transaction.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+  - id: apk-revision-binding
+    group: clear_delete_reinstall
+    command: [python, scripts/check-apk-revision-binding.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-026]
+  - id: ownership-cleanup
+    group: package_visibility
+    command: [python, scripts/check-m4-t18-ownership-cleanup.py]
+    capabilities: [virtual_pms_package_visibility]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-M10-006]
+  - id: durable-atomic
+    group: native_self_test
+    command: [python, scripts/check-m5-t19-1-s-durable-atomic-persistence.py]
+    capabilities: [native_loader_jni_io, package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 300
+    known_issue_ids: [KI-M10-005]
+  - id: internal-bundle-boundary
+    group: typed_contract
+    command: [python, scripts/check-m5-t19-1-p-internal-bundle-boundary.py]
+    capabilities: [pending_intent_intent_sender]
+    required: true
+    timeout_sec: 300
+    known_issue_ids: [KI-M10-007]
+  - id: capability-proxy-split
+    group: architecture
+    command: [python, scripts/check-capability-proxy-broker-split.py]
+    capabilities: [system_service_virtualization]
+    required: true
+    timeout_sec: 180
+  - id: system-services-split
+    group: architecture
+    command: [python, scripts/check-system-services-broker-split.py]
+    capabilities: [system_service_virtualization]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-027]
+  - id: binder-system-services
+    group: framework_self_test
+    command: [python, scripts/check-binder-system-services.py]
+    capabilities: [system_service_virtualization]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-028]
+  - id: split-install
+    group: package_visibility
+    command: [python, scripts/check-split-install-sessions.py]
+    capabilities: [classloader, package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-029]
