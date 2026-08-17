@@ -46,6 +46,7 @@ public final class BrokerManifestReceiverRuntime {
         int userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
         if (userId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
         if (!packageName.equals(manifest.packageName())) throw new SecurityException("MANIFEST_PACKAGE_MISMATCH");
+        String applicationProcessName = manifest.applicationProcessName();
         List<ManifestReceiverRegistry.Receiver> receivers = new ArrayList<>();
         for (ManifestModel.Component component : manifest.receivers()) {
             List<ManifestReceiverRegistry.Filter> filters = new ArrayList<>();
@@ -53,6 +54,7 @@ public final class BrokerManifestReceiverRuntime {
                 List<ManifestReceiverRegistry.DataRule> dataRules = new ArrayList<>();
                 for (ManifestModel.DataRule rule : filter.dataRules()) {
                     dataRules.add(new ManifestReceiverRegistry.DataRule(rule.scheme(), rule.host(),
+                            rule.port(),
                             rule.path(), rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
                 }
                 filters.add(new ManifestReceiverRegistry.Filter(filter.priority(), filter.actions(),
@@ -63,7 +65,7 @@ public final class BrokerManifestReceiverRuntime {
                         Collections.emptySet(), Collections.emptyList()));
             }
             receivers.add(new ManifestReceiverRegistry.Receiver(packageName, component.className(),
-                    processName(packageName, component.processName()), component.exported(),
+                    processName(packageName, applicationProcessName, component.processName()), component.exported(),
                     component.enabled(), component.permission(), filters));
         }
         registry.registerPackage(packageName, userId, new LinkedHashSet<>(manifest.permissions()), receivers);
@@ -95,6 +97,7 @@ public final class BrokerManifestReceiverRuntime {
         BroadcastIntent intent = new BroadcastIntent(required(request, ComponentOperations.ACTION), categories,
                 request.getString(RuntimeKeys.BROADCAST_SCHEME, ""),
                 request.getString(RuntimeKeys.BROADCAST_HOST, ""),
+                request.getInt(RuntimeKeys.BROADCAST_PORT, -1),
                 request.getString(RuntimeKeys.BROADCAST_PATH, ""),
                 request.getString(RuntimeKeys.BROADCAST_MIME_TYPE, ""));
         String requiredPermission = request.getString(RuntimeKeys.BROADCAST_REQUIRED_RECEIVER_PERMISSION, "");
@@ -204,9 +207,13 @@ public final class BrokerManifestReceiverRuntime {
         return request;
     }
 
-    private static String processName(String packageName, String declared) {
-        if (declared == null || declared.trim().isEmpty()) return packageName;
-        return declared.startsWith(":") ? packageName + declared : declared;
+    private static String processName(String packageName, String applicationProcessName,
+                                      String declared) {
+        String value = declared == null ? "" : declared.trim();
+        if (value.isEmpty()) value = applicationProcessName == null
+                ? "" : applicationProcessName.trim();
+        if (value.isEmpty()) return packageName;
+        return value.startsWith(":") ? packageName + value : value;
     }
 
     private static String normalizeClass(String packageName, String raw) {

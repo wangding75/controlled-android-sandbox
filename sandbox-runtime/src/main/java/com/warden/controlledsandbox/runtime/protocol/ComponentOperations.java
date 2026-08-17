@@ -13,6 +13,21 @@ public final class ComponentOperations {
     public static final String UNBIND_SERVICE = "UNBIND_SERVICE";
     /** Requests a Broker-owned process slot for the ActivityThread Service transport. */
     public static final String ROUTE_FRAMEWORK_SERVICE = "ROUTE_FRAMEWORK_SERVICE";
+    /** Creates a Broker-owned IIntentSender relay for a durable Guest PendingIntent record. */
+    public static final String CREATE_PENDING_INTENT_SENDER =
+            "CREATE_PENDING_INTENT_SENDER";
+    /** Commits an ActivityThread-delivered Service lifecycle edge to Broker authority state. */
+    public static final String FRAMEWORK_SERVICE_EVENT = "FRAMEWORK_SERVICE_EVENT";
+    /** Recreates a sticky/redeliver Service through ActivityThread after process replacement. */
+    public static final String RECOVER_FRAMEWORK_SERVICE = "RECOVER_FRAMEWORK_SERVICE";
+    /** Delivers a manifest Receiver through ActivityThread's RECEIVER transaction. */
+    public static final String ROUTE_FRAMEWORK_RECEIVER = "ROUTE_FRAMEWORK_RECEIVER";
+    public static final String FRAMEWORK_SERVICE_EVENT_START = "START";
+    /** Registers a framework Service start before Guest onStartCommand can call startForeground. */
+    public static final String FRAMEWORK_SERVICE_EVENT_START_BEGIN = "START_BEGIN";
+    public static final String FRAMEWORK_SERVICE_EVENT_BIND = "BIND";
+    public static final String FRAMEWORK_SERVICE_EVENT_UNBIND = "UNBIND";
+    public static final String FRAMEWORK_SERVICE_EVENT_STOP = "STOP";
     public static final String REGISTER_RECEIVER = "REGISTER_RECEIVER";
     public static final String UNREGISTER_RECEIVER = "UNREGISTER_RECEIVER";
     public static final String SEND_BROADCAST = "SEND_BROADCAST";
@@ -20,10 +35,16 @@ public final class ComponentOperations {
     public static final String SEND_ORDERED_BROADCAST = "SEND_ORDERED_BROADCAST";
     public static final String PREPARE_PROVIDER = "PREPARE_PROVIDER";
     public static final String PROVIDER_QUERY = "PROVIDER_QUERY";
+    public static final String PROVIDER_QUERY_CANCEL = "PROVIDER_QUERY_CANCEL";
+    public static final String PROVIDER_CANONICALIZE = "PROVIDER_CANONICALIZE";
+    public static final String PROVIDER_UNCANONICALIZE = "PROVIDER_UNCANONICALIZE";
     public static final String PROVIDER_CURSOR_PAGE = "PROVIDER_CURSOR_PAGE";
     public static final String PROVIDER_CURSOR_CLOSE = "PROVIDER_CURSOR_CLOSE";
     public static final String PROVIDER_CURSOR_CANCEL = "PROVIDER_CURSOR_CANCEL";
     public static final String PROVIDER_GET_TYPE = "PROVIDER_GET_TYPE";
+    public static final String PROVIDER_GET_TYPE_ANONYMOUS = "PROVIDER_GET_TYPE_ANONYMOUS";
+    public static final String PROVIDER_GET_STREAM_TYPES = "PROVIDER_GET_STREAM_TYPES";
+    public static final String PROVIDER_REFRESH = "PROVIDER_REFRESH";
     public static final String PROVIDER_INSERT = "PROVIDER_INSERT";
     public static final String PROVIDER_BULK_INSERT = "PROVIDER_BULK_INSERT";
     public static final String PROVIDER_UPDATE = "PROVIDER_UPDATE";
@@ -48,7 +69,9 @@ public final class ComponentOperations {
                 || SET_SERVICE_FOREGROUND.equals(operation)
                 || BIND_SERVICE.equals(operation)
                 || UNBIND_SERVICE.equals(operation)
-                || ROUTE_FRAMEWORK_SERVICE.equals(operation);
+                || ROUTE_FRAMEWORK_SERVICE.equals(operation)
+                || FRAMEWORK_SERVICE_EVENT.equals(operation)
+                || RECOVER_FRAMEWORK_SERVICE.equals(operation);
     }
 
     public static void requireKnownServiceOperation(String operation) {
@@ -75,7 +98,13 @@ public final class ComponentOperations {
 
     public static boolean isProviderTransactionOperation(String operation) {
         return PROVIDER_QUERY.equals(operation)
+                || PROVIDER_QUERY_CANCEL.equals(operation)
+                || PROVIDER_CANONICALIZE.equals(operation)
+                || PROVIDER_UNCANONICALIZE.equals(operation)
                 || PROVIDER_GET_TYPE.equals(operation)
+                || PROVIDER_GET_TYPE_ANONYMOUS.equals(operation)
+                || PROVIDER_GET_STREAM_TYPES.equals(operation)
+                || PROVIDER_REFRESH.equals(operation)
                 || PROVIDER_INSERT.equals(operation)
                 || PROVIDER_BULK_INSERT.equals(operation)
                 || PROVIDER_UPDATE.equals(operation)
@@ -103,7 +132,15 @@ public final class ComponentOperations {
     }
 
     public static boolean requiresProviderRead(String operation) {
-        return PROVIDER_QUERY.equals(operation) || PROVIDER_GET_TYPE.equals(operation)
+        return PROVIDER_QUERY.equals(operation)
+                || PROVIDER_QUERY_CANCEL.equals(operation)
+                || PROVIDER_CANONICALIZE.equals(operation)
+                || PROVIDER_UNCANONICALIZE.equals(operation)
+                || PROVIDER_GET_TYPE.equals(operation)
+                || PROVIDER_GET_TYPE_ANONYMOUS.equals(operation)
+                || PROVIDER_GET_STREAM_TYPES.equals(operation)
+                || PROVIDER_REFRESH.equals(operation)
+                || PROVIDER_OBSERVER_REGISTER.equals(operation)
                 || PROVIDER_CURSOR_PAGE.equals(operation) || PROVIDER_CURSOR_CLOSE.equals(operation)
                 || PROVIDER_CURSOR_CANCEL.equals(operation)
                 || PROVIDER_OPEN_TYPED_ASSET_FILE.equals(operation);
@@ -112,6 +149,6 @@ public final class ComponentOperations {
     public static boolean requiresProviderWrite(String operation) {
         return PROVIDER_INSERT.equals(operation) || PROVIDER_BULK_INSERT.equals(operation)
                 || PROVIDER_UPDATE.equals(operation)
-                || PROVIDER_DELETE.equals(operation) || PROVIDER_CALL.equals(operation);
+                || PROVIDER_DELETE.equals(operation);
     }
 }

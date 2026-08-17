@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.RemoteException;
@@ -10,6 +11,11 @@ import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
 import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
+import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -30,10 +36,17 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
                      VirtualPendingIntentRegistry.SendRequest request) throws Exception;
     }
 
+    /** Result retained across the Guest/Broker boundary for an IIntentSender completion callback. */
+    record PersistentSendResult(boolean delivered, int resultCode, Intent deliveredIntent) { }
+
     private final GuestPackageSpec spec;
     private final VirtualPendingIntentRegistry registry;
     private final ActivityTokenResolver activityTokenResolver;
     private final Map<Object, Object> proxies = new IdentityHashMap<>();
+    /** Maps the locally-owned registry key to the Binder exposed to host/system processes. */
+    private final Map<Object, IBinder> exposedBinders = new IdentityHashMap<>();
+    /** Lets framework callbacks that return only the remote Binder resolve the local record. */
+    private final Map<Object, Object> remoteTokens = new IdentityHashMap<>();
 
     PendingIntentFrameworkInterceptor(GuestPackageSpec spec, Dispatcher dispatcher) {
         this(spec, null, token -> { throw new SecurityException("VIRTUAL_ACTIVITY_FRAMEWORK_TOKEN_UNKNOWN"); }, dispatcher);
@@ -59,7 +72,11 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         if (name.startsWith("cancelintentsender")) {
             Object token = senderToken(arguments);
             if (token == null) return Interception.passThrough();
-            registry.cancel(token); proxies.remove(token); return Interception.handled(defaultValue(method.getReturnType()));
+            registry.cancel(token);
+            proxies.remove(token);
+            IBinder exposed = exposedBinders.remove(token);
+            if (exposed != null) remoteTokens.remove(exposed);
+            return Interception.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("sendintentsender")) {
             Object token = senderToken(arguments);
@@ -100,15 +117,37 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     VirtualPendingIntentRegistry.Snapshot snapshot() { return registry.snapshot(); }
 
     boolean sendPersistent(String tokenId) {
+        return sendPersistent(tokenId, VirtualPendingIntentRegistry.SendRequest.simple(null));
+    }
+
+    boolean sendPersistent(String tokenId, VirtualPendingIntentRegistry.SendRequest request) {
+        return sendPersistentResult(tokenId, request).delivered();
+    }
+
+    PersistentSendResult sendPersistentResult(String tokenId,
+                                              VirtualPendingIntentRegistry.SendRequest request) {
         try {
-            registry.sendPersistent(tokenId, VirtualPendingIntentRegistry.SendRequest.simple(null));
-            return true;
+            VirtualPendingIntentRegistry.SendRequest resolved = request == null
+                    ? VirtualPendingIntentRegistry.SendRequest.simple(null) : request;
+            VirtualPendingIntentRegistry.Record record = registry.findPersistent(tokenId);
+            if (record == null) return new PersistentSendResult(false, -1, null);
+            // Compute the callback payload before delivery retires a one-shot record.  This is
+            // the exact IIntentSender semantic: callback Intent = base sender Intent merged
+            // with fill-in and masked flags, not the raw fill-in parcel supplied by the caller.
+            Intent delivered = GuestPendingIntentDispatcher.selectedIntent(record.payload(), resolved);
+            int resultCode = registry.sendPersistent(tokenId, resolved);
+            return new PersistentSendResult(true, resultCode, delivered);
         } catch (Exception error) {
-            return false;
+            return new PersistentSendResult(false, -1, null);
         }
     }
 
-    @Override public synchronized void close() { registry.close(); proxies.clear(); }
+    @Override public synchronized void close() {
+        registry.close();
+        proxies.clear();
+        exposedBinders.clear();
+        remoteTokens.clear();
+    }
 
     private Interception createSender(Method method, Object[] arguments) {
         if (!method.getReturnType().isInterface()) {
@@ -120,15 +159,51 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         if (issued.record() == null) return Interception.handled(null);
         candidate.bind(issued.record().persistentTokenId());
         Object token = issued.record().token();
+        IBinder exposed = exposedBinders.get(token);
+        if (exposed == null) {
+            exposed = createBrokerSender(issued.record().persistentTokenId(),
+                    descriptor(method.getReturnType()));
+            if (exposed == null) exposed = candidate;
+            exposedBinders.put(token, exposed);
+            if (exposed != candidate) remoteTokens.put(exposed, token);
+        }
         Object sender = proxies.get(token);
         if (sender == null) {
-            sender = createSenderProxy(method.getReturnType(), token);
+            sender = createSenderProxy(method.getReturnType(), token, exposed);
             proxies.put(token, sender);
         }
         return Interception.handled(sender);
     }
 
-    private Object createSenderProxy(Class<?> senderType, Object token) {
+    private IBinder createBrokerSender(String tokenId, String senderDescriptor) {
+        if (spec.runtimeBrokerBinder == null) return null;
+        try {
+            IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(spec.runtimeBrokerBinder);
+            if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_BINDER_UNAVAILABLE");
+            Bundle request = spec.toBundle();
+            request.putString(ComponentOperations.OPERATION,
+                    ComponentOperations.CREATE_PENDING_INTENT_SENDER);
+            request.putString(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
+            request.putString("pendingIntentSenderDescriptor", senderDescriptor);
+            Bundle result = RuntimeOperationTransport.toLegacyBundle(RuntimeOperationTransport.execute(
+                    broker, RuntimeOperationRequest.INVOKE_COMPONENT, request));
+            GuestRuntimeBrokerBridge.requireSuccess(result,
+                    ComponentOperations.CREATE_PENDING_INTENT_SENDER);
+            IBinder binder = result.getBinder(RuntimeKeys.PENDING_INTENT_SENDER_BINDER);
+            if (binder == null) throw new IllegalStateException("PENDING_INTENT_SENDER_BINDER_MISSING");
+            return binder;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            // A production Guest always has the Broker capability. Do not silently return a
+            // process-owned sender in that mode: doing so would reintroduce the post-death hole
+            // this relay is designed to close. The legacy self-test has no Broker binder and
+            // intentionally retains the local transport.
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error : new IllegalStateException(error);
+        }
+    }
+
+    private Object createSenderProxy(Class<?> senderType, Object token, IBinder exposedBinder) {
         ClassLoader loader = senderType.getClassLoader();
         if (loader == null) loader = getClass().getClassLoader();
         InvocationHandler handler = (proxy, method, arguments) -> {
@@ -145,7 +220,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
                     default -> null;
                 };
             }
-            if (name.equals("asBinder")) return token;
+            if (name.equals("asBinder")) return exposedBinder;
             if (name.toLowerCase(Locale.ROOT).startsWith("send")) {
                 int result = registry.send(token, sendRequest(method, arguments));
                 return returnFor(method.getReturnType(), result);
@@ -233,16 +308,22 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         for (Object value : arguments) {
             if (value == null) continue;
             if (registry.find(value) != null) return value;
+            Object mapped = remoteTokens.get(value);
+            if (mapped != null) return mapped;
             if (Proxy.isProxyClass(value.getClass())) {
                 try {
-                    InvocationHandler handler = Proxy.getInvocationHandler(value);
                     Method asBinder = value.getClass().getMethod("asBinder");
                     asBinder.setAccessible(true);
                     Object token = asBinder.invoke(value);
                     if (registry.find(token) != null) return token;
+                    mapped = remoteTokens.get(token);
+                    if (mapped != null) return mapped;
                 } catch (Throwable ignored) { com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored); }
             }
-            if (value instanceof IBinder && registry.find(value) != null) return value;
+            if (value instanceof IBinder) {
+                mapped = remoteTokens.get(value);
+                if (mapped != null) return mapped;
+            }
         }
         return null;
     }
@@ -275,14 +356,25 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         return null;
     }
     private static VirtualPendingIntentRegistry.SendRequest sendRequest(Method method,
-                                                                         Object[] arguments) {
+                                                                          Object[] arguments) {
         Intent fillIn = firstIntent(arguments);
-        List<Integer> integers = new ArrayList<>();
-        if (arguments != null) for (Object value : arguments) if (value instanceof Integer) integers.add((Integer) value);
-        int mask = integers.size() >= 2 ? integers.get(integers.size() - 2) : 0;
-        int values = integers.size() >= 1 ? integers.get(integers.size() - 1) : 0;
+        // IIntentSender.send's first integer is the caller-supplied result code.  It is
+        // delivered to IIntentReceiver.performReceive and is not the Intent fill-in flags
+        // mask/value pair.  Treating it as flagsValues corrupts mutable PendingIntent routing
+        // and makes an immutable sender reject an otherwise empty fill-in when code != 0.
+        int mask = 0;
+        int values = 0;
+        int resultCode = 0;
+        if (arguments != null) {
+            for (Object value : arguments) {
+                if (value instanceof Integer) {
+                    resultCode = (Integer) value;
+                    break;
+                }
+            }
+        }
         return new VirtualPendingIntentRegistry.SendRequest(fillIn, mask, values,
-                sendPermission(method, arguments), -1);
+                sendPermission(method, arguments), -1, resultCode);
     }
 
     /**
@@ -369,7 +461,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             if (code != SEND_TRANSACTION) return super.onTransact(code, data, reply, flags);
             data.enforceInterface(descriptor);
             if (dataAvail(data) <= 0) throw new RemoteException("IIntentSender.send payload missing");
-            data.readInt(); // result code
+            int resultCode = data.readInt();
             Intent intent = data.readInt() != 0 ? readIntent(data) : null;
             data.readString(); // resolved type
             readStrongBinder(data); // whitelist token
@@ -378,7 +470,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             if (dataAvail(data) > 0) readBundle(data);
             try {
                 int result = registry.send(this, new VirtualPendingIntentRegistry.SendRequest(
-                        intent, 0, 0, permission, -1));
+                        intent, 0, 0, permission, -1, resultCode));
                 reply.writeNoException();
                 reply.writeInt(result);
                 return true;

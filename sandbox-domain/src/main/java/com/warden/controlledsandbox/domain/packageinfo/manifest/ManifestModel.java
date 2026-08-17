@@ -33,6 +33,8 @@ public final class ManifestModel {
     private final List<Component> receivers = new ArrayList<>();
     private final List<Component> providers = new ArrayList<>();
     private final List<String> permissions = new ArrayList<>();
+    private final List<PermissionDeclaration> permissionDeclarations = new ArrayList<>();
+    private final List<PermissionGroupDeclaration> permissionGroups = new ArrayList<>();
     private final List<String> sharedLibraries = new ArrayList<>();
     private final List<SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
     private final List<String> providedSharedLibraries = new ArrayList<>();
@@ -88,6 +90,12 @@ public final class ManifestModel {
     public List<Component> receivers() { return Collections.unmodifiableList(receivers); }
     public List<Component> providers() { return Collections.unmodifiableList(providers); }
     public List<String> permissions() { return Collections.unmodifiableList(permissions); }
+    public List<PermissionDeclaration> permissionDeclarations() {
+        return Collections.unmodifiableList(permissionDeclarations);
+    }
+    public List<PermissionGroupDeclaration> permissionGroups() {
+        return Collections.unmodifiableList(permissionGroups);
+    }
     public List<String> sharedLibraries() { return Collections.unmodifiableList(sharedLibraries); }
     public List<SharedLibraryDependency> sharedLibraryDependencies() {
         return Collections.unmodifiableList(sharedLibraryDependencies);
@@ -173,6 +181,34 @@ public final class ManifestModel {
         if (!normalized.isEmpty() && !permissions.contains(normalized)) permissions.add(normalized);
     }
 
+    public void addPermissionDeclaration(PermissionDeclaration declaration) {
+        if (declaration == null) return;
+        for (PermissionDeclaration existing : permissionDeclarations) {
+            if (existing.name().equals(declaration.name())) {
+                if (!existing.equals(declaration)) {
+                    throw new IllegalArgumentException(
+                            "Conflicting duplicate permission declaration: " + declaration.name());
+                }
+                return;
+            }
+        }
+        permissionDeclarations.add(declaration);
+    }
+
+    public void addPermissionGroup(PermissionGroupDeclaration group) {
+        if (group == null) return;
+        for (PermissionGroupDeclaration existing : permissionGroups) {
+            if (existing.name().equals(group.name())) {
+                if (!existing.equals(group)) {
+                    throw new IllegalArgumentException(
+                            "Conflicting duplicate permission-group declaration: " + group.name());
+                }
+                return;
+            }
+        }
+        permissionGroups.add(group);
+    }
+
     public void addQueryPackage(String packageName) {
         String normalized = normalize(packageName);
         if (!normalized.isEmpty()) queryPackages.add(normalized);
@@ -189,6 +225,118 @@ public final class ManifestModel {
         QueryIntent intent = new QueryIntent();
         queryIntents.add(intent);
         return intent;
+    }
+
+    /** Manifest declaration projected to PermissionInfo without depending on Android framework classes. */
+    public static final class PermissionDeclaration {
+        private final String name;
+        private final String group;
+        private final String label;
+        private final String description;
+        private final int labelRes;
+        private final int descriptionRes;
+        private final int icon;
+        private final int protectionLevel;
+        private final int flags;
+        private final boolean tree;
+
+        public PermissionDeclaration(String name, String group, String label, String description,
+                                     int labelRes, int descriptionRes, int icon,
+                                     int protectionLevel, int flags) {
+            this(name, group, label, description, labelRes, descriptionRes, icon,
+                    protectionLevel, flags, false);
+        }
+
+        public PermissionDeclaration(String name, String group, String label, String description,
+                                     int labelRes, int descriptionRes, int icon,
+                                     int protectionLevel, int flags, boolean tree) {
+            this.name = requirePermissionName(name);
+            this.group = normalize(group);
+            this.label = normalize(label);
+            this.description = normalize(description);
+            this.labelRes = Math.max(0, labelRes);
+            this.descriptionRes = Math.max(0, descriptionRes);
+            this.icon = Math.max(0, icon);
+            this.protectionLevel = Math.max(0, protectionLevel);
+            this.flags = Math.max(0, flags);
+            this.tree = tree;
+        }
+
+        public String name() { return name; }
+        public String group() { return group; }
+        public String label() { return label; }
+        public String description() { return description; }
+        public int labelRes() { return labelRes; }
+        public int descriptionRes() { return descriptionRes; }
+        public int icon() { return icon; }
+        public int protectionLevel() { return protectionLevel; }
+        public int flags() { return flags; }
+        public boolean tree() { return tree; }
+
+        @Override public boolean equals(Object value) {
+            if (this == value) return true;
+            if (!(value instanceof PermissionDeclaration other)) return false;
+            return labelRes == other.labelRes && descriptionRes == other.descriptionRes
+                    && icon == other.icon && protectionLevel == other.protectionLevel
+                    && flags == other.flags && tree == other.tree && name.equals(other.name)
+                    && group.equals(other.group) && label.equals(other.label)
+                    && description.equals(other.description);
+        }
+        @Override public int hashCode() {
+            return java.util.Objects.hash(name, group, label, description, labelRes,
+                    descriptionRes, icon, protectionLevel, flags, tree);
+        }
+    }
+
+    /** Manifest permission-group declaration projected to PermissionGroupInfo. */
+    public static final class PermissionGroupDeclaration {
+        private final String name;
+        private final String label;
+        private final String description;
+        private final int labelRes;
+        private final int descriptionRes;
+        private final int icon;
+        private final int requestRes;
+        private final int priority;
+        private final int flags;
+
+        public PermissionGroupDeclaration(String name, String label, String description,
+                                          int labelRes, int descriptionRes, int icon,
+                                          int requestRes, int priority, int flags) {
+            this.name = requirePermissionName(name);
+            this.label = normalize(label);
+            this.description = normalize(description);
+            this.labelRes = Math.max(0, labelRes);
+            this.descriptionRes = Math.max(0, descriptionRes);
+            this.icon = Math.max(0, icon);
+            this.requestRes = Math.max(0, requestRes);
+            this.priority = priority;
+            this.flags = Math.max(0, flags);
+        }
+
+        public String name() { return name; }
+        public String label() { return label; }
+        public String description() { return description; }
+        public int labelRes() { return labelRes; }
+        public int descriptionRes() { return descriptionRes; }
+        public int icon() { return icon; }
+        public int requestRes() { return requestRes; }
+        public int priority() { return priority; }
+        public int flags() { return flags; }
+
+        @Override public boolean equals(Object value) {
+            if (this == value) return true;
+            if (!(value instanceof PermissionGroupDeclaration other)) return false;
+            return labelRes == other.labelRes && descriptionRes == other.descriptionRes
+                    && icon == other.icon && requestRes == other.requestRes
+                    && priority == other.priority && flags == other.flags
+                    && name.equals(other.name) && label.equals(other.label)
+                    && description.equals(other.description);
+        }
+        @Override public int hashCode() {
+            return java.util.Objects.hash(name, label, description, labelRes, descriptionRes,
+                    icon, requestRes, priority, flags);
+        }
     }
 
     public static final class QueryIntent {
@@ -353,6 +501,7 @@ public final class ManifestModel {
         private String launchMode = "standard";
         private String taskAffinity = "";
         private String documentLaunchMode = "none";
+        private String persistableMode = "never";
         private int configChanges;
         private String screenOrientation = "";
         private int windowSoftInputMode;
@@ -458,6 +607,8 @@ public final class ManifestModel {
         public void taskAffinity(String value) { taskAffinity = normalize(value); }
         public String documentLaunchMode() { return documentLaunchMode; }
         public void documentLaunchMode(String value) { documentLaunchMode = enumValue(value, "none"); }
+        public String persistableMode() { return persistableMode; }
+        public void persistableMode(String value) { persistableMode = enumValue(value, "never"); }
         public int configChanges() { return configChanges; }
         public void configChanges(int value) { configChanges = Math.max(0, value); }
         public String screenOrientation() { return screenOrientation; }
@@ -548,6 +699,7 @@ public final class ManifestModel {
             if ("standard".equals(launchMode)) launchMode = other.launchMode;
             if (taskAffinity.isEmpty()) taskAffinity = other.taskAffinity;
             if ("none".equals(documentLaunchMode)) documentLaunchMode = other.documentLaunchMode;
+            if ("never".equals(persistableMode)) persistableMode = other.persistableMode;
             if (configChanges == 0) configChanges = other.configChanges;
             if (screenOrientation.isEmpty()) screenOrientation = other.screenOrientation;
             if (windowSoftInputMode == 0) windowSoftInputMode = other.windowSoftInputMode;
@@ -659,15 +811,23 @@ public final class ManifestModel {
     public static final class DataRule {
         private final String scheme;
         private final String host;
+        private final int port;
         private final String path;
         private final String pathPrefix;
         private final String pathPattern;
         private final String mimeType;
 
         public DataRule(String scheme, String host, String path, String pathPrefix,
+                         String pathPattern, String mimeType) {
+            this(scheme, host, -1, path, pathPrefix, pathPattern, mimeType);
+        }
+
+        public DataRule(String scheme, String host, int port, String path, String pathPrefix,
                         String pathPattern, String mimeType) {
             this.scheme = normalize(scheme);
             this.host = normalize(host);
+            if (port < -1 || port > 65535) throw new IllegalArgumentException("data port out of range");
+            this.port = port;
             this.path = normalize(path);
             this.pathPrefix = normalize(pathPrefix);
             this.pathPattern = normalize(pathPattern);
@@ -676,17 +836,19 @@ public final class ManifestModel {
 
         public String scheme() { return scheme; }
         public String host() { return host; }
+        public int port() { return port; }
         public String path() { return path; }
         public String pathPrefix() { return pathPrefix; }
         public String pathPattern() { return pathPattern; }
         public String mimeType() { return mimeType; }
         public boolean empty() {
             return scheme.isEmpty() && host.isEmpty() && path.isEmpty() && pathPrefix.isEmpty()
-                    && pathPattern.isEmpty() && mimeType.isEmpty();
+                    && pathPattern.isEmpty() && mimeType.isEmpty() && port < 0;
         }
 
         private boolean sameAs(DataRule other) {
             return other != null && scheme.equals(other.scheme) && host.equals(other.host)
+                    && port == other.port
                     && path.equals(other.path) && pathPrefix.equals(other.pathPrefix)
                     && pathPattern.equals(other.pathPattern) && mimeType.equals(other.mimeType);
         }
@@ -696,6 +858,14 @@ public final class ManifestModel {
         if (value != null && !value.trim().isEmpty()) target.add(value.trim());
     }
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
+    private static String requirePermissionName(String value) {
+        String normalized = normalize(value);
+        if (normalized.isEmpty() || normalized.length() > 180
+                || !normalized.matches("[A-Za-z0-9_.:]+")) {
+            throw new IllegalArgumentException("Invalid permission name: " + value);
+        }
+        return normalized;
+    }
     private static String enumValue(String value, String fallback) {
         String normalized = normalize(value).toLowerCase(Locale.ROOT);
         return normalized.isEmpty() ? fallback : normalized;

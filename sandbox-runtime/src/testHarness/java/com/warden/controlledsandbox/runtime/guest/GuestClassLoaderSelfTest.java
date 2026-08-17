@@ -2,7 +2,12 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
+import java.net.URL;
+import java.io.InputStream;
+import java.lang.reflect.Constructor;
 import java.util.List;
+import java.util.Enumeration;
+import java.util.Collections;
 
 public final class GuestClassLoaderSelfTest {
     public static void main(String[] args) {
@@ -125,7 +130,50 @@ public final class GuestClassLoaderSelfTest {
             throw new RuntimeException(e);
         }
         loadNonExistentThrows(loader);
+        verifyGuestFirstResourceLookup();
         System.out.println("PASS Guest class-loader host-boundary and detection policy self-test");
+    }
+
+    private static void verifyGuestFirstResourceLookup() {
+        URL expected = GuestClassLoaderSelfTest.class.getResource("GuestClassLoaderSelfTest.class");
+        require(expected != null, "self-test class resource exists");
+        ClassLoader guestResources = new ClassLoader(null) {
+            @Override protected URL findResource(String name) {
+                return "guest-only-resource".equals(name) ? expected : null;
+            }
+
+            @Override protected Enumeration<URL> findResources(String name) {
+                return "guest-only-resource".equals(name)
+                        ? Collections.enumeration(List.of(expected))
+                        : Collections.emptyEnumeration();
+            }
+        };
+        try {
+            Constructor<GuestClassLoader> constructor = GuestClassLoader.class.getDeclaredConstructor(
+                    ClassLoader.class, ClassLoader.class, String.class, List.class, List.class);
+            constructor.setAccessible(true);
+            GuestClassLoader loader = constructor.newInstance(guestResources,
+                    GuestClassLoaderSelfTest.class.getClassLoader(), "", List.of(), List.of());
+            require(expected.equals(loader.getResource("guest-only-resource")),
+                    "Guest resource wins over parent");
+            Enumeration<URL> resources;
+            try {
+                resources = loader.getResources("guest-only-resource");
+            } catch (java.io.IOException error) {
+                throw new AssertionError("Guest resource enumeration failed", error);
+            }
+            require(resources.hasMoreElements() && expected.equals(resources.nextElement()),
+                    "Guest resource enumeration is visible");
+            require(!resources.hasMoreElements(), "duplicate Guest resource is removed");
+            try (InputStream stream = loader.getResourceAsStream("guest-only-resource")) {
+                require(stream != null && stream.read() >= 0,
+                        "Guest resource stream is visible");
+            } catch (java.io.IOException error) {
+                throw new AssertionError("Guest resource stream failed", error);
+            }
+        } catch (ReflectiveOperationException error) {
+            throw new AssertionError("Guest resource loader construction failed", error);
+        }
     }
 
     private static void verifyNoParallelOrLockStriping(GuestClassLoader loader) {

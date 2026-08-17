@@ -10,6 +10,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.LinkedHashMap;
@@ -170,6 +171,8 @@ public final class VirtualSystemServiceStoreSelfTest {
                 require(hostJobId == reservedJob.hostId(), "host callback must retain host job identity");
                 hostFinished.set(true); hostReschedule.set(needsReschedule);
             }
+            @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+            @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
         };
         require(reloaded.startJob(parameters(reservedJob.hostId()), hostCallback, 0),
                 "owned scheduled job must dispatch");
@@ -188,6 +191,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         first.execution.set(null);
         require(reloaded.startJob(parameters(stoppableJob.hostId()), new IHostJobCallback.Stub() {
                     @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                    @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+                    @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
                 }, 0), "second owned job must start");
         IVirtualJobExecution staleExecution = first.execution.get();
         require(reloaded.stopJob(stoppableJob.hostId(), 3, 7, "constraint"),
@@ -204,6 +209,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         first.execution.set(null);
         require(reloaded.startJob(parameters(recoveryJob.hostId()), new IHostJobCallback.Stub() {
                     @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                    @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+                    @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
                 }, 0), "recovery job must enter RUNNING");
         VirtualSystemServiceStore recoveredWhileRunning = new VirtualSystemServiceStore(root);
         require(VirtualJobSnapshot.SCHEDULED.equals(recoveredWhileRunning
@@ -219,6 +226,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         reloaded.register(second);
         require(!reloaded.startJob(parameters(deferredJob.hostId()), new IHostJobCallback.Stub() {
                     @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                    @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+                    @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
                 }, 0),
                 "job callback without Guest execution acknowledgement must request host reschedule");
         require(VirtualJobSnapshot.SCHEDULED.equals(
@@ -252,11 +261,14 @@ public final class VirtualSystemServiceStoreSelfTest {
         store.scheduleAlarm(scope, "alarm.pkg", 1L, "alarm-rev-a",
                 new VirtualAlarmSnapshot("alarm-pi", trigger, 0L, true, true,
                         VirtualAlarmSnapshot.PENDING_INTENT, pending.tokenId(), "alarm.pkg", 1L,
-                        "alarm-rev-a", new byte[0], 0, System.currentTimeMillis()));
+                        "alarm-rev-a", new byte[0], 0, System.currentTimeMillis(), true,
+                        new byte[]{9, 9, 1}));
         VirtualAlarmSnapshot scheduled = store.alarms(scope, "alarm.pkg", 1L, "alarm-rev-a").get(0);
         require(scheduled.exact() && scheduled.allowWhileIdle()
                         && VirtualAlarmSnapshot.PENDING_INTENT.equals(scheduled.deliveryPath())
-                        && pending.tokenId().equals(scheduled.pendingIntentTokenId()),
+                        && pending.tokenId().equals(scheduled.pendingIntentTokenId())
+                        && scheduled.alarmClock() && java.util.Arrays.equals(
+                        scheduled.alarmClockPayload(), new byte[]{9, 9, 1}),
                 "exact PendingIntent alarm metadata must be durable");
         store.close();
 
@@ -390,6 +402,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         reloaded.register(client);
         require(reloaded.startJob(parameters(restored.hostId()), new IHostJobCallback.Stub() {
                     @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                    @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+                    @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
                 }, 0), "eligible persisted job must dispatch");
         client.execution.get().finish(true);
         VirtualJobSnapshot retried = reloaded.jobs(scope, "job.pkg:worker", 1L,
@@ -409,6 +423,8 @@ public final class VirtualSystemServiceStoreSelfTest {
         reloaded.commitJob(scope, 82);
         require(reloaded.startJob(parameters(periodicReserved.hostId()), new IHostJobCallback.Stub() {
                     @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+                    @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+                    @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
                 }, 0), "periodic job must dispatch");
         client.execution.get().finish(false);
         VirtualJobSnapshot nextPeriod = reloaded.jobs(scope, "job.pkg:worker", 1L,

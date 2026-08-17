@@ -28,7 +28,9 @@ public final class IsolatedProcessResult implements Parcelable {
         this.sessionId = ContractChecks.requiredText(sessionId, "sessionId", 128);
         if (generation < 1) throw new IllegalArgumentException("generation must be positive");
         this.generation = generation;
-        if (processSlot < 0 || processSlot > 31) throw new IllegalArgumentException("processSlot is invalid");
+        if (!ProcessSlotContract.isOrdinarySlot(processSlot)) {
+            throw new IllegalArgumentException("processSlot is invalid");
+        }
         this.processSlot = processSlot;
         this.processName = ContractChecks.requiredText(processName, "processName", 320);
         this.componentClass = ContractChecks.requiredText(componentClass, "componentClass", 512);
@@ -36,7 +38,7 @@ public final class IsolatedProcessResult implements Parcelable {
         this.platformUid = ContractChecks.nonNegative(platformUid, "platformUid");
         this.errorType = ContractChecks.optionalText(errorType, "errorType", 160);
         this.errorMessage = ContractChecks.optionalText(errorMessage, "errorMessage", 2048);
-        this.payload = payload == null ? new Bundle() : new Bundle(payload);
+        this.payload = copyPayload(payload);
         if (successful && !this.errorType.isEmpty()) {
             throw new IllegalArgumentException("successful isolated result cannot contain an error");
         }
@@ -61,7 +63,7 @@ public final class IsolatedProcessResult implements Parcelable {
     private IsolatedProcessResult(Parcel in) {
         this(in.readInt() != 0, in.readString(), in.readString(), in.readLong(), in.readInt(),
                 in.readString(), in.readString(), in.readInt(), in.readInt(), in.readString(),
-                in.readString(), in.readParcelable(Bundle.class.getClassLoader()));
+                in.readString(), in.readParcelable(IsolatedProcessResult.class.getClassLoader()));
     }
 
     public boolean successful() { return successful; }
@@ -75,7 +77,23 @@ public final class IsolatedProcessResult implements Parcelable {
     public int platformUid() { return platformUid; }
     public String errorType() { return errorType; }
     public String errorMessage() { return errorMessage; }
-    public Bundle payload() { return new Bundle(payload); }
+    public Bundle payload() { return copyPayload(payload); }
+
+    private static Bundle copyPayload(Bundle source) {
+        ClassLoader loader = IsolatedProcessResult.class.getClassLoader();
+        if (source == null) {
+            Bundle empty = new Bundle();
+            empty.setClassLoader(loader);
+            return empty;
+        }
+        // Isolated workers return contract Parcelables (for example the virtual package
+        // snapshot) inside this Bundle.  The Binder default loader is the boot loader and
+        // cannot restore application contract classes in the host broker process.
+        source.setClassLoader(loader);
+        Bundle copy = new Bundle(source);
+        copy.setClassLoader(loader);
+        return copy;
+    }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeInt(successful ? 1 : 0);

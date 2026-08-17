@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.runtime.provider.ProviderBatchRuntime;
 import com.warden.controlledsandbox.runtime.provider.ProviderCursorTransport;
 import com.warden.controlledsandbox.domain.component.service.ForegroundServiceStateMachine;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.IProviderQueryCancellation;
 
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -56,6 +57,8 @@ public final class GuestComponentRuntime {
         java.util.Set<String> preparedClasses = new java.util.LinkedHashSet<>();
         for (VirtualComponentSnapshot component : session.spec.packageState().components()) {
             if (!"PROVIDER".equals(component.type()) || !component.enabled()) continue;
+            android.util.Log.i("CS_PROVIDER_DECL", "source=snapshot class=" + component.className()
+                    + " process=" + component.processName() + " authority=" + component.authority());
             if (!sameProcess(component.processName())) {
                 skippedOtherProcess++;
                 continue;
@@ -68,6 +71,8 @@ public final class GuestComponentRuntime {
         if (manifest != null) {
             for (com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel.Component
                     component : manifest.providers()) {
+                android.util.Log.i("CS_PROVIDER_DECL", "source=manifest class=" + component.className()
+                        + " process=" + component.processName() + " authority=" + component.authorities());
                 if (!component.enabled() || preparedClasses.contains(component.className())) continue;
                 if (!sameProcess(component.processName())) {
                     skippedOtherProcess++;
@@ -97,6 +102,15 @@ public final class GuestComponentRuntime {
     }
 
     private com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel parseBaseManifest() {
+        com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel frameworkManifest =
+                parseFrameworkManifest();
+        if (frameworkManifest != null) return frameworkManifest;
+        if (session.spec.isolatedProcess) {
+            // The isolated route has no pathname capability for the logical APK path.  The
+            // framework XmlResourceParser above is the authoritative FD-backed artifact
+            // boundary; never fall back to ZipFile here and silently lose manifest providers.
+            return null;
+        }
         try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(session.spec.apkFile())) {
             java.util.zip.ZipEntry entry = zip.getEntry("AndroidManifest.xml");
             if (entry == null) return null;
@@ -108,6 +122,72 @@ public final class GuestComponentRuntime {
             android.util.Log.w("CS_RUNTIME", "base manifest providers unavailable", error);
             return null;
         }
+    }
+
+    /**
+     * AssetManager owns the decompression and binary-XML decoding boundary.  This is required
+     * for FD-backed isolated APKs: AndroidManifest.xml is commonly compressed and therefore
+     * cannot be exposed as an AssetFileDescriptor or read through a pathname ZipFile.
+     */
+    private com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel parseFrameworkManifest() {
+        if (session.resources.manifestAssets != null) {
+            try (android.content.res.XmlResourceParser parser =
+                         session.resources.manifestAssets.openXmlResourceParser(
+                                 "AndroidManifest.xml")) {
+                final String androidNamespace = "http://schemas.android.com/apk/res/android";
+                com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel model =
+                        new com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel();
+                model.packageName(session.spec.packageName);
+                int queriesDepth = -1;
+                int event;
+                while ((event = parser.next()) != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                    if (event == org.xmlpull.v1.XmlPullParser.START_TAG) {
+                        if ("queries".equals(parser.getName())) {
+                            queriesDepth = parser.getDepth();
+                            continue;
+                        }
+                        if (!"provider".equals(parser.getName()) || queriesDepth >= 0) continue;
+                        String rawName = frameworkAttribute(parser, androidNamespace, "name");
+                        String authorities = frameworkAttribute(parser, androidNamespace, "authorities");
+                        if (rawName == null || rawName.trim().isEmpty()
+                                || authorities == null || authorities.trim().isEmpty()) continue;
+                        String permission = frameworkAttribute(parser, androidNamespace, "permission");
+                        String readPermission = frameworkAttribute(parser, androidNamespace, "readPermission");
+                        String writePermission = frameworkAttribute(parser, androidNamespace, "writePermission");
+                        if (readPermission == null || readPermission.trim().isEmpty()) readPermission = permission;
+                        if (writePermission == null || writePermission.trim().isEmpty()) writePermission = permission;
+                        String process = frameworkAttribute(parser, androidNamespace, "process");
+                        boolean exported = parser.getAttributeBooleanValue(androidNamespace,
+                                "exported", false);
+                        boolean exportedExplicit = parser.getAttributeValue(androidNamespace,
+                                "exported") != null;
+                        boolean enabled = parser.getAttributeBooleanValue(androidNamespace,
+                                "enabled", true);
+                        boolean grantUriPermissions = parser.getAttributeBooleanValue(androidNamespace,
+                                "grantUriPermissions", false);
+                        model.addProvider(new com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel.Component(
+                                model.resolveClassName(rawName), process, exported, exportedExplicit,
+                                enabled, false, authorities, permission == null ? "" : permission,
+                                readPermission == null ? "" : readPermission,
+                                writePermission == null ? "" : writePermission, grantUriPermissions));
+                    } else if (event == org.xmlpull.v1.XmlPullParser.END_TAG
+                            && parser.getDepth() == queriesDepth) {
+                        queriesDepth = -1;
+                    }
+                }
+                return model;
+            } catch (Exception error) {
+                android.util.Log.w("CS_RUNTIME", "base manifest framework parser unavailable", error);
+            }
+        }
+        return null;
+    }
+
+    private static String frameworkAttribute(android.content.res.XmlResourceParser parser,
+                                             String namespace, String name) {
+        String value = parser.getAttributeValue(namespace, name);
+        if (value == null) value = parser.getAttributeValue(null, name);
+        return value;
     }
 
     private boolean sameProcess(String componentProcess) {
@@ -155,6 +235,13 @@ public final class GuestComponentRuntime {
         return switch (operation) {
             case ComponentOperations.START_SERVICE -> startService(componentClass, request, false);
             case ComponentOperations.START_FOREGROUND_SERVICE -> startService(componentClass, request, true);
+            case ComponentOperations.RECOVER_FRAMEWORK_SERVICE -> {
+                GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+                if (framework == null) throw new IllegalStateException(
+                        "GUEST_SERVICE_FRAMEWORK_BRIDGE_UNAVAILABLE_FOR_RECOVERY");
+                yield framework.recover(request, componentClass,
+                        request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, false));
+            }
             case ComponentOperations.STOP_SERVICE -> stopService(componentClass);
             case ComponentOperations.STOP_SERVICE_START_ID -> stopServiceStartId(componentClass,
                     request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
@@ -170,6 +257,8 @@ public final class GuestComponentRuntime {
     private Bundle invokeReceiverOperation(String componentClass, Bundle request, String operation)
             throws Exception {
         return switch (operation) {
+            case ComponentOperations.ROUTE_FRAMEWORK_RECEIVER ->
+                    routeFrameworkReceiver(componentClass, request);
             case ComponentOperations.REGISTER_RECEIVER -> registerReceiver(componentClass, request);
             case ComponentOperations.UNREGISTER_RECEIVER -> unregisterReceiver(
                     required(request, RuntimeKeys.RECEIVER_ID));
@@ -178,29 +267,37 @@ public final class GuestComponentRuntime {
         };
     }
 
+    private Bundle routeFrameworkReceiver(String componentClass, Bundle request) {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework == null) {
+            throw new IllegalStateException("GUEST_RECEIVER_FRAMEWORK_BRIDGE_UNAVAILABLE");
+        }
+        return framework.dispatchFrameworkReceiver(request, componentClass);
+    }
+
     private Bundle invokeProviderOperation(String componentClass, Bundle request, String operation)
             throws Exception {
         if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
             return prepareProvider(componentClass, required(request, ComponentOperations.AUTHORITY));
         }
         if (ComponentOperations.PROVIDER_CURSOR_PAGE.equals(operation)) {
-            return cursorTransport.page(required(request, RuntimeKeys.CURSOR_TOKEN),
+            return withSessionIdentity(cursorTransport.page(required(request, RuntimeKeys.CURSOR_TOKEN),
                     session.spec.sessionId, session.spec.generation,
                     request.getInt(RuntimeKeys.CURSOR_OFFSET, 0),
                     request.getLong(RuntimeKeys.CURSOR_PAGE_SEQUENCE, -1),
-                    request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64));
+                    request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64)));
         }
         if (ComponentOperations.PROVIDER_CURSOR_CLOSE.equals(operation)) {
-            return cursorTransport.close(required(request, RuntimeKeys.CURSOR_TOKEN),
-                    session.spec.sessionId, session.spec.generation);
+            return withSessionIdentity(cursorTransport.close(required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, session.spec.generation));
         }
         if (ComponentOperations.PROVIDER_CURSOR_CANCEL.equals(operation)) {
-            return cursorTransport.cancel(required(request, RuntimeKeys.CURSOR_TOKEN),
-                    session.spec.sessionId, session.spec.generation);
+            return withSessionIdentity(cursorTransport.cancel(required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, session.spec.generation));
         }
         if (ComponentOperations.PROVIDER_FILE_CLOSE.equals(operation)) {
-            return fileTransport.close(required(request, RuntimeKeys.FILE_TOKEN),
-                    session.spec.sessionId, session.spec.generation);
+            return withSessionIdentity(fileTransport.close(required(request, RuntimeKeys.FILE_TOKEN),
+                    session.spec.sessionId, session.spec.generation));
         }
         return invokeProviderTransaction(componentClass, request, operation);
     }
@@ -209,7 +306,16 @@ public final class GuestComponentRuntime {
             throws Exception {
         return switch (operation) {
             case ComponentOperations.PROVIDER_QUERY -> queryProvider(componentClass, request);
+            case ComponentOperations.PROVIDER_CANONICALIZE -> canonicalizeProvider(
+                    componentClass, request, true);
+            case ComponentOperations.PROVIDER_UNCANONICALIZE -> canonicalizeProvider(
+                    componentClass, request, false);
             case ComponentOperations.PROVIDER_GET_TYPE -> getProviderType(componentClass, request);
+            case ComponentOperations.PROVIDER_GET_TYPE_ANONYMOUS ->
+                    getProviderTypeAnonymous(componentClass, request);
+            case ComponentOperations.PROVIDER_GET_STREAM_TYPES ->
+                    getProviderStreamTypes(componentClass, request);
+            case ComponentOperations.PROVIDER_REFRESH -> refreshProvider(componentClass, request);
             case ComponentOperations.PROVIDER_INSERT -> insertProvider(componentClass, request);
             case ComponentOperations.PROVIDER_BULK_INSERT -> bulkInsertProvider(componentClass, request);
             case ComponentOperations.PROVIDER_UPDATE -> updateProvider(componentClass, request);
@@ -232,8 +338,6 @@ public final class GuestComponentRuntime {
                 || ComponentOperations.SET_SERVICE_FOREGROUND.equals(operation)
                 || ComponentOperations.BIND_SERVICE.equals(operation)
                 || ComponentOperations.UNBIND_SERVICE.equals(operation)
-                || ComponentOperations.REGISTER_RECEIVER.equals(operation)
-                || ComponentOperations.UNREGISTER_RECEIVER.equals(operation)
                 || ComponentOperations.SEND_BROADCAST.equals(operation)
                 || ComponentOperations.PREPARE_PROVIDER.equals(operation);
     }
@@ -280,8 +384,13 @@ public final class GuestComponentRuntime {
         }
         ServiceRecord record = getOrCreateService(className);
         String action = request.getString(ComponentOperations.ACTION, "");
-        Intent intent = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
         boolean recovery = request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
+        boolean redelivered = request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false);
+        // The platform contract passes null to a sticky restart.  Only a redelivery receives the
+        // retained wire Intent; decoding an empty Broker envelope here would turn null into a
+        // non-null Intent and changes real-world Service restart behavior.
+        Intent intent = recovery && !redelivered
+                ? null : com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(request);
         int recoveredStartId = request.getInt(RuntimeKeys.SERVICE_START_ID, -1);
         int startId = recovery && recoveredStartId > 0 ? recoveredStartId : nextStartId++;
         if (recovery) nextStartId = Math.max(nextStartId, startId + 1);
@@ -289,7 +398,7 @@ public final class GuestComponentRuntime {
             record.foregroundPolicy.requestStart(foregroundNowMs, foregroundTimeoutMs,
                     backgroundAllowed, exemptionReason, declaredTypeMask);
         }
-        int flags = request.getBoolean(RuntimeKeys.SERVICE_REDELIVERED, false)
+        int flags = redelivered
                 ? Service.START_FLAG_REDELIVERY : 0;
         int resultCode;
         try {
@@ -666,18 +775,94 @@ public final class GuestComponentRuntime {
         Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
         String[] projection = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_PROJECTION));
         String[] selectionArgs = toArray(request.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS));
-        android.database.Cursor cursor = record.provider.query(uri, projection,
-                request.getString(RuntimeKeys.PROVIDER_SELECTION), selectionArgs,
-                request.getString(RuntimeKeys.PROVIDER_SORT_ORDER));
-        Bundle out = cursorTransport.open(cursor, required(request, RuntimeKeys.CURSOR_TOKEN),
-                session.spec.sessionId, providerInstance(record), session.spec.generation,
-                request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64),
-                request.getLong(RuntimeKeys.CURSOR_TTL_MS, ProviderCursorTransport.DEFAULT_LEASE_TTL_MS));
-        out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
-        out.putString(ComponentOperations.AUTHORITY, record.authority);
-        out.putString(RuntimeKeys.URI, uri.toString());
-        RuntimeEventLog.event("GUEST_PROVIDER_QUERY", out);
-        return out;
+        android.database.Cursor cursor = null;
+        android.os.CancellationSignal cancellationSignal = new android.os.CancellationSignal();
+        IProviderQueryCancellation cancellationChannel = queryCancellationChannel(request);
+        IProviderQueryCancellation cancellationEndpoint = new IProviderQueryCancellation.Stub() {
+            @Override public void attach(IProviderQueryCancellation ignored) { }
+            @Override public void cancel() { cancellationSignal.cancel(); }
+            @Override public void detach() { }
+        };
+        if (cancellationChannel != null) cancellationChannel.attach(cancellationEndpoint);
+        Bundle queryArgs = request.getBundle(RuntimeKeys.PROVIDER_QUERY_ARGS);
+        try {
+            cancellationSignal.throwIfCanceled();
+            if (queryArgs != null) {
+                cursor = queryProviderWithArgs(record.provider, uri, projection, queryArgs,
+                        cancellationSignal);
+            } else {
+                cursor = record.provider.query(uri, projection,
+                        request.getString(RuntimeKeys.PROVIDER_SELECTION), selectionArgs,
+                        request.getString(RuntimeKeys.PROVIDER_SORT_ORDER));
+            }
+            cancellationSignal.throwIfCanceled();
+            Bundle out = cursorTransport.open(cursor, required(request, RuntimeKeys.CURSOR_TOKEN),
+                    session.spec.sessionId, providerInstance(record), session.spec.generation,
+                    request.getInt(RuntimeKeys.CURSOR_PAGE_SIZE, 64),
+                    request.getLong(RuntimeKeys.CURSOR_TTL_MS, ProviderCursorTransport.DEFAULT_LEASE_TTL_MS));
+            cursor = null;
+            withSessionIdentity(out);
+            out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
+            out.putString(ComponentOperations.AUTHORITY, record.authority);
+            out.putString(RuntimeKeys.URI, uri.toString());
+            RuntimeEventLog.event("GUEST_PROVIDER_QUERY", out);
+            return out;
+        } finally {
+            if (cursor != null) {
+                try { cursor.close(); }
+                catch (Throwable ignored) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+                }
+            }
+            if (cancellationChannel != null) {
+                try { cancellationChannel.detach(); }
+                catch (android.os.RemoteException ignored) { }
+            }
+        }
+    }
+
+    private static IProviderQueryCancellation queryCancellationChannel(Bundle request) {
+        android.os.IBinder binder = request.getBinder(RuntimeKeys.PROVIDER_QUERY_CANCEL_CHANNEL);
+        return binder == null ? null : IProviderQueryCancellation.Stub.asInterface(binder);
+    }
+
+    private static android.database.Cursor queryProviderWithArgs(
+            android.content.ContentProvider provider, Uri uri, String[] projection,
+            Bundle queryArgs, android.os.CancellationSignal cancellationSignal) throws Exception {
+        try {
+            java.lang.reflect.Method modern = provider.getClass().getMethod("query", Uri.class,
+                    String[].class, Bundle.class, android.os.CancellationSignal.class);
+            Object result = modern.invoke(provider, uri, projection, new Bundle(queryArgs),
+                    cancellationSignal);
+            return (android.database.Cursor) result;
+        } catch (NoSuchMethodException unavailableOnLegacyApi) {
+            // API 25 and the compact verifier stubs expose only the legacy signature.  Preserve
+            // the standard SQL argument subset when falling back instead of dropping queryArgs.
+            return provider.query(uri, projection,
+                    queryArgs.getString("android:query-arg-sql-selection"),
+                    queryStringArray(queryArgs, "android:query-arg-sql-selection-args"),
+                    queryArgs.getString("android:query-arg-sql-sort-order"));
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("PROVIDER_MODERN_QUERY_FAILED", cause);
+        }
+    }
+
+    private static String[] queryStringArray(Bundle args, String key) {
+        try {
+            java.lang.reflect.Method getter = Bundle.class.getMethod("getStringArray", String.class);
+            Object value = getter.invoke(args, key);
+            if (value instanceof String[] strings) return strings;
+        } catch (NoSuchMethodException ignored) {
+            // Compact API stubs and pre-API 12 compatibility layers may not expose this getter.
+        } catch (ReflectiveOperationException error) {
+            throw new IllegalStateException("PROVIDER_QUERY_ARGS_UNREADABLE:" + key, error);
+        }
+        ArrayList<String> values = args.getStringArrayList(key);
+        return values == null ? null : values.toArray(new String[0]);
     }
 
     private Bundle getProviderType(String className, Bundle request) throws Exception {
@@ -687,6 +872,122 @@ public final class GuestComponentRuntime {
         out.putString("mimeType", record.provider.getType(uri));
         out.putString(RuntimeKeys.URI, uri.toString());
         return out;
+    }
+
+    private Bundle canonicalizeProvider(String className, Bundle request, boolean canonicalize)
+            throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        String methodName = canonicalize ? "canonicalize" : "uncanonicalize";
+        Uri result = invokeProviderUri(record.provider, methodName, uri);
+        Bundle out = providerResult(canonicalize ? "PROVIDER_CANONICALIZED"
+                : "PROVIDER_UNCANONICALIZED", record);
+        out.putString(RuntimeKeys.URI, result == null ? "" : result.toString());
+        return out;
+    }
+
+    private Bundle getProviderTypeAnonymous(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        String mimeType;
+        try {
+            java.lang.reflect.Method method = record.provider.getClass().getMethod(
+                    "getTypeAnonymous", Uri.class);
+            mimeType = (String) method.invoke(record.provider, uri);
+        } catch (NoSuchMethodException unavailableOnLegacyApi) {
+            mimeType = record.provider.getType(uri);
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("PROVIDER_TYPE_ANONYMOUS_FAILED", cause);
+        }
+        Bundle out = providerResult("PROVIDER_TYPE_ANONYMOUS", record);
+        out.putString("mimeType", mimeType);
+        out.putString(RuntimeKeys.URI, uri.toString());
+        return out;
+    }
+
+    private Bundle getProviderStreamTypes(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        String filter = required(request, RuntimeKeys.PROVIDER_MIME_TYPE);
+        String[] types;
+        try {
+            java.lang.reflect.Method method = record.provider.getClass().getMethod(
+                    "getStreamTypes", Uri.class, String.class);
+            types = (String[]) method.invoke(record.provider, uri, filter);
+        } catch (NoSuchMethodException unavailableOnLegacyApi) {
+            types = null;
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("PROVIDER_STREAM_TYPES_FAILED", cause);
+        }
+        Bundle out = providerResult("PROVIDER_STREAM_TYPES", record);
+        if (types != null) out.putStringArray(RuntimeKeys.PROVIDER_STREAM_TYPES, types.clone());
+        out.putString(RuntimeKeys.PROVIDER_MIME_TYPE, filter);
+        out.putString(RuntimeKeys.URI, uri.toString());
+        return out;
+    }
+
+    private Bundle refreshProvider(String className, Bundle request) throws Exception {
+        ProviderRecord record = requireProvider(className, request);
+        Uri uri = Uri.parse(required(request, RuntimeKeys.URI));
+        Bundle extras = request.getBundle(RuntimeKeys.PROVIDER_EXTRAS);
+        android.os.CancellationSignal cancellationSignal = new android.os.CancellationSignal();
+        IProviderQueryCancellation cancellationChannel = queryCancellationChannel(request);
+        IProviderQueryCancellation cancellationEndpoint = new IProviderQueryCancellation.Stub() {
+            @Override public void attach(IProviderQueryCancellation ignored) { }
+            @Override public void cancel() { cancellationSignal.cancel(); }
+            @Override public void detach() { }
+        };
+        if (cancellationChannel != null) cancellationChannel.attach(cancellationEndpoint);
+        boolean refreshed;
+        try {
+            cancellationSignal.throwIfCanceled();
+            java.lang.reflect.Method method = record.provider.getClass().getMethod("refresh",
+                    Uri.class, Bundle.class, android.os.CancellationSignal.class);
+            refreshed = (Boolean) method.invoke(record.provider, uri,
+                    extras == null ? null : new Bundle(extras), cancellationSignal);
+            cancellationSignal.throwIfCanceled();
+        } catch (NoSuchMethodException unavailableOnLegacyApi) {
+            refreshed = false;
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("PROVIDER_REFRESH_FAILED", cause);
+        } finally {
+            if (cancellationChannel != null) {
+                try { cancellationChannel.detach(); }
+                catch (android.os.RemoteException ignored) { }
+            }
+        }
+        Bundle out = providerResult("PROVIDER_REFRESHED", record);
+        out.putBoolean("refreshed", refreshed);
+        out.putString(RuntimeKeys.URI, uri.toString());
+        return out;
+    }
+
+    private static Uri invokeProviderUri(android.content.ContentProvider provider, String methodName,
+                                         Uri uri) throws Exception {
+        try {
+            java.lang.reflect.Method method = provider.getClass().getMethod(methodName, Uri.class);
+            return (Uri) method.invoke(provider, uri);
+        } catch (NoSuchMethodException unavailableOnLegacyApi) {
+            return null;
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("PROVIDER_URI_TRANSFORM_FAILED:" + methodName, cause);
+        }
     }
 
     private Bundle insertProvider(String className, Bundle request) throws Exception {
@@ -745,10 +1046,12 @@ public final class GuestComponentRuntime {
         String method = required(request, RuntimeKeys.PROVIDER_METHOD);
         String argument = request.getString(RuntimeKeys.PROVIDER_ARGUMENT);
         Bundle extras = request.getBundle(RuntimeKeys.PROVIDER_EXTRAS);
-        Bundle returned = record.provider.call(method, argument, extras == null ? null : new Bundle(extras));
+        Bundle returned = record.provider.call(method, argument,
+                extras == null ? null : ProviderCallBundleCodec.copy(extras));
         Bundle out = providerResult("PROVIDER_CALLED", record);
         out.putString(RuntimeKeys.PROVIDER_METHOD, method);
-        out.putBundle(RuntimeKeys.PROVIDER_RESULT, returned == null ? null : new Bundle(returned));
+        out.putBundle(RuntimeKeys.PROVIDER_RESULT,
+                returned == null ? null : ProviderCallBundleCodec.copy(returned));
         RuntimeEventLog.event("GUEST_PROVIDER_CALL", out);
         return out;
     }
@@ -757,7 +1060,7 @@ public final class GuestComponentRuntime {
         ProviderRecord record = requireProvider(className, request);
         try {
             ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request, record.authority);
-            Bundle out = ProviderBatchRuntime.execute(record.provider, batch);
+            Bundle out = withSessionIdentity(ProviderBatchRuntime.execute(record.provider, batch));
             out.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
             out.putString(ComponentOperations.AUTHORITY, record.authority);
             RuntimeEventLog.event("GUEST_PROVIDER_APPLY_BATCH", out);
@@ -778,6 +1081,7 @@ public final class GuestComponentRuntime {
                 required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
                 android.os.SystemClock.elapsedRealtime(),
                 request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        withSessionIdentity(out);
         attachProviderFileResult(out, record, uri);
         RuntimeEventLog.event("GUEST_PROVIDER_OPEN_FILE", out);
         return out;
@@ -791,6 +1095,7 @@ public final class GuestComponentRuntime {
                 required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
                 android.os.SystemClock.elapsedRealtime(),
                 request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        withSessionIdentity(out);
         attachProviderFileResult(out, record, uri);
         RuntimeEventLog.event("GUEST_PROVIDER_OPEN_ASSET_FILE", out);
         return out;
@@ -805,6 +1110,7 @@ public final class GuestComponentRuntime {
                 required(request, RuntimeKeys.FILE_TOKEN), session.spec.sessionId, session.spec.generation,
                 android.os.SystemClock.elapsedRealtime(),
                 request.getLong(RuntimeKeys.FILE_TTL_MS, GuestProviderFileTransport.DEFAULT_LEASE_TTL_MS));
+        withSessionIdentity(out);
         attachProviderFileResult(out, record, uri);
         RuntimeEventLog.event("GUEST_PROVIDER_OPEN_TYPED_ASSET_FILE", out);
         return out;
@@ -843,7 +1149,7 @@ public final class GuestComponentRuntime {
         return session.spec.virtualUserId + ":" + session.spec.packageName + ":" + record.authority;
     }
 
-    private static Bundle providerResult(String status, ProviderRecord record) {
+    private Bundle providerResult(String status, ProviderRecord record) {
         Bundle out = success(status, record.className);
         out.putString(ComponentOperations.AUTHORITY, record.authority);
         return out;
@@ -895,8 +1201,17 @@ public final class GuestComponentRuntime {
         }
     }
 
-    private static Bundle success(String status, String component) {
+    private Bundle success(String status, String component) {
         Bundle out = new Bundle();
+        // Component results are also the RuntimeEventLog payload. Keep the logical
+        // process identity on every legacy/isolated component edge so a callback
+        // cannot be mistaken for a host-side generation or an unrelated slot.
+        out.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        out.putLong(RuntimeKeys.GENERATION, session.generation());
+        out.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        out.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+        out.putString(RuntimeKeys.PROCESS_NAME, session.spec.processName);
         out.putString(RuntimeKeys.STATUS, status);
         out.putString(RuntimeKeys.COMPONENT_CLASS, component);
         return out;
@@ -912,13 +1227,24 @@ public final class GuestComponentRuntime {
         }
     }
 
-    private static Bundle failure(Throwable error) {
+    private Bundle failure(Throwable error) {
         Throwable root = error;
         while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-        Bundle out = new Bundle();
+        Bundle out = withSessionIdentity(new Bundle());
         out.putString(RuntimeKeys.STATUS, "FAILED");
         out.putString(RuntimeKeys.ERROR_TYPE, root.getClass().getName());
         out.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(root.getMessage()));
+        return out;
+    }
+
+    private Bundle withSessionIdentity(Bundle out) {
+        if (out == null) out = new Bundle();
+        out.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        out.putLong(RuntimeKeys.GENERATION, session.generation());
+        out.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        out.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+        out.putString(RuntimeKeys.PROCESS_NAME, session.spec.processName);
         return out;
     }
 

@@ -34,6 +34,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         testFrameworkDisconnectUnlinksDeathRecipient();
         testBindingDiedUnlinksDeathRecipient();
         testReleaseStopsConcreteGuestService();
+        testShutdownAwaitsConcreteProcessDeath();
         System.out.println("PASS RuntimeGuestConnectionPool direct ownership self-test");
     }
 
@@ -56,6 +57,8 @@ public final class RuntimeGuestConnectionPoolSelfTest {
                 "current request did not reconnect after detecting a dead cached Binder");
         require(service.bindCount == 2, "dead cached Binder did not trigger exactly one new bind");
         require(service.unbindCount == 1, "dead cached connection was not unbound exactly once");
+        require(service.stopCount == 0,
+                "retiring an old Binder must not stop the replacement service already owning the slot");
         require(disconnects.equals(List.of("2:DEAD_BINDER")),
                 "dead cached Binder reason was not reported distinctly: " + disconnects);
 
@@ -275,6 +278,30 @@ public final class RuntimeGuestConnectionPoolSelfTest {
                         + service.lastStoppedServiceClassName);
     }
 
+    private static void testShutdownAwaitsConcreteProcessDeath() throws Exception {
+        TestService service = new TestService();
+        service.terminateOnStopService = true;
+        RuntimeGuestConnectionPool pool = new RuntimeGuestConnectionPool(
+                service, (slot, reason) -> { });
+        FakeGuest guest = service.guest;
+        Bundle result = pool.callWithTimeoutAndAwaitDisconnect(8,
+                value -> {
+                    require(value == guest, "shutdown barrier used an unexpected Guest Binder");
+                    Bundle out = new Bundle();
+                    out.putString("result", "shutdown");
+                    return out;
+                }, 2_000L);
+        require("shutdown".equals(result.getString("result")),
+                "shutdown barrier did not return the Guest result");
+        require(service.unbindCount == 1,
+                "shutdown barrier did not unbind the concrete Guest service");
+        require(service.stopCount == 1,
+                "shutdown barrier did not stop the concrete Guest service");
+        require(guest.unlinkCount() == 1,
+                "shutdown barrier did not retire its death recipient after process death");
+        pool.close();
+    }
+
     private static Bundle resultFor(IGuestProcess actual, IGuestProcess expected, String value) {
         require(actual == expected, "pool published an unexpected Guest capability");
         Bundle result = new Bundle();
@@ -302,6 +329,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
         private volatile int stopCount;
         private volatile String lastStoppedServiceClassName;
         private volatile boolean asyncConnect;
+        private volatile boolean terminateOnStopService;
         private volatile ServiceConnection currentConnection;
         private volatile ComponentName currentComponent;
         private volatile CountDownLatch blockedBindEntered;
@@ -385,6 +413,7 @@ public final class RuntimeGuestConnectionPoolSelfTest {
             stopCount++;
             lastStoppedServiceClassName = service.getComponent() == null
                     ? null : service.getComponent().getClassName();
+            if (terminateOnStopService && guest != null) guest.dieWithCallback();
             return true;
         }
     }

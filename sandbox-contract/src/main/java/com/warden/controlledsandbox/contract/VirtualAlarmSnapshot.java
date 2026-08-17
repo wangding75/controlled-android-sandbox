@@ -21,6 +21,8 @@ public final class VirtualAlarmSnapshot implements Parcelable {
     private final byte[] tokenPayload;
     private final int deliveryCount;
     private final long updatedAtMs;
+    private final boolean alarmClock;
+    private final byte[] alarmClockPayload;
 
     /** Legacy constructor retained for schema-1/2/3 tests and local authorities. */
     public VirtualAlarmSnapshot(String alarmId, long triggerAtMs, long intervalMs, byte[] tokenPayload) {
@@ -32,6 +34,17 @@ public final class VirtualAlarmSnapshot implements Parcelable {
             boolean exact, boolean allowWhileIdle, String deliveryPath,
             String pendingIntentTokenId, String ownerProcessName, long ownerGeneration,
             String packageRevision, byte[] tokenPayload, int deliveryCount, long updatedAtMs) {
+        this(alarmId, triggerAtMs, intervalMs, exact, allowWhileIdle, deliveryPath,
+                pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
+                tokenPayload, deliveryCount, updatedAtMs, false, new byte[0]);
+    }
+
+    /** Full schema constructor including AlarmClockInfo's user-visible show PendingIntent. */
+    public VirtualAlarmSnapshot(String alarmId, long triggerAtMs, long intervalMs,
+            boolean exact, boolean allowWhileIdle, String deliveryPath,
+            String pendingIntentTokenId, String ownerProcessName, long ownerGeneration,
+            String packageRevision, byte[] tokenPayload, int deliveryCount, long updatedAtMs,
+            boolean alarmClock, byte[] alarmClockPayload) {
         if (alarmId == null || alarmId.trim().isEmpty()) throw new IllegalArgumentException("alarmId is required");
         if (triggerAtMs < 0L || intervalMs < 0L || ownerGeneration < 0L
                 || deliveryCount < 0 || updatedAtMs < 0L) {
@@ -53,12 +66,15 @@ public final class VirtualAlarmSnapshot implements Parcelable {
         this.tokenPayload = tokenPayload == null ? new byte[0] : tokenPayload.clone();
         this.deliveryCount = deliveryCount;
         this.updatedAtMs = updatedAtMs;
+        this.alarmClock = alarmClock;
+        this.alarmClockPayload = alarmClockPayload == null ? new byte[0] : alarmClockPayload.clone();
     }
 
     private VirtualAlarmSnapshot(Parcel in) {
         this(in.readString(), in.readLong(), in.readLong(), in.readInt() != 0, in.readInt() != 0,
                 in.readString(), in.readString(), in.readString(), in.readLong(), in.readString(),
-                in.createByteArray(), in.readInt(), in.readLong());
+                in.createByteArray(), in.readInt(), in.readLong(), in.readInt() != 0,
+                in.createByteArray());
     }
 
     public String alarmId() { return alarmId; }
@@ -74,6 +90,8 @@ public final class VirtualAlarmSnapshot implements Parcelable {
     public byte[] tokenPayload() { return tokenPayload.clone(); }
     public int deliveryCount() { return deliveryCount; }
     public long updatedAtMs() { return updatedAtMs; }
+    public boolean alarmClock() { return alarmClock; }
+    public byte[] alarmClockPayload() { return alarmClockPayload.clone(); }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeString(alarmId); out.writeLong(triggerAtMs); out.writeLong(intervalMs);
@@ -81,6 +99,7 @@ public final class VirtualAlarmSnapshot implements Parcelable {
         out.writeString(deliveryPath); out.writeString(pendingIntentTokenId);
         out.writeString(ownerProcessName); out.writeLong(ownerGeneration); out.writeString(packageRevision);
         out.writeByteArray(tokenPayload); out.writeInt(deliveryCount); out.writeLong(updatedAtMs);
+        out.writeInt(alarmClock ? 1 : 0); out.writeByteArray(alarmClockPayload);
     }
 
     @Override public int describeContents() { return 0; }

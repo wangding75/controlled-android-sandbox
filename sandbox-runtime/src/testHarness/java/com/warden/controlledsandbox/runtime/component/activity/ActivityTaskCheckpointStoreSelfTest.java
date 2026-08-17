@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.framework.activity.SavedActivityState;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.List;
 
 public final class ActivityTaskCheckpointStoreSelfTest {
     private ActivityTaskCheckpointStoreSelfTest() { }
@@ -33,15 +34,28 @@ public final class ActivityTaskCheckpointStoreSelfTest {
                 -1,
                 "rev-3",
                 DocumentLaunchMode.ALWAYS,
-                "content://example/document/1"));
+                "content://example/document/1",
+                "", "", 0,
+                "android.intent.action.VIEW", "https://example.test/docs", "text/plain",
+                List.of("android.intent.category.BROWSABLE")));
         ledger.saveInstanceState(launch.activityToken(),
-                new SavedActivityState(2, Map.of("screen", "home")));
+                new SavedActivityState(2, Map.of("screen", "home"),
+                        new byte[]{1, 2, 3, 4}, new byte[]{5, 6}));
         ActivityTaskCheckpoint expected = ledger.checkpoint();
+        check("android.intent.action.VIEW".equals(expected.tasks().get(0).baseIntentAction())
+                        && "https://example.test/docs".equals(expected.tasks().get(0).baseIntentDataUri())
+                        && expected.tasks().get(0).baseIntentCategories().size() == 1,
+                "base Intent metadata must enter the durable task checkpoint");
 
         ActivityTaskCheckpointStore store = new ActivityTaskCheckpointStore(file);
         store.save(expected);
         ActivityTaskCheckpoint loaded = store.load().orElseThrow();
         check(loaded.equals(expected), "checkpoint codec round trip changed state");
+        SavedActivityState loadedState = loaded.tasks().get(0).activities().get(0).savedState();
+        check(java.util.Arrays.equals(loadedState.bundlePayload(), new byte[]{1, 2, 3, 4})
+                        && java.util.Arrays.equals(loadedState.persistableBundlePayload(),
+                        new byte[]{5, 6}),
+                "opaque framework saved-state payloads must survive checkpoint restore");
 
         ActivityTaskCheckpoint legacy = new ActivityTaskCheckpoint(
                 ActivityTaskCheckpoint.LEGACY_SCHEMA,

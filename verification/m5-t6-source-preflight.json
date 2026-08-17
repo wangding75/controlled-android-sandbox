@@ -5,7 +5,7 @@
   "sourceStatus": "pass",
   "productionStatus": "partial",
   "androidBuildStatus": "blocked-toolchain",
-  "isolatedSlotCount": 4,
+  "isolatedSlotCount": 16,
   "supportedComponentTypes": ["SERVICE"],
   "rejectedComponentTypes": ["ACTIVITY", "RECEIVER", "PROVIDER"],
   "deviceEvidence": {
@@ -16,8 +16,8 @@
     "stabilityMinutes": 0
   },
   "sourceControls": [
-    "four predeclared android isolatedProcess Service workers",
-    "independent four-slot isolated SessionRegistry",
+    "sixteen predeclared android isolatedProcess Service workers",
+    "independent sixteen-slot isolated SessionRegistry",
     "typed session generation slot process component and capability contract",
     "outer and legacy payload identity equality enforcement",
     "owning-application Binder caller enforcement",

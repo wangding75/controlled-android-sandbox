@@ -24,6 +24,7 @@ import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualInteractionProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
@@ -314,7 +315,9 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         VirtualAlarmSnapshot snapshot = new VirtualAlarmSnapshot(candidate.alarmId(), candidate.triggerAtMs(),
                 candidate.intervalMs(), candidate.exact(), candidate.allowWhileIdle(), candidate.deliveryPath(),
                 candidate.pendingIntentTokenId(), candidate.ownerProcessName(), candidate.ownerGeneration(),
-                candidate.packageRevision(), payload, candidate.deliveryCount(), candidate.updatedAtMs());
+                candidate.packageRevision(), payload, candidate.deliveryCount(), candidate.updatedAtMs(),
+                candidate.alarmClock(), candidate.alarmClockShowIntent() instanceof Parcelable
+                        ? marshal(candidate.alarmClockShowIntent()) : new byte[0]);
         try { call(() -> { session.scheduleAlarm(snapshot); return null; }); }
         catch (RuntimeException error) { alarmDeliveries.remove(candidate.alarmId()); throw error; }
     }
@@ -448,6 +451,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
             @Override public void finish(boolean needsReschedule) {
                 callRemote(() -> { remote.finish(needsReschedule); return null; });
             }
+            @Override public VirtualJobWorkItemSnapshot dequeueWork() {
+                return callRemote(remote::dequeueWork);
+            }
+            @Override public boolean completeWork(int workId) {
+                return callRemote(() -> remote.completeWork(workId));
+            }
         };
     }
     private static <T> T callRemote(RemoteCall<T> operation) {
@@ -461,7 +470,7 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
                 snapshot.exact(), snapshot.allowWhileIdle(), snapshot.deliveryPath(),
                 snapshot.pendingIntentTokenId(), snapshot.ownerProcessName(), snapshot.ownerGeneration(),
                 snapshot.packageRevision(), unmarshal(snapshot.tokenPayload()), snapshot.deliveryCount(),
-                snapshot.updatedAtMs());
+                snapshot.updatedAtMs(), snapshot.alarmClock(), unmarshal(snapshot.alarmClockPayload()));
     }
     private PendingIntentRecord pendingIntent(VirtualPendingIntentSnapshot value) {
         return new PendingIntentRecord(value.tokenId(), value.kind(), value.requestCode(),

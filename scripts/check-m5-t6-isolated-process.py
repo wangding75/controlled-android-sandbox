@@ -30,7 +30,7 @@ def require(rel: str, *tokens: str) -> str:
 require(
     "docs/plans/M5_T6_DEVELOPMENT_PLAN.md",
     "Dedicated isolated Service transport",
-    "four isolated slots",
+    "sixteen isolated slots",
     "SOURCE PASS / PRODUCTION PARTIAL / DEVICE BLOCKED",
 )
 require(
@@ -67,18 +67,22 @@ require(
 )
 
 manifest = require("sandbox-runtime/src/main/AndroidManifest.xml", 'android:isolatedProcess="true"')
-if len(re.findall(r'IsolatedGuestProcessService[0-3]"[^>]*android:isolatedProcess="true"', manifest)) != 4:
-    errors.append("runtime manifest must declare exactly four isolated Guest worker Services")
+worker_slots = {
+    int(slot) for slot in re.findall(
+        r'IsolatedGuestProcessService(\d+)"[^>]*android:isolatedProcess="true"', manifest)
+}
+if worker_slots != set(range(16)):
+    errors.append("runtime manifest must declare exactly isolated worker slots 0..15")
 
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/BaseIsolatedGuestProcessService.java",
     "ISOLATED_PLATFORM_UID_NOT_ASSIGNED",
     "ISOLATED_OUTER_INNER_IDENTITY_MISMATCH",
     "ISOLATED_CAPABILITY_MISMATCH",
-    "RUNTIME_BROKER_BINDER, null",
+    "payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER)",
     "stopSelf()",
 )
-for slot in range(4):
+for slot in range(16):
     require(
         f"sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/IsolatedGuestProcessService{slot}.java",
         f"return {slot};",
@@ -86,14 +90,17 @@ for slot in range(4):
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
     "RuntimeIsolatedProcessCoordinator isolatedProcessCoordinator",
-    "isolatedProcessCoordinator.invoke(request, isolatedMatch)",
     "isolatedProcessCoordinator.stopGuest",
     "isolatedProcessCoordinator.purgeExpiredForeground",
     "isolatedProcessCoordinator.close",
 )
 require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java",
+    "isolatedProcessCoordinator.invoke(request, isolatedMatch)",
+)
+require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
-    "SLOT_COUNT = 4",
+    "ProcessSlotContract.ISOLATED_SLOT_COUNT",
     "new SessionRegistry(SLOT_COUNT",
     "requireResult",
     "ISOLATED_PROCESS_UID_EQUALS_HOST_UID",
@@ -122,7 +129,8 @@ for rel, tokens in {
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessContractSelfTest.java":
         ("defensively copy payload", "platform identity evidence", "invalid isolated contract"),
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/broker/IsolatedProcessArchitectureSelfTest.java":
-        ("SessionRegistry(8", "SessionRegistry(4", "fifth isolated lease", "advance generation"),
+        ("SessionRegistry(8", "ProcessSlotContract.ISOLATED_SLOT_COUNT",
+         "isolated pool must enforce the configured active slot count", "advance generation"),
     "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/IsolatedComponentPolicySelfTest.java":
         ("dedicated-transport", "true"),
 }.items():
@@ -142,7 +150,7 @@ try:
     evidence = preflight.get("deviceEvidence", {})
     for field in ("verifiedCapabilities", "emulatorRuns", "physicalDeviceRuns", "stabilityMinutes"):
         if evidence.get(field) != 0: errors.append(f"M5-T6 device {field} must remain zero")
-    if preflight.get("isolatedSlotCount") != 4: errors.append("M5-T6 isolated slot count must be four")
+    if preflight.get("isolatedSlotCount") != 16: errors.append("M5-T6 isolated slot count must be sixteen")
 except Exception as exc:
     errors.append(f"invalid M5-T6 preflight: {exc}")
 

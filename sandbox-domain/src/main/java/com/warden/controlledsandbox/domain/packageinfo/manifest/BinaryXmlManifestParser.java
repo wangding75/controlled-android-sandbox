@@ -88,6 +88,21 @@ public final class BinaryXmlManifestParser {
                 model.targetSdk(element.intAttr("targetSdkVersion", 0));
             }
             case "uses-permission", "uses-permission-sdk-23" -> model.addPermission(element.stringAttr("name"));
+            case "permission", "permission-tree" -> model.addPermissionDeclaration(
+                    new ManifestModel.PermissionDeclaration(
+                            model.resolveClassName(element.stringAttr("name")),
+                            model.resolveClassName(element.stringAttr("group")),
+                            element.stringAttr("label"), element.stringAttr("description"),
+                            element.intAttr("label", 0), element.intAttr("description", 0),
+                            element.intAttr("icon", 0), element.intAttr("protectionLevel", 0),
+                            element.intAttr("flags", 0), "permission-tree".equals(element.name)));
+            case "permission-group" -> model.addPermissionGroup(
+                    new ManifestModel.PermissionGroupDeclaration(
+                            model.resolveClassName(element.stringAttr("name")),
+                            element.stringAttr("label"), element.stringAttr("description"),
+                            element.intAttr("label", 0), element.intAttr("description", 0),
+                            element.intAttr("icon", 0), element.intAttr("request", 0),
+                            element.intAttr("priority", 0), element.intAttr("flags", 0)));
             case "uses-library" -> model.addSharedLibrary(new ManifestModel.SharedLibraryDependency(
                     ManifestModel.SharedLibraryDependency.Kind.JAVA, element.stringAttr("name"),
                     element.boolAttr("required", true), 0L, ""));
@@ -202,6 +217,7 @@ public final class BinaryXmlManifestParser {
                 ManifestModel.QueryIntent query = nearestQueryIntent(stack);
                 ManifestModel.DataRule rule = new ManifestModel.DataRule(
                         element.stringAttr("scheme"), element.stringAttr("host"),
+                        dataPort(element),
                         element.stringAttr("path"), element.stringAttr("pathPrefix"),
                         element.stringAttr("pathPattern"), element.stringAttr("mimeType"));
                 if (query != null) query.addDataRule(rule);
@@ -228,6 +244,15 @@ public final class BinaryXmlManifestParser {
             if ("queries".equals(context.name)) return true;
         }
         return false;
+    }
+
+    private static int dataPort(Element element) {
+        if (element == null || !element.hasAttr("port")) return -1;
+        int port = element.intAttr("port", Integer.MIN_VALUE);
+        if (port < 0 || port > 65535) {
+            throw new IllegalArgumentException("INVALID_DATA_PORT:" + element.stringAttr("port"));
+        }
+        return port;
     }
 
     private static String requireComponentName(String tag, String rawName) {
@@ -289,6 +314,7 @@ public final class BinaryXmlManifestParser {
         component.launchMode(element.stringAttr("launchMode"));
         component.taskAffinity(element.stringAttr("taskAffinity"));
         component.documentLaunchMode(element.stringAttr("documentLaunchMode"));
+        component.persistableMode(element.stringAttr("persistableMode"));
         component.configChanges(element.intAttr("configChanges", 0));
         component.screenOrientation(element.stringAttr("screenOrientation"));
         component.windowSoftInputMode(element.intAttr("windowSoftInputMode", 0));
@@ -300,6 +326,10 @@ public final class BinaryXmlManifestParser {
         component.alwaysRetainTaskState(element.boolAttr("alwaysRetainTaskState", false));
         component.allowTaskReparenting(element.boolAttr("allowTaskReparenting", false));
         component.resizeMode(element.stringAttr("resizeMode"));
+        if (element.hasAttr("resizeableActivity")) {
+            component.resizeMode(element.boolAttr("resizeableActivity", true)
+                    ? "resizeable" : "unresizeable");
+        }
         component.maxAspectRatio(element.floatAttr("maxAspectRatio", 0f));
         component.minAspectRatio(element.floatAttr("minAspectRatio", 0f));
         component.supportsPictureInPicture(element.boolAttr("supportsPictureInPicture", false));
@@ -486,6 +516,57 @@ public final class BinaryXmlManifestParser {
             if (dataType == TYPE_INT_DEC) return data;
             try { return Float.parseFloat(text); } catch (NumberFormatException ignored) { return fallback; }
         }
+        String enumText(String attribute) {
+            if (dataType != TYPE_INT_DEC && dataType != TYPE_INT_BOOLEAN) return "";
+            if ("launchMode".equals(attribute)) {
+                return switch (data) {
+                    case 0 -> "standard";
+                    case 1 -> "singleTop";
+                    case 2 -> "singleTask";
+                    case 3 -> "singleInstance";
+                    case 4 -> "singleInstancePerTask";
+                    default -> "";
+                };
+            }
+            if ("documentLaunchMode".equals(attribute)) {
+                return switch (data) {
+                    case 0 -> "none";
+                    case 1 -> "intoExisting";
+                    case 2 -> "always";
+                    case 3 -> "never";
+                    default -> "";
+                };
+            }
+            if ("persistableMode".equals(attribute)) {
+                return switch (data) {
+                    case 0 -> "persistRootOnly";
+                    case 1 -> "persistNever";
+                    case 2 -> "persistAcrossReboots";
+                    default -> "";
+                };
+            }
+            if ("screenOrientation".equals(attribute)) {
+                return switch (data) {
+                    case -1 -> "unspecified";
+                    case 0 -> "landscape";
+                    case 1 -> "portrait";
+                    case 2 -> "user";
+                    case 3 -> "behind";
+                    case 4 -> "sensor";
+                    case 5 -> "nosensor";
+                    case 6 -> "sensorLandscape";
+                    case 7 -> "sensorPortrait";
+                    case 8 -> "reverseLandscape";
+                    case 9 -> "reversePortrait";
+                    case 10 -> "fullSensor";
+                    case 11 -> "userLandscape";
+                    case 12 -> "userPortrait";
+                    case 13 -> "fullUser";
+                    default -> "";
+                };
+            }
+            return "";
+        }
     }
 
     private static final class Element {
@@ -496,7 +577,12 @@ public final class BinaryXmlManifestParser {
         ManifestModel.QueryIntent queryIntent;
         Element(String name, Map<String, Value> attributes) { this.name = name; this.attributes = attributes; }
         boolean hasAttr(String name) { return attributes.containsKey(name); }
-        String stringAttr(String name) { Value value = attributes.get(name); return value == null ? "" : value.text; }
+        String stringAttr(String name) {
+            Value value = attributes.get(name);
+            if (value == null) return "";
+            if (value.text != null && !value.text.isEmpty()) return value.text;
+            return value.enumText(name);
+        }
         boolean boolAttr(String name, boolean fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asBoolean(fallback); }
         int intAttr(String name, int fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asInt(fallback); }
         float floatAttr(String name, float fallback) { Value value = attributes.get(name); return value == null ? fallback : value.asFloat(fallback); }

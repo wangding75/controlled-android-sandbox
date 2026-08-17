@@ -50,6 +50,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     private final long timeoutMs;
     private final long initialRetryMs;
     private final long maxRetryMs;
+    private final Runnable invalidationListener;
     private final Object lock = new Object();
 
     private Attempt attempt;
@@ -65,17 +66,40 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     public RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName) {
         this(context, intent, adapter, closer, serviceName,
-                DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS);
+                DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS, () -> { });
+    }
+
+    /**
+     * Creates a connector that notifies the owner whenever a published Binder capability is
+     * invalidated by death, disconnection, bind timeout or bind failure.  The callback is a
+     * local state-fence hook; it must not perform blocking Binder work.
+     */
+    public RebindableServiceConnector(Context context, Intent intent,
+            BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
+            Runnable invalidationListener) {
+        this(context, intent, adapter, closer, serviceName,
+                DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS,
+                invalidationListener);
     }
 
     RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
             long timeoutMs, long initialRetryMs, long maxRetryMs) {
+        this(context, intent, adapter, closer, serviceName, timeoutMs, initialRetryMs,
+                maxRetryMs, () -> { });
+    }
+
+    RebindableServiceConnector(Context context, Intent intent,
+            BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
+            long timeoutMs, long initialRetryMs, long maxRetryMs,
+            Runnable invalidationListener) {
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
         this.intent = Objects.requireNonNull(intent, "intent");
         this.adapter = Objects.requireNonNull(adapter, "adapter");
         this.closer = closer == null ? ignored -> { } : closer;
         this.serviceName = required(serviceName, "serviceName");
+        this.invalidationListener = invalidationListener == null ? () -> { }
+                : invalidationListener;
         if (timeoutMs <= 0L || initialRetryMs < 0L || maxRetryMs < initialRetryMs) {
             throw new IllegalArgumentException("Invalid Binder retry timing");
         }
@@ -232,6 +256,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
                     cleanup.attempt == null ? null : cleanup.attempt.deathRecipient);
             closeService(cleanup.service);
             unbind(cleanup.attempt);
+            notifyInvalidated();
         } finally {
             synchronized (lock) {
                 if (cleanupCompleted == cleanup.completed) cleanupCompleted = null;
@@ -339,6 +364,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         unlink(staleBinder, staleAttempt == null ? null : staleAttempt.deathRecipient);
         closeService(staleService);
         if (shouldUnbind) unbind(staleAttempt);
+        notifyInvalidated();
     }
 
     private boolean timeoutAttempt(Attempt target) {
@@ -350,6 +376,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             target.latch.countDown();
         }
         unbind(target);
+        notifyInvalidated();
         return true;
     }
 
@@ -375,6 +402,15 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         unlink(staleBinder, target.deathRecipient);
         closeService(staleService);
         if (shouldUnbind) unbind(target);
+        notifyInvalidated();
+    }
+
+    private void notifyInvalidated() {
+        try {
+            invalidationListener.run();
+        } catch (Throwable error) {
+            FatalErrorPolicy.rethrowIfFatal(error);
+        }
     }
 
     private void recordFailureLocked(String reason, Throwable cause) {

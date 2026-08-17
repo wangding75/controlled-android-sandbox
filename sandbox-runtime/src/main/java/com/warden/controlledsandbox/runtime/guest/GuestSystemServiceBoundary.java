@@ -92,6 +92,10 @@ final class GuestSystemServiceBoundary {
         result.put("biometric", "biometric");
         result.put("sensor_privacy", "sensorPrivacy");
         result.put("power", "power");
+        // BatteryManager is a framework facade whose constructor resolves batterystats and
+        // batteryproperties through ServiceManager.  Keep it Guest-visible only after the
+        // paired Binder projection has been installed.
+        result.put("batterymanager", "battery");
         // KeyguardManager is a framework-owned, read-only capability on the target APIs. Its
         // availability follows the validated power boundary; do not expose it when that boundary
         // failed, and never let an unknown service silently fall back to the Host context.

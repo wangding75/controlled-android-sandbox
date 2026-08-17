@@ -14,6 +14,7 @@ public final class BrokerManifestReceiverRuntimeSelfTest {
 
     public static void main(String[] args) throws Exception {
         testIndexResolveAndActivation();
+        testApplicationProcessInheritance();
         testPermissionAndUserIsolation();
         testGenerationBinding();
         testImplicitMatchingAndOrdering();
@@ -96,6 +97,26 @@ public final class BrokerManifestReceiverRuntimeSelfTest {
         }
         require(explicitRequiredPermissionDenied,
                 "explicit receiverPermission was not enforced");
+    }
+
+    private static void testApplicationProcessInheritance() {
+        BrokerManifestReceiverRuntime runtime = new BrokerManifestReceiverRuntime();
+        ManifestModel model = new ManifestModel();
+        model.packageName("com.example.application.process");
+        model.applicationProcessName(":global");
+        model.addReceiver(new ManifestModel.Component(
+                "com.example.application.process.DefaultReceiver", "", true, true,
+                false, "", ""));
+        runtime.indexManifest(model, template("com.example.application.process", 0));
+        GuestSession sender = session("sender-session", "com.example.sender", 0,
+                "com.example.sender", 0, 1);
+        Bundle request = explicit("com.example.application.process", 0,
+                "com.example.application.process.DefaultReceiver");
+        BrokerManifestReceiverRuntime.Route route = runtime.routeExplicit(request, sender);
+        Bundle activation = runtime.activationRequest(route);
+        require("com.example.application.process:global".equals(
+                        activation.getString(RuntimeKeys.PROCESS_NAME, "")),
+                "manifest Receiver did not inherit application process");
     }
 
     private static void testGenerationBinding() {

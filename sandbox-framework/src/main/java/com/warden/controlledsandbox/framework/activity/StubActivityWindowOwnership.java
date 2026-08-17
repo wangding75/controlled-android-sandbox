@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.activity;
 
+import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import java.util.Objects;
 
 /**
@@ -19,8 +20,9 @@ public final class StubActivityWindowOwnership {
             if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
             requireText(sessionId, "sessionId");
             if (generation < 1) throw new IllegalArgumentException("generation must be positive");
-            if (processSlot < 0 || processSlot > 31) {
-                throw new IllegalArgumentException("processSlot must be in 0..31");
+            if (!ProcessSlotContract.isOrdinarySlot(processSlot)) {
+                throw new IllegalArgumentException("processSlot must be in 0.."
+                        + ProcessSlotContract.MAX_ORDINARY_SLOT);
             }
             requireText(activityToken, "activityToken");
             if (taskId < 1) throw new IllegalArgumentException("taskId must be positive");

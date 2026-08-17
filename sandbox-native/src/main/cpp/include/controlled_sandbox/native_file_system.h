@@ -12,6 +12,7 @@ struct NativeResolvedPath {
     std::string confinement_root;
     std::uint64_t policy_revision{};
     bool rewritten{false};
+    bool capability{false};
 };
 
 class NativeFileSystemResolver final {

@@ -93,7 +93,7 @@ public final class PackageServiceContractSelfTest {
                         List.of(new VirtualIntentFilterSnapshot(10,
                                 List.of("android.intent.action.MAIN"),
                                 List.of("android.intent.category.DEFAULT"),
-                                List.of(new VirtualIntentDataSnapshot("https", "example.com",
+                                List.of(new VirtualIntentDataSnapshot("https", "example.com", 8443,
                                         "", "/fixture", "", "text/*")))))),
                 List.of(new VirtualPermissionSnapshot("android.permission.CAMERA", "DENIED", false)),
                 List.of(new PackageAppOpSnapshot("android:camera", "IGNORED")));
@@ -113,6 +113,9 @@ public final class PackageServiceContractSelfTest {
                 "virtual split names lost");
         require(restoredState.packageState().sharedLibraries().equals(List.of("org.apache.http.legacy")),
                 "virtual shared libraries lost");
+        require(restoredState.packageState().components().get(0).intentFilters().get(0)
+                        .data().get(0).port() == 8443,
+                "Intent data authority port lost across Binder parcel");
         require(restoredState.packageState().firstInstallTime() == 100L
                         && restoredState.packageState().lastUpdateTime() == 200L,
                 "install timestamps lost");

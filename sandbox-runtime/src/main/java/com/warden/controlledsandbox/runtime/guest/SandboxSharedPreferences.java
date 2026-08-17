@@ -5,6 +5,8 @@ import com.warden.controlledsandbox.domain.persistence.DurableAtomicFile;
 import android.content.SharedPreferences;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -34,13 +36,28 @@ public final class SandboxSharedPreferences implements SharedPreferences {
     private static final byte BOOLEAN = 5;
     private static final byte STRING_SET = 6;
     private final File file;
+    private final RemoteBackend remote;
     private final Map<String, Object> values = new LinkedHashMap<>();
     private boolean active = true;
     private final Set<OnSharedPreferenceChangeListener> listeners = new CopyOnWriteArraySet<>();
 
     SandboxSharedPreferences(File file) {
         this.file = file;
+        this.remote = null;
         load();
+    }
+
+    SandboxSharedPreferences(RemoteBackend remote) {
+        if (remote == null) throw new IllegalArgumentException("remote backend is required");
+        this.file = null;
+        this.remote = remote;
+        load();
+    }
+
+    interface RemoteBackend {
+        byte[] read() throws IOException;
+        boolean write(byte[] bytes);
+        boolean delete();
     }
 
     @Override public synchronized Map<String, ?> getAll() { requireActive(); return Collections.unmodifiableMap(copyValues(values)); }
@@ -67,6 +84,11 @@ public final class SandboxSharedPreferences implements SharedPreferences {
         listeners.clear();
     }
 
+    synchronized boolean deleteStoredFile() {
+        if (remote != null) return remote.delete();
+        return file == null || !file.exists() || file.delete();
+    }
+
     private void requireActive() {
         if (!active) throw new IllegalStateException("SHARED_PREFERENCES_MOVED");
     }
@@ -74,8 +96,20 @@ public final class SandboxSharedPreferences implements SharedPreferences {
     private void load() {
         synchronized (this) {
             values.clear();
-            if (!file.isFile()) return;
-            try (DataInputStream input = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            byte[] encoded;
+            try {
+                if (remote != null) {
+                    encoded = remote.read();
+                    if (encoded == null || encoded.length == 0) return;
+                } else {
+                    if (!file.isFile()) return;
+                    encoded = java.nio.file.Files.readAllBytes(file.toPath());
+                }
+            } catch (Exception readFailure) {
+                throw new IllegalStateException("SHARED_PREFERENCES_READ_FAILED", readFailure);
+            }
+            try (DataInputStream input = new DataInputStream(new BufferedInputStream(
+                    new ByteArrayInputStream(encoded)))) {
                 if (input.readInt() != MAGIC || input.readInt() != VERSION) throw new IOException("Unsupported preferences file");
                 int count = input.readInt();
                 if (count < 0 || count > 100_000) throw new IOException("Invalid preference count");
@@ -101,8 +135,12 @@ public final class SandboxSharedPreferences implements SharedPreferences {
                     values.put(key, value);
                 }
             } catch (Exception corrupt) {
-                File rejected = new File(file.getParentFile(), file.getName() + ".corrupt");
-                if (!file.renameTo(rejected)) file.delete();
+                if (remote != null) {
+                    try { remote.delete(); } catch (Throwable ignored) { }
+                } else {
+                    File rejected = new File(file.getParentFile(), file.getName() + ".corrupt");
+                    if (!file.renameTo(rejected)) file.delete();
+                }
                 values.clear();
             }
         }
@@ -110,6 +148,7 @@ public final class SandboxSharedPreferences implements SharedPreferences {
 
     private synchronized boolean persist(Map<String, Object> replacement) {
         requireActive();
+        if (remote != null) return persistRemote(replacement);
         File parent = file.getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) return false;
         File temporary = new File(parent, file.getName() + ".tmp");
@@ -148,6 +187,39 @@ public final class SandboxSharedPreferences implements SharedPreferences {
         values.clear();
         values.putAll(copyValues(replacement));
         return true;
+    }
+
+    private boolean persistRemote(Map<String, Object> replacement) {
+        try {
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            DataOutputStream output = new DataOutputStream(new BufferedOutputStream(raw));
+            output.writeInt(MAGIC);
+            output.writeInt(VERSION);
+            output.writeInt(replacement.size());
+            for (Map.Entry<String, Object> entry : replacement.entrySet()) {
+                writeString(output, entry.getKey());
+                Object value = entry.getValue();
+                if (value instanceof String) { output.writeByte(STRING); writeString(output, (String) value); }
+                else if (value instanceof Integer) { output.writeByte(INT); output.writeInt((Integer) value); }
+                else if (value instanceof Long) { output.writeByte(LONG); output.writeLong((Long) value); }
+                else if (value instanceof Float) { output.writeByte(FLOAT); output.writeFloat((Float) value); }
+                else if (value instanceof Boolean) { output.writeByte(BOOLEAN); output.writeBoolean((Boolean) value); }
+                else if (value instanceof Set<?>) {
+                    output.writeByte(STRING_SET);
+                    Set<?> set = (Set<?>) value;
+                    output.writeInt(set.size());
+                    for (Object item : set) writeString(output, String.valueOf(item));
+                } else throw new IOException("Unsupported preference value " + value.getClass());
+            }
+            output.flush();
+            byte[] encoded = raw.toByteArray();
+            if (!remote.write(encoded)) return false;
+            values.clear();
+            values.putAll(copyValues(replacement));
+            return true;
+        } catch (IOException failure) {
+            return false;
+        }
     }
 
     private static void writeString(DataOutputStream output, String value) throws IOException {

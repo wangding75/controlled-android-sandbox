@@ -132,8 +132,13 @@ public final class VirtualSystemServiceInterceptor {
             String deliveryPath = pendingIntentTokenId.isEmpty() ? "LISTENER" : "PENDING_INTENT";
             boolean exact = name.contains("exact") || name.contains("alarmclock");
             boolean allowWhileIdle = name.contains("allowwhileidle");
+            boolean alarmClock = name.contains("alarmclock");
+            Object alarmClockInfo = alarmClock ? firstAlarmClockInfo(arguments) : null;
+            Object alarmClockShowIntent = alarmClock
+                    ? member(alarmClockInfo, "mShowIntent", "showIntent", "getShowIntent") : null;
             state.alarms().schedule(token, trigger, interval, exact, allowWhileIdle, deliveryPath,
-                    pendingIntentTokenId, identity.processName(), identity.generation(), identity.packageRevision());
+                    pendingIntentTokenId, identity.processName(), identity.generation(), identity.packageRevision(),
+                    alarmClock, alarmClockShowIntent);
             return Call.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("remove") || name.startsWith("cancel")) {
@@ -143,7 +148,7 @@ public final class VirtualSystemServiceInterceptor {
         if (name.startsWith("canScheduleExactAlarms".toLowerCase(Locale.ROOT))) {
             return Call.handled(identity.permissionPolicy().isGranted("android.permission.SCHEDULE_EXACT_ALARM"));
         }
-        if (name.startsWith("getnextalarmclock")) return Call.handled(null);
+        if (name.startsWith("getnextalarmclock")) return Call.handled(nextAlarmClock());
         if (name.contains("time") || name.contains("timezone")) {
             throw new SecurityException("VIRTUAL_ALARM_HOST_CLOCK_MUTATION_DENIED:" + method.getName());
         }
@@ -215,6 +220,14 @@ public final class VirtualSystemServiceInterceptor {
                 return result;
             }, () -> { });
         }
+        // NotificationManager uses getAppActiveNotifications() on API 29+ while older
+        // framework revisions expose getActiveNotifications().  Both are the same
+        // Guest-visible query; leaving the former to the generic query fallback silently
+        // returned an empty array even though the enqueue transaction had committed.
+        if (name.startsWith("getactivenotifications")
+                || name.startsWith("getappactivenotifications")) {
+            return Call.passThroughWithResult(this::rewriteActiveNotifications);
+        }
         if (name.contains("channel") || name.contains("group")) {
             rewriteChannelStrings(arguments, restores, name);
             rewriteChannelObjects(arguments, restores);
@@ -268,7 +281,7 @@ public final class VirtualSystemServiceInterceptor {
                     state.jobs().remove(virtualId); return result;
                 }, () -> { });
             }
-            return Call.passThrough(restores);
+            return Call.passThroughLifecycle(restores, this::rewriteSingleJobResult, () -> { });
         }
         if (name.startsWith("getallpendingjobs")) return Call.passThroughWithResult(this::rewriteJobResults);
         if (isQueryName(name)) return Call.handled(defaultValue(method.getReturnType()));
@@ -294,6 +307,130 @@ public final class VirtualSystemServiceInterceptor {
             } catch (Throwable ignored) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(ignored); }
         }
         return filtered;
+    }
+
+    /**
+     * Projects the single-job query back to the Guest namespace.  The old path only rewrote
+     * getAllPendingJobs(); getPendingJob() therefore returned a Host ID and leaked the Host
+     * JobService component into the Guest process.
+     */
+    private Object rewriteSingleJobResult(Object result) {
+        if (result == null) return null;
+        try {
+            int hostId = intResult(result, "getId");
+            Integer guestId = state.jobs().guestId(hostId);
+            if (guestId == null) return null;
+            Field field = findField(result.getClass(), "jobId", "mJobId");
+            if (field == null) throw new SecurityException("VIRTUAL_JOB_ID_FIELD_UNSUPPORTED");
+            field.setAccessible(true);
+            field.set(result, guestId);
+            return result;
+        } catch (SecurityException error) {
+            throw error;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new SecurityException("VIRTUAL_JOB_RESULT_REWRITE_FAILED", error);
+        }
+    }
+
+    /**
+     * Returns only notifications owned by this virtual package and rewrites the platform
+     * StatusBarNotification identity back to the Guest namespace.  The Host notification
+     * service still owns the underlying record; the Guest must never observe the Host package,
+     * Host integer ID or generation-qualified Host tag.
+     */
+    private Object rewriteActiveNotifications(Object result) {
+        if (result == null) return null;
+        String resultClass = result.getClass().getName();
+        // INotificationManager returns ParceledListSlice<StatusBarNotification> on API 32;
+        // NotificationManager unwraps it before the Guest sees the public array. Project the
+        // slice itself, otherwise the result-rewrite hook observes no array at all.
+        if (resultClass.contains("ParceledListSlice")) {
+            Field listField = findField(result.getClass(), "mList", "list");
+            if (listField == null) return null;
+            try {
+                listField.setAccessible(true);
+                listField.set(result, rewriteActiveNotifications(listField.get(result)));
+                return result;
+            } catch (ReflectiveOperationException error) {
+                throw new SecurityException("VIRTUAL_NOTIFICATION_RESULT_SLICE_UNSUPPORTED", error);
+            }
+        }
+        if (result instanceof Iterable<?> iterable) {
+            List<Object> owned = new ArrayList<>();
+            int index = 0;
+            for (Object value : iterable) {
+                Object projected = projectActiveNotification(value, index++);
+                if (projected != null) owned.add(projected);
+            }
+            return owned;
+        }
+        if (!result.getClass().isArray()) return result;
+        List<Object> owned = new ArrayList<>();
+        int count = Array.getLength(result);
+        for (int index = 0; index < count; index++) {
+            Object projected = projectActiveNotification(Array.get(result, index), index);
+            if (projected != null) owned.add(projected);
+        }
+        Object projected = Array.newInstance(result.getClass().getComponentType(), owned.size());
+        for (int index = 0; index < owned.size(); index++) {
+            Array.set(projected, index, owned.get(index));
+        }
+        return projected;
+    }
+
+    private Object projectActiveNotification(Object value, int index) {
+        if (value == null) return null;
+        int hostId = intMember(value, "id", "mId", "getId");
+        String hostTag = VirtualSystemServiceState.stringMember(value,
+                "tag", "mTag", "getTag");
+        VirtualSystemServiceAuthority.NotificationRecord record =
+                findNotificationByHost(hostId, hostTag);
+        if (record == null || !rewriteActiveNotification(value, record)) return null;
+        return value;
+    }
+
+    private VirtualSystemServiceAuthority.NotificationRecord findNotificationByHost(
+            int hostId, String hostTag) {
+        String normalizedTag = hostTag == null ? "" : hostTag;
+        for (VirtualSystemServiceAuthority.NotificationRecord record : state.notifications().records()) {
+            if (record.hostId() == hostId && record.hostTag().equals(normalizedTag)
+                    && "ACTIVE".equals(record.state())) return record;
+        }
+        return null;
+    }
+
+    private boolean rewriteActiveNotification(Object value,
+            VirtualSystemServiceAuthority.NotificationRecord record) {
+        Field packageField = findField(value.getClass(), "pkg", "mPkg");
+        Field opPackageField = findField(value.getClass(), "opPkg", "mOpPkg");
+        Field idField = findField(value.getClass(), "id", "mId");
+        Field tagField = findField(value.getClass(), "tag", "mTag");
+        if (packageField == null || idField == null || tagField == null) return false;
+        try {
+            packageField.setAccessible(true);
+            idField.setAccessible(true);
+            tagField.setAccessible(true);
+            packageField.set(value, identity.packageName());
+            if (opPackageField != null) {
+                opPackageField.setAccessible(true);
+                opPackageField.set(value, identity.packageName());
+            }
+            idField.set(value, record.guestId());
+            tagField.set(value, record.guestTag());
+            Object notification = member(value, "notification", "mNotification", "getNotification");
+            if (notification != null && !record.channelId().isEmpty()) {
+                Field channelField = findField(notification.getClass(), "mChannelId", "channelId");
+                if (channelField != null) {
+                    channelField.setAccessible(true);
+                    channelField.set(notification, record.channelId());
+                }
+            }
+            return true;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            return false;
+        }
     }
 
     private VirtualSystemServiceAuthority.NotificationRecord findNotification(int guestId, String guestTag) {
@@ -439,6 +576,19 @@ public final class VirtualSystemServiceInterceptor {
         if (value instanceof Iterable<?> iterable) { for (Object item : iterable) collectChannelDrafts(item, out, visited, methodName); return; }
         if (value.getClass().isArray()) { int size = Array.getLength(value); for (int i=0;i<size;i++) collectChannelDrafts(Array.get(value,i), out, visited, methodName); return; }
         String className = value.getClass().getName();
+        // NotificationManager transports channel collections through ParceledListSlice on
+        // API 26-32. Traverse the wrapper so Guest channel IDs are rewritten transactionally.
+        if (className.contains("ParceledListSlice")) {
+            Field listField = findField(value.getClass(), "mList", "list");
+            if (listField == null) return;
+            try {
+                listField.setAccessible(true);
+                collectChannelDrafts(listField.get(value), out, visited, methodName);
+            } catch (ReflectiveOperationException error) {
+                throw new SecurityException("VIRTUAL_NOTIFICATION_CHANNEL_SLICE_UNSUPPORTED", error);
+            }
+            return;
+        }
         if (!className.contains("NotificationChannel") && !className.contains("NotificationChannelGroup")) return;
         String id = VirtualSystemServiceState.stringMember(value, "mId", "id", "getId");
         if (id.isEmpty()) return;
@@ -579,6 +729,19 @@ public final class VirtualSystemServiceInterceptor {
             return;
         }
         String className = value.getClass().getName();
+        // NotificationManager transports channel collections through ParceledListSlice on
+        // API 26-32. Traverse the wrapper so Guest channel IDs are rewritten transactionally.
+        if (className.contains("ParceledListSlice")) {
+            Field listField = findField(value.getClass(), "mList", "list");
+            if (listField == null) return;
+            try {
+                listField.setAccessible(true);
+                rewriteChannelObject(listField.get(value), restores, visited, toHost);
+            } catch (ReflectiveOperationException error) {
+                throw new SecurityException("VIRTUAL_NOTIFICATION_CHANNEL_SLICE_UNSUPPORTED", error);
+            }
+            return;
+        }
         if (!className.contains("NotificationChannel") && !className.contains("NotificationChannelGroup")) return;
         rewriteStringField(value, restores, toHost, "mId", "id");
         if (className.contains("NotificationChannel") && !className.contains("Group")) {
@@ -717,6 +880,12 @@ public final class VirtualSystemServiceInterceptor {
         long trigger = System.currentTimeMillis();
         if (arguments != null) for (Object value : arguments) {
             if (value instanceof Long && ((Long) value) > 0L) { trigger = (Long) value; break; }
+            if (value != null && value.getClass().getName().contains("AlarmClockInfo")) {
+                Object clock = member(value, "triggerTime", "mTriggerTime", "getTriggerTime");
+                if (clock instanceof Number number && number.longValue() > 0L) {
+                    trigger = number.longValue(); break;
+                }
+            }
         }
         int type = -1;
         if (arguments != null) for (Object value : arguments) {
@@ -727,6 +896,33 @@ public final class VirtualSystemServiceInterceptor {
             return System.currentTimeMillis() + Math.max(0L, trigger - elapsedNow);
         }
         return trigger;
+    }
+
+    private static Object firstAlarmClockInfo(Object[] arguments) {
+        if (arguments != null) for (Object value : arguments) {
+            if (value != null && value.getClass().getName().contains("AlarmClockInfo")) return value;
+        }
+        throw new IllegalArgumentException("VIRTUAL_ALARM_CLOCK_INFO_REQUIRED");
+    }
+
+    private Object nextAlarmClock() {
+        VirtualSystemServiceAuthority.AlarmRecord selected = null;
+        for (VirtualSystemServiceAuthority.AlarmRecord record : state.alarms().records()) {
+            if (!record.alarmClock()) continue;
+            if (selected == null || record.triggerAtMs() < selected.triggerAtMs()) selected = record;
+        }
+        if (selected == null) return null;
+        try {
+            Class<?> infoClass = Class.forName("android.app.AlarmManager$AlarmClockInfo");
+            Class<?> pendingIntentClass = Class.forName("android.app.PendingIntent");
+            java.lang.reflect.Constructor<?> constructor = infoClass.getConstructor(long.class, pendingIntentClass);
+            Object showIntent = selected.alarmClockShowIntent();
+            if (showIntent != null && !pendingIntentClass.isInstance(showIntent)) showIntent = null;
+            return constructor.newInstance(selected.triggerAtMs(), showIntent);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new SecurityException("VIRTUAL_ALARM_CLOCK_RESULT_UNSUPPORTED", error);
+        }
     }
     private static long interval(Object[] arguments, long trigger) {
         boolean seen = false;

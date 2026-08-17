@@ -145,8 +145,14 @@ public final class GuestContextBoundarySelfTest {
                     spec.dataRootFile().getCanonicalPath()), "OBB directory isolated");
             require(context.createCredentialProtectedStorageContext() == context,
                     "credential-protected context remains Guest context");
-            require(context.createConfigurationContext(new Configuration()) == context,
-                    "configuration context remains Guest context");
+            Context configurationContext = context.createConfigurationContext(new Configuration());
+            require(configurationContext instanceof GuestContext
+                            && configurationContext != context,
+                    "configuration context remains a distinct Guest context");
+            require(spec.packageName.equals(configurationContext.getPackageName()),
+                    "configuration context preserves Guest package identity");
+            require(configurationContext.getResources() != context.getResources(),
+                    "configuration context owns an independent Resources view");
             require(context.createPackageContext(spec.packageName, 0) == context,
                     "own package context remains Guest context");
             boolean denied = false;

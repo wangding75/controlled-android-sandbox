@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace controlled_sandbox {
@@ -57,6 +58,8 @@ struct NativePathDecision {
     std::string confinement_root;
     std::uint64_t policy_revision{};
     bool rewritten{false};
+    int directory_fd{-100};
+    bool capability{false};
 };
 
 struct NativePolicySnapshot {
@@ -90,6 +93,18 @@ public:
                    std::vector<CidrV6> allow_cidrs_v6 = {},
                    std::vector<CidrV6> deny_cidrs_v6 = {},
                    NativeNetworkIdentity network_identity = {});
+
+    /** Installs duplicated Binder directory capabilities for an isolated Guest process. */
+    void configure_file_capabilities(int data_root_fd, int apk_file_fd,
+                                     std::string apk_entry_name, int native_library_fd);
+    void clear_file_capabilities() noexcept;
+    [[nodiscard]] bool file_capabilities_configured() const noexcept;
+    [[nodiscard]] bool is_capability_fd(int descriptor) const noexcept;
+    [[nodiscard]] bool is_capability_file_fd(int descriptor) const noexcept;
+    void register_capability_fd(int descriptor) noexcept;
+    void unregister_capability_fd(int descriptor) noexcept;
+    [[nodiscard]] NativePathDecision resolve_capability_relative(
+            int directory_fd, std::string_view relative_path) const;
 
     void reset() noexcept;
 
@@ -126,6 +141,11 @@ private:
     std::vector<CidrV6> allow_cidrs_v6_;
     std::vector<CidrV6> deny_cidrs_v6_;
     NativeNetworkIdentity network_identity_;
+    int data_root_fd_{-1};
+    int apk_file_fd_{-1};
+    std::string apk_entry_name_;
+    int native_library_fd_{-1};
+    std::unordered_set<int> capability_fds_;
 };
 
 NativePolicyEngine& global_policy();

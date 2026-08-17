@@ -187,7 +187,7 @@ final class ApkImportManager {
         storageLayout.requireNoManagedSymlinks(revisionDir);
         if (revisionDir.exists()) {
             removeKnownRuntimeProfileSidecars(revisionDir);
-            requireMatchingPublishedRevision(transactionDir, revisionDir);
+            requireMatchingPublishedRevision(transactionDir, revisionDir, selectedAbi);
             sealPublishedRevision(revisionDir);
             deleteTreeOrThrow(transactionDir);
         } else {
@@ -225,10 +225,13 @@ final class ApkImportManager {
                 base.signatureSha256, apk.getAbsolutePath(),
                 selectedAbi.isEmpty() ? "" : nativeDir.getAbsolutePath(), selectedAbi,
                 containsNativeCode, NativeGuestExecutionPolicy.normalizeTrust(nativeGuestTrust),
-                merged.launcherActivity, processName(packageName, activity),
-                base.manifest.applicationClass(), className(service), processName(packageName, service),
-                className(receiver), processName(packageName, receiver), firstAction(receiver),
-                className(provider), processName(packageName, provider),
+                merged.launcherActivity,
+                processName(packageName, merged.applicationProcessName, activity),
+                base.manifest.applicationClass(), className(service),
+                processName(packageName, merged.applicationProcessName, service),
+                className(receiver), processName(packageName, merged.applicationProcessName, receiver),
+                firstAction(receiver), className(provider),
+                processName(packageName, merged.applicationProcessName, provider),
                 provider == null ? "" : provider.authorities(),
                 String.join(",", merged.permissions), String.join(",", merged.sharedLibraries),
                 revisionSha256, base.sha256, published, importedAt,
@@ -372,6 +375,13 @@ final class ApkImportManager {
         for (String abi : Build.SUPPORTED_ABIS) if (available.contains(abi)) { selected = abi; break; }
         if (selected.isEmpty()) return "";
         if (!outputDir.mkdirs() && !outputDir.isDirectory()) throw new IllegalStateException("Cannot create native library directory");
+        // Preserve Android's installed layout: ApplicationInfo.nativeLibraryDir points at the
+        // selected ABI directory (for example .../lib/arm64-v8a), not at a flattened bag of
+        // libraries. Some WebView/Chromium loaders derive sibling paths from this directory.
+        File abiOutputDir = new File(outputDir, selected);
+        if (!abiOutputDir.mkdirs() && !abiOutputDir.isDirectory()) {
+            throw new IllegalStateException("Cannot create ABI native library directory");
+        }
         long total = 0;
         Map<String, String> extractedDigests = new HashMap<>();
         for (PackageArtifactRecord artifact : artifacts) {
@@ -386,7 +396,7 @@ final class ApkImportManager {
                     if (fileName.contains("/") || fileName.contains("\\") || fileName.trim().isEmpty()) {
                         throw new IllegalArgumentException("Unsafe native library path");
                     }
-                    File temporary = new File(outputDir, fileName + ".incoming");
+                    File temporary = new File(abiOutputDir, fileName + ".incoming");
                     long remaining = MAX_NATIVE_BYTES - total;
                     try (InputStream input = zip.getInputStream(entry);
                          FileOutputStream file = new FileOutputStream(temporary);
@@ -399,11 +409,14 @@ final class ApkImportManager {
                     if (existing != null && !existing.equals(digest)) {
                         throw new SecurityException("Conflicting native library across splits: " + fileName);
                     }
-                    File output = new File(outputDir, fileName);
+                    File output = new File(abiOutputDir, fileName);
                     if (existing == null) {
                         moveFile(temporary, output);
                         extractedDigests.put(fileName, digest);
-                        output.setReadable(true, true); output.setWritable(false, false); output.setExecutable(false, false);
+                        // NativeLoader maps Guest ELF files with executable pages. Keep the
+                        // published file owner-only but executable, matching PackageManager's
+                        // extracted native-library contract without making the revision writable.
+                        output.setReadable(true, true); output.setWritable(false, false); output.setExecutable(true, true);
                     } else {
                         Files.deleteIfExists(temporary.toPath());
                     }
@@ -435,13 +448,59 @@ final class ApkImportManager {
     }
 
     private static void requireMatchingPublishedRevision(File stagedRevision,
-                                                         File publishedRevision) throws Exception {
+                                                         File publishedRevision,
+                                                         String selectedAbi) throws Exception {
         if (Files.isSymbolicLink(publishedRevision.toPath()) || !publishedRevision.isDirectory()) {
             throw new SecurityException("IMMUTABLE_REVISION_DIRECTORY_MISMATCH");
         }
-        if (!treeDigests(stagedRevision).equals(treeDigests(publishedRevision))) {
-            throw new SecurityException("IMMUTABLE_REVISION_CONTENT_MISMATCH");
+        if (treeDigests(stagedRevision).equals(treeDigests(publishedRevision))) return;
+        if (!selectedAbi.trim().isEmpty()
+                && migrateLegacyFlatNativeLayout(stagedRevision, publishedRevision, selectedAbi)
+                && treeDigests(stagedRevision).equals(treeDigests(publishedRevision))) return;
+        throw new SecurityException("IMMUTABLE_REVISION_CONTENT_MISMATCH");
+    }
+
+    /**
+     * Rehomes revisions produced before the ABI directory was preserved. The content-addressed
+     * bytes are compared before any move; only a flat lib/*.so tree whose digests exactly match
+     * the staged lib/<abi> tree is eligible. This keeps reinstall idempotent without accepting a
+     * changed or injected native payload.
+     */
+    private static boolean migrateLegacyFlatNativeLayout(File stagedRevision,
+                                                          File publishedRevision,
+                                                          String selectedAbi) throws Exception {
+        File stagedNative = new File(new File(stagedRevision, "lib"), selectedAbi);
+        File publishedNative = new File(publishedRevision, "lib");
+        if (!stagedNative.isDirectory() || !publishedNative.isDirectory()) return false;
+        if (!flatNativeDigests(stagedNative).equals(flatNativeDigests(publishedNative))) return false;
+        File[] children = publishedNative.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list legacy native directory");
+        File abiDirectory = new File(publishedNative, selectedAbi);
+        publishedNative.setWritable(true, false);
+        if (!abiDirectory.exists() && !abiDirectory.mkdirs() && !abiDirectory.isDirectory()) {
+            throw new IllegalStateException("Cannot create migrated ABI native directory");
         }
+        for (File child : children) {
+            if (child.equals(abiDirectory)) continue;
+            if (Files.isSymbolicLink(child.toPath()) || !child.isFile()
+                    || !child.getName().endsWith(".so")) {
+                throw new SecurityException("LEGACY_NATIVE_LAYOUT_INVALID");
+            }
+            moveFile(child, new File(abiDirectory, child.getName()));
+        }
+        return true;
+    }
+
+    private static Map<String, String> flatNativeDigests(File root) throws Exception {
+        Map<String, String> digests = new TreeMap<>();
+        File[] children = root.listFiles();
+        if (children == null) throw new IllegalStateException("Cannot list native directory " + root);
+        for (File child : children) {
+            if (Files.isSymbolicLink(child.toPath()) || !child.isFile()
+                    || !child.getName().endsWith(".so")) return Map.of();
+            digests.put(child.getName(), sha256(child));
+        }
+        return digests;
     }
 
     private static Map<String, String> treeDigests(File root) throws Exception {
@@ -607,7 +666,10 @@ final class ApkImportManager {
             appendComponents(out.receivers, manifest.receivers());
             appendComponents(out.providers, manifest.providers());
             out.permissions.addAll(manifest.permissions()); out.sharedLibraries.addAll(manifest.sharedLibraries());
-            if (artifact.base()) out.launcherActivity = manifest.launcherActivity();
+            if (artifact.base()) {
+                out.launcherActivity = manifest.launcherActivity();
+                out.applicationProcessName = manifest.applicationProcessName();
+            }
             else if (out.launcherActivity.isEmpty() && !manifest.launcherActivity().isEmpty()) {
                 out.launcherActivity = manifest.launcherActivity();
             }
@@ -645,11 +707,14 @@ final class ApkImportManager {
         for (ManifestModel.Component component : components) if (component.enabled()) return component;
         return null;
     }
-    private static String processName(String packageName, ManifestModel.Component component) {
+    private static String processName(String packageName, String applicationProcessName,
+                                      ManifestModel.Component component) {
         if (component == null) return packageName;
         if (component.isolatedProcess()) return packageName + ":isolated_" + component.className().replaceAll("[^A-Za-z0-9_]", "_");
         String declared = component.processName();
+        if (declared == null || declared.trim().isEmpty()) declared = applicationProcessName;
         if (declared == null || declared.trim().isEmpty()) return packageName;
+        declared = declared.trim();
         return declared.startsWith(":") ? packageName + declared : declared;
     }
     private static String className(ManifestModel.Component component) { return component == null ? "" : component.className(); }
@@ -732,7 +797,17 @@ final class ApkImportManager {
             if (child.isDirectory()) sealPublishedRevision(child);
             child.setReadable(true, true);
             child.setWritable(false, false);
-            if (child.isDirectory()) child.setExecutable(true, true);
+            if (child.isDirectory()) {
+                child.setExecutable(true, true);
+            } else if ((revision.getName().equals("lib")
+                    || (revision.getParentFile() != null
+                    && revision.getParentFile().getName().equals("lib")))
+                    && child.getName().endsWith(".so")) {
+                // A sealed revision is immutable, not non-executable. Removing the execute
+                // bit here makes translated ARM guests run a read-only mapping and can crash
+                // inside the guest ELF after System.load succeeds.
+                child.setExecutable(true, true);
+            }
         }
         revision.setReadable(true, true);
         revision.setWritable(false, false);
@@ -840,6 +915,7 @@ final class ApkImportManager {
 
     private static final class ManifestSet {
         String launcherActivity = "";
+        String applicationProcessName = "";
         final List<ManifestModel.Component> activities = new ArrayList<>();
         final List<ManifestModel.Component> services = new ArrayList<>();
         final List<ManifestModel.Component> receivers = new ArrayList<>();

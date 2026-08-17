@@ -5,9 +5,12 @@
 #include <arpa/inet.h>
 #include <cerrno>
 #include <cctype>
+#include <fcntl.h>
 #include <limits.h>
 #include <mutex>
 #include <sstream>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <utility>
 
 namespace controlled_sandbox {
@@ -131,6 +134,54 @@ std::string normalize_absolute(std::string_view path) {
     }
     if (out.size() > PATH_MAX) throw PathPolicyError(ENAMETOOLONG, "PATH_TOO_LONG");
     return out;
+}
+
+std::string normalize_relative(std::string_view path) {
+    if (path.empty()) return ".";
+    if (path.front() == '/') throw PathPolicyError(EINVAL, "CAPABILITY_PATH_ABSOLUTE");
+    if (path.size() > PATH_MAX || path.find('\0') != std::string_view::npos) {
+        throw PathPolicyError(ENAMETOOLONG, "CAPABILITY_PATH_TOO_LONG");
+    }
+    std::vector<std::string> segments;
+    std::stringstream input{std::string(path)};
+    std::string segment;
+    while (std::getline(input, segment, '/')) {
+        if (segment.empty() || segment == ".") continue;
+        if (segment == "..") throw PathPolicyError(EACCES, "CAPABILITY_PATH_TRAVERSAL");
+        segments.push_back(segment);
+    }
+    if (segments.empty()) return ".";
+    std::string out;
+    for (std::size_t index = 0; index < segments.size(); index++) {
+        if (index > 0) out.push_back('/');
+        out.append(segments[index]);
+    }
+    if (out.size() > PATH_MAX) throw PathPolicyError(ENAMETOOLONG, "CAPABILITY_PATH_TOO_LONG");
+    return out;
+}
+
+void close_fd_raw(int descriptor) noexcept {
+    if (descriptor >= 0) (void) syscall(SYS_close, descriptor);
+}
+
+int duplicate_fd(int descriptor) {
+    if (descriptor < 0) return -1;
+#ifdef F_DUPFD_CLOEXEC
+    const int duplicated = ::fcntl(descriptor, F_DUPFD_CLOEXEC, 3);
+#else
+    const int duplicated = ::fcntl(descriptor, F_DUPFD, 3);
+#endif
+    if (duplicated < 0) throw PathPolicyError(errno, "CAPABILITY_FD_DUP_FAILED");
+    return duplicated;
+}
+
+void validate_entry_name(std::string_view value) {
+    if (value.empty() || value == "." || value == ".."
+            || value.find('/') != std::string_view::npos
+            || value.find('\\') != std::string_view::npos
+            || value.find('\0') != std::string_view::npos) {
+        throw std::invalid_argument("APK capability entry is invalid");
+    }
 }
 
 std::string append_relative(std::string_view root, std::string_view relative) {
@@ -345,8 +396,107 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     configured_ = true;
 }
 
+void NativePolicyEngine::configure_file_capabilities(int data_root_fd, int apk_file_fd,
+                                                     std::string apk_entry_name,
+                                                     int native_library_fd) {
+    if (data_root_fd < 0 || apk_file_fd < 0) {
+        throw std::invalid_argument("isolated file capabilities require data root and APK file");
+    }
+    validate_entry_name(apk_entry_name);
+    const int data_duplicate = duplicate_fd(data_root_fd);
+    int apk_duplicate = -1;
+    int native_duplicate = -1;
+    try {
+        apk_duplicate = duplicate_fd(apk_file_fd);
+        if (native_library_fd >= 0) native_duplicate = duplicate_fd(native_library_fd);
+    } catch (...) {
+        close_fd_raw(data_duplicate);
+        close_fd_raw(apk_duplicate);
+        close_fd_raw(native_duplicate);
+        throw;
+    }
+
+    std::unique_lock lock(mutex_);
+    for (const int descriptor : capability_fds_) {
+        if (descriptor != data_root_fd_ && descriptor != apk_file_fd_
+                && descriptor != native_library_fd_) close_fd_raw(descriptor);
+    }
+    close_fd_raw(data_root_fd_);
+    close_fd_raw(apk_file_fd_);
+    close_fd_raw(native_library_fd_);
+    capability_fds_.clear();
+    data_root_fd_ = data_duplicate;
+    apk_file_fd_ = apk_duplicate;
+    native_library_fd_ = native_duplicate;
+    apk_entry_name_ = std::move(apk_entry_name);
+    capability_fds_.insert(data_root_fd_);
+    capability_fds_.insert(apk_file_fd_);
+    if (native_library_fd_ >= 0) capability_fds_.insert(native_library_fd_);
+    revision_++;
+}
+
+void NativePolicyEngine::clear_file_capabilities() noexcept {
+    std::unique_lock lock(mutex_);
+    for (const int descriptor : capability_fds_) close_fd_raw(descriptor);
+    capability_fds_.clear();
+    data_root_fd_ = -1;
+    apk_file_fd_ = -1;
+    native_library_fd_ = -1;
+    apk_entry_name_.clear();
+    revision_++;
+}
+
+bool NativePolicyEngine::file_capabilities_configured() const noexcept {
+    std::shared_lock lock(mutex_);
+    return data_root_fd_ >= 0 && apk_file_fd_ >= 0;
+}
+
+bool NativePolicyEngine::is_capability_fd(int descriptor) const noexcept {
+    if (descriptor < 0) return false;
+    std::shared_lock lock(mutex_);
+    return capability_fds_.find(descriptor) != capability_fds_.end();
+}
+
+bool NativePolicyEngine::is_capability_file_fd(int descriptor) const noexcept {
+    if (descriptor < 0) return false;
+    std::shared_lock lock(mutex_);
+    return descriptor == apk_file_fd_;
+}
+
+void NativePolicyEngine::register_capability_fd(int descriptor) noexcept {
+    if (descriptor < 0) return;
+    std::unique_lock lock(mutex_);
+    if (data_root_fd_ >= 0 || apk_file_fd_ >= 0 || native_library_fd_ >= 0) {
+        capability_fds_.insert(descriptor);
+    }
+}
+
+void NativePolicyEngine::unregister_capability_fd(int descriptor) noexcept {
+    if (descriptor < 0) return;
+    std::unique_lock lock(mutex_);
+    if (descriptor != data_root_fd_ && descriptor != apk_file_fd_
+            && descriptor != native_library_fd_) capability_fds_.erase(descriptor);
+}
+
+NativePathDecision NativePolicyEngine::resolve_capability_relative(
+        int directory_fd, std::string_view relative_path) const {
+    std::shared_lock lock(mutex_);
+    if (!configured_) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
+    if (capability_fds_.find(directory_fd) == capability_fds_.end()) {
+        throw PathPolicyError(EACCES, "CAPABILITY_FD_UNKNOWN");
+    }
+    return NativePathDecision{normalize_relative(relative_path), {}, revision_, false,
+            directory_fd, true};
+}
+
 void NativePolicyEngine::reset() noexcept {
     std::unique_lock lock(mutex_);
+    for (const int descriptor : capability_fds_) close_fd_raw(descriptor);
+    capability_fds_.clear();
+    data_root_fd_ = -1;
+    apk_file_fd_ = -1;
+    native_library_fd_ = -1;
+    apk_entry_name_.clear();
     session_id_.clear();
     generation_ = 0;
     package_name_.clear();
@@ -375,6 +525,7 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
     std::shared_lock lock(mutex_);
     if (!configured_) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
     if (is_sensitive_proc_path(normalized)) throw PathPolicyError(EACCES, "PROC_SELF_PATH_DENIED");
+    if (path_has_prefix(normalized, "/proc")) throw PathPolicyError(EACCES, "PROC_PATH_DENIED");
 
     const std::string data_data = "/data/data/" + package_name_;
     const std::string data_user = "/data/user/" + std::to_string(virtual_user_id_) + "/" + package_name_;
@@ -391,42 +542,80 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
         if (!path_has_prefix(normalized, prefix)) throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
         const std::string relative = suffix_after(normalized, prefix);
         if (relative == "lib" || path_has_prefix(relative, "lib")) {
+            if (native_library_fd_ >= 0) {
+                const std::string library_relative = relative == "lib"
+                        ? std::string{} : relative.substr(4);
+                return NativePathDecision{normalize_relative(library_relative), {}, revision_, true,
+                        native_library_fd_, true};
+            }
             if (native_library_root_.empty()) throw PathPolicyError(ENOENT, "NATIVE_LIBRARY_ROOT_MISSING");
             const std::string library_relative = relative == "lib" ? std::string{} : relative.substr(4);
             return NativePathDecision{append_relative(native_library_root_, library_relative),
                     native_library_root_, revision_, true};
+        }
+        if (data_root_fd_ >= 0) {
+            return NativePathDecision{normalize_relative(relative), {}, revision_, true,
+                    data_root_fd_, true};
         }
         return NativePathDecision{append_relative(data_target, relative), instance_root_, revision_, true};
     }
 
     if (path_has_prefix(guest_path, external)) {
         if (!path_has_prefix(normalized, external)) throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
+        if (data_root_fd_ >= 0) {
+            const std::string suffix = suffix_after(normalized, external);
+            const std::string relative = suffix.empty() ? "external" : "external/" + suffix;
+            return NativePathDecision{normalize_relative(relative), {}, revision_, true,
+                    data_root_fd_, true};
+        }
         return NativePathDecision{append_relative(external_target, suffix_after(normalized, external)),
                 instance_root_, revision_, true};
     }
 
     if (is_data_app_apk_alias(normalized, package_name_)) {
+        if (apk_file_fd_ >= 0) {
+            return NativePathDecision{".", {}, revision_, true, apk_file_fd_, true};
+        }
         return NativePathDecision{apk_path_, {}, revision_, true};
     }
     const std::string library_suffix = data_app_library_suffix(normalized, package_name_);
     if (!library_suffix.empty()) {
+        if (native_library_fd_ >= 0) {
+            return NativePathDecision{normalize_relative(library_suffix), {}, revision_, true,
+                    native_library_fd_, true};
+        }
         if (native_library_root_.empty()) throw PathPolicyError(ENOENT, "NATIVE_LIBRARY_ROOT_MISSING");
         return NativePathDecision{append_relative(native_library_root_, library_suffix),
                 native_library_root_, revision_, true};
     }
 
     if (path_has_prefix(normalized, instance_root_)) {
+        if (data_root_fd_ >= 0) {
+            return NativePathDecision{normalize_relative(suffix_after(normalized, instance_root_)),
+                    {}, revision_, false, data_root_fd_, true};
+        }
         return NativePathDecision{normalized, instance_root_, revision_, false};
     }
-    if (normalized == apk_path_) return NativePathDecision{normalized, {}, revision_, false};
+    if (normalized == apk_path_) {
+        if (apk_file_fd_ >= 0) {
+            return NativePathDecision{".", {}, revision_, false, apk_file_fd_, true};
+        }
+        return NativePathDecision{normalized, {}, revision_, false};
+    }
     if (!native_library_root_.empty() && path_has_prefix(normalized, native_library_root_)) {
+        if (native_library_fd_ >= 0) {
+            return NativePathDecision{normalize_relative(suffix_after(normalized,
+                    native_library_root_)), {}, revision_, false, native_library_fd_, true};
+        }
         return NativePathDecision{normalized, native_library_root_, revision_, false};
     }
 
     if (path_has_prefix(normalized, "/data/app")) {
+        if (data_root_fd_ >= 0) return NativePathDecision{normalized, {}, revision_, false};
         throw PathPolicyError(EACCES, "CROSS_PACKAGE_APK_PATH_DENIED");
     }
     if (is_private_android_root(normalized)) {
+        if (data_root_fd_ >= 0) return NativePathDecision{normalized, {}, revision_, false};
         throw PathPolicyError(EACCES, "CROSS_PACKAGE_PRIVATE_PATH_DENIED");
     }
     return NativePathDecision{normalized, {}, revision_, false};

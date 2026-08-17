@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.domain.component.receiver.OrderedBroadcastSt
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -17,7 +18,7 @@ import java.util.concurrent.TimeoutException;
 /** Broker authority for one-shot ordered Receiver completion tokens. */
 public final class OrderedReceiverTokenRegistry {
     public static final int MAX_ACTIVE = 256;
-    public static final long MAX_TIMEOUT_MS = 10_000L;
+    public static final long MAX_TIMEOUT_MS = RuntimeKeys.FRAMEWORK_RECEIVER_DISPATCH_TIMEOUT_MS;
     public static final long DEFAULT_TIMEOUT_MS = 10_000L;
     private static final long TERMINAL_RETENTION_MS = 60_000L;
     private static final int TOKEN_ATTEMPTS = 8;

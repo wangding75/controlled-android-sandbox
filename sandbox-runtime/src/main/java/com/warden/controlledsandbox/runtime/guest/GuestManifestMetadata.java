@@ -13,13 +13,19 @@ final class GuestManifestMetadata {
     private static final String ANDROID_NS = "http://schemas.android.com/apk/res/android";
     private final Map<String, Bundle> providersByAuthority;
     private final Map<String, Bundle> providersByClass;
+    private final Map<String, Bundle> componentsByClass;
+    private final Map<String, String> activityTargets;
     private final Bundle applicationMetadata;
 
     private GuestManifestMetadata(Map<String, Bundle> providersByAuthority,
                                   Map<String, Bundle> providersByClass,
+                                  Map<String, Bundle> componentsByClass,
+                                  Map<String, String> activityTargets,
                                   Bundle applicationMetadata) {
         this.providersByAuthority = providersByAuthority;
         this.providersByClass = providersByClass;
+        this.componentsByClass = copyBundleMap(componentsByClass);
+        this.activityTargets = new LinkedHashMap<>(activityTargets);
         this.applicationMetadata = applicationMetadata == null
                 ? null : new Bundle(applicationMetadata);
     }
@@ -31,13 +37,16 @@ final class GuestManifestMetadata {
     static GuestManifestMetadata read(AssetManager assets, Resources resources) throws Exception {
         Map<String, Bundle> byAuthority = new LinkedHashMap<>();
         Map<String, Bundle> byClass = new LinkedHashMap<>();
+        Map<String, Bundle> components = new LinkedHashMap<>();
+        Map<String, String> activityTargets = new LinkedHashMap<>();
         Bundle application = new Bundle();
         try (XmlResourceParser parser = assets.openXmlResourceParser("AndroidManifest.xml")) {
             int applicationDepth = -1;
+            int componentDepth = -1;
             String authorities = "";
             String className = "";
+            String componentTag = "";
             String packageName = "";
-            int providerDepth = -1;
             Bundle metadata = null;
             for (int event = parser.getEventType(); event != XmlResourceParser.END_DOCUMENT;
                     event = parser.next()) {
@@ -48,42 +57,65 @@ final class GuestManifestMetadata {
                         packageName = declared == null ? "" : declared.trim();
                     } else if ("application".equals(name)) {
                         applicationDepth = parser.getDepth();
-                    } else if ("provider".equals(name)) {
-                        providerDepth = parser.getDepth();
+                    } else if ("activity-alias".equals(name)) {
+                        String alias = resolveClassName(packageName,
+                                parser.getAttributeValue(ANDROID_NS, "name"));
+                        String target = resolveClassName(packageName,
+                                parser.getAttributeValue(ANDROID_NS, "targetActivity"));
+                        if (!alias.isEmpty() && !target.isEmpty()) {
+                            activityTargets.put(alias, target);
+                        }
+                        if (applicationDepth >= 0 && parser.getDepth() == applicationDepth + 1) {
+                            componentDepth = parser.getDepth();
+                            componentTag = name;
+                            authorities = "";
+                            className = alias;
+                            metadata = new Bundle();
+                        }
+                    } else if (isApplicationComponent(name) && applicationDepth >= 0
+                            && parser.getDepth() == applicationDepth + 1) {
+                        componentDepth = parser.getDepth();
+                        componentTag = name;
                         authorities = parser.getAttributeValue(ANDROID_NS, "authorities");
                         className = resolveClassName(packageName,
                                 parser.getAttributeValue(ANDROID_NS, "name"));
                         metadata = new Bundle();
                     } else if ("meta-data".equals(name) && metadata != null
-                            && parser.getDepth() == providerDepth + 1) {
+                            && parser.getDepth() == componentDepth + 1) {
                         putMetadata(metadata, parser, resources);
                     } else if ("meta-data".equals(name) && applicationDepth >= 0
                             && parser.getDepth() == applicationDepth + 1) {
                         putMetadata(application, parser, resources);
                     }
                 } else if (event == XmlResourceParser.END_TAG
-                        && "provider".equals(parser.getName())
-                        && parser.getDepth() == providerDepth) {
+                        && isApplicationComponent(parser.getName())
+                        && parser.getDepth() == componentDepth) {
                     if (metadata != null) {
                         Bundle copy = new Bundle(metadata);
-                        if (!className.isEmpty()) byClass.putIfAbsent(className, copy);
-                        if (authorities != null) {
-                            for (String authority : authorities.split(";")) {
-                                String normalized = authority == null ? "" : authority.trim();
-                                if (!normalized.isEmpty()) {
-                                    byAuthority.putIfAbsent(normalized, new Bundle(copy));
+                        if (!className.isEmpty()) {
+                            mergeBundle(components, className, copy);
+                        }
+                        if ("provider".equals(componentTag)) {
+                            if (!className.isEmpty()) byClass.put(className, new Bundle(copy));
+                            if (authorities != null) {
+                                for (String authority : authorities.split(";")) {
+                                    String normalized = authority == null ? "" : authority.trim();
+                                    if (!normalized.isEmpty()) {
+                                        byAuthority.put(normalized, new Bundle(copy));
+                                    }
                                 }
                             }
                         }
                     }
                     authorities = "";
                     className = "";
-                    providerDepth = -1;
+                    componentTag = "";
+                    componentDepth = -1;
                     metadata = null;
                 }
             }
         }
-        return new GuestManifestMetadata(byAuthority, byClass,
+        return new GuestManifestMetadata(byAuthority, byClass, components, activityTargets,
                 application.isEmpty() ? null : application);
     }
 
@@ -98,6 +130,21 @@ final class GuestManifestMetadata {
         return value == null ? null : new Bundle(value);
     }
 
+    Bundle componentForClass(String className) {
+        String normalized = className == null ? "" : className.trim();
+        Bundle value = componentsByClass.get(normalized);
+        return value == null || value.isEmpty() ? null : new Bundle(value);
+    }
+
+    Map<String, Bundle> componentMetadata() {
+        return copyBundleMap(componentsByClass);
+    }
+
+    String activityTarget(String className) {
+        String value = activityTargets.get(className == null ? "" : className.trim());
+        return value == null ? "" : value;
+    }
+
     private static String resolveClassName(String packageName, String raw) {
         if (raw == null) return "";
         String name = raw.trim();
@@ -109,6 +156,32 @@ final class GuestManifestMetadata {
 
     Bundle application() {
         return applicationMetadata == null ? null : new Bundle(applicationMetadata);
+    }
+
+    private static boolean isApplicationComponent(String name) {
+        return "activity".equals(name) || "activity-alias".equals(name)
+                || "service".equals(name) || "receiver".equals(name)
+                || "provider".equals(name);
+    }
+
+    private static void mergeBundle(Map<String, Bundle> target, String key, Bundle incoming) {
+        if (key == null || key.trim().isEmpty() || incoming == null || incoming.isEmpty()) return;
+        Bundle existing = target.get(key);
+        if (existing == null) {
+            target.put(key, new Bundle(incoming));
+        } else {
+            existing.putAll(incoming);
+        }
+    }
+
+    private static Map<String, Bundle> copyBundleMap(Map<String, Bundle> source) {
+        Map<String, Bundle> copy = new LinkedHashMap<>();
+        if (source == null) return copy;
+        for (Map.Entry<String, Bundle> entry : source.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null) continue;
+            copy.put(entry.getKey(), new Bundle(entry.getValue()));
+        }
+        return copy;
     }
 
     private static void putMetadata(Bundle out, XmlResourceParser parser, Resources resources) {

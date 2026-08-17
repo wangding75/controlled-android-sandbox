@@ -2,6 +2,7 @@
 #include "controlled_sandbox/native_audio.h"
 #include "controlled_sandbox/native_camera1.h"
 #include "controlled_sandbox/native_interceptors.h"
+#include "controlled_sandbox/native_hook.h"
 #include "controlled_sandbox/native_loader.h"
 #include "controlled_sandbox/native_network.h"
 
@@ -10,14 +11,18 @@
 #include <android/native_window_jni.h>
 #include <dlfcn.h>
 #include <elf.h>
+#include <fcntl.h>
 #include <jni.h>
 #include <link.h>
 #include <cstdint>
+#include <cerrno>
 #include <cstring>
 #include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 namespace {
 
@@ -91,7 +96,11 @@ void throw_java(JNIEnv* env, const char* type, const std::string& message) {
     if (klass != nullptr) env->ThrowNew(klass, message.c_str());
 }
 
-using HiddenApiNative = void (*)(JNIEnv*, jclass, jobjectArray);
+// VMRuntime.setHiddenApiExemptions is an instance native method.  Its second argument is
+// the VMRuntime object returned by getRuntime(), not the VMRuntime Class object used for
+// lookup.  Keeping the receiver type as jobject makes that contract explicit and prevents
+// a translated/native bridge from dereferencing a class object as a VMRuntime instance.
+using HiddenApiNative = void (*)(JNIEnv*, jobject, jobjectArray);
 
 struct LoadedSegment {
     uintptr_t begin;
@@ -277,7 +286,7 @@ bool install_hidden_api_bridge(JNIEnv* env) {
         env->DeleteLocalRef(runtime);
         return false;
     }
-    native_method(env, runtime, values);
+    native_method(env, instance, values);
     const bool success = !env->ExceptionCheck();
     if (!success) env->ExceptionClear();
     __android_log_print(success ? ANDROID_LOG_INFO : ANDROID_LOG_WARN, tag,
@@ -486,6 +495,117 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigure(
     }
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeConfigureFileCapabilities(
+        JNIEnv* env, jclass, jint data_root_fd, jint apk_parent_fd, jstring apk_entry_name,
+        jint native_library_fd) {
+    try {
+        controlled_sandbox::global_policy().configure_file_capabilities(
+                data_root_fd, apk_parent_fd, string_value(env, apk_entry_name), native_library_fd);
+        return JNI_TRUE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalArgumentException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeOpenCapability(
+        JNIEnv* env, jclass, jint directory_fd, jstring entry_name, jboolean write) {
+    try {
+        const std::string entry = string_value(env, entry_name);
+        if (directory_fd < 0 || entry.empty() || entry == "." || entry == ".."
+                || entry.find('/') != std::string::npos || entry.find('\\') != std::string::npos
+                || entry.find('\0') != std::string::npos) {
+            throw std::invalid_argument("capability entry is invalid");
+        }
+        const int flags = (write == JNI_TRUE ? O_RDWR : O_RDONLY) | O_CLOEXEC;
+        const long descriptor = syscall(SYS_openat, directory_fd, entry.c_str(), flags, 0);
+        if (descriptor < 0) {
+            throw std::runtime_error("capability openat failed errno=" + std::to_string(errno));
+        }
+        return static_cast<jint>(descriptor);
+    } catch (const std::exception& error) {
+        throw_java(env, "java/io/IOException", error.what());
+        return -1;
+    }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeMaterializeCapabilityFile(
+        JNIEnv* env, jclass, jint source_fd) {
+    try {
+        if (source_fd < 0) throw std::invalid_argument("source capability fd is invalid");
+#ifndef SYS_memfd_create
+        throw std::runtime_error("memfd_create is unavailable");
+#else
+#ifndef MFD_CLOEXEC
+#define MFD_CLOEXEC 0x0001U
+#endif
+        const long target = syscall(SYS_memfd_create, "cas-isolated-apk", MFD_CLOEXEC);
+        if (target < 0) {
+            throw std::runtime_error("memfd_create failed errno=" + std::to_string(errno));
+        }
+        std::vector<std::uint8_t> buffer(64U * 1024U);
+        std::int64_t offset = 0;
+        for (;;) {
+            const long read = syscall(SYS_pread64, source_fd, buffer.data(), buffer.size(), offset);
+            if (read < 0) {
+                const int saved = errno;
+                syscall(SYS_close, target);
+                throw std::runtime_error("capability pread failed errno=" + std::to_string(saved));
+            }
+            if (read == 0) break;
+            std::size_t written = 0;
+            while (written < static_cast<std::size_t>(read)) {
+                const long count = syscall(SYS_write, target, buffer.data() + written,
+                        static_cast<std::size_t>(read) - written);
+                if (count <= 0) {
+                    const int saved = errno;
+                    syscall(SYS_close, target);
+                    throw std::runtime_error("capability memfd write failed errno="
+                            + std::to_string(saved));
+                }
+                written += static_cast<std::size_t>(count);
+            }
+            offset += read;
+        }
+        syscall(SYS_lseek, target, 0, SEEK_SET);
+        return static_cast<jint>(target);
+#endif
+    } catch (const std::exception& error) {
+        throw_java(env, "java/io/IOException", error.what());
+        return -1;
+    }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeCreateProcessLocalFile(
+        JNIEnv* env, jclass, jstring name) {
+    try {
+#ifndef SYS_memfd_create
+        throw std::runtime_error("memfd_create is unavailable");
+#else
+#ifndef MFD_CLOEXEC
+#define MFD_CLOEXEC 0x0001U
+#endif
+        const std::string requested = string_value(env, name);
+        if (requested.empty() || requested.size() > 64 || requested.find('/') != std::string::npos
+                || requested.find('\\') != std::string::npos) {
+            throw std::invalid_argument("process-local file name is invalid");
+        }
+        const long descriptor = syscall(SYS_memfd_create, requested.c_str(), MFD_CLOEXEC);
+        if (descriptor < 0) {
+            throw std::runtime_error("memfd_create failed errno=" + std::to_string(errno));
+        }
+        return static_cast<jint>(descriptor);
+#endif
+    } catch (const std::exception& error) {
+        throw_java(env, "java/io/IOException", error.what());
+        return -1;
+    }
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeMapPath(
         JNIEnv* env, jclass, jstring path) {
@@ -585,6 +705,17 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallHooks(
     try {
         return controlled_sandbox::global_hooks().install(string_value(env, guest_library_root))
                 ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalStateException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallSystemIoHooks(
+        JNIEnv* env, jclass) {
+    try {
+        return controlled_sandbox::global_hooks().install_system_io() ? JNI_TRUE : JNI_FALSE;
     } catch (const std::exception& error) {
         throw_java(env, "java/lang/IllegalStateException", error.what());
         return JNI_FALSE;

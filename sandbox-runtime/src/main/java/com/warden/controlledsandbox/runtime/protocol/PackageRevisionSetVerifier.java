@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.protocol;
 
+import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.domain.session.PackageRevision;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -21,21 +22,44 @@ public final class PackageRevisionSetVerifier {
                                          String expectedRevisionSha256) throws Exception {
         List<Artifact> all = new ArrayList<>();
         all.add(new Artifact("", "BASE", "", "", baseApk, baseSha256));
+        return verifyArtifacts(all, splits, versionCode, expectedRevisionSha256);
+    }
+
+    /** Verifies a base APK received as an isolated-process file capability. */
+    public static PackageRevision verify(ParcelFileDescriptor baseApk, String baseSha256,
+                                         List<Artifact> splits, long versionCode,
+                                         String expectedRevisionSha256) throws Exception {
+        List<Artifact> all = new ArrayList<>();
+        all.add(new Artifact("", "BASE", "", "", baseApk, baseSha256));
+        return verifyArtifacts(all, splits, versionCode, expectedRevisionSha256);
+    }
+
+    private static PackageRevision verifyArtifacts(List<Artifact> base,
+                                                   List<Artifact> splits,
+                                                   long versionCode,
+                                                   String expectedRevisionSha256) throws Exception {
+        List<Artifact> all = new ArrayList<>(base);
         if (splits != null) all.addAll(splits);
         validateArtifactSet(all);
-        String actualBase = ApkRevisionVerifier.sha256(baseApk);
-        requireDigest(baseSha256, actualBase, "BASE_APK_SHA256_MISMATCH");
+        String actualBase = digest(all.get(0));
+        requireDigest(all.get(0).sha256, actualBase, "BASE_APK_SHA256_MISMATCH");
         for (Artifact artifact : all) {
-            if (!artifact.file.isFile()) {
+            if (!artifact.hasSource()) {
                 throw new IllegalArgumentException("APK artifact is missing: " + artifact.splitName);
             }
-            requireDigest(artifact.sha256, ApkRevisionVerifier.sha256(artifact.file),
+            requireDigest(artifact.sha256, digest(artifact),
                     artifact.base() ? "BASE_APK_SHA256_MISMATCH"
                             : "SPLIT_APK_SHA256_MISMATCH:" + artifact.splitName);
         }
         String actualRevision = digestValidated(all);
         requireDigest(expectedRevisionSha256, actualRevision, "PACKAGE_REVISION_SET_MISMATCH");
         return PackageRevision.of(versionCode, expectedRevisionSha256);
+    }
+
+    private static String digest(Artifact artifact) throws Exception {
+        return artifact.descriptor == null
+                ? ApkRevisionVerifier.sha256(artifact.file)
+                : ApkRevisionVerifier.sha256(artifact.descriptor);
     }
 
     public static String revisionDigest(List<Artifact> artifacts) throws Exception {
@@ -128,15 +152,33 @@ public final class PackageRevisionSetVerifier {
         public final String configForSplit;
         public final String usesSplit;
         public final File file;
+        public final ParcelFileDescriptor descriptor;
         public final String sha256;
 
         public Artifact(String splitName, String type, String configForSplit, String usesSplit,
                         File file, String sha256) {
+            this(splitName, type, configForSplit, usesSplit, file, null, sha256);
+        }
+
+        public Artifact(String splitName, String type, String configForSplit, String usesSplit,
+                        ParcelFileDescriptor descriptor, String sha256) {
+            this(splitName, type, configForSplit, usesSplit, null, descriptor, sha256);
+        }
+
+        private Artifact(String splitName, String type, String configForSplit, String usesSplit,
+                         File file, ParcelFileDescriptor descriptor, String sha256) {
             this.splitName = splitValue(splitName, "splitName");
             this.type = normalizeType(type);
             this.configForSplit = splitValue(configForSplit, "configForSplit");
             this.usesSplit = splitValue(usesSplit, "usesSplit");
-            this.file = java.util.Objects.requireNonNull(file, "file");
+            if (file == null && descriptor == null) {
+                throw new NullPointerException("file or descriptor");
+            }
+            if (file != null && descriptor != null) {
+                throw new IllegalArgumentException("file and descriptor are mutually exclusive");
+            }
+            this.file = file;
+            this.descriptor = descriptor;
             this.sha256 = required(sha256, "sha256").toLowerCase(java.util.Locale.ROOT);
             if (!this.sha256.matches("[0-9a-f]{64}")) {
                 throw new IllegalArgumentException("sha256 must contain 64 hexadecimal characters");
@@ -158,6 +200,10 @@ public final class PackageRevisionSetVerifier {
         }
 
         boolean base() { return "BASE".equals(type); }
+
+        boolean hasSource() {
+            return descriptor != null ? descriptor.getFd() >= 0 : file != null && file.isFile();
+        }
 
         private static String normalizeType(String value) {
             String normalized = required(value, "type").toUpperCase(java.util.Locale.ROOT);

@@ -1,6 +1,16 @@
 <resources>
     <style name="ControlledSandbox.Stub" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowNoTitle">true</item>
+        <!--
+             Stub activities are host trampolines.  A preview/starting window belongs to the
+             host ActivityRecord, not to the Guest window that is installed after the route is
+             consumed.  OEM ActivityTaskManager implementations can try to reparent that stale
+             preview during a rapid task transition (MuMu API32 crashes in
+             ActivityRecord.transferStartingWindow).  VA and NBB both disable the preview for
+             their proxy activities; keep the same invariant here.
+        -->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
         <item name="android:colorAccent">#455A64</item>
     </style>
 </resources>

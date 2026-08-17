@@ -5,7 +5,9 @@ import android.net.Uri;
 import android.os.Parcel;
 import android.os.Parcelable;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +34,40 @@ final class HostJobParametersSnapshotFactory {
         return integer(value, -1, "getInternalStopReason");
     }
     static String debugStopReason(JobParameters value) { return string(value, "getDebugStopReason"); }
+
+    /** API 31+ exposes the same successful terminal transition through a hidden internal code. */
+    static boolean isSuccessfulFinish(JobParameters value) {
+        if (value == null) return false;
+        int internal = internalStopReason(value);
+        String debug = debugStopReason(value);
+        // JobParameters.INTERNAL_STOP_REASON_SUCCESSFUL_FINISH is hidden but stable since API 31.
+        return internal == 10 || "last work dequeued".equalsIgnoreCase(debug.trim());
+    }
+
+    /**
+     * Projects a host-dequeued JobWorkItem into a bounded, framework-neutral payload.
+     * The host JobWorkItem itself never crosses the Package/Guest boundary.
+     */
+    static VirtualJobWorkItemSnapshot workItem(Object value) {
+        return workItem(value, workId(value));
+    }
+
+    /** Uses a Broker-owned projection ID when the platform hides JobWorkItem.mWorkId. */
+    static VirtualJobWorkItemSnapshot workItem(Object value, int projectedWorkId) {
+        if (value == null) return null;
+        Object intent = invoke(value, "getIntent");
+        if (!(intent instanceof Parcelable)) {
+            throw new IllegalArgumentException("JOB_WORK_ITEM_INTENT_UNAVAILABLE");
+        }
+        int workId = projectedWorkId >= 0 ? projectedWorkId : workId(value);
+        if (workId < 0) throw new IllegalArgumentException("JOB_WORK_ITEM_ID_UNAVAILABLE");
+        return new VirtualJobWorkItemSnapshot(workId,
+                integer(value, 0, "getDeliveryCount"), marshal(intent),
+                marshal(invoke(value, "getExtras")),
+                longValue(value, -1L, "getEstimatedNetworkDownloadBytes"),
+                longValue(value, -1L, "getEstimatedNetworkUploadBytes"),
+                longValue(value, -1L, "getMinimumNetworkChunkBytes"));
+    }
 
     private static byte[] marshal(Object value) {
         if (value == null) return new byte[0];
@@ -61,6 +97,27 @@ final class HostJobParametersSnapshotFactory {
     }
     private static int integer(Object target, int fallback, String... names) {
         Object value = invoke(target, names); return value instanceof Number ? ((Number) value).intValue() : fallback;
+    }
+    private static long longValue(Object target, long fallback, String... names) {
+        Object value = invoke(target, names); return value instanceof Number ? ((Number) value).longValue() : fallback;
+    }
+    private static int workId(Object target) {
+        Object value = invoke(target, "getWorkId");
+        if (value instanceof Number) return ((Number) value).intValue();
+        for (String name : new String[]{"mWorkId", "workId"}) {
+            for (Class<?> cursor = target.getClass(); cursor != null; cursor = cursor.getSuperclass()) {
+                try {
+                    Field field = cursor.getDeclaredField(name);
+                    field.setAccessible(true);
+                    Object result = field.get(target);
+                    if (result instanceof Number) return ((Number) result).intValue();
+                } catch (NoSuchFieldException ignored) {
+                } catch (Throwable ignored) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+                }
+            }
+        }
+        return -1;
     }
     private static List<String> uris(Object value) {
         List<String> out = new ArrayList<>();

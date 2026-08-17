@@ -119,7 +119,7 @@ template <typename Relocation>
 std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, std::size_t count,
                               const ElfW(Sym)* symbols, const char* strings,
                               std::size_t& targets, std::size_t& failures,
-                              bool camera_system, bool lifetime_system) {
+                              bool camera_system, bool lifetime_system, bool system_io) {
     if (entries == nullptr || symbols == nullptr || strings == nullptr) return 0;
     std::size_t patched = 0;
     for (std::size_t index = 0; index < count; index++) {
@@ -131,6 +131,7 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
         if (name == nullptr) continue;
         if (camera_system ? !is_camera1_system_symbol(name)
                 : lifetime_system ? !NativeHookRuntime::is_process_lifetime_symbol(name)
+                : system_io ? !NativeHookRuntime::is_target_symbol(name)
                 : !NativeHookRuntime::is_target_symbol(name)) continue;
         void* replacement = camera_system ? replacement_for_camera1_symbol(name)
                                           : replacement_for_symbol(name);
@@ -152,6 +153,7 @@ struct ScanContext {
     std::string root;
     bool camera_system{false};
     bool lifetime_system{false};
+    bool system_io{false};
     std::size_t scanned{0};
     std::size_t matched{0};
     std::size_t patched{0};
@@ -165,6 +167,7 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     context->scanned++;
     const std::string_view path = info->dlpi_name == nullptr ? std::string_view{} : std::string_view(info->dlpi_name);
     const bool guest_module = !context->camera_system && !context->lifetime_system
+            && !context->system_io
             && NativeHookRuntime::is_guest_module(path, context->root);
     // The Android native bridge may expose a foreign-ABI module through the host
     // linker's module walk. Its ELF tables and relocation types are not parseable by
@@ -177,6 +180,8 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
         if (!is_camera1_system_module(path)) return 0;
     } else if (context->lifetime_system) {
         if (!NativeHookRuntime::is_process_lifetime_system_module(path)) return 0;
+    } else if (context->system_io) {
+        if (!NativeHookRuntime::is_process_io_system_module(path)) return 0;
     } else if (!NativeHookRuntime::is_guest_module(path, context->root)) {
         return 0;
     }
@@ -230,14 +235,14 @@ int scan_module(dl_phdr_info* info, std::size_t, void* opaque) {
     if (jump_relocations != nullptr && jump_size > 0) {
         if (jump_type == DT_RELA) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
+                    static_cast<const ElfW(Rela)*>(jump_relocations), jump_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system, context->system_io);
         } else if (jump_type == DT_REL) {
             context->patched += patch_relocations(base,
-                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
+                    static_cast<const ElfW(Rel)*>(jump_relocations), jump_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system, context->system_io);
         }
     }
-    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
-    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system);
+    context->patched += patch_relocations(base, rela, rela_size / sizeof(ElfW(Rela)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system, context->system_io);
+    context->patched += patch_relocations(base, rel, rel_size / sizeof(ElfW(Rel)), symbols, strings, context->targets, context->failures, context->camera_system, context->lifetime_system, context->system_io);
     return 0;
 }
 
@@ -269,13 +274,33 @@ bool NativeHookRuntime::install(std::string guest_library_root) {
     return refresh();
 }
 
+bool NativeHookRuntime::install_system_io() {
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    if (!policy.configured || !global_policy().file_capabilities_configured()) return false;
+    {
+        auto& state = hook_state();
+        std::lock_guard lock(state.mutex);
+        if (state.status.installed && state.status.policy_revision != policy.revision) {
+            state.status.last_error = "POLICY_REVISION_CHANGED_REINSTALL_REQUIRED";
+            state.status.installed = false;
+            return false;
+        }
+        state.status.installed = true;
+        state.status.system_io_installed = true;
+        state.status.policy_revision = policy.revision;
+    }
+    return refresh();
+}
+
 bool NativeHookRuntime::refresh() {
     auto& state = hook_state();
     std::string root;
+    bool system_io = false;
     {
         std::lock_guard lock(state.mutex);
         if (!state.status.installed) return false;
         root = state.status.guest_library_root;
+        system_io = state.status.system_io_installed;
     }
     const NativePolicySnapshot policy = global_policy().snapshot();
     {
@@ -286,22 +311,29 @@ bool NativeHookRuntime::refresh() {
             return false;
         }
     }
-    ScanContext context{this, root, false, false};
-    const int result = dl_iterate_phdr(scan_module, &context);
-    ScanContext lifetime{this, root, false, true};
+    ScanContext context{this, root, false, false, false};
+    const int result = root.empty() ? 0 : dl_iterate_phdr(scan_module, &context);
+    ScanContext lifetime{this, root, false, true, false};
     if (!context.foreign_guest_module) (void) dl_iterate_phdr(scan_module, &lifetime);
+    ScanContext system{this, root, false, false, system_io};
+    if (system_io) (void) dl_iterate_phdr(scan_module, &system);
     context.patched += lifetime.patched;
     context.targets += lifetime.targets;
+    context.patched += system.patched;
+    context.targets += system.targets;
     std::lock_guard lock(state.mutex);
     state.status.refresh_count++;
     state.status.modules_scanned = context.scanned;
     state.status.modules_matched = context.matched;
     state.status.relocations_patched += context.patched;
     state.status.target_relocations = context.targets;
-    state.status.patch_failures += context.failures;
+    state.status.patch_failures += context.failures + system.failures;
     if (result != 0) state.status.last_error = "DL_ITERATE_PHDR_FAILED:" + std::to_string(result);
-    else if (context.failures > 0) state.status.last_error = "PLT_PATCH_FAILED:" + std::to_string(context.failures);
-    const bool success = result == 0 && context.failures == 0;
+    else if (context.failures > 0 || system.failures > 0) {
+        state.status.last_error = "PLT_PATCH_FAILED:" + std::to_string(
+                context.failures + system.failures);
+    }
+    const bool success = result == 0 && context.failures == 0 && system.failures == 0;
     if (!success) state.status.installed = false;
     return success;
 }
@@ -313,7 +345,7 @@ bool NativeHookRuntime::installCamera1() {
 
 bool NativeHookRuntime::refreshCamera1() {
     if (!global_camera1_adapter().prepare_symbols()) return false;
-    ScanContext context{this, {}, true};
+    ScanContext context{this, {}, true, false, false};
     const int result = dl_iterate_phdr(scan_module, &context);
     global_camera1_adapter().record_hook_result(context.patched, context.targets, context.failures);
     return result == 0 && context.failures == 0 && context.targets > 0;
@@ -348,8 +380,19 @@ bool NativeHookRuntime::is_process_lifetime_system_module(std::string_view modul
             || ends_with(module_path, "libjavacore.so");
 }
 
+bool NativeHookRuntime::is_process_io_system_module(std::string_view module_path) noexcept {
+    auto ends_with = [](std::string_view path, std::string_view name) {
+        return path == name || (path.size() > name.size()
+                && path.compare(path.size() - name.size(), name.size(), name) == 0);
+    };
+    return ends_with(module_path, "libandroid_runtime.so")
+            || ends_with(module_path, "libopenjdk.so")
+            || ends_with(module_path, "libopenjdkjvm.so")
+            || ends_with(module_path, "libjavacore.so");
+}
+
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 73> targets{
+    static constexpr std::array<std::string_view, 74> targets{
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
             "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir", "opendir",
@@ -361,7 +404,7 @@ bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
             "getaddrinfo", "getnameinfo", "gethostname", "uname",
             "getifaddrs", "freeifaddrs", "AAudioStream_requestStart",
             "AAudioStream_requestStop", "AMediaRecorder_start", "AMediaRecorder_stop",
-            "dlopen", "android_dlopen_ext",
+            "dlopen", "android_dlopen_ext", "syscall",
             "kill", "killpg", "tgkill", "tkill", "exit", "_exit", "_Exit", "abort"};
     return std::find(targets.begin(), targets.end(), symbol) != targets.end();
 }

@@ -13,6 +13,7 @@ public record ActivityRestoreSnapshot(
         String resultWho,
         int requestCode,
         int launchFlags,
+        int activityInfoFlags,
         boolean noHistory,
         long newIntentCount,
         long recreationCount,
@@ -20,7 +21,9 @@ public record ActivityRestoreSnapshot(
         long configurationCount,
         String lastConfigurationToken,
         List<ActivityResultRegistration> resultRegistrations,
-        List<PendingActivityResultSnapshot> pendingResultLinks) {
+        List<PendingActivityResultSnapshot> pendingResultLinks,
+        String taskAffinity,
+        boolean allowTaskReparenting) {
 
     public ActivityRestoreSnapshot {
         identity = Objects.requireNonNull(identity, "identity");
@@ -29,6 +32,7 @@ public record ActivityRestoreSnapshot(
         processName = requireText(processName, "processName");
         resultWho = optional(resultWho, 256);
         lastConfigurationToken = optional(lastConfigurationToken, 1024);
+        taskAffinity = optional(taskAffinity, 255);
         resultRegistrations = List.copyOf(resultRegistrations == null ? List.of() : resultRegistrations);
         pendingResultLinks = List.copyOf(pendingResultLinks == null ? List.of() : pendingResultLinks);
         if (resultRegistrations.size() > 128 || pendingResultLinks.size() > 128) {
@@ -38,6 +42,35 @@ public record ActivityRestoreSnapshot(
                 || configurationCount < 0) {
             throw new IllegalArgumentException("invalid Activity restore snapshot");
         }
+        if (activityInfoFlags < 0) {
+            throw new IllegalArgumentException("activityInfoFlags must be non-negative");
+        }
+    }
+
+    /** Compatibility constructor for checkpoints before per-Activity affinity was durable. */
+    public ActivityRestoreSnapshot(
+            ActivityIdentity identity,
+            String stableId,
+            LaunchMode launchMode,
+            String processName,
+            long processGeneration,
+            String resultWho,
+            int requestCode,
+            int launchFlags,
+            int activityInfoFlags,
+            boolean noHistory,
+            long newIntentCount,
+            long recreationCount,
+            SavedActivityState savedState,
+            long configurationCount,
+            String lastConfigurationToken,
+            List<ActivityResultRegistration> resultRegistrations,
+            List<PendingActivityResultSnapshot> pendingResultLinks) {
+        this(identity, stableId, launchMode, processName, processGeneration, resultWho, requestCode,
+                launchFlags, activityInfoFlags, noHistory, newIntentCount, recreationCount,
+                savedState, configurationCount, lastConfigurationToken, resultRegistrations,
+                pendingResultLinks, identity.packageName(),
+                ActivityInfoTaskFlags.has(activityInfoFlags, ActivityInfoTaskFlags.ALLOW_TASK_REPARENTING));
     }
 
     /** Compatibility constructor for schema 1/2 checkpoints. */
@@ -56,8 +89,9 @@ public record ActivityRestoreSnapshot(
             long configurationCount,
             String lastConfigurationToken) {
         this(identity, "", launchMode, processName, processGeneration, resultWho, requestCode,
-                launchFlags, noHistory, newIntentCount, recreationCount, savedState,
-                configurationCount, lastConfigurationToken, List.of(), List.of());
+                launchFlags, 0, noHistory, newIntentCount, recreationCount, savedState,
+                configurationCount, lastConfigurationToken, List.of(), List.of(),
+                identity.packageName(), false);
     }
 
     private static String requireText(String value, String name) {

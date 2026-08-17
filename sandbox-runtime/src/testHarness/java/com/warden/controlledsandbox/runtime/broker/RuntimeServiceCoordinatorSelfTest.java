@@ -27,7 +27,7 @@ public final class RuntimeServiceCoordinatorSelfTest {
             calls.add(new Bundle(request));
             Bundle result = new Bundle();
             result.putString(RuntimeKeys.STATUS, "SERVICE_RECOVERED");
-            result.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
+            result.putInt("onStartCommandResult", Service.START_STICKY);
             return result;
         }, clock);
         GuestSession stale = session("old", 1);
@@ -39,6 +39,14 @@ public final class RuntimeServiceCoordinatorSelfTest {
 
         Bundle start = request(ComponentOperations.START_FOREGROUND_SERVICE);
         start.putString(ComponentOperations.ACTION, "ACTION_REDELIVER");
+        start.putString(RuntimeKeys.URI, "content://com.example.sync/42");
+        start.putString(RuntimeKeys.BROADCAST_MIME_TYPE, "application/json");
+        start.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
+                new ArrayList<>(java.util.Arrays.asList("sync.category")));
+        start.putInt(RuntimeKeys.ACTIVITY_FLAGS, 0x10000000);
+        Bundle startExtras = new Bundle();
+        startExtras.putString("requestId", "sync-42");
+        start.putBundle(RuntimeKeys.INTENT_EXTRAS, startExtras);
         start.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0b0011);
         Bundle startResult = success();
         startResult.putInt("onStartCommandResult", Service.START_REDELIVER_INTENT);
@@ -90,6 +98,8 @@ public final class RuntimeServiceCoordinatorSelfTest {
             List<ServiceRuntimeRegistry.Snapshot> recovered = coordinator.recoverSession(stale, current, newSpec);
             check(recovered.size() == 1 && recovered.get(0).generation() == 2,
                     "service recovery generation not committed");
+            check(recovered.get(0).restartMode() == ServiceRuntimeRegistry.RestartMode.STICKY,
+                    "recovery callback restart mode was not committed");
         } catch (Exception error) {
             throw new AssertionError("recovery failed", error);
         }
@@ -102,6 +112,14 @@ public final class RuntimeServiceCoordinatorSelfTest {
                 "recovery metadata missing");
         check("ACTION_REDELIVER".equals(recoveryCall.getString(ComponentOperations.ACTION, "")),
                 "redelivery action missing");
+        check("content://com.example.sync/42".equals(recoveryCall.getString(RuntimeKeys.URI, ""))
+                        && "application/json".equals(
+                        recoveryCall.getString(RuntimeKeys.BROADCAST_MIME_TYPE, ""))
+                        && recoveryCall.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0) == 0x10000000
+                        && recoveryCall.getStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES).size() == 1
+                        && "sync-42".equals(recoveryCall.getBundle(RuntimeKeys.INTENT_EXTRAS)
+                        .getString("requestId", "")),
+                "full redelivery Intent was not routed through recovery");
         check(recoveryCall.getInt(RuntimeKeys.SERVICE_START_ID, -1) == 1,
                 "recovery start id continuity missing");
         check("PENDING".equals(coordinator.snapshot().get(0).foregroundSnapshot().state().name()),

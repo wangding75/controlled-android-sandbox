@@ -145,6 +145,26 @@ public final class DebugCommandActivity extends Activity {
                 result.put("components", components);
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+            } else if ("isolated-service".equals(command)) {
+                String component = extras.getString("component", "").trim();
+                if (component.isEmpty()) {
+                    throw new IllegalArgumentException("component extra is required");
+                }
+                String processName = extras.getString("processName", "").trim();
+                String serviceOperation = extras.getString("serviceOperation", "start").trim();
+                if ("stop".equalsIgnoreCase(serviceOperation)) {
+                    operation = runtime.stopService(record, virtualUserId, component, processName);
+                    requireStatus("isolated-service-stop", operation,
+                            "SERVICE_STOPPED", "SERVICE_NOT_RUNNING", "SERVICE_STOP_REQUESTED");
+                } else if ("start".equalsIgnoreCase(serviceOperation)) {
+                    operation = runtime.startService(record, virtualUserId, component, processName);
+                    requireStatus("isolated-service-start", operation,
+                            "SERVICE_STARTED", "SERVICE_RECOVERED");
+                } else {
+                    throw new IllegalArgumentException("serviceOperation must be start or stop");
+                }
+                result.put("isolatedComponent", component);
+                result.put("isolatedServiceOperation", serviceOperation);
             } else if ("prepare".equals(command) || "import-prepare".equals(command)) {
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
@@ -154,6 +174,11 @@ public final class DebugCommandActivity extends Activity {
                 // the normal client teardown path releases the slot.
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("hold-prepare", operation, "PREPARED", "ALREADY_PREPARED");
+                String kickoffComponent = extras.getString("launchComponent", "").trim();
+                if (!kickoffComponent.isEmpty()) {
+                    Bundle kickoff = runtime.launchComponent(record, virtualUserId, kickoffComponent);
+                    requireStatus("hold-prepare-launch", kickoff, "LAUNCH_PASS");
+                }
                 long holdMs = Math.max(5_000L, Math.min(60_000L,
                         extras.getLong("holdMs", 30_000L)));
                 try {
@@ -368,6 +393,13 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "captureSubstitution");
         copyIfPresent(bundle, out, "cameraSourceKind");
         copyIfPresent(bundle, out, "cameraSourceSha256");
+        copyIfPresent(bundle, out, "isolatedProcess");
+        copyIfPresent(bundle, out, "isolatedPlatformPid");
+        copyIfPresent(bundle, out, "isolatedPlatformUid");
+        copyIfPresent(bundle, out, "processName");
+        copyIfPresent(bundle, out, "componentClass");
+        copyIfPresent(bundle, out, "startId");
+        copyIfPresent(bundle, out, "created");
         return out;
     }
 

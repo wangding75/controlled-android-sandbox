@@ -4,6 +4,9 @@ import android.content.ContentProvider;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ProviderInfo;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -18,11 +21,41 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
     private final Map<String, ProviderDescriptor> descriptors = new LinkedHashMap<>();
     private final Map<String, Object> holders = new LinkedHashMap<>();
     private final Map<String, GuestBrokerContentProvider> providers = new LinkedHashMap<>();
+    /**
+     * The framework hook can remain installed for a short interval while the guest generation
+     * is being torn down.  Without an explicit fence, a late ActivityManager
+     * getContentProvider() call could create a fresh broker transport after close(), effectively
+     * resurrecting a provider from the dead generation.
+     */
+    private volatile boolean closed;
 
     GuestContentProviderFrameworkInterceptor(GuestContext context, GuestPackageSpec spec) {
         this.context = java.util.Objects.requireNonNull(context, "context");
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
-        for (VirtualComponentSnapshot component : spec.packageState.components()) {
+        addDescriptors(spec.packageState, spec.packageName, spec.virtualUserId, spec.virtualUid,
+                spec.packageState.applicationInfo());
+        // The Virtual PackageManager projection is already visibility-filtered by the
+        // Package Authority. Registering these read-only descriptors here makes the normal
+        // ContentResolver -> ActivityManager.getContentProvider() path work for an exported
+        // provider in another virtual package without executing that APK in the caller process.
+        for (VirtualPackageProjectionSnapshot projection : spec.packageUniverse) {
+            if (projection == null) continue;
+            VirtualPackageStateSnapshot state = projection.packageState();
+            addDescriptors(state, state.packageName(), state.virtualUserId(), projection.virtualUid(),
+                    projection.parsedApplicationInfo());
+        }
+    }
+
+    private void addDescriptors(VirtualPackageStateSnapshot state, String packageName,
+                                int virtualUserId, int virtualUid,
+                                ApplicationInfo parsedApplicationInfo) {
+        if (state == null || packageName == null || packageName.trim().isEmpty()) return;
+        ApplicationInfo applicationInfo = parsedApplicationInfo == null
+                ? state.applicationInfo() : new ApplicationInfo(parsedApplicationInfo);
+        if (applicationInfo == null) applicationInfo = new ApplicationInfo();
+        applicationInfo.packageName = packageName;
+        applicationInfo.uid = virtualUid;
+        for (VirtualComponentSnapshot component : state.components()) {
             if (!"PROVIDER".equals(component.type()) || !component.enabled()) continue;
             for (String authority : component.authority().split(";")) {
                 String normalized = authority == null ? "" : authority.trim();
@@ -30,13 +63,22 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
                 // Match Android package parsing: the first provider owns a duplicated authority;
                 // a later malformed declaration must not replace or conflict with that owner.
                 descriptors.putIfAbsent(normalized,
-                        new ProviderDescriptor(normalized, component.className(), component.exported()));
+                        new ProviderDescriptor(packageName, virtualUserId, normalized,
+                                component.className(), component.exported(),
+                                component.processName().isEmpty() ? packageName : component.processName(),
+                                component.readPermission(), component.writePermission(),
+                                component.grantUriPermissions(),
+                                component.providerPathRules(),
+                                new ApplicationInfo(applicationInfo)));
             }
         }
     }
 
     @Override public synchronized Interception intercept(
             String serviceName, Method method, Object[] arguments) throws Throwable {
+        if (closed) {
+            throw new SecurityException("CONTENT_PROVIDER_TRANSPORT_CLOSED");
+        }
         if (!"activity-manager".equals(serviceName) || method == null
                 || !"getContentProvider".equals(method.getName())) {
             return Interception.passThrough();
@@ -62,6 +104,10 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
     }
 
     @Override public synchronized void close() {
+        if (closed) return;
+        // Publish the terminal state before closing any provider.  Shutdown callbacks may re-enter
+        // framework code; they must observe this interceptor as dead and cannot allocate a holder.
+        closed = true;
         for (GuestBrokerContentProvider provider : providers.values()) {
             try { provider.shutdown(); }
             catch (Throwable ignored) {
@@ -75,7 +121,9 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
     private Object createHolder(Class<?> holderType, ProviderDescriptor descriptor) throws Exception {
         ProviderInfo info = providerInfo(descriptor);
         GuestBrokerContentProvider provider = new GuestBrokerContentProvider(
-                context, spec, descriptor.authority, descriptor.componentClass);
+                context, spec, descriptor.packageName, descriptor.virtualUserId,
+                descriptor.processName, descriptor.authority, descriptor.componentClass,
+                descriptor.exported);
         provider.attachInfo(context, info);
         provider.prepare();
         Method transportMethod = ContentProvider.class.getDeclaredMethod("getIContentProvider");
@@ -94,30 +142,30 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
 
     private ProviderInfo providerInfo(ProviderDescriptor descriptor) {
         ProviderInfo info = new ProviderInfo();
-        info.packageName = spec.packageName;
+        info.packageName = descriptor.packageName;
         info.name = descriptor.componentClass;
         info.authority = descriptor.authority;
         info.exported = descriptor.exported;
         info.enabled = true;
-        info.processName = processName(descriptor.componentClass);
-        info.applicationInfo = new ApplicationInfo(context.getApplicationInfo());
-        try {
-            GuestManifestMetadata metadata = GuestManifestMetadata.read(context.getAssets());
-            info.metaData = metadata.provider(descriptor.authority);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            throw new IllegalStateException("GUEST_PROVIDER_METADATA_READ_FAILED", error);
-        }
-        return info;
-    }
-
-    private String processName(String componentClass) {
-        for (VirtualComponentSnapshot component : spec.packageState.components()) {
-            if (componentClass.equals(component.className())) {
-                return component.processName().isEmpty() ? spec.packageName : component.processName();
+        info.processName = descriptor.processName;
+        info.readPermission = descriptor.readPermission;
+        info.writePermission = descriptor.writePermission;
+        info.grantUriPermissions = descriptor.grantUriPermissions;
+        PathPermissionProjection.apply(info, descriptor.pathRules);
+        info.applicationInfo = descriptor.applicationInfo == null
+                ? new ApplicationInfo(context.getApplicationInfo())
+                : new ApplicationInfo(descriptor.applicationInfo);
+        info.applicationInfo.packageName = descriptor.packageName;
+        if (descriptor.packageName.equals(spec.packageName)) {
+            try {
+                GuestManifestMetadata metadata = GuestManifestMetadata.read(context.getAssets());
+                info.metaData = metadata.provider(descriptor.authority);
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                throw new IllegalStateException("GUEST_PROVIDER_METADATA_READ_FAILED", error);
             }
         }
-        return spec.packageName;
+        return info;
     }
 
     private static Object instantiateHolder(Class<?> holderType, ProviderInfo info) throws Exception {
@@ -198,5 +246,46 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         return "";
     }
 
-    private record ProviderDescriptor(String authority, String componentClass, boolean exported) { }
+    private record ProviderDescriptor(String packageName, int virtualUserId, String authority,
+                                      String componentClass, boolean exported, String processName,
+                                      String readPermission, String writePermission,
+                                      boolean grantUriPermissions,
+                                      java.util.List<VirtualProviderPathRuleSnapshot> pathRules,
+                                      ApplicationInfo applicationInfo) { }
+
+    /** Projects ProviderInfo path/URI grant rules without depending on hidden field visibility. */
+    private static final class PathPermissionProjection {
+        private PathPermissionProjection() { }
+
+        static void apply(ProviderInfo info, java.util.List<VirtualProviderPathRuleSnapshot> rules) {
+            if (rules == null || rules.isEmpty()) return;
+            java.util.ArrayList<android.content.pm.PathPermission> permissions = new java.util.ArrayList<>();
+            java.util.ArrayList<android.os.PatternMatcher> uriPatterns = new java.util.ArrayList<>();
+            for (VirtualProviderPathRuleSnapshot rule : rules) {
+                if (rule == null) continue;
+                int kind = rule.path().isEmpty()
+                        ? (rule.pathPrefix().isEmpty()
+                        ? android.os.PatternMatcher.PATTERN_SIMPLE_GLOB
+                        : android.os.PatternMatcher.PATTERN_PREFIX)
+                        : android.os.PatternMatcher.PATTERN_LITERAL;
+                String pattern = rule.path().isEmpty()
+                        ? (rule.pathPrefix().isEmpty() ? rule.pathPattern() : rule.pathPrefix())
+                        : rule.path();
+                if (rule.uriGrantRule()) uriPatterns.add(new android.os.PatternMatcher(pattern, kind));
+                else permissions.add(new android.content.pm.PathPermission(pattern, kind,
+                        rule.readPermission(), rule.writePermission()));
+            }
+            if (!permissions.isEmpty()) info.pathPermissions = permissions.toArray(
+                    new android.content.pm.PathPermission[0]);
+            if (!uriPatterns.isEmpty()) {
+                try {
+                    setField(info, "uriPermissionPatterns",
+                            uriPatterns.toArray(new android.os.PatternMatcher[0]), false);
+                } catch (IllegalAccessException error) {
+                    throw new IllegalStateException("CONTENT_PROVIDER_URI_PATTERN_PROJECTION_FAILED",
+                            error);
+                }
+            }
+        }
+    }
 }

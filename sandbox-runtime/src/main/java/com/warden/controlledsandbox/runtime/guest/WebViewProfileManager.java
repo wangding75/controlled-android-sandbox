@@ -29,10 +29,16 @@ public final class WebViewProfileManager {
             }
             return configuredProfile;
         }
-        createDirectory(profile.root);
-        createDirectory(profile.cache);
-        createDirectory(profile.databases);
-        createDirectory(profile.serviceWorker);
+        // Platform isolated UIDs cannot traverse the host package data label.  The isolated
+        // WebView profile is therefore provisioned by the capability-backed storage bridge when
+        // WebView is actually requested; eagerly mkdir'ing the logical Guest path here makes the
+        // whole process fail before Application.onCreate.
+        if (!spec.isolatedProcess) {
+            createDirectory(profile.root);
+            createDirectory(profile.cache);
+            createDirectory(profile.databases);
+            createDirectory(profile.serviceWorker);
+        }
         if (Build.VERSION.SDK_INT >= 28) {
             try {
                 WebView.setDataDirectorySuffix(profile.suffix);

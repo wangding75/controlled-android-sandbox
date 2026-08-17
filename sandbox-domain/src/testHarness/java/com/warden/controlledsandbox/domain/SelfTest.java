@@ -72,6 +72,16 @@ public final class SelfTest {
                         BinaryXmlFixtureBuilder.integer("versionCode", 42))
                 .start("uses-sdk", BinaryXmlFixtureBuilder.integer("minSdkVersion", 26), BinaryXmlFixtureBuilder.integer("targetSdkVersion", 35)).end("uses-sdk")
                 .start("uses-permission", BinaryXmlFixtureBuilder.text("name", "android.permission.INTERNET")).end("uses-permission")
+                .start("permission-group", BinaryXmlFixtureBuilder.text("name", "com.example.PERM_GROUP"),
+                        BinaryXmlFixtureBuilder.text("label", "Guest permissions"),
+                        BinaryXmlFixtureBuilder.integer("priority", 7)).end("permission-group")
+                .start("permission", BinaryXmlFixtureBuilder.text("name", "com.example.CUSTOM"),
+                        BinaryXmlFixtureBuilder.text("group", "com.example.PERM_GROUP"),
+                        BinaryXmlFixtureBuilder.text("label", "Custom"),
+                        BinaryXmlFixtureBuilder.integer("protectionLevel", 1)).end("permission")
+                .start("permission-tree", BinaryXmlFixtureBuilder.text("name", "com.example.TREE"),
+                        BinaryXmlFixtureBuilder.text("label", "Tree"),
+                        BinaryXmlFixtureBuilder.integer("protectionLevel", 2)).end("permission-tree")
                 .start("uses-library", BinaryXmlFixtureBuilder.text("name", "org.apache.http.legacy"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-library")
                 .start("uses-native-library", BinaryXmlFixtureBuilder.text("name", "libguest_optional.so"), BinaryXmlFixtureBuilder.bool("required", false)).end("uses-native-library")
                 .start("uses-sdk-library", BinaryXmlFixtureBuilder.text("name", "com.example.sdk"), BinaryXmlFixtureBuilder.integer("versionMajor", 3), BinaryXmlFixtureBuilder.text("certDigest", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")).end("uses-sdk-library")
@@ -124,6 +134,19 @@ public final class SelfTest {
         require(model.activities().get(0).themeResId() == 0x7f120002, "activity theme resource");
         require(model.isolatedProcessCount() == 1, "isolated process");
         require(model.permissions().contains("android.permission.INTERNET"), "permission");
+        require(model.permissionGroups().size() == 1
+                        && "com.example.PERM_GROUP".equals(model.permissionGroups().get(0).name())
+                        && model.permissionGroups().get(0).priority() == 7,
+                "permission-group declaration");
+        require(model.permissionDeclarations().size() == 2
+                        && "com.example.CUSTOM".equals(model.permissionDeclarations().get(0).name())
+                        && "com.example.PERM_GROUP".equals(model.permissionDeclarations().get(0).group())
+                        && model.permissionDeclarations().get(0).protectionLevel() == 1,
+                "custom permission declaration");
+        require("com.example.TREE".equals(model.permissionDeclarations().get(1).name())
+                        && model.permissionDeclarations().get(1).tree()
+                        && model.permissionDeclarations().get(1).group().isEmpty(),
+                "permission-tree declaration");
         require(model.sharedLibraryDependencies().size() == 3, "typed shared-library declarations");
         require(!model.sharedLibraryDependencies().get(0).required(), "optional Java shared library");
         require(model.sharedLibraryDependencies().get(1).kind() == ManifestModel.SharedLibraryDependency.Kind.NATIVE,
@@ -225,7 +248,7 @@ public final class SelfTest {
     private static void testTypedStringComponentNames() throws Exception {
         byte[] xml = new BinaryXmlFixtureBuilder()
                 .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
-                .start("application")
+                .start("application", BinaryXmlFixtureBuilder.text("process", ":global"))
                 .start("activity", BinaryXmlFixtureBuilder.text("name", ".TypedActivity")).end("activity")
                 .start("activity-alias", BinaryXmlFixtureBuilder.text("name", ".TypedAlias"),
                         BinaryXmlFixtureBuilder.text("targetActivity", ".TypedActivity")).end("activity-alias")
@@ -871,6 +894,21 @@ public final class SelfTest {
         require(!persistentAuth.commit(120).oneTimeConsumed(), "persistent grant not consumed");
         require(registry.size(120) == 1, "persistent URI grant retained");
 
+        UriGrantRegistry.Grant packageScoped = registry.grantForTargetInstance(
+                "u0:owner", "owner-session", 3, "u0:target", 0,
+                "content://pkg.exact/item", UriGrantRegistry.READ, false,
+                121, UriGrantRegistry.DURABLE_TTL_MS);
+        UriGrantRegistry.Authorization coldTarget = registry.beginAuthorization(
+                "u0:target", "replacement-session", 99, 0, 122);
+        require(coldTarget.allows("u0:target", "content://pkg.exact/item", UriGrantRegistry.READ),
+                "package-scoped grant did not survive target cold start");
+        require(!coldTarget.allows("u0:target", "content://pkg.exact/item/child", UriGrantRegistry.READ),
+                "exact URI grant widened without prefix flag");
+        require(packageScoped.expiresAtMs() == Long.MAX_VALUE,
+                "package-scoped Context grant was not durable");
+        require(registry.revokeOwned("u0:owner", "content://pkg.exact/item",
+                UriGrantRegistry.READ, 123) == 1, "package-scoped grant revocation");
+
         UriGrantRegistry.Grant oneTime = registry.grant("u0:owner", "owner-session", 3,
                 "u0:target", "target-session", 7, 0, "content://pkg.data",
                 UriGrantRegistry.READ | UriGrantRegistry.WRITE, true, 130, 100);
@@ -993,7 +1031,7 @@ public final class SelfTest {
         BinaryXmlFixtureBuilder f = new BinaryXmlFixtureBuilder();
         ManifestModel model = new BinaryXmlManifestParser().parse(f
                 .start("manifest", BinaryXmlFixtureBuilder.text("package", "com.example.guest"))
-                .start("application")
+                .start("application", BinaryXmlFixtureBuilder.text("process", ":global"))
                 .start("activity", BinaryXmlFixtureBuilder.text("name", ".MainActivity")).end("activity")
                 .start("service", BinaryXmlFixtureBuilder.text("name", ".RemoteService"),
                         BinaryXmlFixtureBuilder.text("process", ":remote")).end("service")
@@ -1002,6 +1040,8 @@ public final class SelfTest {
                 .end("application").end("manifest").build());
         java.util.List<ComponentProcessPlanner.ProcessPlan> plans = new ComponentProcessPlanner().plan(model);
         require(plans.size() == 3, "component process plan count");
+        require(plans.stream().anyMatch(p -> p.normalizedName().equals("com.example.guest:global")),
+                "application process inherited by default component");
         require(plans.stream().anyMatch(p -> p.normalizedName().equals("com.example.guest:remote")),
                 "remote process normalized");
         require(plans.stream().anyMatch(ComponentProcessPlanner.ProcessPlan::isolated),

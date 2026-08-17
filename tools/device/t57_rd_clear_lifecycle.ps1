@@ -1,4 +1,9 @@
 param([string]$InstanceName = '', [string]$Serial = '',
-      [string]$OutputDirectory = 'build/t57-rd-evidence', [string]$TestCommand = '')
-. "$PSScriptRoot/t57_rd_common.ps1"
-exit (Invoke-T57RdCase -CaseName 'RD-06-clear-delete-force-stop-barrier' -InstanceName $InstanceName -Serial $Serial -OutputDirectory $OutputDirectory -TestCommand $TestCommand)
+      [string]$OutputDirectory = 'build/t57-rd-evidence')
+
+# Keep one authoritative implementation of the destructive lifecycle transaction.  The former
+# wrapper called Invoke-T57RdCase without a fixture command, which only emitted a pending status
+# and could be mistaken for an executed clear/delete test by the surrounding suite.
+& (Join-Path $PSScriptRoot 't57_rd_lifecycle_probe.ps1') `
+    -InstanceName $InstanceName -Serial $Serial -OutputDirectory $OutputDirectory
+exit $LASTEXITCODE

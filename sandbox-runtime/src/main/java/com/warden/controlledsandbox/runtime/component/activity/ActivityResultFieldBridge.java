@@ -5,24 +5,27 @@ import android.content.Intent;
 import java.lang.reflect.Field;
 
 /** Audited read-only bridge for Activity.setResult state held by the Guest instance. */
-final class ActivityResultFieldBridge {
-    record Captured(int resultCode, Intent data, boolean explicit) { }
+public final class ActivityResultFieldBridge {
+    public record Captured(int resultCode, Intent data, boolean explicit, boolean finished) { }
 
     private ActivityResultFieldBridge() { }
 
-    static Captured capture(Activity guest) {
-        if (guest == null) return new Captured(ActivityTaskResultCodes.CANCELED, null, false);
+    public static Captured capture(Activity guest) {
+        if (guest == null) return new Captured(ActivityTaskResultCodes.CANCELED, null, false, false);
         try {
             Field code = find(Activity.class, "mResultCode");
             Field data = find(Activity.class, "mResultData");
+            Field finished = find(Activity.class, "mFinished");
             code.setAccessible(true);
             data.setAccessible(true);
+            finished.setAccessible(true);
             int resultCode = code.getInt(guest);
             Intent intent = (Intent) data.get(guest);
             return new Captured(resultCode, intent,
-                    resultCode != ActivityTaskResultCodes.CANCELED || intent != null);
+                    resultCode != ActivityTaskResultCodes.CANCELED || intent != null,
+                    finished.getBoolean(guest));
         } catch (ReflectiveOperationException | RuntimeException unavailable) {
-            return new Captured(ActivityTaskResultCodes.CANCELED, null, false);
+            return new Captured(ActivityTaskResultCodes.CANCELED, null, false, false);
         }
     }
 

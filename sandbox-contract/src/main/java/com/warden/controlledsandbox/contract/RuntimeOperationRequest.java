@@ -12,15 +12,23 @@ public final class RuntimeOperationRequest implements Parcelable {
     public static final String INVOKE_COMPONENT = "INVOKE_COMPONENT";
     public static final String GRANT_URI_PERMISSION = "GRANT_URI_PERMISSION";
     public static final String REVOKE_URI_PERMISSION = "REVOKE_URI_PERMISSION";
+    public static final String CHECK_URI_PERMISSION = "CHECK_URI_PERMISSION";
+    /** Read-only, visibility-checked APK resource capability for createPackageContext(). */
+    public static final String OPEN_PACKAGE_RESOURCES = "OPEN_PACKAGE_RESOURCES";
     public static final String CONSUME_ROUTE = "CONSUME_ROUTE";
     public static final String ACTIVITY_EVENT = "ACTIVITY_EVENT";
+    public static final String STORAGE = "STORAGE";
     public static final String SESSION_STATUS = "SESSION_STATUS";
     public static final String GUEST_RUNTIME_STATUS = "GUEST_RUNTIME_STATUS";
+    /** Broker-to-Guest delivery of a durable PendingIntent after the creator process changed. */
+    public static final String SEND_PENDING_INTENT = "SEND_PENDING_INTENT";
 
     private static final Set<String> OPERATIONS = Set.of(
             PREPARE_GUEST, LAUNCH_ACTIVITY, INVOKE_COMPONENT,
-            GRANT_URI_PERMISSION, REVOKE_URI_PERMISSION, CONSUME_ROUTE,
-            ACTIVITY_EVENT, SESSION_STATUS, GUEST_RUNTIME_STATUS);
+            GRANT_URI_PERMISSION, REVOKE_URI_PERMISSION, CHECK_URI_PERMISSION,
+            OPEN_PACKAGE_RESOURCES, CONSUME_ROUTE,
+            ACTIVITY_EVENT, STORAGE, SESSION_STATUS, GUEST_RUNTIME_STATUS,
+            SEND_PENDING_INTENT);
 
     public static final Creator<RuntimeOperationRequest> CREATOR = new Creator<>() {
         @Override public RuntimeOperationRequest createFromParcel(Parcel source) {

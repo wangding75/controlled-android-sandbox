@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.contract;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.Bundle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -25,6 +26,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final String launchMode;
     private final String taskAffinity;
     private final String documentLaunchMode;
+    private final String persistableMode;
     private final int configChanges;
     private final String screenOrientation;
     private final int windowSoftInputMode;
@@ -45,6 +47,9 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final boolean multiprocess;
     private final int initOrder;
     private final boolean syncable;
+    /** Non-empty for an activity-alias; the logical component remains className. */
+    private String targetActivity;
+    private final Bundle metaData;
     private final ArrayList<String> actions;
     private final ArrayList<VirtualIntentFilterSnapshot> intentFilters;
     private final ArrayList<VirtualProviderPathRuleSnapshot> providerPathRules;
@@ -139,7 +144,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
                  excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
                  alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
                  minAspectRatio, supportsPictureInPicture, foregroundServiceType, stopWithTask,
-                 directBootAware, false, 0, false);
+                 directBootAware, false, 0, false, "never", "");
     }
 
     public VirtualComponentSnapshot(String type, String className, String processName,
@@ -158,7 +163,67 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                      String resizeMode, float maxAspectRatio, float minAspectRatio,
                                      boolean supportsPictureInPicture, int foregroundServiceType,
                                      boolean stopWithTask, boolean directBootAware,
-                                     boolean multiprocess, int initOrder, boolean syncable) {
+                                     boolean multiprocess, int initOrder, boolean syncable,
+                                     String persistableMode) {
+        this(type, className, processName, exported, enabled, isolated, authority, permission,
+                readPermission, writePermission, grantUriPermissions, enabledSetting, actions,
+                intentFilters, providerPathRules, themeResId, launchMode, taskAffinity,
+                documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                minAspectRatio, supportsPictureInPicture, foregroundServiceType, stopWithTask,
+                directBootAware, multiprocess, initOrder, syncable, persistableMode, "");
+    }
+
+    /** Full component contract including the PackageParser activity-alias target. */
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                     boolean exported, boolean enabled, boolean isolated,
+                                     String authority, String permission, String readPermission,
+                                     String writePermission, boolean grantUriPermissions,
+                                     String enabledSetting, List<String> actions,
+                                     List<VirtualIntentFilterSnapshot> intentFilters,
+                                     List<VirtualProviderPathRuleSnapshot> providerPathRules,
+                                     int themeResId, String launchMode, String taskAffinity,
+                                     String documentLaunchMode, int configChanges,
+                                     String screenOrientation, int windowSoftInputMode, int flags,
+                                     boolean excludeFromRecents, boolean noHistory,
+                                     boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                                     boolean alwaysRetainTaskState, boolean allowTaskReparenting,
+                                     String resizeMode, float maxAspectRatio, float minAspectRatio,
+                                     boolean supportsPictureInPicture, int foregroundServiceType,
+                                     boolean stopWithTask, boolean directBootAware,
+                                     boolean multiprocess, int initOrder, boolean syncable,
+                                     String persistableMode, String targetActivity) {
+        this(type, className, processName, exported, enabled, isolated, authority, permission,
+                readPermission, writePermission, grantUriPermissions, enabledSetting, actions,
+                intentFilters, providerPathRules, themeResId, launchMode, taskAffinity,
+                documentLaunchMode, configChanges, screenOrientation, windowSoftInputMode, flags,
+                excludeFromRecents, noHistory, finishOnTaskLaunch, clearTaskOnLaunch,
+                alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
+                minAspectRatio, supportsPictureInPicture, foregroundServiceType, stopWithTask,
+                directBootAware, multiprocess, initOrder, syncable, persistableMode,
+                targetActivity, null);
+    }
+
+    /** Full component contract including alias target and component-level manifest metadata. */
+    public VirtualComponentSnapshot(String type, String className, String processName,
+                                     boolean exported, boolean enabled, boolean isolated,
+                                     String authority, String permission, String readPermission,
+                                     String writePermission, boolean grantUriPermissions,
+                                     String enabledSetting, List<String> actions,
+                                     List<VirtualIntentFilterSnapshot> intentFilters,
+                                     List<VirtualProviderPathRuleSnapshot> providerPathRules,
+                                     int themeResId, String launchMode, String taskAffinity,
+                                     String documentLaunchMode, int configChanges,
+                                     String screenOrientation, int windowSoftInputMode, int flags,
+                                     boolean excludeFromRecents, boolean noHistory,
+                                     boolean finishOnTaskLaunch, boolean clearTaskOnLaunch,
+                                     boolean alwaysRetainTaskState, boolean allowTaskReparenting,
+                                     String resizeMode, float maxAspectRatio, float minAspectRatio,
+                                     boolean supportsPictureInPicture, int foregroundServiceType,
+                                     boolean stopWithTask, boolean directBootAware,
+                                     boolean multiprocess, int initOrder, boolean syncable,
+                                     String persistableMode, String targetActivity, Bundle metaData) {
         this.type = componentType(type);
         this.className = required(className, "className");
         this.processName = value(processName);
@@ -176,6 +241,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
         this.launchMode = enumValue(launchMode, "standard");
         this.taskAffinity = value(taskAffinity);
         this.documentLaunchMode = enumValue(documentLaunchMode, "none");
+        this.persistableMode = enumValue(persistableMode, "never");
         if (configChanges < 0 || windowSoftInputMode < 0 || flags < 0
                 || maxAspectRatio < 0f || minAspectRatio < 0f) {
             throw new IllegalArgumentException("activity task contract contains a negative value");
@@ -202,6 +268,11 @@ public final class VirtualComponentSnapshot implements Parcelable {
         if (initOrder < 0) throw new IllegalArgumentException("initOrder must be non-negative");
         this.initOrder = initOrder;
         this.syncable = syncable;
+        this.targetActivity = value(targetActivity);
+        this.metaData = metaData == null ? null : new Bundle(metaData);
+        if (!this.targetActivity.isEmpty() && !"ACTIVITY".equals(this.type)) {
+            throw new IllegalArgumentException("targetActivity is activity-only metadata");
+        }
         this.intentFilters = new ArrayList<>(intentFilters == null ? List.of() : intentFilters);
         if (this.intentFilters.size() > 256) throw new IllegalArgumentException("Too many intent filters");
         this.providerPathRules = new ArrayList<>(providerPathRules == null ? List.of() : providerPathRules);
@@ -229,7 +300,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
                  in.readString(), Float.intBitsToFloat(in.readInt()),
                  Float.intBitsToFloat(in.readInt()), in.readInt() != 0, in.readInt(),
                  in.readInt() != 0, in.readInt() != 0, in.readInt() != 0, in.readInt(),
-                 in.readInt() != 0);
+                 in.readInt() != 0, in.readString(), in.readString(), readTrailingMetadata(in));
     }
 
     public String type() { return type; }
@@ -248,6 +319,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public String launchMode() { return launchMode; }
     public String taskAffinity() { return taskAffinity; }
     public String documentLaunchMode() { return documentLaunchMode; }
+    public String persistableMode() { return persistableMode; }
     public int configChanges() { return configChanges; }
     public String screenOrientation() { return screenOrientation; }
     public int windowSoftInputMode() { return windowSoftInputMode; }
@@ -268,6 +340,8 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public boolean multiprocess() { return multiprocess; }
     public int initOrder() { return initOrder; }
     public boolean syncable() { return syncable; }
+    public String targetActivity() { return targetActivity; }
+    public Bundle metaData() { return metaData == null ? null : new Bundle(metaData); }
     public List<String> actions() { return Collections.unmodifiableList(actions); }
     public List<VirtualIntentFilterSnapshot> intentFilters() { return Collections.unmodifiableList(intentFilters); }
     public List<VirtualProviderPathRuleSnapshot> providerPathRules() {
@@ -296,6 +370,10 @@ public final class VirtualComponentSnapshot implements Parcelable {
           out.writeInt(multiprocess ? 1 : 0);
           out.writeInt(initOrder);
           out.writeInt(syncable ? 1 : 0);
+          out.writeString(persistableMode);
+          out.writeString(targetActivity);
+          out.writeInt(metaData == null ? 0 : 1);
+          if (metaData != null) out.writeBundle(metaData);
     }
     @Override public int describeContents() { return 0; }
 
@@ -303,6 +381,24 @@ public final class VirtualComponentSnapshot implements Parcelable {
         @Override public VirtualComponentSnapshot createFromParcel(Parcel in) { return new VirtualComponentSnapshot(in); }
         @Override public VirtualComponentSnapshot[] newArray(int size) { return new VirtualComponentSnapshot[size]; }
     };
+
+    private static Bundle readTrailingMetadata(Parcel in) {
+        try {
+            java.lang.reflect.Method dataAvail = Parcel.class.getMethod("dataAvail");
+            if (((Number) dataAvail.invoke(in)).intValue() < 4) return null;
+            int marker = in.readInt();
+            if (marker == 0) return null;
+            if (marker != 1) return null;
+            java.lang.reflect.Method readBundle = Parcel.class.getMethod(
+                    "readBundle", ClassLoader.class);
+            Object value = readBundle.invoke(in, VirtualComponentSnapshot.class.getClassLoader());
+            return value instanceof Bundle ? new Bundle((Bundle) value) : null;
+        } catch (Throwable ignored) {
+            // Old reduced Parcel stubs and old peers have no metadata trailer.  The structural
+            // component contract remains readable and simply exposes null metadata there.
+            return null;
+        }
+    }
 
     private static String componentType(String value) {
         String normalized = required(value, "type").toUpperCase(java.util.Locale.ROOT);

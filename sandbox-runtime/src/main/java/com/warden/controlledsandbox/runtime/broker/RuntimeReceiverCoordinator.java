@@ -219,6 +219,7 @@ public final class RuntimeReceiverCoordinator {
             }
             Bundle call = new Bundle(base);
             call.putAll(request);
+            RuntimeBrokerService.restoreTargetSessionIdentity(call, base, target);
             call.putString(RuntimeKeys.COMPONENT_CLASS, registration.receiverClass());
             call.putString(RuntimeKeys.RECEIVER_ID, registration.id());
             try {
@@ -250,6 +251,7 @@ public final class RuntimeReceiverCoordinator {
         if (base == null) return failure("DYNAMIC_RECEIVER_PREPARED_SPEC_MISSING", registration.id());
         Bundle call = new Bundle(base);
         call.putAll(request);
+        RuntimeBrokerService.restoreTargetSessionIdentity(call, base, target);
         call.putString(ComponentOperations.OPERATION, ComponentOperations.SEND_BROADCAST);
         call.putString(RuntimeKeys.PACKAGE_NAME, target.packageName());
         call.putInt(RuntimeKeys.VIRTUAL_USER_ID, target.virtualUserId());
@@ -304,6 +306,7 @@ public final class RuntimeReceiverCoordinator {
         if (base == null) throw new IllegalStateException("MANIFEST_RECEIVER_PREPARED_SPEC_MISSING");
         Bundle call = new Bundle(base);
         call.putAll(request);
+        RuntimeBrokerService.restoreTargetSessionIdentity(call, base, target);
         call.putString(ComponentOperations.OPERATION, ComponentOperations.SEND_BROADCAST);
         call.putString(RuntimeKeys.PACKAGE_NAME, target.packageName());
         call.putInt(RuntimeKeys.VIRTUAL_USER_ID, target.virtualUserId());
@@ -340,15 +343,25 @@ public final class RuntimeReceiverCoordinator {
         OrderedReceiverTokenRegistry.Lease orderedLease = null;
         if (orderedDelivery) {
             lifecycle.purgeExpired();
+            long receiverTimeoutMs = request.getLong(RuntimeKeys.BROADCAST_RECEIVER_TIMEOUT_MS,
+                    OrderedReceiverTokenRegistry.DEFAULT_TIMEOUT_MS);
+            if (request.getBoolean(RuntimeKeys.FRAMEWORK_RECEIVER_ROUTE, false)) {
+                receiverTimeoutMs = Math.max(receiverTimeoutMs,
+                        RuntimeKeys.FRAMEWORK_RECEIVER_DISPATCH_TIMEOUT_MS);
+            }
             orderedLease = ordered.issue(deliveryTarget, receiverClass,
-                    request.getLong(RuntimeKeys.BROADCAST_RECEIVER_TIMEOUT_MS,
-                            OrderedReceiverTokenRegistry.DEFAULT_TIMEOUT_MS));
+                    receiverTimeoutMs);
             call.putString(RuntimeKeys.ORDERED_RECEIVER_TOKEN, orderedLease.token());
             call.putLong(RuntimeKeys.ORDERED_RECEIVER_DEADLINE_MS, orderedLease.deadlineMs());
             call.putBinder(RuntimeKeys.ORDERED_RECEIVER_COMPLETION_BINDER, completion.asBinder());
         }
         Bundle result;
         try {
+            if (request.getBoolean(RuntimeKeys.FRAMEWORK_RECEIVER_ROUTE, false)
+                    && call.getBoolean(RuntimeKeys.RECEIVER_MANIFEST, false)) {
+                call.putString(ComponentOperations.OPERATION,
+                        ComponentOperations.ROUTE_FRAMEWORK_RECEIVER);
+            }
             result = guestInvoker.invoke(deliveryTarget.processSlot(), call);
         } catch (Throwable error) {
             try {
@@ -489,8 +502,11 @@ public final class RuntimeReceiverCoordinator {
         if (update.hasResultCode()) target.putInt(RuntimeKeys.BROADCAST_RESULT_CODE, update.resultCode());
         if (update.hasResultData()) target.putString(RuntimeKeys.BROADCAST_RESULT_DATA, update.resultData());
         if (update.hasResultExtras()) {
-            target.putBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS,
-                    OrderedBroadcastResultExtrasCodec.decode(update.resultExtras()));
+            Bundle extras = new Bundle();
+            for (java.util.Map.Entry<String, String> entry : update.resultExtras().entrySet()) {
+                extras.putString(entry.getKey(), entry.getValue());
+            }
+            target.putBundle(RuntimeKeys.BROADCAST_RESULT_EXTRAS, extras);
         }
         if (update.abortRequested()) target.putBoolean(RuntimeKeys.BROADCAST_ABORT, true);
         if (update.clearAbortRequested()) target.putBoolean(RuntimeKeys.BROADCAST_CLEAR_ABORT, true);

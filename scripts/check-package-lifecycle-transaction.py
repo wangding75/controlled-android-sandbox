@@ -14,6 +14,11 @@ files = {
     'importer': ROOT / 'app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java',
     'layout': ROOT / 'app/src/main/java/com/warden/controlledsandbox/PackageStorageLayout.java',
     'migrator': ROOT / 'app/src/main/java/com/warden/controlledsandbox/LegacyPackageLayoutMigrator.java',
+    'package_session': ROOT / 'app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java',
+    'dependencies': ROOT / 'app/src/main/java/com/warden/controlledsandbox/PackageServiceDependencies.java',
+    'application_layer': ROOT / 'app/src/main/java/com/warden/controlledsandbox/SandboxApplicationLayer.java',
+    'adapter': ROOT / 'app/src/main/java/com/warden/controlledsandbox/SxSandboxAdapter.java',
+    'isolated': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java',
     'activity': ROOT / 'app/src/main/java/com/warden/controlledsandbox/MainActivity.java',
     'debug_activity': ROOT / 'app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java',
     'store': ROOT / 'sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/persistence/RecoverableFileStore.java',
@@ -61,6 +66,60 @@ if not errors:
     for fragment in required_lifecycle:
         if fragment not in text['lifecycle']:
             errors.append(f'package lifecycle transaction control missing: {fragment}')
+
+    for operation, lifecycle_call in [
+            ('deleteInstance(String packageName, int virtualUserId)',
+             'lifecycle.deleteInstance(normalizedPackage, virtualUserId)'),
+            ('clearInstanceData(String packageName, int virtualUserId)',
+             'lifecycle.clearInstanceData(normalizedPackage, virtualUserId)')]:
+        start = text['package_session'].find(operation)
+        if start < 0:
+            errors.append(f'package management operation missing: {operation}')
+            continue
+        end = text['package_session'].find('\n    @Override', start + len(operation))
+        block = text['package_session'][start:end if end >= 0 else None]
+        barrier = block.find(
+            'dependencies.stopGuestBeforeDestructiveOperation(normalizedPackage, virtualUserId);')
+        mutation = block.find(lifecycle_call)
+        if barrier < 0 or mutation < 0 or barrier > mutation:
+            errors.append(f'{operation} must stop the Guest before lifecycle mutation')
+
+    required_isolated_barrier = [
+        'SHUTDOWN_TIMEOUT_MILLIS',
+        'final CountDownLatch terminated = new CountDownLatch(1);',
+        'connection.awaitTerminated(SHUTDOWN_TIMEOUT_MILLIS',
+        'abortConnection(connection, "ISOLATED_SHUTDOWN_PROCESS_TIMEOUT")',
+        'source.terminated.countDown();',
+        'RuntimeException firstFailure = null;',
+        'if (firstFailure != null) throw firstFailure;',
+    ]
+    for fragment in required_isolated_barrier:
+        if fragment not in text['isolated']:
+            errors.append(f'isolated process death barrier missing: {fragment}')
+
+    for fragment in ['RevisionCommitBarrier', 'commitImported(current, imported, barrier)']:
+        if fragment not in text['lifecycle']:
+            errors.append(f'APK revision commit barrier missing: {fragment}')
+    if text['package_session'].count('dependencies::stopGuestBeforeRevisionCommit') < 6:
+        errors.append('all production APK import/install entry points must use the revision stop barrier')
+    for fragment in ['stopGuestBeforeRevisionCommit',
+                     'previous.sha256.equals(imported.sha256)',
+                     'for (int userId : users) runtimeClient.stop(previous, userId);']:
+        if fragment not in text['dependencies']:
+            errors.append(f'revision stop barrier implementation missing: {fragment}')
+
+    clear_start = text['application_layer'].find('void clearData(String packageName, int userId)')
+    delete_start = text['application_layer'].find('void deleteInstance(String packageName, int userId)')
+    if clear_start >= 0 and delete_start >= 0:
+        if 'adapter.stopRuntime(' in text['application_layer'][clear_start:delete_start]:
+            errors.append('SandboxApplicationLayer.clearData must not duplicate the stop barrier')
+        next_method = text['application_layer'].find('\n    Bundle launch(', delete_start)
+        if 'adapter.stopRuntime(' in text['application_layer'][delete_start:next_method if next_method >= 0 else None]:
+            errors.append('SandboxApplicationLayer.deleteInstance must not duplicate the stop barrier')
+    adapter_delete = text['adapter'].find('SandboxOperationResult deleteInstance(SandboxIdentity identity)')
+    adapter_status = text['adapter'].find('SandboxOperationResult status()', adapter_delete)
+    if adapter_delete >= 0 and 'runtime.stop(' in text['adapter'][adapter_delete:adapter_status if adapter_status >= 0 else None]:
+        errors.append('SxSandboxAdapter.deleteInstance must delegate the single package transaction')
 
     save_pos = text['lifecycle'].find('catalogRepository.save(next);',
                                       text['lifecycle'].find('deleteInstance('))

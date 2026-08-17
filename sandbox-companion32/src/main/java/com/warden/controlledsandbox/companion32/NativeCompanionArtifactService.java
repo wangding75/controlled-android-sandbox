@@ -20,6 +20,12 @@ public final class NativeCompanionArtifactService extends Service {
             return workspaces.prepare(request);
         }
 
+        @Override public NativeCompanionArtifactResult inspectArtifact(
+                NativeCompanionArtifactRequest request) {
+            NativeCompanionCallerGuard.requireSignedPeer(NativeCompanionArtifactService.this);
+            return workspaces.inspect(request);
+        }
+
         @Override public NativeCompanionArtifactResult stageArtifact(
                 NativeCompanionArtifactRequest request, ParcelFileDescriptor source) {
             NativeCompanionCallerGuard.requireSignedPeer(NativeCompanionArtifactService.this);

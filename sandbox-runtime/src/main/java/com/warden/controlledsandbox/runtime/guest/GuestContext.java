@@ -16,6 +16,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
@@ -25,7 +26,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import java.util.concurrent.Executor;
 
 /**
@@ -46,6 +51,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final File instanceRoot;
     private final File dataRoot;
     private final File externalRoot;
+    private final boolean capabilityBackedStorage;
     private final ApplicationInfo applicationInfo;
     private final GuestContextComponentRouter componentRouter;
     private final GuestWebViewProviderServiceBridge webViewProviderServices;
@@ -54,6 +60,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final SharedState sharedState;
     private final Context unwrapBoundary;
     private final Resources.Theme frameworkTheme;
+    private final Map<String, GuestPackageContext> packageContexts = new HashMap<>();
     private volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
     final GuestDynamicReceiverRegistry dynamicReceivers;
     final GuestMainThreadDispatcher mainThread;
@@ -123,11 +130,16 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.deviceProtected = deviceProtected;
         this.sharedState = sharedState;
         this.unwrapBoundary = new GuestContextUnwrapBoundary(this);
-        this.instanceRoot = ensureDirectory(spec.dataRootFile());
+        android.util.Log.i("CS_GUEST_STORAGE", "bootstrap isolated=" + spec.isolatedProcess
+                + " dataFd=" + (spec.dataRootDescriptor == null ? -1 : spec.dataRootDescriptor.getFd())
+                + " dataRoot=" + spec.dataRoot);
+        this.capabilityBackedStorage = spec.isolatedProcess && spec.dataRootDescriptor != null;
+        this.instanceRoot = capabilityBackedStorage
+                ? spec.dataRootFile() : ensureDirectory(spec.dataRootFile());
         this.dataRoot = ensureDirectory(new File(instanceRoot,
                 deviceProtected ? "device_protected" : "data"));
         this.externalRoot = ensureDirectory(new File(instanceRoot, "external"));
-        this.storageNames = new GuestStorageNameCodec(instanceRoot);
+        this.storageNames = new GuestStorageNameCodec(instanceRoot, capabilityBackedStorage);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
                 applicationMetadata, appComponentFactory, parsedApplicationInfo);
         this.dynamicReceivers = sharedState.dynamicReceivers;
@@ -162,8 +174,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     void closeWebViewProviderServices() {
         webViewProviderServices.close();
     }
-    void closeComponentServices() {
+    void beginComponentTeardown() {
+        componentRouter.beginTeardown();
+    }
+    synchronized void closeComponentServices() {
         componentRouter.close();
+        for (GuestPackageContext packageContext : packageContexts.values()) {
+            packageContext.closeResources();
+        }
+        packageContexts.clear();
     }
 
     void installServiceFrameworkBridge(GuestActivityThreadServiceBridge bridge) {
@@ -231,6 +250,8 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SERVICE;
         if (serviceClass != null && "android.telephony.SubscriptionManager"
                 .equals(serviceClass.getName())) return Context.TELEPHONY_SUBSCRIPTION_SERVICE;
+        if (serviceClass != null && "android.os.BatteryManager"
+                .equals(serviceClass.getName())) return "batterymanager";
         if (serviceClass != null && "android.telecom.TelecomManager"
                 .equals(serviceClass.getName())) return "telecom";
         return null;
@@ -256,6 +277,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (checkPermission(permission, pid, uid) != PackageManager.PERMISSION_GRANTED) {
             throw new SecurityException(message == null ? "Permission denied: " + permission : message);
         }
+    }
+    @Override public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
+        componentRouter.grantUriPermission(toPackage, uri, modeFlags);
+    }
+    @Override public void revokeUriPermission(Uri uri, int modeFlags) {
+        componentRouter.revokeUriPermission(uri, modeFlags);
+    }
+    @Override public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
+        return componentRouter.checkUriPermission(uri, pid, uid, modeFlags);
     }
     @Override public Object getSystemService(String name) {
         // LayoutInflater is framework-owned but context-bound. It must be cloned into the
@@ -293,6 +323,14 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     }
     void startActivityFromActivity(Intent intent, Bundle options, int callerTaskId) {
         componentRouter.startActivity(intent, options, callerTaskId);
+    }
+    Bundle startActivityFromFrameworkActivity(Intent intent, Bundle options, int callerTaskId) {
+        return componentRouter.startActivityFromFrameworkActivity(intent, options, callerTaskId, -1);
+    }
+    Bundle startActivityFromFrameworkActivity(Intent intent, Bundle options, int callerTaskId,
+                                              int requestCode) {
+        return componentRouter.startActivityFromFrameworkActivity(
+                intent, options, callerTaskId, requestCode);
     }
     @Override public void startActivities(Intent[] intents) { startActivities(intents, null); }
     @Override public void startActivities(Intent[] intents, Bundle options) {
@@ -424,14 +462,22 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (existing != null) return existing;
         File file = storageNames.resolve(ensureDirectory(new File(dataRoot, "shared_prefs")),
                 "shared_preferences", name, "", ".cspf", ".tmp");
-        SharedPreferences created = new SandboxSharedPreferences(file);
+        SharedPreferences created = capabilityBackedStorage
+                ? new SandboxSharedPreferences(GuestStorageBroker.preferences(spec, file.getName(),
+                        deviceProtected))
+                : new SandboxSharedPreferences(file);
         preferences.put(name, created);
         return created;
     }
     @Override public synchronized boolean deleteSharedPreferences(String name) {
-        preferences.remove(name);
+        SharedPreferences cached = preferences.remove(name);
         File file = storageNames.resolve(ensureDirectory(new File(dataRoot, "shared_prefs")),
                 "shared_preferences", name, "", ".cspf", ".tmp");
+        if (capabilityBackedStorage) {
+            return cached instanceof SandboxSharedPreferences
+                    ? ((SandboxSharedPreferences) cached).deleteStoredFile()
+                    : GuestStorageBroker.preferences(spec, file.getName(), deviceProtected).delete();
+        }
         File temporary = new File(file.getParentFile(), file.getName() + ".tmp");
         boolean deleted = (!file.exists() || file.delete())
                 && (!temporary.exists() || temporary.delete());
@@ -445,11 +491,25 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         File targetParent = ensureDirectory(new File(dataRoot, "shared_prefs"));
         File sourceFile = source.storageNames.resolve(sourceParent,
                 "shared_preferences", name, "", ".cspf", ".tmp");
-        if (!sourceFile.isFile()) return false;
         File targetFile = storageNames.resolve(targetParent,
                 "shared_preferences", name, "", ".cspf", ".tmp");
         SandboxSharedPreferences sourceCached = source.cachedPreferences(name);
         SandboxSharedPreferences targetCached = cachedPreferences(name);
+        if (capabilityBackedStorage) {
+            boolean moved = withPreferenceLocks(sourceCached, targetCached, () ->
+                    GuestStorageBroker.move(spec, sourceFile.getName(), source.deviceProtected,
+                            targetFile.getName(), deviceProtected));
+            if (moved) {
+                if (sourceCached != null) sourceCached.invalidateAfterMove();
+                if (targetCached != null && targetCached != sourceCached) {
+                    targetCached.invalidateAfterMove();
+                }
+                synchronized (source) { source.preferences.remove(name); }
+                synchronized (this) { preferences.remove(name); }
+            }
+            return moved;
+        }
+        if (!sourceFile.isFile()) return false;
         boolean moved = withPreferenceLocks(sourceCached, targetCached, () -> {
             boolean result = GuestStorageTransferCoordinator.move(
                     instanceRoot, sourceFile, targetFile, ".tmp");
@@ -488,6 +548,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return storageNames.listExisting(getFilesDir(), "file", "", "");
     }
     @Override public File getDir(String name, int mode) {
+        // Android's ContextImpl exposes valid app directories using the stable
+        // "app_<name>" contract.  A number of production runtimes (notably UC/U4)
+        // derive sibling paths from that value and will not find a codec-generated
+        // name such as app_v2_dTRzZGs.  Keep the collision-safe codec for names that
+        // cannot be represented as one Android directory component, but preserve the
+        // framework-visible spelling for the normal component-name subset.
+        if (isFrameworkDirectoryName(name)) {
+            return ensureDirectory(new File(dataRoot, "app_" + name));
+        }
         return ensureDirectory(storageNames.resolve(dataRoot, "dir", name, "app_", ""));
     }
     @Override public File getExternalFilesDir(String type) {
@@ -512,9 +581,100 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     @Override public Context createPackageContext(String packageName, int flags)
             throws PackageManager.NameNotFoundException {
-        if (spec.packageName.equals(packageName)) return this;
-        throw new PackageManager.NameNotFoundException(
-                "Guest package context is unavailable for " + packageName);
+        if (packageName == null || packageName.trim().isEmpty()) {
+            throw new PackageManager.NameNotFoundException("Guest package name is empty");
+        }
+        String targetPackage = packageName.trim();
+        if (spec.packageName.equals(targetPackage)) return this;
+        String cacheKey = packageContextCacheKey(targetPackage, flags);
+        synchronized (this) {
+            GuestPackageContext cached = packageContexts.get(cacheKey);
+            if (cached != null) return cached;
+        }
+        VirtualPackageProjectionSnapshot projection = null;
+        for (VirtualPackageProjectionSnapshot candidate : spec.packageUniverse) {
+            if (candidate != null && targetPackage.equals(candidate.packageState().packageName())) {
+                projection = candidate;
+                break;
+            }
+        }
+        if (projection == null) {
+            throw new PackageManager.NameNotFoundException(
+                    "Guest package is not visible: " + targetPackage);
+        }
+        VirtualPackageStateSnapshot targetState = projection.packageState();
+        if (!targetState.enabled()) {
+            throw new PackageManager.NameNotFoundException(
+                    "Guest package is disabled: " + targetPackage);
+        }
+        try {
+            GuestResourceLoader.LoadedResources loaded =
+                    componentRouter.openPackageResources(targetPackage);
+            ApplicationInfo targetInfo = packageContextApplicationInfo(projection);
+            if (loaded.manifestMetadata != null) {
+                Bundle metadata = loaded.manifestMetadata.application();
+                if (metadata != null) targetInfo.metaData = metadata;
+            }
+            // Match ContextImpl's CONTEXT_INCLUDE_CODE contract without crossing the sandbox
+            // boundary. The Broker has already checked visibility and supplied FD capabilities;
+            // the target loader consumes DEX bytes from those FDs, never a host APK pathname.
+            // It is a resource/code view, not a new UID/session: Binder, system-service and
+            // storage calls remain owned by this Guest session.
+            ClassLoader targetLoader = packageContextClassLoader(flags, targetPackage,
+                    targetState, loaded);
+            GuestPackageContext created = new GuestPackageContext(this, targetPackage,
+                    targetState, targetInfo, loaded, targetLoader);
+            synchronized (this) {
+                GuestPackageContext existing = packageContexts.get(cacheKey);
+                if (existing != null) {
+                    created.closeResources();
+                    return existing;
+                }
+                packageContexts.put(cacheKey, created);
+            }
+            return created;
+        } catch (Exception error) {
+            PackageManager.NameNotFoundException failure =
+                    new PackageManager.NameNotFoundException(
+                            "Guest package resources unavailable: " + targetPackage);
+            failure.initCause(error);
+            throw failure;
+        }
+    }
+
+    private static String packageContextCacheKey(String targetPackage, int flags) {
+        // ContextImpl keeps code-bearing and resources-only package contexts distinct. A caller
+        // may legitimately request resources first and CONTEXT_INCLUDE_CODE later; collapsing
+        // those views would permanently return the weaker ClassLoader contract.
+        return targetPackage + ((flags & 0x00000001) != 0 ? "\ninclude-code" : "\nresources-only");
+    }
+
+    private ClassLoader packageContextClassLoader(
+            int flags, String targetPackage, VirtualPackageStateSnapshot targetState,
+            GuestResourceLoader.LoadedResources loaded) throws Exception {
+        if ((flags & 0x00000001) == 0) return classLoader;
+        List<java.nio.ByteBuffer> buffers = GuestDexBufferLoader.load(
+                loaded.baseDescriptor(), loaded.splitDescriptors());
+        // No native search path is inherited from the owner. A target package's Java code can be
+        // inspected/used through the FD-backed loader, while native loading remains explicit and
+        // capability-gated instead of accidentally resolving the owner's .so directory.
+        return new GuestClassLoader(buffers, "", classLoader, targetPackage,
+                declaredGuestClasses(targetState));
+    }
+
+    private static List<String> declaredGuestClasses(VirtualPackageStateSnapshot state) {
+        ArrayList<String> classes = new ArrayList<>();
+        if (state.applicationClass() != null && !state.applicationClass().trim().isEmpty()) {
+            classes.add(state.applicationClass().trim());
+        }
+        for (com.warden.controlledsandbox.contract.VirtualComponentSnapshot component
+                : state.components()) {
+            if (component != null && component.className() != null
+                    && !component.className().trim().isEmpty()) {
+                classes.add(component.className().trim());
+            }
+        }
+        return List.copyOf(classes);
     }
 
     @Override public Context createContextForSplit(String splitName)
@@ -525,7 +685,17 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     @Override public Context createConfigurationContext(Configuration overrideConfiguration) {
         if (overrideConfiguration == null) throw new IllegalArgumentException("overrideConfiguration is required");
-        return this;
+        // ContextImpl creates a new Resources view for an override configuration. Returning the
+        // current GuestContext here made locale/orientation/night-mode changes silently mutate
+        // the process-wide resource view (and, in practice, left libraries such as AppCompat
+        // observing the host configuration). Keep the Guest AssetManager and identity, but give
+        // the derived context an independent Configuration object and Resources instance.
+        Configuration configuration = copyConfiguration(overrideConfiguration);
+        Resources configuredResources = new Resources(assets, resources.getDisplayMetrics(),
+                configuration);
+        return new GuestContext(hostServiceContext, spec, classLoader, configuredResources, assets,
+                packageManager, deviceProtected, sharedState, applicationInfo.metaData,
+                applicationInfo.appComponentFactory, applicationInfo);
     }
 
     public Context createCredentialProtectedStorageContext() {
@@ -542,6 +712,48 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 packageManager, targetDeviceProtected, sharedState, applicationInfo.metaData,
                 applicationInfo.appComponentFactory, applicationInfo);
+    }
+
+    private ApplicationInfo packageContextApplicationInfo(
+            VirtualPackageProjectionSnapshot projection) {
+        VirtualPackageStateSnapshot state = projection.packageState();
+        ApplicationInfo info = projection.parsedApplicationInfo();
+        if (info == null) info = state.applicationInfo();
+        if (info == null) info = new ApplicationInfo();
+        info.packageName = state.packageName();
+        info.uid = projection.virtualUid();
+        info.processName = normalizePackageProcess(state.packageName(),
+                info.processName);
+        info.sourceDir = "/data/app/" + state.packageName() + "/base.apk";
+        info.publicSourceDir = info.sourceDir;
+        info.dataDir = "/data/user/" + spec.virtualUserId + "/" + state.packageName();
+        info.nativeLibraryDir = "";
+        info.enabled = state.enabled();
+        if (state.applicationClass() != null && !state.applicationClass().isEmpty()) {
+            info.name = state.applicationClass();
+            info.className = state.applicationClass();
+        }
+        return info;
+    }
+
+    private static String normalizePackageProcess(String packageName, String processName) {
+        String value = processName == null ? "" : processName.trim();
+        if (value.isEmpty()) return packageName;
+        return value.startsWith(":") ? packageName + value : value;
+    }
+
+    private static Configuration copyConfiguration(Configuration source) {
+        try {
+            java.lang.reflect.Constructor<Configuration> constructor =
+                    Configuration.class.getDeclaredConstructor(Configuration.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(source);
+        } catch (ReflectiveOperationException unavailable) {
+            // The host's API contract has always accepted a Configuration object. The reduced
+            // static test stubs do not expose the copy constructor; production Android does. Do
+            // not reject a valid configuration solely because the compile-time stub is small.
+            return source;
+        }
     }
 
     private synchronized SandboxSharedPreferences cachedPreferences(String name) {
@@ -612,11 +824,34 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         }
     }
 
-    private static File ensureDirectory(File file) {
+    private File ensureDirectory(File file) {
+        if (capabilityBackedStorage) return file;
         if (!file.isDirectory() && !file.mkdirs() && !file.isDirectory()) {
             throw new IllegalStateException("Cannot create directory " + file);
         }
         return file;
+    }
+
+    /**
+     * The exact Android getDir() projection is safe only for a single, ordinary
+     * directory component.  Reject separators, dot components, control/space
+     * characters and the names that can be confused with the codec namespace.
+     */
+    private static boolean isFrameworkDirectoryName(String value) {
+        if (value == null || value.isEmpty() || value.equals(".") || value.equals("..")
+                || value.length() > 240 || value.startsWith("v2_") || value.startsWith("v2h_")) {
+            return false;
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (!(character >= 'a' && character <= 'z')
+                    && !(character >= 'A' && character <= 'Z')
+                    && !(character >= '0' && character <= '9')
+                    && character != '_' && character != '-' && character != '.') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static Resources.Theme createFrameworkTheme(Resources resources, GuestPackageSpec spec) {

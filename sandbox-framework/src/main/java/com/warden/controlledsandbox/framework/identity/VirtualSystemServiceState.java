@@ -421,7 +421,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
                     if (token == null) continue;
                     AlarmEntry entry = new AlarmEntry(record.alarmId(), token, record.triggerAtMs(), record.intervalMs(),
                             record.exact(), record.allowWhileIdle(), record.deliveryPath(), record.pendingIntentTokenId(),
-                            record.ownerProcessName(), record.ownerGeneration(), record.packageRevision());
+                            record.ownerProcessName(), record.ownerGeneration(), record.packageRevision(),
+                            record.alarmClock(), record.alarmClockShowIntent());
                     alarms.put(token, entry);
                     if (record.alarmId().startsWith("a")) {
                         try { nextId = Math.max(nextId, Long.parseLong(record.alarmId().substring(1)) + 1L); }
@@ -439,18 +440,26 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         public void schedule(Object token, long triggerAtMs, long intervalMs, boolean exact,
                              boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
                              String ownerProcessName, long ownerGeneration, String packageRevision) {
+            schedule(token, triggerAtMs, intervalMs, exact, allowWhileIdle, deliveryPath,
+                    pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
+                    false, null);
+        }
+        public void schedule(Object token, long triggerAtMs, long intervalMs, boolean exact,
+                             boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                             String ownerProcessName, long ownerGeneration, String packageRevision,
+                             boolean alarmClock, Object alarmClockShowIntent) {
             if (token == null) throw new IllegalArgumentException("VIRTUAL_ALARM_TOKEN_REQUIRED");
             cancel(token);
             String id = authority == null ? "" : "a" + remoteIds.getAndIncrement();
             AlarmEntry entry = new AlarmEntry(id, token, triggerAtMs, Math.max(0L, intervalMs), exact,
                     allowWhileIdle, deliveryPath, pendingIntentTokenId, ownerProcessName,
-                    ownerGeneration, packageRevision);
+                    ownerGeneration, packageRevision, alarmClock, alarmClockShowIntent);
             alarms.put(token, entry);
             if (authority != null) {
                 VirtualSystemServiceAuthority.AlarmRecord record = new VirtualSystemServiceAuthority.AlarmRecord(
                         id, triggerAtMs, entry.intervalMs, exact, allowWhileIdle, deliveryPath,
                         pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
-                        token, 0, System.currentTimeMillis());
+                        token, 0, System.currentTimeMillis(), alarmClock, alarmClockShowIntent);
                 authority.scheduleAlarm(record, () -> {
                     try { dispatch(token); }
                     finally { if (entry.intervalMs == 0L) alarms.remove(token, entry); }
@@ -489,7 +498,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             for (AlarmEntry entry : alarms.values()) out.add(new VirtualSystemServiceAuthority.AlarmRecord(
                     entry.id, entry.triggerAtMs, entry.intervalMs, entry.exact, entry.allowWhileIdle,
                     entry.deliveryPath, entry.pendingIntentTokenId, entry.ownerProcessName,
-                    entry.ownerGeneration, entry.packageRevision, entry.token, 0, 0L));
+                    entry.ownerGeneration, entry.packageRevision, entry.token, 0, 0L,
+                    entry.alarmClock, entry.alarmClockShowIntent));
             return Collections.unmodifiableList(out);
         }
         @Override public void close() {
@@ -783,10 +793,19 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         final String id; final Object token; final long triggerAtMs; final long intervalMs;
         final boolean exact; final boolean allowWhileIdle; final String deliveryPath;
         final String pendingIntentTokenId; final String ownerProcessName; final long ownerGeneration;
-        final String packageRevision; volatile ScheduledFuture<?> future;
+        final String packageRevision; final boolean alarmClock; final Object alarmClockShowIntent;
+        volatile ScheduledFuture<?> future;
         AlarmEntry(String id, Object token, long triggerAtMs, long intervalMs, boolean exact,
                    boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
                    String ownerProcessName, long ownerGeneration, String packageRevision) {
+            this(id, token, triggerAtMs, intervalMs, exact, allowWhileIdle, deliveryPath,
+                    pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
+                    false, null);
+        }
+        AlarmEntry(String id, Object token, long triggerAtMs, long intervalMs, boolean exact,
+                   boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                   String ownerProcessName, long ownerGeneration, String packageRevision,
+                   boolean alarmClock, Object alarmClockShowIntent) {
             this.id = id; this.token = token; this.triggerAtMs = triggerAtMs; this.intervalMs = intervalMs;
             this.exact = exact; this.allowWhileIdle = allowWhileIdle;
             this.deliveryPath = deliveryPath == null ? "LISTENER" : deliveryPath;
@@ -794,6 +813,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             this.ownerProcessName = ownerProcessName == null ? "legacy" : ownerProcessName;
             this.ownerGeneration = ownerGeneration;
             this.packageRevision = packageRevision == null ? "legacy-revision" : packageRevision;
+            this.alarmClock = alarmClock;
+            this.alarmClockShowIntent = alarmClockShowIntent;
         }
     }
 

@@ -28,6 +28,7 @@ public final class ServiceRuntimeRegistry {
         private final String lastStartAction;
         private final ForegroundServiceStateMachine.Snapshot foreground;
         private final boolean recoverForeground;
+        private final boolean frameworkOwned;
 
         private Snapshot(MutableRecord record) {
             instanceId = record.instanceId;
@@ -42,6 +43,7 @@ public final class ServiceRuntimeRegistry {
             lastStartAction = record.lastStartAction;
             foreground = record.foreground.snapshot();
             recoverForeground = record.recoverForeground;
+            frameworkOwned = record.frameworkOwned;
         }
 
         public String instanceId() { return instanceId; }
@@ -58,6 +60,7 @@ public final class ServiceRuntimeRegistry {
         public ForegroundServiceStateMachine.Snapshot foregroundSnapshot() { return foreground; }
         public boolean foregroundRequested() { return foreground.pending() || foreground.active(); }
         public boolean recoverForeground() { return recoverForeground; }
+        public boolean frameworkOwned() { return frameworkOwned; }
         public boolean started() { return startCount > 0; }
         public boolean bound() { return !connectionIds.isEmpty(); }
         public boolean recoverable() { return state == State.RECOVERING; }
@@ -74,8 +77,17 @@ public final class ServiceRuntimeRegistry {
     public synchronized Snapshot start(String instanceId, String component, String processName,
                                        RestartMode restartMode, long generation, String action,
                                        boolean foreground) {
+        return start(instanceId, component, processName, restartMode, generation, action,
+                foreground, false);
+    }
+
+    /** Starts a service and records whether ActivityThread owns the concrete instance. */
+    public synchronized Snapshot start(String instanceId, String component, String processName,
+                                       RestartMode restartMode, long generation, String action,
+                                       boolean foreground, boolean frameworkOwned) {
         MutableRecord record = startRecord(instanceId, component, processName, restartMode,
                 generation, action);
+        record.frameworkOwned |= frameworkOwned;
         if (foreground) {
             record.foreground.requestStart(0L, ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
                     true, "LEGACY_IMMEDIATE_PROMOTION", 0);
@@ -89,15 +101,74 @@ public final class ServiceRuntimeRegistry {
             String instanceId, String component, String processName, RestartMode restartMode,
             long generation, String action, long nowMs, long promotionTimeoutMs,
             boolean backgroundAllowed, String exemptionReason, int declaredTypeMask) {
+        return startForegroundRequested(instanceId, component, processName, restartMode,
+                generation, action, nowMs, promotionTimeoutMs, backgroundAllowed,
+                exemptionReason, declaredTypeMask, false);
+    }
+
+    public synchronized Snapshot startForegroundRequested(
+            String instanceId, String component, String processName, RestartMode restartMode,
+            long generation, String action, long nowMs, long promotionTimeoutMs,
+            boolean backgroundAllowed, String exemptionReason, int declaredTypeMask,
+            boolean frameworkOwned) {
         ForegroundServiceStateMachine validation = new ForegroundServiceStateMachine();
         validation.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
                 exemptionReason, declaredTypeMask);
         MutableRecord record = startRecord(instanceId, component, processName, restartMode,
                 generation, action);
+        record.frameworkOwned |= frameworkOwned;
         record.foreground.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
                 exemptionReason, declaredTypeMask);
         record.lastDeclaredForegroundTypeMask = declaredTypeMask;
         record.recoverForeground = true;
+        return new Snapshot(record);
+    }
+
+    /**
+     * Opens the framework-owned start transaction before ActivityThread invokes Guest
+     * {@code Service.onStartCommand()}.
+     *
+     * <p>A Guest Service is allowed to call {@code startForeground()} from inside that callback.
+     * The Broker must therefore have a started record before the callback begins; otherwise the
+     * real AMS can mark the Stub foreground while the virtual Service registry still has no
+     * record to promote.  The restart mode is deliberately provisional and is committed by
+     * {@link #completeFrameworkStart} after the callback returns.</p>
+     */
+    public synchronized Snapshot beginFrameworkStart(
+            String instanceId, String component, String processName, long generation,
+            int startId, String action, boolean foregroundRequested, long nowMs,
+            long promotionTimeoutMs, boolean backgroundAllowed, String exemptionReason,
+            int declaredTypeMask) {
+        if (foregroundRequested) {
+            ForegroundServiceStateMachine validation = new ForegroundServiceStateMachine();
+            validation.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
+                    exemptionReason, declaredTypeMask);
+        }
+        MutableRecord record = startRecord(instanceId, component, processName,
+                RestartMode.NOT_STICKY, generation, action, startId);
+        record.frameworkOwned = true;
+        if (foregroundRequested) {
+            record.foreground.requestStart(nowMs, promotionTimeoutMs, backgroundAllowed,
+                    exemptionReason, declaredTypeMask);
+            record.lastDeclaredForegroundTypeMask = declaredTypeMask;
+            record.recoverForeground = true;
+        }
+        return new Snapshot(record);
+    }
+
+    /** Commits the restart mode and callback payload of a framework-owned start transaction. */
+    public synchronized Snapshot completeFrameworkStart(
+            String instanceId, String component, long generation, int startId,
+            RestartMode restartMode, String action) {
+        MutableRecord record = requireRecord(instanceId, component);
+        requireGeneration(record, generation);
+        if (!record.frameworkOwned) throw new IllegalStateException("SERVICE_NOT_FRAMEWORK_OWNED");
+        if (record.startCount == 0) throw new IllegalStateException("SERVICE_NOT_STARTED");
+        if (startId > 0 && record.lastStartId != startId) {
+            throw new IllegalStateException("SERVICE_START_ID_MISMATCH");
+        }
+        record.restartMode = restartMode == null ? RestartMode.NOT_STICKY : restartMode;
+        if (action != null) record.lastStartAction = action;
         return new Snapshot(record);
     }
 
@@ -138,6 +209,12 @@ public final class ServiceRuntimeRegistry {
 
     public synchronized Snapshot bind(String instanceId, String component, String processName,
                                       String connectionId, long generation) {
+        return bind(instanceId, component, processName, connectionId, generation, false);
+    }
+
+    public synchronized Snapshot bind(String instanceId, String component, String processName,
+                                      String connectionId, long generation,
+                                      boolean frameworkOwned) {
         requireText(connectionId, "connectionId");
         MutableRecord record = getOrCreate(instanceId, component, processName, generation);
         requireGeneration(record, generation);
@@ -147,6 +224,7 @@ public final class ServiceRuntimeRegistry {
             throw new IllegalStateException("SERVICE_CONNECTION_LIMIT_EXCEEDED");
         }
         if (!record.connectionIds.add(connectionId)) throw new IllegalStateException("DUPLICATE_SERVICE_CONNECTION");
+        record.frameworkOwned |= frameworkOwned;
         record.state = State.ACTIVE;
         return new Snapshot(record);
     }
@@ -242,8 +320,8 @@ public final class ServiceRuntimeRegistry {
     }
 
     public synchronized Snapshot completeRecovery(String instanceId, String component,
-                                                  long oldGeneration, long newGeneration,
-                                                  long nowMs) {
+                                                   long oldGeneration, long newGeneration,
+                                                   long nowMs) {
         MutableRecord record = requireRecord(instanceId, component);
         requireGeneration(record, oldGeneration);
         if (record.state != State.RECOVERING) throw new IllegalStateException("SERVICE_NOT_RECOVERING");
@@ -283,17 +361,33 @@ public final class ServiceRuntimeRegistry {
     public synchronized List<Snapshot> completeProcessRecovery(
             String instanceId, String processName, long oldGeneration, long newGeneration,
             long nowMs) {
+        return completeProcessRecovery(instanceId, processName, oldGeneration, newGeneration,
+                nowMs, Collections.emptyMap());
+    }
+
+    /**
+     * Atomically advances all recovering services and commits the restart modes returned by their
+     * new-process onStartCommand callbacks.  The mode update is part of the same generation fence
+     * so a partially recovered process cannot publish a future restart policy early.
+     */
+    public synchronized List<Snapshot> completeProcessRecovery(
+            String instanceId, String processName, long oldGeneration, long newGeneration,
+            long nowMs, Map<String, RestartMode> recoveryModes) {
         requireText(instanceId, "instanceId");
         requireText(processName, "processName");
         if (oldGeneration < 1 || newGeneration <= oldGeneration) {
             throw new IllegalArgumentException("new generation must increase");
         }
+        Map<String, RestartMode> modes = recoveryModes == null
+                ? Collections.emptyMap() : recoveryModes;
         List<Snapshot> recovered = new ArrayList<>();
         for (MutableRecord record : records.values()) {
             if (record.instanceId.equals(instanceId)
                     && record.processName.equals(processName)
                     && record.generation == oldGeneration
                     && record.state == State.RECOVERING) {
+                RestartMode recoveredMode = modes.get(record.component);
+                if (recoveredMode != null) record.restartMode = recoveredMode;
                 record.generation = newGeneration;
                 record.state = State.ACTIVE;
                 if (record.recoverForeground) {
@@ -305,6 +399,47 @@ public final class ServiceRuntimeRegistry {
             }
         }
         return Collections.unmodifiableList(recovered);
+    }
+
+    /**
+     * Completes a framework-owned recovery after ActivityThread delivered onStartCommand.
+     * The old generation remains RECOVERING until this transaction installs the new generation.
+     */
+    public synchronized Snapshot completeFrameworkRecovery(
+            String instanceId, String component, long oldGeneration, long newGeneration,
+            int startId, String action, long nowMs) {
+        return completeFrameworkRecovery(instanceId, component, oldGeneration, newGeneration,
+                startId, action, nowMs, null);
+    }
+
+    /** Completes framework recovery and commits its callback restart mode at the generation fence. */
+    public synchronized Snapshot completeFrameworkRecovery(
+            String instanceId, String component, long oldGeneration, long newGeneration,
+            int startId, String action, long nowMs, RestartMode recoveryMode) {
+        MutableRecord record = requireRecord(instanceId, component);
+        requireGeneration(record, oldGeneration);
+        if (record.state != State.RECOVERING) throw new IllegalStateException("SERVICE_NOT_RECOVERING");
+        if (!record.frameworkOwned) throw new IllegalStateException("SERVICE_NOT_FRAMEWORK_OWNED");
+        if (newGeneration <= oldGeneration) throw new IllegalArgumentException("new generation must increase");
+        record.generation = newGeneration;
+        record.state = State.ACTIVE;
+        if (recoveryMode != null) record.restartMode = recoveryMode;
+        if (startId > 0) record.lastStartId = startId;
+        if (action != null) record.lastStartAction = action;
+        if (record.recoverForeground) {
+            record.foreground.requestStart(nowMs,
+                    ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS,
+                    true, "PROCESS_RECOVERY", record.lastDeclaredForegroundTypeMask);
+        }
+        return new Snapshot(record);
+    }
+
+    /** Promotes a framework-owned recovery after its new ActivityThread callback succeeded. */
+    public synchronized Snapshot promoteFrameworkRecovery(
+            String instanceId, String component, long generation, long nowMs,
+            int requestedTypeMask, int notificationId, String notificationTag) {
+        return promoteForeground(instanceId, component, generation, nowMs,
+                requestedTypeMask, notificationId, notificationTag);
     }
 
     public synchronized int destroyInstance(String instanceId, long generation) {
@@ -331,10 +466,23 @@ public final class ServiceRuntimeRegistry {
 
     private MutableRecord startRecord(String instanceId, String component, String processName,
                                       RestartMode restartMode, long generation, String action) {
+        return startRecord(instanceId, component, processName, restartMode, generation, action, -1);
+    }
+
+    private MutableRecord startRecord(String instanceId, String component, String processName,
+                                      RestartMode restartMode, long generation, String action,
+                                      int requestedStartId) {
         MutableRecord record = getOrCreate(instanceId, component, processName, generation);
         requireGeneration(record, generation);
         if (record.state == State.DESTROYED) throw new IllegalStateException("SERVICE_DESTROYED");
-        record.lastStartId++;
+        if (requestedStartId > 0) {
+            if (requestedStartId <= record.lastStartId) {
+                throw new IllegalStateException("SERVICE_START_ID_NOT_MONOTONIC");
+            }
+            record.lastStartId = requestedStartId;
+        } else {
+            record.lastStartId++;
+        }
         record.startCount++;
         record.restartMode = restartMode == null ? RestartMode.NOT_STICKY : restartMode;
         record.lastStartAction = action == null ? "" : action;
@@ -398,6 +546,7 @@ public final class ServiceRuntimeRegistry {
         long generation;
         String lastStartAction = "";
         boolean recoverForeground;
+        boolean frameworkOwned;
         int lastDeclaredForegroundTypeMask;
 
         MutableRecord(String instanceId, String component, String processName, long generation) {

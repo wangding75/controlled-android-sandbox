@@ -13,8 +13,12 @@ import java.util.UUID;
 public final class UriGrantRegistry {
     public static final int READ = 1;
     public static final int WRITE = 1 << 1;
+    /** Optional Android FLAG_GRANT_PREFIX_URI_PERMISSION projection. */
+    public static final int PREFIX = 1 << 2;
     public static final int MAX_ACTIVE_GRANTS = 256;
     public static final long MAX_TTL_MS = 86_400_000L;
+    /** A Context URI permission is durable until revoke/clear/delete, not a short lease. */
+    public static final long DURABLE_TTL_MS = -1L;
 
     public static final class Grant {
         private final String id;
@@ -27,13 +31,14 @@ public final class UriGrantRegistry {
         private final int virtualUserId;
         private final String uriPrefix;
         private final int flags;
+        private final boolean prefix;
         private final boolean oneTime;
         private final long expiresAtMs;
 
         private Grant(String id, String ownerInstanceId, String ownerSessionId, long ownerGeneration,
                       String targetInstanceId, String targetSessionId, long targetGeneration,
                       int virtualUserId, String uriPrefix, int flags, boolean oneTime,
-                      long expiresAtMs) {
+                      boolean prefix, long expiresAtMs) {
             this.id = id;
             this.ownerInstanceId = ownerInstanceId;
             this.ownerSessionId = ownerSessionId;
@@ -44,6 +49,7 @@ public final class UriGrantRegistry {
             this.virtualUserId = virtualUserId;
             this.uriPrefix = uriPrefix;
             this.flags = flags;
+            this.prefix = prefix;
             this.oneTime = oneTime;
             this.expiresAtMs = expiresAtMs;
         }
@@ -58,8 +64,41 @@ public final class UriGrantRegistry {
         public int virtualUserId() { return virtualUserId; }
         public String uriPrefix() { return uriPrefix; }
         public int flags() { return flags; }
+        public boolean prefix() { return prefix; }
         public boolean oneTime() { return oneTime; }
         public long expiresAtMs() { return expiresAtMs; }
+
+        private Grant reboundSession(String oldSessionId, long oldGeneration,
+                                     String newSessionId, long newGeneration) {
+            String reboundOwnerSession = ownerSessionId;
+            long reboundOwnerGeneration = ownerGeneration;
+            if (ownerSessionId.equals(oldSessionId) && ownerGeneration == oldGeneration) {
+                reboundOwnerSession = newSessionId;
+                reboundOwnerGeneration = newGeneration;
+            }
+            String reboundTargetSession = targetSessionId;
+            long reboundTargetGeneration = targetGeneration;
+            if (targetSessionId.equals(oldSessionId) && targetGeneration == oldGeneration) {
+                reboundTargetSession = newSessionId;
+                reboundTargetGeneration = newGeneration;
+            }
+            if (reboundOwnerSession.equals(ownerSessionId)
+                    && reboundOwnerGeneration == ownerGeneration
+                    && reboundTargetSession.equals(targetSessionId)
+                    && reboundTargetGeneration == targetGeneration) {
+                return this;
+            }
+            return new Grant(id, ownerInstanceId, reboundOwnerSession, reboundOwnerGeneration,
+                    targetInstanceId, reboundTargetSession, reboundTargetGeneration,
+                    virtualUserId, uriPrefix, flags, oneTime, prefix, expiresAtMs);
+        }
+
+        private Grant withAccessFlags(int accessFlags) {
+            int projectedFlags = accessFlags | (prefix ? PREFIX : 0);
+            return new Grant(id, ownerInstanceId, ownerSessionId, ownerGeneration,
+                    targetInstanceId, targetSessionId, targetGeneration, virtualUserId,
+                    uriPrefix, projectedFlags, oneTime, prefix, expiresAtMs);
+        }
     }
 
     public static final class AuthorizationResult {
@@ -131,23 +170,55 @@ public final class UriGrantRegistry {
                                     String targetInstanceId, String targetSessionId, long targetGeneration,
                                     int virtualUserId, String uriPrefix, int flags, boolean oneTime,
                                     long nowMs, long ttlMs) {
+        // Preserve the original low-level API's path-prefix behavior for existing callers.
+        // Context.grantUriPermission uses the package-scoped API below and gets Android's
+        // exact-vs-prefix behavior from FLAG_GRANT_PREFIX_URI_PERMISSION.
+        return grantInternal(ownerInstanceId, ownerSessionId, ownerGeneration, targetInstanceId,
+                targetSessionId, targetGeneration, virtualUserId, uriPrefix, flags, oneTime,
+                true, nowMs, ttlMs);
+    }
+
+    /**
+     * Creates a package-scoped grant. The recipient may be cold or may later move to another
+     * process generation; its stable virtual package instance remains the authorization fence.
+     */
+    public synchronized Grant grantForTargetInstance(String ownerInstanceId, String ownerSessionId,
+                                    long ownerGeneration, String targetInstanceId,
+                                    int virtualUserId, String uriPrefix, int flags, boolean oneTime,
+                                    long nowMs, long ttlMs) {
+        return grantInternal(ownerInstanceId, ownerSessionId, ownerGeneration, targetInstanceId,
+                "", 0L, virtualUserId, uriPrefix, flags, oneTime,
+                (flags & PREFIX) != 0, nowMs, ttlMs);
+    }
+
+    private Grant grantInternal(String ownerInstanceId, String ownerSessionId,
+                                    long ownerGeneration, String targetInstanceId,
+                                    String targetSessionId, long targetGeneration,
+                                    int virtualUserId, String uriPrefix, int flags, boolean oneTime,
+                                    boolean prefix, long nowMs, long ttlMs) {
         requireText(ownerInstanceId, "ownerInstanceId");
         requireText(ownerSessionId, "ownerSessionId");
         requireText(targetInstanceId, "targetInstanceId");
-        requireText(targetSessionId, "targetSessionId");
-        if (ownerGeneration < 1 || targetGeneration < 1) {
-            throw new IllegalArgumentException("generations must be positive");
+        if (targetSessionId == null) targetSessionId = "";
+        if (targetSessionId.isEmpty() != (targetGeneration == 0L)) {
+            throw new IllegalArgumentException("target session identity must be both present or absent");
+        }
+        if (ownerGeneration < 1 || targetGeneration < 0) {
+            throw new IllegalArgumentException("generations must be non-negative");
         }
         if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
         requireFlags(flags);
-        if (ttlMs < 1 || ttlMs > MAX_TTL_MS) throw new IllegalArgumentException("invalid URI grant ttlMs");
+        if (ttlMs != DURABLE_TTL_MS && (ttlMs < 1 || ttlMs > MAX_TTL_MS)) {
+            throw new IllegalArgumentException("invalid URI grant ttlMs");
+        }
         purgeExpired(nowMs);
         if (grants.size() >= MAX_ACTIVE_GRANTS) throw new IllegalStateException("URI_GRANT_CAPACITY_EXHAUSTED");
         String id;
         do { id = UUID.randomUUID().toString(); } while (grants.containsKey(id));
+        long expiresAtMs = ttlMs == DURABLE_TTL_MS ? Long.MAX_VALUE : Math.addExact(nowMs, ttlMs);
         Grant grant = new Grant(id, ownerInstanceId, ownerSessionId, ownerGeneration,
                 targetInstanceId, targetSessionId, targetGeneration, virtualUserId,
-                normalize(uriPrefix), flags, oneTime, Math.addExact(nowMs, ttlMs));
+                normalize(uriPrefix), flags, oneTime, prefix, expiresAtMs);
         grants.put(id, grant);
         return grant;
     }
@@ -180,6 +251,28 @@ public final class UriGrantRegistry {
         return true;
     }
 
+    /** Revokes the caller package's matching grants, preserving any unrequested access mode. */
+    public synchronized int revokeOwned(String ownerInstanceId, String uri, int flags, long nowMs) {
+        requireText(ownerInstanceId, "ownerInstanceId");
+        String normalizedUri = normalize(uri);
+        requireFlags(flags);
+        purgeExpired(nowMs);
+        int requestedAccess = flags & (READ | WRITE);
+        int changed = 0;
+        for (Map.Entry<String, Grant> item : new ArrayList<>(grants.entrySet())) {
+            Grant grant = item.getValue();
+            if (!grant.ownerInstanceId.equals(ownerInstanceId)) continue;
+            if (!matchesRevocationUri(grant, normalizedUri)) continue;
+            int currentAccess = grant.flags & (READ | WRITE);
+            int remaining = currentAccess & ~requestedAccess;
+            if (remaining == currentAccess) continue;
+            if (remaining == 0) grants.remove(item.getKey());
+            else grants.put(item.getKey(), grant.withAccessFlags(remaining));
+            changed++;
+        }
+        return changed;
+    }
+
     public synchronized int revokeSession(String sessionId, long generation) {
         requireText(sessionId, "sessionId");
         List<String> ids = new ArrayList<>();
@@ -191,6 +284,35 @@ public final class UriGrantRegistry {
         }
         for (String id : ids) grants.remove(id);
         return ids.size();
+    }
+
+    /**
+     * Moves grants across a recoverable process generation without changing package ownership.
+     *
+     * <p>Transient Provider transport capabilities (Cursor, FD, observer Binder) are correctly
+     * generation-bound and must be revoked on process death.  A URI permission is different: it
+     * is an ActivityManager-owned authorization and must remain usable when the recipient is
+     * cold-started after a crash.  Rebinding both owner and recipient session references keeps
+     * the authorization fence while preserving that Android lifecycle semantic.</p>
+     */
+    public synchronized int rebindSession(String oldSessionId, long oldGeneration,
+                                           String newSessionId, long newGeneration) {
+        requireText(oldSessionId, "oldSessionId");
+        requireText(newSessionId, "newSessionId");
+        if (oldGeneration < 1 || newGeneration <= oldGeneration) {
+            throw new IllegalArgumentException("new generation must increase");
+        }
+        int rebound = 0;
+        for (Map.Entry<String, Grant> item : new ArrayList<>(grants.entrySet())) {
+            Grant current = item.getValue();
+            Grant next = current.reboundSession(oldSessionId, oldGeneration,
+                    newSessionId, newGeneration);
+            if (next != current) {
+                grants.put(item.getKey(), next);
+                rebound++;
+            }
+        }
+        return rebound;
     }
 
     public synchronized int revokeInstance(String instanceId) {
@@ -266,14 +388,24 @@ public final class UriGrantRegistry {
     private static boolean matchesIdentity(Grant grant, String targetInstanceId, String targetSessionId,
                                            long targetGeneration, int virtualUserId) {
         return grant.targetInstanceId.equals(targetInstanceId)
-                && grant.targetSessionId.equals(targetSessionId)
-                && grant.targetGeneration == targetGeneration
+                && (grant.targetSessionId.isEmpty()
+                    || (grant.targetSessionId.equals(targetSessionId)
+                        && grant.targetGeneration == targetGeneration))
                 && grant.virtualUserId == virtualUserId;
     }
 
     private static boolean covers(Grant grant, Requirement requirement) {
         if ((grant.flags & requirement.flags) != requirement.flags) return false;
-        return requirement.uri.equals(grant.uriPrefix) || requirement.uri.startsWith(grant.uriPrefix + "/");
+        return grant.prefix
+                ? requirement.uri.equals(grant.uriPrefix)
+                    || requirement.uri.startsWith(grant.uriPrefix + "/")
+                : requirement.uri.equals(grant.uriPrefix);
+    }
+
+    private static boolean matchesRevocationUri(Grant grant, String uri) {
+        if (grant.uriPrefix.equals(uri)) return true;
+        if (grant.prefix && uri.startsWith(grant.uriPrefix + "/")) return true;
+        return grant.prefix && grant.uriPrefix.startsWith(uri + "/");
     }
 
     private int purgeExpired(long nowMs) {
@@ -293,7 +425,9 @@ public final class UriGrantRegistry {
     }
 
     private static int requireFlags(int flags) {
-        if ((flags & ~(READ | WRITE)) != 0 || flags == 0) throw new IllegalArgumentException("invalid URI grant flags");
+        if ((flags & ~(READ | WRITE | PREFIX)) != 0 || (flags & (READ | WRITE)) == 0) {
+            throw new IllegalArgumentException("invalid URI grant flags");
+        }
         return flags;
     }
 

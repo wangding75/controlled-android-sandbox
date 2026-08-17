@@ -220,8 +220,8 @@ final class SxSandboxAdapter implements SandboxSdk {
     }
 
     @Override public SandboxOperationResult deleteInstance(SandboxIdentity identity) throws Exception {
-        SandboxRecord record = requireRecord(identity);
-        runtime.stop(record, identity.virtualUserId());
+        // PackageManagementSession is the single lifecycle authority.  It performs the stop
+        // barrier and data/catalog transaction atomically for every caller, including SDK calls.
         packageService.deleteInstance(identity.packageName(), identity.virtualUserId());
         return SandboxOperationResult.success("deleteInstance", "DELETED", identity, Map.of());
     }

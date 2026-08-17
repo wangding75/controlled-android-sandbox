@@ -4,7 +4,9 @@ import android.os.Binder;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
+import com.warden.controlledsandbox.contract.IPackageRuntimeQuerySession;
 import com.warden.controlledsandbox.contract.IPackageService;
+import com.warden.controlledsandbox.contract.PackageAuthorityCapabilityContract;
 import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
@@ -54,12 +56,35 @@ final class PackageServiceBinder extends IPackageService.Stub {
 
     @Override public void registerManagementCapability(IBinder capability,
             long capabilityGeneration) {
-        throw new SecurityException("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED");
+        if (capabilityGeneration != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH) {
+            throw new SecurityException("PACKAGE_AUTHORITY_CLIENT_EPOCH_FORBIDDEN");
+        }
+        // This is a recovery handshake, not a public registration API.  The caller must be the
+        // signed host UID; the registry pins the capability to this exact Binder caller PID and
+        // still links its death.  It repairs the narrow window in which Package Service survives
+        // a host-process restart before Android delivers the bootstrap ServiceConnection death.
+        PackageCallerVerifier.VerifiedCaller caller = dependencies.callerVerifier.managementCaller();
+        dependencies.capabilityRegistry.installManagement(capability, caller.uid, caller.pid);
     }
 
     @Override public void registerRuntimeCapability(IBinder capability,
             long capabilityGeneration) {
-        throw new SecurityException("PACKAGE_AUTHORITY_PUBLIC_BOOTSTRAP_DISABLED");
+        if (capabilityGeneration != PackageAuthorityCapabilityContract.SERVER_MANAGED_EPOCH) {
+            throw new SecurityException("PACKAGE_AUTHORITY_CLIENT_EPOCH_FORBIDDEN");
+        }
+        // Runtime and companion processes use the same recovery path.  Role selection remains
+        // derived from the server-side caller verifier, never from a caller-supplied package name.
+        PackageCallerVerifier.VerifiedCaller caller = dependencies.callerVerifier.runtimeCaller();
+        if (PackageCallerVerifier.HOST_RUNTIME_ROLE.equals(caller.role)) {
+            dependencies.capabilityRegistry.installRuntime(capability, caller.uid, caller.pid);
+        } else if (caller.role.startsWith(PackageCallerVerifier.COMPANION_RUNTIME_ROLE_PREFIX)) {
+            String packageName = caller.role.substring(
+                    PackageCallerVerifier.COMPANION_RUNTIME_ROLE_PREFIX.length());
+            dependencies.capabilityRegistry.installCompanionRuntime(
+                    packageName, capability, caller.uid, caller.pid);
+        } else {
+            throw new SecurityException("RUNTIME_PERMISSION_CALLER_NOT_TRUSTED_UID");
+        }
     }
 
     @Override public IPackageManagementSession openManagementSessionWithCapability(
@@ -73,6 +98,18 @@ final class PackageServiceBinder extends IPackageService.Stub {
                 capability, capabilityGeneration);
         linkClientDeath(clientToken, session,
                 "PACKAGE_MANAGEMENT_CLIENT_TOKEN_DEAD");
+        return session;
+    }
+
+    @Override public IPackageRuntimeQuerySession openRuntimePackageQuerySessionWithCapability(
+            IBinder clientToken, IBinder capability, long capabilityGeneration) {
+        requireClientToken(clientToken, "PACKAGE_RUNTIME_QUERY_CLIENT_TOKEN_REQUIRED");
+        dependencies.capabilityRegistry.requireRuntime(capability, capabilityGeneration);
+        int ownerUid = Binder.getCallingUid();
+        int ownerPid = Binder.getCallingPid();
+        PackageRuntimeQuerySession session = new PackageRuntimeQuerySession(
+                dependencies, ownerUid, ownerPid, clientToken, capability, capabilityGeneration);
+        linkClientDeath(clientToken, session, "PACKAGE_RUNTIME_QUERY_CLIENT_TOKEN_DEAD");
         return session;
     }
 

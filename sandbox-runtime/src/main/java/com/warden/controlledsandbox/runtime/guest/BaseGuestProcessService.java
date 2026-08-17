@@ -23,6 +23,9 @@ public abstract class BaseGuestProcessService extends Service {
                     case RuntimeOperationRequest.PREPARE_GUEST -> prepareGuestInternal(request.payload());
                     case RuntimeOperationRequest.INVOKE_COMPONENT -> invokeComponentInternal(request.payload());
                     case RuntimeOperationRequest.GUEST_RUNTIME_STATUS -> runtimeStatusInternal();
+                    case RuntimeOperationRequest.SEND_PENDING_INTENT ->
+                            sendPendingIntentInternal(request.sessionId(), request.generation(),
+                                    request.payload());
                     default -> throw new IllegalArgumentException(
                             "unsupported guest operation: " + request.operation());
                 };
@@ -52,6 +55,10 @@ public abstract class BaseGuestProcessService extends Service {
 
     private Bundle runtimeStatusInternal() {
         return GuestRuntimeEnvironment.status();
+    }
+
+    private Bundle sendPendingIntentInternal(String sessionId, long generation, Bundle request) {
+        return GuestRuntimeEnvironment.sendPersistentPendingIntent(sessionId, generation, request);
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }

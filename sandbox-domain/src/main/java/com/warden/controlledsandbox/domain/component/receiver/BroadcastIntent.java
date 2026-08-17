@@ -12,15 +12,23 @@ public final class BroadcastIntent {
     private final Set<String> categories;
     private final String scheme;
     private final String host;
+    private final int port;
     private final String path;
     private final String mimeType;
 
     public BroadcastIntent(String action, Set<String> categories, String scheme,
                            String host, String path, String mimeType) {
+        this(action, categories, scheme, host, -1, path, mimeType);
+    }
+
+    public BroadcastIntent(String action, Set<String> categories, String scheme,
+                           String host, int port, String path, String mimeType) {
         this.action = requireText(action, "action");
         this.categories = immutableTextSet(categories, "category");
         this.scheme = normalizeLimited(scheme, 128, "scheme");
         this.host = normalizeLimited(host, 255, "host").toLowerCase(Locale.ROOT);
+        if (port < -1 || port > 65535) throw new IllegalArgumentException("port out of range");
+        this.port = port;
         this.path = normalizePath(normalizeLimited(path, 4096, "path"));
         this.mimeType = normalizeLimited(mimeType, 255, "mimeType").toLowerCase(Locale.ROOT);
         if (!this.mimeType.isEmpty() && !validMime(this.mimeType)) {
@@ -32,16 +40,21 @@ public final class BroadcastIntent {
         if (!this.path.isEmpty() && this.scheme.isEmpty()) {
             throw new IllegalArgumentException("Broadcast path requires scheme");
         }
+        if (this.port >= 0 && this.host.isEmpty()) {
+            throw new IllegalArgumentException("Broadcast port requires host");
+        }
     }
 
     public String action() { return action; }
     public Set<String> categories() { return categories; }
     public String scheme() { return scheme; }
     public String host() { return host; }
+    public int port() { return port; }
     public String path() { return path; }
     public String mimeType() { return mimeType; }
     public boolean hasData() {
-        return !scheme.isEmpty() || !host.isEmpty() || !path.isEmpty() || !mimeType.isEmpty();
+        return !scheme.isEmpty() || !host.isEmpty() || port >= 0 || !path.isEmpty()
+                || !mimeType.isEmpty();
     }
 
     static boolean validMime(String value) {

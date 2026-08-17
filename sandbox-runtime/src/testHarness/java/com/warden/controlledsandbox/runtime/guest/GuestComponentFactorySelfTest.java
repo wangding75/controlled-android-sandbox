@@ -20,27 +20,27 @@ public final class GuestComponentFactorySelfTest {
 
         ClassLoader processLoader = GuestComponentFactory.instantiateClassLoader(loader,
                 CountingFactory.class.getName(), new ApplicationInfo());
-        require(processLoader == loader, "default factory returns the same ClassLoader");
+        require(processLoader != loader, "factory may return a derived ClassLoader");
         require(CountingFactory.classLoaders == 1, "LoadedApk wraps ClassLoader through factory first");
 
-        Application first = GuestComponentFactory.instantiateApplication(loader,
+        Application first = GuestComponentFactory.instantiateApplication(processLoader,
                 CountingFactory.class.getName(), GuestApplication.class.getName());
-        Application second = GuestComponentFactory.instantiateApplication(loader,
+        Application second = GuestComponentFactory.instantiateApplication(processLoader,
                 CountingFactory.class.getName(), GuestApplication.class.getName());
         require(first instanceof GuestApplication && second instanceof GuestApplication,
                 "application instantiated through factory");
-        require(GuestComponentFactory.cachedFactory(loader, CountingFactory.class.getName())
+        require(GuestComponentFactory.cachedFactory(processLoader, CountingFactory.class.getName())
                         == CountingFactory.last,
-                "factory is cached as a process singleton");
+                "derived ClassLoader reuses the LoadedApk factory singleton");
         require(CountingFactory.instances == 1, "factory constructed once for the same loader");
 
-        Activity activity = GuestComponentFactory.instantiateActivity(loader,
+        Activity activity = GuestComponentFactory.instantiateActivity(processLoader,
                 CountingFactory.class.getName(), GuestActivity.class.getName(), new Intent("act"));
-        Service service = GuestComponentFactory.instantiateService(loader,
+        Service service = GuestComponentFactory.instantiateService(processLoader,
                 CountingFactory.class.getName(), GuestService.class.getName(), new Intent("svc"));
-        BroadcastReceiver receiver = GuestComponentFactory.instantiateReceiver(loader,
+        BroadcastReceiver receiver = GuestComponentFactory.instantiateReceiver(processLoader,
                 CountingFactory.class.getName(), GuestReceiver.class.getName(), new Intent("rcv"));
-        ContentProvider provider = GuestComponentFactory.instantiateProvider(loader,
+        ContentProvider provider = GuestComponentFactory.instantiateProvider(processLoader,
                 CountingFactory.class.getName(), GuestProvider.class.getName());
         require(activity instanceof GuestActivity, "activity factory path");
         require(service instanceof GuestService, "service factory path");
@@ -52,18 +52,30 @@ public final class GuestComponentFactorySelfTest {
                 "factory saw every Sandbox-created component type");
         require(CountingFactory.instances == 1, "later component types reuse the same factory");
 
-        Application fallback = GuestComponentFactory.instantiateApplication(loader, "",
+        Application fallback = GuestComponentFactory.instantiateApplication(processLoader, "",
                 GuestApplication.class.getName());
         require(fallback instanceof GuestApplication, "empty factory class falls back");
 
         boolean wrongType = false;
         try {
-            GuestComponentFactory.instantiateApplication(loader,
+            GuestComponentFactory.instantiateApplication(processLoader,
                     GuestApplication.class.getName(), GuestApplication.class.getName());
         } catch (IllegalArgumentException expected) {
             wrongType = expected.getMessage().contains("wrong type");
         }
         require(wrongType, "non-factory class is rejected");
+
+        ClassLoader secondLoader = new ClassLoader(loader) { };
+        Application secondLoaderApplication = GuestComponentFactory.instantiateApplication(
+                secondLoader, CountingFactory.class.getName(), GuestApplication.class.getName());
+        require(secondLoaderApplication instanceof GuestApplication,
+                "a distinct ClassLoader can instantiate the Guest Application");
+        require(GuestComponentFactory.cachedFactory(secondLoader, CountingFactory.class.getName())
+                        != GuestComponentFactory.cachedFactory(loader, CountingFactory.class.getName()),
+                "factory cache is isolated by ClassLoader identity");
+        GuestComponentFactory.clearCacheForLoader(secondLoader);
+        require(GuestComponentFactory.cachedFactory(secondLoader, CountingFactory.class.getName()) == null,
+                "retired ClassLoader factory cache is removed");
         System.out.println("PASS guest AppComponentFactory lifecycle self-test");
     }
 
@@ -89,7 +101,9 @@ public final class GuestComponentFactorySelfTest {
         @Override
         public ClassLoader instantiateClassLoader(ClassLoader cl, ApplicationInfo info) {
             classLoaders++;
-            return super.instantiateClassLoader(cl, info);
+            // Model a production SplitCompat/loader-wrapping factory.  Every later component
+            // call receives the returned loader, but must still use this exact Factory object.
+            return new ClassLoader(cl) { };
         }
 
         @Override

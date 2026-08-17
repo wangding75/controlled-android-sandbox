@@ -1,0 +1,70 @@
+package com.warden.controlledsandbox.runtime.component.receiver;
+
+/** Physical receiver classes keep Android's process allocation stable per ordinary slot. */
+public final class StubReceiverSlots {
+    private StubReceiverSlots() { }
+    public static final class S0 extends BaseStubReceiver { }
+    public static final class S1 extends BaseStubReceiver { }
+    public static final class S2 extends BaseStubReceiver { }
+    public static final class S3 extends BaseStubReceiver { }
+    public static final class S4 extends BaseStubReceiver { }
+    public static final class S5 extends BaseStubReceiver { }
+    public static final class S6 extends BaseStubReceiver { }
+    public static final class S7 extends BaseStubReceiver { }
+    public static final class S8 extends BaseStubReceiver { }
+    public static final class S9 extends BaseStubReceiver { }
+    public static final class S10 extends BaseStubReceiver { }
+    public static final class S11 extends BaseStubReceiver { }
+    public static final class S12 extends BaseStubReceiver { }
+    public static final class S13 extends BaseStubReceiver { }
+    public static final class S14 extends BaseStubReceiver { }
+    public static final class S15 extends BaseStubReceiver { }
+    public static final class S16 extends BaseStubReceiver { }
+    public static final class S17 extends BaseStubReceiver { }
+    public static final class S18 extends BaseStubReceiver { }
+    public static final class S19 extends BaseStubReceiver { }
+    public static final class S20 extends BaseStubReceiver { }
+    public static final class S21 extends BaseStubReceiver { }
+    public static final class S22 extends BaseStubReceiver { }
+    public static final class S23 extends BaseStubReceiver { }
+    public static final class S24 extends BaseStubReceiver { }
+    public static final class S25 extends BaseStubReceiver { }
+    public static final class S26 extends BaseStubReceiver { }
+    public static final class S27 extends BaseStubReceiver { }
+    public static final class S28 extends BaseStubReceiver { }
+    public static final class S29 extends BaseStubReceiver { }
+    public static final class S30 extends BaseStubReceiver { }
+    public static final class S31 extends BaseStubReceiver { }
+    public static final class S32 extends BaseStubReceiver { }
+    public static final class S33 extends BaseStubReceiver { }
+    public static final class S34 extends BaseStubReceiver { }
+    public static final class S35 extends BaseStubReceiver { }
+    public static final class S36 extends BaseStubReceiver { }
+    public static final class S37 extends BaseStubReceiver { }
+    public static final class S38 extends BaseStubReceiver { }
+    public static final class S39 extends BaseStubReceiver { }
+    public static final class S40 extends BaseStubReceiver { }
+    public static final class S41 extends BaseStubReceiver { }
+    public static final class S42 extends BaseStubReceiver { }
+    public static final class S43 extends BaseStubReceiver { }
+    public static final class S44 extends BaseStubReceiver { }
+    public static final class S45 extends BaseStubReceiver { }
+    public static final class S46 extends BaseStubReceiver { }
+    public static final class S47 extends BaseStubReceiver { }
+    public static final class S48 extends BaseStubReceiver { }
+    public static final class S49 extends BaseStubReceiver { }
+    public static final class S50 extends BaseStubReceiver { }
+    public static final class S51 extends BaseStubReceiver { }
+    public static final class S52 extends BaseStubReceiver { }
+    public static final class S53 extends BaseStubReceiver { }
+    public static final class S54 extends BaseStubReceiver { }
+    public static final class S55 extends BaseStubReceiver { }
+    public static final class S56 extends BaseStubReceiver { }
+    public static final class S57 extends BaseStubReceiver { }
+    public static final class S58 extends BaseStubReceiver { }
+    public static final class S59 extends BaseStubReceiver { }
+    public static final class S60 extends BaseStubReceiver { }
+    public static final class S61 extends BaseStubReceiver { }
+    public static final class S62 extends BaseStubReceiver { }
+    public static final class S63 extends BaseStubReceiver { }
+}

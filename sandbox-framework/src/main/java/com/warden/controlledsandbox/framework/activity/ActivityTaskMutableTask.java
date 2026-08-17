@@ -14,10 +14,17 @@ final class ActivityTaskMutableTask {
     final DocumentLaunchMode documentLaunchMode;
     final String documentKey;
     final int rootIntentFlags;
+    final String baseIntentAction;
+    final String baseIntentDataUri;
+    final String baseIntentMimeType;
+    final List<String> baseIntentCategories;
     final boolean excludedFromRecents;
     final boolean retainInRecents;
     long lastActiveSequence;
+    long lastActiveTimeMillis;
     long moveToFrontCount;
+    /** True while the durable virtual task has no corresponding live Host task after restore. */
+    boolean hostTaskDetached;
     final List<ActivityTaskMutableActivity> activities = new ArrayList<>();
 
     ActivityTaskMutableTask(
@@ -30,9 +37,14 @@ final class ActivityTaskMutableTask {
             DocumentLaunchMode documentLaunchMode,
             String documentKey,
             int rootIntentFlags,
+            String baseIntentAction,
+            String baseIntentDataUri,
+            String baseIntentMimeType,
+            List<String> baseIntentCategories,
             boolean excludedFromRecents,
             boolean retainInRecents,
-            long lastActiveSequence) {
+            long lastActiveSequence,
+            long lastActiveTimeMillis) {
         this.taskId = taskId;
         this.virtualUserId = virtualUserId;
         this.packageName = packageName;
@@ -42,9 +54,16 @@ final class ActivityTaskMutableTask {
         this.documentLaunchMode = documentLaunchMode;
         this.documentKey = documentKey;
         this.rootIntentFlags = rootIntentFlags;
+        this.baseIntentAction = baseIntentAction == null ? "" : baseIntentAction;
+        this.baseIntentDataUri = baseIntentDataUri == null ? "" : baseIntentDataUri;
+        this.baseIntentMimeType = baseIntentMimeType == null ? "" : baseIntentMimeType;
+        this.baseIntentCategories = baseIntentCategories == null
+                ? List.of() : List.copyOf(baseIntentCategories);
         this.excludedFromRecents = excludedFromRecents;
         this.retainInRecents = retainInRecents;
         this.lastActiveSequence = lastActiveSequence;
+        this.lastActiveTimeMillis = lastActiveTimeMillis > 0
+                ? lastActiveTimeMillis : System.currentTimeMillis();
     }
 
     TaskSnapshot snapshot() {

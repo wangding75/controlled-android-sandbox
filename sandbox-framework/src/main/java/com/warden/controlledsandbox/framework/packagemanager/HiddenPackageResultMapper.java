@@ -36,6 +36,12 @@ public final class HiddenPackageResultMapper {
         if (isGidLookup(methodName)) {
             return null;
         }
+        if (isEnabledStateLookup(methodName)) {
+            // COMPONENT_ENABLED_STATE_DEFAULT is the only non-error value that does not
+            // disclose a hidden package's real state.  Returning -1 makes callers treat the
+            // package as malformed and diverges from PackageManager's enabled-setting API.
+            return 0;
+        }
         if (InvocationMethodMatcher.named(methodName, "isPackageAvailable")) {
             return false;
         }
@@ -73,6 +79,12 @@ public final class HiddenPackageResultMapper {
         return InvocationMethodMatcher.named(methodName, "getPackageGids", "getPackageGidsEtc");
     }
 
+    static boolean isEnabledStateLookup(String methodName) {
+        return InvocationMethodMatcher.named(methodName,
+                "getApplicationEnabledSetting", "getApplicationEnabledSettingAsUser",
+                "getComponentEnabledSetting");
+    }
+
     static boolean isResolveMethod(String methodName) {
         return InvocationMethodMatcher.named(methodName,
                 "resolveIntent",
@@ -90,16 +102,27 @@ public final class HiddenPackageResultMapper {
     static boolean isQueryOrInventoryMethod(String methodName) {
         return InvocationMethodMatcher.named(methodName,
                 "queryIntentActivities",
+                "queryIntentActivitiesAsUser",
+                "queryIntentActivityOptions",
                 "queryIntentReceivers",
+                "queryIntentReceiversAsUser",
                 "queryBroadcastReceivers",
+                "queryBroadcastReceiversAsUser",
                 "queryIntentServices",
+                "queryIntentServicesAsUser",
+                "queryIntentContentProviders",
+                "queryIntentContentProvidersAsUser",
                 "queryContentProviders",
                 "queryInstrumentation",
                 "getSharedLibraries",
                 "getDeclaredSharedLibraries",
                 "getInstalledPackages",
+                "getInstalledPackagesAsUser",
                 "getInstalledApplications",
-                "getPackagesHoldingPermissions");
+                "getInstalledApplicationsAsUser",
+                "getPackagesHoldingPermissions",
+                "getPackagesHoldingPermissionsAsUser",
+                "getSystemAvailableFeatures");
     }
 
     static boolean isMutationMethod(String methodName) {

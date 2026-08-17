@@ -46,10 +46,15 @@ public final class RuntimeBrokerOperationBoundarySelfTest {
         @Override public Bundle invokeComponent(Bundle request) { return unsupported(); }
         @Override public Bundle grantUriPermission(Bundle request) { return unsupported(); }
         @Override public Bundle revokeUriPermission(Bundle request) { return unsupported(); }
+        @Override public Bundle checkUriPermission(Bundle request) { return unsupported(); }
+        @Override public Bundle openPackageResources(Bundle request) { return unsupported(); }
         @Override public Bundle consumeRoute(String token, String sessionId, long generation) {
             return unsupported();
         }
         @Override public Bundle activityEvent(Bundle request) { return unsupported(); }
+        @Override public Bundle storageOperation(Bundle request, String sessionId, long generation) {
+            return unsupported();
+        }
         @Override public Bundle sessionStatus(String packageName, int virtualUserId) {
             return unsupported();
         }

@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.contract;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import java.util.List;
 
 /** Typed bounded projection of one virtual running or recent task. */
 public final class ActivityTaskSnapshot implements Parcelable {
@@ -12,7 +13,8 @@ public final class ActivityTaskSnapshot implements Parcelable {
                     source.readString(), source.readInt() != 0, source.readString(), source.readString(),
                     source.readInt() != 0, source.readInt() != 0, source.readInt() != 0,
                     source.readInt(), source.readString(), source.readString(),
-                    source.readLong(), source.readLong());
+                    source.readLong(), source.readLong(), source.readInt(), source.readString(), source.readString(),
+                    source.readString(), source.createStringArrayList(), source.readLong());
         }
 
         @Override public ActivityTaskSnapshot[] newArray(int size) {
@@ -36,6 +38,12 @@ public final class ActivityTaskSnapshot implements Parcelable {
     private final String topComponentName;
     private final long lastActiveSequence;
     private final long moveToFrontCount;
+    private final int baseIntentFlags;
+    private final String baseIntentAction;
+    private final String baseIntentDataUri;
+    private final String baseIntentMimeType;
+    private final List<String> baseIntentCategories;
+    private final long lastActiveTimeMillis;
 
     public ActivityTaskSnapshot(
             int taskId,
@@ -53,9 +61,15 @@ public final class ActivityTaskSnapshot implements Parcelable {
             String baseComponentName,
             String topComponentName,
             long lastActiveSequence,
-            long moveToFrontCount) {
+            long moveToFrontCount,
+            int baseIntentFlags,
+            String baseIntentAction,
+            String baseIntentDataUri,
+            String baseIntentMimeType,
+            List<String> baseIntentCategories,
+            long lastActiveTimeMillis) {
         if (taskId < 1 || virtualUserId < 0 || activityCount < 0
-                || lastActiveSequence < 0 || moveToFrontCount < 0) {
+                || lastActiveSequence < 0 || moveToFrontCount < 0 || lastActiveTimeMillis < 0) {
             throw new IllegalArgumentException("invalid Activity task snapshot");
         }
         if (active && activityCount < 1) {
@@ -79,10 +93,50 @@ public final class ActivityTaskSnapshot implements Parcelable {
         this.topComponentName = ContractChecks.optionalText(topComponentName, "topComponentName", 512);
         this.lastActiveSequence = lastActiveSequence;
         this.moveToFrontCount = moveToFrontCount;
+        this.baseIntentFlags = baseIntentFlags;
+        this.baseIntentAction = ContractChecks.optionalText(baseIntentAction, "baseIntentAction", 512);
+        this.baseIntentDataUri = ContractChecks.optionalText(baseIntentDataUri, "baseIntentDataUri", 4096);
+        this.baseIntentMimeType = ContractChecks.optionalText(baseIntentMimeType, "baseIntentMimeType", 255);
+        this.baseIntentCategories = baseIntentCategories == null
+                ? List.of() : List.copyOf(baseIntentCategories);
+        this.lastActiveTimeMillis = lastActiveTimeMillis;
+        if (this.baseIntentCategories.size() > 64) {
+            throw new IllegalArgumentException("baseIntentCategories exceeds 64 values");
+        }
         if (!documentTask && (!this.documentKey.isEmpty()
                 || !"NONE".equals(this.documentLaunchMode))) {
             throw new IllegalArgumentException("non-document task cannot expose document metadata");
         }
+    }
+
+    /** Compatibility constructor for callers compiled before task time was projected. */
+    public ActivityTaskSnapshot(
+            int taskId,
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String affinity,
+            boolean documentTask,
+            String documentLaunchMode,
+            String documentKey,
+            boolean active,
+            boolean excludedFromRecents,
+            boolean retainInRecents,
+            int activityCount,
+            String baseComponentName,
+            String topComponentName,
+            long lastActiveSequence,
+            long moveToFrontCount,
+            int baseIntentFlags,
+            String baseIntentAction,
+            String baseIntentDataUri,
+            String baseIntentMimeType,
+            List<String> baseIntentCategories) {
+        this(taskId, virtualUserId, packageName, packageRevision, affinity, documentTask,
+                documentLaunchMode, documentKey, active, excludedFromRecents,
+                retainInRecents, activityCount, baseComponentName, topComponentName,
+                lastActiveSequence, moveToFrontCount, baseIntentFlags, baseIntentAction,
+                baseIntentDataUri, baseIntentMimeType, baseIntentCategories, 0L);
     }
 
     /** Compatibility constructor for schema-1 task projections. */
@@ -103,7 +157,31 @@ public final class ActivityTaskSnapshot implements Parcelable {
         this(taskId, virtualUserId, packageName, "legacy", affinity, documentTask,
                 documentTask ? "ALWAYS" : "NONE", "", active, excludedFromRecents,
                 retainInRecents, activityCount, baseComponentName, topComponentName,
-                lastActiveSequence, moveToFrontCount);
+                lastActiveSequence, moveToFrontCount, 0, "", "", "", List.of(), 0L);
+    }
+
+    /** Compatibility constructor for the schema-2 task projection without base Intent metadata. */
+    public ActivityTaskSnapshot(
+            int taskId,
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String affinity,
+            boolean documentTask,
+            String documentLaunchMode,
+            String documentKey,
+            boolean active,
+            boolean excludedFromRecents,
+            boolean retainInRecents,
+            int activityCount,
+            String baseComponentName,
+            String topComponentName,
+            long lastActiveSequence,
+            long moveToFrontCount) {
+        this(taskId, virtualUserId, packageName, packageRevision, affinity, documentTask,
+                documentLaunchMode, documentKey, active, excludedFromRecents,
+                retainInRecents, activityCount, baseComponentName, topComponentName,
+                lastActiveSequence, moveToFrontCount, 0, "", "", "", List.of(), 0L);
     }
 
     public int taskId() { return taskId; }
@@ -122,6 +200,12 @@ public final class ActivityTaskSnapshot implements Parcelable {
     public String topComponentName() { return topComponentName; }
     public long lastActiveSequence() { return lastActiveSequence; }
     public long moveToFrontCount() { return moveToFrontCount; }
+    public int baseIntentFlags() { return baseIntentFlags; }
+    public String baseIntentAction() { return baseIntentAction; }
+    public String baseIntentDataUri() { return baseIntentDataUri; }
+    public String baseIntentMimeType() { return baseIntentMimeType; }
+    public List<String> baseIntentCategories() { return baseIntentCategories; }
+    public long lastActiveTimeMillis() { return lastActiveTimeMillis; }
 
     @Override public int describeContents() { return 0; }
 
@@ -142,5 +226,11 @@ public final class ActivityTaskSnapshot implements Parcelable {
         dest.writeString(topComponentName);
         dest.writeLong(lastActiveSequence);
         dest.writeLong(moveToFrontCount);
+        dest.writeInt(baseIntentFlags);
+        dest.writeString(baseIntentAction);
+        dest.writeString(baseIntentDataUri);
+        dest.writeString(baseIntentMimeType);
+        dest.writeStringList(baseIntentCategories);
+        dest.writeLong(lastActiveTimeMillis);
     }
 }

@@ -39,6 +39,10 @@ public final class ActivityTaskLedger {
     private final Map<String, ActivityTaskMutableActivity> activitiesByToken = new LinkedHashMap<>();
     private final Map<String, List<ActivityResultDelivery>> resultDeliveriesByCaller =
             new LinkedHashMap<>();
+    private final ActivityTaskActivityStateCoordinator activityState =
+            new ActivityTaskActivityStateCoordinator(
+                    this, nextConfigurationSequence, tasks, activitiesByToken,
+                    resultDeliveriesByCaller, MAX_RESULT_REGISTRATIONS);
     private final ActivityTaskCheckpointCoordinator checkpointCoordinator =
             new ActivityTaskCheckpointCoordinator(
                     nextTaskId, nextNewIntentSequence, nextConfigurationSequence,
@@ -123,6 +127,16 @@ public final class ActivityTaskLedger {
             clearTaskForReuse(target);
         }
 
+        // Android performs task-reset pruning only when an existing task is being brought to the
+        // front with RESET_TASK_IF_NEEDED. The launching ActivityInfo controls force-reset, while
+        // each retained ActivityInfo controls whether that Activity is finished.
+        int resetRemoved = 0;
+        if (!clearTask && !createdTask
+                && LaunchFlags.has(request.flags(), LaunchFlags.NEW_TASK)
+                && LaunchFlags.has(request.flags(), LaunchFlags.RESET_TASK_IF_NEEDED)) {
+            resetRemoved = resetTaskIfNeeded(target, request);
+        }
+
         if (request.launchMode() == LaunchMode.SINGLE_INSTANCE_PER_TASK) {
             int existingIndex = findIndex(target, request.identity());
             if (existingIndex >= 0) {
@@ -134,7 +148,7 @@ public final class ActivityTaskLedger {
                         LaunchAction.DELIVERED_NEW_INTENT,
                         target,
                         activity,
-                        removed,
+                        removed + resetRemoved,
                         createdTask,
                         request.routeToken(),
                         callerActivityToken);
@@ -155,7 +169,7 @@ public final class ActivityTaskLedger {
                         LaunchAction.REORDERED_TO_FRONT,
                         target,
                         activity,
-                        0,
+                        resetRemoved,
                         createdTask,
                         request.routeToken(),
                         callerActivityToken);
@@ -176,7 +190,7 @@ public final class ActivityTaskLedger {
                             LaunchAction.CLEARED_TOP,
                             target,
                             activity,
-                            removed,
+                            removed + resetRemoved,
                             createdTask,
                             request.routeToken(),
                             callerActivityToken);
@@ -191,7 +205,7 @@ public final class ActivityTaskLedger {
                         LaunchAction.CLEARED_TOP,
                         target,
                         replacement,
-                        removed,
+                        removed + resetRemoved,
                         createdTask,
                         request.routeToken(),
                         callerActivityToken);
@@ -208,7 +222,7 @@ public final class ActivityTaskLedger {
                     LaunchAction.DELIVERED_NEW_INTENT,
                     target,
                     top,
-                    0,
+                    resetRemoved,
                     createdTask,
                     request.routeToken(),
                     callerActivityToken);
@@ -227,181 +241,103 @@ public final class ActivityTaskLedger {
                 createdTask ? LaunchAction.CREATED_TASK : LaunchAction.CREATED_ACTIVITY,
                 target,
                 created,
-                0,
+                resetRemoved,
                 createdTask,
                 request.routeToken(),
                 callerActivityToken);
     }
 
     public synchronized boolean transition(String token, LifecycleState next) {
-        ActivityTaskMutableActivity activity = requireActivity(token);
-        Objects.requireNonNull(next, "next");
-        if (activity.lifecycleState == next) {
-            return false;
-        }
-        if (!activity.lifecycleState.canTransitionTo(next)) {
-            throw new IllegalStateException(
-                    "Invalid lifecycle transition " + activity.lifecycleState + " -> " + next);
-        }
-        if (next == LifecycleState.DESTROYED) {
-            return removeActivityByToken(token, RESULT_CANCELED, "");
-        }
-        activity.lifecycleState = next;
-        return true;
+        return activityState.transition(token, next);
     }
 
     public synchronized boolean finish(String token) {
-        return finishWithResult(token, RESULT_CANCELED, "");
+        return activityState.finish(token);
     }
 
     public synchronized boolean finishWithResult(String token, int resultCode, String dataToken) {
-        String normalizedDataToken = dataToken == null ? "" : dataToken;
-        return removeActivityByToken(token, resultCode, normalizedDataToken, ResultIntentSnapshot.EMPTY);
+        return activityState.finishWithResult(token, resultCode, dataToken);
     }
 
     public synchronized boolean finishWithResult(
             String token,
             int resultCode,
             ResultIntentSnapshot resultIntent) {
-        return removeActivityByToken(token, resultCode, "", Objects.requireNonNull(resultIntent, "resultIntent"));
+        return activityState.finishWithResult(token, resultCode, resultIntent);
     }
 
     public synchronized ActivityResultRegistration registerActivityResult(
             String activityToken,
             String registrationKey) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        String key = requireBoundedText(registrationKey, "registrationKey", 256);
-        Integer existing = activity.resultRegistrations.get(key);
-        if (existing != null) return new ActivityResultRegistration(key, existing);
-        if (activity.resultRegistrations.size() >= MAX_RESULT_REGISTRATIONS) {
-            throw new IllegalStateException("ACTIVITY_RESULT_REGISTRATION_LIMIT");
-        }
-        boolean[] used = new boolean[0x10000];
-        for (Integer value : activity.resultRegistrations.values()) used[value] = true;
-        int requestCode = 0;
-        while (requestCode < used.length && used[requestCode]) requestCode++;
-        if (requestCode == used.length) throw new IllegalStateException("ACTIVITY_RESULT_REQUEST_CODE_EXHAUSTED");
-        activity.resultRegistrations.put(key, requestCode);
-        return new ActivityResultRegistration(key, requestCode);
+        return activityState.registerActivityResult(activityToken, registrationKey);
     }
 
     public synchronized boolean unregisterActivityResult(String activityToken, String registrationKey) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        return activity.resultRegistrations.remove(requireBoundedText(
-                registrationKey, "registrationKey", 256)) != null;
+        return activityState.unregisterActivityResult(activityToken, registrationKey);
     }
 
     public synchronized Optional<ActivityResultRegistration> activityResultRegistration(
             String activityToken,
             String registrationKey) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        String key = requireBoundedText(registrationKey, "registrationKey", 256);
-        Integer requestCode = activity.resultRegistrations.get(key);
-        return requestCode == null ? Optional.empty()
-                : Optional.of(new ActivityResultRegistration(key, requestCode));
+        return activityState.activityResultRegistration(activityToken, registrationKey);
     }
 
     public synchronized boolean deliverActivityResult(String callerActivityToken,
             String resultWho, int requestCode, int resultCode, String intentSenderToken,
             ResultIntentSnapshot resultIntent) {
-        ActivityTaskMutableActivity caller = requireActivity(callerActivityToken);
-        if (requestCode < 0 || requestCode > 0xffff) {
-            throw new IllegalArgumentException("requestCode must be 0..65535");
-        }
-        ActivityResultDelivery delivery = new ActivityResultDelivery(caller.token,
-                "intent-sender:" + requireBoundedText(intentSenderToken, "intentSenderToken", 512),
-                normalizeOptional(resultWho), "", requestCode, resultCode,
-                intentSenderToken, "", Objects.requireNonNull(resultIntent, "resultIntent"));
-        resultDeliveriesByCaller.computeIfAbsent(caller.token, ignored -> new ArrayList<>()).add(delivery);
-        return true;
+        return activityState.deliverActivityResult(callerActivityToken, resultWho, requestCode,
+                resultCode, intentSenderToken, resultIntent);
     }
 
     public synchronized List<ActivityResultDelivery> drainActivityResults(String callerActivityToken) {
-        ActivityTaskMutableActivity caller = requireActivity(callerActivityToken);
-        List<ActivityResultDelivery> deliveries = resultDeliveriesByCaller.remove(caller.token);
-        return deliveries == null ? List.of() : List.copyOf(deliveries);
+        return activityState.drainActivityResults(callerActivityToken);
     }
 
     public synchronized int pendingActivityResultCount(String callerActivityToken) {
-        ActivityTaskMutableActivity caller = requireActivity(callerActivityToken);
-        List<ActivityResultDelivery> deliveries = resultDeliveriesByCaller.get(caller.token);
-        return deliveries == null ? 0 : deliveries.size();
+        return activityState.pendingActivityResultCount(callerActivityToken);
     }
 
     public synchronized Optional<NewIntentDelivery> pollNewIntent(String activityToken) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        if (activity.pendingNewIntents.isEmpty()) {
-            return Optional.empty();
-        }
-        return Optional.of(activity.pendingNewIntents.remove(0));
+        return activityState.pollNewIntent(activityToken);
+    }
+
+    /** Returns whether a framework lifecycle callback still has a live virtual Activity owner. */
+    public synchronized boolean containsActivity(String activityToken) {
+        return activityState.containsActivity(activityToken);
+    }
+
+    /**
+     * A framework-owned onNewIntent route is consumed by the client Instrumentation before the
+     * asynchronous lifecycle evidence reaches the broker. Remove the matching ledger delivery
+     * here so a successful callback cannot remain queued indefinitely. A missing delivery is
+     * treated as an idempotent replay because process death/recovery may have already drained it.
+     */
+    public synchronized boolean acknowledgeNewIntent(String activityToken, String routeToken) {
+        return activityState.acknowledgeNewIntent(activityToken, routeToken);
     }
 
     public synchronized List<NewIntentDelivery> drainNewIntents(String activityToken) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        List<NewIntentDelivery> deliveries = List.copyOf(activity.pendingNewIntents);
-        activity.pendingNewIntents.clear();
-        return deliveries;
+        return activityState.drainNewIntents(activityToken);
     }
 
     public synchronized ActivityProcessIdentity processIdentity(String activityToken) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        return new ActivityProcessIdentity(
-                activity.identity.virtualUserId(),
-                activity.identity.packageName(),
-                activity.processName,
-                activity.processGeneration);
+        return activityState.processIdentity(activityToken);
     }
 
     public synchronized boolean saveInstanceState(String activityToken, SavedActivityState state) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        Objects.requireNonNull(state, "state");
-        if (activity.savedState != null) {
-            if (state.version() < activity.savedState.version()) {
-                throw new IllegalArgumentException("saved-state version must be monotonic");
-            }
-            if (state.version() == activity.savedState.version()) {
-                if (!state.equals(activity.savedState)) {
-                    throw new IllegalArgumentException(
-                            "saved-state version collision with different content");
-                }
-                return false;
-            }
-        }
-        activity.savedState = state;
-        return true;
+        return activityState.saveInstanceState(activityToken, state);
     }
 
     public synchronized Optional<SavedActivityState> savedInstanceState(String activityToken) {
-        return Optional.ofNullable(requireActivity(activityToken).savedState);
+        return activityState.savedInstanceState(activityToken);
     }
 
     public synchronized ConfigurationDecision handleConfigurationChange(
             String activityToken,
             String configurationToken,
             boolean handledByGuest) {
-        ActivityTaskMutableActivity activity = requireActivity(activityToken);
-        String normalizedConfigurationToken = requireText(configurationToken, "configurationToken");
-        long sequence = nextConfigurationSequence.getAndIncrement();
-        activity.configurationCount++;
-        activity.lastConfigurationToken = normalizedConfigurationToken;
-        if (handledByGuest) {
-            return new ConfigurationDecision(
-                    ConfigurationAction.DELIVERED_TO_EXISTING,
-                    activity.token,
-                    activity.token,
-                    sequence,
-                    normalizedConfigurationToken);
-        }
-        ActivityRecreation recreation = rotateActivityToken(
-                activity,
-                activity.processGeneration,
-                RecreationReason.CONFIGURATION_CHANGE);
-        return new ConfigurationDecision(
-                ConfigurationAction.RECREATED,
-                recreation.previousActivityToken(),
-                recreation.currentActivityToken(),
-                sequence,
-                normalizedConfigurationToken);
+        return activityState.handleConfigurationChange(
+                activityToken, configurationToken, handledByGuest);
     }
 
     public synchronized List<ActivityRecreation> recreateProcessGeneration(
@@ -410,30 +346,8 @@ public final class ActivityTaskLedger {
             String processName,
             long staleGeneration,
             long newGeneration) {
-        String normalizedPackageName = requireText(packageName, "packageName");
-        String normalizedProcessName = requireText(processName, "processName");
-        if (staleGeneration < 1 || newGeneration <= staleGeneration) {
-            throw new IllegalArgumentException("new generation must be greater than stale generation");
-        }
-        List<ActivityTaskMutableActivity> candidates = new ArrayList<>();
-        for (ActivityTaskMutableTask task : tasks.values()) {
-            for (ActivityTaskMutableActivity activity : task.activities) {
-                if (activity.identity.virtualUserId() == virtualUserId
-                        && activity.identity.packageName().equals(normalizedPackageName)
-                        && activity.processName.equals(normalizedProcessName)
-                        && activity.processGeneration <= staleGeneration) {
-                    candidates.add(activity);
-                }
-            }
-        }
-        List<ActivityRecreation> recreations = new ArrayList<>();
-        for (ActivityTaskMutableActivity activity : candidates) {
-            recreations.add(rotateActivityToken(
-                    activity,
-                    newGeneration,
-                    RecreationReason.PROCESS_RESTART));
-        }
-        return List.copyOf(recreations);
+        return activityState.recreateProcessGeneration(
+                virtualUserId, packageName, processName, staleGeneration, newGeneration);
     }
 
     public synchronized int invalidateProcessGeneration(
@@ -441,27 +355,8 @@ public final class ActivityTaskLedger {
             String packageName,
             String processName,
             long staleGeneration) {
-        String normalizedPackageName = requireText(packageName, "packageName");
-        String normalizedProcessName = requireText(processName, "processName");
-        if (staleGeneration < 1) {
-            throw new IllegalArgumentException("staleGeneration must be positive");
-        }
-        int removed = 0;
-        List<String> tokens = new ArrayList<>();
-        for (ActivityTaskMutableActivity activity : activitiesByToken.values()) {
-            if (activity.identity.virtualUserId() == virtualUserId
-                    && activity.identity.packageName().equals(normalizedPackageName)
-                    && activity.processName.equals(normalizedProcessName)
-                    && activity.processGeneration <= staleGeneration) {
-                tokens.add(activity.token);
-            }
-        }
-        for (String token : tokens) {
-            if (removeActivityByToken(token, RESULT_CANCELED, "")) {
-                removed++;
-            }
-        }
-        return removed;
+        return activityState.invalidateProcessGeneration(
+                virtualUserId, packageName, processName, staleGeneration);
     }
 
     /** Returns tasks in back-to-front order; the last entry is the foreground task. */
@@ -723,6 +618,26 @@ public final class ActivityTaskLedger {
         return adopted;
     }
 
+    /**
+     * Returns whether the virtual task has to be rebound to a new Host task after a Host restart.
+     * The virtual task/back stack remains durable, but the Android task owned by the previous Host
+     * process is not assumed to survive force-stop, crash, or LMK.
+     */
+    public synchronized boolean hostTaskRebindRequired(int taskId) {
+        ActivityTaskMutableTask task = tasks.get(taskId);
+        if (task == null) throw new IllegalArgumentException("Unknown taskId: " + taskId);
+        return task.hostTaskDetached;
+    }
+
+    /** Marks the physical Host task as attached after a route was consumed by ActivityThread. */
+    public synchronized boolean attachHostTask(int taskId) {
+        ActivityTaskMutableTask task = tasks.get(taskId);
+        if (task == null) throw new IllegalArgumentException("Unknown taskId: " + taskId);
+        if (!task.hostTaskDetached) return false;
+        task.hostTaskDetached = false;
+        return true;
+    }
+
     public synchronized int taskCount() {
         return tasks.size();
     }
@@ -801,7 +716,13 @@ public final class ActivityTaskLedger {
                 base == null ? "" : base.identity.componentName(),
                 top == null ? "" : top.identity.componentName(),
                 task.lastActiveSequence,
-                task.moveToFrontCount);
+                task.moveToFrontCount,
+                task.rootIntentFlags,
+                task.baseIntentAction,
+                task.baseIntentDataUri,
+                task.baseIntentMimeType,
+                task.baseIntentCategories,
+                task.lastActiveTimeMillis);
     }
 
     private void archiveTask(ActivityTaskMutableTask task) {
@@ -828,7 +749,13 @@ public final class ActivityTaskLedger {
                 base == null ? "" : base.identity.componentName(),
                 top == null ? "" : top.identity.componentName(),
                 task.lastActiveSequence,
-                task.moveToFrontCount);
+                task.moveToFrontCount,
+                task.rootIntentFlags,
+                task.baseIntentAction,
+                task.baseIntentDataUri,
+                task.baseIntentMimeType,
+                task.baseIntentCategories,
+                task.lastActiveTimeMillis);
         recentTasks.remove(task.taskId);
         recentTasks.put(task.taskId, snapshot);
         trimRecentTasks();
@@ -988,9 +915,14 @@ public final class ActivityTaskLedger {
                 documentMode,
                 documentTask ? request.documentKey() : "",
                 request.flags(),
+                request.intentAction(),
+                request.intentDataUri(),
+                request.intentMimeType(),
+                request.intentCategories(),
                 LaunchFlags.has(request.flags(), LaunchFlags.EXCLUDE_FROM_RECENTS),
                 LaunchFlags.has(request.flags(), LaunchFlags.RETAIN_IN_RECENTS),
-                nextActivationSequence.getAndIncrement());
+                nextActivationSequence.getAndIncrement(),
+                System.currentTimeMillis());
         tasks.put(id, task);
         return task;
     }
@@ -1010,6 +942,10 @@ public final class ActivityTaskLedger {
                 request.resultWho(),
                 request.requestCode(),
                 request.flags(),
+                request.activityInfoFlags(),
+                request.taskAffinity(),
+                ActivityInfoTaskFlags.has(
+                        request.activityInfoFlags(), ActivityInfoTaskFlags.ALLOW_TASK_REPARENTING),
                 LaunchFlags.has(request.flags(), LaunchFlags.NO_HISTORY));
         activitiesByToken.put(token, activity);
         return activity;
@@ -1023,10 +959,14 @@ public final class ActivityTaskLedger {
         ActivityTaskMutableTask found = null;
         for (ActivityTaskMutableTask task : tasks.values()) {
             if (task.virtualUserId == virtualUserId
-                    && task.packageName.equals(packageName)
-                    && task.packageRevision.equals(packageRevision)
                     && task.affinity.equals(affinity)
                     && !task.documentTask) {
+                // A task affinity is a virtual Android-world namespace, not a package-private
+                // key. Preserve revision fencing for same-package reuse, but allow an exported
+                // cross-package launch (already authorized by the broker resolver) to reuse the
+                // matching affinity task just like ActivityTaskManager/VA/NBB.
+                boolean samePackage = task.packageName.equals(packageName);
+                if (samePackage && !task.packageRevision.equals(packageRevision)) continue;
                 found = task;
             }
         }
@@ -1134,6 +1074,73 @@ public final class ActivityTaskLedger {
         return removed;
     }
 
+    /**
+     * Applies the broker equivalent of ActivityTaskManager's resetTaskIfNeeded pass.
+     *
+     * <p>The task root is never removed by a reset. A launcher Activity with
+     * {@code FLAG_CLEAR_TASK_ON_LAUNCH} requests a force reset; otherwise only Activities whose
+     * virtual ActivityInfo carries {@code FLAG_FINISH_ON_TASK_LAUNCH} are removed. A root carrying
+     * {@code FLAG_ALWAYS_RETAIN_TASK_STATE} suppresses ordinary pruning, matching the platform
+     * contract while still allowing an explicit force reset.</p>
+     */
+    private int resetTaskIfNeeded(ActivityTaskMutableTask task, LaunchRequest request) {
+        if (task == null) return 0;
+        reparentActivitiesToTask(task);
+        if (task.activities.size() <= 1) return 0;
+        ActivityTaskMutableActivity root = task.activities.get(0);
+        boolean forceReset = ActivityInfoTaskFlags.has(
+                request.activityInfoFlags(), ActivityInfoTaskFlags.CLEAR_TASK_ON_LAUNCH);
+        boolean rootRetains = ActivityInfoTaskFlags.has(
+                root.activityInfoFlags, ActivityInfoTaskFlags.ALWAYS_RETAIN_TASK_STATE);
+        if (rootRetains && !forceReset) return 0;
+
+        int removed = 0;
+        for (int index = task.activities.size() - 1; index > 0; index--) {
+            ActivityTaskMutableActivity activity = task.activities.get(index);
+            boolean finishOnReset = ActivityInfoTaskFlags.has(
+                    activity.activityInfoFlags, ActivityInfoTaskFlags.FINISH_ON_TASK_LAUNCH);
+            if (forceReset || finishOnReset) {
+                removeActivityAt(task, index, false, RESULT_CANCELED, "");
+                removed++;
+            }
+        }
+        ensureTaskRegistered(task);
+        return removed;
+    }
+
+    /**
+     * Applies the ActivityInfo {@code allowTaskReparenting} edge during a task reset.
+     *
+     * <p>The old implementation parsed and projected the flag but never moved the Activity. That
+     * made cross-package task affinity appear correct in PackageManager while leaving the actual
+     * Activity stack inconsistent with Android. Reparenting is deliberately limited to the same
+     * virtual user, non-document tasks, matching affinity, and a target that can legally accept the
+     * incoming Activity (notably preserving singleInstance isolation).</p>
+     */
+    private void reparentActivitiesToTask(ActivityTaskMutableTask target) {
+        if (target == null || target.documentTask || target.affinity.isEmpty()) return;
+        for (ActivityTaskMutableTask source : new ArrayList<>(tasks.values())) {
+            if (source == target || source.documentTask
+                    || source.virtualUserId != target.virtualUserId) continue;
+            for (ActivityTaskMutableActivity activity : new ArrayList<>(source.activities)) {
+                if (!activity.allowTaskReparenting
+                        || !activity.taskAffinity.equals(target.affinity)
+                        || !canAcceptActivity(target, activity.identity)
+                        || (activity.launchMode == LaunchMode.SINGLE_INSTANCE
+                        && !target.activities.isEmpty())) {
+                    continue;
+                }
+                source.activities.remove(activity);
+                target.activities.add(activity);
+            }
+            if (source.activities.isEmpty()) {
+                recentTasks.remove(source.taskId);
+                tasks.remove(source.taskId);
+            }
+        }
+        ensureTaskRegistered(target);
+    }
+
     private void clearTaskForReuse(ActivityTaskMutableTask task) {
         while (!task.activities.isEmpty()) {
             removeActivityAt(
@@ -1171,11 +1178,11 @@ public final class ActivityTaskLedger {
         }
     }
 
-    private boolean removeActivityByToken(String token, int resultCode, String dataToken) {
+    boolean removeActivityByToken(String token, int resultCode, String dataToken) {
         return removeActivityByToken(token, resultCode, dataToken, ResultIntentSnapshot.EMPTY);
     }
 
-    private boolean removeActivityByToken(
+    boolean removeActivityByToken(
             String token,
             int resultCode,
             String dataToken,
@@ -1284,7 +1291,7 @@ public final class ActivityTaskLedger {
                 request.requestCode()));
     }
 
-    private ActivityRecreation rotateActivityToken(
+    ActivityRecreation rotateActivityToken(
             ActivityTaskMutableActivity activity,
             long newProcessGeneration,
             RecreationReason reason) {
@@ -1394,7 +1401,7 @@ public final class ActivityTaskLedger {
                 delivery.resultIntent());
     }
 
-    private ActivityTaskMutableActivity requireActivity(String token) {
+    ActivityTaskMutableActivity requireActivity(String token) {
         ActivityTaskMutableActivity activity = activitiesByToken.get(Objects.requireNonNull(token, "token"));
         if (activity == null) {
             throw new IllegalArgumentException("Unknown activity token: " + token);
@@ -1429,6 +1436,7 @@ public final class ActivityTaskLedger {
                 removeNoHistoryTop(previousFront);
             }
             task.lastActiveSequence = nextActivationSequence.getAndIncrement();
+            task.lastActiveTimeMillis = System.currentTimeMillis();
             task.moveToFrontCount++;
             recentTasks.remove(taskId);
             tasks.put(taskId, task);
@@ -1470,7 +1478,8 @@ public final class ActivityTaskLedger {
                 activity.token,
                 routeToken,
                 removedActivityCount,
-                createdNewTask);
+                createdNewTask,
+                task.hostTaskDetached);
     }
 
 

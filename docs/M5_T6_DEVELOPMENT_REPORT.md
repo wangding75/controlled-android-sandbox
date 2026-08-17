@@ -12,13 +12,13 @@ M5-T6 replaces the previous ordinary-route fail-closed placeholder with a dedica
 
 ## Delivered
 
-### Four dedicated workers
+### Sixteen dedicated workers
 
-The runtime manifest declares four non-exported `android:isolatedProcess="true"` Services. Each immutable worker class owns one logical isolated slot. These workers are separate from the eight ordinary Guest process Services.
+The runtime manifest declares sixteen non-exported `android:isolatedProcess="true"` Services. Each immutable worker class owns one logical isolated slot. These workers are separate from the ordinary Guest process pool and are sized by the shared `ProcessSlotContract`.
 
 ### Independent Session and Service state
 
-The Broker owns a second `SessionRegistry` with capacity four and a dedicated `RuntimeServiceCoordinator`. Package/user stop, stale revision purge, Binder death and Broker shutdown clean both ordinary and isolated resources without sharing slots.
+The Broker owns a second `SessionRegistry` with capacity sixteen and a dedicated `RuntimeServiceCoordinator`. Package/user stop, stale revision purge, Binder death and Broker shutdown clean both ordinary and isolated resources without sharing slots.
 
 ### Typed capability protocol
 
@@ -51,7 +51,7 @@ Passed source-side checks cover:
 - deterministic route matching and class normalization;
 - non-Service and wrong-operation rejection;
 - ordinary Guest fail-closed behavior;
-- independent four-slot capacity and saturation;
+- independent sixteen-slot capacity and saturation;
 - isolated process-death recovery and generation advancement;
 - static Android-source compilation and existing regressions.
 

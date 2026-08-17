@@ -17,6 +17,9 @@ interface IRuntimeBroker {
     PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
         String permission, int requestCode, boolean hostGranted, String reason);
     RuntimeStatusResult runtimeStatusV2(in RuntimeStatusRequest request);
+    // Authoritative virtual UID lookup used when constructing PackageManager projections.
+    // The mapping is owned by Runtime Broker and must not be recreated by a caller.
+    int virtualUidFor(String packageName, int virtualUserId);
     // Legacy compatibility only. New callers must use runtimeStatusV2.
     void stopGuest(String packageName, int virtualUserId);
 }

@@ -23,8 +23,11 @@ serial, boot ID, manager metadata, APK hashes, and Git HEAD.
 
 The bounded diagnostic run passed Activity launch/resume, Service start/stop,
 Provider preparation, 32-bit companion probes, teardown, a 30-second stability
-window, and simultaneous user0/user1 Guest slots. Direct clear/delete replay also
-passed with a fresh generation and process slot after deletion.
+window, and simultaneous user0/user1 Guest slots. The later API32 full regression
+passed 9/9 transport/recovery/lifecycle cases, including real PendingIntent,
+ContentProvider batch, remote process routing, isolated Service transport, clear/delete/
+reinstall, and cross-ABI lifecycle. Quark also passed a 300-second/30-tick run with
+one stable PID, `processCount=1`, and zero errors.
 
 ## Review rules
 
@@ -32,15 +35,15 @@ Static source/self-test evidence and device evidence are separate gates. `PREPAR
 host trampoline completion, or a Java proxy self-test is not Framework ownership.
 Android 13–16 results are not inferred from an API32 simulator.
 
-The final result remains BLOCKED because the dedicated real PendingIntent
-`IIntentSender` fixture has not been run, the bounded diagnostic run is not the
+The overall VA/NBB/VA Pro comparison remains BLOCKED as a final claim: API32 baseline
+evidence is now strong, but the bounded transport evidence is no longer pending; the
 formal 1200-second stability gate, and API 33–36 remain untested.
 
 ## Changes revalidated
 
 - Activity manifest identity uses the declared component alias and projects task-contract fields into `ActivityInfo`.
-- PendingIntent interception uses positional permission semantics and exposes a descriptor-bearing Binder transport; real cross-process `IIntentSender` evidence remains pending.
-- clear/delete stop the runtime generation before destructive catalog/data mutation and return explicit partial-cleanup failures.
+- PendingIntent interception uses positional permission semantics and exposes a descriptor-bearing Binder transport; API32 RD framework transport reached the real sender route and launched `DetailActivity`.
+- clear/delete stop the runtime generation before destructive catalog/data mutation and return explicit partial-cleanup failures; APK revision replacement now has the same stop-before-catalog-switch barrier.
 - `<queries>` package/provider/intent declarations are parsed and carried through package-state snapshots into guest metadata.
 - Runtime event records carry a shared trace domain, launch/binder identifiers when supplied, virtual user, generation, slot, physical PID, and thread TID.
 - Hardcoded app/SDK-specific native probe names were removed.

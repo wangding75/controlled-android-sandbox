@@ -45,10 +45,17 @@ public final class RuntimeDiagnostics {
     private RuntimeDiagnostics() { }
 
     public static void install(Context context, String processRole) {
+        install(context, processRole, null);
+    }
+
+    /** Install diagnostics into an explicitly broker-provisioned directory when the process is
+     * hosted by an Android isolated UID and cannot write the host Context's data directory. */
+    public static void install(Context context, String processRole, File directoryOverride) {
         if (context == null) return;
         synchronized (LOCK) {
             role = safe(processRole == null ? "unknown" : processRole);
-            File directory = new File(context.getFilesDir(), "runtime-diagnostics");
+            File directory = directoryOverride == null
+                    ? new File(context.getFilesDir(), "runtime-diagnostics") : directoryOverride;
             if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
                 Log.e(TAG, "Cannot create diagnostics directory " + directory);
                 return;

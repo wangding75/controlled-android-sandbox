@@ -1,5 +1,6 @@
 #include "controlled_sandbox/native_network_interceptors.h"
 #include "controlled_sandbox/native_network.h"
+#include "controlled_sandbox/native_policy.h"
 
 #include <algorithm>
 #include <array>
@@ -383,12 +384,18 @@ extern "C" int controlled_close(int descriptor) {
     // Linux releases the descriptor before reporting late close errors. Remove policy state first so
     // another thread cannot reuse the numeric descriptor and then have its new state erased here.
     native_unregister_socket(descriptor);
+    global_policy().unregister_capability_fd(descriptor);
     return function(descriptor);
 }
 
 bool bind_duplicate_or_close(int source, int duplicated) noexcept {
     if (duplicated < 0) return false;
-    if (native_rebind_duplicated_descriptor(source, duplicated)) return true;
+    const bool capability = global_policy().is_capability_fd(source);
+    if (native_rebind_duplicated_descriptor(source, duplicated)) {
+        if (capability) global_policy().register_capability_fd(duplicated);
+        return true;
+    }
+    if (capability) global_policy().register_capability_fd(duplicated);
     CloseFn close_function = require_real(real_close, "close");
     if (close_function != nullptr) (void) close_function(duplicated);
     errno = EMFILE;
@@ -406,6 +413,9 @@ extern "C" int controlled_dup2(int descriptor, int target) {
     Dup2Fn function = require_real(real_dup2, "dup2");
     if (function == nullptr) { errno = ENOSYS; return -1; }
     const int duplicated = function(descriptor, target);
+    if (duplicated >= 0 && duplicated != descriptor) {
+        global_policy().unregister_capability_fd(target);
+    }
     return duplicated < 0 || bind_duplicate_or_close(descriptor, duplicated) ? duplicated : -1;
 }
 
@@ -413,6 +423,9 @@ extern "C" int controlled_dup3(int descriptor, int target, int flags) {
     Dup3Fn function = require_real(real_dup3, "dup3");
     if (function == nullptr) { errno = ENOSYS; return -1; }
     const int duplicated = function(descriptor, target, flags);
+    if (duplicated >= 0 && duplicated != descriptor) {
+        global_policy().unregister_capability_fd(target);
+    }
     return duplicated < 0 || bind_duplicate_or_close(descriptor, duplicated) ? duplicated : -1;
 }
 

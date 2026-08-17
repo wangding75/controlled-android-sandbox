@@ -117,6 +117,19 @@ public final class BrokerObserverRuntime {
         return removed;
     }
 
+    /**
+     * Removes an observer whose caller session belongs to the Host Broker and therefore is not
+     * present in the Companion's local SessionRegistry.  The signed Host Broker has already
+     * validated the caller generation before sending this relay operation.
+     */
+    public synchronized ProviderObserverRegistry.Entry unregisterRelayed(String id,
+            String callerInstance, String callerSessionId, long callerGeneration) {
+        ProviderObserverRegistry.Entry removed = registry.unregister(id, callerInstance,
+                callerSessionId, callerGeneration);
+        unlink(id);
+        return removed;
+    }
+
     public NotifyResult notifyChange(int virtualUserId, String authority, String uri,
                               String notifyingInstance, String targetSessionId,
                               long targetGeneration, int flags) {

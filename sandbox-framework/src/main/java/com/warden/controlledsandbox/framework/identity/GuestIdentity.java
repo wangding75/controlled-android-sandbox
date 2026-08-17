@@ -30,6 +30,7 @@ public final class GuestIdentity {
     private final VirtualSystemServiceState virtualServices;
     private final GuestInteractionState interactions;
     private final GuestNetworkState networks;
+    private volatile ContentObserverBridge contentObserverBridge;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
                          Set<String> requestedPermissions) {
@@ -168,6 +169,7 @@ public final class GuestIdentity {
         this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
         this.interactions = new GuestInteractionState();
         this.networks = new GuestNetworkState();
+        this.contentObserverBridge = null;
     }
 
     public String packageName() { return packageName; }
@@ -179,6 +181,8 @@ public final class GuestIdentity {
     public VirtualPackageMetadata packageMetadata() { return packageMetadata; }
     public VirtualPackageUniverse packageUniverse() { return packageUniverse; }
     public String processName() { return processName; }
+    /** Platform isolated service slots use a manifest-owned :isolated_ process identity. */
+    public boolean isolatedProcess() { return processName.contains(":isolated_"); }
     public int virtualUserId() { return virtualUserId; }
     public long generation() { return generation; }
     public String packageRevision() { return packageRevision; }
@@ -190,4 +194,34 @@ public final class GuestIdentity {
     public VirtualSystemServiceState virtualServices() { return virtualServices; }
     public GuestInteractionState interactions() { return interactions; }
     public GuestNetworkState networks() { return networks; }
+
+    /** Installs the process-scoped Broker relay before Framework service proxies are published. */
+    public void installContentObserverBridge(ContentObserverBridge bridge) {
+        this.contentObserverBridge = bridge;
+    }
+
+    public ContentObserverBridge contentObserverBridge() { return contentObserverBridge; }
+
+    /**
+     * Resolves a visible virtual Provider from its URI authority. Unknown authorities are left to
+     * the virtual SystemService fallback (for example Settings on a compact test environment).
+     */
+    public ProviderRoute providerRoute(String authority) {
+        if (authority == null || authority.trim().isEmpty()) return null;
+        String normalized = authority.trim();
+        for (VirtualPackageMetadata target : packageUniverse.packages()) {
+            if (!packageUniverse.isVisibleTo(packageName, target.packageName())) continue;
+            VirtualPackageMetadata.Component provider = target.providerComponent(normalized);
+            if (provider == null || !provider.enabled()) continue;
+            String process = provider.processName();
+            if (process == null || process.trim().isEmpty()) process = target.packageName();
+            else if (process.startsWith(":")) process = target.packageName() + process;
+            return new ProviderRoute(target.packageName(), virtualUserId, process,
+                    provider.className(), provider.authority());
+        }
+        return null;
+    }
+
+    public record ProviderRoute(String packageName, int virtualUserId, String processName,
+                                String componentClass, String authority) { }
 }

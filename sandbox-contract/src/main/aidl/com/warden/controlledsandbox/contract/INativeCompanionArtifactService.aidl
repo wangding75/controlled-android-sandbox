@@ -7,6 +7,7 @@ import com.warden.controlledsandbox.contract.NativeCompanionRequest;
 /** Signature-protected, bounded file transfer boundary for 32-bit Guest execution. */
 interface INativeCompanionArtifactService {
     NativeCompanionArtifactResult prepareWorkspace(in NativeCompanionRequest request);
+    NativeCompanionArtifactResult inspectArtifact(in NativeCompanionArtifactRequest request);
     NativeCompanionArtifactResult stageArtifact(in NativeCompanionArtifactRequest request,
                                                  in ParcelFileDescriptor source);
     NativeCompanionArtifactResult clearWorkspace(in NativeCompanionRequest request);

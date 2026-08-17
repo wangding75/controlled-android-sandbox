@@ -72,13 +72,28 @@ public final class FixtureProvider extends ContentProvider {
     }
 
     @Override public synchronized int update(Uri uri, ContentValues values,
-                                              String selection, String[] selectionArgs) {
+                                               String selection, String[] selectionArgs) {
         String value = values == null ? null : values.getAsString("value");
         if (value == null) return 0;
         for (Long id : new java.util.ArrayList<>(rows.keySet())) rows.put(id, value);
         Log.i("CS_FIXTURE", "PROVIDER_UPDATE count=" + rows.size());
         return rows.size();
     }
+
+    @Override public Bundle call(String method, String arg, Bundle extras) {
+        if ("batch-call".equals(method)) {
+            Bundle result = new Bundle();
+            result.putString("method", method);
+            result.putString("arg", arg);
+            result.putString("extra", extras == null ? null : extras.getString("source"));
+            return result;
+        }
+        if ("batch-fail".equals(method)) {
+            throw new IllegalStateException("fixture batch failure");
+        }
+        return super.call(method, arg, extras);
+    }
+
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         File file = new File(getContext().getFilesDir(), "fixture-provider.txt");
         return ParcelFileDescriptor.open(file, descriptorMode(mode));

@@ -30,9 +30,12 @@ public final class ActivityTaskLedgerSelfTest {
         testRunningRecentMoveAndRemoveQueries();
         testRootActivityQuery();
         testLaunchFlagValidationMatrix();
+        testResetTaskIfNeededContract();
+        testCrossPackageAffinityAndReparenting();
         testDocumentLaunchModes();
         testFinishMoveBackAndRevisionCleanup();
         testCheckpointRestoreDropsTransportAndPreservesState();
+        testRestoredTaskRequiresHostRebind();
         testRegistryResultIntentAndIntentSender();
         testCheckpointRestoresPendingResultOwnership();
         testExactRollbackState();
@@ -85,6 +88,117 @@ public final class ActivityTaskLedgerSelfTest {
                 1));
         check(!reset.createdNewTask(), "CLEAR_TASK should reuse the selected task identity");
         check(ledger.activityCount() == 1, "CLEAR_TASK should remove prior stack");
+    }
+
+    private static void testResetTaskIfNeededContract() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 1, 0));
+        ledger.launch(requestWithActivityInfoFlags(
+                0, "Child", LaunchMode.STANDARD, 0, root.taskId(), 1,
+                ActivityInfoTaskFlags.FINISH_ON_TASK_LAUNCH));
+
+        LaunchDecision reset = ledger.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.SINGLE_TOP,
+                LaunchFlags.NEW_TASK | LaunchFlags.RESET_TASK_IF_NEEDED
+                        | LaunchFlags.SINGLE_TOP,
+                null, 1, 0));
+        check(reset.action() == LaunchAction.DELIVERED_NEW_INTENT,
+                "reset launch should deliver to the retained task root");
+        check(reset.removedActivityCount() == 1,
+                "finishOnTaskLaunch should prune one child during reset");
+        check(ledger.activityCount() == 1, "reset should leave only the task root");
+
+        ActivityTaskLedger forced = new ActivityTaskLedger();
+        LaunchDecision forcedRoot = forced.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 1, 0));
+        forced.launch(requestWithActivityInfoFlags(
+                0, "Keep", LaunchMode.STANDARD, 0, forcedRoot.taskId(), 1, 0));
+        LaunchDecision forceReset = forced.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.SINGLE_TOP,
+                LaunchFlags.NEW_TASK | LaunchFlags.RESET_TASK_IF_NEEDED
+                        | LaunchFlags.SINGLE_TOP,
+                null, 1, ActivityInfoTaskFlags.CLEAR_TASK_ON_LAUNCH));
+        check(forceReset.removedActivityCount() == 1,
+                "clearTaskOnLaunch should force-reset the task above its root");
+
+        ActivityTaskLedger retained = new ActivityTaskLedger();
+        LaunchDecision retainedRoot = retained.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 1,
+                ActivityInfoTaskFlags.ALWAYS_RETAIN_TASK_STATE));
+        retained.launch(requestWithActivityInfoFlags(
+                0, "Keep", LaunchMode.STANDARD, 0, retainedRoot.taskId(), 1,
+                ActivityInfoTaskFlags.FINISH_ON_TASK_LAUNCH));
+        LaunchDecision retainedLaunch = retained.launch(requestWithActivityInfoFlags(
+                0, "Root", LaunchMode.SINGLE_TOP,
+                LaunchFlags.NEW_TASK | LaunchFlags.RESET_TASK_IF_NEEDED
+                        | LaunchFlags.SINGLE_TOP,
+                null, 1, 0));
+        check(retainedLaunch.removedActivityCount() == 0,
+                "alwaysRetainTaskState should suppress ordinary reset pruning");
+        check(retained.activityCount() == 3,
+                "a retained task should keep its child before a standard root launch");
+    }
+
+    private static void testCrossPackageAffinityAndReparenting() {
+        ActivityTaskLedger crossPackage = new ActivityTaskLedger();
+        LaunchDecision owner = crossPackage.launch(customRequest(
+                "owner.example", "OwnerActivity", "shared.affinity", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK, null, "owner-rev", 0));
+        LaunchDecision foreign = crossPackage.launch(customRequest(
+                "target.example", "TargetActivity", "shared.affinity", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK, null, "target-rev", 0));
+        check(foreign.taskId() == owner.taskId() && !foreign.createdNewTask(),
+                "matching affinity must reuse an authorized cross-package task");
+        check(crossPackage.snapshot().get(0).activities().size() == 2,
+                "cross-package affinity reuse must retain both Activities");
+
+        ActivityTaskLedger reparenting = new ActivityTaskLedger();
+        LaunchDecision source = reparenting.launch(customRequest(
+                "source.example", "SourceRoot", "source.affinity", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK, null, "source-rev", 0));
+        reparenting.launch(customRequest(
+                "source.example", "MoveMe", "shared.affinity", LaunchMode.STANDARD,
+                0, source.taskId(), "source-rev", ActivityInfoTaskFlags.ALLOW_TASK_REPARENTING));
+        LaunchDecision target = reparenting.launch(customRequest(
+                "target.example", "TargetRoot", "shared.affinity", LaunchMode.STANDARD,
+                LaunchFlags.NEW_TASK | LaunchFlags.MULTIPLE_TASK, null, "target-rev", 0));
+        check(target.taskId() != source.taskId(), "reparent source and target tasks must be distinct");
+
+        reparenting.launch(customRequest(
+                "target.example", "TargetRoot", "shared.affinity", LaunchMode.SINGLE_TOP,
+                LaunchFlags.NEW_TASK | LaunchFlags.RESET_TASK_IF_NEEDED,
+                null, "target-rev", 0));
+        TaskSnapshot targetSnapshot = reparenting.snapshot().stream()
+                .filter(value -> value.taskId() == target.taskId())
+                .findFirst().orElseThrow();
+        check(targetSnapshot.activities().stream().anyMatch(value ->
+                        value.identity().packageName().equals("source.example")
+                                && value.identity().componentName().equals("MoveMe")),
+                "allowTaskReparenting Activity did not move to matching affinity task");
+        TaskSnapshot sourceSnapshot = reparenting.snapshot().stream()
+                .filter(value -> value.taskId() == source.taskId())
+                .findFirst().orElseThrow();
+        check(sourceSnapshot.activities().stream().noneMatch(value ->
+                        value.identity().componentName().equals("MoveMe")),
+                "reparented Activity remained in its source task");
+
+        ActivityTaskCheckpoint checkpoint = reparenting.checkpoint();
+        ActivityRestoreSnapshot restoredActivity = checkpoint.tasks().stream()
+                .filter(value -> value.taskId() == target.taskId())
+                .flatMap(value -> value.activities().stream())
+                .filter(value -> value.identity().componentName().equals("MoveMe"))
+                .findFirst().orElseThrow();
+        check(restoredActivity.taskAffinity().equals("shared.affinity")
+                        && restoredActivity.allowTaskReparenting(),
+                "reparent policy was not persisted in the Activity checkpoint");
+        ActivityTaskLedger restored = new ActivityTaskLedger();
+        restored.restore(checkpoint);
+        check(restored.snapshot().stream()
+                        .filter(value -> value.taskId() == target.taskId())
+                        .findFirst().orElseThrow().activities().stream()
+                        .anyMatch(value -> value.identity().componentName().equals("MoveMe")),
+                "cross-package reparented Activity was lost across checkpoint restore");
     }
 
     private static void testSingleInstanceExclusivityAndReuse() {
@@ -624,6 +738,27 @@ public final class ActivityTaskLedgerSelfTest {
                 "restored generation adoption must be one-shot");
     }
 
+    private static void testRestoredTaskRequiresHostRebind() {
+        ActivityTaskLedger source = new ActivityTaskLedger();
+        LaunchDecision root = source.launch(request(
+                0, "HostRebindRoot", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null, 12));
+        ActivityTaskLedger restored = new ActivityTaskLedger();
+        restored.restore(source.checkpoint());
+        check(restored.hostTaskRebindRequired(root.taskId()),
+                "restored virtual task must start detached from the old Host task");
+
+        LaunchDecision launch = restored.launch(request(
+                0, "HostRebindChild", LaunchMode.STANDARD, 0, root.taskId(), 12));
+        check(launch.hostTaskRebindRequired(),
+                "first restored route must carry an explicit Host-task rebind requirement");
+        check(restored.attachHostTask(launch.taskId()),
+                "consuming the first restored route must attach the Host task");
+        check(!restored.hostTaskRebindRequired(launch.taskId()),
+                "attached Host task must not request a second rebind");
+        check(!restored.attachHostTask(launch.taskId()),
+                "Host-task attachment must be idempotent");
+    }
+
     private static void testRegistryResultIntentAndIntentSender() {
         ActivityTaskLedger ledger = new ActivityTaskLedger();
         LaunchDecision caller = ledger.launch(request(
@@ -779,6 +914,50 @@ public final class ActivityTaskLedgerSelfTest {
                 routeToken,
                 "",
                 -1);
+    }
+
+    private static LaunchRequest requestWithActivityInfoFlags(
+            int user,
+            String component,
+            LaunchMode mode,
+            int flags,
+            Integer callerTask,
+            long generation,
+            int activityInfoFlags) {
+        return new LaunchRequest(
+                new ActivityIdentity(user, "guest.example", component),
+                "guest.example",
+                mode,
+                flags,
+                callerTask,
+                "guest.example:main",
+                generation,
+                "route-task-reset-" + user + "-" + component + "-" + generation
+                        + "-" + activityInfoFlags,
+                "",
+                -1,
+                "legacy",
+                DocumentLaunchMode.NONE,
+                "",
+                "",
+                "",
+                activityInfoFlags);
+    }
+
+    private static LaunchRequest customRequest(
+            String packageName,
+            String component,
+            String affinity,
+            LaunchMode mode,
+            int flags,
+            Integer callerTask,
+            String revision,
+            int activityInfoFlags) {
+        return new LaunchRequest(
+                new ActivityIdentity(0, packageName, component), affinity, mode, flags, callerTask,
+                packageName + ":main", 1, "route-custom-" + packageName + "-" + component
+                        + "-" + flags + "-" + activityInfoFlags,
+                "", -1, revision, DocumentLaunchMode.NONE, "", "", "", activityInfoFlags);
     }
 
     private static LaunchRequest requestForResult(

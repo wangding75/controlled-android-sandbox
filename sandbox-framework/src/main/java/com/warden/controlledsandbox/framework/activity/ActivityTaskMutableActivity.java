@@ -15,6 +15,11 @@ final class ActivityTaskMutableActivity {
     final String resultWho;
     final int requestCode;
     final int launchFlags;
+    /** Snapshot of the virtual ActivityInfo flags used by task-reset policy. */
+    final int activityInfoFlags;
+    /** Activity-level affinity; it may differ from the root task affinity for cross-package tasks. */
+    final String taskAffinity;
+    final boolean allowTaskReparenting;
     final boolean noHistory;
     boolean restoredFromCheckpoint;
     LifecycleState lifecycleState = LifecycleState.INITIALIZED;
@@ -37,6 +42,9 @@ final class ActivityTaskMutableActivity {
             String resultWho,
             int requestCode,
             int launchFlags,
+            int activityInfoFlags,
+            String taskAffinity,
+            boolean allowTaskReparenting,
             boolean noHistory) {
         this.identity = identity;
         this.stableId = ActivityTaskTextPolicy.requireBoundedText(stableId, "stableId", 128);
@@ -47,6 +55,10 @@ final class ActivityTaskMutableActivity {
         this.resultWho = resultWho;
         this.requestCode = requestCode;
         this.launchFlags = launchFlags;
+        this.activityInfoFlags = activityInfoFlags;
+        this.taskAffinity = taskAffinity == null || taskAffinity.isBlank()
+                ? identity.packageName() : taskAffinity.trim();
+        this.allowTaskReparenting = allowTaskReparenting;
         this.noHistory = noHistory;
     }
 

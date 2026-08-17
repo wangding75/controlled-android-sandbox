@@ -86,8 +86,10 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         setOptional(loadedApk, "mClassLoader", processLoader);
         setOptional(loadedApk, "mDefaultClassLoader", processLoader);
         setOptional(loadedApk, "mResources", session.resources.resources);
-        setOptional(loadedApk, "mApplication", session.application);
-        verifyFrameworkApplicationOwnership(loadedApk, activityThread, session.application);
+        // handleBindApplication creates/publishes LoadedApk before the Application object is
+        // constructed.  Do not force a second Application through LoadedApk.makeApplication at
+        // this point; bindApplication(Application) completes the same framework-owned state
+        // transition after AppComponentFactory has selected the Guest class.
 
         Field packagesField = findField(activityThreadType, "mPackages");
         packagesField.setAccessible(true);
@@ -97,10 +99,23 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         boundInfoField.set(boundApplication, loadedApk);
         android.util.Log.i("CS_GUEST_LOADED_APK", "installed package=" + session.spec.packageName
                 + " loader=" + processLoader.getClass().getName()
-                + " application=" + session.application.getClass().getName());
+                + " application=DEFERRED_UNTIL_BIND_APPLICATION");
         return new GuestLoadedApkBridge(activityThread, boundApplication, boundInfoField,
                 originalBoundInfo, packagesField, packages, originalEntry, loadedApk,
                 session.spec.packageName);
+    }
+
+    synchronized void bindApplication(Application application) {
+        if (closed) throw new IllegalStateException("GUEST_LOADED_APK_ALREADY_CLOSED");
+        if (application == null) throw new IllegalArgumentException("application is required");
+        Object current = readOptional(loadedApk, "mApplication");
+        if (current != null && current != application) {
+            throw new IllegalStateException("GUEST_LOADED_APK_APPLICATION_SPLIT_BRAIN");
+        }
+        setOptional(loadedApk, "mApplication", application);
+        verifyFrameworkApplicationOwnership(loadedApk, activityThread, application);
+        android.util.Log.i("CS_GUEST_LOADED_APK", "frameworkMakeApplication=OWNED_BY_GUEST"
+                + " application=" + application.getClass().getName());
     }
 
     Object loadedApk() { return loadedApk; }
@@ -192,6 +207,19 @@ final class GuestLoadedApkBridge implements AutoCloseable {
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             throw new IllegalStateException("GUEST_LOADED_APK_FIELD_FAILED:" + name, error);
+        }
+    }
+
+    private static Object readOptional(Object target, String name) {
+        try {
+            Field field = findField(target.getClass(), name);
+            field.setAccessible(true);
+            return field.get(target);
+        } catch (NoSuchFieldException ignored) {
+            return null;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("GUEST_LOADED_APK_FIELD_READ_FAILED:" + name, error);
         }
     }
 

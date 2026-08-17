@@ -12,6 +12,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 /** Common Binder-interface proxy with identity rewriting and virtual permission/AppOps/capability decisions. */
@@ -200,14 +201,40 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     private Object activityManagerResult(Method method) {
-        if (!"activityManager".equalsIgnoreCase(serviceName)
+        if (!isActivityManagerService(serviceName)
                 || !"getHistoricalProcessExitReasons".equals(method.getName())) {
             return NoResult.VALUE;
         }
         // Android 16 protects this host-wide diagnostic history with DUMP. A Guest must not
         // read host process history; an empty Guest-owned history is the safe read-only view.
         android.util.Log.i("CS_ACTIVITY_MANAGER", "historicalProcessExitReasons=guest-empty");
-        return Collections.emptyList();
+        return emptyActivityManagerHistory(method.getReturnType());
+    }
+
+    private static boolean isActivityManagerService(String value) {
+        if (value == null) return false;
+        String normalized = value.replace("-", "")
+                .toLowerCase(java.util.Locale.ROOT);
+        return "activitymanager".equals(normalized);
+    }
+
+    private static Object emptyActivityManagerHistory(Class<?> returnType) {
+        if (returnType == null || returnType == void.class) return null;
+        if (List.class.isAssignableFrom(returnType)) return Collections.emptyList();
+        if (returnType.isArray()) return Array.newInstance(returnType.getComponentType(), 0);
+        if (returnType.getName().endsWith("ParceledListSlice")) {
+            try {
+                java.lang.reflect.Constructor<?> constructor =
+                        returnType.getDeclaredConstructor(List.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(Collections.emptyList());
+            } catch (ReflectiveOperationException error) {
+                throw new IllegalStateException("VIRTUAL_ACTIVITY_EXIT_HISTORY_PROJECTION_FAILED",
+                        error);
+            }
+        }
+        throw new SecurityException("VIRTUAL_ACTIVITY_EXIT_HISTORY_SIGNATURE_UNSUPPORTED:"
+                + returnType.getName());
     }
 
     String serviceName() { return serviceName; }
@@ -272,8 +299,29 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     private Object appOpsDecision(Method method, Object[] arguments) {
-        if (!targetsGuest(arguments)) return NoResult.VALUE;
         String methodName = method.getName();
+        if ("checkPackage".equals(methodName)) {
+            return appOpsCheckPackage(method, arguments);
+        }
+        if (isAppOpsMutation(methodName)) {
+            // AppOps state is Package-Service-owned. A Guest-side IAppOpsService proxy must
+            // never mutate the Host table, even when the call carries only a numeric UID and
+            // therefore cannot be recognized by the ordinary package/attribution matcher.
+            throw new SecurityException("VIRTUAL_APPOPS_MUTATION_REQUIRES_PACKAGE_SERVICE:"
+                    + methodName);
+        }
+        if (isAppOpsInventory(methodName)) {
+            // These APIs return host package/UID operation records. Returning an empty virtual
+            // inventory is the only safe projection until a typed per-Guest OpEntry model is
+            // available; delegating would expose Host package names and historical timestamps.
+            if ("getPackagesForOps".equals(methodName)
+                    || InvocationMethodMatcher.startsWith(methodName, "getHistorical")) {
+                return emptyAppOpsResult(method.getReturnType());
+            }
+            if (!targetsGuest(arguments)) return NoResult.VALUE;
+            return emptyAppOpsResult(method.getReturnType());
+        }
+        if (!targetsGuest(arguments)) return NoResult.VALUE;
         if (!(InvocationMethodMatcher.containsAny(methodName,
                 "Operation", "ProxyOp", "OpNoThrow", "ProxyOperation"))) {
             return NoResult.VALUE;
@@ -301,6 +349,75 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             }
         }
         throw new SecurityException("VIRTUAL_APPOPS_SIGNATURE_UNSUPPORTED:" + methodName);
+    }
+
+    private Object appOpsCheckPackage(Method method, Object[] arguments) {
+        String packageName = firstPackageName(arguments);
+        Integer uid = firstInteger(arguments);
+        boolean guestPackage = identity.packageName().equals(packageName);
+        boolean guestUid = uid != null && uid == identity.virtualUid();
+        if (guestPackage && (uid == null || guestUid)) {
+            // IAppOpsService.checkPackage() is void on Android; preserve a false/zero fallback
+            // for reduced API stubs without manufacturing a Host PackageOps result.
+            return defaultValue(method.getReturnType());
+        }
+        if (guestPackage || guestUid) {
+            throw new SecurityException("VIRTUAL_APPOPS_PACKAGE_UID_MISMATCH");
+        }
+        if (identity.hostPackageName().equals(packageName)) {
+            throw new SecurityException("VIRTUAL_APPOPS_HOST_PACKAGE_HIDDEN");
+        }
+        return NoResult.VALUE;
+    }
+
+    private static boolean isAppOpsMutation(String methodName) {
+        return InvocationMethodMatcher.named(methodName,
+                "setMode", "setUidMode", "resetAllModes", "clearHistory",
+                "setHistoryParameters", "removePackage", "packageRemoved");
+    }
+
+    private static boolean isAppOpsInventory(String methodName) {
+        return InvocationMethodMatcher.named(methodName,
+                "getOpsForPackage", "getUidOps", "getPackagesForOps",
+                "getHistoricalOps", "getHistoricalOpsFromDisk", "getNonPackageUidOps");
+    }
+
+    private static Object emptyAppOpsResult(Class<?> returnType) {
+        if (returnType == null || returnType == void.class) return null;
+        if (java.util.List.class.isAssignableFrom(returnType)) return Collections.emptyList();
+        if (java.util.Set.class.isAssignableFrom(returnType)) return Collections.emptySet();
+        if (returnType.isArray()) return Array.newInstance(returnType.getComponentType(), 0);
+        return defaultValue(returnType);
+    }
+
+    private static Object defaultValue(Class<?> returnType) {
+        if (returnType == null || returnType == void.class) return null;
+        if (returnType == boolean.class || returnType == Boolean.class) return false;
+        if (returnType == byte.class || returnType == Byte.class) return (byte) 0;
+        if (returnType == short.class || returnType == Short.class) return (short) 0;
+        if (returnType == int.class || returnType == Integer.class) return 0;
+        if (returnType == long.class || returnType == Long.class) return 0L;
+        if (returnType == float.class || returnType == Float.class) return 0f;
+        if (returnType == double.class || returnType == Double.class) return 0d;
+        if (returnType == char.class || returnType == Character.class) return '\0';
+        if (returnType.isArray()) return Array.newInstance(returnType.getComponentType(), 0);
+        if (java.util.List.class.isAssignableFrom(returnType)) return Collections.emptyList();
+        if (java.util.Set.class.isAssignableFrom(returnType)) return Collections.emptySet();
+        return null;
+    }
+
+    private static String firstPackageName(Object[] arguments) {
+        if (arguments == null) return "";
+        for (Object argument : arguments) {
+            if (argument instanceof String value && value.contains(".")) return value;
+        }
+        return "";
+    }
+
+    private static Integer firstInteger(Object[] arguments) {
+        if (arguments == null) return null;
+        for (Object argument : arguments) if (argument instanceof Integer value) return value;
+        return null;
     }
 
     private String firstAttributionTag(Object[] arguments) {

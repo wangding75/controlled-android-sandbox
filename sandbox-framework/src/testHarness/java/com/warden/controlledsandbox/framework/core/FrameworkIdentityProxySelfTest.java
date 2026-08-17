@@ -5,6 +5,10 @@ import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.framework.packagemanager.PackageManagerInvocationHandlerTestAccess;
+import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
+import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
+import com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse;
+import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -23,6 +27,7 @@ public final class FrameworkIdentityProxySelfTest {
         ApplicationInfo info = new ApplicationInfo();
         info.packageName = "guest.pkg";
         info.uid = 12001;
+        info.targetSdkVersion = 29;
         VirtualPackageMetadata metadata = new VirtualPackageMetadata("guest.pkg", "guest.pkg.MainActivity", info,
                 Arrays.asList(
                         new VirtualPackageMetadata.Component(VirtualPackageMetadata.Type.ACTIVITY,
@@ -46,7 +51,9 @@ public final class FrameworkIdentityProxySelfTest {
                 new SandboxAppOpsPolicy(java.util.Map.of("android:camera", "IGNORED")));
         testIdentityRewriting(identity);
         testPackageQueries(identity);
+        testCrossPackageSigning(identity, metadata, info);
         testPermissionAndAppOps(identity);
+        testActivityManagerHistory(identity);
         testHookReadinessPolicy();
         System.out.println("PASS framework identity and package-manager proxy self-test");
     }
@@ -165,8 +172,74 @@ public final class FrameworkIdentityProxySelfTest {
         FakeAttribution source = new FakeAttribution("guest.pkg", 12001, "proxy", null);
         require(appOps.noteProxyOperation("android:camera", source) == 1,
                 "proxy AppOps attribution chain targets Guest policy");
+        appOps.checkPackage(12001, "guest.pkg");
+        boolean packageMismatch = false;
+        try { appOps.checkPackage(12002, "guest.pkg"); }
+        catch (SecurityException expected) {
+            packageMismatch = expected.getMessage().contains("VIRTUAL_APPOPS_PACKAGE_UID_MISMATCH");
+        }
+        require(packageMismatch, "AppOps checkPackage rejects a virtual UID/package mismatch");
+        require(appOps.getOpsForPackage(12001, "guest.pkg", new int[]{26}).isEmpty(),
+                "AppOps package inventory is Guest-owned and does not expose Host records");
+        boolean appOpsMutationBlocked = false;
+        try { appOps.setMode(26, 12001, "guest.pkg", 0); }
+        catch (SecurityException expected) {
+            appOpsMutationBlocked = expected.getMessage().contains("VIRTUAL_APPOPS_MUTATION_REQUIRES_PACKAGE_SERVICE");
+        }
+        require(appOpsMutationBlocked, "AppOps mutation is Package-Service-owned");
         require("proxy".equals(source.attributionTag), "proxy attributionTag remains unchanged");
         require(appOpsDelegate.calls == 0, "AppOps virtual decision avoids host delegate");
+    }
+
+    private static void testCrossPackageSigning(GuestIdentity callerIdentity,
+                                                 VirtualPackageMetadata callerMetadata,
+                                                 ApplicationInfo callerInfo) {
+        ApplicationInfo peerInfo = new ApplicationInfo();
+        peerInfo.packageName = "peer.pkg";
+        peerInfo.uid = 12002;
+        VirtualPackageMetadata peerMetadata = new VirtualPackageMetadata("peer.pkg", "",
+                peerInfo, List.of(), "", 0L, repeat('b'), 0L, 0L, "", List.of(),
+                List.of(), List.of(), List.of(), true);
+        VirtualPackageMetadata signedCallerMetadata = new VirtualPackageMetadata("guest.pkg", "",
+                callerInfo, callerMetadata.components(), "", 0L, repeat('a'), 0L, 0L, "",
+                List.of(), List.of(), List.of(), List.of(), true);
+        GuestIdentity identity = new GuestIdentity("guest.pkg", 12001, callerInfo,
+                Set.of("android.permission.INTERNET"), "host.pkg", 10001,
+                signedCallerMetadata, "guest.pkg", 0, 1L,
+                new VirtualPermissionPolicy(Set.of("android.permission.INTERNET"),
+                        java.util.Map.of()), new SandboxAppOpsPolicy(java.util.Map.of()),
+                CapabilityAuditSink.NO_OP, new CapabilityLeaseRegistry(),
+                new VirtualSystemServiceState(), "signature-test",
+                new VirtualPackageUniverse(List.of(signedCallerMetadata, peerMetadata)));
+        FakePackageService delegate = new FakePackageService();
+        FakePackageApi proxy = (FakePackageApi) Proxy.newProxyInstance(
+                FrameworkIdentityProxySelfTest.class.getClassLoader(),
+                new Class<?>[]{FakePackageApi.class},
+                PackageManagerInvocationHandlerTestAccess.create(delegate, identity));
+        byte[] callerCertificate = new byte[32];
+        java.util.Arrays.fill(callerCertificate, (byte) 0xaa);
+        byte[] peerCertificate = new byte[32];
+        java.util.Arrays.fill(peerCertificate, (byte) 0xbb);
+        require(proxy.hasSigningCertificate("guest.pkg", callerCertificate, 0),
+                "current Guest certificate matches virtual signature");
+        require(!proxy.hasSigningCertificate("peer.pkg", callerCertificate, 0),
+                "cross-package certificate does not reuse caller signature");
+        require(proxy.hasSigningCertificate("peer.pkg", peerCertificate, 0),
+                "visible cross-package certificate uses target signature");
+        require(delegate.calls == 0, "signature queries avoid host PackageManager");
+    }
+
+    private static void testActivityManagerHistory(GuestIdentity identity) {
+        FakeActivityManagerHistory delegate = new FakeActivityManagerHistory();
+        for (String serviceName : List.of("activityManager", "activity-manager")) {
+            FakeActivityManagerHistoryApi proxy = (FakeActivityManagerHistoryApi)
+                    Proxy.newProxyInstance(FrameworkIdentityProxySelfTest.class.getClassLoader(),
+                            new Class<?>[]{FakeActivityManagerHistoryApi.class},
+                            new SystemServiceInvocationHandler(delegate, identity, serviceName));
+            require(proxy.getHistoricalProcessExitReasons("guest.pkg", 12001, 10, 0).isEmpty(),
+                    "activity-manager exit history is Guest-owned and empty: " + serviceName);
+        }
+        require(delegate.calls == 0, "activity-manager history never delegates Host DUMP data");
     }
 
     private static void testHookReadinessPolicy() {
@@ -231,6 +304,12 @@ public final class FrameworkIdentityProxySelfTest {
         try { blocked.requireMandatoryReady(); }
         catch (IllegalStateException expected) { rejected = expected.getMessage().contains("notification"); }
         require(rejected, "mandatory hook failure rejects guest prepare");
+    }
+
+    private static String repeat(char value) {
+        StringBuilder result = new StringBuilder(64);
+        for (int index = 0; index < 64; index++) result.append(value);
+        return result.toString();
     }
 
     private static void require(boolean condition, String label) {
@@ -311,6 +390,7 @@ public final class FrameworkIdentityProxySelfTest {
         String[] getPackagesForUid(int uid);
         List<ApplicationInfo> getInstalledApplications(long flags, int userId);
         int checkPermission(String permission, String packageName, int userId);
+        boolean hasSigningCertificate(String packageName, byte[] certificate, int type);
         String unhandled(String packageName);
     }
 
@@ -326,6 +406,9 @@ public final class FrameworkIdentityProxySelfTest {
         @Override public String[] getPackagesForUid(int uid) { return called(new String[]{"host.pkg"}); }
         @Override public List<ApplicationInfo> getInstalledApplications(long flags, int userId) { return called(List.of()); }
         @Override public int checkPermission(String permission, String packageName, int userId) { return called(-99); }
+        @Override public boolean hasSigningCertificate(String packageName, byte[] certificate, int type) {
+            return called(Boolean.FALSE);
+        }
         @Override public String unhandled(String packageName) { lastPackage = packageName; return called("host-result"); }
     }
 
@@ -344,10 +427,27 @@ public final class FrameworkIdentityProxySelfTest {
         }
     }
 
+    interface FakeActivityManagerHistoryApi {
+        List<Object> getHistoricalProcessExitReasons(String packageName, int uid,
+                                                      int maxNum, int userId);
+    }
+
+    static final class FakeActivityManagerHistory implements FakeActivityManagerHistoryApi {
+        int calls;
+        @Override public List<Object> getHistoricalProcessExitReasons(String packageName, int uid,
+                                                                       int maxNum, int userId) {
+            calls++;
+            return List.of(new Object());
+        }
+    }
+
     interface FakeAppOpsApi {
         int checkOperation(String opName, int uid, String packageName);
         int checkOperation(int opCode, int uid, String packageName);
         int noteProxyOperation(String opName, FakeAttribution source);
+        void checkPackage(int uid, String packageName);
+        List<Object> getOpsForPackage(int uid, String packageName, int[] operations);
+        void setMode(int op, int uid, String packageName, int mode);
     }
 
     static final class FakeAppOpsService implements FakeAppOpsApi {
@@ -360,6 +460,15 @@ public final class FrameworkIdentityProxySelfTest {
         }
         @Override public int noteProxyOperation(String opName, FakeAttribution source) {
             calls++; return -99;
+        }
+        @Override public void checkPackage(int uid, String packageName) {
+            calls++;
+        }
+        @Override public List<Object> getOpsForPackage(int uid, String packageName, int[] operations) {
+            calls++; return List.of(new Object());
+        }
+        @Override public void setMode(int op, int uid, String packageName, int mode) {
+            calls++;
         }
     }
 

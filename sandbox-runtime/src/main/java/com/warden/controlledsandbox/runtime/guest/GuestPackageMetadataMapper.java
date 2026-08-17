@@ -11,14 +11,23 @@ import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionDeclarationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionGroupSnapshot;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 
 /** Maps the package authority's immutable snapshot into the process-local PackageManager model. */
-final class GuestPackageMetadataMapper {
+public final class GuestPackageMetadataMapper {
     private GuestPackageMetadataMapper() { }
+
+    /** Builds the broker-side PackageManager view without requiring parsed Guest resources. */
+    public static VirtualPackageMetadata fromSnapshot(VirtualPackageStateSnapshot state,
+                                                       ApplicationInfo applicationInfo) {
+        return fromSnapshot(state, applicationInfo, null);
+    }
 
     static VirtualPackageMetadata fromSnapshot(VirtualPackageStateSnapshot state,
                                                ApplicationInfo applicationInfo,
@@ -30,7 +39,7 @@ final class GuestPackageMetadataMapper {
             for (VirtualIntentFilterSnapshot filter : component.intentFilters()) {
                 List<VirtualPackageMetadata.DataRule> data = new ArrayList<>();
                 for (VirtualIntentDataSnapshot rule : filter.data()) {
-                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(),
+                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(), rule.port(),
                             rule.path(), rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
                 }
                 filters.add(new VirtualPackageMetadata.Filter(filter.priority(),
@@ -43,14 +52,24 @@ final class GuestPackageMetadataMapper {
                         rule.path(), rule.pathPrefix(), rule.pathPattern(),
                         rule.readPermission(), rule.writePermission(), rule.uriGrantRule()));
             }
-            Bundle providerMetadata = null;
+            // The package authority carries component metadata in the immutable snapshot.  Use
+            // it as the baseline for every package in the virtual universe; the primary Guest
+            // may additionally have an APK-backed parser view, but cross-package projections do
+            // not reopen the peer APK and therefore must not drop the snapshot value.
+            Bundle componentMetadata = component.metaData();
+            Bundle parsedComponentMetadata = manifestMetadata == null
+                    ? null : manifestMetadata.componentForClass(component.className());
+            if (parsedComponentMetadata != null) {
+                if (componentMetadata == null) componentMetadata = parsedComponentMetadata;
+                else componentMetadata.putAll(parsedComponentMetadata);
+            }
             if (VirtualPackageMetadata.Type.PROVIDER == VirtualPackageMetadata.Type.valueOf(component.type())
-                    && manifestMetadata != null) {
-                providerMetadata = manifestMetadata.providerForClass(component.className());
-                if (providerMetadata == null) {
+                    && componentMetadata == null && manifestMetadata != null) {
+                componentMetadata = manifestMetadata.providerForClass(component.className());
+                if (componentMetadata == null) {
                     for (String authority : component.authority().split(";")) {
-                        providerMetadata = manifestMetadata.provider(authority);
-                        if (providerMetadata != null) break;
+                        componentMetadata = manifestMetadata.provider(authority);
+                        if (componentMetadata != null) break;
                     }
                 }
             }
@@ -60,8 +79,8 @@ final class GuestPackageMetadataMapper {
                     component.enabled(), component.isolated(),
                     new LinkedHashSet<>(component.actions()), component.authority(),
                      component.permission(), component.readPermission(), component.writePermission(),
-                     component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules,
-                     providerMetadata, component.launchMode(), component.taskAffinity(),
+                    component.grantUriPermissions(), component.enabledSetting(), filters, providerPathRules,
+                     componentMetadata, component.launchMode(), component.taskAffinity(),
                      component.documentLaunchMode(), component.configChanges(),
                      component.screenOrientation(), component.windowSoftInputMode(), component.flags(),
                      component.excludeFromRecents(), component.noHistory(),
@@ -71,11 +90,29 @@ final class GuestPackageMetadataMapper {
                      component.supportsPictureInPicture(), component.themeResId(),
                      component.foregroundServiceType(), component.stopWithTask(),
                      component.directBootAware(), component.multiprocess(), component.initOrder(),
-                     component.syncable()));
+                     component.syncable(), component.persistableMode(),
+                     activityAliasTarget(component, manifestMetadata)));
         }
         List<String> permissions = new ArrayList<>();
+        LinkedHashMap<String, Boolean> permissionGrants = new LinkedHashMap<>();
         for (com.warden.controlledsandbox.contract.VirtualPermissionSnapshot permission : state.permissions()) {
             permissions.add(permission.name());
+            permissionGrants.put(permission.name(), permission.effectiveGranted());
+        }
+        List<VirtualPackageMetadata.PermissionDeclaration> permissionDeclarations = new ArrayList<>();
+        for (VirtualPermissionDeclarationSnapshot declaration : state.permissionDeclarations()) {
+            permissionDeclarations.add(new VirtualPackageMetadata.PermissionDeclaration(
+                    declaration.name(), declaration.group(), declaration.label(),
+                    declaration.description(), declaration.labelRes(), declaration.descriptionRes(),
+                    declaration.icon(), declaration.protectionLevel(), declaration.flags(),
+                    declaration.tree()));
+        }
+        List<VirtualPackageMetadata.PermissionGroup> permissionGroups = new ArrayList<>();
+        for (VirtualPermissionGroupSnapshot group : state.permissionGroups()) {
+            permissionGroups.add(new VirtualPackageMetadata.PermissionGroup(
+                    group.name(), group.label(), group.description(), group.labelRes(),
+                    group.descriptionRes(), group.icon(), group.requestRes(), group.priority(),
+                    group.flags()));
         }
         List<VirtualPackageMetadata.SharedLibrary> sharedLibraryDetails = new ArrayList<>();
         for (VirtualSharedLibrarySnapshot library : state.sharedLibraryDetails()) {
@@ -101,7 +138,7 @@ final class GuestPackageMetadataMapper {
             } else if (query.intent() != null) {
                 List<VirtualPackageMetadata.DataRule> data = new ArrayList<>();
                 for (VirtualIntentDataSnapshot rule : query.intent().data()) {
-                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(),
+                    data.add(new VirtualPackageMetadata.DataRule(rule.scheme(), rule.host(), rule.port(),
                             rule.path(), rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
                 }
                 queryIntentFilters.add(new VirtualPackageMetadata.Filter(query.intent().priority(),
@@ -114,10 +151,22 @@ final class GuestPackageMetadataMapper {
                 state.signatureSha256(), state.firstInstallTime(), state.lastUpdateTime(),
                 state.installerPackageName(), state.sharedLibraries(), sharedLibraryDetails,
                 instrumentations, permissions, state.enabled(), queryPackages,
-                queryProviderAuthorities, queryIntentFilters);
+                queryProviderAuthorities, queryIntentFilters, permissionGrants,
+                permissionDeclarations, permissionGroups);
     }
 
-    static VirtualPackageMetadata fromProjection(VirtualPackageProjectionSnapshot projection) {
+    private static String activityAliasTarget(VirtualComponentSnapshot component,
+                                              GuestManifestMetadata manifestMetadata) {
+        if (component != null && !component.targetActivity().isEmpty()) {
+            return component.targetActivity();
+        }
+        if (manifestMetadata == null || component == null
+                || component.className().trim().isEmpty()) return "";
+        return manifestMetadata.activityTarget(component.className());
+    }
+
+    public static VirtualPackageMetadata fromProjection(
+            VirtualPackageProjectionSnapshot projection) {
         VirtualPackageStateSnapshot state = projection.packageState();
         ApplicationInfo applicationInfo = projection.parsedApplicationInfo();
         if (applicationInfo == null) applicationInfo = state.applicationInfo();

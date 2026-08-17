@@ -60,12 +60,29 @@ final class GuestStorageNameCodec {
     private final File registryFile;
     private final File lockFile;
     private final Object jvmLock;
+    private final boolean capabilityBacked;
 
     GuestStorageNameCodec(File root) {
+        this(root, false);
+    }
+
+    /**
+     * Isolated UIDs receive data through Binder capabilities and cannot create a pathname under
+     * the host package's data label. Keep name validation deterministic in that mode, while the
+     * actual file operation is supplied by the capability-backed storage layer.
+     */
+    GuestStorageNameCodec(File root, boolean capabilityBacked) {
         try {
             this.root = root.getCanonicalFile();
         } catch (IOException error) {
             throw new IllegalStateException("GUEST_STORAGE_ROOT_INVALID", error);
+        }
+        this.capabilityBacked = capabilityBacked;
+        if (capabilityBacked) {
+            this.registryFile = null;
+            this.lockFile = null;
+            this.jvmLock = new Object();
+            return;
         }
         if (!this.root.isDirectory() && !this.root.mkdirs() && !this.root.isDirectory()) {
             throw new IllegalStateException("Cannot create directory " + this.root);
@@ -83,6 +100,9 @@ final class GuestStorageNameCodec {
         File canonicalParent = canonicalParent(parent);
         String normalizedPrefix = nullToEmpty(prefix);
         String normalizedSuffix = nullToEmpty(suffix);
+        if (capabilityBacked) {
+            return new File(canonicalParent, normalizedPrefix + encode(logical) + normalizedSuffix);
+        }
         List<String> companions = normalizedCompanions(companionSuffixes);
         String encoded = encode(logical);
         String physicalName = normalizedPrefix + encoded + normalizedSuffix;
@@ -112,6 +132,7 @@ final class GuestStorageNameCodec {
 
     String[] listExisting(File parent, String namespace,
                           String prefix, String suffix, String... companionSuffixes) {
+        if (capabilityBacked) return new String[0];
         File canonicalParent = canonicalParent(parent);
         String normalizedPrefix = nullToEmpty(prefix);
         String normalizedSuffix = nullToEmpty(suffix);
@@ -157,6 +178,7 @@ final class GuestStorageNameCodec {
 
     void release(File parent, String namespace, String logicalName,
                  String prefix, String suffix, String... companionSuffixes) {
+        if (capabilityBacked) return;
         String logical = validateLogicalName(logicalName);
         File canonicalParent = canonicalParent(parent);
         String normalizedPrefix = nullToEmpty(prefix);
@@ -351,6 +373,10 @@ final class GuestStorageNameCodec {
             if (!valuePath.equals(rootPath) && !valuePath.startsWith(rootPath + File.separator)) {
                 throw new SecurityException("GUEST_STORAGE_PARENT_OUTSIDE_INSTANCE");
             }
+            // The isolated process receives the instance root as a directory capability.  Its
+            // UID is intentionally not allowed to mkdir below the host package label, so the
+            // host-side storage transport owns directory creation in this mode.
+            if (capabilityBacked) return value;
             if (!value.isDirectory() && !value.mkdirs() && !value.isDirectory()) {
                 throw new IllegalStateException("Cannot create directory " + value);
             }

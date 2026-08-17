@@ -10,6 +10,7 @@ namespace controlled_sandbox {
 
 struct NativeHookStatus {
     bool installed{false};
+    bool system_io_installed{false};
     std::size_t modules_scanned{0};
     std::size_t modules_matched{0};
     std::size_t relocations_patched{0};
@@ -31,6 +32,8 @@ struct NativeHookStatus {
 class NativeHookRuntime final {
 public:
     bool install(std::string guest_library_root);
+    /** Patch the Android Java/native file boundary for an isolated capability-backed process. */
+    bool install_system_io();
     bool refresh();
     bool installCamera1();
     bool refreshCamera1();
@@ -40,6 +43,7 @@ public:
     static bool is_target_symbol(std::string_view symbol) noexcept;
     static bool is_process_lifetime_symbol(std::string_view symbol) noexcept;
     static bool is_process_lifetime_system_module(std::string_view module_path) noexcept;
+    static bool is_process_io_system_module(std::string_view module_path) noexcept;
     static bool is_guest_module(std::string_view module_path,
                                 std::string_view guest_library_root) noexcept;
 };

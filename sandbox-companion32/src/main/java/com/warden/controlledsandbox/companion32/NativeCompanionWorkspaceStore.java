@@ -111,18 +111,43 @@ final class NativeCompanionWorkspaceStore {
         }
     }
 
+    synchronized NativeCompanionArtifactResult inspect(NativeCompanionArtifactRequest request) {
+        if (request == null) return NativeCompanionArtifactResult.failure(
+                "INSPECT_ARTIFACT", "REQUEST_REQUIRED", "request is required");
+        try {
+            requireProtocol(request.protocol());
+            WorkspaceState state = requireWorkspace(request);
+            File target = safeTarget(state.workspaceRoot, request.relativePath());
+            if (!target.isFile() || target.length() != request.sizeBytes()) {
+                return NativeCompanionArtifactResult.failure("INSPECT_ARTIFACT",
+                        "ARTIFACT_MISSING", request.relativePath());
+            }
+            if (!request.sha256().equals(sha256(target))) {
+                return NativeCompanionArtifactResult.failure("INSPECT_ARTIFACT",
+                        "ARTIFACT_STALE", request.relativePath());
+            }
+            return result("INSPECT_ARTIFACT", request.artifactKind(), request.relativePath(),
+                    target.getCanonicalPath(), state);
+        } catch (Throwable error) {
+            FatalErrorPolicy.rethrowIfFatal(error);
+            return failure("INSPECT_ARTIFACT", error);
+        }
+    }
+
     synchronized NativeCompanionArtifactResult clear(NativeCompanionRequest request) {
         try {
             requireProtocol(request == null ? 0 : request.protocol());
             if (request == null || !NativeCompanionRequest.OP_CLEAR_GENERATION.equals(request.operation())) {
                 throw new IllegalArgumentException("CLEAR_GENERATION_REQUEST_REQUIRED");
             }
-            String key = key(request.packageName(), request.virtualUserId(), request.packageRevision(),
-                    request.requestedAbi());
-            WorkspaceState state = workspaces.remove(key);
-            if (state == null) state = workspace(request.packageName(), request.virtualUserId(),
+            // A package instance is not scoped by the APK revision used by its last process.
+            // Keeping older revision workspaces here leaves Guest data and WebView/native
+            // caches recoverable after clear/delete followed by reinstall.  The caller has
+            // already stopped every process for this package/user, so clear the whole virtual
+            // instance atomically at the Companion boundary rather than only the current key.
+            clearPackageUser(request.packageName(), request.virtualUserId());
+            WorkspaceState state = workspace(request.packageName(), request.virtualUserId(),
                     request.packageRevision(), request.requestedAbi());
-            deleteTree(state.workspaceRoot);
             return result("CLEAR_WORKSPACE", "", "", "", state);
         } catch (Throwable error) {
             FatalErrorPolicy.rethrowIfFatal(error);
@@ -172,6 +197,19 @@ final class NativeCompanionWorkspaceStore {
                 new File(workspace, "lib"));
     }
 
+    private void clearPackageUser(String packageName, int virtualUserId) throws IOException {
+        File canonicalRoot = root.getCanonicalFile();
+        File packageRoot = new File(root, safe(packageName)).getCanonicalFile();
+        File userRoot = new File(packageRoot, "u" + virtualUserId).getCanonicalFile();
+        if (!packageRoot.toPath().startsWith(canonicalRoot.toPath())
+                || !userRoot.toPath().startsWith(canonicalRoot.toPath())) {
+            throw new SecurityException("COMPANION_WORKSPACE_CLEAR_TRAVERSAL");
+        }
+        String prefix = packageName + "\n" + virtualUserId + "\n";
+        workspaces.keySet().removeIf(value -> value.startsWith(prefix));
+        deleteTree(userRoot);
+    }
+
     private static NativeCompanionArtifactResult result(String operation, String kind,
             String relativePath, String absolutePath, WorkspaceState state) throws IOException {
         return NativeCompanionArtifactResult.success(operation, kind, relativePath, absolutePath,
@@ -219,7 +257,15 @@ final class NativeCompanionWorkspaceStore {
     }
 
     private static void deleteTree(File value) throws IOException {
-        if (value == null || !value.exists()) return;
+        if (value == null) return;
+        // Never follow a symlink while reclaiming a workspace.  A stale or tampered workspace
+        // must be removed as a link itself, not used as a path to delete outside Companion
+        // private storage.
+        if (Files.isSymbolicLink(value.toPath())) {
+            Files.deleteIfExists(value.toPath());
+            return;
+        }
+        if (!value.exists()) return;
         File[] children = value.listFiles();
         if (children != null) for (File child : children) deleteTree(child);
         if (!value.delete() && value.exists()) throw new IOException("cannot delete " + value);
@@ -241,6 +287,18 @@ final class NativeCompanionWorkspaceStore {
         StringBuilder out = new StringBuilder(bytes.length * 2);
         for (byte value : bytes) out.append(String.format(java.util.Locale.ROOT, "%02x", value & 0xff));
         return out.toString();
+    }
+
+    private static String sha256(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        try (InputStream input = new FileInputStream(file)) {
+            byte[] buffer = new byte[BUFFER_BYTES];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                if (read > 0) digest.update(buffer, 0, read);
+            }
+        }
+        return hex(digest.digest());
     }
 
     private static final class WorkspaceState {

@@ -40,13 +40,13 @@ public final class ProviderLifecycleCoordinatorSelfTest {
         ProviderLifecycleCoordinator.CleanupResult cleanup =
                 fixture.lifecycle.disconnectSession(recovering);
         check(cleanup.authorities() == 0, "disconnect removed recoverable authority");
-        check(cleanup.observers() == 1 && cleanup.grants() == 1
+        check(cleanup.observers() == 1 && cleanup.grants() == 0
                 && cleanup.cursorsRemoved() == 1 && cleanup.filesRemoved() == 1,
-                "disconnect did not revoke all generation capabilities");
+                "disconnect did not revoke process-bound generation capabilities");
         check(fixture.descriptor.isClosed(), "disconnect did not close Broker FD resource");
         ProviderLifecycleCoordinator.Snapshot after = fixture.lifecycle.snapshot(2);
-        check(after.authorities() == 1 && after.total() == 1,
-                "disconnect leaked non-authority Provider resources");
+        check(after.authorities() == 1 && after.grants() == 1 && after.total() == 2,
+                "disconnect did not preserve recoverable URI permission");
 
         ProviderLifecycleCoordinator.CleanupResult stop = fixture.lifecycle.stopSession(fixture.provider);
         check(stop.authorities() == 1 && fixture.lifecycle.snapshot(3).empty(),
@@ -70,12 +70,13 @@ public final class ProviderLifecycleCoordinatorSelfTest {
         GuestSession recovered = session("provider-current", "com.provider", 1, 2, 1);
         ProviderLifecycleCoordinator.RecoveryResult recovery =
                 fixture.lifecycle.recoverSession(fixture.provider, recovered);
-        check(recovery.authoritiesRebound() == 1, "Provider authority was not rebound");
+        check(recovery.authoritiesRebound() == 1 && recovery.grantsRebound() == 1,
+                "Provider authority/URI permission was not rebound");
         check(recovery.staleResources().observers() == 1
-                && recovery.staleResources().grants() == 1
+                && recovery.staleResources().grants() == 0
                 && recovery.staleResources().cursorsRemoved() == 1
                 && recovery.staleResources().filesRemoved() == 1,
-                "recovery did not revoke stale-generation capabilities");
+                "recovery did not revoke stale process capabilities");
         check(fixture.descriptor.isClosed(), "recovery leaked Broker FD resource");
 
         fixture.providers.requireOwned(operation("provider.authority"), recovered);
@@ -83,7 +84,8 @@ public final class ProviderLifecycleCoordinatorSelfTest {
         try { fixture.providers.requireOwned(operation("provider.authority"), fixture.provider); }
         catch (SecurityException expected) { staleDenied = true; }
         check(staleDenied, "stale Provider generation retained authority");
-        check(fixture.lifecycle.snapshot(2).total() == 1, "recovery retained stale resources");
+        check(fixture.lifecycle.snapshot(2).total() == 2,
+                "recovery did not retain the rebound URI permission");
         check(fixture.lifecycle.stopSession(recovered).authorities() == 1
                 && fixture.lifecycle.snapshot(3).empty(), "recovered Provider cleanup failed");
     }

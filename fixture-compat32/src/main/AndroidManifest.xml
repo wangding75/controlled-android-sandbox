@@ -8,6 +8,7 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <activity android:name="com.warden.controlledsandbox.fixture.MainActivity" android:exported="true">
+            <meta-data android:name="cas.fixture.activity_meta" android:value="activity-peer" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -15,16 +16,26 @@
         </activity>
         <activity android:name="com.warden.controlledsandbox.fixture.DetailActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.RemoteActivity" android:exported="false" android:process=":remote" />
-        <service android:name="com.warden.controlledsandbox.fixture.FixtureService" android:exported="false" />
+        <!-- Cross-package component transport fixture: the virtual PMS must still enforce the
+             exported boundary, while an explicitly exported peer Service is routable. -->
+        <service android:name="com.warden.controlledsandbox.fixture.FixtureService" android:exported="true">
+            <meta-data android:name="cas.fixture.service_meta" android:value="service-peer" />
+        </service>
         <service android:name="com.warden.controlledsandbox.fixture.RemoteFixtureService" android:exported="false" android:process=":remote" />
         <service android:name="com.warden.controlledsandbox.fixture.IsolatedFixtureService" android:exported="false" android:isolatedProcess="true" />
         <receiver android:name="com.warden.controlledsandbox.fixture.FixtureReceiver" android:exported="true">
-            <intent-filter><action android:name="com.warden.controlledsandbox.fixture32.PING" /></intent-filter>
+            <meta-data android:name="cas.fixture.receiver_meta" android:value="receiver-peer" />
+            <intent-filter>
+                <action android:name="com.warden.controlledsandbox.fixture32.PING" />
+                <action android:name="com.warden.controlledsandbox.fixture32.DIRECT_FRAMEWORK_RECEIVER_PROBE" />
+            </intent-filter>
         </receiver>
         <provider
             android:name="com.warden.controlledsandbox.fixture.FixtureProvider"
             android:authorities="${applicationId}.provider"
-            android:exported="false"
-            android:process=":provider" />
+            android:exported="true"
+            android:process=":provider">
+            <meta-data android:name="cas.fixture.provider_meta" android:value="provider-peer" />
+        </provider>
     </application>
 </manifest>

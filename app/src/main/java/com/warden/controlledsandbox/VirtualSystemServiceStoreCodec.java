@@ -115,6 +115,8 @@ final class VirtualSystemServiceStoreCodec {
                             alarm.optBoolean("allowWhileIdle", false),
                             alarm.optString("deliveryPath", VirtualAlarmSnapshot.LISTENER),
                             alarm.optString("pendingIntentTokenId", ""), decodeBytes(alarm.optString("token", "")),
+                            alarm.optBoolean("alarmClock", false),
+                            decodeBytes(alarm.optString("alarmClockShowIntent", "")),
                             alarm.optString("ownerProcessName", scope.packageName()),
                             alarm.optLong("ownerGeneration", 0L),
                             alarm.optString("packageRevision", "legacy-revision"),
@@ -273,6 +275,8 @@ final class VirtualSystemServiceStoreCodec {
                         .put("deliveryPath", alarm.deliveryPath)
                         .put("pendingIntentTokenId", alarm.pendingIntentTokenId)
                         .put("token", encodeBytes(alarm.tokenPayload)).put("ownerProcessName", alarm.ownerProcessName)
+                        .put("alarmClock", alarm.alarmClock)
+                        .put("alarmClockShowIntent", encodeBytes(alarm.alarmClockPayload))
                         .put("ownerGeneration", alarm.ownerGeneration).put("packageRevision", alarm.packageRevision)
                         .put("deliveryCount", alarm.deliveryCount).put("updatedAtMs", alarm.updatedAtMs));
                 item.put("alarms", alarms);

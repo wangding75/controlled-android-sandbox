@@ -58,7 +58,8 @@ final class ActivityRuntimeRouteCoordinator {
             int adopted = ledger.adoptRestoredProcessGeneration(
                     session.virtualUserId(), session.packageName(), session.packageRevision(),
                     session.processName(), session.generation());
-            ActivityLaunchSpec spec = ActivityLaunchSpecFactory.create(session, component, request);
+            ActivityLaunchSpec spec = ActivityLaunchSpecFactory.create(
+                    session, component, prepared, request);
             Map<String, String> metadata = new LinkedHashMap<>();
             metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
             metadata.put(RuntimeKeys.COMPONENT_CLASS, component);
@@ -80,6 +81,7 @@ final class ActivityRuntimeRouteCoordinator {
             envelope.putString(RuntimeKeys.COMPONENT_CLASS, component);
             envelope.putString(RuntimeKeys.ROUTE_TOKEN, token);
             addDecision(envelope, transaction);
+            attachSavedState(envelope, transaction.decision().activityToken());
             transport.putRoute(token, envelope);
             if (pending.putIfAbsent(token, transaction) != null) {
                 throw new IllegalStateException("DUPLICATE_ACTIVITY_TRANSACTION");
@@ -121,6 +123,9 @@ final class ActivityRuntimeRouteCoordinator {
         envelope.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
         addDecision(envelope, transaction);
         envelope.putLong(RuntimeKeys.ROUTE_EXPIRES_AT, payload.get().expiresAtMillis());
+        // A restored virtual task is not the same thing as a surviving Android Host task.  Only
+        // the real route consumer can acknowledge that the new Stub/ActivityThread task exists.
+        transactions.mutate(() -> ledger.attachHostTask(transaction.decision().taskId()));
         consumed.put(token, new ConsumedRoute(envelope));
         return envelope;
     }
@@ -181,18 +186,22 @@ final class ActivityRuntimeRouteCoordinator {
                     transaction.decision().action(), transaction.decision().taskId(),
                     currentActivityToken, transaction.decision().routeToken(),
                     transaction.decision().removedActivityCount(),
-                    transaction.decision().createdNewTask());
+                    transaction.decision().createdNewTask(),
+                    transaction.decision().hostTaskRebindRequired());
             ActivityLaunchTransaction rebound = new ActivityLaunchTransaction(
                     decision,
                     new RouteToken(transaction.routeToken().value(), transaction.routeToken().expiresAtMillis()),
                     currentOwner);
             pending.put(entry.getKey(), rebound);
-            transport.rebindRoute(entry.getKey(), current.generation(), currentActivityToken);
+            Bundle recoveryState = savedStateEnvelope(currentActivityToken);
+            transport.rebindRoute(entry.getKey(), current.generation(), currentActivityToken,
+                    recoveryState);
             ConsumedRoute consumedRoute = consumed.get(entry.getKey());
             if (consumedRoute != null) {
                 consumedRoute.envelope.putLong(RuntimeKeys.GENERATION, current.generation());
                 consumedRoute.envelope.putString(RuntimeKeys.ACTIVITY_TOKEN, currentActivityToken);
                 consumedRoute.envelope.putString(RuntimeKeys.SESSION_ID, current.sessionId());
+                if (recoveryState != null) consumedRoute.envelope.putAll(recoveryState);
             }
         }
     }
@@ -283,11 +292,39 @@ final class ActivityRuntimeRouteCoordinator {
         if (source.containsKey(key)) target.putLong(key, source.getLong(key));
     }
 
+    /** Projects only the bounded, opaque saved-state capability into a recovery route. */
+    private void attachSavedState(Bundle target, String activityToken) {
+        Bundle state = savedStateEnvelope(activityToken);
+        if (state != null) target.putAll(state);
+    }
+
+    private Bundle savedStateEnvelope(String activityToken) {
+        Optional<com.warden.controlledsandbox.framework.activity.SavedActivityState> saved =
+                ledger.savedInstanceState(activityToken);
+        if (saved.isEmpty()) return null;
+        com.warden.controlledsandbox.framework.activity.SavedActivityState state = saved.get();
+        Bundle envelope = new Bundle();
+        envelope.putLong(RuntimeKeys.SAVED_STATE_VERSION, state.version());
+        byte[] payload = state.bundlePayload();
+        if (payload.length != 0) envelope.putByteArray(RuntimeKeys.SAVED_STATE_PAYLOAD, payload);
+        byte[] persistablePayload = state.persistableBundlePayload();
+        if (persistablePayload.length != 0) {
+            envelope.putByteArray(RuntimeKeys.SAVED_STATE_PERSISTABLE_PAYLOAD, persistablePayload);
+        }
+        for (Map.Entry<String, String> entry : state.values().entrySet()) {
+            envelope.putString(RuntimeKeys.SAVED_STATE_PREFIX + entry.getKey(), entry.getValue());
+        }
+        return envelope;
+    }
+
     private static void addDecision(Bundle out, ActivityLaunchTransaction transaction) {
         out.putString(RuntimeKeys.ROUTE_TOKEN, transaction.routeToken().value());
         out.putString(RuntimeKeys.ACTIVITY_TOKEN, transaction.decision().activityToken());
         out.putInt(RuntimeKeys.TASK_ID, transaction.decision().taskId());
         out.putString(RuntimeKeys.ACTIVITY_ACTION, transaction.decision().action().name());
+        out.putBoolean(RuntimeKeys.CREATED_NEW_TASK, transaction.decision().createdNewTask());
+        out.putBoolean(RuntimeKeys.HOST_TASK_REBIND_REQUIRED,
+                transaction.decision().hostTaskRebindRequired());
         out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, transaction.decision().removedActivityCount());
     }
 

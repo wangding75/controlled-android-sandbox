@@ -7,6 +7,14 @@ captures/
 .externalNativeBuild/
 .cxx/
 .gradle-reproducible/
+.gradle-user/
+.gradle-user-home/
+$d/
+caches/
+/android/
+/daemon/
+/native/
+/notifications/
 __pycache__/
 *.py[cod]
 

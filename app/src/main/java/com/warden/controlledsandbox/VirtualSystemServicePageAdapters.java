@@ -30,7 +30,8 @@ final class VirtualSystemServicePageAdapters {
                     return new VirtualAlarmSnapshot(value.alarmId(), value.triggerAtMs(), value.intervalMs(),
                             value.exact(), value.allowWhileIdle(), value.deliveryPath(), value.pendingIntentTokenId(),
                             value.ownerProcessName(), value.ownerGeneration(), value.packageRevision(), new byte[0],
-                            value.deliveryCount(), value.updatedAtMs());
+                            value.deliveryCount(), value.updatedAtMs(), value.alarmClock(),
+                            value.alarmClockPayload());
                 }
             };
 

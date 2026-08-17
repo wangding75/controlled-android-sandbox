@@ -23,11 +23,15 @@ final class RuntimeBrokerOperationAdapter {
                 case RuntimeOperationRequest.INVOKE_COMPONENT -> broker.invokeComponent(payload);
                 case RuntimeOperationRequest.GRANT_URI_PERMISSION -> broker.grantUriPermission(payload);
                 case RuntimeOperationRequest.REVOKE_URI_PERMISSION -> broker.revokeUriPermission(payload);
+                case RuntimeOperationRequest.CHECK_URI_PERMISSION -> broker.checkUriPermission(payload);
+                case RuntimeOperationRequest.OPEN_PACKAGE_RESOURCES -> broker.openPackageResources(payload);
                 case RuntimeOperationRequest.CONSUME_ROUTE -> broker.consumeRoute(
                         payload.getString(RuntimeKeys.ROUTE_TOKEN, ""),
                         request.sessionId(),
                         request.generation());
                 case RuntimeOperationRequest.ACTIVITY_EVENT -> broker.activityEvent(payload);
+                case RuntimeOperationRequest.STORAGE -> broker.storageOperation(
+                        payload, request.sessionId(), request.generation());
                 case RuntimeOperationRequest.SESSION_STATUS -> broker.sessionStatus(
                         request.packageName(), request.virtualUserId());
                 default -> throw new IllegalArgumentException(

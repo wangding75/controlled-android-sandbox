@@ -44,8 +44,14 @@ Import/upgrade now follows this order:
 1. Parse, verify, hash and extract into a private staging directory.
 2. Publish a new immutable revision directory.
 3. Construct and validate the next catalog aggregate.
-4. Atomically switch the catalog.
-5. Remove unreferenced package revisions and interrupted `.install-*` directories.
+4. When an existing package revision changes, stop every catalog instance through the runtime
+   death barrier, including the old ABI companion route.
+5. Atomically switch the catalog.
+6. Remove unreferenced package revisions and interrupted `.install-*` directories.
+
+The stop barrier is attached to every production import/install entry point. If it fails, the new
+revision is deleted when unreferenced and the old catalog remains authoritative; an upgrade cannot
+publish a revision while an old Guest ClassLoader or native workspace is still live.
 
 If the catalog switch fails, the newly published revision is removed when no prior catalog record references it. Cleanup failure is attached as a suppressed exception instead of being silently discarded.
 
@@ -85,6 +91,7 @@ Post-commit cleanup failure does not revert trusted metadata or report that the 
   - symbolic-link-safe deletion;
   - backup-before-primary publication;
   - product use of the lifecycle authority;
+  - revision stop-before-switch ordering and isolated physical-death barrier;
   - executable self-test registration.
 - `tools/static_android_compile.py` compiles the production path and executes the aggregate self-test.
 - The complete host verification gate runs all pre-existing checks plus the new lifecycle gate.

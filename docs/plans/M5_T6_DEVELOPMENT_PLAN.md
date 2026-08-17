@@ -16,8 +16,8 @@
 
 ### Independent process ownership
 
-- Declare four Host Services using `android:isolatedProcess="true"`.
-- Allocate them from a separate four isolated slots `SessionRegistry`; ordinary Guest capacity remains eight slots.
+- Declare sixteen Host Services using `android:isolatedProcess="true"`.
+- Allocate them from a separate sixteen isolated slots `SessionRegistry`; ordinary Guest capacity is governed by the shared 64-slot contract.
 - Bind one package, virtual user, declared process, package revision and component to one active isolated lease.
 - Keep Session ID, generation and process slot independent from the ordinary Guest registry.
 
@@ -41,7 +41,7 @@
 - Typed contract validation and defensive-copy tests.
 - Service-only route and non-Service rejection tests.
 - Ordinary fail-closed versus dedicated-transport Guest policy tests.
-- Independent eight-slot ordinary and four-slot isolated registry tests.
+- Independent ordinary and sixteen-slot isolated registry tests.
 - Slot saturation, Binder-death state and generation recovery tests.
 - Static Android compilation, all historical gates, Host and Native regression, evidence matrix and reproducible source package.
 - Attempt the real Android build entry without claiming an APK when the locked toolchain is absent.

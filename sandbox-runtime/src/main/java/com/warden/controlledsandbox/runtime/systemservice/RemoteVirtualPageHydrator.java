@@ -53,7 +53,8 @@ final class RemoteVirtualPageHydrator {
             out.add(payload == null ? value : new VirtualAlarmSnapshot(value.alarmId(), value.triggerAtMs(),
                     value.intervalMs(), value.exact(), value.allowWhileIdle(), value.deliveryPath(),
                     value.pendingIntentTokenId(), value.ownerProcessName(), value.ownerGeneration(),
-                    value.packageRevision(), payload, value.deliveryCount(), value.updatedAtMs()));
+                    value.packageRevision(), payload, value.deliveryCount(), value.updatedAtMs(),
+                    value.alarmClock(), value.alarmClockPayload()));
         }
         return List.copyOf(out);
     }

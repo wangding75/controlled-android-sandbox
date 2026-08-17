@@ -44,13 +44,14 @@ public final class GuestActivityController {
     Bundle create(String componentClass, Intent launchIntent, Bundle state) {
         Bundle result = new Bundle();
         try {
-            Class<?> type = session.classLoader().loadClass(componentClass);
+            String instantiateComponent = activityInstantiationClass(componentClass);
+            Class<?> type = session.classLoader().loadClass(instantiateComponent);
             com.warden.controlledsandbox.runtime.guest.GuestNativeBindingDiagnostic.recordClass(
-                    "activity." + componentClass, type);
+                    "activity." + instantiateComponent, type);
             if (!Activity.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not an Activity: " + componentClass);
             guest = GuestComponentFactory.instantiateActivity(session.context().getClassLoader(),
                     session.context().getApplicationInfo().appComponentFactory,
-                    componentClass, launchIntent == null ? new Intent() : new Intent(launchIntent));
+                    instantiateComponent, launchIntent == null ? new Intent() : new Intent(launchIntent));
             attachFrameworkState(guest, componentClass);
             ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(
                     host, guest, session, componentClass, taskId);
@@ -79,6 +80,15 @@ public final class GuestActivityController {
                     "GUEST_ACTIVITY_CREATE", root(error));
         }
         return result;
+    }
+
+    private String activityInstantiationClass(String componentClass) {
+        if (componentClass == null || componentClass.trim().isEmpty()) return componentClass;
+        com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata.Component metadata =
+                session.packageMetadata().component(componentClass,
+                        com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata.Type.ACTIVITY);
+        return metadata == null || metadata.targetActivity().isEmpty()
+                ? componentClass : metadata.targetActivity();
     }
 
     void start() {

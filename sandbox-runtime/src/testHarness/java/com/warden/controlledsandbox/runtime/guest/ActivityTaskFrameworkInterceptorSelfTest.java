@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.app.ActivityManager;
 import android.content.pm.ParceledListSlice;
+import android.content.Intent;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -47,6 +48,13 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
         require("guest.pkg.MainActivity".equals(runningInfo.baseActivity.getClassName())
                         && "guest.pkg.DetailActivity".equals(runningInfo.topActivity.getClassName()),
                 "virtual base/top components projected");
+        require(runningInfo.baseIntent != null
+                        && "android.intent.action.VIEW".equals(runningInfo.baseIntent.getAction())
+                        && "https://guest.example/docs".equals(runningInfo.baseIntent.getDataString())
+                        && "text/plain".equals(runningInfo.baseIntent.getType())
+                        && runningInfo.baseIntent.hasCategory("android.intent.category.BROWSABLE")
+                        && runningInfo.baseIntent.getFlags() == Intent.FLAG_ACTIVITY_NEW_TASK,
+                "base Intent action/data/type/categories/flags are projected");
         assertIdentity(broker.lastRequest, ActivityTaskRequest.QUERY_RUNNING);
 
         Method getRecent = FakeAtm.class.getMethod("getRecentTasks", int.class, int.class, int.class);
@@ -194,7 +202,10 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
         private static ActivityTaskSnapshot task() {
             return new ActivityTaskSnapshot(41, 2, "guest.pkg", "revision-1",
                     "guest.pkg", false, "NONE", "", true, false, true, 2,
-                    "guest.pkg.MainActivity", "guest.pkg.DetailActivity", 9L, 3L);
+                    "guest.pkg.MainActivity", "guest.pkg.DetailActivity", 9L, 3L,
+                    Intent.FLAG_ACTIVITY_NEW_TASK, "android.intent.action.VIEW",
+                    "https://guest.example/docs", "text/plain",
+                    List.of("android.intent.category.BROWSABLE"));
         }
 
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) { return null; }
@@ -204,6 +215,7 @@ public final class ActivityTaskFrameworkInterceptorSelfTest {
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
                 String permission, int requestCode, boolean hostGranted, String reason) { return null; }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { return null; }
+        @Override public int virtualUidFor(String packageName, int virtualUserId) { return 12002; }
         @Override public void stopGuest(String packageName, int virtualUserId) { }
     }
 

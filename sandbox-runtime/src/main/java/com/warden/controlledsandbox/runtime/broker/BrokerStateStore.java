@@ -57,6 +57,12 @@ public final class BrokerStateStore {
     }
 
     public synchronized void rebindRoute(String token, long generation, String activityToken) {
+        rebindRoute(token, generation, activityToken, null);
+    }
+
+    /** Rebinds a pending route and atomically replaces its recovery-only saved-state envelope. */
+    public synchronized void rebindRoute(String token, long generation, String activityToken,
+                                          Bundle recoveryState) {
         Bundle value = routePayloads.get(token);
         if (value == null) return;
         Bundle updated = new Bundle(value);
@@ -64,7 +70,11 @@ public final class BrokerStateStore {
         if (activityToken != null && !activityToken.trim().isEmpty()) {
             updated.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
         }
-        routePayloads.put(token, updated);
+        if (recoveryState != null) updated.putAll(recoveryState);
+        // Re-run the same bounded transport check used at initial route publication. A recovery
+        // payload must never turn a previously safe route into a TransactionTooLarge route.
+        Bundle bounded = boundedCopy(updated, MAX_ROUTE_BYTES, "ROUTE_PAYLOAD");
+        routePayloads.put(token, bounded);
     }
 
     synchronized int purgeRoutes(String sessionId, long generation) {

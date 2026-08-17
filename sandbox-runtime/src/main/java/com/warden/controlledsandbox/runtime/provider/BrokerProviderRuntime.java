@@ -153,6 +153,38 @@ public final class BrokerProviderRuntime {
                 session.generation(), registration.createdAuthorities());
     }
 
+    /**
+     * Publishes a metadata-only Provider owner in the Host namespace for a cross-ABI target.
+     *
+     * <p>The Host must remain the authority for visibility, URI grants and permission decisions,
+     * but it must not instantiate an x86 Provider in the 64-bit process.  This shadow entry gives
+     * the Host router a stable owner to authorize against; the executable Provider owner and its
+     * real session are created by the Companion.</p>
+     */
+    public synchronized void ensureRemotePrepared(Bundle request, String packageName,
+                                                   int virtualUserId, String processName) {
+        String authority = required(request, ComponentOperations.AUTHORITY);
+        String componentClass = required(request, RuntimeKeys.COMPONENT_CLASS);
+        ProviderManifestAuthorityResolver.Metadata provider =
+                ProviderManifestAuthorityResolver.resolve(request, componentClass, authority);
+        String instance = instanceId(packageName, virtualUserId);
+        String sessionId = "cross-abi-shadow:" + instance;
+        long generation = 1L;
+        ProviderAuthorityRegistry.Entry existing = registry.resolveAuthority(virtualUserId, authority);
+        if (existing != null && existing.instanceId().equals(instance)
+                && existing.component().equals(componentClass)
+                && existing.processName().equals(processName == null ? "" : processName.trim())
+                && existing.sessionId().equals(sessionId) && existing.generation() == generation) {
+            return;
+        }
+        if (existing != null && existing.instanceId().equals(instance)) {
+            registry.unregisterInstance(virtualUserId, instance);
+        }
+        registry.registerSession(instance, virtualUserId, authority, componentClass,
+                processName, provider.exported(), provider.readPermission(), provider.writePermission(),
+                provider.grantUriPermissions(), provider.pathRules(), sessionId, generation);
+    }
+
     public synchronized void rollbackPrepare(Reservation reservation) {
         if (reservation == null || reservation.createdAuthorities.isEmpty()) return;
         registry.rollback(reservation.virtualUserId, reservation.instanceId, reservation.sessionId,
@@ -173,6 +205,13 @@ public final class BrokerProviderRuntime {
         if (entry == null) throw new IllegalArgumentException("UNKNOWN_PROVIDER_AUTHORITY:" + authority);
         if (!entry.instanceId().equals(ownerInstance)) {
             throw new SecurityException("URI_GRANT_PROVIDER_OWNER_MISMATCH");
+        }
+        // Ownership alone is not sufficient to mint a grant.  Android's grantUriPermission
+        // path still consults ProviderInfo.grantUriPermissions and its path-specific
+        // <grant-uri-permission> rules; otherwise a private Provider owner could create a
+        // durable capability that only happened to be rejected later during use.
+        if (!entry.allowsUriGrant(uri)) {
+            throw new SecurityException("URI_GRANT_NOT_ALLOWED_BY_PROVIDER");
         }
         return entry;
     }
@@ -220,6 +259,35 @@ public final class BrokerProviderRuntime {
                 declaredPermissionChecker, operation, authority, nowMs);
         return new OperationRoute(UUID.randomUUID().toString(), operation, callerInstance,
                 entry.instanceId(), authority, input.uri, input.flags, permissionBasis, entry);
+    }
+
+    /**
+     * Routes a Provider transaction after Host authorization has crossed the ABI boundary.
+     * Companion requests are accepted only through the signature-protected Runtime Broker Binder;
+     * the Host-decision marker is still checked here to prevent normal Guest traffic from using
+     * this path to bypass local caller-session validation.
+     */
+    public synchronized OperationRoute routeRelayedOperation(Bundle request, String operation,
+            String callerInstance, int targetVirtualUserId, String requestedTargetInstance,
+            long nowMs) {
+        if (!request.getBoolean(RuntimeKeys.CROSS_ABI_PROVIDER_RELAY, false)) {
+            throw new SecurityException("CROSS_ABI_PROVIDER_RELAY_REQUIRED");
+        }
+        if (!ComponentOperations.isProviderTransactionOperation(operation)) {
+            throw new IllegalArgumentException("Provider operation is not transaction-routable: " + operation);
+        }
+        String authority = required(request, ComponentOperations.AUTHORITY);
+        ProviderAuthorityRegistry.Entry entry = requireRouteEntry(request, operation, callerInstance,
+                targetVirtualUserId, requestedTargetInstance, authority, nowMs);
+        OperationInput input = operationInput(request, operation, callerInstance, entry, authority, nowMs);
+        String basis = required(request, RuntimeKeys.CROSS_ABI_PROVIDER_PERMISSION_BASIS);
+        if (!isRelayedPermissionBasis(basis, entry, callerInstance)) {
+            recordDenied(operation, callerInstance, entry.instanceId(), authority, input.uri, input.flags,
+                    "RELAY_PERMISSION_BASIS_INVALID", nowMs);
+            throw new SecurityException("CROSS_ABI_PROVIDER_PERMISSION_BASIS_INVALID");
+        }
+        return new OperationRoute(UUID.randomUUID().toString(), operation, callerInstance,
+                entry.instanceId(), authority, input.uri, input.flags, basis, entry);
     }
 
     private ProviderAuthorityRegistry.Entry requireRouteEntry(Bundle request, String operation,
@@ -282,6 +350,14 @@ public final class BrokerProviderRuntime {
         recordDenied(operation, callerInstance, entry.instanceId(), authority, input.uri, input.flags,
                 "PERMISSION_DENIED", nowMs);
         throw new SecurityException("PROVIDER_PERMISSION_DENIED");
+    }
+
+    private static boolean isRelayedPermissionBasis(String basis,
+                                                    ProviderAuthorityRegistry.Entry entry,
+                                                    String callerInstance) {
+        if ("OWNER".equals(basis)) return entry.instanceId().equals(callerInstance);
+        return "EXPORTED".equals(basis) || "DECLARED_PERMISSION".equals(basis)
+                || "URI_GRANT".equals(basis);
     }
 
     private static String defaultProviderUri(String uri, String authority) {
@@ -420,7 +496,13 @@ public final class BrokerProviderRuntime {
 
     private static int requiredFlags(String operation, Bundle request) {
         if (ComponentOperations.PROVIDER_CALL.equals(operation)) {
-            return UriGrantRegistry.READ | UriGrantRegistry.WRITE;
+            // ContentProvider.call() is intentionally opaque to the framework.  AOSP does not
+            // infer read/write URI access from the provider-defined method, because only the
+            // provider knows whether that method reads or mutates its own state.  Requiring both
+            // flags here made exported call-only APIs fail for callers which had no URI grant.
+            // The route still requires basic provider access (owner/exported/declared policy),
+            // while the Guest provider remains responsible for method-level authorization.
+            return 0;
         }
         if (ComponentOperations.PROVIDER_APPLY_BATCH.equals(operation)) {
             try {

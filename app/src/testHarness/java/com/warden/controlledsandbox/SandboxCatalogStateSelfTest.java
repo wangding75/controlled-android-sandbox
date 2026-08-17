@@ -141,6 +141,8 @@ public final class SandboxCatalogStateSelfTest {
                     "migrated immutable APK exists");
             require(new java.io.File(migratedRecord.nativeLibraryDir, "liblegacy.so").isFile(),
                     "legacy native library copied");
+            require(new java.io.File(migratedRecord.nativeLibraryDir, "liblegacy.so").canExecute(),
+                    "legacy native library remains executable after sealing");
             layout.requireCatalogLayout(migrated);
             SandboxCatalogState repeated = migrator.migrate(migrated);
             require(repeated.records().get(0).apkPath.equals(migratedRecord.apkPath),

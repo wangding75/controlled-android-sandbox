@@ -109,6 +109,65 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         }
     }
 
+    /**
+     * Runs an intentional Guest shutdown and does not complete until the concrete Guest process
+     * has gone away.  A successful shutdown Binder call only means that the Guest requested
+     * {@code stopSelf()}; ActivityThread may still be dispatching Activity/Service destruction
+     * callbacks which can legitimately re-enter the Broker and read the staged APK.  Destructive
+     * package transactions must therefore use this physical process-death barrier before their
+     * data or APK workspace is removed.
+     */
+    Bundle callWithTimeoutAndAwaitDisconnect(int slot, GuestCall call, long timeoutMillis)
+            throws Exception {
+        if (timeoutMillis <= 0L) throw new IllegalArgumentException("timeoutMillis must be positive");
+        GuestConnection connection = requireConnection(slot);
+        long deadline = System.nanoTime()
+                + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
+        Future<Bundle> future = BOUNDED_CALL_WORKERS.submit(() -> {
+            try {
+                return call.run(connection.requireGuest());
+            } catch (Exception error) {
+                if (!connection.isAlive()) {
+                    disconnect(connection,
+                            "BINDER_CALL_FAILED:" + error.getClass().getSimpleName());
+                }
+                throw error;
+            }
+        });
+        Bundle result;
+        try {
+            result = future.get(timeoutMillis, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException error) {
+            future.cancel(true);
+            abort(slot, "GUEST_SHUTDOWN_TIMEOUT");
+            throw new IllegalStateException("GUEST_SHUTDOWN_TIMEOUT", error);
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            future.cancel(true);
+            abort(slot, "GUEST_SHUTDOWN_INTERRUPTED");
+            throw new IllegalStateException("GUEST_SHUTDOWN_INTERRUPTED", error);
+        } catch (ExecutionException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw new IllegalStateException(cause);
+        }
+
+        // Keep the death recipient installed while unbinding/stopping the concrete Service.  The
+        // normal release() path unlinks first and is intentionally unsuitable for a destructive
+        // barrier because it can report success while the old process is still alive.
+        if (detachForShutdown(connection)) {
+            long remainingNanos = deadline - System.nanoTime();
+            boolean terminated = remainingNanos > 0L
+                    && connection.awaitTerminated(remainingNanos, TimeUnit.NANOSECONDS);
+            connection.unlinkDeath();
+            if (!terminated) {
+                throw new IllegalStateException("GUEST_SHUTDOWN_PROCESS_TIMEOUT");
+            }
+        }
+        return result;
+    }
+
     /** Detaches a connection that can no longer participate in a bounded lifecycle operation. */
     void abort(int slot, String reason) {
         GuestConnection connection;
@@ -130,6 +189,19 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         }
         connection.closing = true;
         retire(connection, "RELEASED", false);
+    }
+
+    private boolean detachForShutdown(GuestConnection connection) {
+        synchronized (this) {
+            if (!connections.remove(connection.slot, connection)) return false;
+            connection.closing = true;
+        }
+        connection.markFailure("RELEASED");
+        // Do not unlink the death recipient here.  The process-death latch is completed by the
+        // Binder/service disconnect callback after the framework has finished teardown.
+        unbind(connection);
+        stopGuestServiceIfUnowned(connection);
+        return true;
     }
 
     @Override
@@ -227,9 +299,26 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         // leaves the old process-local GuestRuntimeEnvironment resident in the slot and lets a
         // later session collide with the slot's generation.  The logical slot owns exactly one
         // Guest process, so retire the concrete service after releasing this binding.
-        stopGuestService(source);
+        stopGuestServiceIfUnowned(source);
         if (notify && source.claimDisconnectNotification()) {
             disconnectListener.onDisconnect(source.slot, reason);
+        }
+    }
+
+    /**
+     * Stops the concrete stub service only while this logical slot is still unowned.
+     *
+     * <p>A dead connection is retired outside the pool monitor.  A replacement connection can
+     * therefore already be published by the time the old connection reaches teardown.  Calling
+     * {@code stopService()} unconditionally at that point tears down the replacement process and
+     * turns an otherwise recoverable Binder death into a reconnect loop.  Keep the ownership check
+     * and the stop operation in the same monitor boundary as replacement publication so a new
+     * lease cannot appear between the check and the destructive framework call.</p>
+     */
+    private void stopGuestServiceIfUnowned(GuestConnection connection) {
+        synchronized (this) {
+            if (connections.containsKey(connection.slot)) return;
+            stopGuestService(connection);
         }
     }
 
@@ -254,6 +343,7 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
     private final class GuestConnection implements ServiceConnection, IBinder.DeathRecipient {
         private final int slot;
         private final CountDownLatch connected = new CountDownLatch(1);
+        private final CountDownLatch terminated = new CountDownLatch(1);
         private volatile IGuestProcess guest;
         private volatile IBinder binderToken;
         private volatile boolean closing;
@@ -331,11 +421,16 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
             markFailure(reason);
             guest = null;
             connected.countDown();
+            terminated.countDown();
             disconnect(this, reason);
         }
 
         private boolean await(long timeout, TimeUnit unit) throws InterruptedException {
             return connected.await(timeout, unit);
+        }
+
+        private boolean awaitTerminated(long timeout, TimeUnit unit) throws InterruptedException {
+            return terminated.await(timeout, unit);
         }
 
         private boolean isBinding() {

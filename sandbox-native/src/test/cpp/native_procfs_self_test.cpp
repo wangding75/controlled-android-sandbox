@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
+#include <unistd.h>
 
 using controlled_sandbox::NativeProcFileSystem;
 using controlled_sandbox::NativePolicySnapshot;
@@ -67,7 +68,9 @@ int main() {
     require(status.find("Uid:\t103000\t103000\t103000\t103000") != std::string::npos,
             "virtual status uid");
 
-    for (const std::string path : {"/proc/self/maps", "/proc/self/cmdline", "/proc/self/status"}) {
+    for (const std::string path : {"/proc/self/maps", "/proc/self/cmdline", "/proc/self/status",
+                                   "/proc/self/mountinfo", "/proc/self/stat", "/proc/self/statm",
+                                   "/proc/self/io"}) {
         auto decision = NativeProcFileSystem::materialize(path);
         require(decision.rewritten, "proc path rewritten");
         require(decision.confinement_root == instance.string(), "proc snapshot confinement");
@@ -77,6 +80,17 @@ int main() {
         require((value.st_mode & 0777) == 0400, "proc snapshot permissions");
         require(!read_file(decision.path).empty(), "proc snapshot content");
     }
+    require(NativeProcFileSystem::is_virtual_path(
+                    "/proc/" + std::to_string(getpid()) + "/maps"),
+            "host pid maps alias");
+    require(NativeProcFileSystem::is_virtual_path(
+                    "/proc/" + std::to_string(snapshot.virtual_pid) + "/status"),
+            "virtual pid status alias");
+    require(NativeProcFileSystem::is_virtual_path(
+                    "/proc/self/task/" + std::to_string(getpid()) + "/status"),
+            "task status alias");
+    require(!NativeProcFileSystem::is_virtual_path("/proc/999999/maps"),
+            "foreign proc pid denied");
 
     policy.reset();
     std::filesystem::remove_all(root);

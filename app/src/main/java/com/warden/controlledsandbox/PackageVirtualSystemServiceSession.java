@@ -423,11 +423,22 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public boolean active() { return active; }
 
     private void requireCapability() {
-        if (!active || Binder.getCallingUid() != ownerUid) {
+        int callerUid = Binder.getCallingUid();
+        // Runtime Broker opens this Binder under the owning app UID and may transfer it to a
+        // platform isolated worker. The worker is still bound to the same generation-scoped
+        // capability and manifest service route; accepting only Android's isolated UID class
+        // preserves the ownership boundary without weakening ordinary cross-app callers.
+        if (!active || (callerUid != ownerUid && !isPlatformIsolatedUid(callerUid))) {
             throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_DENIED");
         }
         capabilityRegistry.requireRuntimeSession(authorityRole, authorityCapability,
                 authorityGeneration);
+    }
+
+    private static boolean isPlatformIsolatedUid(int uid) {
+        // FIRST_ISOLATED_UID/LAST_ISOLATED_UID are hidden on API 32. Android's stable UID
+        // allocation reserves this range for platform isolated processes.
+        return uid >= 99000 && uid <= 99999;
     }
     private synchronized void closeInternal() {
         if (!active) return;

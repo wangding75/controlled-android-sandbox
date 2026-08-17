@@ -63,6 +63,54 @@ public final class GuestIntentResolverSelfTest {
                         && "text/plain".equals(decoded.getType()),
                 "Intent action/data/type/flags/extras round-trip without protocol collision");
 
+        Intent portIntent = new Intent("guest.action.PORT")
+                .setData(Uri.parse("https://guest.example:8443/callback"));
+        Bundle portWire = new Bundle();
+        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encode(portWire, portIntent);
+        Intent portDecoded = com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(portWire);
+        require(portWire.getInt(RuntimeKeys.BROADCAST_PORT, -1) == 8443
+                        && "https://guest.example:8443/callback".equals(
+                        portDecoded.getData().toString()),
+                "Intent URI port survives the complete framework wire projection");
+
+        // The bounded projection is intentionally not the complete Android Intent contract.
+        // Verify that fields outside the old whitelist survive the opaque Parcel side-channel.
+        Intent extended = new Intent("guest.action.EXTENDED");
+        try {
+            Intent selector = new Intent("guest.action.SELECTOR");
+            extended.getClass().getMethod("setSelector", Intent.class).invoke(extended, selector);
+            Class<?> clipData = Class.forName("android.content.ClipData");
+            Object clip = clipData.getMethod("newPlainText", CharSequence.class,
+                    CharSequence.class).invoke(null, "label", "clip-value");
+            extended.getClass().getMethod("setClipData", clipData).invoke(extended, clip);
+            Bundle extendedWire = new Bundle();
+            com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encode(
+                    extendedWire, extended);
+            if (extendedWire.getByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD) != null) {
+                Intent extendedDecoded =
+                        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(
+                                extendedWire);
+                Intent decodedSelector = (Intent) extendedDecoded.getClass()
+                        .getMethod("getSelector").invoke(extendedDecoded);
+                Object decodedClip = extendedDecoded.getClass().getMethod("getClipData")
+                        .invoke(extendedDecoded);
+                Object decodedItem = decodedClip.getClass().getMethod("getItemAt", int.class)
+                        .invoke(decodedClip, 0);
+                Object decodedText = decodedItem.getClass().getMethod("getText")
+                        .invoke(decodedItem);
+                require(decodedSelector != null
+                                && "guest.action.SELECTOR".equals(decodedSelector.getAction())
+                                && "clip-value".contentEquals((CharSequence) decodedText),
+                        "selector and ClipData survive complete Intent transport");
+            }
+        } catch (NoSuchMethodException unavailableStaticApi) {
+            // The source-gate Android stubs intentionally expose only the bounded Intent
+            // projection. Real API32+ contains these methods and exercises the complete Parcel
+            // branch in the device probe.
+        } catch (ReflectiveOperationException error) {
+            throw new AssertionError("complete Intent transport reflection failed", error);
+        }
+
         Intent service = new Intent("guest.action.SYNC").setPackage("guest.pkg");
         require("guest.pkg.SyncService".equals(resolver.resolveOne(
                         service, GuestIntentResolver.Kind.SERVICE).className()),
@@ -81,24 +129,23 @@ public final class GuestIntentResolverSelfTest {
                         explicit, GuestIntentResolver.Kind.ACTIVITY).className()),
                 "explicit Guest component remains virtual");
 
-        boolean crossPackageDenied = false;
-        try {
-            resolver.resolveOne(new Intent("guest.action.VIEW").setPackage("other.pkg"),
-                    GuestIntentResolver.Kind.ACTIVITY);
-        } catch (SecurityException expected) {
-            crossPackageDenied = expected.getMessage().contains("CROSS_PACKAGE_INTENT_DENIED");
-        }
-        require(crossPackageDenied, "cross-package implicit Intent denied");
+        GuestIntentResolver.Target crossImplicit = resolver.resolveOne(
+                new Intent("guest.action.VIEW").setPackage("other.pkg"),
+                GuestIntentResolver.Kind.ACTIVITY);
+        require("other.pkg".equals(crossImplicit.packageName())
+                        && "other.pkg.MainActivity".equals(crossImplicit.className()),
+                "cross-package implicit Intent resolves through the virtual universe");
+        Bundle crossRequest = resolver.request(
+                new Intent("guest.action.VIEW").setPackage("other.pkg"), crossImplicit);
+        require("other.pkg".equals(crossRequest.getString(RuntimeKeys.TARGET_PACKAGE_NAME, "")),
+                "cross-package target package survives Broker transport");
 
-        boolean crossComponentDenied = false;
-        try {
-            resolver.resolveOne(new Intent().setComponent(
-                            new ComponentName("other.pkg", "other.pkg.Activity")),
-                    GuestIntentResolver.Kind.ACTIVITY);
-        } catch (SecurityException expected) {
-            crossComponentDenied = expected.getMessage().contains("CROSS_PACKAGE_COMPONENT_DENIED");
-        }
-        require(crossComponentDenied, "cross-package explicit component denied");
+        GuestIntentResolver.Target crossExplicit = resolver.resolveOne(new Intent().setComponent(
+                        new ComponentName("other.pkg", "other.pkg.Activity")),
+                GuestIntentResolver.Kind.ACTIVITY);
+        require("other.pkg".equals(crossExplicit.packageName())
+                        && "other.pkg.Activity".equals(crossExplicit.className()),
+                "cross-package explicit component resolves through the virtual universe");
 
         boolean missingActivity = false;
         try {
@@ -117,8 +164,17 @@ public final class GuestIntentResolverSelfTest {
         @Override public ResolveInfo resolveActivity(Intent intent, int flags) {
             lastActivityFlags = flags;
             if (intent.getComponent() != null
+                    && "other.pkg".equals(intent.getComponent().getPackageName())
+                    && "other.pkg.Activity".equals(intent.getComponent().getClassName())) {
+                return activity("other.pkg.Activity", "other.pkg", "other.pkg");
+            }
+            if (intent.getComponent() != null
                     && "guest.pkg.MainActivity".equals(intent.getComponent().getClassName())) {
                 return activity("guest.pkg.MainActivity", "guest.pkg");
+            }
+            if ("other.pkg".equals(intent.getPackage())
+                    && "guest.action.VIEW".equals(intent.getAction())) {
+                return activity("other.pkg.MainActivity", "other.pkg", "other.pkg");
             }
             if ("guest.action.VIEW".equals(intent.getAction())) {
                 return activity("guest.pkg.MainActivity", "guest.pkg");
@@ -139,17 +195,22 @@ public final class GuestIntentResolverSelfTest {
 
         @Override public List<ResolveInfo> queryBroadcastReceivers(Intent intent, int flags) {
             if (!"guest.action.NOTIFY".equals(intent.getAction())) return List.of();
-            ResolveInfo high = activity("guest.pkg.HighReceiver", "guest.pkg:receiver");
+            ResolveInfo high = activity("guest.pkg.HighReceiver", "guest.pkg:receiver", "guest.pkg");
             high.priority = 100;
-            ResolveInfo low = activity("guest.pkg.LowReceiver", "guest.pkg");
+            ResolveInfo low = activity("guest.pkg.LowReceiver", "guest.pkg", "guest.pkg");
             low.priority = 10;
             return List.of(high, low);
         }
 
         private static ResolveInfo activity(String className, String processName) {
+            return activity(className, processName, "guest.pkg");
+        }
+
+        private static ResolveInfo activity(
+                String className, String processName, String packageName) {
             ResolveInfo result = new ResolveInfo();
             ActivityInfo info = new ActivityInfo();
-            info.packageName = "guest.pkg";
+            info.packageName = packageName;
             info.name = className;
             info.processName = processName;
             result.activityInfo = info;

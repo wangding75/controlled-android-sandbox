@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.contract.VirtualAccountSummary;
 import com.warden.controlledsandbox.contract.VirtualAlarmSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationChannelSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNotificationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPendingIntentSnapshot;
@@ -319,6 +320,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         AlarmRecord record = new AlarmRecord(normalizedId, candidate.triggerAtMs(), candidate.intervalMs(),
                 candidate.exact(), candidate.allowWhileIdle(), path, pendingIntentTokenId,
                 boundedPayload(candidate.tokenPayload(), "alarmToken"),
+                candidate.alarmClock(), boundedPayload(candidate.alarmClockPayload(), "alarmClockShowIntent"),
                 required(processName, "processName"), generation, revision,
                 previous == null ? candidate.deliveryCount() : previous.deliveryCount,
                 System.currentTimeMillis());
@@ -705,6 +707,17 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         JobExecution execution;
         synchronized (this) { execution = activeJobExecutions.get(hostJobId); }
         if (execution == null || !execution.active()) return true;
+        // JobParameters.dequeueWork() has a framework-owned successful terminal path: when the
+        // queue is empty and all dequeued work is complete, Android calls onStopJob() with
+        // INTERNAL_STOP_REASON_SUCCESSFUL_FINISH instead of expecting jobFinished(). Do not
+        // synthesize Guest onStopJob() for that path; it is a successful completion, not a
+        // preemption, and the Guest may still be unwinding its final dequeue call.
+        if (internalStopReason == 10
+                || "last work dequeued".equalsIgnoreCase(
+                        debugStopReason == null ? "" : debugStopReason.trim())) {
+            execution.complete(false, false);
+            return false;
+        }
         boolean reschedule = true;
         try {
             reschedule = execution.client.observer().onJobStop(execution.job.guestId,
@@ -761,6 +774,30 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         @Override public void finish(boolean needsReschedule) {
             if (Binder.getCallingUid() != ownerUid) throw new SecurityException("JOB_EXECUTION_UID_MISMATCH");
             complete(needsReschedule, true);
+        }
+        @Override public VirtualJobWorkItemSnapshot dequeueWork() {
+            if (Binder.getCallingUid() != ownerUid) {
+                throw new SecurityException("JOB_EXECUTION_UID_MISMATCH");
+            }
+            if (!active()) return null;
+            try {
+                return hostCallback.dequeueHostWork(job.hostId);
+            } catch (RemoteException error) {
+                cancelWithoutHost(true);
+                return null;
+            }
+        }
+        @Override public boolean completeWork(int workId) {
+            if (Binder.getCallingUid() != ownerUid) {
+                throw new SecurityException("JOB_EXECUTION_UID_MISMATCH");
+            }
+            if (workId < 0 || !active()) return false;
+            try {
+                return hostCallback.completeHostWork(job.hostId, workId);
+            } catch (RemoteException error) {
+                cancelWithoutHost(true);
+                return false;
+            }
         }
         @Override public void binderDied() { cancelWithoutHost(true); }
         boolean active() {
@@ -1029,7 +1066,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             AlarmRecord alarm = item.getValue();
             AlarmRecord alarmCopy = new AlarmRecord(alarm.id, alarm.triggerAtMs, alarm.intervalMs,
                     alarm.exact, alarm.allowWhileIdle, alarm.deliveryPath, alarm.pendingIntentTokenId,
-                    alarm.tokenPayload, alarm.ownerProcessName, alarm.ownerGeneration, alarm.packageRevision,
+                    alarm.tokenPayload, alarm.alarmClock, alarm.alarmClockPayload,
+                    alarm.ownerProcessName, alarm.ownerGeneration, alarm.packageRevision,
                     alarm.deliveryCount, alarm.updatedAtMs);
             alarmCopy.future = alarm.future;
             copy.alarms.put(item.getKey(), alarmCopy);
@@ -1118,7 +1156,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     private void load() {
         try {
             String payload = persistence.readPayload();
-            if (payload == null) return;
+            if (payload == null) {
+                secretCipher.retireLegacyKey();
+                return;
+            }
             VirtualSystemServiceStoreCodec.Decoded decoded =
                     VirtualSystemServiceStoreCodec.decode(payload, secretCipher);
             states.clear();
@@ -1127,7 +1168,10 @@ final class VirtualSystemServiceStore implements AutoCloseable {
             nextJobHostId = decoded.nextJobHostId();
             nextPendingIntentToken = decoded.nextPendingIntentToken();
             removeStaleReservations();
-            if (decoded.requiresSecretMigration()) persist();
+            if (decoded.requiresSecretMigration() || secretCipher.hasLegacyKey()) {
+                persist();
+                secretCipher.retireLegacyKey();
+            }
         } catch (RuntimeException error) {
             states.clear();
             nextNotificationHostId = 0x51000000;
@@ -1288,7 +1332,8 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         return new VirtualAlarmSnapshot(value.id, value.triggerAtMs, value.intervalMs,
                 value.exact, value.allowWhileIdle, value.deliveryPath, value.pendingIntentTokenId,
                 value.ownerProcessName, value.ownerGeneration, value.packageRevision,
-                value.tokenPayload, value.deliveryCount, value.updatedAtMs);
+                value.tokenPayload, value.deliveryCount, value.updatedAtMs,
+                value.alarmClock, value.alarmClockPayload);
     }
     private void validateNotificationReferences(Scope scope, String revision,
                                                 VirtualNotificationSnapshot value) {

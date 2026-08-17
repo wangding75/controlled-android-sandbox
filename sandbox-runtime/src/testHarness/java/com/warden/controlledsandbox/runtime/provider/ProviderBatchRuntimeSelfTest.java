@@ -23,9 +23,11 @@ public final class ProviderBatchRuntimeSelfTest {
 
     public static void main(String[] args) throws Exception {
         standardBatch();
+        backReferenceBatch();
+        backReferenceValidation();
         validationFailures();
         customCallBatch();
-        customCallRequiresExtension();
+        nativeCallDoesNotRequireExtension();
         customFailureIndex();
         concurrentBatches();
         resultValidation();
@@ -310,6 +312,65 @@ public final class ProviderBatchRuntimeSelfTest {
         expectBatchFailure(0, () -> ProviderBatchRuntime.validate(request(huge), AUTHORITY));
     }
 
+    private static void backReferenceBatch() throws Exception {
+        RecordingProvider provider = new RecordingProvider();
+        Bundle first = operation(ProviderBatchRuntime.INSERT, "/items", values("one"), -1);
+        Bundle second = operation(ProviderBatchRuntime.INSERT, "/items", new Bundle(), -1);
+        Bundle valueReferences = new Bundle();
+        valueReferences.putInt("parent_id", 0);
+        second.putBundle(RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCES, valueReferences);
+        Bundle third = operation(ProviderBatchRuntime.UPDATE, "/items", values("updated"), -1);
+        third.putString(RuntimeKeys.PROVIDER_SELECTION, "_id=?");
+        ArrayList<String> selectionArgs = new ArrayList<>();
+        selectionArgs.add("0");
+        third.putStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS, selectionArgs);
+        Bundle selectionReferences = new Bundle();
+        selectionReferences.putInt("0", 0);
+        third.putBundle(RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCES, selectionReferences);
+
+        ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(
+                request(first, second, third), AUTHORITY);
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require("PROVIDER_BATCH_APPLIED".equals(result.getString(RuntimeKeys.STATUS, "")),
+                "back-reference batch status");
+        require(provider.lastInsertedParent != null && provider.lastInsertedParent == 1L,
+                "value back-reference resolves previous insert id");
+        require("updated".equals(provider.rows.get(1L)),
+                "selection back-reference resolves previous insert id");
+    }
+
+    private static void backReferenceValidation() throws Exception {
+        Bundle invalidType = operation(ProviderBatchRuntime.DELETE, "/items", null, -1);
+        Bundle valueReferences = new Bundle();
+        valueReferences.putInt("value", 0);
+        invalidType.putBundle(RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCES, valueReferences);
+        try {
+            ProviderBatchRuntime.validate(request(
+                    operation(ProviderBatchRuntime.INSERT, "/items", values("one"), -1),
+                    invalidType), AUTHORITY);
+            throw new AssertionError("Expected value back-reference type failure");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 1, "back-reference invalid type index");
+            require("PROVIDER_BATCH_VALUE_BACK_REFERENCE_TYPE_INVALID".equals(error.getMessage()),
+                    "back-reference invalid type message");
+        }
+
+        Bundle forward = operation(ProviderBatchRuntime.UPDATE, "/items", values("bad"), -1);
+        Bundle forwardReferences = new Bundle();
+        forwardReferences.putInt("0", 1);
+        forward.putBundle(RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCES, forwardReferences);
+        try {
+            ProviderBatchRuntime.validate(request(
+                    operation(ProviderBatchRuntime.INSERT, "/items", values("one"), -1),
+                    forward), AUTHORITY);
+            throw new AssertionError("Expected forward back-reference failure");
+        } catch (ProviderBatchRuntime.BatchException error) {
+            require(error.operationIndex() == 1, "forward back-reference index");
+            require("PROVIDER_BATCH_BACK_REFERENCE_ORDER_INVALID".equals(error.getMessage()),
+                    "forward back-reference message");
+        }
+    }
+
     private static void customCallBatch() throws Exception {
         AtomicRecordingProvider provider = new AtomicRecordingProvider();
         Bundle call = operation(ProviderBatchRuntime.CALL, "", null, -1);
@@ -326,11 +387,18 @@ public final class ProviderBatchRuntimeSelfTest {
         require(result.getInt(RuntimeKeys.PROVIDER_BATCH_RESULT_COUNT, -1) == 1, "custom result count");
     }
 
-    private static void customCallRequiresExtension() throws Exception {
+    private static void nativeCallDoesNotRequireExtension() throws Exception {
         Bundle call = operation(ProviderBatchRuntime.CALL, "", null, -1);
         call.putString(RuntimeKeys.PROVIDER_METHOD, "refresh");
+        Bundle extras = new Bundle();
+        extras.putString("source", "framework");
+        call.putBundle(RuntimeKeys.PROVIDER_BATCH_EXTRAS, extras);
         ProviderBatchRuntime.Batch batch = ProviderBatchRuntime.validate(request(call), AUTHORITY);
-        expectBatchFailure(-1, () -> ProviderBatchRuntime.execute(new RecordingProvider(), batch));
+        NativeCallProvider provider = new NativeCallProvider();
+        Bundle result = ProviderBatchRuntime.execute(provider, batch);
+        require(provider.callSeen, "ordinary provider receives native CALL operation");
+        require(result.getInt(RuntimeKeys.PROVIDER_BATCH_RESULT_COUNT, -1) == 1,
+                "native call result count");
     }
 
 
@@ -435,6 +503,7 @@ public final class ProviderBatchRuntimeSelfTest {
     static class RecordingProvider extends ContentProvider {
         final Map<Long, String> rows = new LinkedHashMap<>();
         long nextId = 1;
+        Long lastInsertedParent;
 
         @Override public boolean onCreate() { return true; }
         @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
@@ -471,6 +540,7 @@ public final class ProviderBatchRuntimeSelfTest {
         @Override public String getType(Uri uri) { return "vnd.test"; }
         @Override public synchronized Uri insert(Uri uri, ContentValues values) {
             long id = nextId++;
+            lastInsertedParent = values == null ? null : values.getAsLong("parent_id");
             rows.put(id, values == null ? "" : values.getAsString("value"));
             return Uri.parse(uri.toString() + "/" + id);
         }
@@ -482,8 +552,21 @@ public final class ProviderBatchRuntimeSelfTest {
         }
         @Override public synchronized int update(Uri uri, ContentValues values, String selection, String[] args) {
             String value = values == null ? "" : values.getAsString("value");
-            for (Long id : new ArrayList<>(rows.keySet())) rows.put(id, value);
-            return rows.size();
+            Long filterId = null;
+            if (selection != null && !selection.isEmpty()) {
+                if (!"_id=?".equals(selection) || args == null || args.length == 0) {
+                    throw new IllegalArgumentException("Unsupported update selection");
+                }
+                filterId = Long.parseLong(args[0]);
+            }
+            int affected = 0;
+            for (Long id : new ArrayList<>(rows.keySet())) {
+                if (filterId == null || id.equals(filterId)) {
+                    rows.put(id, value);
+                    affected++;
+                }
+            }
+            return affected;
         }
     }
 
@@ -492,6 +575,19 @@ public final class ProviderBatchRuntimeSelfTest {
         @Override public Bundle applyAtomicBatch(String authority, ArrayList<Bundle> operations)
                 throws AtomicProviderBatchException {
             throw new AtomicProviderBatchException(0, "expected failure");
+        }
+    }
+
+    static final class NativeCallProvider extends RecordingProvider {
+        boolean callSeen;
+
+        @Override public android.content.ContentProviderResult[] applyBatch(
+                ArrayList<android.content.ContentProviderOperation> operations)
+                throws android.content.OperationApplicationException {
+            require(operations.size() == 1, "native call operation count");
+            callSeen = operations.get(0).isCall();
+            return new android.content.ContentProviderResult[]{
+                    new android.content.ContentProviderResult(1)};
         }
     }
 

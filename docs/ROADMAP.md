@@ -18,7 +18,7 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 
 - DONE — versioned Binder protocol.
 - DONE — explicit session lifecycle, generation checks and immutable APK-revision binding with stale-Session replacement.
-- DONE — eight retained Guest process bindings and Binder-death handling.
+- DONE — 64 ordinary Guest process bindings plus 16 isolated slots with Binder-death handling.
 - DONE — one-time expiring Activity route authority.
 - DONE — separate virtual-user roots and virtual UIDs.
 - DONE — per-declared-process session keys and component process propagation.
@@ -56,7 +56,7 @@ Status legend: `DONE` means locally executable source implementation/tests exist
 - DONE — reversible notification, JobScheduler and storage identity proxies with per-service diagnostics.
 - DONE — ActivityManager/ActivityTaskManager source mediation uses an atomic proxy pair, exact API-signature policies, callback/result task models and reversible rollback.
 - DONE — Package-Service-owned typed Binder authority shares Clipboard, basic Account and persistent Notification/Job namespaces per package/virtual user; Alarm ownership is bound to virtual process and Runtime generation with bounded recovery.
-- PARTIAL — AlarmManager power/reboot semantics, Account authenticators, Notification callbacks/channels, Job work-item APIs and Android-version Job constraints remain open.
+- PARTIAL — AlarmManager power/reboot semantics, Account authenticators, Notification callbacks/channels and Android-version Job constraints remain open; Job work-item transport is source-complete and API32 device-verified.
 - DEVICE — hidden API and Binder signature matrix on Android 12–16 and OEM variants.
 
 ## Native and WebView
@@ -89,7 +89,7 @@ decomposition. Device validation remains intentionally deferred.
 
 ## M4-T13 source baseline
 
-Completed in source/host evidence: typed JobParameters transport, trusted Host JobService dispatch, owning Guest JobService `onStartJob`/`onStopJob`, one-shot scoped `jobFinished`, timeout and Binder-death rescheduling, and stale-generation rejection. Remaining priority: Android-version validation, Job work-item APIs, Service coordinator extraction and complete Service lifecycle semantics. Device validation remains intentionally deferred.
+Completed in source/host evidence: typed JobParameters transport, trusted Host JobService dispatch, owning Guest JobService `onStartJob`/`onStopJob`, one-shot scoped `jobFinished`, bounded `dequeueWork`/`completeWork` transport, timeout and Binder-death rescheduling, and stale-generation rejection. RD API32 evidence now covers two-item ordering, completion and Host `jobFinished` receipt. Remaining priority: stop-reason/version matrix, expedited/constraint behavior, Service coordinator extraction and complete Service lifecycle semantics; API33–36/OEM validation remains environment-blocked.
 
 ## M4-T14 source baseline
 
@@ -163,7 +163,7 @@ Completed in source/host evidence: dedicated Service coordinator ownership, star
 
 ## M5-T6 dedicated isolated Service source baseline
 
-- DONE — four predeclared Android isolated Service workers and independent four-slot ownership.
+- DONE — 16 predeclared Android isolated Service workers and independent 16-slot ownership.
 - DONE — typed Session/generation/slot/component/revision/capability Binder transport.
 - DONE — Service-only route, non-Service rejection, outer/payload identity equality and ordinary Broker Binder removal.
 - DONE — Binder-death recovery, generation advancement, package-stop cleanup and combined status metrics.

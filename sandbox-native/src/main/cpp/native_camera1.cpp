@@ -14,6 +14,7 @@
 #include <limits>
 #include <mutex>
 #include <shared_mutex>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -178,39 +179,65 @@ void* loaded_module_symbol(const char* module, const char* name) {
     return query.address;
 }
 
-void* module_symbol(const char* module, const char* name) {
+std::array<std::string, 2> system_module_candidates(const char* module) {
+#if defined(__LP64__)
+    constexpr const char* kRuntimeLib = "/apex/com.android.runtime/lib64/";
+    constexpr const char* kSystemLib = "/system/lib64/";
+#else
+    constexpr const char* kRuntimeLib = "/apex/com.android.runtime/lib/";
+    constexpr const char* kSystemLib = "/system/lib/";
+#endif
+    return {std::string(kRuntimeLib) + module, std::string(kSystemLib) + module};
+}
+
+void* open_module(const char* module, int flags, std::string& opened_path) {
+    void* handle = dlopen(module, flags | RTLD_NOLOAD);
+    if (handle != nullptr) {
+        opened_path = module;
+        return handle;
+    }
+    handle = dlopen(module, flags);
+    if (handle != nullptr) {
+        opened_path = module;
+        return handle;
+    }
+    if (module == nullptr || module[0] == '/') return nullptr;
+    for (const std::string& candidate : system_module_candidates(module)) {
+        handle = dlopen(candidate.c_str(), flags | RTLD_NOLOAD);
+        if (handle == nullptr) handle = dlopen(candidate.c_str(), flags);
+        if (handle != nullptr) {
+            opened_path = candidate;
+            return handle;
+        }
+    }
+    return nullptr;
+}
+
+void* module_symbol(const char* module, const char* name, bool log_failure) {
     void* address = loaded_module_symbol(module, name);
     if (module != nullptr) {
-        void* handle = dlopen(module, RTLD_NOW | RTLD_NOLOAD);
-        if (handle == nullptr && module[0] != '/') {
-            char absolute_module[128]{};
-            std::snprintf(absolute_module, sizeof(absolute_module), "/system/lib64/%s", module);
-            handle = dlopen(absolute_module, RTLD_NOW | RTLD_NOLOAD);
-        }
-        if (handle == nullptr) {
-            handle = dlopen(module, RTLD_NOW | RTLD_GLOBAL);
-            if (handle == nullptr && module[0] != '/') {
-                char absolute_module[128]{};
-                std::snprintf(absolute_module, sizeof(absolute_module), "/system/lib64/%s", module);
-                handle = dlopen(absolute_module, RTLD_NOW | RTLD_GLOBAL);
-            }
-            if (handle != nullptr) {
-                __android_log_print(ANDROID_LOG_INFO, kTag,
-                        "SYMBOL_MODULE_LOADED module=%s", module);
-            }
-        }
-        const char* handle_error = handle == nullptr ? dlerror() : nullptr;
-        if (handle == nullptr) {
-            __android_log_print(ANDROID_LOG_WARN, kTag,
-                    "SYMBOL_MODULE_UNAVAILABLE module=%s error=%s", module,
-                    handle_error == nullptr ? "unknown" : handle_error);
+        std::string opened_path;
+        void* handle = open_module(module, RTLD_NOW | RTLD_GLOBAL, opened_path);
+        if (handle != nullptr && opened_path != module) {
+            __android_log_print(ANDROID_LOG_INFO, kTag,
+                    "SYMBOL_MODULE_LOADED module=%s path=%s", module, opened_path.c_str());
         }
         if (address == nullptr && handle != nullptr) address = dlsym(handle, name);
         if (address == nullptr) {
-            const char* symbol_error = dlerror();
-            __android_log_print(ANDROID_LOG_WARN, kTag,
-                    "SYMBOL_MODULE_LOOKUP_FAILED module=%s symbol=%s error=%s", module, name,
-                    symbol_error == nullptr ? "unknown" : symbol_error);
+            void* default_address = dlsym(RTLD_DEFAULT, name);
+            if (default_address != nullptr) address = default_address;
+        }
+        if (address == nullptr && log_failure) {
+            const char* error = dlerror();
+            if (handle == nullptr) {
+                __android_log_print(ANDROID_LOG_WARN, kTag,
+                        "SYMBOL_MODULE_UNAVAILABLE module=%s error=%s", module,
+                        error == nullptr ? "unknown" : error);
+            } else {
+                __android_log_print(ANDROID_LOG_WARN, kTag,
+                        "SYMBOL_MODULE_LOOKUP_FAILED module=%s symbol=%s error=%s", module, name,
+                        error == nullptr ? "unknown" : error);
+            }
         }
     }
     if (address == nullptr) address = dlsym(RTLD_DEFAULT, name);
@@ -219,9 +246,13 @@ void* module_symbol(const char* module, const char* name) {
 
 template <typename Function>
 Function symbol(const char* name, const char* module, const char* dependency = nullptr) {
-    void* address = module_symbol(module, name);
+    // A symbol may legitimately live in a linked dependency on different Android
+    // releases.  Do not report the primary module as broken until the dependency
+    // lookup has also failed; otherwise a successful cross-module fallback looks
+    // like an ABI failure in production logs.
+    void* address = module_symbol(module, name, dependency == nullptr);
     if (address == nullptr && dependency != nullptr) {
-        address = module_symbol(dependency, name);
+        address = module_symbol(dependency, name, true);
     }
     return reinterpret_cast<Function>(address);
 }

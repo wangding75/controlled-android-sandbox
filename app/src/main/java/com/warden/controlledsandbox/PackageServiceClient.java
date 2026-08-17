@@ -43,9 +43,22 @@ final class PackageServiceClient implements AutoCloseable {
                 new Intent(this.context, PackageManagementService.class), binder -> {
                     IPackageService root = IPackageService.Stub.asInterface(binder);
                     if (root == null) return null;
-                    return root.openManagementSessionWithCapability(
-                            clientToken, HostPackageAuthorityCapability.token(),
-                            HostPackageAuthorityCapability.epochMarker());
+                    try {
+                        return root.openManagementSessionWithCapability(
+                                clientToken, HostPackageAuthorityCapability.token(),
+                                HostPackageAuthorityCapability.epochMarker());
+                    } catch (SecurityException capabilityFailure) {
+                        if (!isCapabilityRecoveryFailure(capabilityFailure)) throw capabilityFailure;
+                        // Package Service can outlive the host process.  Re-registering from this
+                        // exact host PID closes the ServiceConnection notification race, after
+                        // which the normal capability and owner-PID checks run again.
+                        root.registerManagementCapability(
+                                HostPackageAuthorityCapability.token(),
+                                HostPackageAuthorityCapability.epochMarker());
+                        return root.openManagementSessionWithCapability(
+                                clientToken, HostPackageAuthorityCapability.token(),
+                                HostPackageAuthorityCapability.epochMarker());
+                    }
                 }, IPackageManagementSession::close, "Package management service");
     }
 
@@ -418,6 +431,12 @@ final class PackageServiceClient implements AutoCloseable {
             throw new IllegalStateException(result.errorCode() + ": " + result.errorMessage());
         }
         return result;
+    }
+
+    private static boolean isCapabilityRecoveryFailure(SecurityException error) {
+        String message = error.getMessage();
+        return message != null && (message.contains("PACKAGE_MANAGEMENT_CAPABILITY_DENIED")
+                || message.contains("PACKAGE_AUTHORITY_BOOTSTRAP"));
     }
 
     @Override public void close() {

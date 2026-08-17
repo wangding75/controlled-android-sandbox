@@ -1,9 +1,11 @@
 package com.warden.controlledsandbox.runtime.protocol;
 
+import android.os.ParcelFileDescriptor;
 import com.warden.controlledsandbox.domain.session.PackageRevision;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -24,6 +26,29 @@ public final class ApkRevisionVerifier {
     }
 
     public static String sha256(File source) throws IOException {
+        if (source == null || !source.isFile()) throw new IllegalArgumentException("APK file is missing");
+        try (FileInputStream input = new FileInputStream(source)) {
+            return sha256(input);
+        }
+    }
+
+    /**
+     * Hashes an immutable APK capability without converting it back to a pathname.  The
+     * descriptor is duplicated so verification cannot move or close the caller's capability.
+     */
+    public static String sha256(ParcelFileDescriptor source) throws IOException {
+        if (source == null || source.getFd() < 0) {
+            throw new IllegalArgumentException("APK descriptor is missing");
+        }
+        ParcelFileDescriptor duplicate = source.dup();
+        try (ParcelFileDescriptor.AutoCloseInputStream input =
+                     new ParcelFileDescriptor.AutoCloseInputStream(duplicate)) {
+            input.getChannel().position(0L);
+            return sha256(input);
+        }
+    }
+
+    private static String sha256(InputStream input) throws IOException {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
@@ -31,11 +56,9 @@ public final class ApkRevisionVerifier {
             throw new IllegalStateException("SHA-256 unavailable", impossible);
         }
         byte[] buffer = new byte[64 * 1024];
-        try (FileInputStream input = new FileInputStream(source)) {
-            int read;
-            while ((read = input.read(buffer)) >= 0) {
-                if (read > 0) digest.update(buffer, 0, read);
-            }
+        int read;
+        while ((read = input.read(buffer)) >= 0) {
+            if (read > 0) digest.update(buffer, 0, read);
         }
         return toHex(digest.digest());
     }

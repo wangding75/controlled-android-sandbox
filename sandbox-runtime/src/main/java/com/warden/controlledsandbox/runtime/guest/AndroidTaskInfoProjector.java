@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.IInterface;
@@ -111,6 +112,18 @@ final class AndroidTaskInfoProjector {
         Intent baseIntent = new Intent();
         ComponentName base = component(task.packageName(), task.baseComponentName());
         if (base != null) baseIntent.setComponent(base);
+        if (!task.baseIntentAction().isEmpty()) baseIntent.setAction(task.baseIntentAction());
+        if (!task.baseIntentDataUri().isEmpty()) {
+            Uri data = Uri.parse(task.baseIntentDataUri());
+            if (!task.baseIntentMimeType().isEmpty()) baseIntent.setDataAndType(data, task.baseIntentMimeType());
+            else baseIntent.setData(data);
+        } else if (!task.baseIntentMimeType().isEmpty()) {
+            baseIntent.setType(task.baseIntentMimeType());
+        }
+        if (!task.baseIntentCategories().isEmpty()) {
+            for (String category : task.baseIntentCategories()) baseIntent.addCategory(category);
+        }
+        baseIntent.setFlags(task.baseIntentFlags());
         setIfPresent(value, baseIntent, "baseIntent");
         setIfPresent(value, task.excludedFromRecents(), "isExcluded");
         return value;

@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.broker;
 import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability;
+import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityRecovery;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -27,10 +28,22 @@ final class RuntimeVirtualSystemServicePackageClient implements AutoCloseable {
     IVirtualSystemServiceSession open(IBinder clientToken, String packageName,
                                       int virtualUserId, int virtualUid, String processName, long generation, String packageRevision) throws Exception {
         IPackageService root = rootConnection.require();
-        IVirtualSystemServiceSession session = root.openVirtualSystemServiceSessionWithCapability(
-                clientToken, packageName, virtualUserId, virtualUid, processName, generation,
-                packageRevision, RuntimePackageAuthorityCapability.token(),
-                RuntimePackageAuthorityCapability.epochMarker());
+        IVirtualSystemServiceSession session;
+        try {
+            session = root.openVirtualSystemServiceSessionWithCapability(
+                    clientToken, packageName, virtualUserId, virtualUid, processName, generation,
+                    packageRevision, RuntimePackageAuthorityCapability.token(),
+                    RuntimePackageAuthorityCapability.epochMarker());
+        } catch (SecurityException capabilityFailure) {
+            if (!RuntimePackageAuthorityRecovery.isCapabilityFailure(capabilityFailure)) {
+                throw capabilityFailure;
+            }
+            RuntimePackageAuthorityRecovery.register(root);
+            session = root.openVirtualSystemServiceSessionWithCapability(
+                    clientToken, packageName, virtualUserId, virtualUid, processName, generation,
+                    packageRevision, RuntimePackageAuthorityCapability.token(),
+                    RuntimePackageAuthorityCapability.epochMarker());
+        }
         if (session == null) throw new IllegalStateException("Package service returned no virtual system-service session");
         return session;
     }

@@ -13,6 +13,8 @@ This report compares only the M4-T13 Guest JobService execution increment. It se
 - Scoped one-shot Guest `jobFinished` capability.
 - Host callback death, Runtime replacement and timeout rescheduling.
 - Removal of direct Guest `finishJob(id)` authority.
+- Bounded `JobWorkItem` dequeue/complete transport with Broker-owned projected work IDs.
+- API32 RD evidence for ordered two-item drain and Host `jobFinished` receipt.
 
 ## Comparison
 
@@ -21,11 +23,12 @@ This report compares only the M4-T13 Guest JobService execution increment. It se
 | Job ID namespace | Persistent virtual/host mapping | Mature virtualization model | Broad virtualization model | Device behavior unverified here |
 | Host JobService bridge | Implemented in source and production path | Established framework coverage | Established framework coverage | Android-version adapter evidence absent |
 | Guest JobService start/stop | Implemented through Guest runtime | Mature implementation lineage | Broader modern-version implementation | No device validation |
-| Guest jobFinished | One-shot scoped Binder capability | Supported through virtual service stack | Supported through virtual service stack | Work-item APIs remain open |
+| Guest jobFinished | One-shot scoped Binder capability with Host receipt | Supported through virtual service stack | Supported through virtual service stack | Stop-reason/version matrix remains open |
+| JobWorkItem dequeue/complete | Bounded cross-process transport; API32 two-item device evidence | Mature framework coverage | Mature framework coverage | API33–36/OEM behavior not verified |
 | Process/generation ownership | Explicit package/user/process/generation binding | Mature process model | Mature process model | Current model has clearer typed ownership, less field coverage |
 | Persistent state recovery | DISPATCHING/RUNNING recover to SCHEDULED | Broader runtime recovery | Broader runtime recovery | Reboot/OEM behavior unverified |
 | Job constraints | Host JobInfo retained | Broader system integration | Broader system integration | Constraint/result compatibility incomplete |
-| Device evidence | 0% by current project policy | Long usage history, branch/version dependent | Project/version dependent | Controlled Sandbox has no real Android evidence |
+| Device evidence | API32 RD-11 real two-item transport and Host receipt | Long usage history, branch/version dependent | Project/version dependent | API33–36/OEM behavior remains unverified |
 
 ## Evidence-based judgment
 
@@ -45,11 +48,10 @@ These are repository evidence metrics, not APK compatibility rates.
 ## Unfinished items
 
 1. Real Android JobParameters constructor and hidden callback validation.
-2. `dequeueWork` and `completeWork` bridging.
-3. Full stop-reason/version matrix.
-4. Constraint and expedited Job behavior across Android versions.
-5. OEM JobScheduler adaptation.
-6. Device reboot and persisted Job recovery.
+2. Full stop-reason/version matrix.
+3. Constraint and expedited Job behavior across Android versions.
+4. OEM JobScheduler adaptation.
+5. Device reboot and persisted Job recovery.
 
 ## Next priority
 

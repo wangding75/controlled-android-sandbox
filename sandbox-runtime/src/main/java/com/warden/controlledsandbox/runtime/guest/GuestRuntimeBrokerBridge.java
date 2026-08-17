@@ -5,6 +5,7 @@ import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
+import java.util.function.Consumer;
 
 /** Synchronous, session-bound bridge used by standard Guest Context APIs. */
 final class GuestRuntimeBrokerBridge {
@@ -22,8 +23,54 @@ final class GuestRuntimeBrokerBridge {
         return execute(RuntimeOperationRequest.INVOKE_COMPONENT, request);
     }
 
+    void invokeComponentAsync(Bundle request, Consumer<Bundle> success,
+                              Consumer<Throwable> failure) {
+        mainThread.callBrokerAsync(
+                () -> execute(RuntimeOperationRequest.INVOKE_COMPONENT, request), success, failure);
+    }
+
     Bundle launchActivity(Bundle request) {
         return execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+    }
+
+    Bundle launchActivityFromFrameworkHost(Bundle request) {
+        Bundle payload = request == null ? baseRequest() : new Bundle(request);
+        payload.putBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, true);
+        return launchActivity(payload);
+    }
+
+    void grantUriPermission(String targetPackage, int targetVirtualUserId,
+                            String uri, int modeFlags) {
+        Bundle request = baseRequest();
+        request.putString(RuntimeKeys.TARGET_PACKAGE_NAME, targetPackage);
+        request.putInt(RuntimeKeys.TARGET_VIRTUAL_USER_ID, targetVirtualUserId);
+        request.putString(RuntimeKeys.URI, uri);
+        request.putInt(RuntimeKeys.URI_FLAGS, modeFlags);
+        execute(RuntimeOperationRequest.GRANT_URI_PERMISSION, request);
+    }
+
+    void revokeUriPermission(String uri, int modeFlags) {
+        Bundle request = baseRequest();
+        request.putString(RuntimeKeys.URI, uri);
+        request.putInt(RuntimeKeys.URI_FLAGS, modeFlags);
+        execute(RuntimeOperationRequest.REVOKE_URI_PERMISSION, request);
+    }
+
+    int checkUriPermission(String uri, int pid, int uid, int modeFlags) {
+        Bundle request = baseRequest();
+        request.putString(RuntimeKeys.URI, uri);
+        request.putInt(RuntimeKeys.URI_CHECK_PID, pid);
+        request.putInt(RuntimeKeys.URI_CHECK_UID, uid);
+        request.putInt(RuntimeKeys.URI_FLAGS, modeFlags);
+        Bundle result = execute(RuntimeOperationRequest.CHECK_URI_PERMISSION, request);
+        return result.getInt(RuntimeKeys.URI_PERMISSION_RESULT,
+                android.content.pm.PackageManager.PERMISSION_DENIED);
+    }
+
+    Bundle openPackageResources(String targetPackage) {
+        Bundle request = baseRequest();
+        request.putString(RuntimeKeys.PACKAGE_RESOURCE_TARGET, targetPackage);
+        return execute(RuntimeOperationRequest.OPEN_PACKAGE_RESOURCES, request);
     }
 
     Bundle baseRequest() {

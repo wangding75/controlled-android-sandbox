@@ -8,16 +8,21 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSharedLibrarySnapshot;
 import com.warden.controlledsandbox.contract.VirtualInstrumentationSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionDeclarationSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionGroupSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.os.Bundle;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.ManifestModel;
+import com.warden.controlledsandbox.runtime.guest.GuestResourceLoader;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +35,10 @@ import java.util.zip.ZipFile;
 final class VirtualPackageStateBuilder {
     private final Map<String, ManifestSet> manifestsByRevision = new ConcurrentHashMap<>();
     private final HostPermissionStateResolver hostPermissions;
+    private final Context context;
 
     VirtualPackageStateBuilder(Context context) {
+        this.context = context;
         hostPermissions = new HostPermissionStateResolver(context);
     }
 
@@ -42,17 +49,21 @@ final class VirtualPackageStateBuilder {
         if (policy == null) throw new IllegalArgumentException("policy is required");
         ManifestSet set = manifestsByRevision.get(record.sha256);
         if (set == null) {
-            set = parse(record);
+            set = parseForPackageState(record);
             manifestsByRevision.put(record.sha256, set);
         }
         if (!record.packageName.equals(set.packageName)) {
             throw new SecurityException("CATALOG_MANIFEST_PACKAGE_MISMATCH");
         }
         List<VirtualComponentSnapshot> components = new ArrayList<>();
-        append(components, record.packageName, set.activities, "ACTIVITY", policy);
-        append(components, record.packageName, set.services, "SERVICE", policy);
-        append(components, record.packageName, set.receivers, "RECEIVER", policy);
-        append(components, record.packageName, set.providers, "PROVIDER", policy);
+        append(components, record.packageName, set.applicationProcessName,
+                set.activities, "ACTIVITY", policy, set.componentMetadata);
+        append(components, record.packageName, set.applicationProcessName,
+                set.services, "SERVICE", policy, set.componentMetadata);
+        append(components, record.packageName, set.applicationProcessName,
+                set.receivers, "RECEIVER", policy, set.componentMetadata);
+        append(components, record.packageName, set.applicationProcessName,
+                set.providers, "PROVIDER", policy, set.componentMetadata);
 
         List<VirtualPermissionSnapshot> permissions = new ArrayList<>();
         Map<String, String> effectiveAppOps = new java.util.TreeMap<>(policy.appOpModes());
@@ -79,6 +90,21 @@ final class VirtualPackageStateBuilder {
         List<PackageAppOpSnapshot> appOps = new ArrayList<>();
         for (Map.Entry<String, String> item : effectiveAppOps.entrySet()) {
             appOps.add(new PackageAppOpSnapshot(item.getKey(), item.getValue()));
+        }
+        List<VirtualPermissionDeclarationSnapshot> permissionDeclarations = new ArrayList<>();
+        for (ManifestModel.PermissionDeclaration declaration : set.permissionDeclarations) {
+            permissionDeclarations.add(new VirtualPermissionDeclarationSnapshot(
+                    declaration.name(), declaration.group(), declaration.label(),
+                    declaration.description(), declaration.labelRes(), declaration.descriptionRes(),
+                    declaration.icon(), declaration.protectionLevel(), declaration.flags(),
+                    declaration.tree()));
+        }
+        List<VirtualPermissionGroupSnapshot> permissionGroups = new ArrayList<>();
+        for (ManifestModel.PermissionGroupDeclaration group : set.permissionGroups) {
+            permissionGroups.add(new VirtualPermissionGroupSnapshot(
+                    group.name(), group.label(), group.description(), group.labelRes(),
+                    group.descriptionRes(), group.icon(), group.requestRes(), group.priority(),
+                    group.flags()));
         }
 
         SharedLibraryResolver resolver = new SharedLibraryResolver(availableLibraries(catalog));
@@ -117,7 +143,7 @@ final class VirtualPackageStateBuilder {
         for (ManifestModel.QueryIntent query : set.queryIntents) {
             List<VirtualIntentDataSnapshot> data = new ArrayList<>();
             for (ManifestModel.DataRule rule : query.dataRules()) {
-                data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.path(),
+                data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.port(), rule.path(),
                         rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
             }
             queries.add(new VirtualPackageQuerySnapshot(VirtualPackageQuerySnapshot.INTENT, "",
@@ -132,7 +158,8 @@ final class VirtualPackageStateBuilder {
                 "com.warden.virtualinstaller", record.splitNames(),
                 new ArrayList<>(set.sharedLibraries), librarySnapshots, instrumentationSnapshots,
                 queries,
-                components, permissions, appOps, applicationInfoTemplate(record, set));
+                components, permissions, permissionDeclarations, permissionGroups, appOps,
+                applicationInfoTemplate(record, set));
     }
 
     static boolean effectivePackageEnabled(String state) {
@@ -156,7 +183,7 @@ final class VirtualPackageStateBuilder {
     boolean declaresPermission(SandboxRecord record, String permission) throws Exception {
         ManifestSet set = manifestsByRevision.get(record.sha256);
         if (set == null) {
-            set = parse(record);
+            set = parseForPackageState(record);
             manifestsByRevision.put(record.sha256, set);
         }
         return set.permissions.contains(permission);
@@ -165,7 +192,7 @@ final class VirtualPackageStateBuilder {
     boolean declaresComponent(SandboxRecord record, String className) throws Exception {
         ManifestSet set = manifestsByRevision.get(record.sha256);
         if (set == null) {
-            set = parse(record);
+            set = parseForPackageState(record);
             manifestsByRevision.put(record.sha256, set);
         }
         for (ManifestModel.Component component : set.allComponents()) {
@@ -178,7 +205,15 @@ final class VirtualPackageStateBuilder {
         if (revisionSha256 != null) manifestsByRevision.remove(revisionSha256);
     }
 
+    private ManifestSet parseForPackageState(SandboxRecord record) throws Exception {
+        return parseManifest(record, context);
+    }
+
     private static ManifestSet parse(SandboxRecord record) throws Exception {
+        return parseManifest(record, null);
+    }
+
+    private static ManifestSet parseManifest(SandboxRecord record, Context context) throws Exception {
         ManifestSet set = new ManifestSet();
         for (PackageArtifactRecord artifact : record.artifacts) {
             File apk = new File(artifact.path).getCanonicalFile();
@@ -209,14 +244,43 @@ final class VirtualPackageStateBuilder {
                 set.applicationNetworkSecurityConfigResId = manifest.applicationNetworkSecurityConfigResId();
                 set.minSdk = manifest.minSdk();
                 set.targetSdk = manifest.targetSdk();
+                if (context != null) {
+                    try {
+                        set.applicationMetadata = GuestResourceLoader.readApplicationMetadata(
+                                context, apk.getPath());
+                    } catch (Throwable metadataUnavailable) {
+                        // PackageManager metadata is an optional projection. LoadedApk still owns
+                        // the authoritative bootstrap path and will surface a hard resource error
+                        // there; do not make unrelated package queries fail because this projection
+                        // is unavailable on an older/OEM AssetManager.
+                        set.applicationMetadata = null;
+                    }
+                }
             } else if (set.launcherActivity.isEmpty() && !manifest.launcherActivity().isEmpty()) {
                 set.launcherActivity = manifest.launcherActivity();
+            }
+            if (context != null) {
+                try {
+                    mergeComponentMetadata(set.componentMetadata,
+                            GuestResourceLoader.readComponentMetadata(context, apk.getPath()));
+                    android.util.Log.i("CS_PMS_METADATA", "parsed package=" + set.packageName
+                            + " artifact=" + apk.getName() + " components="
+                            + set.componentMetadata.size());
+                } catch (Throwable metadataUnavailable) {
+                    // The runtime LoadedApk path remains authoritative.  A reduced/OEM
+                    // AssetManager may not expose every split's XML metadata; component queries
+                    // still retain their structural PackageParser fields in that case.
+                    android.util.Log.w("CS_PMS_METADATA", "component metadata unavailable package="
+                            + set.packageName + " artifact=" + apk.getName(), metadataUnavailable);
+                }
             }
             appendComponents(set.activities, manifest.activities());
             appendComponents(set.services, manifest.services());
             appendComponents(set.receivers, manifest.receivers());
             appendComponents(set.providers, manifest.providers());
             set.permissions.addAll(manifest.permissions()); set.sharedLibraries.addAll(manifest.sharedLibraries());
+            appendPermissionDeclarations(set.permissionDeclarations, manifest.permissionDeclarations());
+            appendPermissionGroups(set.permissionGroups, manifest.permissionGroups());
             set.sharedLibraryDependencies.addAll(manifest.sharedLibraryDependencies());
             set.providedSharedLibraries.addAll(manifest.providedSharedLibraries());
             set.instrumentations.addAll(manifest.instrumentations());
@@ -249,6 +313,42 @@ final class VirtualPackageStateBuilder {
         }
     }
 
+    private static void appendPermissionDeclarations(List<ManifestModel.PermissionDeclaration> target,
+                                                      List<ManifestModel.PermissionDeclaration> incoming) {
+        for (ManifestModel.PermissionDeclaration declaration : incoming) {
+            boolean present = false;
+            for (ManifestModel.PermissionDeclaration existing : target) {
+                if (existing.name().equals(declaration.name())) {
+                    if (!existing.equals(declaration)) {
+                        throw new IllegalArgumentException(
+                                "Conflicting permission declaration: " + declaration.name());
+                    }
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) target.add(declaration);
+        }
+    }
+
+    private static void appendPermissionGroups(List<ManifestModel.PermissionGroupDeclaration> target,
+                                                List<ManifestModel.PermissionGroupDeclaration> incoming) {
+        for (ManifestModel.PermissionGroupDeclaration group : incoming) {
+            boolean present = false;
+            for (ManifestModel.PermissionGroupDeclaration existing : target) {
+                if (existing.name().equals(group.name())) {
+                    if (!existing.equals(group)) {
+                        throw new IllegalArgumentException(
+                                "Conflicting permission-group declaration: " + group.name());
+                    }
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) target.add(group);
+        }
+    }
+
     private static boolean hasProviderAuthority(List<ManifestModel.Component> target,
                                                  ManifestModel.Component incoming) {
         for (ManifestModel.Component candidate : target) {
@@ -270,7 +370,7 @@ final class VirtualPackageStateBuilder {
             for (SandboxRecord installed : catalog.records()) {
                 ManifestSet installedSet = manifestsByRevision.get(installed.sha256);
                 if (installedSet == null) {
-                    installedSet = parse(installed);
+                    installedSet = parseForPackageState(installed);
                     manifestsByRevision.put(installed.sha256, installedSet);
                 }
                 appendProvidedLibraries(available, installedSet, installed.packageName);
@@ -323,8 +423,10 @@ final class VirtualPackageStateBuilder {
     }
 
     private static void append(List<VirtualComponentSnapshot> output, String packageName,
+                               String applicationProcessName,
                                List<ManifestModel.Component> components, String type,
-                               SandboxPolicyState policy) {
+                               SandboxPolicyState policy,
+                               Map<String, Bundle> componentMetadata) {
         for (ManifestModel.Component component : components) {
             String enabledSetting = policy.componentState(component.className());
             boolean enabled = effectiveComponentEnabled(component.enabled(), enabledSetting);
@@ -332,7 +434,7 @@ final class VirtualPackageStateBuilder {
             for (ManifestModel.IntentFilter filter : component.intentFilters()) {
                 List<VirtualIntentDataSnapshot> data = new ArrayList<>();
                 for (ManifestModel.DataRule rule : filter.dataRules()) {
-                    data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.path(),
+                    data.add(new VirtualIntentDataSnapshot(rule.scheme(), rule.host(), rule.port(), rule.path(),
                             rule.pathPrefix(), rule.pathPattern(), rule.mimeType()));
                 }
                 filters.add(new VirtualIntentFilterSnapshot(filter.priority(),
@@ -345,7 +447,8 @@ final class VirtualPackageStateBuilder {
                         rule.uriGrantRule()));
             }
             output.add(new VirtualComponentSnapshot(type, component.className(),
-                    processName(packageName, component), component.exported(), enabled,
+                    processName(packageName, applicationProcessName, component),
+                    component.exported(), enabled,
                     component.isolatedProcess(), component.authorities(), component.permission(),
                     component.readPermission(), component.writePermission(), component.grantUriPermissions(),
                     enabledSetting, component.actions(), filters, providerPathRules,
@@ -358,7 +461,22 @@ final class VirtualPackageStateBuilder {
                     component.resizeMode(), component.maxAspectRatio(), component.minAspectRatio(),
                     component.supportsPictureInPicture(), component.foregroundServiceType(),
                     component.stopWithTask(), component.directBootAware(), component.multiprocess(),
-                    component.initOrder(), component.syncable()));
+                    component.initOrder(), component.syncable(), component.persistableMode(),
+                    component.targetActivity(), componentMetadata == null ? null
+                            : componentMetadata.get(component.className())));
+        }
+    }
+
+    private static void mergeComponentMetadata(Map<String, Bundle> target,
+                                                Map<String, Bundle> incoming) {
+        if (target == null || incoming == null) return;
+        for (Map.Entry<String, Bundle> entry : incoming.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+                continue;
+            }
+            Bundle current = target.get(entry.getKey());
+            if (current == null) target.put(entry.getKey(), new Bundle(entry.getValue()));
+            else current.putAll(entry.getValue());
         }
     }
 
@@ -368,13 +486,15 @@ final class VirtualPackageStateBuilder {
         return manifestEnabled;
     }
 
-    private static String processName(String packageName, ManifestModel.Component component) {
+    private static String processName(String packageName, String applicationProcessName,
+                                      ManifestModel.Component component) {
         if (component.isolatedProcess()) {
             return packageName + ":isolated_" + component.className().replaceAll("[^A-Za-z0-9_]", "_");
         }
         String declared = component.processName();
-        if (declared == null || declared.trim().isEmpty()) return packageName;
-        return declared.startsWith(":") ? packageName + declared : declared;
+        return normalizeProcessName(packageName,
+                declared == null || declared.trim().isEmpty()
+                        ? applicationProcessName : declared);
     }
 
     private static final class ManifestSet {
@@ -384,11 +504,15 @@ final class VirtualPackageStateBuilder {
         boolean applicationExtractNativeLibs = true; boolean applicationUsesCleartextTraffic = true;
         boolean applicationLargeHeap; boolean applicationHardwareAccelerated = true;
         int applicationNetworkSecurityConfigResId; int minSdk; int targetSdk;
+        Bundle applicationMetadata;
+        final Map<String, Bundle> componentMetadata = new LinkedHashMap<>();
         final List<ManifestModel.Component> activities = new ArrayList<>();
         final List<ManifestModel.Component> services = new ArrayList<>();
         final List<ManifestModel.Component> receivers = new ArrayList<>();
         final List<ManifestModel.Component> providers = new ArrayList<>();
         final Set<String> permissions = new LinkedHashSet<>();
+        final List<ManifestModel.PermissionDeclaration> permissionDeclarations = new ArrayList<>();
+        final List<ManifestModel.PermissionGroupDeclaration> permissionGroups = new ArrayList<>();
         final Set<String> sharedLibraries = new LinkedHashSet<>();
         final List<ManifestModel.SharedLibraryDependency> sharedLibraryDependencies = new ArrayList<>();
         final Set<String> providedSharedLibraries = new LinkedHashSet<>();
@@ -419,6 +543,7 @@ final class VirtualPackageStateBuilder {
         if (set.applicationExtractNativeLibs) info.flags |= ApplicationInfo.FLAG_EXTRACT_NATIVE_LIBS;
         if (set.applicationUsesCleartextTraffic) info.flags |= ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC;
         info.appComponentFactory = set.applicationComponentFactory;
+        info.metaData = set.applicationMetadata == null ? null : new Bundle(set.applicationMetadata);
         setOptionalApplicationField(info, "directBootAware", set.applicationDirectBootAware);
         info.enabled = true;
         setOptionalApplicationField(info, "networkSecurityConfigRes",
@@ -427,8 +552,13 @@ final class VirtualPackageStateBuilder {
     }
 
     private static String applicationProcessName(String packageName, String declared) {
+        return normalizeProcessName(packageName, declared);
+    }
+
+    private static String normalizeProcessName(String packageName, String declared) {
         if (declared == null || declared.trim().isEmpty()) return packageName;
-        return declared.startsWith(":") ? packageName + declared : declared;
+        String value = declared.trim();
+        return value.startsWith(":") ? packageName + value : value;
     }
 
     private static void setOptionalApplicationField(ApplicationInfo info, String name, Object value) {

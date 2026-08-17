@@ -9,12 +9,21 @@ import com.warden.controlledsandbox.domain.component.service.ForegroundServiceSt
 import com.warden.controlledsandbox.domain.component.service.ServiceRuntimeRegistry;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Broker-owned production state for started, bound, foreground, and recovering Guest services. */
 public final class BrokerServiceRuntime {
     private final ServiceRuntimeRegistry registry = new ServiceRuntimeRegistry();
     private final Clock clock;
+    /**
+     * The domain registry deliberately remains Android-free.  Keep the platform Intent envelope
+     * beside it in the Broker, where it can survive a Guest process death without leaking Guest
+     * objects into the domain layer.  The map is bounded by the registry record limit.
+     */
+    private final Map<String, Bundle> lastStartIntents = new LinkedHashMap<>();
 
     public BrokerServiceRuntime() { this(System::currentTimeMillis); }
 
@@ -29,20 +38,22 @@ public final class BrokerServiceRuntime {
         String operation = request.getString(ComponentOperations.OPERATION, "");
         String component = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
         if (component.trim().isEmpty()) return null;
+        boolean frameworkOwned = request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, false);
         ServiceRuntimeRegistry.Snapshot snapshot = null;
         String instance = instanceId(session);
         switch (operation) {
             case ComponentOperations.START_SERVICE -> snapshot = registry.start(
-                    instance, component, session.processName(), restartMode(result), session.generation(),
-                    request.getString(ComponentOperations.ACTION, ""), false);
+                    instance, component, session.processName(), restartModeOf(result), session.generation(),
+                    request.getString(ComponentOperations.ACTION, ""), false, frameworkOwned);
             case ComponentOperations.START_FOREGROUND_SERVICE -> snapshot = registry.startForegroundRequested(
-                    instance, component, session.processName(), restartMode(result), session.generation(),
+                    instance, component, session.processName(), restartModeOf(result), session.generation(),
                     request.getString(ComponentOperations.ACTION, ""), clock.nowMillis(),
                     request.getLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
                             ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS),
                     request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true),
                     request.getString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, ""),
-                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0));
+                    request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0),
+                    frameworkOwned);
             case ComponentOperations.STOP_SERVICE -> {
                 if (registry.find(instance, component) != null) {
                     snapshot = registry.stopStarted(instance, component, session.generation());
@@ -70,7 +81,7 @@ public final class BrokerServiceRuntime {
             }
             case ComponentOperations.BIND_SERVICE -> snapshot = registry.bind(
                     instance, component, session.processName(), required(request, RuntimeKeys.CONNECTION_ID),
-                    session.generation());
+                    session.generation(), frameworkOwned);
             case ComponentOperations.UNBIND_SERVICE -> {
                 if (registry.find(instance, component) != null) {
                     snapshot = registry.unbind(instance, component,
@@ -79,7 +90,15 @@ public final class BrokerServiceRuntime {
             }
             default -> { return null; }
         }
-        if (snapshot != null) addSnapshot(result, snapshot);
+        if (snapshot != null) {
+            if (ComponentOperations.START_SERVICE.equals(operation)
+                    || ComponentOperations.START_FOREGROUND_SERVICE.equals(operation)) {
+                rememberStartIntent(instance, component, request);
+            } else if (snapshot.state() == ServiceRuntimeRegistry.State.DESTROYED) {
+                forgetStartIntent(instance, component);
+            }
+            addSnapshot(result, snapshot);
+        }
         result.putInt(RuntimeKeys.SERVICE_RECORD_COUNT, registry.snapshot().size());
         return snapshot;
     }
@@ -91,8 +110,47 @@ public final class BrokerServiceRuntime {
         return registry.disconnect(instanceId(session), component, connectionId, session.generation());
     }
 
+    /** Opens the framework Service start record before ActivityThread enters onStartCommand. */
+    public synchronized ServiceRuntimeRegistry.Snapshot beginFrameworkStart(
+            GuestSession session, Bundle request, Bundle result) {
+        String component = required(request, RuntimeKeys.COMPONENT_CLASS);
+        boolean foreground = request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, false);
+        ServiceRuntimeRegistry.Snapshot snapshot = registry.beginFrameworkStart(
+                instanceId(session), component, session.processName(), session.generation(),
+                request.getInt(RuntimeKeys.SERVICE_START_ID, -1),
+                request.getString(ComponentOperations.ACTION, ""), foreground,
+                clock.nowMillis(), request.getLong(RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS,
+                        ForegroundServiceStateMachine.DEFAULT_PROMOTION_TIMEOUT_MS),
+                request.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true),
+                request.getString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, ""),
+                 request.getInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, 0));
+        rememberStartIntent(instanceId(session), component, request);
+        addSnapshot(result, snapshot);
+        return snapshot;
+    }
+
+    /** Commits the final onStartCommand restart mode after a framework Service callback returns. */
+    public synchronized ServiceRuntimeRegistry.Snapshot completeFrameworkStart(
+            GuestSession session, Bundle request, Bundle result) {
+        String component = required(request, RuntimeKeys.COMPONENT_CLASS);
+        ServiceRuntimeRegistry.Snapshot snapshot = registry.completeFrameworkStart(
+                instanceId(session), component, session.generation(),
+                request.getInt(RuntimeKeys.SERVICE_START_ID, -1),
+                restartModeOf(result), request.getString(ComponentOperations.ACTION, ""));
+        addSnapshot(result, snapshot);
+        return snapshot;
+    }
+
     public synchronized List<ServiceRuntimeRegistry.Snapshot> processDisconnected(GuestSession stale) {
-        return registry.markProcessDied(instanceId(stale), stale.processName(), stale.generation());
+        String instance = instanceId(stale);
+        List<ServiceRuntimeRegistry.Snapshot> affected = registry.markProcessDied(
+                instance, stale.processName(), stale.generation());
+        for (ServiceRuntimeRegistry.Snapshot service : affected) {
+            if (service.state() == ServiceRuntimeRegistry.State.DESTROYED) {
+                forgetStartIntent(instance, service.component());
+            }
+        }
+        return affected;
     }
 
     public synchronized List<ServiceRuntimeRegistry.Snapshot> recovering(GuestSession stale) {
@@ -100,8 +158,36 @@ public final class BrokerServiceRuntime {
     }
 
     public synchronized List<ServiceRuntimeRegistry.Snapshot> processRecovered(GuestSession stale, GuestSession current) {
+        return processRecovered(stale, current, java.util.Collections.emptyMap());
+    }
+
+    public synchronized List<ServiceRuntimeRegistry.Snapshot> processRecovered(
+            GuestSession stale, GuestSession current,
+            Map<String, ServiceRuntimeRegistry.RestartMode> recoveryModes) {
         return registry.completeProcessRecovery(instanceId(stale), stale.processName(),
-                stale.generation(), current.generation(), clock.nowMillis());
+                stale.generation(), current.generation(), clock.nowMillis(), recoveryModes);
+    }
+
+    public synchronized ServiceRuntimeRegistry.Snapshot completeFrameworkRecovery(
+            GuestSession stale, GuestSession current, ServiceRuntimeRegistry.Snapshot service,
+            Bundle request, Bundle result) {
+        int startId = result == null ? -1 : result.getInt(RuntimeKeys.SERVICE_START_ID,
+                request == null ? -1 : request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
+        String action = request == null ? "" : request.getString(ComponentOperations.ACTION, "");
+        ServiceRuntimeRegistry.Snapshot snapshot = registry.completeFrameworkRecovery(
+                instanceId(stale), service.component(), stale.generation(), current.generation(),
+                startId, action, clock.nowMillis(), result != null
+                        && result.containsKey("onStartCommandResult")
+                        ? restartModeOf(result) : null);
+        if (result != null && result.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_OBSERVED, false)) {
+            snapshot = registry.promoteFrameworkRecovery(
+                    instanceId(current), service.component(), current.generation(), clock.nowMillis(),
+                    result.getInt(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED_TYPE_MASK, 0),
+                    result.getInt(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_ID, -1),
+                    result.getString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, ""));
+        }
+        if (result != null) addSnapshot(result, snapshot);
+        return snapshot;
     }
 
     public synchronized List<ServiceRuntimeRegistry.Snapshot> expireForeground() {
@@ -109,13 +195,80 @@ public final class BrokerServiceRuntime {
     }
 
     public synchronized int invalidate(GuestSession session) {
-        return registry.destroyInstance(instanceId(session), session.generation());
+        String instance = instanceId(session);
+        int removed = registry.destroyInstance(instance, session.generation());
+        forgetStartIntents(instance);
+        return removed;
     }
 
     public synchronized int recordCount() { return registry.snapshot().size(); }
     public synchronized List<ServiceRuntimeRegistry.Snapshot> snapshot() { return registry.snapshot(); }
 
-    private static ServiceRuntimeRegistry.RestartMode restartMode(Bundle result) {
+    /** Returns a defensive copy of the last full wire Intent for START_REDELIVER_INTENT. */
+    public synchronized Bundle recoveryIntent(ServiceRuntimeRegistry.Snapshot service) {
+        if (service == null) return null;
+        Bundle envelope = lastStartIntents.get(serviceKey(service.instanceId(), service.component()));
+        return envelope == null ? null : new Bundle(envelope);
+    }
+
+    private void rememberStartIntent(String instance, String component, Bundle request) {
+        Bundle envelope = new Bundle();
+        if (request != null) {
+            copyString(request, envelope, ComponentOperations.ACTION);
+            copyString(request, envelope, RuntimeKeys.ACTIVITY_ACTION);
+            copyString(request, envelope, RuntimeKeys.URI);
+            copyString(request, envelope, RuntimeKeys.BROADCAST_SCHEME);
+            copyString(request, envelope, RuntimeKeys.BROADCAST_HOST);
+            if (request.containsKey(RuntimeKeys.BROADCAST_PORT)) {
+                envelope.putInt(RuntimeKeys.BROADCAST_PORT,
+                        request.getInt(RuntimeKeys.BROADCAST_PORT, -1));
+            }
+            copyString(request, envelope, RuntimeKeys.BROADCAST_PATH);
+            copyString(request, envelope, RuntimeKeys.BROADCAST_MIME_TYPE);
+            copyString(request, envelope, RuntimeKeys.TARGET_PACKAGE_NAME);
+            copyString(request, envelope, RuntimeKeys.INTENT_COMPONENT_PACKAGE);
+            copyString(request, envelope, RuntimeKeys.INTENT_COMPONENT_CLASS);
+            if (request.containsKey(RuntimeKeys.ACTIVITY_FLAGS)) {
+                envelope.putInt(RuntimeKeys.ACTIVITY_FLAGS,
+                        request.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0));
+            }
+            List<String> categories = request.getStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES);
+            if (categories != null) {
+                envelope.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
+                        new ArrayList<>(categories));
+            }
+            Bundle extras = request.getBundle(RuntimeKeys.INTENT_EXTRAS);
+            if (extras != null) envelope.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+        }
+        lastStartIntents.put(serviceKey(instance, component), envelope);
+        while (lastStartIntents.size() > ServiceRuntimeRegistry.MAX_SERVICE_RECORDS) {
+            lastStartIntents.remove(lastStartIntents.keySet().iterator().next());
+        }
+    }
+
+    private void forgetStartIntent(String instance, String component) {
+        lastStartIntents.remove(serviceKey(instance, component));
+    }
+
+    private void forgetStartIntents(String instance) {
+        java.util.Iterator<String> iterator = lastStartIntents.keySet().iterator();
+        String prefix = instance + "#";
+        while (iterator.hasNext()) {
+            if (iterator.next().startsWith(prefix)) iterator.remove();
+        }
+    }
+
+    private static void copyString(Bundle source, Bundle target, String key) {
+        if (!source.containsKey(key)) return;
+        String value = source.getString(key);
+        if (value != null) target.putString(key, value);
+    }
+
+    private static String serviceKey(String instance, String component) {
+        return instance + "#" + component;
+    }
+
+    public static ServiceRuntimeRegistry.RestartMode restartModeOf(Bundle result) {
         int value = result.getInt("onStartCommandResult", Service.START_NOT_STICKY);
         if (value == Service.START_STICKY) return ServiceRuntimeRegistry.RestartMode.STICKY;
         if (value == Service.START_REDELIVER_INTENT) return ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT;
@@ -143,6 +296,7 @@ public final class BrokerServiceRuntime {
                 foreground.backgroundStartAllowed());
         result.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, foreground.exemptionReason());
         result.putString(RuntimeKeys.SERVICE_FOREGROUND_TERMINAL_REASON, foreground.terminalReason());
+        result.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, snapshot.frameworkOwned());
     }
 
     public static String instanceId(GuestSession session) {

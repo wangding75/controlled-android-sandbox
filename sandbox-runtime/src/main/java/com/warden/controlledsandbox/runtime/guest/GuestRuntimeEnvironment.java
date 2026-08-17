@@ -5,13 +5,18 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
+import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -46,12 +51,19 @@ import com.warden.controlledsandbox.nativebridge.NativePolicy;
 import com.warden.controlledsandbox.nativebridge.NativeNetworkIdentity;
 import com.warden.controlledsandbox.runtime.systemservice.RemoteVirtualSystemServiceAuthority;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.OutputStream;
+import android.os.ParcelFileDescriptor;
 import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -132,21 +144,22 @@ public final class GuestRuntimeEnvironment {
         GuestFrameworkCallRouter stagedFrameworkCallRouter = null;
         Session stagedSession = null;
         GuestProcessIdentityBridge stagedProcessIdentity = null;
+        ParcelFileDescriptor loaderApkDescriptor = null;
+        ParcelFileDescriptor loaderNativeArchiveDescriptor = null;
         try {
-            RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot);
-            File nativeCrashFile = RuntimeDiagnostics.nativeCrashFile();
-            // Do not install a second signal-chain handler in a foreign-ABI process.  The
-            // platform bridge and Quark's CrashSDK already own that chain; CAS's recorder is
-            // retained for native-ABI guests where the calling convention is ours.
-            boolean nativeCrashRecorderInstalled = !isTranslatedGuestAbi(spec.nativeAbi)
-                    && nativeCrashFile != null
-                    && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
-            com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
-                    PackageRevisionSetVerifier.verify(spec.apkFile(), spec.baseApkSha256,
-                            spec.splitArtifacts(), spec.apkVersionCode, spec.apkSha256);
-            if (!verifiedRevision.canonical().equals(spec.packageRevision)) {
-                throw new SecurityException("PACKAGE_REVISION_MISMATCH");
-            }
+            IVirtualSystemServiceSession systemServiceSession = requireSystemServiceSession(spec);
+            NativeBootstrap nativeBootstrap = prepareNativeBootstrap(host, spec, systemServiceSession);
+            String nativeAbi = nativeBootstrap.nativeAbi;
+            String packagedNativeLibraryDir = nativeBootstrap.packagedNativeLibraryDir;
+            File guestDataRoot = nativeBootstrap.guestDataRoot;
+            String runtimeNativeLibraryDir = nativeBootstrap.runtimeNativeLibraryDir;
+            String nativeLibrarySearchPath = nativeBootstrap.nativeLibrarySearchPath;
+            String guestDexPath = nativeBootstrap.guestDexPath;
+            String coreDexMode = nativeBootstrap.coreDexMode;
+            String nativePolicyLibraryRoot = nativeBootstrap.nativePolicyLibraryRoot;
+            boolean nativePolicyConfigured = nativeBootstrap.nativePolicyConfigured;
+            boolean systemIoHooksInstalled = nativeBootstrap.systemIoHooksInstalled;
+            boolean nativeCrashRecorderInstalled = nativeBootstrap.nativeCrashRecorderInstalled;
             if (current != null) {
                 if (current.spec.sessionId.equals(spec.sessionId)
                         && current.spec.generation == spec.generation
@@ -158,9 +171,32 @@ public final class GuestRuntimeEnvironment {
                 if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
                 current.shutdown();
             }
-            File optimized = new File(host.getCodeCacheDir(), "guest/" + safe(spec.packageName)
-                    + "/" + safe(spec.packageRevision) + "/" + spec.generation);
-            ensureDirectory(optimized);
+            File optimized = host.getCodeCacheDir();
+            if (!spec.isolatedProcess) {
+                File optimizedBase = host.getCodeCacheDir();
+        optimized = new File(optimizedBase, "guest/" + safe(spec.packageName)
+                + "/" + safe(spec.packageRevision) + "/" + spec.generation);
+        ensureDirectory(optimized);
+        String coreOverlay = GuestNativeRuntimeProjection.materializeRawDexOverlay(
+                guestDataRoot, nativeAbi, false, packagedNativeLibraryDir);
+            if (!coreOverlay.isEmpty()) {
+                    guestDexPath = coreOverlay + File.pathSeparator + spec.dexPath();
+                    coreDexMode = "zip-overlay";
+                } else {
+                    guestDexPath = GuestNativeRuntimeProjection.prependCoreDexPath(
+                            guestDataRoot, nativeAbi, false, packagedNativeLibraryDir,
+                            spec.dexPath());
+                    if (!guestDexPath.equals(spec.dexPath())) coreDexMode = "zip-path";
+                }
+                guestDexPath = GuestSharedLibraryPathResolver.appendResolvedLibraryPaths(
+                        guestDexPath, spec.packageState, spec.packageUniverse);
+            }
+            android.util.Log.i("CS_NATIVE_RUNTIME", "projection="
+                    + (!runtimeNativeLibraryDir.equals(packagedNativeLibraryDir))
+                    + " runtimeDir=" + runtimeNativeLibraryDir
+                    + " packagedDir=" + packagedNativeLibraryDir
+                    + " dexPathProjected=" + !guestDexPath.equals(spec.dexPath())
+                    + " coreDexMode=" + coreDexMode);
             if (Build.VERSION.SDK_INT >= 29 && !NativePolicy.installHiddenApiBridge()) {
                 throw new IllegalStateException("HIDDEN_API_BRIDGE_UNAVAILABLE");
             }
@@ -175,22 +211,54 @@ public final class GuestRuntimeEnvironment {
                     + " translatedAbi=" + translatedGuestAbi
                     + " guestAbi=" + safe(spec.nativeAbi)
                     + " hostAbi=" + safe(hostAbi()));
-            GuestClassLoader loader = new GuestClassLoader(spec.dexPath(), optimized.getAbsolutePath(),
-                    emptyToNull(spec.nativeLibraryDir), GuestRuntimeEnvironment.class.getClassLoader(),
-                    spec.packageName, declaredGuestClasses(spec));
+            GuestClassLoader loader;
+            if (spec.isolatedProcess) {
+                java.util.List<java.nio.ByteBuffer> isolatedDexBuffers =
+                        loadIsolatedGuestDexBuffers(spec);
+                if (!spec.nativeLibraryDescriptors.isEmpty()) {
+                    loaderNativeArchiveDescriptor = createNativeLibraryArchive(spec);
+                    android.util.Log.i("CS_NATIVE_BIND", "FD_NATIVE_ARCHIVE_MATERIALIZED fd="
+                            + loaderNativeArchiveDescriptor.getFd() + " count="
+                            + spec.nativeLibraryDescriptors.size());
+                } else if (spec.apkDescriptor != null && spec.containsNativeCode
+                        && spec.nativeAbi != null && !spec.nativeAbi.trim().isEmpty()) {
+                    // Zip-backed NativeLibraryElement lookup cannot open the host APK through
+                    // the isolated UID's /proc view on all Android 12 builds. Materialize the
+                    // already verified APK capability into a process-local memfd: the bytes
+                    // stay inside this isolated process, while DexPathList can use the normal
+                    // apk!/lib/<abi> NativeLoader path and preserve JNI_OnLoad semantics.
+                    loaderApkDescriptor = NativePolicy.materializeCapabilityFile(spec.apkDescriptor);
+                    android.util.Log.i("CS_NATIVE_BIND", "FD_APK_MATERIALIZED fd="
+                            + loaderApkDescriptor.getFd() + " abi=" + safe(spec.nativeAbi));
+                }
+                loader = new GuestClassLoader(isolatedDexBuffers,
+                        isolatedNativeLibraryPath(spec,
+                                loaderApkDescriptor, loaderNativeArchiveDescriptor),
+                        GuestRuntimeEnvironment.class.getClassLoader(), spec.packageName,
+                        declaredGuestClasses(spec));
+            } else {
+                loader = new GuestClassLoader(guestDexPath, optimized.getAbsolutePath(),
+                        emptyToNull(nativeLibrarySearchPath), GuestRuntimeEnvironment.class.getClassLoader(),
+                        spec.packageName, declaredGuestClasses(spec));
+            }
             loader.configureNativeCompatibility(translatedGuestAbi);
             GuestNativeBindingDiagnostic.installProcessProbes();
             GuestNativeBindingDiagnostic.recordLoader("guest.base", loader);
             GuestNativeBindingDiagnostic.recordLoader("guest.dex", loader.definingLoader());
-            GuestResourceLoader.LoadedResources loadedResources = GuestResourceLoader.load(
-                    host, spec.apkPath, spec.splitPathArray());
+            GuestResourceLoader.LoadedResources loadedResources = spec.isolatedProcess
+                    ? GuestResourceLoader.load(host, spec.apkDescriptor, spec.splitDescriptors)
+                    : GuestResourceLoader.load(host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
             ApplicationInfo parsedApplicationInfo = null;
             try {
+                if (spec.isolatedProcess) {
+                    parsedApplicationInfo = spec.packageState.applicationInfo();
+                } else {
                 android.content.pm.PackageInfo parsed = processPackageManager.getPackageArchiveInfo(
                         spec.apkPath, PackageManager.GET_META_DATA);
                 if (parsed != null && parsed.applicationInfo != null) {
                     parsedApplicationInfo = new ApplicationInfo(parsed.applicationInfo);
+                }
                 }
             } catch (Throwable error) {
                 // The custom binary manifest parser remains authoritative for the virtual PMS.
@@ -201,25 +269,14 @@ public final class GuestRuntimeEnvironment {
             if (parsedApplicationInfo == null) {
                 parsedApplicationInfo = spec.packageState.applicationInfo();
             }
-            String appComponentFactory = archiveAppComponentFactory(processPackageManager, spec.apkPath);
+            String appComponentFactory = spec.isolatedProcess
+                    ? (parsedApplicationInfo == null ? "" :
+                    String.valueOf(parsedApplicationInfo.appComponentFactory))
+                    : archiveAppComponentFactory(processPackageManager, spec.apkPath);
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager,
                     loadedResources.manifestMetadata.application(), appComponentFactory,
                     parsedApplicationInfo);
-            IVirtualSystemServiceSession systemServiceSession = IVirtualSystemServiceSession.Stub.asInterface(
-                    spec.virtualSystemServiceBinder);
-            if (systemServiceSession == null) throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
-            VirtualNetworkServiceProfileSnapshot nativeNetworkProfile =
-                    systemServiceSession.getNetworkServiceProfile();
-            if (nativeNetworkProfile == null) throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_MISSING");
-            String nativeAbi = spec.nativeAbi;
-            int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
-            boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
-                    spec.packageName, spec.processName, spec.virtualUserId, spec.virtualUid,
-                    virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
-                    spec.nativeLibraryDir, true, new String[0], new String[0], new String[0], new String[0],
-                    new String[0], new String[0],
-                    nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
             boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
             // A foreign-ABI guest is executed by Android's native bridge. The host process
             // cannot safely rewrite that guest ELF's PLT/GOT, so the platform bridge remains
@@ -231,11 +288,13 @@ public final class GuestRuntimeEnvironment {
             // translated syscall boundary is available, do not patch host PLT/lifetime symbols
             // from the guest process: the bridge can legitimately enter those host modules with
             // translated register state, and a host-side replacement is not ABI-transparent.
-            boolean enableNativeHooks = requiresNativeHooks && !translatedGuestAbi;
+            boolean enableNativeHooks = requiresNativeHooks && !translatedGuestAbi
+                    && !spec.isolatedProcess;
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
             }
-            boolean nativeHooksInstalled = enableNativeHooks && NativePolicy.installHooks(spec.nativeLibraryDir);
+            boolean nativeHooksInstalled = systemIoHooksInstalled
+                    || (enableNativeHooks && NativePolicy.installHooks(nativePolicyLibraryRoot));
             if (enableNativeHooks && !nativeHooksInstalled) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_INSTALL_FAILED:" + NativePolicy.hookStatus());
             }
@@ -247,13 +306,14 @@ public final class GuestRuntimeEnvironment {
             // loader unchanged and rely on the structured loader evidence around it.
             boolean nativeLoadDiag = !translatedGuestAbi
                     && NativePolicy.installNativeLoadDiagnostic();
-            // A translated guest cannot safely receive host-ABI PLT/GOT patches, but the
-            // platform nativeLoad entry itself is a supported JNI registration boundary.  Use
-            // the narrow redirect there so absolute guest library paths still enter the native
-            // policy before the Android native bridge loads them.  Ordinary native guests keep
-            // the full PLT/IO hook path above.
-            boolean nativeLoadRedirect = translatedGuestAbi
-                    && NativePolicy.installNativeLoadRedirect();
+            // A translated guest cannot safely receive host-ABI PLT/GOT patches.  It also must
+            // not replace Runtime.nativeLoad globally: the Android foreign-ABI bridge and
+            // WebView/Chromium call this entry from translated frames, and a JNI replacement
+            // changes the callback ABI for every native library in the process.  The framework
+            // PathClassLoader already owns the verified guest native directory, so translated
+            // guests use the platform loader unchanged. Native-ABI guests keep the diagnostic
+            // wrapper and the PLT/IO policy above.
+            boolean nativeLoadRedirect = false;
             String nativeBoundaryMode = translatedGuestAbi
                     ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
                     : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
@@ -303,13 +363,17 @@ public final class GuestRuntimeEnvironment {
                     capabilityPolicy.allowed(CapabilityAccessPolicy.MICROPHONE))) {
                 throw new IllegalStateException("NATIVE_AUDIO_POLICY_UNAVAILABLE");
             }
+            GuestIdentity guestIdentity = new GuestIdentity(spec.packageName, spec.virtualUid,
+                    guestContext.getApplicationInfo(), new HashSet<>(spec.permissions),
+                    host.getPackageName(), Process.myUid(), packageMetadata, spec.processName,
+                    spec.virtualUserId, spec.generation, permissionPolicy, appOpsPolicy,
+                    capabilityAudit, capabilityLeases, virtualServices, spec.packageRevision,
+                    packageUniverse);
+            guestIdentity.installContentObserverBridge(
+                    new GuestContentObserverBridge(spec, guestContext.mainThread));
             FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
                     processPackageManager,
-                    new GuestIdentity(spec.packageName, spec.virtualUid, guestContext.getApplicationInfo(),
-                            new HashSet<>(spec.permissions), host.getPackageName(), Process.myUid(),
-                            packageMetadata, spec.processName, spec.virtualUserId, spec.generation,
-                            permissionPolicy, appOpsPolicy, capabilityAudit, capabilityLeases, virtualServices,
-                            spec.packageRevision, packageUniverse),
+                    guestIdentity,
                     frameworkCallRouter, nativeBoundaryAvailable);
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());
@@ -385,10 +449,31 @@ public final class GuestRuntimeEnvironment {
                     + " frameworkBase=" + frameworkLoader.getClass().getName()
                     + " process=" + processLoader.getClass().getName());
             GuestNativeBindingDiagnostic.recordLoader("guest.process", processLoader);
+            // Keep the platform bindApplication ordering: ActivityThread's LoadedApk projection
+            // is published before the Guest Application is constructed.  The object is still
+            // instantiated through the declared AppComponentFactory and attached to GuestContext
+            // because the host package owns the real Android ContextImpl.
+            Session session = new Session(spec, loader, guestContext, null, loadedResources, frameworkHooks,
+                    frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
+                    capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
+                    nativeHooksInstalled, nativeLoadRedirect, nativeBoundaryMode,
+                    camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
+                    stagedProcessIdentity, loaderApkDescriptor, loaderNativeArchiveDescriptor);
+            stagedSession = session;
+            loaderApkDescriptor = null;
+            loaderNativeArchiveDescriptor = null;
+            session.loadedApkBridge = GuestLoadedApkBridge.install(session);
             Application application = guestContext.mainThread.call(
-                    () -> instantiateApplication(spec, guestContext.getClassLoader(),
+                    () -> instantiateApplication(spec, processLoader,
                             guestContext.getApplicationInfo().appComponentFactory));
             guestContext.application(application);
+            // LoadedApk.makeApplication() is still called by the real ActivityThread when the
+            // first framework-owned Activity transaction arrives. Publish the already-created
+            // Guest Application into that exact LoadedApk before the session becomes READY;
+            // otherwise Android will construct a second Application and apps with process-global
+            // SDK state (for example Quark's platform client API) fail during Activity launch.
+            session.loadedApkBridge.bindApplication(application);
+            session.bindApplication(application);
             GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
             stagedProcessIdentity.attachApplication(application);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
@@ -401,15 +486,7 @@ public final class GuestRuntimeEnvironment {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
             }
-            Session session = new Session(spec, loader, guestContext, application, loadedResources, frameworkHooks,
-                    frameworkCallRouter, packageMetadata, permissionPolicy, appOpsPolicy,
-                    capabilityPolicy, capabilityAudit, capabilityLeases, virtualServices, nativePolicyConfigured,
-                    nativeHooksInstalled, nativeLoadRedirect, nativeBoundaryMode,
-                    camera1AdapterInstalled, nativeCrashRecorderInstalled, webViewProfile,
-                    stagedProcessIdentity);
-            stagedSession = session;
             stagedProcessIdentity = null;
-            session.loadedApkBridge = GuestLoadedApkBridge.install(session);
             session.components = new GuestComponentRuntime(session);
             session.jobServices = new GuestJobServiceBridge(session);
             virtualServices.jobs().setExecutionListener(new com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority.JobExecutionListener() {
@@ -465,6 +542,12 @@ public final class GuestRuntimeEnvironment {
                 NativePolicy.resetCamera1();
                 NativePolicy.resetHooks();
                 NativePolicy.resetPolicy();
+                if (loaderApkDescriptor != null) {
+                    try { loaderApkDescriptor.close(); } catch (Throwable ignored) { }
+                }
+                if (loaderNativeArchiveDescriptor != null) {
+                    try { loaderNativeArchiveDescriptor.close(); } catch (Throwable ignored) { }
+                }
                 synchronized (GuestRuntimeEnvironment.class) {
                     current = null;
                     preparing = false;
@@ -478,8 +561,125 @@ public final class GuestRuntimeEnvironment {
             result.putString("stack", stackSummary(error));
             result.putInt("pid", Process.myPid());
             result.putLong("durationMs", android.os.SystemClock.elapsedRealtime() - started);
+            android.util.Log.e("CS_RUNTIME", "GUEST_PREPARE_FAILED_STACK\n"
+                    + result.getString("stack", ""));
             RuntimeEventLog.event("GUEST_PREPARE_FAILED", result);
             return result;
+        }
+    }
+
+    private static void verifyIsolatedArtifactCapability(GuestPackageSpec spec) {
+        ParcelFileDescriptor opened = null;
+        FileInputStream input = null;
+        try {
+            opened = spec.apkDescriptor.dup();
+            input = new FileInputStream(opened.getFileDescriptor());
+            byte[] probe = new byte[4];
+            int read = input.read(probe);
+            if (read != 4 || probe[0] != 'P' || probe[1] != 'K') {
+                throw new IllegalStateException("ISOLATED_APK_CAPABILITY_CONTENT_INVALID");
+            }
+            android.util.Log.i("CS_ISOLATED_IO", "apkCapability=PASS entry=" + spec.apkEntryName);
+        } catch (Throwable error) {
+            android.util.Log.e("CS_ISOLATED_IO", "openatCapability=FAIL", error);
+            throw new IllegalStateException("ISOLATED_APK_CAPABILITY_OPEN_FAILED", error);
+        } finally {
+            if (input != null) try { input.close(); } catch (Throwable ignored) { }
+            if (opened != null) try { opened.close(); } catch (Throwable ignored) { }
+        }
+    }
+
+    private static IVirtualSystemServiceSession requireSystemServiceSession(GuestPackageSpec spec) {
+        IVirtualSystemServiceSession session = IVirtualSystemServiceSession.Stub.asInterface(
+                spec.virtualSystemServiceBinder);
+        if (session == null) {
+            throw new IllegalStateException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_INVALID");
+        }
+        return session;
+    }
+
+    private static NativeBootstrap prepareNativeBootstrap(Context host, GuestPackageSpec spec,
+                                                           IVirtualSystemServiceSession systemServiceSession)
+            throws Exception {
+        VirtualNetworkServiceProfileSnapshot nativeNetworkProfile =
+                systemServiceSession.getNetworkServiceProfile();
+        if (nativeNetworkProfile == null) {
+            throw new IllegalStateException("VIRTUAL_NETWORK_PROFILE_MISSING");
+        }
+        String nativeAbi = spec.nativeAbi;
+        String packagedNativeLibraryDir = spec.effectiveNativeLibraryDir();
+        File guestDataRoot = new File(spec.dataRootFile(), "data");
+        String runtimeNativeLibraryDir = GuestNativeRuntimeProjection.select(
+                spec, guestDataRoot, packagedNativeLibraryDir);
+        String nativeLibrarySearchPath = GuestNativeRuntimeProjection.searchPath(
+                spec, guestDataRoot, packagedNativeLibraryDir);
+        String guestDexPath = spec.dexPath();
+        String coreDexMode = "apk";
+        int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
+        // The selected runtime directory is the authoritative native root.  This matters
+        // for U4/WebView-style deployments: ApplicationInfo and the class-loader search path
+        // may be projected to an immutable data-side revision while the APK's packaged lib
+        // directory remains only a fallback.  Keeping NativePolicy on spec.nativeLibraryDir
+        // would leave native open/dlopen and /data/app/.../lib aliases enforcing the wrong
+        // revision, even though Java already observes runtimeNativeLibraryDir.
+        String nativePolicyLibraryRoot = runtimeNativeLibraryDir.isEmpty()
+                ? spec.nativeLibraryDir : runtimeNativeLibraryDir;
+        boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
+                spec.packageName, spec.processName, spec.virtualUserId, spec.virtualUid,
+                virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
+                nativePolicyLibraryRoot, true, new String[0], new String[0], new String[0], new String[0],
+                new String[0], new String[0],
+                nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
+        boolean systemIoHooksInstalled = installIsolatedIoCapabilities(spec);
+        RuntimeDiagnostics.install(host, "guest-slot-" + spec.processSlot,
+                spec.isolatedProcess ? new File(spec.dataRootFile(), "diagnostics") : null);
+        if (spec.isolatedProcess) verifyIsolatedArtifactCapability(spec);
+        File nativeCrashFile = RuntimeDiagnostics.nativeCrashFile();
+        // Do not install a second signal-chain handler in a foreign-ABI process.  The
+        // platform bridge and Quark's CrashSDK already own that chain; CAS's recorder is
+        // retained for native-ABI guests where the calling convention is ours.
+        boolean nativeCrashRecorderInstalled = !isTranslatedGuestAbi(spec.nativeAbi)
+                && nativeCrashFile != null
+                && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
+        verifyPackageRevision(spec);
+        return new NativeBootstrap(nativeAbi, packagedNativeLibraryDir, guestDataRoot,
+                runtimeNativeLibraryDir, nativeLibrarySearchPath, guestDexPath, coreDexMode,
+                nativePolicyLibraryRoot, nativePolicyConfigured, systemIoHooksInstalled,
+                nativeCrashRecorderInstalled);
+    }
+
+    private static boolean installIsolatedIoCapabilities(GuestPackageSpec spec) {
+        if (!spec.isolatedProcess) return false;
+        if (spec.dataRootDescriptor == null || spec.apkDescriptor == null) {
+            throw new IllegalStateException("ISOLATED_FILE_CAPABILITIES_MISSING");
+        }
+        if (!NativePolicy.configureFileCapabilities(spec.dataRootDescriptor,
+                spec.apkDescriptor, spec.apkEntryName, spec.nativeLibraryDescriptor)) {
+            throw new IllegalStateException("ISOLATED_FILE_CAPABILITIES_UNAVAILABLE");
+        }
+        boolean installed = NativePolicy.installSystemIoHooks();
+        android.util.Log.i("CS_ISOLATED_IO", "capabilities=installed systemHooks="
+                + installed + " hookStatus=" + NativePolicy.hookStatus());
+        if (!installed) {
+            throw new IllegalStateException("ISOLATED_SYSTEM_IO_HOOK_INSTALL_FAILED:",
+                    new IllegalStateException(NativePolicy.hookStatus()));
+        }
+        return true;
+    }
+
+    private static void verifyPackageRevision(GuestPackageSpec spec) throws Exception {
+        if (spec.isolatedProcess && spec.apkDescriptor == null) {
+            throw new IllegalStateException("ISOLATED_APK_CAPABILITY_MISSING");
+        }
+        com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
+                spec.isolatedProcess
+                        ? PackageRevisionSetVerifier.verify(spec.apkDescriptor,
+                        spec.baseApkSha256, spec.splitDescriptorArtifacts(), spec.apkVersionCode,
+                        spec.apkSha256)
+                        : PackageRevisionSetVerifier.verify(spec.apkFile(), spec.baseApkSha256,
+                        spec.splitArtifacts(), spec.apkVersionCode, spec.apkSha256);
+        if (!verifiedRevision.canonical().equals(spec.packageRevision)) {
+            throw new SecurityException("PACKAGE_REVISION_MISMATCH");
         }
     }
 
@@ -488,6 +688,45 @@ public final class GuestRuntimeEnvironment {
         if (!current.spec.sessionId.equals(sessionId)) throw new SecurityException("SESSION_MISMATCH");
         if (current.spec.generation != generation) throw new SecurityException("GENERATION_MISMATCH");
         return current;
+    }
+
+    /** Delivers a Broker-owned IIntentSender send through the current Guest generation. */
+    static Bundle sendPersistentPendingIntent(String sessionId, long generation,
+                                              Bundle request) {
+        Session session = require(sessionId, generation);
+        String tokenId = request == null
+                ? "" : request.getString(RuntimeKeys.PENDING_INTENT_TOKEN_ID, "");
+        if (tokenId.trim().isEmpty()) throw new SecurityException("PENDING_INTENT_TOKEN_REQUIRED");
+        android.content.Intent fillIn = request == null
+                || !request.getBoolean(RuntimeKeys.PENDING_INTENT_FILL_IN, false) ? null
+                : RuntimeIntentWireCodec.decode(request);
+        String permission = request == null ? ""
+                : request.getString(RuntimeKeys.PENDING_INTENT_SENDER_PERMISSION, "");
+        int flagsMask = request == null ? 0
+                : request.getInt(RuntimeKeys.PENDING_INTENT_FLAGS_MASK, 0);
+        int flagsValues = request == null ? 0
+                : request.getInt(RuntimeKeys.PENDING_INTENT_FLAGS_VALUES, 0);
+        int resultCode = request == null ? 0
+                : request.getInt(RuntimeKeys.PENDING_INTENT_RESULT_CODE, 0);
+        VirtualPendingIntentRegistry.SendRequest send = new VirtualPendingIntentRegistry.SendRequest(
+                fillIn, flagsMask, flagsValues, permission, -1, resultCode);
+        PendingIntentFrameworkInterceptor.PersistentSendResult delivery =
+                session.frameworkCallRouter.sendPersistentPendingIntentResult(tokenId, send);
+        if (!delivery.delivered()) {
+            throw new IllegalStateException("PENDING_INTENT_DELIVERY_REJECTED");
+        }
+        Bundle result = new Bundle();
+        result.putString(RuntimeKeys.STATUS, "PENDING_INTENT_DELIVERED");
+        result.putString(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
+        result.putInt("pendingIntentSendResult", delivery.resultCode());
+        if (delivery.deliveredIntent() != null) {
+            RuntimeIntentWireCodec.encode(result, delivery.deliveredIntent());
+            result.putBoolean(RuntimeKeys.PENDING_INTENT_DELIVERED_INTENT, true);
+        }
+        result.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        result.putLong(RuntimeKeys.GENERATION, session.generation());
+        result.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        return result;
     }
 
     static synchronized Bundle status() {
@@ -700,7 +939,206 @@ public final class GuestRuntimeEnvironment {
     }
 
     private static String emptyToNull(String value) { return value == null || value.trim().isEmpty() ? null : value; }
+
+    private static String isolatedNativeLibraryPath(GuestPackageSpec spec,
+                                                    ParcelFileDescriptor materializedApk,
+                                                    ParcelFileDescriptor nativeArchive) {
+        // DexPathList only accepts directory/zip path elements for native lookup. A directory
+        // capability cannot be traversed through /proc/self/fd on the isolated_app SELinux
+        // domain, so passing its fd as a directory never reaches findLibrary(). Android's
+        // NativeLoader already supports an uncompressed APK entry (apk!/lib/<abi>); the base
+        // APK descriptor is a direct read capability and keeps loading inside the platform
+        // loader instead of copying a .so into a host-visible staging path.
+        ParcelFileDescriptor apk = materializedApk != null ? materializedApk : spec.apkDescriptor;
+        if (nativeArchive != null && nativeArchive.getFd() >= 0
+                && spec.nativeAbi != null && !spec.nativeAbi.trim().isEmpty()) {
+            return "/proc/self/fd/" + nativeArchive.getFd() + "!/lib/"
+                    + spec.nativeAbi.trim();
+        }
+        if (apk != null && apk.getFd() >= 0
+                && spec.nativeAbi != null && !spec.nativeAbi.trim().isEmpty()) {
+            return "/proc/self/fd/" + apk.getFd() + "!/lib/"
+                    + spec.nativeAbi.trim();
+        }
+        if (spec.nativeLibraryDescriptor != null && spec.nativeLibraryDescriptor.getFd() >= 0) {
+            return "/proc/self/fd/" + spec.nativeLibraryDescriptor.getFd();
+        }
+        return emptyToNull(spec.nativeLibraryDir);
+    }
+
+    private static ParcelFileDescriptor createNativeLibraryArchive(GuestPackageSpec spec)
+            throws Exception {
+        if (spec.nativeLibraryDescriptors.isEmpty()) return null;
+        if (spec.nativeAbi == null || spec.nativeAbi.trim().isEmpty()) {
+            throw new IllegalStateException("ISOLATED_NATIVE_ABI_MISSING");
+        }
+        ParcelFileDescriptor archive = NativePolicy.createProcessLocalFile("cas-native-libs.apk");
+        long total = 0L;
+        try {
+            ParcelFileDescriptor outputDescriptor = archive.dup();
+            try (ParcelFileDescriptor.AutoCloseOutputStream output =
+                         new ParcelFileDescriptor.AutoCloseOutputStream(outputDescriptor);
+                 CountingOutputStream counted = new CountingOutputStream(output);
+                 ZipOutputStream zip = new ZipOutputStream(counted)) {
+                for (int index = 0; index < spec.nativeLibraryDescriptors.size(); index++) {
+                    ParcelFileDescriptor source = spec.nativeLibraryDescriptors.get(index);
+                    String entryName = validateNativeLibraryEntry(
+                            spec.nativeLibraryEntryNames.get(index));
+                    long size = source.getStatSize();
+                    if (size <= 0L || size > 256L * 1024L * 1024L
+                            || total > 512L * 1024L * 1024L - size) {
+                        throw new IllegalStateException("ISOLATED_NATIVE_LIBRARY_SIZE_INVALID:" + entryName);
+                    }
+                    total += size;
+                    CRC32 checksum = new CRC32();
+                    copyNativeLibrary(source, checksum, null);
+                    ZipEntry entry = new ZipEntry("lib/" + spec.nativeAbi.trim() + "/" + entryName);
+                    entry.setMethod(ZipEntry.STORED);
+                    entry.setSize(size);
+                    entry.setCompressedSize(size);
+                    entry.setCrc(checksum.getValue());
+                    String archiveEntryName = "lib/" + spec.nativeAbi.trim() + "/" + entryName;
+                    byte[] alignment = pageAlignmentExtra(counted.count(), archiveEntryName);
+                    if (alignment.length > 0) entry.setExtra(alignment);
+                    zip.putNextEntry(entry);
+                    copyNativeLibrary(source, null, zip);
+                    zip.closeEntry();
+                }
+                zip.finish();
+            }
+            try (ZipFile verification = new ZipFile("/proc/self/fd/" + archive.getFd())) {
+                for (String entryName : spec.nativeLibraryEntryNames) {
+                    ZipEntry entry = verification.getEntry("lib/" + spec.nativeAbi.trim()
+                            + "/" + entryName);
+                    if (entry == null || entry.getMethod() != ZipEntry.STORED) {
+                        throw new IllegalStateException("ISOLATED_NATIVE_LIBRARY_ARCHIVE_ENTRY_INVALID:"
+                                + entryName);
+                    }
+                }
+            }
+            android.util.Log.i("CS_NATIVE_BIND", "FD_NATIVE_ARCHIVE_VERIFIED fd="
+                    + archive.getFd() + " bytes=" + total);
+            return archive;
+        } catch (Throwable error) {
+            try { archive.close(); } catch (Throwable ignored) { }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof Exception exception) throw exception;
+            throw new IllegalStateException("ISOLATED_NATIVE_LIBRARY_ARCHIVE_FAILED", error);
+        }
+    }
+
+    private static void copyNativeLibrary(ParcelFileDescriptor source, CRC32 checksum,
+                                          OutputStream output) throws Exception {
+        ParcelFileDescriptor duplicate = source.dup();
+        try (ParcelFileDescriptor.AutoCloseInputStream input =
+                     new ParcelFileDescriptor.AutoCloseInputStream(duplicate)) {
+            input.getChannel().position(0L);
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                if (read == 0) continue;
+                if (checksum != null) checksum.update(buffer, 0, read);
+                if (output != null) output.write(buffer, 0, read);
+            }
+        }
+    }
+
+    private static String validateNativeLibraryEntry(String value) {
+        if (value == null || value.trim().isEmpty() || !value.endsWith(".so")
+                || value.contains("/") || value.contains("\\")
+                || ".".equals(value) || "..".equals(value)) {
+            throw new IllegalArgumentException("ISOLATED_NATIVE_LIBRARY_ENTRY_INVALID");
+        }
+        return value;
+    }
+
+    private static byte[] pageAlignmentExtra(long localHeaderOffset, String entryName) {
+        int nameBytes = entryName.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        int padding = (int) ((4096L - ((localHeaderOffset + 30L + nameBytes) % 4096L)) % 4096L);
+        if (padding == 0) return new byte[0];
+        if (padding < 4) padding += 4096;
+        byte[] extra = new byte[padding];
+        // One private ZIP extra field. The payload is intentionally opaque padding; its only
+        // purpose is to make the stored ELF data start on a linker page boundary.
+        extra[0] = (byte) 0xCA;
+        extra[1] = (byte) 0x53;
+        int payload = padding - 4;
+        extra[2] = (byte) (payload & 0xff);
+        extra[3] = (byte) ((payload >>> 8) & 0xff);
+        return extra;
+    }
+
+    private static final class CountingOutputStream extends OutputStream {
+        private final OutputStream delegate;
+        private long count;
+
+        CountingOutputStream(OutputStream delegate) { this.delegate = delegate; }
+        long count() { return count; }
+
+        @Override public void write(int value) throws java.io.IOException {
+            delegate.write(value);
+            count++;
+        }
+
+        @Override public void write(byte[] values, int offset, int length)
+                throws java.io.IOException {
+            delegate.write(values, offset, length);
+            count += length;
+        }
+
+        @Override public void flush() throws java.io.IOException { delegate.flush(); }
+        @Override public void close() throws java.io.IOException { delegate.close(); }
+    }
+
     private static String safe(String value) { return value.replaceAll("[^A-Za-z0-9._-]", "_"); }
+
+    /**
+     * Isolated processes cannot traverse another package's APK path.  Load the current APK and
+     * every authority-resolved Java shared-library provider through the Broker's read-only FD
+     * capability, then keep only direct DEX buffers in the process-local class loader.  This
+     * mirrors Android's LoadedApk shared-library class path without copying a host pathname into
+     * an isolated process or widening the native filesystem policy.
+     */
+    private static java.util.List<java.nio.ByteBuffer> loadIsolatedGuestDexBuffers(
+            GuestPackageSpec spec) throws Exception {
+        java.util.ArrayList<java.nio.ByteBuffer> buffers = new java.util.ArrayList<>(
+                GuestDexBufferLoader.load(spec.apkDescriptor, spec.splitDescriptors));
+        java.util.List<com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot>
+                providers = GuestSharedLibraryPathResolver.resolvedJavaLibraryProjections(
+                        spec.packageState, spec.packageUniverse);
+        if (providers.isEmpty()) return java.util.List.copyOf(buffers);
+        try (GuestMainThreadDispatcher resourceDispatcher = new GuestMainThreadDispatcher(
+                GuestRuntimeEnvironment.class.getClassLoader())) {
+            GuestRuntimeBrokerBridge bridge = new GuestRuntimeBrokerBridge(spec,
+                    resourceDispatcher);
+            for (com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot provider
+                    : providers) {
+                String packageName = provider.packageState().packageName();
+                Bundle resources = bridge.openPackageResources(packageName);
+                ParcelFileDescriptor base = resources.getParcelable(
+                        RuntimeKeys.PACKAGE_RESOURCE_APK_FD);
+                java.util.ArrayList<ParcelFileDescriptor> splits = resources
+                        .getParcelableArrayList(RuntimeKeys.PACKAGE_RESOURCE_SPLIT_FDS);
+                if (base == null || base.getFd() < 0) {
+                    throw new IllegalStateException(
+                            "SHARED_LIBRARY_PROVIDER_APK_CAPABILITY_MISSING:" + packageName);
+                }
+                if (splits == null) splits = new java.util.ArrayList<>();
+                try {
+                    buffers.addAll(GuestDexBufferLoader.load(base, splits));
+                } finally {
+                    try { base.close(); } catch (Throwable ignored) { }
+                    for (ParcelFileDescriptor split : splits) {
+                        if (split == null || split == base) continue;
+                        try { split.close(); } catch (Throwable ignored) { }
+                    }
+                }
+            }
+        }
+        android.util.Log.i("CS_GUEST_LOADER", "ISOLATED_SHARED_LIBRARY_DEX_READY providers="
+                + providers.size() + " buffers=" + buffers.size());
+        return java.util.List.copyOf(buffers);
+    }
 
     private static boolean isTranslatedGuestAbi(String guestAbi) {
         if (guestAbi == null || guestAbi.trim().isEmpty()) return false;
@@ -736,14 +1174,32 @@ public final class GuestRuntimeEnvironment {
      */
     private static java.util.List<String> declaredGuestClasses(GuestPackageSpec spec) {
         java.util.ArrayList<String> classes = new java.util.ArrayList<>();
-        if (spec.applicationClass != null && !spec.applicationClass.trim().isEmpty()) {
-            classes.add(spec.applicationClass);
-        }
-        for (com.warden.controlledsandbox.contract.VirtualComponentSnapshot component
-                : spec.packageState.components()) {
-            classes.add(component.className());
+        appendDeclaredGuestClasses(classes, spec.packageState);
+        for (com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot provider
+                : GuestSharedLibraryPathResolver.resolvedJavaLibraryProjections(
+                        spec.packageState, spec.packageUniverse)) {
+            appendDeclaredGuestClasses(classes, provider.packageState());
+            // A shared-library provider may expose implementation classes that are not manifest
+            // components. Add a package marker so detection filtering does not hide its package
+            // namespace while the provider DEX is part of the same LoadedApk class path.
+            classes.add(provider.packageState().packageName() + ".__cas_shared_library__");
         }
         return java.util.List.copyOf(classes);
+    }
+
+    private static void appendDeclaredGuestClasses(
+            java.util.List<String> classes,
+            com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot state) {
+        if (state.applicationClass() != null && !state.applicationClass().trim().isEmpty()) {
+            classes.add(state.applicationClass());
+        }
+        for (com.warden.controlledsandbox.contract.VirtualComponentSnapshot component
+                : state.components()) {
+            if (component != null && component.className() != null
+                    && !component.className().trim().isEmpty()) {
+                classes.add(component.className());
+            }
+        }
     }
 
     private static void ensureDirectory(File value) {
@@ -756,12 +1212,44 @@ public final class GuestRuntimeEnvironment {
         return out.toString();
     }
 
+    private static final class NativeBootstrap {
+        final String nativeAbi;
+        final String packagedNativeLibraryDir;
+        final File guestDataRoot;
+        final String runtimeNativeLibraryDir;
+        final String nativeLibrarySearchPath;
+        final String guestDexPath;
+        final String coreDexMode;
+        final String nativePolicyLibraryRoot;
+        final boolean nativePolicyConfigured;
+        final boolean systemIoHooksInstalled;
+        final boolean nativeCrashRecorderInstalled;
+
+        NativeBootstrap(String nativeAbi, String packagedNativeLibraryDir, File guestDataRoot,
+                        String runtimeNativeLibraryDir, String nativeLibrarySearchPath,
+                        String guestDexPath, String coreDexMode, String nativePolicyLibraryRoot,
+                        boolean nativePolicyConfigured, boolean systemIoHooksInstalled,
+                        boolean nativeCrashRecorderInstalled) {
+            this.nativeAbi = nativeAbi;
+            this.packagedNativeLibraryDir = packagedNativeLibraryDir;
+            this.guestDataRoot = guestDataRoot;
+            this.runtimeNativeLibraryDir = runtimeNativeLibraryDir;
+            this.nativeLibrarySearchPath = nativeLibrarySearchPath;
+            this.guestDexPath = guestDexPath;
+            this.coreDexMode = coreDexMode;
+            this.nativePolicyLibraryRoot = nativePolicyLibraryRoot;
+            this.nativePolicyConfigured = nativePolicyConfigured;
+            this.systemIoHooksInstalled = systemIoHooksInstalled;
+            this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
+        }
+    }
+
     public static final class Session {
         final GuestPackageSpec spec;
         final GuestClassLoader classLoader;
         final GuestContext context;
         final GuestMainThreadDispatcher mainThread;
-        final Application application;
+        volatile Application application;
         final GuestResourceLoader.LoadedResources resources;
         final FrameworkHooks frameworkHooks;
         final GuestFrameworkCallRouter frameworkCallRouter;
@@ -782,6 +1270,8 @@ public final class GuestRuntimeEnvironment {
         final boolean nativeCrashRecorderInstalled;
         final WebViewProfileManager.Profile webViewProfile;
         final GuestProcessIdentityBridge processIdentity;
+        final ParcelFileDescriptor loaderApkDescriptor;
+        final ParcelFileDescriptor loaderNativeArchiveDescriptor;
         GuestActivityThreadInstrumentation activityThreadInstrumentation;
         GuestActivityThreadServiceBridge serviceFrameworkBridge;
         GuestLoadedApkBridge loadedApkBridge;
@@ -799,7 +1289,9 @@ public final class GuestRuntimeEnvironment {
                 boolean nativeLoadRedirectInstalled, String nativeBoundaryMode,
                 boolean camera1AdapterInstalled, boolean nativeCrashRecorderInstalled,
                 WebViewProfileManager.Profile webViewProfile,
-                GuestProcessIdentityBridge processIdentity) {
+                GuestProcessIdentityBridge processIdentity,
+                ParcelFileDescriptor loaderApkDescriptor,
+                ParcelFileDescriptor loaderNativeArchiveDescriptor) {
             this.spec = spec;
             this.classLoader = classLoader;
             this.context = context;
@@ -826,12 +1318,23 @@ public final class GuestRuntimeEnvironment {
             this.nativeCrashRecorderInstalled = nativeCrashRecorderInstalled;
             this.webViewProfile = webViewProfile;
             this.processIdentity = java.util.Objects.requireNonNull(processIdentity, "processIdentity");
+            this.loaderApkDescriptor = loaderApkDescriptor;
+            this.loaderNativeArchiveDescriptor = loaderNativeArchiveDescriptor;
         }
 
         public GuestPackageSpec spec() { return spec; }
         public GuestClassLoader classLoader() { return classLoader; }
         public GuestContext context() { return context; }
         public Application application() { return application; }
+        public VirtualPackageMetadata packageMetadata() { return packageMetadata; }
+
+        void bindApplication(Application application) {
+            if (application == null) throw new IllegalArgumentException("application is required");
+            if (this.application != null && this.application != application) {
+                throw new IllegalStateException("GUEST_SESSION_APPLICATION_REBOUND");
+            }
+            this.application = application;
+        }
         public String sessionId() { return spec.sessionId; }
         public long generation() { return spec.generation; }
         public String packageName() { return spec.packageName; }
@@ -945,8 +1448,8 @@ public final class GuestRuntimeEnvironment {
             out.putInt("capabilityDeniedCount", capabilityAudit.deniedCount());
             out.putInt("capabilityActiveLeases", capabilityLeases.activeCount());
             out.putStringArrayList("capabilityAudit", capabilityAudit.compactSnapshot());
-            out.putBoolean("isolatedProcessSupported", false);
-            out.putString("isolatedProcessPolicy", "FAIL_CLOSED_UNTIL_REAL_ANDROID_UID_SLOT_IS_VERIFIED");
+            Bundle isolatedStatus = isolatedProcessStatus(context);
+            out.putAll(isolatedStatus);
             out.putBoolean("nativePolicyAvailable", NativePolicy.available());
             out.putBoolean("nativePolicyConfigured", nativePolicyConfigured);
             out.putBoolean("nativeHooksInstalled", nativeHooksInstalled);
@@ -970,10 +1473,46 @@ public final class GuestRuntimeEnvironment {
             out.putString("frameworkHookError", frameworkHooks.report().errorType() + ":" + frameworkHooks.report().errorMessage());
             out.putLong("durationMs", Math.max(0, android.os.SystemClock.elapsedRealtime() - started));
             return out;
-        }
+    }
 
-        void shutdown() {
+    private static Bundle isolatedProcessStatus(GuestContext guestContext) {
+        Bundle out = new Bundle();
+        int verified = 0;
+        PackageManager packageManager = guestContext.hostServiceContext().getPackageManager();
+        String packageName = guestContext.hostServiceContext().getPackageName();
+        for (int slot = 0; slot < ProcessSlotContract.ISOLATED_SLOT_COUNT; slot++) {
+            String worker = ProcessSlotContract.isolatedServiceClassName(slot);
+            try {
+                ServiceInfo info = packageManager.getServiceInfo(
+                        new ComponentName(packageName, worker), 0);
+                if (info != null && (info.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0) {
+                    verified++;
+                }
+            } catch (PackageManager.NameNotFoundException ignored) {
+                // A merged manifest without every predeclared slot is not a usable isolated
+                // process pool; the coordinator will fail closed when that slot is requested.
+            }
+        }
+        boolean supported = verified == ProcessSlotContract.ISOLATED_SLOT_COUNT;
+        out.putBoolean("isolatedProcessSupported", supported);
+        out.putInt("isolatedProcessManifestSlots", verified);
+        out.putInt("isolatedProcessManifestSlotCapacity",
+                ProcessSlotContract.ISOLATED_SLOT_COUNT);
+        out.putBoolean("isolatedProcessActive", Process.myUid()
+                != guestContext.hostServiceContext().getApplicationInfo().uid);
+        out.putString("isolatedProcessPolicy", supported
+                ? "DEDICATED_PLATFORM_ISOLATED_SERVICE_WITH_PID_UID_EVIDENCE"
+                : "MANIFEST_ISOLATED_SERVICE_SLOTS_UNAVAILABLE");
+        return out;
+    }
+
+    void shutdown() {
             if (jobServices != null) jobServices.close();
+            // Publish the Guest-side component fence before asking ActivityThread to destroy
+            // framework-owned Activities. finishAndRemoveTask() schedules destruction and
+            // onDestroy can arrive after it returns; those callbacks must not synchronously
+            // re-enter the Broker while the process-service lease is being retired.
+            context.beginComponentTeardown();
             // Finish framework-owned activities while ActivityThread still owns the Guest
             // instrumentation.  The broker clears its task ledger as part of the same stop
             // transaction, but Android must also observe the concrete host StubActivity task
@@ -981,9 +1520,9 @@ public final class GuestRuntimeEnvironment {
             if (activityThreadInstrumentation != null) {
                 mainThread.run(activityThreadInstrumentation::finishAllActivities);
             }
-            // Stop accepting Guest-side component unbinds before the Broker-side component
-            // runtime and WebView provider are torn down.  Chromium may issue one final unbind
-            // asynchronously; GuestContextComponentRouter handles that late call explicitly.
+            // Complete the resource teardown after ActivityThread has received the finish request.
+            // Chromium may issue one final unbind asynchronously; the component fence above
+            // makes that callback local and idempotent.
             context.closeComponentServices();
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
@@ -992,6 +1531,13 @@ public final class GuestRuntimeEnvironment {
             if (activityThreadInstrumentation != null) activityThreadInstrumentation.close();
             if (serviceFrameworkBridge != null) serviceFrameworkBridge.close();
             if (loadedApkBridge != null) loadedApkBridge.close();
+            // AppComponentFactory is LoadedApk/ClassLoader scoped.  Retire every loader used
+            // during this generation so a later recovery/reinstall cannot reuse a factory that
+            // still closes over the previous Guest dex namespace.
+            GuestComponentFactory.clearCacheForLoader(context.getClassLoader());
+            GuestComponentFactory.clearCacheForLoader(classLoader);
+            GuestComponentFactory.clearCacheForLoader(classLoader.definingLoader());
+            resources.close();
             virtualServices.close();
             frameworkCallRouter.close();
             frameworkHooks.close();
@@ -1001,6 +1547,12 @@ public final class GuestRuntimeEnvironment {
             NativePolicy.resetHooks();
             NativePolicy.resetPolicy();
             NativePolicy.resetCrashRecorder();
+            if (loaderApkDescriptor != null) {
+                try { loaderApkDescriptor.close(); } catch (Throwable ignored) { }
+            }
+            if (loaderNativeArchiveDescriptor != null) {
+                try { loaderNativeArchiveDescriptor.close(); } catch (Throwable ignored) { }
+            }
             mainThread.close();
         }
 

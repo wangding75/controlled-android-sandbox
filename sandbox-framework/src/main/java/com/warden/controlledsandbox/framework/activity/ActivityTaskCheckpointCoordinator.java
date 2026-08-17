@@ -114,6 +114,7 @@ final class ActivityTaskCheckpointCoordinator {
                         activity.resultWho,
                         activity.requestCode,
                         activity.launchFlags,
+                        activity.activityInfoFlags,
                         activity.noHistory,
                         activity.newIntentCount,
                         activity.recreationCount,
@@ -121,7 +122,9 @@ final class ActivityTaskCheckpointCoordinator {
                         activity.configurationCount,
                         activity.lastConfigurationToken,
                         registrations,
-                        pendingLinks));
+                        pendingLinks,
+                        activity.taskAffinity,
+                        activity.allowTaskReparenting));
             }
             taskSnapshots.add(new TaskRestoreSnapshot(
                     task.taskId,
@@ -137,7 +140,12 @@ final class ActivityTaskCheckpointCoordinator {
                     task.retainInRecents,
                     task.lastActiveSequence,
                     task.moveToFrontCount,
-                    activities));
+                    task.baseIntentAction,
+                     task.baseIntentDataUri,
+                     task.baseIntentMimeType,
+                     task.baseIntentCategories,
+                     task.lastActiveTimeMillis,
+                     activities));
         }
         return new ActivityTaskCheckpoint(
                 ActivityTaskCheckpoint.CURRENT_SCHEMA,
@@ -174,9 +182,17 @@ final class ActivityTaskCheckpointCoordinator {
                     snapshot.documentLaunchMode(),
                     snapshot.documentKey(),
                     snapshot.rootIntentFlags(),
-                    snapshot.excludedFromRecents(),
-                    snapshot.retainInRecents(),
-                    snapshot.lastActiveSequence());
+                    snapshot.baseIntentAction(),
+                    snapshot.baseIntentDataUri(),
+                    snapshot.baseIntentMimeType(),
+                    snapshot.baseIntentCategories(),
+                     snapshot.excludedFromRecents(),
+                     snapshot.retainInRecents(),
+                     snapshot.lastActiveSequence(),
+                     snapshot.lastActiveTimeMillis());
+            // The durable virtual task survives a Broker restart, but the Android Host task is
+            // owned by the old process and must be recreated before the first restored route.
+            task.hostTaskDetached = true;
             task.moveToFrontCount = snapshot.moveToFrontCount();
             for (ActivityRestoreSnapshot activitySnapshot : snapshot.activities()) {
                 String token = UUID.randomUUID().toString();
@@ -195,6 +211,9 @@ final class ActivityTaskCheckpointCoordinator {
                         activitySnapshot.resultWho(),
                         activitySnapshot.requestCode(),
                         activitySnapshot.launchFlags(),
+                        activitySnapshot.activityInfoFlags(),
+                        activitySnapshot.taskAffinity(),
+                        activitySnapshot.allowTaskReparenting(),
                         activitySnapshot.noHistory());
                 activity.lifecycleState = LifecycleState.INITIALIZED;
                 activity.restoredFromCheckpoint = true;
@@ -260,14 +279,20 @@ final class ActivityTaskCheckpointCoordinator {
                 source.packageName,
                 source.packageRevision,
                 source.affinity,
-                source.documentTask,
-                source.documentLaunchMode,
-                source.documentKey,
-                source.rootIntentFlags,
-                source.excludedFromRecents,
-                source.retainInRecents,
-                source.lastActiveSequence);
+                    source.documentTask,
+                    source.documentLaunchMode,
+                    source.documentKey,
+                    source.rootIntentFlags,
+                    source.baseIntentAction,
+                    source.baseIntentDataUri,
+                    source.baseIntentMimeType,
+                 source.baseIntentCategories,
+                 source.excludedFromRecents,
+                 source.retainInRecents,
+                 source.lastActiveSequence,
+                 source.lastActiveTimeMillis);
         copy.moveToFrontCount = source.moveToFrontCount;
+        copy.hostTaskDetached = source.hostTaskDetached;
         for (ActivityTaskMutableActivity activity : source.activities) {
             ActivityTaskMutableActivity activityCopy = copyActivity(activity);
             copy.activities.add(activityCopy);
@@ -287,6 +312,9 @@ final class ActivityTaskCheckpointCoordinator {
                 source.resultWho,
                 source.requestCode,
                 source.launchFlags,
+                source.activityInfoFlags,
+                source.taskAffinity,
+                source.allowTaskReparenting,
                 source.noHistory);
         copy.restoredFromCheckpoint = source.restoredFromCheckpoint;
         copy.lifecycleState = source.lifecycleState;

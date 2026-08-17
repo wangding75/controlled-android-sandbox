@@ -134,7 +134,7 @@ final class LegacyPackageLayoutMigrator {
                 copyFile(child, target);
                 target.setReadable(true, true);
                 target.setWritable(false, false);
-                target.setExecutable(false, false);
+                if (target.getName().endsWith(".so")) target.setExecutable(true, true);
             } else {
                 throw new SecurityException("Unsupported legacy native entry: " + child);
             }

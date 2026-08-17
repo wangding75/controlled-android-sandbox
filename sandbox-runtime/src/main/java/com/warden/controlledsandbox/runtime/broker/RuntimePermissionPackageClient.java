@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.broker;
 import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability;
+import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityRecovery;
 
 import android.content.ComponentName;
 import android.content.Context;
@@ -25,9 +26,19 @@ final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
         this.sessionConnection = new RebindableServiceConnector<>(this.context, service, binder -> {
             IPackageService root = IPackageService.Stub.asInterface(binder);
             if (root == null) return null;
-            return root.openRuntimePermissionSessionWithCapability(clientToken,
-                    RuntimePackageAuthorityCapability.token(),
-                    RuntimePackageAuthorityCapability.epochMarker());
+            try {
+                return root.openRuntimePermissionSessionWithCapability(clientToken,
+                        RuntimePackageAuthorityCapability.token(),
+                        RuntimePackageAuthorityCapability.epochMarker());
+            } catch (SecurityException capabilityFailure) {
+                if (!RuntimePackageAuthorityRecovery.isCapabilityFailure(capabilityFailure)) {
+                    throw capabilityFailure;
+                }
+                RuntimePackageAuthorityRecovery.register(root);
+                return root.openRuntimePermissionSessionWithCapability(clientToken,
+                        RuntimePackageAuthorityCapability.token(),
+                        RuntimePackageAuthorityCapability.epochMarker());
+            }
         }, IRuntimePermissionSession::close, "Runtime permission package service");
     }
 

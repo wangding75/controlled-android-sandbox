@@ -25,10 +25,12 @@ final class GuestIntentFilterWireCodec {
 
         ArrayList<Bundle> rules = new ArrayList<>();
         ArrayList<String> schemes = values(filter.countDataSchemes(), filter::getDataScheme, "scheme");
-        ArrayList<String> hosts = new ArrayList<>();
+        ArrayList<AuthorityProjection> authorities = new ArrayList<>();
         for (int index = 0; index < filter.countDataAuthorities(); index++) {
             IntentFilter.AuthorityEntry authority = filter.getDataAuthority(index);
-            if (authority != null) hosts.add(value(authority.getHost()));
+            if (authority != null) {
+                authorities.add(new AuthorityProjection(value(authority.getHost()), authorityPort(authority)));
+            }
         }
         ArrayList<String> mimeTypes = values(filter.countDataTypes(), filter::getDataType, "mimeType");
         ArrayList<Bundle> paths = new ArrayList<>();
@@ -41,17 +43,17 @@ final class GuestIntentFilterWireCodec {
             if (path.getType() == PatternMatcher.PATTERN_LITERAL) exact = value(path.getPath());
             else if (path.getType() == PatternMatcher.PATTERN_PREFIX) prefix = value(path.getPath());
             else pattern = value(path.getPath());
-            paths.add(rule("", "", exact, prefix, pattern, ""));
+            paths.add(rule("", "", -1, exact, prefix, pattern, ""));
         }
         if (!paths.isEmpty()) {
             ArrayList<String> pathSchemes = schemes.isEmpty()
                     ? new ArrayList<>(java.util.List.of("")) : schemes;
-            ArrayList<String> pathHosts = hosts.isEmpty()
-                    ? new ArrayList<>(java.util.List.of("")) : hosts;
+            ArrayList<AuthorityProjection> pathAuthorities = authorities.isEmpty()
+                    ? new ArrayList<>(java.util.List.of(new AuthorityProjection("", -1))) : authorities;
             for (String scheme : pathSchemes) {
-                for (String host : pathHosts) {
+                for (AuthorityProjection authority : pathAuthorities) {
                     for (Bundle path : paths) {
-                        rules.add(rule(scheme, host,
+                        rules.add(rule(scheme, authority.host, authority.port,
                                 path.getString(RuntimeKeys.BROADCAST_PATH, ""),
                                 path.getString(RuntimeKeys.RECEIVER_DATA_PATH_PREFIX, ""),
                                 path.getString(RuntimeKeys.RECEIVER_DATA_PATH_PATTERN, ""), ""));
@@ -59,15 +61,17 @@ final class GuestIntentFilterWireCodec {
                 }
             }
         } else {
-            for (String scheme : schemes) rules.add(rule(scheme, "", "", "", "", ""));
-            if (!hosts.isEmpty()) {
+            for (String scheme : schemes) rules.add(rule(scheme, "", -1, "", "", "", ""));
+            if (!authorities.isEmpty()) {
                 for (String scheme : schemes.isEmpty()
                         ? new ArrayList<>(java.util.List.of("")) : schemes) {
-                    for (String host : hosts) rules.add(rule(scheme, host, "", "", "", ""));
+                    for (AuthorityProjection authority : authorities) {
+                        rules.add(rule(scheme, authority.host, authority.port, "", "", "", ""));
+                    }
                 }
             }
         }
-        for (String mimeType : mimeTypes) rules.add(rule("", "", "", "", "", mimeType));
+        for (String mimeType : mimeTypes) rules.add(rule("", "", -1, "", "", "", mimeType));
         if (rules.size() > MAX_DATA_RULES) {
             throw new IllegalArgumentException("IntentFilter data rule limit exceeded");
         }
@@ -77,16 +81,40 @@ final class GuestIntentFilterWireCodec {
         }
     }
 
-    private static Bundle rule(String scheme, String host, String path,
+    private static Bundle rule(String scheme, String host, int port, String path,
             String pathPrefix, String pathPattern, String mimeType) {
         Bundle rule = new Bundle();
         rule.putString(RuntimeKeys.BROADCAST_SCHEME, value(scheme));
         rule.putString(RuntimeKeys.BROADCAST_HOST, value(host));
+        if (port >= 0) rule.putInt(RuntimeKeys.BROADCAST_PORT, port);
         rule.putString(RuntimeKeys.BROADCAST_PATH, value(path));
         rule.putString(RuntimeKeys.RECEIVER_DATA_PATH_PREFIX, value(pathPrefix));
         rule.putString(RuntimeKeys.RECEIVER_DATA_PATH_PATTERN, value(pathPattern));
         rule.putString(RuntimeKeys.BROADCAST_MIME_TYPE, value(mimeType));
         return rule;
+    }
+
+    private static int authorityPort(IntentFilter.AuthorityEntry authority) {
+        try {
+            java.lang.reflect.Method method = authority.getClass().getMethod("getPort");
+            Object value = method.invoke(authority);
+            if (value instanceof Number) {
+                int port = ((Number) value).intValue();
+                if (port >= -1 && port <= 65535) return port;
+            }
+        } catch (Throwable ignored) {
+            // API adapters keep this codec usable on compact/old framework stubs without getPort.
+        }
+        return -1;
+    }
+
+    private static final class AuthorityProjection {
+        final String host;
+        final int port;
+        AuthorityProjection(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
     }
 
     private static ArrayList<String> values(int count, ValueReader reader, String label) {

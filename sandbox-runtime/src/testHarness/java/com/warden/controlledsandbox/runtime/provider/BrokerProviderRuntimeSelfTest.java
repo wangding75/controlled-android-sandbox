@@ -221,7 +221,7 @@ public final class BrokerProviderRuntimeSelfTest {
         BrokerProviderRuntime.OperationRoute route = runtime.routeOperation(call,
                 ComponentOperations.PROVIDER_CALL, BrokerProviderRuntime.instanceId("com.call", 0), 0,
                 BrokerProviderRuntime.instanceId("com.call", 0), (caller, uri, flags) -> false, 20);
-        check(route.flags() == 3, "Provider call did not require read and write permission");
+        check(route.flags() == 0, "Provider call incorrectly inferred URI read/write permission");
         check("content://call.authority".equals(route.uri()), "Provider call did not receive canonical URI");
 
         boolean methodRequired = false;
@@ -233,6 +233,18 @@ public final class BrokerProviderRuntimeSelfTest {
             methodRequired = true;
         }
         check(methodRequired, "Provider call accepted missing method");
+
+        GuestSession exportedOwner = session("call-exported-owner", "com.call.exported", 0, 1);
+        Bundle exportedCallPrepare = prepare("call.exported.authority", "com.call.exported.Provider");
+        exportedCallPrepare.putBoolean(RuntimeKeys.PROVIDER_EXPORTED, true);
+        runtime.reservePrepare(exportedCallPrepare, exportedOwner);
+        Bundle foreignCall = operation("call.exported.authority", "");
+        foreignCall.putString(RuntimeKeys.PROVIDER_METHOD, "refresh");
+        BrokerProviderRuntime.OperationRoute foreignRoute = runtime.routeOperation(foreignCall,
+                ComponentOperations.PROVIDER_CALL, BrokerProviderRuntime.instanceId("com.caller", 0), 0,
+                BrokerProviderRuntime.instanceId("com.call.exported", 0), (caller, uri, flags) -> false, 22);
+        check(foreignRoute.flags() == 0 && "EXPORTED".equals(foreignRoute.permissionBasis()),
+                "exported Provider.call was incorrectly gated by URI grants");
 
         for (int i = 0; i < 300; i++) {
             Bundle result = new Bundle();
@@ -342,13 +354,24 @@ public final class BrokerProviderRuntimeSelfTest {
     private static void uriGrantOwnerValidation() {
         BrokerProviderRuntime runtime = new BrokerProviderRuntime();
         GuestSession owner = session("grant-owner", "com.owner", 6, 1);
-        runtime.reservePrepare(prepare("grant.authority", "com.owner.Provider"), owner);
-        runtime.requireGrantOwner("content://grant.authority/items", 6,
-                BrokerProviderRuntime.instanceId("com.owner", 6));
+        runtime.reservePrepare(securePrepare("grant.authority", "com.owner.Provider",
+                false, "", "", false, List.of()), owner);
+        boolean policyDenied = false;
+        try {
+            runtime.requireGrantOwner("content://grant.authority/items", 6,
+                    BrokerProviderRuntime.instanceId("com.owner", 6));
+        } catch (SecurityException expected) { policyDenied = true; }
+        check(policyDenied, "Provider without grantUriPermissions minted a URI grant");
+
+        GuestSession grantable = session("grantable-owner", "com.grantable", 6, 1);
+        runtime.reservePrepare(securePrepare("grantable.authority", "com.grantable.Provider",
+                false, "", "", true, List.of()), grantable);
+        runtime.requireGrantOwner("content://grantable.authority/items", 6,
+                BrokerProviderRuntime.instanceId("com.grantable", 6));
 
         boolean foreignDenied = false;
         try {
-            runtime.requireGrantOwner("content://grant.authority/items", 6,
+            runtime.requireGrantOwner("content://grantable.authority/items", 6,
                     BrokerProviderRuntime.instanceId("com.foreign", 6));
         } catch (SecurityException expected) {
             foreignDenied = true;
@@ -357,8 +380,8 @@ public final class BrokerProviderRuntimeSelfTest {
 
         boolean crossUserDenied = false;
         try {
-            runtime.requireGrantOwner("content://grant.authority/items", 7,
-                    BrokerProviderRuntime.instanceId("com.owner", 7));
+            runtime.requireGrantOwner("content://grantable.authority/items", 7,
+                    BrokerProviderRuntime.instanceId("com.grantable", 7));
         } catch (IllegalArgumentException expected) {
             crossUserDenied = true;
         }

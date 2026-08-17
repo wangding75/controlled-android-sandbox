@@ -39,12 +39,14 @@ final class SandboxApplicationLayer implements AutoCloseable {
         adapter.updateInstanceStatus(packageName, userId, status);
     }
     void clearData(String packageName, int userId) throws Exception {
-        SandboxRecord record = requireRecord(packageName);
-        adapter.stopRuntime(record, userId);
+        // PackageManagementSession owns the destructive transaction, including the runtime
+        // stop/death barrier.  Keeping the stop here would create a second, non-transactional
+        // lifecycle edge before the authoritative package-service operation.
         adapter.clearInstanceData(packageName, userId);
     }
     void deleteInstance(String packageName, int userId) throws Exception {
-        adapter.stopRuntime(requireRecord(packageName), userId);
+        // Deletion is serialized by PackageManagementSession.  It must stop the generation and
+        // clear all virtual-service state before mutating the catalog or instance directory.
         adapter.deleteInstance(packageName, userId);
         SandboxShortcutManager.disable(context, packageName, userId);
     }

@@ -7,10 +7,12 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 
 import com.warden.controlledsandbox.contract.IIsolatedGuestProcess;
 import com.warden.controlledsandbox.contract.IsolatedProcessRequest;
 import com.warden.controlledsandbox.contract.IsolatedProcessResult;
+import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.domain.port.SessionMetricsRepository;
 import com.warden.controlledsandbox.domain.port.TokenGenerator;
@@ -23,6 +25,18 @@ import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService0;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService1;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService2;
 import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService3;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService4;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService5;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService6;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService7;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService8;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService9;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService10;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService11;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService12;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService13;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService14;
+import com.warden.controlledsandbox.runtime.guest.IsolatedGuestProcessService15;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
@@ -32,18 +46,33 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
  * Owns the dedicated Android isolated-Service process channel.
  *
  * <p>This coordinator intentionally does not model isolated Activity, Receiver or Provider
- * execution. It owns a separate four-slot registry, capability tokens, Binder connections,
+ * execution. It owns a separate 16-slot registry, capability tokens, Binder connections,
  * Service recovery and cleanup so the central Broker remains a route authority rather than a
- * second process manager implementation.</p>
+ * second process manager implementation. The pool size is defined by
+ * {@link ProcessSlotContract#ISOLATED_SLOT_COUNT}; worker declarations and status projection
+ * must use the same contract.</p>
  */
 final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
-    static final int SLOT_COUNT = 4;
+    static final int SLOT_COUNT = ProcessSlotContract.ISOLATED_SLOT_COUNT;
+    private static final long SHUTDOWN_TIMEOUT_MILLIS = TimeUnit.SECONDS.toMillis(10L);
+
+    private static final Class<?>[] ISOLATED_SERVICE_CLASSES = {
+            IsolatedGuestProcessService0.class, IsolatedGuestProcessService1.class,
+            IsolatedGuestProcessService2.class, IsolatedGuestProcessService3.class,
+            IsolatedGuestProcessService4.class, IsolatedGuestProcessService5.class,
+            IsolatedGuestProcessService6.class, IsolatedGuestProcessService7.class,
+            IsolatedGuestProcessService8.class, IsolatedGuestProcessService9.class,
+            IsolatedGuestProcessService10.class, IsolatedGuestProcessService11.class,
+            IsolatedGuestProcessService12.class, IsolatedGuestProcessService13.class,
+            IsolatedGuestProcessService14.class, IsolatedGuestProcessService15.class
+    };
 
     @FunctionalInterface interface InputValidator {
         void validate(Bundle input) throws Exception;
@@ -65,6 +94,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     private final SpecFactory specFactory;
     private final Supplier<RuntimeSystemServiceCoordinator> systemServices;
     private final SessionBundleFactory sessionBundles;
+    private final Consumer<GuestSession> shareCleaner;
     private final SessionRegistry sessions;
     private final RuntimeServiceCoordinator services;
     private final ConcurrentMap<Integer, IsolatedConnection> connections = new ConcurrentHashMap<>();
@@ -73,10 +103,10 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     RuntimeIsolatedProcessCoordinator(Service host, BrokerStateStore brokerState, Clock clock,
             TokenGenerator tokenGenerator, InputValidator inputValidator, SpecFactory specFactory,
             Supplier<RuntimeSystemServiceCoordinator> systemServices,
-            SessionBundleFactory sessionBundles) {
+            SessionBundleFactory sessionBundles, Consumer<GuestSession> shareCleaner) {
         if (host == null || brokerState == null || clock == null || tokenGenerator == null
                 || inputValidator == null || specFactory == null || systemServices == null
-                || sessionBundles == null) {
+                || sessionBundles == null || shareCleaner == null) {
             throw new IllegalArgumentException("isolated process dependencies are required");
         }
         this.host = host;
@@ -87,12 +117,31 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         this.specFactory = specFactory;
         this.systemServices = systemServices;
         this.sessionBundles = sessionBundles;
+        this.shareCleaner = shareCleaner;
         this.sessions = new SessionRegistry(SLOT_COUNT, tokenGenerator);
         this.services = new RuntimeServiceCoordinator(brokerState, this::invokeGuest, clock);
     }
 
     SessionMetricsRepository sessionMetrics() { return sessions; }
     ServiceMetricsSource serviceMetrics() { return services; }
+
+    /**
+     * Resolves an isolated lease for capability transports which terminate in the main Broker
+     * process.  The ordinary and isolated registries intentionally remain separate so slot
+     * allocation and recovery cannot alias, therefore callers must not look up an isolated
+     * Binder operation in RuntimeBrokerService's ordinary registry.
+     */
+    GuestSession findStorageSession(String sessionId, long generation) {
+        if (sessionId == null || sessionId.trim().isEmpty() || generation < 1) return null;
+        for (GuestSession session : sessions.snapshot()) {
+            if (session.sessionId().equals(sessionId) && session.generation() == generation
+                    && session.state() != SessionState.STOPPED
+                    && session.state() != SessionState.FAILED) {
+                return session;
+            }
+        }
+        return null;
+    }
 
     synchronized Bundle invoke(Bundle request, IsolatedProcessRoutePolicy.Match suppliedMatch)
             throws Exception {
@@ -152,6 +201,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                 try {
                     if (staleRecovery != null) services.invalidate(staleRecovery);
                     systemServices().stop(session);
+                    shareCleaner.accept(session);
                     sessions.transition(packageName, userId, processName, session.generation(),
                             SessionState.FAILED, now(), String.valueOf(error.getMessage()));
                     removeCapabilities(session.sessionId());
@@ -208,9 +258,15 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     }
 
     synchronized void stopGuest(String packageName, int userId) {
+        RuntimeException firstFailure = null;
         for (GuestSession session : new ArrayList<>(sessions.getAll(packageName, userId))) {
-            stopSession(session);
+            try {
+                stopSession(session);
+            } catch (RuntimeException error) {
+                if (firstFailure == null) firstFailure = error;
+            }
         }
+        if (firstFailure != null) throw firstFailure;
     }
 
     int purgeExpiredForeground() { return services.purgeExpiredForeground(); }
@@ -232,6 +288,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
 
     private void stopSession(GuestSession original) {
         GuestSession session = original;
+        Throwable stopFailure = null;
         try {
             if (session.state() != SessionState.STOPPING
                     && session.state() != SessionState.STOPPED
@@ -240,21 +297,46 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                         session.processName(), session.generation(), SessionState.STOPPING, now(), "");
                 String capability = requireCapability(session);
                 final GuestSession stopping = session;
-                callVoid(session.processSlot(), worker ->
-                        worker.shutdown(stopping.sessionId(), stopping.generation(), capability));
-                sessions.transition(session.packageName(), session.virtualUserId(),
-                        session.processName(), session.generation(), SessionState.STOPPED, now(), "");
+                IsolatedConnection connection = requireConnection(session.processSlot());
+                try {
+                    connection.requireWorker().shutdown(
+                            stopping.sessionId(), stopping.generation(), capability);
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                    // A process can die while the shutdown Binder transaction is unwinding.  In
+                    // that case the death callback is the successful physical stop signal; do not
+                    // turn an already-dead worker into a false lifecycle failure.
+                    if (!connection.terminated()) {
+                        if (error instanceof RuntimeException runtime) throw runtime;
+                        if (error instanceof Error fatal) throw fatal;
+                        throw new IllegalStateException("ISOLATED_SHUTDOWN_CALL_FAILED", error);
+                    }
+                }
+                if (!connection.awaitTerminated(SHUTDOWN_TIMEOUT_MILLIS,
+                        TimeUnit.MILLISECONDS)) {
+                    abortConnection(connection, "ISOLATED_SHUTDOWN_PROCESS_TIMEOUT");
+                    throw new IllegalStateException("ISOLATED_SHUTDOWN_PROCESS_TIMEOUT");
+                }
+                GuestSession current = sessions.get(session.packageName(), session.virtualUserId(),
+                        session.processName());
+                if (current != null && current.state() == SessionState.STOPPING) {
+                    sessions.transition(session.packageName(), session.virtualUserId(),
+                            session.processName(), session.generation(), SessionState.STOPPED,
+                            now(), "");
+                }
             }
         } catch (Throwable error) {
-            try {
-                GuestSession current = sessions.get(original.packageName(), original.virtualUserId(),
-                        original.processName());
-                if (current != null && current.state().canTransitionTo(SessionState.FAILED)) {
-                    sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
-                            current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
-                }
-            } finally {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            stopFailure = error;
+            GuestSession current = sessions.get(original.packageName(), original.virtualUserId(),
+                    original.processName());
+            if (current != null && current.state() != SessionState.FAILED
+                    && current.state() != SessionState.STOPPED
+                    && current.state().canTransitionTo(SessionState.FAILED)) {
+                sessions.transition(current.packageName(), current.virtualUserId(), current.processName(),
+                        current.generation(), SessionState.FAILED, now(), String.valueOf(error.getMessage()));
             }
         } finally {
             brokerState.removePrepared(processKey(original.packageName(), original.virtualUserId(),
@@ -262,8 +344,14 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
             services.stopSession(original);
             RuntimeSystemServiceCoordinator system = systemServices.get();
             if (system != null) system.stop(original);
+            shareCleaner.accept(original);
             removeCapabilities(original.sessionId());
             releaseConnection(original.processSlot());
+        }
+        if (stopFailure != null) {
+            if (stopFailure instanceof RuntimeException runtime) throw runtime;
+            if (stopFailure instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("ISOLATED_GUEST_STOP_FAILED", stopFailure);
         }
     }
 
@@ -378,7 +466,10 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                 connection = new IsolatedConnection(slot);
                 connections.put(slot, connection);
                 Intent intent = new Intent(host, serviceClassFor(slot));
-                if (!host.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+                boolean bound = host.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+                Log.i("CS_ISOLATED_BIND", "bind slot=" + slot + " accepted=" + bound
+                        + " connection=" + System.identityHashCode(connection));
+                if (!bound) {
                     connections.remove(slot);
                     throw new IllegalStateException("ISOLATED_BIND_FAILED");
                 }
@@ -395,12 +486,36 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         IsolatedConnection connection;
         synchronized (this) { connection = connections.remove(slot); }
         if (connection == null) return;
+        Log.i("CS_ISOLATED_BIND", "unbind slot=" + slot + " connection="
+                + System.identityHashCode(connection));
         connection.closing = true;
         connection.unlinkDeath();
         try { host.unbindService(connection); } catch (Exception ignored) { }
     }
 
+    /**
+     * Detaches a worker after the physical-stop deadline has expired.  The caller must keep the
+     * lifecycle transaction failed; this method only prevents a timed-out Binder connection from
+     * being reused and asks Android to tear down the concrete isolated service.
+     */
+    private void abortConnection(IsolatedConnection source, String reason) {
+        synchronized (this) {
+            if (!connections.remove(source.slot, source)) return;
+            source.closing = true;
+        }
+        Log.e("CS_ISOLATED_BIND", "abort slot=" + source.slot + " reason=" + reason);
+        source.unlinkDeath();
+        try { host.unbindService(source); } catch (Exception ignored) { }
+        host.stopService(new Intent(host, serviceClassFor(source.slot)));
+    }
+
     private void handleDisconnect(int slot, IsolatedConnection source, String reason) {
+        Log.w("CS_ISOLATED_BIND", "disconnect slot=" + slot + " reason=" + reason
+                + " connection=" + System.identityHashCode(source));
+        // Signal the physical death before entering the coordinator monitor.  Destructive
+        // lifecycle calls may be waiting while holding the operation monitor; waiting for the
+        // monitor first would deadlock the death barrier with this callback.
+        source.terminated.countDown();
         GuestSession affected = null;
         synchronized (this) {
             IsolatedConnection current = connections.get(slot);
@@ -421,6 +536,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
                     affected.processName()));
             RuntimeSystemServiceCoordinator system = systemServices.get();
             if (system != null) system.stop(affected);
+            shareCleaner.accept(affected);
         }
         source.unlinkDeath();
         try { host.unbindService(source); } catch (Exception ignored) { }
@@ -433,7 +549,10 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     }
 
     @Override public void close() {
-        for (GuestSession session : sessions.snapshot()) services.stopSession(session);
+        for (GuestSession session : sessions.snapshot()) {
+            services.stopSession(session);
+            shareCleaner.accept(session);
+        }
         Integer[] slots;
         synchronized (this) { slots = connections.keySet().toArray(new Integer[0]); }
         for (int slot : slots) releaseConnection(slot);
@@ -442,13 +561,10 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     }
 
     private static Class<?> serviceClassFor(int slot) {
-        switch (slot) {
-            case 0: return IsolatedGuestProcessService0.class;
-            case 1: return IsolatedGuestProcessService1.class;
-            case 2: return IsolatedGuestProcessService2.class;
-            case 3: return IsolatedGuestProcessService3.class;
-            default: throw new IllegalArgumentException("Invalid isolated process slot: " + slot);
+        if (!ProcessSlotContract.isIsolatedSlot(slot)) {
+            throw new IllegalArgumentException("Invalid isolated process slot: " + slot);
         }
+        return ISOLATED_SERVICE_CLASSES[slot];
     }
 
     private static String processKey(String packageName, int userId, String processName) {
@@ -476,6 +592,7 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
     private final class IsolatedConnection implements ServiceConnection, IBinder.DeathRecipient {
         final int slot;
         final CountDownLatch connected = new CountDownLatch(1);
+        final CountDownLatch terminated = new CountDownLatch(1);
         volatile IIsolatedGuestProcess worker;
         volatile IBinder binderToken;
         volatile boolean closing;
@@ -483,6 +600,8 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         IsolatedConnection(int slot) { this.slot = slot; }
 
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.i("CS_ISOLATED_BIND", "connected slot=" + slot + " component=" + name
+                    + " connection=" + System.identityHashCode(this));
             binderToken = service;
             worker = IIsolatedGuestProcess.Stub.asInterface(service);
             try { service.linkToDeath(this, 0); }
@@ -495,29 +614,37 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         }
 
         @Override public void onServiceDisconnected(ComponentName name) {
+            Log.w("CS_ISOLATED_BIND", "serviceDisconnected slot=" + slot + " component=" + name);
             worker = null;
             binderToken = null;
+            terminated.countDown();
             connected.countDown();
             handleDisconnect(slot, this, "SERVICE_DISCONNECTED");
         }
 
         @Override public void onBindingDied(ComponentName name) {
+            Log.w("CS_ISOLATED_BIND", "bindingDied slot=" + slot + " component=" + name);
             worker = null;
             binderToken = null;
+            terminated.countDown();
             connected.countDown();
             handleDisconnect(slot, this, "BINDING_DIED");
         }
 
         @Override public void onNullBinding(ComponentName name) {
+            Log.w("CS_ISOLATED_BIND", "nullBinding slot=" + slot + " component=" + name);
             worker = null;
             binderToken = null;
+            terminated.countDown();
             connected.countDown();
             handleDisconnect(slot, this, "NULL_BINDING");
         }
 
         @Override public void binderDied() {
+            Log.w("CS_ISOLATED_BIND", "binderDied slot=" + slot);
             worker = null;
             binderToken = null;
+            terminated.countDown();
             handleDisconnect(slot, this, "BINDER_DIED");
         }
 
@@ -528,6 +655,12 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         boolean isAlive() {
             IBinder token = binderToken;
             return worker != null && token != null && token.isBinderAlive();
+        }
+
+        boolean terminated() { return terminated.getCount() == 0L; }
+
+        boolean awaitTerminated(long timeout, TimeUnit unit) throws InterruptedException {
+            return terminated.await(timeout, unit);
         }
 
         IIsolatedGuestProcess requireWorker() {

@@ -19,13 +19,10 @@ import com.warden.controlledsandbox.contract.VirtualUsageStatsPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualUserProfileSnapshot;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
-import java.lang.reflect.Array;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,11 +33,12 @@ final class ApplicationEnvironmentInvocationInterceptor {
     private final GuestIdentity identity;
     private final String service;
     private final Set<Object> listeners = Collections.newSetFromMap(new IdentityHashMap<>());
-    private final Set<Object> contentObservers = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final ApplicationEnvironmentContentObserverRegistry contentObservers;
 
     ApplicationEnvironmentInvocationInterceptor(GuestIdentity identity, String service) {
         this.identity = java.util.Objects.requireNonNull(identity, "identity");
         this.service = normalize(service);
+        this.contentObservers = new ApplicationEnvironmentContentObserverRegistry(identity);
     }
 
     Decision before(Method method, Object[] arguments) {
@@ -377,22 +375,23 @@ final class ApplicationEnvironmentInvocationInterceptor {
         requireStatic(profile.mode(), "content", name);
         if (InvocationMethodMatcher.named(name, "unregisterContentObserver")
                 || InvocationMethodMatcher.startsWith(name, "unregisterContentObserver")) {
-            Object observer = callback(arguments);
-            if (observer != null) contentObservers.remove(observer);
+            Object observer = contentObservers.observerArgument(arguments);
+            if (observer != null) contentObservers.unregister(observer);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (InvocationMethodMatcher.named(name, "registerContentObserver")
                 || InvocationMethodMatcher.startsWith(name, "registerContentObserver")) {
-            Object observer = callback(arguments);
+            Object observer = contentObservers.observerArgument(arguments);
             if (observer == null) throw new IllegalArgumentException("VIRTUAL_CONTENT_OBSERVER_REQUIRED");
-            if (contentObservers.size() >= 256 && !contentObservers.contains(observer)) {
+            if (contentObservers.count() >= 256 && !contentObservers.contains(observer)) {
                 throw new IllegalStateException("VIRTUAL_CONTENT_OBSERVER_LIMIT_EXCEEDED");
             }
-            contentObservers.add(observer);
+            contentObservers.register(observer, contentObservers.observerUri(arguments),
+                    contentObservers.firstBoolean(arguments, false));
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "notifychange")) {
-            dispatchContentObservers(arguments);
+            contentObservers.notifyObservers(arguments);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (containsAny(name, "getsyncadaptertypes", "getcurrentsyncs", "getsyncstatus")) {
@@ -406,27 +405,6 @@ final class ApplicationEnvironmentInvocationInterceptor {
         }
         if (containsAny(name, "getcache")) return Decision.handled(nullValue(method.getReturnType()));
         return failUnsupported("content", method);
-    }
-
-    private void dispatchContentObservers(Object[] arguments) {
-        List<Object> dead = new ArrayList<>();
-        for (Object observer : new ArrayList<>(contentObservers)) {
-            boolean delivered = false;
-            for (Method callback : observer.getClass().getMethods()) {
-                if (!callback.getName().equals("onChange")) continue;
-                Object[] values = new Object[callback.getParameterCount()];
-                for (int index = 0; index < values.length; index++) {
-                    Class<?> type = callback.getParameterTypes()[index];
-                    if (type == boolean.class || type == Boolean.class) values[index] = false;
-                    else if (type == int.class || type == Integer.class) values[index] = identity.virtualUserId();
-                    else values[index] = firstCompatible(arguments, type);
-                }
-                try { callback.setAccessible(true); callback.invoke(observer, values); delivered = true; break; }
-                catch (Throwable error) { com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error); dead.add(observer); break; }
-            }
-            if (!delivered && !dead.contains(observer)) dead.add(observer);
-        }
-        contentObservers.removeAll(dead);
     }
 
     private List<VirtualShortcutSnapshot> shortcuts(Object[] arguments, boolean dynamic) {

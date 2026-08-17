@@ -61,6 +61,18 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
         return snapshot;
     }
 
+    /** Opens a framework-owned start transaction before Guest onStartCommand executes. */
+    public ServiceRuntimeRegistry.Snapshot beginFrameworkStart(
+            GuestSession session, Bundle request, Bundle result) {
+        return runtime.beginFrameworkStart(session, request, result);
+    }
+
+    /** Commits a framework-owned start after Guest onStartCommand returns its restart mode. */
+    public ServiceRuntimeRegistry.Snapshot completeFrameworkStart(
+            GuestSession session, Bundle request, Bundle result) {
+        return runtime.completeFrameworkStart(session, request, result);
+    }
+
     public List<ServiceRuntimeRegistry.Snapshot> disconnectSession(GuestSession session) {
         removeSessionConnections(session);
         return runtime.processDisconnected(session);
@@ -71,16 +83,26 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
             GuestSession stale, GuestSession current, Bundle currentSpec) throws Exception {
         removeSessionConnections(stale);
         List<ServiceRuntimeRegistry.Snapshot> recovering = runtime.recovering(stale);
+        List<ServiceRuntimeRegistry.Snapshot> recovered = new ArrayList<>();
+        Map<String, ServiceRuntimeRegistry.RestartMode> recoveryModes = new LinkedHashMap<>();
         for (ServiceRuntimeRegistry.Snapshot service : recovering) {
             Bundle call = new Bundle(currentSpec);
-            call.putString(ComponentOperations.OPERATION, service.recoverForeground()
+            call.putString(ComponentOperations.OPERATION, service.frameworkOwned()
+                    ? ComponentOperations.RECOVER_FRAMEWORK_SERVICE
+                    : service.recoverForeground()
                     ? ComponentOperations.START_FOREGROUND_SERVICE : ComponentOperations.START_SERVICE);
             call.putString(RuntimeKeys.COMPONENT_CLASS, service.component());
             call.putBoolean(RuntimeKeys.SERVICE_RECOVERY, true);
             call.putInt(RuntimeKeys.SERVICE_START_ID, service.lastStartId());
             boolean redeliver = service.restartMode() == ServiceRuntimeRegistry.RestartMode.REDELIVER_INTENT;
             call.putBoolean(RuntimeKeys.SERVICE_REDELIVERED, redeliver);
-            call.putString(ComponentOperations.ACTION, redeliver ? service.lastStartAction() : "");
+            // Android delivers a null Intent for START_STICKY and the exact last Intent for
+            // START_REDELIVER_INTENT.  Keep the action-only field as a compatibility fallback for
+            // records created before the Broker began retaining the full wire envelope.
+            call.putString(ComponentOperations.ACTION, "");
+            Bundle redeliveryIntent = redeliver ? runtime.recoveryIntent(service) : null;
+            if (redeliveryIntent != null) call.putAll(redeliveryIntent);
+            else if (redeliver) call.putString(ComponentOperations.ACTION, service.lastStartAction());
             if (service.recoverForeground()) {
                 call.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true);
                 call.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, "PROCESS_RECOVERY");
@@ -93,8 +115,14 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
                         : result.getString(RuntimeKeys.ERROR_TYPE, result.getString(RuntimeKeys.STATUS, "FAILED"));
                 throw new IllegalStateException("SERVICE_RECOVERY_FAILED:" + service.component() + ":" + reason);
             }
+            if (service.frameworkOwned()) {
+                recovered.add(runtime.completeFrameworkRecovery(stale, current, service, call, result));
+            } else {
+                recoveryModes.put(service.component(), BrokerServiceRuntime.restartModeOf(result));
+            }
         }
-        return runtime.processRecovered(stale, current);
+        recovered.addAll(runtime.processRecovered(stale, current, recoveryModes));
+        return java.util.Collections.unmodifiableList(recovered);
     }
 
 

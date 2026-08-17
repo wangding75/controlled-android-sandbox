@@ -9,8 +9,8 @@ The comparison uses the preserved read-only snapshots under `ref/upstream`. No u
 | Area | VirtualApp snapshot | NewBlackbox snapshot | Controlled Sandbox M5-T6 |
 |---|---|---|---|
 | Process record | `server/am/ProcessRecord` tracks vuid/vpid/process/client | `core/system/ProcessRecord` and process manager track B-process state | Immutable Session/generation/slot records with explicit recovery states |
-| Stub capacity | Virtual Stub process model | `ProxyManifest` exposes ordinary `:pN` proxy processes | Eight ordinary slots plus a separate four isolated slots |
-| Android isolated worker | No explicit `android:isolatedProcess` worker route found in the preserved snapshot | No explicit `android:isolatedProcess` worker route found in the preserved snapshot | Four predeclared `android:isolatedProcess=true` Service workers |
+| Stub capacity | Virtual Stub process model | `ProxyManifest` exposes ordinary `:pN` proxy processes | 64 ordinary slots plus a separate 16 isolated slots |
+| Android isolated worker | No explicit `android:isolatedProcess` worker route found in the preserved snapshot | No explicit `android:isolatedProcess` worker route found in the preserved snapshot | Sixteen predeclared `android:isolatedProcess=true` Service workers |
 | Component scope | General virtual component routing | General proxy component routing | Isolated route intentionally limited to Service; other types fail closed |
 | Binder identity | Mature virtual client/app-thread channel | Mature BActivityThread/system channel | Typed Session/generation/component/revision plus per-lease capability token |
 | Death recovery | Long-lived process management model | Process-manager and proxy lifecycle model | Explicit Binder-death transition to RECOVERING and generation advancement |

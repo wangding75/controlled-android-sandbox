@@ -322,12 +322,14 @@ public final class ManifestReceiverRegistry {
             if (dataRules.isEmpty()) return !intent.hasData();
 
             LinkedHashSet<String> schemes = new LinkedHashSet<>();
-            LinkedHashSet<String> hosts = new LinkedHashSet<>();
+            LinkedHashSet<Integer> ports = new LinkedHashSet<>();
             LinkedHashSet<String> mimeTypes = new LinkedHashSet<>();
+            ArrayList<DataRule> authorityRules = new ArrayList<>();
             ArrayList<DataRule> pathRules = new ArrayList<>();
             for (DataRule rule : dataRules) {
                 if (!rule.scheme().isEmpty()) schemes.add(rule.scheme());
-                if (!rule.host().isEmpty()) hosts.add(rule.host());
+                if (!rule.host().isEmpty()) authorityRules.add(rule);
+                if (rule.port() >= 0) ports.add(rule.port());
                 if (!rule.mimeType().isEmpty()) mimeTypes.add(rule.mimeType());
                 if (rule.hasPathConstraint()) pathRules.add(rule);
             }
@@ -349,7 +351,19 @@ public final class ManifestReceiverRegistry {
                 return false;
             }
 
-            if (!hosts.isEmpty() && !hosts.contains(intent.host().toLowerCase(Locale.ROOT))) return false;
+            if (!authorityRules.isEmpty()) {
+                boolean authorityMatched = false;
+                for (DataRule rule : authorityRules) {
+                    if (rule.host().equals(intent.host().toLowerCase(Locale.ROOT))
+                            && (rule.port() < 0 || rule.port() == intent.port())) {
+                        authorityMatched = true;
+                        break;
+                    }
+                }
+                if (!authorityMatched) return false;
+            } else if (!ports.isEmpty()) {
+                return false;
+            }
             if (!pathRules.isEmpty()) {
                 boolean pathMatched = false;
                 for (DataRule rule : pathRules) {
@@ -364,6 +378,7 @@ public final class ManifestReceiverRegistry {
     public static final class DataRule {
         private final String scheme;
         private final String host;
+        private final int port;
         private final String path;
         private final String pathPrefix;
         private final String pathPattern;
@@ -371,8 +386,15 @@ public final class ManifestReceiverRegistry {
 
         public DataRule(String scheme, String host, String path, String pathPrefix,
                         String pathPattern, String mimeType) {
+            this(scheme, host, -1, path, pathPrefix, pathPattern, mimeType);
+        }
+
+        public DataRule(String scheme, String host, int port, String path, String pathPrefix,
+                        String pathPattern, String mimeType) {
             this.scheme = normalize(scheme).toLowerCase(Locale.ROOT);
             this.host = normalize(host).toLowerCase(Locale.ROOT);
+            if (port < -1 || port > 65535) throw new IllegalArgumentException("port out of range");
+            this.port = port;
             this.path = normalizePath(path);
             this.pathPrefix = normalizePath(pathPrefix);
             this.pathPattern = normalizePath(pathPattern);
@@ -384,6 +406,7 @@ public final class ManifestReceiverRegistry {
 
         public String scheme() { return scheme; }
         public String host() { return host; }
+        public int port() { return port; }
         public String path() { return path; }
         public String pathPrefix() { return pathPrefix; }
         public String pathPattern() { return pathPattern; }

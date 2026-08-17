@@ -21,8 +21,13 @@ coordinator=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/
  'class RuntimeServiceCoordinator','linkToDeath','connectionDied(','recoverSession(',
  'SERVICE_CONNECTION_BINDER','SERVICE_REDELIVERED','SERVICE_START_ID','bestEffortGuestUnbind')
 broker=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
- 'RuntimeServiceCoordinator serviceCoordinator','serviceCoordinator.applySuccessfulOperation',
- 'componentRecoveryCoordinator.recover','serviceCoordinator.disconnectSession','serviceCoordinator.stopSession')
+ 'RuntimeServiceCoordinator serviceCoordinator',
+ 'serviceCoordinator.disconnectSession','serviceCoordinator.stopSession')
+lifecycle=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java',
+ 'componentRecoveryCoordinator.recover','serviceCoordinator.disconnectSession',
+ 'serviceCoordinator.stopSession','GUEST_RUNTIME_STATUS_NOT_READY')
+component=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java',
+ 'serviceCoordinator.applySuccessfulOperation')
 if 'BrokerServiceRuntime serviceRuntime' in broker:
  errors.append('RuntimeBrokerService still owns BrokerServiceRuntime directly')
 if len(broker.splitlines()) > 1450:

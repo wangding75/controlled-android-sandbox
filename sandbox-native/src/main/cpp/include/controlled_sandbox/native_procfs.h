@@ -15,8 +15,13 @@ public:
 
     [[nodiscard]] static std::string sanitize_maps(std::string_view raw,
                                                    const NativePolicySnapshot& policy);
+    [[nodiscard]] static std::string sanitize_mountinfo(std::string_view raw,
+                                                        const NativePolicySnapshot& policy);
     [[nodiscard]] static std::string render_cmdline(const NativePolicySnapshot& policy);
     [[nodiscard]] static std::string render_status(const NativePolicySnapshot& policy);
+    [[nodiscard]] static std::string render_stat(const NativePolicySnapshot& policy);
+    [[nodiscard]] static std::string render_statm(const NativePolicySnapshot& policy);
+    [[nodiscard]] static std::string render_io(const NativePolicySnapshot& policy);
 };
 
 }  // namespace controlled_sandbox

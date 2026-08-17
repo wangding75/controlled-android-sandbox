@@ -19,13 +19,18 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
     public enum Kind { BROADCAST, ACTIVITY, ACTIVITY_RESULT, SERVICE, FOREGROUND_SERVICE }
 
     public record SendRequest(Object fillInPayload, int flagsMask, int flagsValues,
-                              String senderPermission, int senderUid) {
+                              String senderPermission, int senderUid, int resultCode) {
         public SendRequest {
             senderPermission = normalize(senderPermission);
             if (senderUid < -1) throw new IllegalArgumentException("senderUid is invalid");
         }
+        /** Compatibility constructor for internal callers that do not have a target result code. */
+        public SendRequest(Object fillInPayload, int flagsMask, int flagsValues,
+                           String senderPermission, int senderUid) {
+            this(fillInPayload, flagsMask, flagsValues, senderPermission, senderUid, 0);
+        }
         public static SendRequest simple(Object fillInPayload) {
-            return new SendRequest(fillInPayload, 0, 0, "", -1);
+            return new SendRequest(fillInPayload, 0, 0, "", -1, 0);
         }
     }
 
@@ -102,6 +107,7 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
         private Object payload;
         private boolean cancelled;
         private int sends;
+        private boolean oneShotClaimed;
 
         private Record(long id, String persistentTokenId, String packageName, int virtualUserId,
                        int creatorUid, long generation, Object token, Spec spec, Object payload,
@@ -123,8 +129,17 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
         public synchronized boolean cancelled() { return cancelled; }
         public synchronized int sends() { return sends; }
         private synchronized void update(Spec value, Object nextPayload) { spec = value; payload = nextPayload; }
+        private synchronized void refresh(Spec value, Object nextPayload, int nextSends) {
+            spec = value; payload = nextPayload; sends = nextSends;
+        }
         private synchronized void cancel() { cancelled = true; }
         private synchronized void sent(int count, boolean isCancelled) { sends = count; cancelled = isCancelled; }
+        private synchronized boolean claimOneShot() {
+            if (cancelled || oneShotClaimed) return false;
+            oneShotClaimed = true;
+            return true;
+        }
+        private synchronized boolean oneShotClaimed() { return oneShotClaimed; }
     }
 
     public record IssueResult(Record record, boolean created) { }
@@ -218,6 +233,17 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
     }
 
     public synchronized Record find(Object token) { return byToken.get(token); }
+    /**
+     * Resolves a durable sender by its stable identity, rehydrating the local record after the
+     * creator process has died.  Broker-owned Binder relays use this before delivery so the
+     * completion callback can be populated from the same immutable base Intent that the send
+     * transaction will route.
+     */
+    public synchronized Record findPersistent(String tokenId) {
+        String normalized = required(tokenId, "tokenId");
+        Record local = byPersistentId.get(normalized);
+        return local != null ? local : materializePersistent(normalized);
+    }
     public synchronized boolean equivalent(Object first, Object second) {
         Record left = byToken.get(first); Record right = byToken.get(second);
         return left != null && right != null && left.persistentTokenId().equals(right.persistentTokenId());
@@ -232,7 +258,9 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
         SendRequest resolved = request == null ? SendRequest.simple(null) : request;
         synchronized (this) {
             record = byToken.get(token);
+            refreshDurable(record);
             requireSendable(record, resolved);
+            claimOneShot(record);
         }
         return deliver(record, resolved);
     }
@@ -245,7 +273,9 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
             String normalized = required(tokenId, "tokenId");
             record = byPersistentId.get(normalized);
             if (record == null) record = materializePersistent(normalized);
+            refreshDurable(record);
             requireSendable(record, resolved);
+            claimOneShot(record);
         }
         return deliver(record, resolved);
     }
@@ -254,11 +284,11 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
         try { return delivery.deliver(record, request); }
         finally {
             synchronized (this) {
-                if (persistence != null) {
+                if (persistence != null && !record.oneShotClaimed()) {
                     DurableRecord updated = persistence.markSent(record.persistentTokenId());
                     if (updated != null) record.sent(updated.sends(), updated.cancelled());
                     else record.cancel();
-                } else {
+                } else if (persistence == null && !record.oneShotClaimed()) {
                     record.sent(record.sends() + 1, record.spec().oneShot());
                 }
                 if (record.cancelled() || record.spec().oneShot()) cancelLocal(record);
@@ -312,6 +342,52 @@ public final class VirtualPendingIntentRegistry implements AutoCloseable {
         if (!spec.requiredPermission().isEmpty()
                 && !spec.requiredPermission().equals(request.senderPermission())) {
             throw new SecurityException("VIRTUAL_PENDING_INTENT_SENDER_PERMISSION_DENIED");
+        }
+    }
+
+    /**
+     * Re-checks authority state before a local Binder handle is allowed to send.  A different
+     * Guest generation may have cancelled, consumed, or updated the same durable token after
+     * this process rehydrated its handle; local maps must never become an authority cache.
+     */
+    private void refreshDurable(Record record) {
+        if (record == null || persistence == null) return;
+        DurableRecord current = null;
+        for (DurableRecord value : persistence.records()) {
+            if (record.persistentTokenId().equals(value.tokenId())) {
+                current = value;
+                break;
+            }
+        }
+        if (current == null || current.cancelled()
+                || !packageName.equals(current.creatorPackage())
+                || creatorUid != current.creatorUid()
+                || !packageRevision.equals(current.packageRevision())) {
+            record.cancel();
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+        }
+        record.refresh(specFrom(current), current.payload(), current.sends());
+    }
+
+    /** Claims one-shot state before delivery, matching PendingIntentRecord's pre-dispatch revoke. */
+    private void claimOneShot(Record record) {
+        if (record == null || !record.spec().oneShot()) return;
+        if (!record.claimOneShot()) {
+            throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+        }
+        try {
+            if (persistence != null) {
+                DurableRecord updated = persistence.markSent(record.persistentTokenId());
+                if (updated == null) throw new IllegalStateException("VIRTUAL_PENDING_INTENT_CANCELLED");
+                record.sent(updated.sends(), true);
+            } else {
+                record.sent(record.sends(), true);
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            record.cancel();
+            if (error instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException(error);
         }
     }
 

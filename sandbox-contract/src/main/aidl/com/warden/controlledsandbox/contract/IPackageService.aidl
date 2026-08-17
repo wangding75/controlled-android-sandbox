@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.contract;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IHostJobCallback;
 import com.warden.controlledsandbox.contract.IPackageManagementSession;
+import com.warden.controlledsandbox.contract.IPackageRuntimeQuerySession;
 import com.warden.controlledsandbox.contract.IRuntimePermissionSession;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceSession;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
@@ -34,4 +35,6 @@ interface IPackageService {
     boolean stopVirtualJobWithCapability(int hostJobId, int stopReason,
             int internalStopReason, String debugStopReason, in IBinder capability,
             long capabilityGeneration);
+    IPackageRuntimeQuerySession openRuntimePackageQuerySessionWithCapability(
+            in IBinder clientToken, in IBinder capability, long capabilityGeneration);
 }

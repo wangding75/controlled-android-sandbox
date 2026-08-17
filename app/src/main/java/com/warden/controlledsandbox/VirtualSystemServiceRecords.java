@@ -57,6 +57,8 @@ final class VirtualSystemServiceRecords {
         final String deliveryPath;
         final String pendingIntentTokenId;
         final byte[] tokenPayload;
+        final boolean alarmClock;
+        final byte[] alarmClockPayload;
         final String ownerProcessName;
         long ownerGeneration;
         final String packageRevision;
@@ -66,6 +68,15 @@ final class VirtualSystemServiceRecords {
         AlarmRecord(String id, long triggerAtMs, long intervalMs, boolean exact,
                     boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
                     byte[] tokenPayload, String ownerProcessName, long ownerGeneration,
+                    String packageRevision, int deliveryCount, long updatedAtMs) {
+            this(id, triggerAtMs, intervalMs, exact, allowWhileIdle, deliveryPath, pendingIntentTokenId,
+                    tokenPayload, false, new byte[0], ownerProcessName, ownerGeneration,
+                    packageRevision, deliveryCount, updatedAtMs);
+        }
+        AlarmRecord(String id, long triggerAtMs, long intervalMs, boolean exact,
+                    boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                    byte[] tokenPayload, boolean alarmClock, byte[] alarmClockPayload,
+                    String ownerProcessName, long ownerGeneration,
                     String packageRevision, int deliveryCount, long updatedAtMs) {
             this.id = required(id, "alarmId");
             this.triggerAtMs = Math.max(0L, triggerAtMs);
@@ -79,6 +90,8 @@ final class VirtualSystemServiceRecords {
                 throw new IllegalArgumentException("pendingIntentTokenId is required");
             }
             this.tokenPayload = boundedPayload(tokenPayload, "alarmToken");
+            this.alarmClock = alarmClock;
+            this.alarmClockPayload = boundedPayload(alarmClockPayload, "alarmClockShowIntent");
             this.ownerProcessName = required(ownerProcessName, "ownerProcessName");
             if (ownerGeneration < 0L || deliveryCount < 0) {
                 throw new IllegalArgumentException("alarm owner/count must be non-negative");

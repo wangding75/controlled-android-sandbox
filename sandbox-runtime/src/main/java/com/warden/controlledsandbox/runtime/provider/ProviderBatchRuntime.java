@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.runtime.provider;
 
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.guest.ProviderCallBundleCodec;
 
 import android.content.ContentProvider;
 import android.content.ContentProviderOperation;
@@ -112,6 +113,7 @@ public final class ProviderBatchRuntime {
             if (CALL.equals(type) && uri.trim().isEmpty()) uri = "content://" + authority;
             validateUriAuthority(uri, authority, index);
             validateOperation(type, copy, index);
+            validateBackReferences(type, copy, index);
             copy.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, type);
             copy.putString(RuntimeKeys.URI, uri);
             int operationBytes;
@@ -135,10 +137,10 @@ public final class ProviderBatchRuntime {
 
     public static Bundle execute(ContentProvider provider, Batch batch) throws BatchException {
         if (provider == null) throw new BatchException(-1, "PROVIDER_BATCH_PROVIDER_REQUIRED");
-        if (batch.containsCall()) {
-            if (!(provider instanceof AtomicProviderBatch)) {
-                throw new BatchException(-1, "PROVIDER_BATCH_CALL_REQUIRES_ATOMIC_EXTENSION");
-            }
+        // API 30 made CALL a first-class ContentProviderOperation.  Keep the old
+        // AtomicProviderBatch extension as a compatibility path for pre-R hosts and
+        // specialized providers, but let ordinary providers use Framework applyBatch().
+        if (batch.containsCall() && provider instanceof AtomicProviderBatch) {
             ArrayList<Bundle> wireOperations = new ArrayList<>();
             for (Operation operation : batch.operations()) wireOperations.add(operation.wire());
             try {
@@ -154,6 +156,9 @@ public final class ProviderBatchRuntime {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                 throw new BatchException(-1, "PROVIDER_BATCH_CUSTOM_EXECUTION_FAILED", error);
             }
+        }
+        if (batch.containsCall() && android.os.Build.VERSION.SDK_INT < 30) {
+            throw new BatchException(-1, "PROVIDER_BATCH_CALL_REQUIRES_API_30");
         }
 
         ArrayList<ContentProviderOperation> nativeOperations = new ArrayList<>();
@@ -195,11 +200,13 @@ public final class ProviderBatchRuntime {
                 case INSERT:
                     builder = ContentProviderOperation.newInsert(uri)
                             .withValues(contentValues(wire.getBundle(RuntimeKeys.PROVIDER_VALUES)));
+                    applyValueBackReferences(builder, wire, operation.index());
                     break;
                 case UPDATE:
                     builder = ContentProviderOperation.newUpdate(uri)
                             .withValues(contentValues(wire.getBundle(RuntimeKeys.PROVIDER_VALUES)));
                     applySelection(builder, wire);
+                    applyValueBackReferences(builder, wire, operation.index());
                     break;
                 case DELETE:
                     builder = ContentProviderOperation.newDelete(uri);
@@ -216,12 +223,30 @@ public final class ProviderBatchRuntime {
                         builder.withValues(contentValues(values));
                     }
                     applySelection(builder, wire);
+                    applyValueBackReferences(builder, wire, operation.index());
                     int expected = wire.getInt(RuntimeKeys.PROVIDER_BATCH_EXPECTED_COUNT, -1);
                     if (expected >= 0) builder.withExpectedCount(expected);
+                    break;
+                case CALL:
+                    if (android.os.Build.VERSION.SDK_INT < 30) {
+                        throw new BatchException(operation.index(), "PROVIDER_BATCH_CALL_REQUIRES_API_30");
+                    }
+                    String method = wire.getString(RuntimeKeys.PROVIDER_METHOD, "").trim();
+                    if (method.isEmpty()) {
+                        throw new BatchException(operation.index(), "PROVIDER_BATCH_CALL_METHOD_REQUIRED");
+                    }
+                    builder = ContentProviderOperation.newCall(uri, method,
+                            wire.getString(RuntimeKeys.PROVIDER_ARGUMENT));
+                    Bundle extras = wire.getBundle(RuntimeKeys.PROVIDER_BATCH_EXTRAS);
+                    if (extras != null) invokeBuilder(builder, "withExtras",
+                            new Class<?>[]{Bundle.class}, new Object[]{new Bundle(extras)},
+                            operation.index());
+                    applyExtraBackReferences(builder, wire, operation.index());
                     break;
                 default:
                     throw new BatchException(operation.index(), "PROVIDER_BATCH_NATIVE_TYPE_UNSUPPORTED");
             }
+            applyOperationFlags(builder, wire, operation.index());
             return builder.build();
         } catch (BatchException error) {
             throw error;
@@ -231,10 +256,111 @@ public final class ProviderBatchRuntime {
         }
     }
 
-    private static void applySelection(ContentProviderOperation.Builder builder, Bundle wire) {
+    private static void applySelection(ContentProviderOperation.Builder builder, Bundle wire)
+            throws BatchException {
         ArrayList<String> args = wire.getStringArrayList(RuntimeKeys.PROVIDER_SELECTION_ARGS);
         builder.withSelection(wire.getString(RuntimeKeys.PROVIDER_SELECTION, ""),
                 args == null ? null : args.toArray(new String[0]));
+        Bundle backReferences = wire.getBundle(RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCES);
+        if (backReferences == null) return;
+        Bundle sources = wire.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCE_SOURCES);
+        for (String key : backReferences.keySet()) {
+            int previous = backReferences.getInt(key);
+            String source = sourceKey(sources, key);
+            if (source == null) {
+                builder.withSelectionBackReference(Integer.parseInt(key), previous);
+            } else {
+                invokeBuilder(builder, "withSelectionBackReference",
+                        new Class<?>[]{int.class, int.class, String.class},
+                        new Object[]{Integer.parseInt(key), previous, source}, -1);
+            }
+        }
+    }
+
+    private static void applyValueBackReferences(ContentProviderOperation.Builder builder,
+                                                  Bundle wire, int operationIndex)
+            throws BatchException {
+        Bundle backReferences = wire.getBundle(RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCES);
+        if (backReferences == null) return;
+        Bundle sources = wire.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCE_SOURCES);
+        for (String key : backReferences.keySet()) {
+            try {
+                int previous = backReferences.getInt(key);
+                String source = sourceKey(sources, key);
+                if (source == null) {
+                    builder.withValueBackReference(key, previous);
+                } else {
+                    invokeBuilder(builder, "withValueBackReference",
+                            new Class<?>[]{String.class, int.class, String.class},
+                            new Object[]{key, previous, source}, operationIndex);
+                }
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                throw new BatchException(operationIndex,
+                        "PROVIDER_BATCH_VALUE_BACK_REFERENCE_BUILD_FAILED", error);
+            }
+        }
+    }
+
+    private static void applyExtraBackReferences(ContentProviderOperation.Builder builder,
+                                                 Bundle wire, int operationIndex)
+            throws BatchException {
+        Bundle backReferences = wire.getBundle(RuntimeKeys.PROVIDER_BATCH_EXTRAS_BACK_REFERENCES);
+        if (backReferences == null) return;
+        Bundle sources = wire.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_EXTRAS_BACK_REFERENCE_SOURCES);
+        for (String key : backReferences.keySet()) {
+            int previous = backReferences.getInt(key);
+            String source = sourceKey(sources, key);
+            if (source == null) {
+                invokeBuilder(builder, "withExtraBackReference",
+                        new Class<?>[]{String.class, int.class},
+                        new Object[]{key, previous}, operationIndex);
+            } else {
+                invokeBuilder(builder, "withExtraBackReference",
+                        new Class<?>[]{String.class, int.class, String.class},
+                        new Object[]{key, previous, source}, operationIndex);
+            }
+        }
+    }
+
+    private static String sourceKey(Bundle sources, String key) {
+        if (sources == null || !sources.containsKey(key)) return null;
+        return sources.getString(key, "");
+    }
+
+    private static void applyOperationFlags(ContentProviderOperation.Builder builder, Bundle wire,
+                                            int operationIndex) throws BatchException {
+        if (wire.getBoolean(RuntimeKeys.PROVIDER_BATCH_YIELD_ALLOWED, false)) {
+            try {
+                builder.withYieldAllowed(true);
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                throw new BatchException(operationIndex, "PROVIDER_BATCH_YIELD_FLAG_FAILED", error);
+            }
+        }
+        if (wire.getBoolean(RuntimeKeys.PROVIDER_BATCH_EXCEPTION_ALLOWED, false)) {
+            if (android.os.Build.VERSION.SDK_INT < 30) {
+                throw new BatchException(operationIndex, "PROVIDER_BATCH_EXCEPTION_FLAG_REQUIRES_API_30");
+            }
+            invokeBuilder(builder, "withExceptionAllowed",
+                    new Class<?>[]{boolean.class}, new Object[]{true}, operationIndex);
+        }
+    }
+
+    private static void invokeBuilder(ContentProviderOperation.Builder builder, String name,
+                                      Class<?>[] parameterTypes, Object[] arguments,
+                                      int operationIndex) throws BatchException {
+        try {
+            java.lang.reflect.Method method = builder.getClass().getMethod(name, parameterTypes);
+            method.invoke(builder, arguments);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new BatchException(operationIndex, "PROVIDER_BATCH_BUILDER_METHOD_FAILED:" + name,
+                    error);
+        }
     }
 
     private static Bundle encodeNativeResults(Batch batch, ContentProviderResult[] results) throws BatchException {
@@ -252,6 +378,25 @@ public final class ProviderBatchRuntime {
             item.putString(RuntimeKeys.PROVIDER_BATCH_TYPE, batch.operations().get(index).type());
             if (result != null && result.uri != null) item.putString(RuntimeKeys.URI, result.uri.toString());
             if (result != null && result.count != null) item.putInt(RuntimeKeys.PROVIDER_BATCH_AFFECTED_ROWS, result.count);
+            if (result != null) {
+                Object extras = resultField(result, "extras");
+                if (extras instanceof Bundle bundle) {
+                    try {
+                        item.putBundle(RuntimeKeys.PROVIDER_BATCH_RESULT_EXTRAS,
+                                ProviderCallBundleCodec.copy(bundle));
+                    } catch (IllegalArgumentException error) {
+                        throw new BatchException(index,
+                                "PROVIDER_BATCH_RESULT_EXTRAS_UNSUPPORTED", error);
+                    }
+                }
+                Object exception = resultField(result, "exception");
+                if (exception instanceof Throwable failure) {
+                    item.putString(RuntimeKeys.PROVIDER_BATCH_RESULT_EXCEPTION_TYPE,
+                            failure.getClass().getName());
+                    item.putString(RuntimeKeys.PROVIDER_BATCH_RESULT_EXCEPTION_MESSAGE,
+                            failure.getMessage() == null ? "" : failure.getMessage());
+                }
+            }
             out.putBundle(RuntimeKeys.PROVIDER_BATCH_RESULT_PREFIX + index, item);
         }
                 validateResult(out, count);
@@ -293,6 +438,88 @@ public final class ProviderBatchRuntime {
             String method = operation.getString(RuntimeKeys.PROVIDER_METHOD, "");
             if (method == null || method.trim().isEmpty()) {
                 throw new BatchException(index, "PROVIDER_BATCH_CALL_METHOD_REQUIRED");
+            }
+            Bundle extras = operation.getBundle(RuntimeKeys.PROVIDER_BATCH_EXTRAS);
+            if (extras != null) {
+                try { estimateBundle(extras, 0); }
+                catch (IllegalArgumentException error) {
+                    throw new BatchException(index, "PROVIDER_BATCH_EXTRAS_INVALID", error);
+                }
+            }
+        }
+    }
+
+    private static void validateBackReferences(String type, Bundle operation, int index)
+            throws BatchException {
+        Bundle valueReferences = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCES);
+        Bundle selectionReferences = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCES);
+        if (valueReferences != null && !valueReferences.isEmpty()
+                && !(INSERT.equals(type) || UPDATE.equals(type) || ASSERT.equals(type))) {
+            throw new BatchException(index, "PROVIDER_BATCH_VALUE_BACK_REFERENCE_TYPE_INVALID");
+        }
+        if (selectionReferences != null && !selectionReferences.isEmpty()
+                && !(UPDATE.equals(type) || DELETE.equals(type) || ASSERT.equals(type))) {
+            throw new BatchException(index, "PROVIDER_BATCH_SELECTION_BACK_REFERENCE_TYPE_INVALID");
+        }
+        Bundle extraReferences = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_EXTRAS_BACK_REFERENCES);
+        if (extraReferences != null && !extraReferences.isEmpty() && !CALL.equals(type)) {
+            throw new BatchException(index, "PROVIDER_BATCH_EXTRAS_BACK_REFERENCE_TYPE_INVALID");
+        }
+        Bundle valueSources = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_VALUES_BACK_REFERENCE_SOURCES);
+        Bundle selectionSources = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_SELECTION_BACK_REFERENCE_SOURCES);
+        Bundle extraSources = operation.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_EXTRAS_BACK_REFERENCE_SOURCES);
+        validateReferenceBundle(valueReferences, index, true);
+        validateReferenceBundle(selectionReferences, index, false);
+        validateReferenceBundle(extraReferences, index, true);
+        validateReferenceSources(valueSources, valueReferences, index);
+        validateReferenceSources(selectionSources, selectionReferences, index);
+        validateReferenceSources(extraSources, extraReferences, index);
+    }
+
+    private static void validateReferenceSources(Bundle sources, Bundle references,
+                                                 int operationIndex) throws BatchException {
+        if (sources == null) return;
+        for (String key : sources.keySet()) {
+            if (references == null || !references.containsKey(key)) {
+                throw new BatchException(operationIndex,
+                        "PROVIDER_BATCH_BACK_REFERENCE_SOURCE_WITHOUT_REFERENCE");
+            }
+            String source = sources.getString(key, null);
+            if (source == null) {
+                throw new BatchException(operationIndex,
+                        "PROVIDER_BATCH_BACK_REFERENCE_SOURCE_INVALID");
+            }
+        }
+    }
+
+    private static void validateReferenceBundle(Bundle references, int operationIndex,
+                                                boolean valueKeys) throws BatchException {
+        if (references == null) return;
+        if (references.size() > 128) {
+            throw new BatchException(operationIndex, "PROVIDER_BATCH_TOO_MANY_BACK_REFERENCES");
+        }
+        for (String key : references.keySet()) {
+            if (!valueKeys) {
+                try {
+                    if (Integer.parseInt(key) < 0) throw new NumberFormatException();
+                } catch (NumberFormatException error) {
+                    throw new BatchException(operationIndex,
+                            "PROVIDER_BATCH_SELECTION_BACK_REFERENCE_KEY_INVALID");
+                }
+            } else if (key == null || key.isEmpty()) {
+                throw new BatchException(operationIndex,
+                        "PROVIDER_BATCH_VALUE_BACK_REFERENCE_KEY_INVALID");
+            }
+            int previous = references.getInt(key, Integer.MIN_VALUE);
+            if (previous < 0 || previous >= operationIndex) {
+                throw new BatchException(operationIndex,
+                        "PROVIDER_BATCH_BACK_REFERENCE_ORDER_INVALID");
             }
         }
     }
@@ -338,23 +565,61 @@ public final class ProviderBatchRuntime {
     private static int estimateValue(Object value, int depth) {
         if (value == null) return 1;
         if (value instanceof String) return utf8((String) value) + 4;
-        if (value instanceof Integer || value instanceof Float || value instanceof Boolean) return 8;
+        if (value instanceof Byte || value instanceof Short || value instanceof Character
+                || value instanceof Integer || value instanceof Float
+                || value instanceof Boolean) return 8;
         if (value instanceof Long || value instanceof Double) return 12;
         if (value instanceof byte[]) return ((byte[]) value).length + 4;
+        if (value instanceof String[]) {
+            int total = 8;
+            for (String item : (String[]) value) total = Math.addExact(total, utf8(item) + 4);
+            return total;
+        }
+        if (value.getClass().isArray() && value.getClass().getComponentType().isPrimitive()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            int width = value.getClass().getComponentType() == boolean.class
+                    || value.getClass().getComponentType() == byte.class ? 1
+                    : value.getClass().getComponentType() == short.class
+                    || value.getClass().getComponentType() == char.class ? 2
+                    : value.getClass().getComponentType() == int.class
+                    || value.getClass().getComponentType() == float.class ? 4 : 8;
+            return Math.addExact(8, Math.multiplyExact(length, width));
+        }
         if (value instanceof Bundle) return estimateBundle((Bundle) value, depth);
         if (value instanceof ArrayList<?>) {
             int total = 8;
             for (Object item : (ArrayList<?>) value) {
-                if (!(item instanceof String)) throw new IllegalArgumentException("Only String ArrayList is supported");
-                total = Math.addExact(total, utf8((String) item) + 4);
+                if (item != null && !(item instanceof String) && !(item instanceof Bundle)) {
+                    throw new IllegalArgumentException("Unsupported ArrayList value");
+                }
+                total = Math.addExact(total, estimateValue(item, depth + 1));
             }
             return total;
+        }
+        // Uri, ComponentName and other explicitly whitelisted framework values are Parcelable
+        // transport objects.  They are copied by ProviderCallBundleCodec before this estimate;
+        // retain a bounded accounting path here without accepting arbitrary Guest objects.
+        if (value instanceof android.net.Uri || value instanceof android.content.ComponentName) {
+            return utf8(String.valueOf(value)) + 16;
         }
         throw new IllegalArgumentException("Unsupported Bundle type: " + value.getClass().getName());
     }
 
     private static int utf8(String value) {
         return value == null ? 0 : value.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private static Object resultField(ContentProviderResult result, String name) {
+        try {
+            java.lang.reflect.Field field = ContentProviderResult.class.getField(name);
+            return field.get(result);
+        } catch (NoSuchFieldException ignored) {
+            return null;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("PROVIDER_BATCH_RESULT_FIELD_UNAVAILABLE:" + name,
+                    error);
+        }
     }
 
     private static void validateUriAuthority(String uri, String authority, int index) throws BatchException {

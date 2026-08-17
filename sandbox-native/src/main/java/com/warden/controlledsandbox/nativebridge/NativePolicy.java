@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox.nativebridge;
 
 import android.app.Activity;
+import android.os.ParcelFileDescriptor;
 import android.view.Surface;
 
 /** JNI boundary for the clean-room native path and network policy engine. */
@@ -124,20 +125,69 @@ public final class NativePolicy {
     }
 
     public static String mapPath(String guestPath) {
-        if (!AVAILABLE) return guestPath;
+        if (!AVAILABLE) throw new IllegalStateException("NATIVE_POLICY_UNAVAILABLE");
+        if (guestPath == null || guestPath.trim().isEmpty()) {
+            throw new IllegalArgumentException("guestPath is required");
+        }
         return nativeMapPath(guestPath);
     }
 
+    /** Installs duplicated directory capabilities received over Binder for an isolated Guest. */
+    public static boolean configureFileCapabilities(ParcelFileDescriptor dataRoot,
+                                                    ParcelFileDescriptor apkParent,
+                                                    String apkEntryName,
+                                                    ParcelFileDescriptor nativeLibraryRoot) {
+        if (!AVAILABLE) return false;
+        if (dataRoot == null || apkParent == null) {
+            throw new IllegalArgumentException("dataRoot and apkParent capabilities are required");
+        }
+        if (apkEntryName == null || apkEntryName.trim().isEmpty()) {
+            throw new IllegalArgumentException("apkEntryName is required");
+        }
+        return nativeConfigureFileCapabilities(dataRoot.getFd(), apkParent.getFd(), apkEntryName,
+                nativeLibraryRoot == null ? -1 : nativeLibraryRoot.getFd());
+    }
+
+    /** Opens a child of a transferred directory capability without resolving a /proc pathname. */
+    public static ParcelFileDescriptor openCapability(ParcelFileDescriptor directory,
+                                                      String entryName, boolean write) {
+        if (!AVAILABLE) throw new IllegalStateException("NATIVE_POLICY_UNAVAILABLE");
+        if (directory == null) throw new IllegalArgumentException("directory is required");
+        int descriptor = nativeOpenCapability(directory.getFd(), entryName, write);
+        return ParcelFileDescriptor.adoptFd(descriptor);
+    }
+
+    /** Copies a transferred immutable file into a process-local memfd for path-based Android APIs. */
+    public static ParcelFileDescriptor materializeCapabilityFile(ParcelFileDescriptor source) {
+        if (!AVAILABLE) throw new IllegalStateException("NATIVE_POLICY_UNAVAILABLE");
+        if (source == null) throw new IllegalArgumentException("source is required");
+        int descriptor = nativeMaterializeCapabilityFile(source.getFd());
+        return ParcelFileDescriptor.adoptFd(descriptor);
+    }
+
+    /** Creates an unnamed process-local file used for FD-backed platform loader archives. */
+    public static ParcelFileDescriptor createProcessLocalFile(String name) {
+        if (!AVAILABLE) throw new IllegalStateException("NATIVE_POLICY_UNAVAILABLE");
+        if (name == null || name.trim().isEmpty()) throw new IllegalArgumentException("name is required");
+        return ParcelFileDescriptor.adoptFd(nativeCreateProcessLocalFile(name));
+    }
+
     public static boolean allowHost(String host) {
-        return !AVAILABLE || nativeAllowHost(host == null ? "" : host);
+        // An unavailable native boundary is not an allow decision.  Returning true here made
+        // callers silently fall back to host networking when the policy engine failed to load,
+        // which is the opposite of the native engine's fail-closed contract.
+        if (!AVAILABLE) return false;
+        return nativeAllowHost(host == null ? "" : host);
     }
 
     public static boolean allowIpv4(String address) {
-        return !AVAILABLE || nativeAllowIpv4(address == null ? "" : address);
+        if (!AVAILABLE) return false;
+        return nativeAllowIpv4(address == null ? "" : address);
     }
 
     public static boolean allowIpv6(String address) {
-        return !AVAILABLE || nativeAllowIpv6(address == null ? "" : address);
+        if (!AVAILABLE) return false;
+        return nativeAllowIpv6(address == null ? "" : address);
     }
 
     public static boolean configureAudioCapture(String sessionId, long generation, boolean allowed) {
@@ -188,6 +238,11 @@ public final class NativePolicy {
         if (!AVAILABLE) return false;
         if (guestLibraryRoot == null || guestLibraryRoot.trim().isEmpty()) return false;
         return nativeInstallHooks(guestLibraryRoot);
+    }
+
+    /** Installs the system-library IO boundary used by isolated capability-backed workers. */
+    public static boolean installSystemIoHooks() {
+        return AVAILABLE && nativeInstallSystemIoHooks();
     }
 
     public static boolean refreshHooks() { return AVAILABLE && nativeRefreshHooks(); }
@@ -268,6 +323,12 @@ public final class NativePolicy {
                                                   int networkId, String transport, boolean vpnActive,
                                                   boolean metered, boolean validated, int mtu,
                                                   String privateDnsServerName, String[] dnsServers);
+    private static native boolean nativeConfigureFileCapabilities(int dataRootFd, int apkParentFd,
+                                                                   String apkEntryName,
+                                                                   int nativeLibraryRootFd);
+    private static native int nativeOpenCapability(int directoryFd, String entryName, boolean write);
+    private static native int nativeMaterializeCapabilityFile(int sourceFd);
+    private static native int nativeCreateProcessLocalFile(String name);
     private static native String nativeMapPath(String guestPath);
     private static native boolean nativeAllowHost(String host);
     private static native boolean nativeAllowIpv4(String address);
@@ -283,6 +344,7 @@ public final class NativePolicy {
     private static native boolean nativeInstallNativeLoadRedirect();
     private static native boolean nativeInstallJniPendingExceptionProbe();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
+    private static native boolean nativeInstallSystemIoHooks();
     private static native boolean nativeRefreshHooks();
     private static native String nativeHookStatus();
     private static native void nativeResetHooks();

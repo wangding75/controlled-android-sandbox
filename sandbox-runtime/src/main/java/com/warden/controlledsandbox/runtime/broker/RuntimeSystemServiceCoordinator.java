@@ -50,6 +50,16 @@ final class RuntimeSystemServiceCoordinator implements AutoCloseable {
     }
 
     synchronized void stop(GuestSession guest) { closeKey(key(guest.sessionId(), guest.generation())); }
+
+    /** Returns the live, generation-scoped virtual system-service capability for Broker checks. */
+    synchronized IVirtualSystemServiceSession sessionFor(GuestSession guest) {
+        if (guest == null) throw new IllegalArgumentException("guest is required");
+        Capability capability = capabilities.get(key(guest.sessionId(), guest.generation()));
+        if (capability == null || !isAlive(capability)) {
+            throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_CAPABILITY_NOT_LIVE");
+        }
+        return capability.session();
+    }
     synchronized int size() { return capabilities.size(); }
 
     private void closeKey(String key) {

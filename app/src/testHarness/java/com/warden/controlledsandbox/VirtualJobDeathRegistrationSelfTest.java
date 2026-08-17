@@ -6,6 +6,7 @@ import com.warden.controlledsandbox.contract.IVirtualJobExecution;
 import com.warden.controlledsandbox.contract.IVirtualSystemServiceObserver;
 import com.warden.controlledsandbox.contract.VirtualJobParametersSnapshot;
 import com.warden.controlledsandbox.contract.VirtualJobSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.List;
@@ -60,6 +61,8 @@ public final class VirtualJobDeathRegistrationSelfTest {
         }
 
         @Override public void finishHostJob(int hostJobId, boolean needsReschedule) { }
+        @Override public VirtualJobWorkItemSnapshot dequeueHostWork(int hostJobId) { return null; }
+        @Override public boolean completeHostWork(int hostJobId, int workId) { return false; }
     }
 
     private static final class TestClient implements VirtualSystemServiceStore.Client {

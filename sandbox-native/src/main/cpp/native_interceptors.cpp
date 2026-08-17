@@ -9,6 +9,7 @@
 
 #include <arpa/inet.h>
 #include <cerrno>
+#include <climits>
 #include <cstdarg>
 #include <cstdint>
 #include <cstring>
@@ -139,6 +140,40 @@ using TgKillFn = int (*)(int, int, int);
 using TKillFn = int (*)(int, int);
 using ExitFn = void (*)(int);
 using AbortFn = void (*)();
+using SyscallFn = long (*)(long, ...);
+
+bool is_own_proc_fd_path(const char* value) {
+    if (value == nullptr) return false;
+    const std::string_view path(value);
+    constexpr std::string_view prefix = "/proc/";
+    if (path.compare(0, prefix.size(), prefix) != 0) return false;
+    const std::size_t target_end = path.find('/', prefix.size());
+    if (target_end == std::string_view::npos || target_end == prefix.size()) return false;
+    const std::string_view target = path.substr(prefix.size(), target_end - prefix.size());
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    if (!policy.configured) return false;
+    bool own = target == "self" || target == "thread-self";
+    if (!own) {
+        long pid = 0;
+        if (target.empty()) return false;
+        for (const char character : target) {
+            if (character < '0' || character > '9') return false;
+            pid = pid * 10 + (character - '0');
+            if (pid > INT_MAX) return false;
+        }
+        own = pid == static_cast<long>(getpid()) || pid == policy.virtual_pid;
+    }
+    if (!own) return false;
+    constexpr std::string_view fd_prefix = "/fd/";
+    const std::string_view suffix = path.substr(target_end);
+    if (suffix.compare(0, fd_prefix.size(), fd_prefix) != 0) return false;
+    const std::string_view descriptor = suffix.substr(fd_prefix.size());
+    if (descriptor.empty()) return false;
+    for (const char character : descriptor) {
+        if (character < '0' || character > '9') return false;
+    }
+    return true;
+}
 
 std::atomic<OpenFn> real_open{nullptr};
 std::atomic<OpenFn> real_open64{nullptr};
@@ -194,6 +229,7 @@ std::atomic<TKillFn> real_tkill{nullptr};
 std::atomic<ExitFn> real_exit{nullptr};
 std::atomic<ExitFn> real_underscore_exit{nullptr};
 std::atomic<AbortFn> real_abort{nullptr};
+std::atomic<SyscallFn> real_syscall{nullptr};
 std::atomic<bool> process_exit_allowed{false};
 thread_local bool inside_refresh = false;
 
@@ -211,6 +247,125 @@ Function require_real(std::atomic<Function>& storage, const char* name) {
     current = reinterpret_cast<Function>(resolve_next(name));
     storage.store(current, std::memory_order_release);
     return current;
+}
+
+/** Call the real libc syscall entry from an interceptor without re-entering our PLT replacement. */
+long raw_syscall6(long number, long a0 = 0, long a1 = 0, long a2 = 0,
+                  long a3 = 0, long a4 = 0, long a5 = 0) {
+    SyscallFn function = require_real(real_syscall, "syscall");
+    if (function == nullptr) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return function(number, a0, a1, a2, a3, a4, a5);
+}
+
+int call_open_resolved(const NativeResolvedPath& resolved, OpenFn function,
+                       int flags, bool has_mode, mode_t mode) {
+    if (!resolved.capability) {
+        if (function == nullptr) { errno = ENOSYS; return -1; }
+        return has_mode ? function(resolved.path.c_str(), flags, mode)
+                        : function(resolved.path.c_str(), flags);
+    }
+    if (global_policy().is_capability_file_fd(resolved.directory_fd)) {
+#ifdef F_DUPFD_CLOEXEC
+        const int duplicated = static_cast<int>(raw_syscall6(SYS_fcntl, resolved.directory_fd,
+                F_DUPFD_CLOEXEC, 3));
+        __android_log_print(ANDROID_LOG_INFO, "CS_CAP_IO", "open file capability fd=%d dup=%d flags=0x%x",
+                resolved.directory_fd, duplicated, flags);
+        return duplicated;
+#else
+        const int duplicated = static_cast<int>(raw_syscall6(SYS_dup, resolved.directory_fd));
+        __android_log_print(ANDROID_LOG_INFO, "CS_CAP_IO", "open file capability fd=%d dup=%d flags=0x%x",
+                resolved.directory_fd, duplicated, flags);
+        return duplicated;
+#endif
+    }
+    OpenAtFn at = require_real(real_openat, "openat");
+    if (at != nullptr) {
+        return has_mode ? at(resolved.directory_fd, resolved.path.c_str(), flags, mode)
+                        : at(resolved.directory_fd, resolved.path.c_str(), flags);
+    }
+#ifdef SYS_openat
+    return static_cast<int>(raw_syscall6(SYS_openat, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), flags,
+            has_mode ? static_cast<long>(mode) : 0L));
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
+}
+
+void register_opened_capability(const NativeResolvedPath& resolved, int descriptor) {
+    if (resolved.capability && descriptor >= 0) global_policy().register_capability_fd(descriptor);
+}
+
+int call_access_resolved(const NativeResolvedPath& resolved, AccessFn function, int mode) {
+    if (!resolved.capability) {
+        if (function == nullptr) { errno = ENOSYS; return -1; }
+        return function(resolved.path.c_str(), mode);
+    }
+    if (global_policy().is_capability_file_fd(resolved.directory_fd)) {
+#ifdef SYS_fstat
+        struct stat value{};
+        if (raw_syscall6(SYS_fstat, resolved.directory_fd,
+                reinterpret_cast<long>(&value)) != 0) return -1;
+        if (mode == F_OK) return 0;
+        const mode_t permissions = value.st_mode;
+        if ((mode & R_OK) != 0 && (permissions & (S_IRUSR | S_IRGRP | S_IROTH)) == 0) {
+            errno = EACCES; return -1;
+        }
+        if ((mode & W_OK) != 0 && (permissions & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0) {
+            errno = EACCES; return -1;
+        }
+        if ((mode & X_OK) != 0 && (permissions & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0) {
+            errno = EACCES; return -1;
+        }
+        return 0;
+#else
+        errno = ENOSYS;
+        return -1;
+#endif
+    }
+    FaccessAtFn at = require_real(real_faccessat, "faccessat");
+    if (at != nullptr) return at(resolved.directory_fd, resolved.path.c_str(), mode, 0);
+#ifdef SYS_faccessat
+    return static_cast<int>(raw_syscall6(SYS_faccessat, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), mode, 0));
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
+}
+
+int call_stat_resolved(const NativeResolvedPath& resolved, StatFn function,
+                       struct stat* value, int flags) {
+    if (!resolved.capability) {
+        if (function == nullptr) { errno = ENOSYS; return -1; }
+        return function(resolved.path.c_str(), value);
+    }
+    if (global_policy().is_capability_file_fd(resolved.directory_fd)) {
+#ifdef SYS_fstat
+        if ((flags & AT_SYMLINK_NOFOLLOW) != 0) {
+            errno = EINVAL;
+            return -1;
+        }
+        return static_cast<int>(raw_syscall6(SYS_fstat, resolved.directory_fd,
+                reinterpret_cast<long>(value)));
+#else
+        errno = ENOSYS;
+        return -1;
+#endif
+    }
+    FstatAtFn at = require_real(real_fstatat, "fstatat");
+    if (at != nullptr) return at(resolved.directory_fd, resolved.path.c_str(), value, flags);
+#ifdef SYS_newfstatat
+    return static_cast<int>(raw_syscall6(SYS_newfstatat, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), reinterpret_cast<long>(value), flags));
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
 }
 
 void log_native_binding(const char* api, const char* requested, const char* resolved,
@@ -255,7 +410,6 @@ bool resolve_checked(Resolver&& resolver, bool follow_final_symlink, NativeResol
 
 extern "C" int controlled_open(const char* path, int flags, ...) {
     OpenFn function = require_real(real_open, "open");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
     if (requires_mode(flags)) {
@@ -263,15 +417,18 @@ extern "C" int controlled_open(const char* path, int flags, ...) {
         va_start(values, flags);
         mode_t mode = static_cast<mode_t>(va_arg(values, int));
         va_end(values);
-        return function(resolved.path.c_str(), flags, mode);
+        const int descriptor = call_open_resolved(resolved, function, flags, true, mode);
+        register_opened_capability(resolved, descriptor);
+        return descriptor;
     }
-    return function(resolved.path.c_str(), flags);
+    const int descriptor = call_open_resolved(resolved, function, flags, false, 0);
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 }
 
 extern "C" int controlled_open64(const char* path, int flags, ...) {
     OpenFn function = require_real(real_open64, "open64");
     if (function == nullptr) function = require_real(real_open, "open");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
     if (requires_mode(flags)) {
@@ -279,9 +436,13 @@ extern "C" int controlled_open64(const char* path, int flags, ...) {
         va_start(values, flags);
         mode_t mode = static_cast<mode_t>(va_arg(values, int));
         va_end(values);
-        return function(resolved.path.c_str(), flags, mode);
+        const int descriptor = call_open_resolved(resolved, function, flags, true, mode);
+        register_opened_capability(resolved, descriptor);
+        return descriptor;
     }
-    return function(resolved.path.c_str(), flags);
+    const int descriptor = call_open_resolved(resolved, function, flags, false, 0);
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 }
 
 extern "C" int controlled_openat(int directory, const char* path, int flags, ...) {
@@ -294,9 +455,13 @@ extern "C" int controlled_openat(int directory, const char* path, int flags, ...
         va_start(values, flags);
         mode_t mode = static_cast<mode_t>(va_arg(values, int));
         va_end(values);
-        return function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
+        const int descriptor = function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
+        register_opened_capability(resolved, descriptor);
+        return descriptor;
     }
-    return function(resolved.directory_fd, resolved.path.c_str(), flags);
+    const int descriptor = function(resolved.directory_fd, resolved.path.c_str(), flags);
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 }
 
 extern "C" int controlled_openat64(int directory, const char* path, int flags, ...) {
@@ -310,17 +475,24 @@ extern "C" int controlled_openat64(int directory, const char* path, int flags, .
         va_start(values, flags);
         mode_t mode = static_cast<mode_t>(va_arg(values, int));
         va_end(values);
-        return function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
+        const int descriptor = function(resolved.directory_fd, resolved.path.c_str(), flags, mode);
+        register_opened_capability(resolved, descriptor);
+        return descriptor;
     }
-    return function(resolved.directory_fd, resolved.path.c_str(), flags);
+    const int descriptor = function(resolved.directory_fd, resolved.path.c_str(), flags);
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 }
 
 extern "C" int controlled_open_2(const char* path, int flags) {
     Open2Fn function = require_real(real_open_2, "__open_2");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), flags);
+    if (!resolved.capability) return function == nullptr ? (errno = ENOSYS, -1)
+            : function(resolved.path.c_str(), flags);
+    const int descriptor = call_open_resolved(resolved, nullptr, flags, false, 0);
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 }
 
 extern "C" int controlled_openat_2(int directory, const char* path, int flags) {
@@ -343,10 +515,18 @@ extern "C" int controlled_openat2(int directory, const char* path,
     mapped.resolve &= ~(static_cast<std::uint64_t>(RESOLVE_BENEATH)
             | static_cast<std::uint64_t>(RESOLVE_IN_ROOT));
     OpenAt2Fn function = require_real(real_openat2, "openat2");
-    if (function != nullptr) return function(resolved.directory_fd, resolved.path.c_str(), &mapped, sizeof(mapped));
+    if (function != nullptr) {
+        const int descriptor = function(resolved.directory_fd, resolved.path.c_str(), &mapped,
+                sizeof(mapped));
+        register_opened_capability(resolved, descriptor);
+        return descriptor;
+    }
 #ifdef SYS_openat2
-    return static_cast<int>(syscall(SYS_openat2, resolved.directory_fd, resolved.path.c_str(),
-            &mapped, sizeof(mapped)));
+    const int descriptor = static_cast<int>(raw_syscall6(SYS_openat2, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), reinterpret_cast<long>(&mapped),
+            sizeof(mapped)));
+    register_opened_capability(resolved, descriptor);
+    return descriptor;
 #else
     errno = ENOSYS;
     return -1;
@@ -355,10 +535,9 @@ extern "C" int controlled_openat2(int directory, const char* path,
 
 extern "C" int controlled_access(const char* path, int mode) {
     AccessFn function = require_real(real_access, "access");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), mode);
+    return call_access_resolved(resolved, function, mode);
 }
 
 extern "C" int controlled_faccessat(int directory, const char* path, int mode, int flags) {
@@ -382,7 +561,8 @@ extern "C" int controlled_faccessat2(int directory, const char* path, int mode, 
         FaccessAt2Fn function = require_real(real_faccessat2, "faccessat2");
         if (function != nullptr) return function(directory, path, mode, flags);
 #ifdef SYS_faccessat2
-        return static_cast<int>(syscall(SYS_faccessat2, directory, path, mode, flags));
+        return static_cast<int>(raw_syscall6(SYS_faccessat2, directory,
+                reinterpret_cast<long>(path), mode, flags));
 #else
         errno = ENOSYS;
         return -1;
@@ -395,8 +575,8 @@ extern "C" int controlled_faccessat2(int directory, const char* path, int mode, 
     FaccessAt2Fn function = require_real(real_faccessat2, "faccessat2");
     if (function != nullptr) return function(resolved.directory_fd, resolved.path.c_str(), mode, flags);
 #ifdef SYS_faccessat2
-    return static_cast<int>(syscall(SYS_faccessat2, resolved.directory_fd,
-            resolved.path.c_str(), mode, flags));
+    return static_cast<int>(raw_syscall6(SYS_faccessat2, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), mode, flags));
 #else
     errno = ENOSYS;
     return -1;
@@ -405,18 +585,16 @@ extern "C" int controlled_faccessat2(int directory, const char* path, int mode, 
 
 extern "C" int controlled_stat(const char* path, struct stat* value) {
     StatFn function = require_real(real_stat, "stat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) return -1;
-    return function(resolved.path.c_str(), value);
+    return call_stat_resolved(resolved, function, value, 0);
 }
 
 extern "C" int controlled_lstat(const char* path, struct stat* value) {
     StatFn function = require_real(real_lstat, "lstat");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) return -1;
-    return function(resolved.path.c_str(), value);
+    return call_stat_resolved(resolved, function, value, AT_SYMLINK_NOFOLLOW);
 }
 
 extern "C" int controlled_fstatat(int directory, const char* path, struct stat* value, int flags) {
@@ -443,7 +621,8 @@ extern "C" int controlled_statx(int directory, const char* path, int flags,
         StatxFn function = require_real(real_statx, "statx");
         if (function != nullptr) return function(directory, path, flags, mask, value);
 #ifdef SYS_statx
-        return static_cast<int>(syscall(SYS_statx, directory, path, flags, mask, value));
+        return static_cast<int>(raw_syscall6(SYS_statx, directory,
+                reinterpret_cast<long>(path), flags, mask, reinterpret_cast<long>(value)));
 #else
         errno = ENOSYS;
         return -1;
@@ -456,8 +635,9 @@ extern "C" int controlled_statx(int directory, const char* path, int flags,
     StatxFn function = require_real(real_statx, "statx");
     if (function != nullptr) return function(resolved.directory_fd, resolved.path.c_str(), flags, mask, value);
 #ifdef SYS_statx
-    return static_cast<int>(syscall(SYS_statx, resolved.directory_fd,
-            resolved.path.c_str(), flags, mask, value));
+    return static_cast<int>(raw_syscall6(SYS_statx, resolved.directory_fd,
+            reinterpret_cast<long>(resolved.path.c_str()), flags, mask,
+            reinterpret_cast<long>(value)));
 #else
     errno = ENOSYS;
     return -1;
@@ -483,9 +663,9 @@ extern "C" int controlled_renameat2(int old_directory, const char* old_path,
     if (function != nullptr) return function(old_resolved.directory_fd, old_resolved.path.c_str(),
             new_resolved.directory_fd, new_resolved.path.c_str(), flags);
 #ifdef SYS_renameat2
-    return static_cast<int>(syscall(SYS_renameat2, old_resolved.directory_fd,
-            old_resolved.path.c_str(), new_resolved.directory_fd,
-            new_resolved.path.c_str(), flags));
+    return static_cast<int>(raw_syscall6(SYS_renameat2, old_resolved.directory_fd,
+            reinterpret_cast<long>(old_resolved.path.c_str()), new_resolved.directory_fd,
+            reinterpret_cast<long>(new_resolved.path.c_str()), flags));
 #else
     errno = ENOSYS;
     return -1;
@@ -494,7 +674,6 @@ extern "C" int controlled_renameat2(int old_directory, const char* old_path,
 
 extern "C" int controlled_rename(const char* old_path, const char* new_path) {
     RenameFn function = require_real(real_rename, "rename");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath old_resolved;
     NativeResolvedPath new_resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(old_path); }, false,
@@ -507,6 +686,13 @@ extern "C" int controlled_rename(const char* old_path, const char* new_path) {
         errno = error.error_number();
         return -1;
     }
+    if (old_resolved.capability || new_resolved.capability) {
+        RenameAtFn at = require_real(real_renameat, "renameat");
+        if (at == nullptr) { errno = ENOSYS; return -1; }
+        return at(old_resolved.directory_fd, old_resolved.path.c_str(),
+                new_resolved.directory_fd, new_resolved.path.c_str());
+    }
+    if (function == nullptr) { errno = ENOSYS; return -1; }
     return function(old_resolved.path.c_str(), new_resolved.path.c_str());
 }
 
@@ -532,11 +718,16 @@ extern "C" int controlled_renameat(int old_directory, const char* old_path,
 
 extern "C" int controlled_unlink(const char* path) {
     UnlinkFn function = require_real(real_unlink, "unlink");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
         return -1;
     }
+    if (resolved.capability) {
+        UnlinkAtFn at = require_real(real_unlinkat, "unlinkat");
+        if (at == nullptr) { errno = ENOSYS; return -1; }
+        return at(resolved.directory_fd, resolved.path.c_str(), 0);
+    }
+    if (function == nullptr) { errno = ENOSYS; return -1; }
     return function(resolved.path.c_str());
 }
 
@@ -551,11 +742,18 @@ extern "C" int controlled_unlinkat(int directory, const char* path, int flags) {
 
 extern "C" int controlled_mkdir(const char* path, mode_t mode) {
     MkdirFn function = require_real(real_mkdir, "mkdir");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
         return -1;
     }
+    if (resolved.capability) {
+        MkdirAtFn at = require_real(real_mkdirat, "mkdirat");
+        if (at == nullptr) { errno = ENOSYS; return -1; }
+        const int status = at(resolved.directory_fd, resolved.path.c_str(), mode);
+        if (status == 0) return status;
+        return status;
+    }
+    if (function == nullptr) { errno = ENOSYS; return -1; }
     return function(resolved.path.c_str(), mode);
 }
 
@@ -570,21 +768,33 @@ extern "C" int controlled_mkdirat(int directory, const char* path, mode_t mode) 
 
 extern "C" int controlled_rmdir(const char* path) {
     RmdirFn function = require_real(real_rmdir, "rmdir");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) {
         return -1;
     }
+    if (resolved.capability) {
+        UnlinkAtFn at = require_real(real_unlinkat, "unlinkat");
+        if (at == nullptr) { errno = ENOSYS; return -1; }
+        return at(resolved.directory_fd, resolved.path.c_str(), AT_REMOVEDIR);
+    }
+    if (function == nullptr) { errno = ENOSYS; return -1; }
     return function(resolved.path.c_str());
 }
 
 extern "C" DIR* controlled_opendir(const char* path) {
     OpendirFn function = require_real(real_opendir, "opendir");
-    if (function == nullptr) { errno = ENOSYS; return nullptr; }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, true, resolved)) {
         return nullptr;
     }
+    if (resolved.capability) {
+        const int descriptor = call_open_resolved(resolved, nullptr, O_RDONLY | O_DIRECTORY,
+                false, 0);
+        if (descriptor < 0) return nullptr;
+        register_opened_capability(resolved, descriptor);
+        return fdopendir(descriptor);
+    }
+    if (function == nullptr) { errno = ENOSYS; return nullptr; }
     return function(resolved.path.c_str());
 }
 
@@ -595,7 +805,8 @@ extern "C" ssize_t controlled_getdents64(int directory, void* buffer, std::size_
     Getdents64Fn function = require_real(real_getdents64, "getdents64");
     if (function != nullptr) return function(directory, buffer, size);
 #ifdef SYS_getdents64
-    return static_cast<ssize_t>(syscall(SYS_getdents64, directory, buffer, size));
+    return static_cast<ssize_t>(raw_syscall6(SYS_getdents64, directory,
+            reinterpret_cast<long>(buffer), size));
 #else
     errno = ENOSYS;
     return -1;
@@ -648,9 +859,22 @@ ssize_t controlled_readlink_common(Call&& call, char* buffer, size_t size) {
 
 extern "C" ssize_t controlled_readlink(const char* path, char* buffer, size_t size) {
     ReadlinkFn function = require_real(real_readlink, "readlink");
-    if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (is_own_proc_fd_path(path)) {
+        if (function == nullptr) { errno = ENOSYS; return -1; }
+        return controlled_readlink_common([&](char* out, size_t capacity) {
+            return function(path, out, capacity);
+        }, buffer, size);
+    }
     NativeResolvedPath resolved;
     if (!resolve_checked([&] { return NativeFileSystemResolver::resolve(path); }, false, resolved)) return -1;
+    if (resolved.capability) {
+        ReadlinkAtFn at = require_real(real_readlinkat, "readlinkat");
+        if (at == nullptr) { errno = ENOSYS; return -1; }
+        return controlled_readlink_common([&](char* out, size_t capacity) {
+            return at(resolved.directory_fd, resolved.path.c_str(), out, capacity);
+        }, buffer, size);
+    }
+    if (function == nullptr) { errno = ENOSYS; return -1; }
     return controlled_readlink_common([&](char* out, size_t capacity) {
         return function(resolved.path.c_str(), out, capacity);
     }, buffer, size);
@@ -659,6 +883,11 @@ extern "C" ssize_t controlled_readlink(const char* path, char* buffer, size_t si
 extern "C" ssize_t controlled_readlinkat(int directory, const char* path, char* buffer, size_t size) {
     ReadlinkAtFn function = require_real(real_readlinkat, "readlinkat");
     if (function == nullptr) { errno = ENOSYS; return -1; }
+    if (directory == AT_FDCWD && is_own_proc_fd_path(path)) {
+        return controlled_readlink_common([&](char* out, size_t capacity) {
+            return function(directory, path, out, capacity);
+        }, buffer, size);
+    }
     if (path != nullptr && path[0] == '\0' && directory != AT_FDCWD) {
         return controlled_readlink_common([&](char* out, size_t capacity) {
             return function(directory, path, out, capacity);
@@ -934,7 +1163,7 @@ extern "C" int controlled_tgkill(int process_id, int thread_id, int signal_numbe
     }
     TgKillFn function = require_real(real_tgkill, "tgkill");
     if (function == nullptr) {
-        return static_cast<int>(syscall(SYS_tgkill, process_id, thread_id, signal_number));
+        return static_cast<int>(raw_syscall6(SYS_tgkill, process_id, thread_id, signal_number));
     }
     return function(process_id, thread_id, signal_number);
 }
@@ -972,7 +1201,7 @@ extern "C" void controlled_abort() {
     }
     AbortFn function = require_real(real_abort, "abort");
     if (function != nullptr) function();
-    syscall(SYS_exit_group, 134);
+    raw_syscall6(SYS_exit_group, 134);
 }
 
 extern "C" void controlled_underscore_exit(int status) {
@@ -983,7 +1212,527 @@ extern "C" void controlled_underscore_exit(int status) {
     }
     ExitFn function = require_real(real_underscore_exit, "_exit");
     if (function != nullptr) function(status);
-    syscall(SYS_exit_group, status);
+    raw_syscall6(SYS_exit_group, status);
+}
+
+/**
+ * Mediate the libc syscall() entry for Guest modules.  Inline assembly and a raw SVC/SYSCALL
+ * instruction cannot be intercepted by a userspace PLT rewrite; this function nevertheless closes
+ * the common JNI/NDK escape hatch where libraries call syscall(SYS_openat/ SYS_connect) directly.
+ * Unknown calls are forwarded with the Linux six-argument ABI so futex, clock and ART support
+ * syscalls continue to work.  The native policy remains a compatibility boundary, not a hostile
+ * code security boundary, until the process is additionally protected by seccomp.
+ */
+extern "C" long controlled_syscall(long number, ...) {
+    va_list values;
+    va_start(values, number);
+
+#if defined(SYS_open)
+    if (number == SYS_open) {
+        const char* path = va_arg(values, const char*);
+        const int flags = va_arg(values, int);
+        if (requires_mode(flags)) {
+            const mode_t mode = static_cast<mode_t>(va_arg(values, int));
+            va_end(values);
+            return controlled_open(path, flags, mode);
+        }
+        va_end(values);
+        return controlled_open(path, flags);
+    }
+#endif
+#if defined(SYS_openat)
+    if (number == SYS_openat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const int flags = va_arg(values, int);
+        if (requires_mode(flags)) {
+            const mode_t mode = static_cast<mode_t>(va_arg(values, int));
+            va_end(values);
+            return controlled_openat(directory, path, flags, mode);
+        }
+        va_end(values);
+        return controlled_openat(directory, path, flags);
+    }
+#endif
+#if defined(SYS_openat2)
+    if (number == SYS_openat2) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const struct open_how* how = va_arg(values, const struct open_how*);
+        const std::size_t size = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_openat2(directory, path, how, size);
+    }
+#endif
+#if defined(SYS_access)
+    if (number == SYS_access) {
+        const char* path = va_arg(values, const char*);
+        const int mode = va_arg(values, int);
+        va_end(values);
+        return controlled_access(path, mode);
+    }
+#endif
+#if defined(SYS_faccessat)
+    if (number == SYS_faccessat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const int mode = va_arg(values, int);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_faccessat(directory, path, mode, flags);
+    }
+#endif
+#if defined(SYS_faccessat2)
+    if (number == SYS_faccessat2) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const int mode = va_arg(values, int);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_faccessat2(directory, path, mode, flags);
+    }
+#endif
+#if defined(SYS_stat)
+    if (number == SYS_stat) {
+        const char* path = va_arg(values, const char*);
+        struct stat* value = va_arg(values, struct stat*);
+        va_end(values);
+        return controlled_stat(path, value);
+    }
+#endif
+#if defined(SYS_lstat)
+    if (number == SYS_lstat) {
+        const char* path = va_arg(values, const char*);
+        struct stat* value = va_arg(values, struct stat*);
+        va_end(values);
+        return controlled_lstat(path, value);
+    }
+#endif
+#if defined(SYS_newfstatat)
+    if (number == SYS_newfstatat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        struct stat* value = va_arg(values, struct stat*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_fstatat(directory, path, value, flags);
+    }
+#endif
+#if defined(SYS_fstatat64)
+    if (number == SYS_fstatat64) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        struct stat* value = va_arg(values, struct stat*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_fstatat(directory, path, value, flags);
+    }
+#endif
+#if defined(SYS_statx)
+    if (number == SYS_statx) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const int flags = va_arg(values, int);
+        const unsigned int mask = va_arg(values, unsigned int);
+        struct statx* value = va_arg(values, struct statx*);
+        va_end(values);
+        return controlled_statx(directory, path, flags, mask, value);
+    }
+#endif
+#if defined(SYS_rename)
+    if (number == SYS_rename) {
+        const char* oldPath = va_arg(values, const char*);
+        const char* newPath = va_arg(values, const char*);
+        va_end(values);
+        return controlled_rename(oldPath, newPath);
+    }
+#endif
+#if defined(SYS_renameat)
+    if (number == SYS_renameat) {
+        const int oldDirectory = va_arg(values, int);
+        const char* oldPath = va_arg(values, const char*);
+        const int newDirectory = va_arg(values, int);
+        const char* newPath = va_arg(values, const char*);
+        va_end(values);
+        return controlled_renameat(oldDirectory, oldPath, newDirectory, newPath);
+    }
+#endif
+#if defined(SYS_renameat2)
+    if (number == SYS_renameat2) {
+        const int oldDirectory = va_arg(values, int);
+        const char* oldPath = va_arg(values, const char*);
+        const int newDirectory = va_arg(values, int);
+        const char* newPath = va_arg(values, const char*);
+        const unsigned int flags = va_arg(values, unsigned int);
+        va_end(values);
+        return controlled_renameat2(oldDirectory, oldPath, newDirectory, newPath, flags);
+    }
+#endif
+#if defined(SYS_unlink)
+    if (number == SYS_unlink) {
+        const char* path = va_arg(values, const char*);
+        va_end(values);
+        return controlled_unlink(path);
+    }
+#endif
+#if defined(SYS_unlinkat)
+    if (number == SYS_unlinkat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_unlinkat(directory, path, flags);
+    }
+#endif
+#if defined(SYS_mkdir)
+    if (number == SYS_mkdir) {
+        const char* path = va_arg(values, const char*);
+        const mode_t mode = static_cast<mode_t>(va_arg(values, int));
+        va_end(values);
+        return controlled_mkdir(path, mode);
+    }
+#endif
+#if defined(SYS_mkdirat)
+    if (number == SYS_mkdirat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        const mode_t mode = static_cast<mode_t>(va_arg(values, int));
+        va_end(values);
+        return controlled_mkdirat(directory, path, mode);
+    }
+#endif
+#if defined(SYS_rmdir)
+    if (number == SYS_rmdir) {
+        const char* path = va_arg(values, const char*);
+        va_end(values);
+        return controlled_rmdir(path);
+    }
+#endif
+#if defined(SYS_readlink)
+    if (number == SYS_readlink) {
+        const char* path = va_arg(values, const char*);
+        char* buffer = va_arg(values, char*);
+        const std::size_t size = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_readlink(path, buffer, size);
+    }
+#endif
+#if defined(SYS_readlinkat)
+    if (number == SYS_readlinkat) {
+        const int directory = va_arg(values, int);
+        const char* path = va_arg(values, const char*);
+        char* buffer = va_arg(values, char*);
+        const std::size_t size = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_readlinkat(directory, path, buffer, size);
+    }
+#endif
+#if defined(SYS_getdents64)
+    if (number == SYS_getdents64) {
+        const int directory = va_arg(values, int);
+        void* buffer = va_arg(values, void*);
+        const std::size_t size = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_getdents64(directory, buffer, size);
+    }
+#endif
+#if defined(SYS_mmap)
+    if (number == SYS_mmap) {
+        void* address = va_arg(values, void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        const int protection = va_arg(values, int);
+        const int flags = va_arg(values, int);
+        const int descriptor = va_arg(values, int);
+        const off_t offset = va_arg(values, off_t);
+        va_end(values);
+        return reinterpret_cast<long>(controlled_mmap(address, length, protection, flags,
+                descriptor, offset));
+    }
+#endif
+#if defined(SYS_socket)
+    if (number == SYS_socket) {
+        const int domain = va_arg(values, int);
+        const int type = va_arg(values, int);
+        const int protocol = va_arg(values, int);
+        va_end(values);
+        return controlled_socket(domain, type, protocol);
+    }
+#endif
+#if defined(SYS_fcntl)
+    if (number == SYS_fcntl) {
+        const int descriptor = va_arg(values, int);
+        const int command = va_arg(values, int);
+        const long argument = va_arg(values, long);
+        va_end(values);
+        return controlled_fcntl(descriptor, command, argument);
+    }
+#endif
+#if defined(SYS_fcntl64)
+    if (number == SYS_fcntl64) {
+        const int descriptor = va_arg(values, int);
+        const int command = va_arg(values, int);
+        const long argument = va_arg(values, long);
+        va_end(values);
+        return controlled_fcntl(descriptor, command, argument);
+    }
+#endif
+#if defined(SYS_close)
+    if (number == SYS_close) {
+        const int descriptor = va_arg(values, int);
+        va_end(values);
+        return controlled_close(descriptor);
+    }
+#endif
+#if defined(SYS_dup)
+    if (number == SYS_dup) {
+        const int descriptor = va_arg(values, int);
+        va_end(values);
+        return controlled_dup(descriptor);
+    }
+#endif
+#if defined(SYS_dup2)
+    if (number == SYS_dup2) {
+        const int descriptor = va_arg(values, int);
+        const int target = va_arg(values, int);
+        va_end(values);
+        return controlled_dup2(descriptor, target);
+    }
+#endif
+#if defined(SYS_dup3)
+    if (number == SYS_dup3) {
+        const int descriptor = va_arg(values, int);
+        const int target = va_arg(values, int);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_dup3(descriptor, target, flags);
+    }
+#endif
+#if defined(SYS_bind)
+    if (number == SYS_bind) {
+        const int descriptor = va_arg(values, int);
+        const sockaddr* address = va_arg(values, const sockaddr*);
+        const socklen_t length = va_arg(values, socklen_t);
+        va_end(values);
+        return controlled_bind(descriptor, address, length);
+    }
+#endif
+#if defined(SYS_connect)
+    if (number == SYS_connect) {
+        const int descriptor = va_arg(values, int);
+        const sockaddr* address = va_arg(values, const sockaddr*);
+        const socklen_t length = va_arg(values, socklen_t);
+        va_end(values);
+        return controlled_connect(descriptor, address, length);
+    }
+#endif
+#if defined(SYS_send)
+    if (number == SYS_send) {
+        const int descriptor = va_arg(values, int);
+        const void* buffer = va_arg(values, const void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_send(descriptor, buffer, length, flags);
+    }
+#endif
+#if defined(SYS_sendto)
+    if (number == SYS_sendto) {
+        const int descriptor = va_arg(values, int);
+        const void* buffer = va_arg(values, const void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        const int flags = va_arg(values, int);
+        const sockaddr* destination = va_arg(values, const sockaddr*);
+        const socklen_t destinationLength = va_arg(values, socklen_t);
+        va_end(values);
+        return controlled_sendto(descriptor, buffer, length, flags, destination,
+                destinationLength);
+    }
+#endif
+#if defined(SYS_sendmsg)
+    if (number == SYS_sendmsg) {
+        const int descriptor = va_arg(values, int);
+        const msghdr* message = va_arg(values, const msghdr*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_sendmsg(descriptor, message, flags);
+    }
+#endif
+#if defined(SYS_recvfrom)
+    if (number == SYS_recvfrom) {
+        const int descriptor = va_arg(values, int);
+        void* buffer = va_arg(values, void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        const int flags = va_arg(values, int);
+        sockaddr* source = va_arg(values, sockaddr*);
+        socklen_t* sourceLength = va_arg(values, socklen_t*);
+        va_end(values);
+        return controlled_recvfrom(descriptor, buffer, length, flags, source, sourceLength);
+    }
+#endif
+#if defined(SYS_recv)
+    if (number == SYS_recv) {
+        const int descriptor = va_arg(values, int);
+        void* buffer = va_arg(values, void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_recv(descriptor, buffer, length, flags);
+    }
+#endif
+#if defined(SYS_recvmsg)
+    if (number == SYS_recvmsg) {
+        const int descriptor = va_arg(values, int);
+        msghdr* message = va_arg(values, msghdr*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_recvmsg(descriptor, message, flags);
+    }
+#endif
+#if defined(SYS_setsockopt)
+    if (number == SYS_setsockopt) {
+        const int descriptor = va_arg(values, int);
+        const int level = va_arg(values, int);
+        const int option = va_arg(values, int);
+        const void* optionValue = va_arg(values, const void*);
+        const socklen_t optionLength = va_arg(values, socklen_t);
+        va_end(values);
+        return controlled_setsockopt(descriptor, level, option, optionValue, optionLength);
+    }
+#endif
+#if defined(SYS_getsockopt)
+    if (number == SYS_getsockopt) {
+        const int descriptor = va_arg(values, int);
+        const int level = va_arg(values, int);
+        const int option = va_arg(values, int);
+        void* optionValue = va_arg(values, void*);
+        socklen_t* optionLength = va_arg(values, socklen_t*);
+        va_end(values);
+        return controlled_getsockopt(descriptor, level, option, optionValue, optionLength);
+    }
+#endif
+#if defined(SYS_read)
+    if (number == SYS_read) {
+        const int descriptor = va_arg(values, int);
+        void* buffer = va_arg(values, void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_read(descriptor, buffer, length);
+    }
+#endif
+#if defined(SYS_write)
+    if (number == SYS_write) {
+        const int descriptor = va_arg(values, int);
+        const void* buffer = va_arg(values, const void*);
+        const std::size_t length = va_arg(values, std::size_t);
+        va_end(values);
+        return controlled_write(descriptor, buffer, length);
+    }
+#endif
+#if defined(SYS_accept)
+    if (number == SYS_accept) {
+        const int descriptor = va_arg(values, int);
+        sockaddr* address = va_arg(values, sockaddr*);
+        socklen_t* length = va_arg(values, socklen_t*);
+        va_end(values);
+        return controlled_accept(descriptor, address, length);
+    }
+#endif
+#if defined(SYS_accept4)
+    if (number == SYS_accept4) {
+        const int descriptor = va_arg(values, int);
+        sockaddr* address = va_arg(values, sockaddr*);
+        socklen_t* length = va_arg(values, socklen_t*);
+        const int flags = va_arg(values, int);
+        va_end(values);
+        return controlled_accept4(descriptor, address, length, flags);
+    }
+#endif
+#if defined(SYS_getsockname)
+    if (number == SYS_getsockname) {
+        const int descriptor = va_arg(values, int);
+        sockaddr* address = va_arg(values, sockaddr*);
+        socklen_t* length = va_arg(values, socklen_t*);
+        va_end(values);
+        return controlled_getsockname(descriptor, address, length);
+    }
+#endif
+#if defined(SYS_getpeername)
+    if (number == SYS_getpeername) {
+        const int descriptor = va_arg(values, int);
+        sockaddr* address = va_arg(values, sockaddr*);
+        socklen_t* length = va_arg(values, socklen_t*);
+        va_end(values);
+        return controlled_getpeername(descriptor, address, length);
+    }
+#endif
+#if defined(SYS_kill)
+    if (number == SYS_kill) {
+        const pid_t process = va_arg(values, pid_t);
+        const int signalNumber = va_arg(values, int);
+        va_end(values);
+        return controlled_kill(process, signalNumber);
+    }
+#endif
+#if defined(SYS_tgkill)
+    if (number == SYS_tgkill) {
+        const int process = va_arg(values, int);
+        const int thread = va_arg(values, int);
+        const int signalNumber = va_arg(values, int);
+        va_end(values);
+        return controlled_tgkill(process, thread, signalNumber);
+    }
+#endif
+#if defined(SYS_tkill)
+    if (number == SYS_tkill) {
+        const int thread = va_arg(values, int);
+        const int signalNumber = va_arg(values, int);
+        va_end(values);
+        return controlled_tkill(thread, signalNumber);
+    }
+#endif
+#if defined(SYS_exit)
+    if (number == SYS_exit
+#if defined(SYS_exit_group)
+            || number == SYS_exit_group
+#endif
+    ) {
+        const int status = va_arg(values, int);
+        va_end(values);
+        if (!process_exit_allowed.load(std::memory_order_acquire)) {
+            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                    "guest direct syscall exit(%d) ignored", status);
+            return 0;
+        }
+        SyscallFn function = require_real(real_syscall, "syscall");
+        return function == nullptr ? -1 : function(number, status);
+    }
+#elif defined(SYS_exit_group)
+    if (number == SYS_exit_group) {
+        const int status = va_arg(values, int);
+        va_end(values);
+        if (!process_exit_allowed.load(std::memory_order_acquire)) {
+            __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                    "guest direct syscall exit(%d) ignored", status);
+            return 0;
+        }
+        SyscallFn function = require_real(real_syscall, "syscall");
+        return function == nullptr ? -1 : function(number, status);
+    }
+#endif
+
+    // libc's syscall() is variadic and has no argument-count metadata.  The Linux ABI reserves
+    // six argument registers/slots, so forwarding all six preserves ordinary non-sensitive calls
+    // such as futex and clock_gettime without trying to reinterpret their payloads.
+    long arguments[6]{};
+    for (long& argument : arguments) argument = va_arg(values, long);
+    va_end(values);
+    SyscallFn function = require_real(real_syscall, "syscall");
+    if (function == nullptr) {
+        errno = ENOSYS;
+        return -1;
+    }
+    return function(number, arguments[0], arguments[1], arguments[2], arguments[3],
+            arguments[4], arguments[5]);
 }
 
 void* replacement_for(std::string_view name) {
@@ -1057,6 +1806,7 @@ void* replacement_for(std::string_view name) {
     if (name == "exit") return reinterpret_cast<void*>(&controlled_exit);
     if (name == "_exit" || name == "_Exit") return reinterpret_cast<void*>(&controlled_underscore_exit);
     if (name == "abort") return reinterpret_cast<void*>(&controlled_abort);
+    if (name == "syscall") return reinterpret_cast<void*>(&controlled_syscall);
     return nullptr;
 }
 

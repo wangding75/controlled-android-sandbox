@@ -29,6 +29,7 @@ public final class RebindableServiceConnectorSelfTest {
         closeReleasesWaitingRequire();
         closeDuringSynchronousCallbackDoesNotRearmBinding();
         closesAdaptedCapabilities();
+        notifiesOwnerWhenCapabilityIsInvalidated();
         System.out.println("PASS rebindable service connector self-test");
     }
 
@@ -222,6 +223,38 @@ public final class RebindableServiceConnectorSelfTest {
         connector.close();
         require(closed.equals(List.of("session")), "close must release adapted session");
         require(context.unbindCount() == 1, "close must unbind active connection");
+    }
+
+    private static void notifiesOwnerWhenCapabilityIsInvalidated() throws Exception {
+        FakeContext context = new FakeContext();
+        AtomicInteger invalidations = new AtomicInteger();
+        RebindableServiceConnector<String> connector = new RebindableServiceConnector<>(
+                context, new Intent(), ignored -> "session-" + context.bindCount(),
+                ignored -> { }, "invalidation callback service", 40L, 0L, 0L,
+                invalidations::incrementAndGet);
+        FakeBinder first = new FakeBinder();
+        context.nextBinder = first;
+        require("session-1".equals(connector.require()), "callback test must connect first Binder");
+        first.die();
+        require(invalidations.get() == 1,
+                "Binder death must notify the owner exactly once");
+        connector.close();
+        require(invalidations.get() == 1,
+                "intentional connector close must not look like remote generation loss");
+
+        FakeContext timeoutContext = new FakeContext();
+        timeoutContext.enqueue(BindBehavior.NO_CALLBACK);
+        AtomicInteger timeoutInvalidations = new AtomicInteger();
+        RebindableServiceConnector<String> timeoutConnector = new RebindableServiceConnector<>(
+                timeoutContext, new Intent(), ignored -> "timeout", ignored -> { },
+                "timeout invalidation callback service", 20L, 0L, 0L,
+                timeoutInvalidations::incrementAndGet);
+        Throwable failure = captureFailure(timeoutConnector::require);
+        require(hasMessage(failure, "BIND_TIMEOUT"),
+                "missing callback must report BIND_TIMEOUT");
+        require(timeoutInvalidations.get() == 1,
+                "bind timeout must notify the owner exactly once");
+        timeoutConnector.close();
     }
 
     private enum BindBehavior { CONNECT, CONNECT_AND_BLOCK_RETURN, NO_CALLBACK, REJECT }

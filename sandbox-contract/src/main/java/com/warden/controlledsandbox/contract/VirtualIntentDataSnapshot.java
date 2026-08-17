@@ -7,6 +7,7 @@ import android.os.Parcelable;
 public final class VirtualIntentDataSnapshot implements Parcelable {
     private final String scheme;
     private final String host;
+    private final int port;
     private final String path;
     private final String pathPrefix;
     private final String pathPattern;
@@ -14,8 +15,15 @@ public final class VirtualIntentDataSnapshot implements Parcelable {
 
     public VirtualIntentDataSnapshot(String scheme, String host, String path,
                                      String pathPrefix, String pathPattern, String mimeType) {
+        this(scheme, host, -1, path, pathPrefix, pathPattern, mimeType);
+    }
+
+    public VirtualIntentDataSnapshot(String scheme, String host, int port, String path,
+                                     String pathPrefix, String pathPattern, String mimeType) {
         this.scheme = value(scheme);
         this.host = value(host);
+        if (port < -1 || port > 65535) throw new IllegalArgumentException("Intent data port is invalid");
+        this.port = port;
         this.path = value(path);
         this.pathPrefix = value(pathPrefix);
         this.pathPattern = value(pathPattern);
@@ -28,19 +36,20 @@ public final class VirtualIntentDataSnapshot implements Parcelable {
     }
 
     private VirtualIntentDataSnapshot(Parcel in) {
-        this(in.readString(), in.readString(), in.readString(), in.readString(),
+        this(in.readString(), in.readString(), in.readInt(), in.readString(), in.readString(),
                 in.readString(), in.readString());
     }
 
     public String scheme() { return scheme; }
     public String host() { return host; }
+    public int port() { return port; }
     public String path() { return path; }
     public String pathPrefix() { return pathPrefix; }
     public String pathPattern() { return pathPattern; }
     public String mimeType() { return mimeType; }
 
     @Override public void writeToParcel(Parcel out, int flags) {
-        out.writeString(scheme); out.writeString(host); out.writeString(path);
+        out.writeString(scheme); out.writeString(host); out.writeInt(port); out.writeString(path);
         out.writeString(pathPrefix); out.writeString(pathPattern); out.writeString(mimeType);
     }
     @Override public int describeContents() { return 0; }

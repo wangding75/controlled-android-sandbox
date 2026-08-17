@@ -43,6 +43,7 @@ import com.warden.controlledsandbox.framework.service.AutofillManagerServiceHook
 import com.warden.controlledsandbox.framework.service.BiometricServiceHook;
 import com.warden.controlledsandbox.framework.service.SensorPrivacyServiceHook;
 import com.warden.controlledsandbox.framework.service.PowerManagerServiceHook;
+import com.warden.controlledsandbox.framework.service.BatteryServiceHook;
 import com.warden.controlledsandbox.framework.service.VibratorServiceHook;
 import com.warden.controlledsandbox.framework.service.MediaSessionManagerServiceHook;
 import com.warden.controlledsandbox.framework.service.MediaRouterServiceHook;
@@ -232,6 +233,8 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> SensorPrivacyServiceHook.install(identity));
         attempt("power", installed, failures, hooks,
                 () -> PowerManagerServiceHook.install(hostServiceContext, identity));
+        attempt("battery", installed, failures, hooks,
+                () -> BatteryServiceHook.install(guestContext, identity));
         attempt("vibrator", installed, failures, hooks,
                 () -> VibratorServiceHook.install(hostServiceContext, identity));
         attempt("mediaSession", installed, failures, hooks,

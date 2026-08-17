@@ -13,6 +13,7 @@ import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import java.util.List;
 
 /** Optional cross-process authority backing Guest-visible virtual system-service state. */
@@ -27,7 +28,17 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     record AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, boolean exact,
                        boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
                        String ownerProcessName, long ownerGeneration, String packageRevision,
-                       Object token, int deliveryCount, long updatedAtMs) { }
+                       Object token, int deliveryCount, long updatedAtMs,
+                       boolean alarmClock, Object alarmClockShowIntent) {
+        AlarmRecord(String alarmId, long triggerAtMs, long intervalMs, boolean exact,
+                    boolean allowWhileIdle, String deliveryPath, String pendingIntentTokenId,
+                    String ownerProcessName, long ownerGeneration, String packageRevision,
+                    Object token, int deliveryCount, long updatedAtMs) {
+            this(alarmId, triggerAtMs, intervalMs, exact, allowWhileIdle, deliveryPath,
+                    pendingIntentTokenId, ownerProcessName, ownerGeneration, packageRevision,
+                    token, deliveryCount, updatedAtMs, false, null);
+        }
+    }
     record NamespaceMapping(int hostId, boolean created) { }
     record NotificationRecord(int guestId, int hostId, String guestTag, String hostTag,
                               String channelId, String state, String packageRevision,
@@ -58,6 +69,8 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
         long dispatchToken();
         boolean active();
         void finish(boolean needsReschedule);
+        default VirtualJobWorkItemSnapshot dequeueWork() { return null; }
+        default boolean completeWork(int workId) { return false; }
     }
     interface JobExecutionListener {
         boolean onStart(int guestJobId, Object jobPayload, JobParametersRecord parameters,

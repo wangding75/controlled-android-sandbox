@@ -7,6 +7,7 @@ public final class VirtualPendingIntentRegistrySelfTest {
     public static void main(String[] args) throws Exception {
         localLifecycle();
         durableLifecycle();
+        oneShotAtomicity();
         boundedLocalRegistry();
         System.out.println("PASS virtual PendingIntent identity and lifecycle self-test");
     }
@@ -71,8 +72,9 @@ public final class VirtualPendingIntentRegistrySelfTest {
                 "creator identity is virtual and durable");
         String persistentId = issued.record().persistentTokenId();
         int result = firstProcess.send(tokenOne, new VirtualPendingIntentRegistry.SendRequest(
-                "fill", 0x30, 0x20, "guest.permission.SEND_RESULT", 13000));
-        require(result == 77 && "fill".equals(observed.get().fillInPayload()),
+                "fill", 0x30, 0x20, "guest.permission.SEND_RESULT", 13000, 41));
+        require(result == 77 && "fill".equals(observed.get().fillInPayload())
+                        && observed.get().resultCode() == 41,
                 "mutable sender accepts bounded fill-in request");
         require(issued.record().sends() == 1, "durable send count committed");
         firstProcess.close();
@@ -168,6 +170,48 @@ public final class VirtualPendingIntentRegistrySelfTest {
         } catch (IllegalStateException expected) { bounded = true; }
         require(bounded, "local PendingIntent registry capacity");
         registry.close();
+    }
+
+    private static void oneShotAtomicity() throws Exception {
+        MemoryPersistence shared = new MemoryPersistence();
+        java.util.concurrent.CountDownLatch entered = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        AtomicInteger deliveries = new AtomicInteger();
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        VirtualPendingIntentRegistry.Spec spec = new VirtualPendingIntentRegistry.Spec(
+                VirtualPendingIntentRegistry.Kind.BROADCAST, 17, "guest.ONE_SHOT", "", "",
+                VirtualPendingIntentRegistry.FLAG_ONE_SHOT);
+        VirtualPendingIntentRegistry first = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 21L, "guest.pkg", "rev-a", shared,
+                (record, request) -> {
+                    entered.countDown();
+                    release.await();
+                    deliveries.incrementAndGet();
+                    return 0;
+                });
+        Object firstToken = new Object();
+        first.issue(spec, firstToken, null);
+        VirtualPendingIntentRegistry second = new VirtualPendingIntentRegistry(
+                "guest.pkg", 2, 12002, 22L, "guest.pkg", "rev-a", shared,
+                (record, request) -> { deliveries.incrementAndGet(); return 0; });
+        Object secondToken = new Object();
+        second.issue(spec, secondToken, null);
+        Thread sender = new Thread(() -> {
+            try { first.send(firstToken, null); }
+            catch (Throwable error) { failure.set(error); }
+        }, "pending-intent-one-shot-test");
+        sender.start();
+        require(entered.await(5, java.util.concurrent.TimeUnit.SECONDS),
+                "one-shot first send did not enter delivery");
+        boolean rejected = false;
+        try { second.send(secondToken, null); }
+        catch (IllegalStateException expected) { rejected = true; }
+        release.countDown();
+        sender.join(5000L);
+        require(rejected && !sender.isAlive() && failure.get() == null && deliveries.get() == 1,
+                "one-shot durable token is claimed before concurrent delivery");
+        first.close();
+        second.close();
     }
 
     private static final class MemoryPersistence implements VirtualPendingIntentRegistry.Persistence {

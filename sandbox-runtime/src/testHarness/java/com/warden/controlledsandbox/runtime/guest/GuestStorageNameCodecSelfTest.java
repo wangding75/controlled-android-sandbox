@@ -79,6 +79,9 @@ public final class GuestStorageNameCodecSelfTest {
             require(!context.getDir("dir a", Context.MODE_PRIVATE).equals(
                             context.getDir("dir?a", Context.MODE_PRIVATE)),
                     "colliding getDir names mapped to one directory");
+            require(context.getDir("u4sdk", Context.MODE_PRIVATE).getCanonicalFile().equals(
+                            new File(context.getDataDir(), "app_u4sdk").getCanonicalFile()),
+                    "framework-compatible getDir name was not preserved");
             require(!context.getExternalFilesDir("Pictures A").equals(
                             context.getExternalFilesDir("Pictures?A")),
                     "colliding external types mapped to one directory");

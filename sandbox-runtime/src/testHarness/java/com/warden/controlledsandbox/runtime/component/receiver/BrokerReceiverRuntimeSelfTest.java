@@ -122,6 +122,7 @@ public final class BrokerReceiverRuntimeSelfTest {
         low.putBundle(RuntimeKeys.RECEIVER_DATA_RULE_PREFIX + 0, scheme);
         Bundle host = new Bundle();
         host.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        host.putInt(RuntimeKeys.BROADCAST_PORT, 8443);
         low.putBundle(RuntimeKeys.RECEIVER_DATA_RULE_PREFIX + 1, host);
         Bundle mime = new Bundle();
         mime.putString(RuntimeKeys.BROADCAST_MIME_TYPE, "text/*");
@@ -140,6 +141,7 @@ public final class BrokerReceiverRuntimeSelfTest {
                 new ArrayList<>(List.of("CATEGORY_SYNC")));
         matching.putString(RuntimeKeys.BROADCAST_SCHEME, "content");
         matching.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        matching.putInt(RuntimeKeys.BROADCAST_PORT, 8443);
         matching.putString(RuntimeKeys.BROADCAST_MIME_TYPE, "text/plain");
         List<com.warden.controlledsandbox.domain.component.receiver.DynamicReceiverRegistry.Registration>
                 matches = runtime.resolve(matching, 9, owner.sessionId(), false);
@@ -152,6 +154,10 @@ public final class BrokerReceiverRuntimeSelfTest {
         check(runtime.resolve(matching, 9, owner.sessionId(), false).isEmpty(),
                 "dynamic receiver data authority mismatch");
         matching.putString(RuntimeKeys.BROADCAST_HOST, "guest.example");
+        matching.putInt(RuntimeKeys.BROADCAST_PORT, 443);
+        check(runtime.resolve(matching, 9, owner.sessionId(), false).isEmpty(),
+                "dynamic receiver data authority port mismatch");
+        matching.putInt(RuntimeKeys.BROADCAST_PORT, 8443);
         matching.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
                 new ArrayList<>(List.of("CATEGORY_OTHER")));
         check(runtime.resolve(matching, 9, owner.sessionId(), false).isEmpty(),

@@ -68,9 +68,23 @@ final class RuntimeClient implements AutoCloseable {
                 : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
     }
     Bundle startService(SandboxRecord record) throws Exception { return startService(record, 0); }
-    Bundle startService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.START_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
+    Bundle startService(SandboxRecord record, int virtualUserId) throws Exception {
+        return startService(record, virtualUserId, record.serviceClass, record.serviceProcess);
+    }
+    Bundle startService(SandboxRecord record, int virtualUserId, String component,
+                        String processName) throws Exception {
+        return component(record, virtualUserId, ComponentOperations.START_SERVICE,
+                component, processName, "", "");
+    }
     Bundle stopService(SandboxRecord record) throws Exception { return stopService(record, 0); }
-    Bundle stopService(SandboxRecord record, int virtualUserId) throws Exception { return component(record, virtualUserId, ComponentOperations.STOP_SERVICE, record.serviceClass, record.serviceProcess, "", ""); }
+    Bundle stopService(SandboxRecord record, int virtualUserId) throws Exception {
+        return stopService(record, virtualUserId, record.serviceClass, record.serviceProcess);
+    }
+    Bundle stopService(SandboxRecord record, int virtualUserId, String component,
+                       String processName) throws Exception {
+        return component(record, virtualUserId, ComponentOperations.STOP_SERVICE,
+                component, processName, "", "");
+    }
     Bundle startForegroundService(SandboxRecord record, int virtualUserId) throws Exception {
         return startForegroundService(record, virtualUserId, true, "", 0, 5_000L);
     }
@@ -186,8 +200,13 @@ final class RuntimeClient implements AutoCloseable {
         request.putInt(RuntimeKeys.PROTOCOL, RuntimeProtocol.CURRENT);
         request.putString(RuntimeKeys.PACKAGE_NAME, record.packageName);
         request.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        String defaultProcess = packageState.applicationInfo() == null
+                ? record.packageName : packageState.applicationInfo().processName;
+        if (defaultProcess == null || defaultProcess.trim().isEmpty()) {
+            defaultProcess = record.packageName;
+        }
         request.putString(RuntimeKeys.PROCESS_NAME, processName == null || processName.trim().isEmpty()
-                ? record.packageName : processName);
+                ? defaultProcess : processName);
         request.putString(RuntimeKeys.APK_PATH, record.apkPath);
         request.putString(RuntimeKeys.APK_SHA256, record.sha256);
         request.putString(RuntimeKeys.BASE_APK_SHA256, record.baseApkSha256);
@@ -230,7 +249,6 @@ final class RuntimeClient implements AutoCloseable {
     private ArrayList<VirtualPackageProjectionSnapshot> packageUniverse(
             SandboxRecord current, int virtualUserId) throws Exception {
         ArrayList<VirtualPackageProjectionSnapshot> result = new ArrayList<>();
-        int nextUid = 10000;
         for (SandboxRecord record : packageService.load().records()) {
             if (current.packageName.equals(record.packageName)) continue;
             VirtualPackageStateSnapshot state;
@@ -255,8 +273,13 @@ final class RuntimeClient implements AutoCloseable {
                 // The package authority state remains authoritative if the platform parser
                 // cannot read an optional projection APK on this device image.
             }
+            // Runtime Broker is the single owner of the persistent package/user -> UID mapping.
+            // Do not synthesize sequential UIDs here: that silently diverges from the UID used
+            // by the target process, Binder identity and virtual system-service state whenever
+            // package enumeration order changes or a package was assigned an ID earlier.
+            int virtualUid = requireBroker().virtualUidFor(record.packageName, virtualUserId);
             result.add(new VirtualPackageProjectionSnapshot(state, record.apkPath,
-                    record.nativeLibraryDir, nextUid++, parsedApplicationInfo));
+                    record.nativeLibraryDir, virtualUid, parsedApplicationInfo));
         }
         return result;
     }

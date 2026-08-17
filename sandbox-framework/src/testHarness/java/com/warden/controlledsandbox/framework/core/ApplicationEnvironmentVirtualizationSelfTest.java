@@ -84,11 +84,19 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         AtomicInteger changes = new AtomicInteger();
         FakeObserver observer = new FakeObserver(changes);
         content.registerContentObserver("content://settings/secure/theme_mode", false, observer, 3);
-        content.notifyChange("content://settings/secure/theme_mode", null, 3);
+        content.notifyChange("content://settings/secure/theme_mode", null, 3, 3);
         require(changes.get() == 1, "content observer delivery");
+        CollectionObserver collectionObserver = new CollectionObserver();
+        content.registerContentObserver("content://settings/secure/theme_mode", false,
+                collectionObserver, 3);
+        content.notifyChange("content://settings/secure/theme_mode", null, 3, 3);
+        require(collectionObserver.calls == 1 && collectionObserver.uriCount == 1
+                        && collectionObserver.flags == 3,
+                "content observer collection/flags projection");
         content.unregisterContentObserver(observer);
-        content.notifyChange("content://settings/secure/theme_mode", null, 3);
-        require(changes.get() == 1,
+        content.unregisterContentObserver(collectionObserver);
+        content.notifyChange("content://settings/secure/theme_mode", null, 3, 3);
+        require(changes.get() == 2,
                 "unregister content observer removes rather than re-registers the callback");
         require(content.getSyncAdapterTypes().isEmpty(), "sync adapters fail closed");
 
@@ -181,9 +189,9 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         int getAppStandbyBucket(String callingPackage, String packageName, int userId);
     }
     interface ContentApi {
-        void registerContentObserver(String uri, boolean descendants, FakeObserver observer, int userId);
-        void unregisterContentObserver(FakeObserver observer);
-        void notifyChange(String uri, Object observer, int userId);
+        void registerContentObserver(String uri, boolean descendants, Object observer, int userId);
+        void unregisterContentObserver(Object observer);
+        void notifyChange(String uri, Object observer, int flags, int userId);
         List<Object> getSyncAdapterTypes();
     }
     static final class FakeShortcut {
@@ -207,6 +215,17 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         private final AtomicInteger changes;
         FakeObserver(AtomicInteger changes) { this.changes = changes; }
         public void onChange(boolean selfChange) { changes.incrementAndGet(); }
+    }
+    static final class CollectionObserver {
+        int calls;
+        int uriCount;
+        int flags;
+        public void onChange(boolean selfChange, java.util.Collection<android.net.Uri> uris,
+                             int flags) {
+            calls++;
+            uriCount = uris == null ? 0 : uris.size();
+            this.flags = flags;
+        }
     }
 
     static final class FakeAuthority implements VirtualSystemServiceAuthority {

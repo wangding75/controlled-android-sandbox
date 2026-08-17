@@ -161,6 +161,28 @@ final class PackageServiceDependencies implements AutoCloseable {
         runtimeClient.stop(record, virtualUserId);
     }
 
+    /**
+     * Stops every catalog instance before an APK revision becomes authoritative. An upgrade is
+     * destructive to the running ClassLoader/native workspace even though the old immutable APK
+     * file remains on disk, so the old generation must be dead before the catalog switch.
+     */
+    void stopGuestBeforeRevisionCommit(SandboxCatalogState current, SandboxRecord imported)
+            throws Exception {
+        if (runtimeClient == null || current == null || imported == null) return;
+        SandboxRecord previous = current.findRecord(imported.packageName);
+        if (previous == null || previous.sha256.equals(imported.sha256)) return;
+        java.util.LinkedHashSet<Integer> users = new java.util.LinkedHashSet<>();
+        for (SandboxInstance instance : current.instances()) {
+            if (imported.packageName.equals(instance.packageName)) {
+                users.add(instance.virtualUserId);
+            }
+        }
+        // A stale runtime can survive a catalog inconsistency; probe the default instance even
+        // when the aggregate no longer contains a row so an upgrade cannot publish over it.
+        if (users.isEmpty()) users.add(0);
+        for (int userId : users) runtimeClient.stop(previous, userId);
+    }
+
     @Override public void close() {
         capabilityRegistry.close();
         systemServices.close();

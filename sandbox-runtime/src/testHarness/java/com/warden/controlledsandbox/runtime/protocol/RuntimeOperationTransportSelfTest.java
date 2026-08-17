@@ -113,6 +113,7 @@ public final class RuntimeOperationTransportSelfTest {
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
                 String permission, int requestCode, boolean hostGranted, String reason) { throw legacy(); }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { throw legacy(); }
+        @Override public int virtualUidFor(String packageName, int virtualUserId) { throw legacy(); }
         @Override public void stopGuest(String packageName, int virtualUserId) { throw legacy(); }
 
         private static UnsupportedOperationException legacy() {

@@ -96,6 +96,7 @@ public final class BrokerReceiverRuntime {
             rules.add(new ManifestReceiverRegistry.DataRule(
                     rule.getString(RuntimeKeys.BROADCAST_SCHEME, ""),
                     rule.getString(RuntimeKeys.BROADCAST_HOST, ""),
+                    rule.getInt(RuntimeKeys.BROADCAST_PORT, -1),
                     rule.getString(RuntimeKeys.BROADCAST_PATH, ""),
                     rule.getString(RuntimeKeys.RECEIVER_DATA_PATH_PREFIX, ""),
                     rule.getString(RuntimeKeys.RECEIVER_DATA_PATH_PATTERN, ""),
@@ -113,6 +114,7 @@ public final class BrokerReceiverRuntime {
                 new LinkedHashSet<>(categories == null ? List.of() : categories),
                 request.getString(RuntimeKeys.BROADCAST_SCHEME, ""),
                 request.getString(RuntimeKeys.BROADCAST_HOST, ""),
+                request.getInt(RuntimeKeys.BROADCAST_PORT, -1),
                 request.getString(RuntimeKeys.BROADCAST_PATH, ""),
                 request.getString(RuntimeKeys.BROADCAST_MIME_TYPE, ""));
     }

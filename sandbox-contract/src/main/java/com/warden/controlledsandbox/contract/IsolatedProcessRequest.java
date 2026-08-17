@@ -34,7 +34,8 @@ public final class IsolatedProcessRequest implements Parcelable {
         this.protocol = protocol;
         this.sessionId = ContractChecks.requiredText(sessionId, "sessionId", 128);
         this.generation = generation;
-        this.processSlot = bounded(processSlot, "processSlot", 0, 31);
+        this.processSlot = bounded(processSlot, "processSlot", 0,
+                ProcessSlotContract.MAX_ORDINARY_SLOT);
         this.virtualUserId = ContractChecks.nonNegative(virtualUserId, "virtualUserId");
         this.packageName = packageName(packageName);
         this.processName = ContractChecks.requiredText(processName, "processName", 320);
@@ -43,12 +44,14 @@ public final class IsolatedProcessRequest implements Parcelable {
         this.operation = serviceOperation(operation);
         this.capabilityToken = ContractChecks.requiredText(capabilityToken, "capabilityToken", 192);
         this.payload = payload == null ? new Bundle() : new Bundle(payload);
+        this.payload.setClassLoader(IsolatedProcessRequest.class.getClassLoader());
     }
 
     private IsolatedProcessRequest(Parcel in) {
         this(in.readInt(), in.readString(), in.readLong(), in.readInt(), in.readInt(),
                 in.readString(), in.readString(), in.readString(), in.readString(),
-                in.readString(), in.readString(), in.readParcelable(Bundle.class.getClassLoader()));
+                in.readString(), in.readString(), in.readParcelable(
+                        IsolatedProcessRequest.class.getClassLoader()));
     }
 
     public int protocol() { return protocol; }
@@ -62,7 +65,11 @@ public final class IsolatedProcessRequest implements Parcelable {
     public String packageRevision() { return packageRevision; }
     public String operation() { return operation; }
     public String capabilityToken() { return capabilityToken; }
-    public Bundle payload() { return new Bundle(payload); }
+    public Bundle payload() {
+        Bundle copy = new Bundle(payload);
+        copy.setClassLoader(IsolatedProcessRequest.class.getClassLoader());
+        return copy;
+    }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeInt(protocol);
@@ -79,7 +86,7 @@ public final class IsolatedProcessRequest implements Parcelable {
         out.writeParcelable(payload, flags);
     }
 
-    @Override public int describeContents() { return 0; }
+    @Override public int describeContents() { return Parcelable.CONTENTS_FILE_DESCRIPTOR; }
 
     public static final Creator<IsolatedProcessRequest> CREATOR = new Creator<>() {
         @Override public IsolatedProcessRequest createFromParcel(Parcel source) {

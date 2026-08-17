@@ -15,6 +15,7 @@ public final class UriGrantLifecycleSelfTest {
         oneTimeProviderRoute();
         batchUsesOneTimeGrantOnce();
         persistentGrantRevocationAndSessionCleanup();
+        recoverableSessionRebindPreservesGrant();
         System.out.println("PASS URI grant lifecycle integration self-test");
     }
 
@@ -97,6 +98,25 @@ public final class UriGrantLifecycleSelfTest {
                 4, "content://owner.cleanup", UriGrantRegistry.WRITE, false, 330, 1_000);
         check(grants.revokeSession("owner-session", 5) == 1, "owner Session cleanup failed");
         check(grants.size(331) == 0, "URI grant leaked after Session cleanup");
+    }
+
+    private static void recoverableSessionRebindPreservesGrant() {
+        UriGrantRegistry grants = new UriGrantRegistry();
+        grants.grant("u5:owner", "owner-old", 7,
+                "u5:target", "target-old", 8, 5, "content://owner.recoverable/item",
+                UriGrantRegistry.READ, false, 400, 1_000);
+        check(grants.rebindSession("target-old", 8, "target-new", 9) == 1,
+                "target URI grant was not rebound");
+        UriGrantRegistry.Authorization target = grants.beginAuthorization(
+                "u5:target", "target-new", 9, 5, 401);
+        check(target.allows("u5:target", "content://owner.recoverable/item/1",
+                        UriGrantRegistry.READ),
+                "rebound target URI grant was not usable after recovery");
+        check(grants.rebindSession("owner-old", 7, "owner-new", 10) == 1,
+                "owner URI grant was not rebound");
+        check(grants.revokeSession("target-old", 8) == 0,
+                "stale target generation revoked a rebound grant");
+        check(grants.size(402) == 1, "rebound URI grant was lost during stale cleanup");
     }
 
     private static GuestSession session(String id, String packageName, int user, long generation) {

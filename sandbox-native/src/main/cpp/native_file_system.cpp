@@ -93,48 +93,105 @@ std::string canonical_existing(std::string path) {
     }
 }
 
+bool parse_capability_path(std::string_view path, int& directory_fd,
+                           std::string_view& relative) {
+    constexpr std::string_view prefix = "/proc/self/fd/";
+    if (path.size() <= prefix.size() || path.compare(0, prefix.size(), prefix) != 0) {
+        return false;
+    }
+    std::size_t cursor = prefix.size();
+    std::size_t end = path.find('/', cursor);
+    if (end == std::string_view::npos) end = path.size();
+    if (end == cursor) return false;
+    int parsed = 0;
+    for (; cursor < end; cursor++) {
+        const char value = path[cursor];
+        if (value < '0' || value > '9') return false;
+        parsed = parsed * 10 + (value - '0');
+        if (parsed < 0) return false;
+    }
+    directory_fd = parsed;
+    relative = end == path.size() ? std::string_view{} : path.substr(end + 1);
+    return true;
+}
+
 }  // namespace
 
 NativeResolvedPath NativeFileSystemResolver::resolve(const char* path) {
     if (path == nullptr) throw PathPolicyError(EFAULT, "PATH_NULL");
     if (path[0] != '/') return resolve_at(AT_FDCWD, path);
+    int capability_fd = -1;
+    std::string_view relative;
+    if (parse_capability_path(path, capability_fd, relative)
+            && global_policy().is_capability_fd(capability_fd)) {
+        const NativePathDecision decision = global_policy().resolve_capability_relative(
+                capability_fd, relative);
+        return NativeResolvedPath{decision.directory_fd, std::move(decision.path),
+                std::move(decision.confinement_root), decision.policy_revision,
+                decision.rewritten, decision.capability};
+    }
     NativePathDecision decision = NativeProcFileSystem::is_virtual_path(path)
             ? NativeProcFileSystem::materialize(path) : global_policy().resolve_path(path);
     return NativeResolvedPath{AT_FDCWD, std::move(decision.path),
-            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten};
+            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten,
+            decision.capability};
 }
 
 NativeResolvedPath NativeFileSystemResolver::resolve_at(int directory_fd, const char* path) {
     if (path == nullptr) throw PathPolicyError(EFAULT, "PATH_NULL");
     if (path[0] == '/') return resolve(path);
+    if (global_policy().is_capability_fd(directory_fd)) {
+        const NativePathDecision decision = global_policy().resolve_capability_relative(
+                directory_fd, path);
+        return NativeResolvedPath{decision.directory_fd, std::move(decision.path),
+                std::move(decision.confinement_root), decision.policy_revision,
+                decision.rewritten, decision.capability};
+    }
     const std::string base_host = directory_for_fd(directory_fd);
     const std::string base_guest = global_policy().reverse_map_path(base_host);
     const std::string guest_path = normalize_join(base_guest, path);
     NativePathDecision decision = NativeProcFileSystem::is_virtual_path(guest_path)
             ? NativeProcFileSystem::materialize(guest_path) : global_policy().resolve_path(guest_path);
     return NativeResolvedPath{AT_FDCWD, std::move(decision.path),
-            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten};
+            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten,
+            decision.capability};
 }
 
 NativeResolvedPath NativeFileSystemResolver::resolve_fd(int file_descriptor) {
     if (file_descriptor < 0) throw PathPolicyError(EBADF, "FD_NEGATIVE");
+    if (global_policy().is_capability_fd(file_descriptor)) {
+        const NativePolicySnapshot policy = global_policy().snapshot();
+        if (!policy.configured) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
+        return NativeResolvedPath{file_descriptor, ".", {}, policy.revision, false, true};
+    }
     const std::string host = raw_readlink("/proc/self/fd/" + std::to_string(file_descriptor));
     if (host.rfind("socket:[", 0) == 0 || host.rfind("pipe:[", 0) == 0
             || host.rfind("anon_inode:", 0) == 0 || host.rfind("memfd:", 0) == 0
             || host.rfind("/memfd:", 0) == 0) {
         const NativePolicySnapshot policy = global_policy().snapshot();
         if (!policy.configured) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
-        return NativeResolvedPath{file_descriptor, host, {}, policy.revision, false};
+        return NativeResolvedPath{file_descriptor, host, {}, policy.revision, false, false};
     }
     const std::string guest = global_policy().reverse_map_path(host);
     NativePathDecision decision = global_policy().resolve_path(guest);
     if (decision.path != host) throw PathPolicyError(EACCES, "FD_HOST_PATH_MISMATCH");
     return NativeResolvedPath{file_descriptor, std::move(decision.path),
-            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten};
+            std::move(decision.confinement_root), decision.policy_revision, decision.rewritten,
+            decision.capability};
 }
 
 void NativeFileSystemResolver::validate_confinement(
         const NativeResolvedPath& resolved, bool follow_final_symlink) {
+    if (resolved.capability) {
+        if (resolved.directory_fd < 0 || resolved.path.empty() || resolved.path.front() == '/') {
+            throw PathPolicyError(EACCES, "CAPABILITY_RESOLUTION_INVALID");
+        }
+        if (resolved.path == ".." || resolved.path.rfind("../", 0) == 0
+                || resolved.path.find("/../") != std::string::npos) {
+            throw PathPolicyError(EACCES, "CAPABILITY_PATH_TRAVERSAL");
+        }
+        return;
+    }
     if (resolved.confinement_root.empty()) return;
     if (!path_has_prefix(resolved.path, resolved.confinement_root)) {
         throw PathPolicyError(EACCES, "CONFINEMENT_LEXICAL_ESCAPE");
@@ -152,6 +209,13 @@ void NativeFileSystemResolver::validate_same_confinement(
         const NativeResolvedPath& first, const NativeResolvedPath& second) {
     if (first.policy_revision != second.policy_revision) {
         throw PathPolicyError(EAGAIN, "POLICY_REVISION_CHANGED");
+    }
+    if (first.capability || second.capability) {
+        if (!first.capability || !second.capability
+                || first.directory_fd != second.directory_fd) {
+            throw PathPolicyError(EXDEV, "CROSS_CAPABILITY_OPERATION_DENIED");
+        }
+        return;
     }
     if (first.confinement_root == second.confinement_root) return;
     if (first.confinement_root.empty() && second.confinement_root.empty()) return;

@@ -2,12 +2,15 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.app.Application;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ServiceInfo;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -15,6 +18,7 @@ import android.os.Message;
 import android.os.RemoteException;
 
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.component.activity.ActivityFieldBridge;
 import com.warden.controlledsandbox.runtime.component.service.GuestServiceStubNames;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
@@ -26,10 +30,14 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * ActivityThread-owned Service transport for a Guest process.
@@ -43,28 +51,15 @@ import java.util.concurrent.Executor;
  * the platform Service lifecycle rather than a Broker-side manual lifecycle.</p>
  */
 public final class GuestActivityThreadServiceBridge implements AutoCloseable {
-    private static final int CREATE_SERVICE = 114;
-    private static final int SERVICE_ARGS = 115;
-    private static final int STOP_SERVICE = 116;
-    private static final int BIND_SERVICE = 121;
-    private static final int UNBIND_SERVICE = 122;
-    private static final int SERVICE_DONE_EXECUTING_ANON = 0;
-    private static final int SERVICE_DONE_EXECUTING_START = 1;
-    private static final int SERVICE_DONE_EXECUTING_STOP = 2;
-    private static final int START_TASK_REMOVED_COMPLETE = 1000;
-
     private final GuestRuntimeEnvironment.Session session;
     private final Object activityThread;
     private final Handler handler;
     private final Field callbackField;
     private final Handler.Callback previousCallback;
     private final Handler.Callback callback;
-    private final Map<IBinder, Record> records = new IdentityHashMap<>();
     private final GuestRuntimeBrokerBridge routeBroker;
-    private final Object servicesData;
-    private final Object services;
-    private final Object activityManager;
-    private final Class<?> activityThreadType;
+    private final GuestActivityThreadServiceLifecycle serviceLifecycle;
+    private final GuestActivityThreadReceiverBridge receiverBridge;
     private volatile boolean closed;
 
     private GuestActivityThreadServiceBridge(GuestRuntimeEnvironment.Session session,
@@ -74,14 +69,13 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
                                               Object activityManager) {
         this.session = Objects.requireNonNull(session, "session");
         this.activityThread = activityThread;
-        this.activityThreadType = activityThread.getClass();
         this.handler = handler;
         this.callbackField = callbackField;
         this.previousCallback = previousCallback;
-        this.servicesData = servicesData;
-        this.services = services;
-        this.activityManager = activityManager;
         this.routeBroker = new GuestRuntimeBrokerBridge(session.spec, session.mainThread);
+        this.serviceLifecycle = new GuestActivityThreadServiceLifecycle(session, activityThread,
+                servicesData, services, activityManager, routeBroker);
+        this.receiverBridge = new GuestActivityThreadReceiverBridge(session);
         this.callback = this::handleMessage;
     }
 
@@ -103,7 +97,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         servicesDataField.setAccessible(true);
         Field servicesField = findField(activityThreadType, "mServices");
         servicesField.setAccessible(true);
-        Object activityManager = activityManager();
+        Object activityManager = GuestActivityThreadServiceLifecycle.activityManager();
         GuestActivityThreadServiceBridge bridge = new GuestActivityThreadServiceBridge(session,
                 activityThread, handler, callbackField, previous, servicesDataField.get(activityThread),
                 servicesField.get(activityThread), activityManager);
@@ -114,13 +108,35 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
 
     /** Starts a Guest Service through AMS/ActivityThread using a predeclared process-slot stub. */
     ComponentName start(Bundle request, String guestClass, boolean foreground) {
-        Route route = route(request, guestClass);
+        Bundle routedRequest = new Bundle(request == null ? new Bundle() : request);
+        routedRequest.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, foreground);
+        Route route = route(routedRequest, guestClass);
         Intent hostIntent = hostIntent(route);
         ComponentName started = foreground
                 ? session.context.hostServiceContext().startForegroundService(hostIntent)
                 : session.context.hostServiceContext().startService(hostIntent);
         if (started == null) throw new IllegalStateException("FRAMEWORK_SERVICE_START_RETURNED_NULL");
         return new ComponentName(session.spec.packageName, guestClass);
+    }
+
+    /**
+     * Restarts a sticky/redeliver Service through the platform Service queue and waits until the
+     * real ActivityThread SERVICE_ARGS callback has completed. The wait is performed off the
+     * Guest main thread so the callback can continue through the Handler normally.
+     */
+    Bundle recover(Bundle request, String guestClass, boolean foreground) {
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        Bundle routedRequest = new Bundle(request == null ? new Bundle() : request);
+        routedRequest.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, foreground);
+        return serviceLifecycle.recover(routedRequest, guestClass, () -> {
+                Route route = route(routedRequest, guestClass);
+                Intent hostIntent = hostIntent(route);
+                ComponentName started = foreground
+                        ? session.context.hostServiceContext().startForegroundService(hostIntent)
+                        : session.context.hostServiceContext().startService(hostIntent);
+                if (started == null) throw new IllegalStateException("FRAMEWORK_SERVICE_RECOVERY_START_NULL");
+                return started;
+        });
     }
 
     boolean stop(Bundle request, String guestClass) {
@@ -130,25 +146,91 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
 
     boolean bind(Bundle request, String guestClass, ServiceConnection guestConnection,
                  int flags, Executor executor) {
-        Route route = route(request, guestClass);
+        if (closed) throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        Bundle routedRequest = new Bundle(request == null ? new Bundle() : request);
+        if (!routedRequest.containsKey(RuntimeKeys.CONNECTION_ID)) {
+            routedRequest.putString(RuntimeKeys.CONNECTION_ID, UUID.randomUUID().toString());
+        }
+        routedRequest.putBinder(RuntimeKeys.SERVICE_CONNECTION_BINDER, new Binder());
+        Route route = route(routedRequest, guestClass);
         HostConnection hostConnection = new HostConnection(route, guestConnection,
                 executor == null ? session.context.getMainExecutor() : executor);
-        boolean accepted = session.context.hostServiceContext().bindService(hostIntent(route),
-                hostConnection, flags);
-        if (accepted) hostConnection.published = true;
-        else {
+        if (closed) {
+            hostConnection.close();
+            synchronized (hostConnections) { hostConnections.remove(guestConnection, hostConnection); }
+            throw new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED");
+        }
+        boolean accepted;
+        try {
+            accepted = session.context.hostServiceContext().bindService(hostIntent(route),
+                    hostConnection, flags);
+        } catch (Throwable error) {
+            hostConnection.close();
+            synchronized (hostConnections) { hostConnections.remove(guestConnection, hostConnection); }
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error : new IllegalStateException(error);
+        }
+        if (accepted) {
+            boolean retired;
+            synchronized (hostConnections) {
+                retired = closed || hostConnections.get(guestConnection) != hostConnection;
+                if (!retired) hostConnection.published = true;
+                else hostConnections.remove(guestConnection, hostConnection);
+            }
+            if (retired) {
+                hostConnection.close();
+                try { session.context.hostServiceContext().unbindService(hostConnection); }
+                catch (RuntimeException ignored) { }
+                return false;
+            }
+        } else {
+            hostConnection.close();
             hostConnection.published = false;
-            synchronized (hostConnections) { hostConnections.remove(guestConnection); }
+            synchronized (hostConnections) { hostConnections.remove(guestConnection, hostConnection); }
         }
         return accepted;
     }
 
+    Bundle dispatchFrameworkReceiver(Bundle request, String guestClass) {
+        return receiverBridge.dispatchFrameworkReceiver(request, guestClass);
+    }
+
+    Intent registerDynamicReceiver(String receiverId, BroadcastReceiver guestReceiver,
+                                   IntentFilter filter, String permission, Handler scheduler,
+                                   int flags) {
+        return receiverBridge.registerDynamicReceiver(receiverId, guestReceiver, filter,
+                permission, scheduler, flags);
+    }
+
+    void unregisterDynamicReceiver(String receiverId) {
+        receiverBridge.unregisterDynamicReceiver(receiverId);
+    }
+
     void unbind(ServiceConnection guestConnection) {
+        if (closed) {
+            android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                    "late unbind ignored after framework bridge teardown");
+            return;
+        }
         HostConnection found = null;
         synchronized (hostConnections) {
             found = hostConnections.remove(guestConnection);
         }
-        if (found == null) throw new IllegalArgumentException("ServiceConnection not bound");
+        if (found == null) {
+            // close() may win the race after the first closed check and clear the map while a
+            // framework callback is still unwinding.  Keep strict Android behavior while live,
+            // but converge teardown races on an idempotent terminal edge.
+            if (closed) {
+                android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                        "late unbind ignored after framework bridge teardown");
+                return;
+            }
+            throw new IllegalArgumentException("ServiceConnection not bound");
+        }
+        // Fence the Guest callback queue before asking host AMS to remove the binding.  AMS is
+        // allowed to race a pending onServiceConnected/onBindingDied notification with unbind.
+        found.close();
         session.context.hostServiceContext().unbindService(found);
     }
 
@@ -167,13 +249,16 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         }
         return new Route(routed.getString(RuntimeKeys.SESSION_ID),
                 routed.getLong(RuntimeKeys.GENERATION), routed.getInt(RuntimeKeys.PROCESS_SLOT, -1),
-                routed.getString(RuntimeKeys.PACKAGE_NAME), guestClass, new Bundle(request));
+                routed.getString(RuntimeKeys.PACKAGE_NAME),
+                routed.getString("frameworkServiceStubPackage",
+                        session.context.hostServiceContext().getPackageName()),
+                guestClass, new Bundle(request));
     }
 
     private Intent hostIntent(Route route) {
         String stub = GuestServiceStubNames.classNameFor(route.slot);
         Intent intent = new Intent().setComponent(new ComponentName(
-                session.context.hostServiceContext().getPackageName(), stub));
+                route.stubPackage, stub));
         intent.putExtra("frameworkServiceRoute", true);
         intent.putExtra(RuntimeKeys.SESSION_ID, route.sessionId);
         intent.putExtra(RuntimeKeys.GENERATION, route.generation);
@@ -183,9 +268,24 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         copyString(route.request, intent, RuntimeKeys.PROCESS_NAME);
         copyString(route.request, intent, ComponentOperations.ACTION);
         copyString(route.request, intent, RuntimeKeys.URI);
+        copyString(route.request, intent, RuntimeKeys.BROADCAST_SCHEME);
+        copyString(route.request, intent, RuntimeKeys.BROADCAST_HOST);
+        copyInt(route.request, intent, RuntimeKeys.BROADCAST_PORT);
+        copyString(route.request, intent, RuntimeKeys.BROADCAST_PATH);
         copyString(route.request, intent, RuntimeKeys.BROADCAST_MIME_TYPE);
         copyString(route.request, intent, RuntimeKeys.INTENT_COMPONENT_PACKAGE);
         copyString(route.request, intent, RuntimeKeys.INTENT_COMPONENT_CLASS);
+        copyString(route.request, intent, RuntimeKeys.CONNECTION_ID);
+        copyBoolean(route.request, intent, RuntimeKeys.SERVICE_RECOVERY);
+        copyBoolean(route.request, intent, RuntimeKeys.SERVICE_REDELIVERED);
+        copyBoolean(route.request, intent, RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND);
+        copyInt(route.request, intent, RuntimeKeys.SERVICE_START_ID);
+        copyInt(route.request, intent, RuntimeKeys.SERVICE_START_RESULT);
+        copyLong(route.request, intent, RuntimeKeys.SERVICE_FOREGROUND_PROMOTION_TIMEOUT_MS);
+        copyInt(route.request, intent, RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK);
+        copyBoolean(route.request, intent, RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED);
+        copyString(route.request, intent, RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON);
+        copyBinder(route.request, intent, RuntimeKeys.SERVICE_CONNECTION_BINDER);
         copyInt(route.request, intent, RuntimeKeys.ACTIVITY_FLAGS);
         copyStringList(route.request, intent, RuntimeKeys.BROADCAST_CATEGORIES);
         Bundle extras = route.request.getBundle(RuntimeKeys.INTENT_EXTRAS);
@@ -196,29 +296,16 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
     private boolean handleMessage(Message message) {
         try {
             if (closed) return delegate(message);
-            if (message.what == CREATE_SERVICE && isFrameworkRoute(createIntent(message.obj))) {
-                createService(message.obj);
+            // ClientTransaction is the last framework-owned boundary before ActivityThread
+            // creates ActivityClientRecord and selects the Activity.onCreate overload.  Let the
+            // Activity bridge project Guest metadata here; the existing Service callback then
+            // continues to own CREATE/BIND/ARGS/STOP and delegates every unrelated message.
+            ActivityFieldBridge.projectFrameworkLaunchTransaction(activityThread, message, session);
+            if (receiverBridge.handles(message)) {
+                receiverBridge.handle(message.obj);
                 return true;
             }
-            IBinder token = tokenFor(message.what, message.obj);
-            Record record;
-            synchronized (records) { record = token == null ? null : records.get(token); }
-            if (record == null && token != null
-                    && (message.what == BIND_SERVICE || message.what == SERVICE_ARGS)) {
-                Intent routeIntent = lifecycleIntent(message.what, message.obj);
-                if (isFrameworkRoute(routeIntent)) {
-                    promoteCreatedService(token, routeIntent);
-                    synchronized (records) { record = records.get(token); }
-                }
-            }
-            if (record != null) {
-                switch (message.what) {
-                    case BIND_SERVICE -> bindService(message.obj, record);
-                    case UNBIND_SERVICE -> unbindService(message.obj, record);
-                    case SERVICE_ARGS -> serviceArgs(message.obj, record);
-                    case STOP_SERVICE -> stopService(token, record);
-                    default -> { return delegate(message); }
-                }
+            if (serviceLifecycle.handle(message)) {
                 return true;
             }
             return delegate(message);
@@ -234,306 +321,27 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         return previousCallback != null && previousCallback.handleMessage(message);
     }
 
-    private void createService(Object data) throws Exception {
-        Intent hostIntent = createIntent(data);
-        String sessionId = hostIntent.getStringExtra(RuntimeKeys.SESSION_ID);
-        long generation = hostIntent.getLongExtra(RuntimeKeys.GENERATION, -1L);
-        if (!session.spec.sessionId.equals(sessionId) || session.spec.generation != generation) {
-            throw new SecurityException("FRAMEWORK_SERVICE_ROUTE_GENERATION_MISMATCH");
-        }
-        String guestClass = hostIntent.getStringExtra(RuntimeKeys.COMPONENT_CLASS);
-        if (guestClass == null || guestClass.trim().isEmpty()) {
-            throw new IllegalArgumentException("FRAMEWORK_SERVICE_COMPONENT_MISSING");
-        }
-        IBinder token = (IBinder) field(data, "token");
-        Intent guestIntent = decodeGuestIntent(hostIntent);
-        installGuestService(data, token, hostIntent, false);
-    }
-
-    /**
-     * API32's CREATE_SERVICE packet has no start Intent. The first BIND_SERVICE/SERVICE_ARGS
-     * packet does carry our route, so replace the framework-created Stub object at that token
-     * before dispatching the actual Guest callback.
-     */
-    private void promoteCreatedService(IBinder token, Intent hostIntent) throws Exception {
-        Object data = mapGet(servicesData, token);
-        if (data == null) throw new IllegalStateException("FRAMEWORK_SERVICE_CREATE_DATA_MISSING");
-        installGuestService(data, token, hostIntent, true);
-    }
-
-    private void installGuestService(Object data, IBinder token, Intent hostIntent,
-                                     boolean replaceExisting) throws Exception {
-        String sessionId = hostIntent.getStringExtra(RuntimeKeys.SESSION_ID);
-        long generation = hostIntent.getLongExtra(RuntimeKeys.GENERATION, -1L);
-        if (!session.spec.sessionId.equals(sessionId) || session.spec.generation != generation) {
-            throw new SecurityException("FRAMEWORK_SERVICE_ROUTE_GENERATION_MISMATCH");
-        }
-        String guestClass = hostIntent.getStringExtra(RuntimeKeys.COMPONENT_CLASS);
-        if (guestClass == null || guestClass.trim().isEmpty()) {
-            throw new IllegalArgumentException("FRAMEWORK_SERVICE_COMPONENT_MISSING");
-        }
-        if (replaceExisting) {
-            Object old = mapGet(services, token);
-            if (old instanceof Service) {
-                try { ((Service) old).onDestroy(); } catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-                try { detach((Service) old); } catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-            }
-        }
-        Intent guestIntent = decodeGuestIntent(hostIntent);
-        Service service = GuestComponentFactory.instantiateService(session.context.getClassLoader(),
-                session.context.getApplicationInfo().appComponentFactory, guestClass, guestIntent);
-        if (service == null) throw new IllegalStateException("FRAMEWORK_SERVICE_FACTORY_RETURNED_NULL");
-        if (!(service instanceof Service)) throw new IllegalArgumentException("NOT_A_GUEST_SERVICE:" + guestClass);
-        ServiceInfo projected = projectServiceInfo(data, guestClass);
-        setField(data, "info", projected);
-        Object manager = serviceManagerProxy(projected);
-        Method attach = Service.class.getDeclaredMethod("attach", Context.class,
-                activityThreadType, String.class, IBinder.class, Application.class, Object.class);
-        attach.setAccessible(true);
-        attach.invoke(service, session.context, activityThread, guestClass, token,
-                session.application, manager);
-        service.onCreate();
-        synchronized (records) {
-            records.put(token, new Record(token, service, guestClass, projected,
-                    new ComponentName(session.context.hostServiceContext(),
-                            GuestServiceStubNames.classNameFor(session.spec.processSlot))));
-        }
-        mapPut(servicesData, token, data);
-        mapPut(services, token, service);
-        if (!replaceExisting) serviceDone(token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
-        Bundle event = new Bundle();
-        event.putString(RuntimeKeys.STATUS, "FRAMEWORK_SERVICE_CREATED");
-        event.putBoolean("frameworkOwnedService", true);
-        event.putString(RuntimeKeys.COMPONENT_CLASS, guestClass);
-        event.putString(RuntimeKeys.SESSION_ID, session.spec.sessionId);
-        event.putLong(RuntimeKeys.GENERATION, session.spec.generation);
-        event.putInt(RuntimeKeys.PROCESS_SLOT, session.spec.processSlot);
-        event.putString("token", String.valueOf(token));
-        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_CREATED", event);
-        android.util.Log.i("CS_SERVICE_FRAMEWORK", (replaceExisting ? "PROMOTE_SERVICE" : "CREATE_SERVICE")
-                + " guest=" + guestClass + " process=" + session.spec.processName + " token=" + token);
-    }
-
-    private void bindService(Object data, Record record) throws Exception {
-        Intent hostIntent = (Intent) field(data, "intent");
-        Intent intent = decodeGuestIntent(hostIntent);
-        boolean rebind = booleanField(data, "rebind");
-        if (rebind) record.service.onRebind(intent);
-        else record.lastBinder = record.service.onBind(intent);
-        if (rebind) serviceDone(record.token, SERVICE_DONE_EXECUTING_ANON, 0, 0);
-        else publishService(record.token, hostIntent, record.lastBinder);
-        logLifecycle("GUEST_SERVICE_FRAMEWORK_BOUND", record, rebind ? "REBIND" : "BIND");
-    }
-
-    private void unbindService(Object data, Record record) throws Exception {
-        Intent hostIntent = (Intent) field(data, "intent");
-        Intent intent = decodeGuestIntent(hostIntent);
-        boolean rebind = record.service.onUnbind(intent);
-        // ActivityThread.handleUnbindService acknowledges both branches through
-        // IActivityManager.unbindFinished().  serviceDoneExecuting() is only the
-        // execution completion path for CREATE/START/STOP and leaves AMS's bind
-        // record unfinished for the ordinary onUnbind(false) case.
-        unbindFinished(record.token, hostIntent, rebind);
-        logLifecycle("GUEST_SERVICE_FRAMEWORK_UNBOUND", record, rebind ? "REBIND" : "UNBIND");
-    }
-
-    private void serviceArgs(Object data, Record record) throws Exception {
-        Intent intent = decodeGuestIntent((Intent) field(data, "args"));
-        int startId = intField(data, "startId");
-        int flags = intField(data, "flags");
-        int result;
-        if (booleanField(data, "taskRemoved")) {
-            // This is a distinct Service callback in the platform contract.  Calling
-            // onStartCommand() here loses the task-removal signal used by sticky services.
-            record.service.onTaskRemoved(intent);
-            result = START_TASK_REMOVED_COMPLETE;
-        } else {
-            result = record.service.onStartCommand(intent, flags, startId);
-        }
-        serviceDone(record.token, SERVICE_DONE_EXECUTING_START, startId, result);
-        logLifecycle("GUEST_SERVICE_FRAMEWORK_STARTED", record, "START:" + startId);
-    }
-
-    private void stopService(IBinder token, Record record) throws Exception {
-        synchronized (records) { records.remove(token); }
-        mapRemove(servicesData, token);
-        mapRemove(services, token);
-        record.service.onDestroy();
-        detach(record.service);
-        // ActivityThread.handleStopService acknowledges STOP_SERVICE to AMS after
-        // Service.onDestroy(). The bridge owns that callback, so omitting the
-        // STOP acknowledgement leaves the StubService in AMS's executing set and
-        // produces a delayed ANR even though the guest Service has already been
-        // destroyed. VA/NBB preserve this framework completion edge as well.
-        serviceDone(token, SERVICE_DONE_EXECUTING_STOP, 0, 0);
-        logLifecycle("GUEST_SERVICE_FRAMEWORK_DESTROYED", record, "STOP");
-    }
-
     @Override public void close() {
         if (closed) return;
         closed = true;
-        synchronized (records) {
-            for (Record record : new ArrayList<>(records.values())) {
-                try { record.service.onDestroy(); } catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-                try { detach(record.service); } catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-                try { serviceDone(record.token, SERVICE_DONE_EXECUTING_STOP, 0, 0); }
-                catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                }
-                mapRemove(servicesData, record.token);
-                mapRemove(services, record.token);
-            }
-            records.clear();
-        }
+        serviceLifecycle.close();
         ArrayList<HostConnection> boundConnections;
         synchronized (hostConnections) {
             boundConnections = new ArrayList<>(hostConnections.values());
             hostConnections.clear();
         }
         for (HostConnection connection : boundConnections) {
+            connection.close();
             try { session.context.hostServiceContext().unbindService(connection); }
             catch (RuntimeException ignored) { }
         }
+        receiverBridge.close();
         try {
             if (callbackField.get(handler) == callback) callbackField.set(handler, previousCallback);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.e("CS_SERVICE_FRAMEWORK", "restore callback failed", error);
         }
-    }
-
-    private Intent createIntent(Object data) {
-        return (Intent) field(data, "intent");
-    }
-
-    private Intent lifecycleIntent(int what, Object data) {
-        if (what == CREATE_SERVICE) return createIntent(data);
-        if (what == BIND_SERVICE || what == UNBIND_SERVICE) return (Intent) field(data, "intent");
-        if (what == SERVICE_ARGS) return (Intent) field(data, "args");
-        return null;
-    }
-
-    private Intent decodeGuestIntent(Intent host) {
-        return RuntimeIntentWireCodec.decode(host == null ? null : host.getExtras());
-    }
-
-    private boolean isFrameworkRoute(Intent intent) {
-        return intent != null && intent.getBooleanExtra("frameworkServiceRoute", false);
-    }
-
-    private IBinder tokenFor(int what, Object data) {
-        if (what == STOP_SERVICE) return data instanceof IBinder ? (IBinder) data : null;
-        if (what == BIND_SERVICE || what == UNBIND_SERVICE || what == SERVICE_ARGS) {
-            Object value = field(data, "token");
-            return value instanceof IBinder ? (IBinder) value : null;
-        }
-        return null;
-    }
-
-    private ServiceInfo projectServiceInfo(Object data, String guestClass) {
-        Object original = field(data, "info");
-        ServiceInfo info = original instanceof ServiceInfo
-                ? new ServiceInfo((ServiceInfo) original) : new ServiceInfo();
-        VirtualPackageMetadata.Component component = session.packageMetadata.component(
-                guestClass, VirtualPackageMetadata.Type.SERVICE);
-        if (component == null) {
-            throw new IllegalArgumentException("SERVICE_NOT_DECLARED:" + guestClass);
-        }
-        info.name = guestClass;
-        info.packageName = session.spec.packageName;
-        info.processName = component.processName().isEmpty()
-                ? session.spec.processName : component.processName();
-        info.exported = component.exported();
-        info.enabled = component.enabled();
-        info.permission = component.permission();
-        info.flags = component.isolated() ? ServiceInfo.FLAG_ISOLATED_PROCESS : 0;
-        if (component.stopWithTask()) {
-            info.flags |= optionalStaticInt(ServiceInfo.class, "FLAG_STOP_WITH_TASK");
-        }
-        setOptional(info, "foregroundServiceType", component.foregroundServiceType());
-        setOptional(info, "directBootAware", component.directBootAware());
-        info.applicationInfo = new ApplicationInfo(session.context.getApplicationInfo());
-        return info;
-    }
-
-    private Object serviceManagerProxy(ServiceInfo info) throws Exception {
-        Class<?> managerType = Class.forName("android.app.IActivityManager");
-        InvocationHandler handler = (proxy, method, args) -> {
-            Object[] forwarded = args == null ? null : args.clone();
-            if ("stopServiceToken".equals(method.getName()) && forwarded != null
-                    && forwarded.length > 0) {
-                forwarded[0] = new ComponentName(session.context.hostServiceContext(),
-                        GuestServiceStubNames.classNameFor(session.spec.processSlot));
-            }
-            try {
-                return method.invoke(activityManager, forwarded);
-            } catch (java.lang.reflect.InvocationTargetException error) {
-                throw error.getCause();
-            }
-        };
-        return Proxy.newProxyInstance(managerType.getClassLoader(), new Class<?>[]{managerType}, handler);
-    }
-
-    private static Object activityManager() throws Exception {
-        Class<?> type = Class.forName("android.app.ActivityManager");
-        Method method = type.getDeclaredMethod("getService");
-        method.setAccessible(true);
-        return method.invoke(null);
-    }
-
-    private void serviceDone(IBinder token, int type, int startId, int result) throws Exception {
-        invokeActivityManager("serviceDoneExecuting", token, type, startId, result);
-    }
-
-    private void publishService(IBinder token, Intent intent, IBinder binder) throws Exception {
-        invokeActivityManager("publishService", token, intent, binder);
-    }
-
-    private void unbindFinished(IBinder token, Intent intent, boolean rebind) throws Exception {
-        invokeActivityManager("unbindFinished", token, intent, rebind);
-    }
-
-    private void invokeActivityManager(String name, Object... args) throws Exception {
-        Method target = null;
-        for (Method candidate : activityManager.getClass().getMethods()) {
-            if (candidate.getName().equals(name) && candidate.getParameterTypes().length == args.length) {
-                target = candidate;
-                break;
-            }
-        }
-        if (target == null) throw new NoSuchMethodException(name);
-        try { target.invoke(activityManager, args); }
-        catch (java.lang.reflect.InvocationTargetException error) {
-            Throwable cause = error.getCause();
-            if (cause instanceof RemoteException) throw (RemoteException) cause;
-            if (cause instanceof Exception) throw (Exception) cause;
-            throw error;
-        }
-    }
-
-    private void logLifecycle(String name, Record record, String stage) {
-        Bundle event = new Bundle();
-        event.putString(RuntimeKeys.STATUS, stage);
-        event.putBoolean("frameworkOwnedService", true);
-        event.putString(RuntimeKeys.COMPONENT_CLASS, record.className);
-        event.putString(RuntimeKeys.SESSION_ID, session.spec.sessionId);
-        event.putLong(RuntimeKeys.GENERATION, session.spec.generation);
-        event.putInt(RuntimeKeys.PROCESS_SLOT, session.spec.processSlot);
-        RuntimeEventLog.event(name, event);
-    }
-
-    private static void detach(Service service) throws Exception {
-        Method method = Service.class.getDeclaredMethod("detachAndCleanUp");
-        method.setAccessible(true);
-        method.invoke(service);
     }
 
     private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
@@ -545,83 +353,30 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         throw new NoSuchFieldException(type.getName() + "." + name);
     }
 
-    private static Object field(Object target, String name) {
-        if (target == null) return null;
-        try {
-            Field field = findField(target.getClass(), name);
-            field.setAccessible(true);
-            return field.get(target);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            throw new IllegalStateException("SERVICE_FIELD_UNAVAILABLE:" + name, error);
-        }
-    }
-
-    private static void setField(Object target, String name, Object value) throws Exception {
-        Field field = findField(target.getClass(), name);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
-
-    private static void setOptional(Object target, String name, Object value) {
-        try {
-            Field field = findField(target.getClass(), name);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (NoSuchFieldException ignored) {
-            // API/OEM field shape differs; the declared manifest contract remains available
-            // through the virtual PackageManager even when the local framework omits a field.
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // Optional service metadata must not break an otherwise valid Service lifecycle.
-        }
-    }
-
-    private static int optionalStaticInt(Class<?> type, String name) {
-        try {
-            Field field = type.getDeclaredField(name);
-            field.setAccessible(true);
-            return field.getInt(null);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            return 0;
-        }
-    }
-
-    private static boolean booleanField(Object target, String name) { return Boolean.TRUE.equals(field(target, name)); }
-    private static int intField(Object target, String name) { return ((Number) field(target, name)).intValue(); }
-
-    private static void mapPut(Object map, Object key, Object value) throws Exception {
-        Method put = map.getClass().getMethod("put", Object.class, Object.class);
-        put.setAccessible(true);
-        put.invoke(map, key, value);
-    }
-
-    private static Object mapGet(Object map, Object key) {
-        try {
-            Method get = map.getClass().getMethod("get", Object.class);
-            get.setAccessible(true);
-            return get.invoke(map, key);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            throw new IllegalStateException("SERVICE_MAP_GET_FAILED", error);
-        }
-    }
-
-    private static void mapRemove(Object map, Object key) {
-        try {
-            Method remove = map.getClass().getMethod("remove", Object.class);
-            remove.setAccessible(true);
-            remove.invoke(map, key);
-        } catch (Throwable error) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-        }
-    }
-
     private static void copyString(Bundle source, Intent target, String key) {
         if (source != null && source.containsKey(key)) target.putExtra(key, source.getString(key));
     }
 
+    private static void copyBoolean(Bundle source, Intent target, String key) {
+        if (source != null && source.containsKey(key)) target.putExtra(key, source.getBoolean(key));
+    }
+
     private static void copyInt(Bundle source, Intent target, String key) {
         if (source != null && source.containsKey(key)) target.putExtra(key, source.getInt(key));
+    }
+
+    private static void copyLong(Bundle source, Intent target, String key) {
+        if (source != null && source.containsKey(key)) target.putExtra(key, source.getLong(key));
+    }
+
+    private static void copyBinder(Bundle source, Intent target, String key) {
+        if (source == null || !source.containsKey(key)) return;
+        Bundle extras = target.getExtras();
+        if (extras == null) {
+            extras = new Bundle();
+            target.putExtras(extras);
+        }
+        extras.putBinder(key, source.getBinder(key));
     }
 
     private static void copyStringList(Bundle source, Intent target, String key) {
@@ -632,59 +387,45 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
     }
 
     private record Route(String sessionId, long generation, int slot, String packageName,
-                         String guestClass, Bundle request) { }
-
-    private static final class Record {
-        final IBinder token;
-        final Service service;
-        final String className;
-        final ServiceInfo info;
-        final ComponentName stub;
-        IBinder lastBinder;
-        Record(IBinder token, Service service, String className, ServiceInfo info,
-               ComponentName stub) {
-            this.token = token;
-            this.service = service;
-            this.className = className;
-            this.info = info;
-            this.stub = stub;
-        }
-    }
+                         String stubPackage, String guestClass, Bundle request) { }
 
     private final class HostConnection implements ServiceConnection {
         final Route route;
-        final ServiceConnection guest;
-        final Executor executor;
-        boolean published;
+        final GuestServiceConnectionRelay relay;
+        volatile boolean published;
+        volatile boolean closed;
         HostConnection(Route route, ServiceConnection guest, Executor executor) {
             this.route = route;
-            this.guest = guest;
-            this.executor = executor;
+            this.relay = new GuestServiceConnectionRelay(
+                    new ComponentName(route.packageName, route.guestClass), guest, executor);
             synchronized (hostConnections) { hostConnections.put(guest, this); }
         }
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
+            if (closed || GuestActivityThreadServiceBridge.this.closed) return;
             android.util.Log.i("CS_SERVICE_FRAMEWORK", "HOST_CONNECTED guest=" + route.guestClass
                     + " binder=" + service);
-            executor.execute(() -> guest.onServiceConnected(
-                    new ComponentName(route.packageName, route.guestClass), service));
+            relay.onServiceConnected(name, service);
         }
         @Override public void onServiceDisconnected(ComponentName name) {
+            if (closed || GuestActivityThreadServiceBridge.this.closed) return;
             android.util.Log.i("CS_SERVICE_FRAMEWORK", "HOST_DISCONNECTED guest=" + route.guestClass);
-            executor.execute(() -> guest.onServiceDisconnected(
-                    new ComponentName(route.packageName, route.guestClass)));
+            relay.onServiceDisconnected(name);
         }
         @Override public void onBindingDied(ComponentName name) {
-            if (android.os.Build.VERSION.SDK_INT >= 26) {
-                executor.execute(() -> guest.onBindingDied(
-                        new ComponentName(route.packageName, route.guestClass)));
-            }
+            if (!closed && !GuestActivityThreadServiceBridge.this.closed
+                    && android.os.Build.VERSION.SDK_INT >= 26) relay.onBindingDied(name);
         }
         @Override public void onNullBinding(ComponentName name) {
-            if (android.os.Build.VERSION.SDK_INT >= 28) {
+            if (!closed && !GuestActivityThreadServiceBridge.this.closed
+                    && android.os.Build.VERSION.SDK_INT >= 28) {
                 android.util.Log.i("CS_SERVICE_FRAMEWORK", "HOST_NULL_BINDING guest=" + route.guestClass);
-                executor.execute(() -> guest.onNullBinding(
-                        new ComponentName(route.packageName, route.guestClass)));
+                relay.onNullBinding(name);
             }
+        }
+        void close() {
+            if (closed) return;
+            closed = true;
+            relay.close();
         }
     }
 }

@@ -5,8 +5,9 @@
 namespace controlled_sandbox {
 
 /**
- * Returns the Guest-only PLT/GOT interceptor for a supported imported symbol.
- * Interceptors do not mediate direct syscalls and must not be treated as a hostile-code boundary.
+ * Returns the Guest-only PLT/GOT interceptor for a supported imported symbol.  The syscall symbol
+ * is included to mediate libc syscall(SYS_*) calls; inline assembly/raw SVC remains outside a
+ * userspace PLT boundary and must not be treated as a hostile-code security boundary.
  */
 [[nodiscard]] void* replacement_for_symbol(std::string_view name) noexcept;
 

@@ -20,9 +20,15 @@ public final class SensorCatalogHook implements AutoCloseable {
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
         VirtualSensorProfileSnapshot profile = identity.virtualServices().deviceServiceProfile().sensors();
         if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return () -> { };
-        Object original = context.getSystemService(Context.SENSOR_SERVICE);
-        if (!(original instanceof SensorManager manager)) {
-            throw new IllegalStateException("System service unavailable: sensor");
+        // SensorManager's API32 constructor calls waitForService("sensorservice"), which can
+        // block forever in an isolated_app domain even after the host relay has projected the
+        // catalog. Build the controlled manager directly in that domain; normal processes keep
+        // the descriptor audit against the real platform manager.
+        if (!identity.isolatedProcess()) {
+            Object original = context.getSystemService(Context.SENSOR_SERVICE);
+            if (!(original instanceof SensorManager)) {
+                throw new IllegalStateException("System service unavailable: sensor");
+            }
         }
         List<Sensor> virtualSensors = new ArrayList<>();
         if (!VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())) {

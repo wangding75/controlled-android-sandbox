@@ -18,6 +18,11 @@ import java.util.Set;
  * failed cleanup is retained as an explicit maintenance warning and retried on the next load.
  */
 final class SandboxPackageLifecycle {
+    @FunctionalInterface
+    interface RevisionCommitBarrier {
+        void beforeCommit(SandboxCatalogState current, SandboxRecord imported) throws Exception;
+    }
+
     private final Context context;
     private final SandboxCatalogRepository catalogRepository;
     private final ApkImportManager importer;
@@ -49,10 +54,22 @@ final class SandboxPackageLifecycle {
         return commitImported(current, importer.importApk(uri, current.records()));
     }
 
+    synchronized SandboxRecord importApk(Uri uri, RevisionCommitBarrier barrier) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current, importer.importApk(uri, current.records()), barrier);
+    }
+
     synchronized SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current,
                 importer.importApk(uri, current.records(), nativeGuestTrust));
+    }
+
+    synchronized SandboxRecord importApk(Uri uri, String nativeGuestTrust,
+                                         RevisionCommitBarrier barrier) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApk(uri, current.records(), nativeGuestTrust), barrier);
     }
 
     synchronized SandboxRecord importApkFile(File source) throws Exception {
@@ -60,10 +77,23 @@ final class SandboxPackageLifecycle {
         return commitImported(current, importer.importApkFile(source, current.records()));
     }
 
+    synchronized SandboxRecord importApkFile(File source, RevisionCommitBarrier barrier)
+            throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current, importer.importApkFile(source, current.records()), barrier);
+    }
+
     synchronized SandboxRecord importApkFile(File source, String nativeGuestTrust) throws Exception {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current,
                 importer.importApkFile(source, current.records(), nativeGuestTrust));
+    }
+
+    synchronized SandboxRecord importApkFile(File source, String nativeGuestTrust,
+                                             RevisionCommitBarrier barrier) throws Exception {
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApkFile(source, current.records(), nativeGuestTrust), barrier);
     }
 
     /** Resolve a physical host-installed application and reuse the normal artifact pipeline. */
@@ -83,6 +113,26 @@ final class SandboxPackageLifecycle {
         SandboxCatalogState current = catalogRepository.load();
         return commitImported(current,
                 importer.importApkFiles(artifacts, current.records(), nativeGuestTrust));
+    }
+
+    synchronized SandboxRecord importInstalledApplication(String packageName,
+                                                           String nativeGuestTrust,
+                                                           RevisionCommitBarrier barrier)
+            throws Exception {
+        String normalized = packageName == null ? "" : packageName.trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
+        ApplicationInfo application = context.getPackageManager().getApplicationInfo(
+                normalized, PackageManager.GET_META_DATA);
+        List<File> artifacts = new ArrayList<>();
+        artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
+        if (application.splitSourceDirs != null) {
+            for (String split : application.splitSourceDirs) {
+                artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
+            }
+        }
+        SandboxCatalogState current = catalogRepository.load();
+        return commitImported(current,
+                importer.importApkFiles(artifacts, current.records(), nativeGuestTrust), barrier);
     }
 
     synchronized int createInstallSession(String expectedPackageName) throws Exception {
@@ -119,6 +169,11 @@ final class SandboxPackageLifecycle {
     }
 
     synchronized SandboxRecord commitInstallSession(int sessionId) throws Exception {
+        return commitInstallSession(sessionId, null);
+    }
+
+    synchronized SandboxRecord commitInstallSession(int sessionId, RevisionCommitBarrier barrier)
+            throws Exception {
         PackageInstallSessionStore.PreparedSession prepared = installSessions.seal(sessionId);
         SandboxRecord committed;
         try {
@@ -132,7 +187,7 @@ final class SandboxPackageLifecycle {
                 deletePublishedRevisionIfUnreferenced(current, imported);
                 throw new SecurityException("INSTALL_SESSION_PACKAGE_MISMATCH");
             }
-            committed = commitImported(current, imported);
+            committed = commitImported(current, imported, barrier);
         } catch (Exception error) {
             try {
                 installSessions.markFailed(sessionId, failureCode(error), error.getMessage());
@@ -296,6 +351,12 @@ final class SandboxPackageLifecycle {
 
     private SandboxRecord commitImported(SandboxCatalogState current,
                                          SandboxRecord imported) throws Exception {
+        return commitImported(current, imported, null);
+    }
+
+    private SandboxRecord commitImported(SandboxCatalogState current,
+                                         SandboxRecord imported,
+                                         RevisionCommitBarrier barrier) throws Exception {
         try {
             VirtualPackageStateBuilder.requireInstallableSharedLibraries(imported, current);
         } catch (Exception error) {
@@ -305,6 +366,18 @@ final class SandboxPackageLifecycle {
                 error.addSuppressed(cleanupFailure);
             }
             throw error;
+        }
+        if (barrier != null) {
+            try {
+                barrier.beforeCommit(current, imported);
+            } catch (Exception error) {
+                try {
+                    deletePublishedRevisionIfUnreferenced(current, imported);
+                } catch (Exception cleanupFailure) {
+                    error.addSuppressed(cleanupFailure);
+                }
+                throw error;
+            }
         }
         SandboxCatalogState next = current.withImported(imported, System.currentTimeMillis());
         try {

@@ -1,10 +1,13 @@
 package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.ContentValues;
+import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
 import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
@@ -38,7 +41,8 @@ public final class GuestBrokerContentProviderSelfTest {
                 new Resources(new AssetManager(), new DisplayMetrics(), new Configuration()),
                 new AssetManager(), new android.content.pm.PackageManager());
         GuestBrokerContentProvider provider = new GuestBrokerContentProvider(
-                context, spec, "guest.authority", "guest.pkg.Provider");
+                context, spec, "guest.pkg", 2, "guest.pkg", "guest.authority",
+                "guest.pkg.Provider", false);
 
         provider.prepare();
         require(ComponentOperations.PREPARE_PROVIDER.equals(broker.operations.get(0)),
@@ -57,9 +61,40 @@ public final class GuestBrokerContentProviderSelfTest {
                         && broker.operations.contains(ComponentOperations.PROVIDER_CURSOR_CLOSE),
                 "query pages and closes remote cursor");
 
+        Bundle queryArgs = new Bundle();
+        queryArgs.putString("android:query-arg-sql-selection", "id > ?");
+        queryArgs.putStringArray("android:query-arg-sql-selection-args", new String[]{"6"});
+        queryArgs.putString("android:query-arg-sql-limit", "2");
+        CancellationSignal cancellation = new CancellationSignal();
+        Cursor modern = provider.query(Uri.parse("content://guest.authority/items"),
+                new String[]{"id", "name"}, queryArgs, cancellation);
+        require(modern.getCount() == 2 && broker.lastRequest(ComponentOperations.PROVIDER_QUERY)
+                        .getBundle(RuntimeKeys.PROVIDER_QUERY_ARGS) != null,
+                "modern query arguments cross the Broker boundary");
+        cancellation.cancel();
+        try { modern.moveToPosition(0); } catch (RuntimeException expected) { }
+        require(broker.operations.contains(ComponentOperations.PROVIDER_CURSOR_CANCEL),
+                "CancellationSignal cancels the remote cursor lease");
+
         require("vnd.android.cursor.dir/item".equals(
                 provider.getType(Uri.parse("content://guest.authority/items"))),
                 "getType routed");
+        require("content://guest.authority/canonical/7".equals(String.valueOf(provider.canonicalize(
+                Uri.parse("content://guest.authority/items/7")))),
+                "canonicalize routed");
+        require("content://guest.authority/items/7".equals(String.valueOf(provider.uncanonicalize(
+                Uri.parse("content://guest.authority/canonical/7")))),
+                "uncanonicalize routed");
+        String[] streamTypes = provider.getStreamTypes(
+                Uri.parse("content://guest.authority/items/7"), "image/*");
+        require(streamTypes != null && streamTypes.length == 1
+                        && "image/png".equals(streamTypes[0]),
+                "getStreamTypes routed");
+        require("vnd.android.cursor.item/anonymous".equals(provider.getTypeAnonymous(
+                Uri.parse("content://guest.authority/items/7"))),
+                "anonymous MIME type routed");
+        require(provider.refresh(Uri.parse("content://guest.authority/items/7"), null,
+                new CancellationSignal()), "refresh routed");
 
         ContentValues values = new ContentValues();
         values.put("name", "inserted");
@@ -75,10 +110,54 @@ public final class GuestBrokerContentProviderSelfTest {
 
         Bundle extras = new Bundle();
         extras.putString("input", "value");
+        Bundle nestedExtras = new Bundle();
+        nestedExtras.putInt("count", 3);
+        extras.putBundle("nested", nestedExtras);
+        extras.putByteArray("bytes", new byte[]{1, 2, 3});
+        extras.putStringArray("names", new String[]{"alpha", "beta"});
         Bundle called = provider.call("ping", "arg", extras);
         require("pong".equals(called.getString("reply", "")), "call result routed");
+        Bundle callWire = broker.lastRequest(ComponentOperations.PROVIDER_CALL)
+                .getBundle(RuntimeKeys.PROVIDER_EXTRAS);
+        require(callWire != null && "value".equals(callWire.getString("input"))
+                        && callWire.getBundle("nested") != null
+                        && callWire.getBundle("nested").getInt("count", -1) == 3
+                        && callWire.getByteArray("bytes").length == 3,
+                "provider call preserves bounded nested and array extras");
+        Bundle unsafeExtras = new Bundle();
+        unsafeExtras.putBinder("binder", new android.os.Binder());
+        boolean unsafeRejected = false;
+        try { provider.call("unsafe", null, unsafeExtras); }
+        catch (IllegalArgumentException expected) { unsafeRejected = true; }
+        require(unsafeRejected, "provider call allowed a Binder handle through the Guest boundary");
         require(provider.call("returnsNull", null, null) == null,
                 "null Provider.call result and argument are preserved");
+
+        Bundle batchCallExtras = new Bundle();
+        batchCallExtras.putString("batchInput", "value");
+        Bundle batchNested = new Bundle();
+        batchNested.putInt("count", 4);
+        batchCallExtras.putBundle("batchNested", batchNested);
+        batchCallExtras.putByteArray("ids", new byte[]{4, 5, 6});
+        ContentProviderOperation batchCall = ContentProviderOperation.newCall(
+                Uri.parse("content://guest.authority"), "batchPing", "batchArg")
+                .withExtras(batchCallExtras).build();
+        ContentProviderResult[] batchResults = provider.applyBatch(
+                new ArrayList<>(List.of(batchCall)));
+        require(batchResults.length == 1 && batchResults[0].count != null
+                        && batchResults[0].count == 1,
+                "batch CALL result routed");
+        Bundle batchWire = broker.lastRequest(ComponentOperations.PROVIDER_APPLY_BATCH);
+        Bundle batchOperation = batchWire.getBundle(
+                RuntimeKeys.PROVIDER_BATCH_OPERATION_PREFIX + "0");
+        Bundle batchWireExtras = batchOperation == null ? null
+                : batchOperation.getBundle(RuntimeKeys.PROVIDER_BATCH_EXTRAS);
+        require(batchWireExtras != null && "value".equals(batchWireExtras.getString("batchInput"))
+                        && batchWireExtras.getBundle("batchNested") != null
+                        && batchWireExtras.getBundle("batchNested").getInt("count", -1) == 4
+                        && batchWireExtras.getByteArray("ids") != null
+                        && batchWireExtras.getByteArray("ids").length == 3,
+                "batch CALL preserves nested and primitive-array extras");
 
         Cursor nullableQuery = provider.query(Uri.parse("content://guest.authority/items"),
                 null, null, null, null);
@@ -183,6 +262,22 @@ public final class GuestBrokerContentProviderSelfTest {
                 case ComponentOperations.PROVIDER_GET_TYPE:
                     result.putString("mimeType", "vnd.android.cursor.dir/item");
                     break;
+                case ComponentOperations.PROVIDER_GET_TYPE_ANONYMOUS:
+                    result.putString("mimeType", "vnd.android.cursor.item/anonymous");
+                    break;
+                case ComponentOperations.PROVIDER_CANONICALIZE:
+                    result.putString(RuntimeKeys.URI, "content://guest.authority/canonical/7");
+                    break;
+                case ComponentOperations.PROVIDER_UNCANONICALIZE:
+                    result.putString(RuntimeKeys.URI, "content://guest.authority/items/7");
+                    break;
+                case ComponentOperations.PROVIDER_GET_STREAM_TYPES:
+                    result.putStringArrayList(RuntimeKeys.PROVIDER_STREAM_TYPES,
+                            new ArrayList<>(List.of("image/png")));
+                    break;
+                case ComponentOperations.PROVIDER_REFRESH:
+                    result.putBoolean("refreshed", true);
+                    break;
                 case ComponentOperations.PROVIDER_INSERT:
                     insertValues = payload.getBundle(RuntimeKeys.PROVIDER_VALUES);
                     result.putString(RuntimeKeys.URI, "content://guest.authority/items/9");
@@ -202,13 +297,27 @@ public final class GuestBrokerContentProviderSelfTest {
                         result.putBundle(RuntimeKeys.PROVIDER_RESULT, null);
                     }
                     break;
+                case ComponentOperations.PROVIDER_APPLY_BATCH:
+                    Bundle batchOperation = payload.getBundle(
+                            RuntimeKeys.PROVIDER_BATCH_OPERATION_PREFIX + "0");
+                    require(batchOperation != null
+                                    && "batchPing".equals(batchOperation.getString(
+                                            RuntimeKeys.PROVIDER_METHOD, "")),
+                            "batch CALL method preserved on wire");
+                    result.putString(RuntimeKeys.STATUS, "PROVIDER_BATCH_APPLIED");
+                    result.putInt(RuntimeKeys.PROVIDER_BATCH_RESULT_COUNT, 1);
+                    Bundle batchResult = new Bundle();
+                    batchResult.putInt(RuntimeKeys.PROVIDER_BATCH_AFFECTED_ROWS, 1);
+                    result.putBundle(RuntimeKeys.PROVIDER_BATCH_RESULT_PREFIX + "0", batchResult);
+                    break;
                 case ComponentOperations.PROVIDER_OPEN_FILE:
                     result.putParcelable(RuntimeKeys.FILE_DESCRIPTOR, new ParcelFileDescriptor());
                     break;
                 default:
                     break;
             }
-            return RuntimeOperationResult.success(request, "OK", result);
+            return RuntimeOperationResult.success(request,
+                    result.getString(RuntimeKeys.STATUS, "OK"), result);
         }
 
 
@@ -226,6 +335,7 @@ public final class GuestBrokerContentProviderSelfTest {
         @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId, long generation,
                 String permission, int requestCode, boolean hostGranted, String reason) { return null; }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { return null; }
+        @Override public int virtualUidFor(String packageName, int virtualUserId) { return 12002; }
         @Override public void stopGuest(String packageName, int virtualUserId) { }
     }
 

@@ -42,6 +42,20 @@ function Invoke-DebugCommand([object]$Device, [string]$Command, [bool]$TrustNati
 try {
     $device = Resolve-T57RdDevice -InstanceName $InstanceName -Serial $Serial
     $null = Write-T57RdEvidence -Device $device -CaseName $caseName -OutputDirectory $OutputDirectory
+    # Recovery deliberately keeps a hold-prepare client alive while the replacement Guest is
+    # prepared.  A lifecycle transaction is a new test session, so cancel any previous host
+    # command before clearing logcat; otherwise its expected late launch failure is attributed
+    # to clear/delete/reinstall and makes the result depend on probe ordering.
+    Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'am', 'force-stop', $hostPackage) | Out-Null
+    Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'am', 'force-stop', $guestPackage) | Out-Null
+    # A prior cross-ABI case owns a separate Companion process.  Stop that independent virtual
+    # world before this case so its remote package/system-service connection cannot contaminate
+    # the ordinary-ABI lifecycle evidence.
+    Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'am', 'force-stop',
+        'com.warden.controlledsandbox.companion32.debug') | Out-Null
+    Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'am', 'force-stop',
+        'com.warden.controlledsandbox.fixture32') | Out-Null
+    Invoke-AdbChecked @('-s', $device.Serial, 'logcat', '-c') | Out-Null
     $instanceRoot = "files/instances/u0/$guestPackage"
     Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'run-as', $hostPackage, 'mkdir', '-p',
         $instanceRoot) | Out-Null

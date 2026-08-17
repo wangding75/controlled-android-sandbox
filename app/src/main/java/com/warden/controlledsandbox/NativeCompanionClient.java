@@ -136,27 +136,6 @@ final class NativeCompanionClient implements AutoCloseable {
                 stagedPaths.add(split.absolutePath());
             }
             staged.putStringArrayList(RuntimeKeys.SPLIT_PATHS, stagedPaths);
-
-            File nativeRoot = record.nativeLibraryDir == null || record.nativeLibraryDir.trim().isEmpty()
-                    ? null : new File(record.nativeLibraryDir);
-            if (nativeRoot != null && nativeRoot.isDirectory()) {
-                File[] libraries = nativeRoot.listFiles(file -> file.isFile()
-                        && file.getName().endsWith(".so"));
-                if (libraries == null) libraries = new File[0];
-                if (libraries.length > MAX_NATIVE_LIBRARIES) {
-                    throw new IllegalStateException("NATIVE_COMPANION_LIBRARY_LIMIT_EXCEEDED");
-                }
-                Set<String> namesSeen = new HashSet<>();
-                for (File library : libraries) {
-                    if (!namesSeen.add(library.getName())) {
-                        throw new IllegalStateException("NATIVE_COMPANION_DUPLICATE_LIBRARY_NAME");
-                    }
-                    stageFile(service, record, virtualUserId,
-                            NativeCompanionArtifactRequest.NATIVE_LIBRARY,
-                            "lib/" + library.getName(), library, ApkImportManager.sha256(library));
-                }
-                staged.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, workspace.nativeLibraryRoot());
-            }
             stagedRevisions.add(key);
         } else {
             staged.putString(RuntimeKeys.APK_PATH,
@@ -170,12 +149,53 @@ final class NativeCompanionClient implements AutoCloseable {
                 }
             }
             staged.putStringArrayList(RuntimeKeys.SPLIT_PATHS, stagedPaths);
-            if (record.nativeLibraryDir != null && !record.nativeLibraryDir.trim().isEmpty()) {
-                staged.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, workspace.nativeLibraryRoot());
-            }
         }
+        // APK/split staging is revision keyed, but native staging must be repaired on every
+        // request.  The companion evicts old workspaces and can also be restarted independently
+        // of this host process; retaining only the host-side stagedRevisions bit would then leave
+        // an apparently valid nativeLibraryDir pointing at an empty directory.  Native payloads
+        // are bounded and content-addressed by stageFile, so re-staging them is cheap and gives
+        // the guest a real file/ABI invariant before ClassLoader bootstrap.
+        stageNativeLibraries(service, record, virtualUserId, workspace, staged);
         staged.putString(RuntimeKeys.DATA_ROOT, workspace.dataRoot());
         return staged;
+    }
+
+    private void stageNativeLibraries(INativeCompanionArtifactService service, SandboxRecord record,
+            int virtualUserId, NativeCompanionArtifactResult workspace, Bundle staged)
+            throws Exception {
+        File nativeRoot = record.nativeLibraryDir == null || record.nativeLibraryDir.trim().isEmpty()
+                ? null : new File(record.nativeLibraryDir);
+        if (nativeRoot == null || !nativeRoot.isDirectory()) return;
+        // Package import preserves the platform layout as <revision>/lib/<abi>/<name>.so,
+        // while PackageRecordSnapshot intentionally keeps nativeLibraryDir at the stable
+        // revision/lib root (the same shape Android exposes to PackageManager).  The companion
+        // workspace is already ABI-scoped, so enumerate the selected child rather than silently
+        // handing it an empty parent directory.
+        File abiRoot = record.nativeAbi == null || record.nativeAbi.trim().isEmpty()
+                ? nativeRoot : new File(nativeRoot, record.nativeAbi.trim());
+        if (abiRoot.isDirectory()) nativeRoot = abiRoot;
+        File[] libraries = nativeRoot.listFiles(file -> file.isFile()
+                && file.getName().endsWith(".so"));
+        if (libraries == null) libraries = new File[0];
+        if (libraries.length > MAX_NATIVE_LIBRARIES) {
+            throw new IllegalStateException("NATIVE_COMPANION_LIBRARY_LIMIT_EXCEEDED");
+        }
+        Set<String> namesSeen = new HashSet<>();
+        for (File library : libraries) {
+            if (!namesSeen.add(library.getName())) {
+                throw new IllegalStateException("NATIVE_COMPANION_DUPLICATE_LIBRARY_NAME");
+            }
+            NativeCompanionArtifactResult stagedLibrary = stageFile(service, record, virtualUserId,
+                    NativeCompanionArtifactRequest.NATIVE_LIBRARY,
+                    "lib/" + library.getName(), library, ApkImportManager.sha256(library));
+            String expected = new File(workspace.nativeLibraryRoot(), library.getName())
+                    .getCanonicalPath();
+            if (!expected.equals(new File(stagedLibrary.absolutePath()).getCanonicalPath())) {
+                throw new SecurityException("COMPANION_NATIVE_PATH_MISMATCH:" + library.getName());
+            }
+        }
+        staged.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, workspace.nativeLibraryRoot());
     }
 
     private NativeCompanionArtifactResult stageFile(INativeCompanionArtifactService service,
@@ -186,6 +206,8 @@ final class NativeCompanionClient implements AutoCloseable {
                 PROTOCOL, transferSession(record, virtualUserId), 1L, virtualUserId,
                 record.packageName, record.sha256, record.nativeAbi, kind, relativePath,
                 sha256, source.length());
+        NativeCompanionArtifactResult existing = service.inspectArtifact(request);
+        if (existing != null && existing.successful()) return existing;
         try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(
                 source, ParcelFileDescriptor.MODE_READ_ONLY)) {
             return requireSuccess(service.stageArtifact(request, descriptor));

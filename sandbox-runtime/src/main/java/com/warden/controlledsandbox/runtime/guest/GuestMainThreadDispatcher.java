@@ -19,6 +19,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Serializes Android component lifecycle work onto the Guest process main thread.
@@ -114,6 +115,23 @@ final class GuestMainThreadDispatcher implements AutoCloseable {
         } catch (TimeoutException impossible) {
             throw new IllegalStateException("GUEST_BROKER_RESULT_UNAVAILABLE", impossible);
         }
+    }
+
+    /** Runs a Broker transaction without holding the Guest main Handler in a synchronous wait. */
+    <T> void callBrokerAsync(Callable<T> action, Consumer<T> success,
+                             Consumer<Throwable> failure) {
+        requireOpen();
+        Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(success, "success");
+        Objects.requireNonNull(failure, "failure");
+        brokerWorkers.execute(() -> {
+            try {
+                success.accept(unchecked(action));
+            } catch (Throwable error) {
+                FatalErrorPolicy.rethrowIfFatal(error);
+                failure.accept(error);
+            }
+        });
     }
 
     <T> T callOnHandler(Handler handler, Callable<T> action) {

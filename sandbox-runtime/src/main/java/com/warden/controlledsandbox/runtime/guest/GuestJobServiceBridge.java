@@ -2,6 +2,8 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.app.job.JobParameters;
 import android.app.job.JobService;
+import android.app.job.JobWorkItem;
+import android.app.Service;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
@@ -10,7 +12,9 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.PersistableBundle;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
+import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
@@ -27,6 +31,8 @@ final class GuestJobServiceBridge implements AutoCloseable {
     private final Map<String, JobService> services = new LinkedHashMap<>();
     private final Map<Integer, RunningJob> running = new LinkedHashMap<>();
     private final java.util.Set<Integer> starting = new java.util.LinkedHashSet<>();
+    /** Generation teardown must win over a queued JobScheduler callback or service start. */
+    private volatile boolean closed;
 
     GuestJobServiceBridge(GuestRuntimeEnvironment.Session session) {
         this.session = java.util.Objects.requireNonNull(session, "session");
@@ -35,6 +41,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
     boolean start(int guestJobId, Object jobPayload,
             VirtualSystemServiceAuthority.JobParametersRecord parameters,
             VirtualSystemServiceAuthority.JobExecution execution) {
+        if (closed) return false;
         if (guestJobId < 0 || parameters == null || execution == null
                 || execution.guestJobId() != guestJobId
                 || execution.generation() != session.spec.generation
@@ -42,6 +49,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
             return false;
         }
         synchronized (this) {
+            if (closed) return false;
             RunningJob existing = running.get(guestJobId);
             if ((existing != null && existing.execution.active()) || !starting.add(guestJobId)) return false;
         }
@@ -54,16 +62,28 @@ final class GuestJobServiceBridge implements AutoCloseable {
             synchronized (this) { starting.remove(guestJobId); }
             throw error;
         }
+        if (closed) {
+            synchronized (this) { starting.remove(guestJobId); }
+            return false;
+        }
         GuestJobCallbackBinder callback = new GuestJobCallbackBinder(guestJobId, execution,
                 () -> removeFinished(guestJobId));
         JobParameters jobParameters = GuestJobParametersFactory.create(parameters, callback);
         boolean ongoing;
         try {
-            ongoing = onMain(() -> service.onStartJob(jobParameters));
+            ongoing = onMain(() -> {
+                if (closed) return false;
+                return service.onStartJob(jobParameters);
+            });
         } catch (RuntimeException error) {
             synchronized (this) { starting.remove(guestJobId); }
             callback.invalidate();
             event("GUEST_JOB_START_FAILED", guestJobId, className, error.getClass().getSimpleName());
+            return false;
+        }
+        if (closed) {
+            synchronized (this) { starting.remove(guestJobId); }
+            callback.invalidate();
             return false;
         }
         if (!ongoing) {
@@ -73,6 +93,11 @@ final class GuestJobServiceBridge implements AutoCloseable {
             return true;
         }
         synchronized (this) {
+            if (closed) {
+                starting.remove(guestJobId);
+                callback.invalidate();
+                return false;
+            }
             starting.remove(guestJobId);
             if (callback.active()) {
                 RunningJob previous = running.putIfAbsent(guestJobId,
@@ -90,6 +115,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
 
     boolean stop(int guestJobId,
             VirtualSystemServiceAuthority.JobParametersRecord parameters) {
+        if (closed) return true;
         RunningJob value;
         synchronized (this) { value = running.remove(guestJobId); }
         if (value == null) return true;
@@ -114,6 +140,8 @@ final class GuestJobServiceBridge implements AutoCloseable {
         List<RunningJob> active;
         List<JobService> created;
         synchronized (this) {
+            if (closed) return;
+            closed = true;
             active = new ArrayList<>(running.values()); running.clear(); starting.clear();
             created = new ArrayList<>(services.values()); services.clear();
         }
@@ -132,17 +160,31 @@ final class GuestJobServiceBridge implements AutoCloseable {
 
     private JobService service(String className) {
         synchronized (this) {
+            if (closed) throw new IllegalStateException("GUEST_JOB_BRIDGE_CLOSED");
             JobService existing = services.get(className);
             if (existing != null) return existing;
         }
         JobService created;
         try {
             created = onMain(() -> {
+                if (closed) throw new IllegalStateException("GUEST_JOB_BRIDGE_CLOSED");
                 Class<?> type = session.classLoader.loadClass(className);
                 if (!JobService.class.isAssignableFrom(type)) {
                     throw new IllegalArgumentException("Component is not a JobService: " + className);
                 }
-                JobService value = (JobService) type.getDeclaredConstructor().newInstance();
+                // JobService is a Service component.  ActivityThread/LoadedApk uses the
+                // application's AppComponentFactory for it as well; direct reflection here
+                // bypassed factory-installed loader/bootstrap state and made JobScheduler a
+                // semantic exception to the normal component lifecycle.
+                Service instantiated = GuestComponentFactory.instantiateService(
+                        session.context.getClassLoader(),
+                        session.context.getApplicationInfo().appComponentFactory,
+                        className, new Intent("android.app.job.JobService"));
+                if (!(instantiated instanceof JobService)) {
+                    throw new IllegalArgumentException("Factory did not create a JobService: "
+                            + className);
+                }
+                JobService value = (JobService) instantiated;
                 attachBaseContext(value, session.context);
                 setOptionalField(value, "mApplication", session.application);
                 setOptionalField(value, "mClassName", className);
@@ -156,7 +198,18 @@ final class GuestJobServiceBridge implements AutoCloseable {
         } catch (RuntimeException error) { throw error; }
         catch (Exception error) { throw new IllegalStateException("GUEST_JOB_SERVICE_CREATE_FAILED", error); }
         JobService existing;
-        synchronized (this) { existing = services.putIfAbsent(className, created); }
+        synchronized (this) {
+            if (closed) {
+                existing = null;
+            } else {
+                existing = services.putIfAbsent(className, created);
+            }
+        }
+        if (closed) {
+            try { onMain(() -> { created.onDestroy(); return false; }); }
+            catch (RuntimeException ignored) { }
+            throw new IllegalStateException("GUEST_JOB_BRIDGE_CLOSED");
+        }
         if (existing == null) return created;
         try { onMain(() -> { created.onDestroy(); return false; }); }
         catch (RuntimeException ignored) { }
@@ -205,10 +258,15 @@ final class GuestJobServiceBridge implements AutoCloseable {
                               VirtualSystemServiceAuthority.JobExecution execution) { }
     @FunctionalInterface private interface ThrowingSupplier<T> { T get() throws Exception; }
 
-    /** Raw callback accepted by hidden JobParameters constructors; only jobFinished is honored. */
+    /** Raw callback accepted by hidden JobParameters constructors. */
     static final class GuestJobCallbackBinder extends Binder {
         private static final String DESCRIPTOR = "android.app.job.IJobCallback";
-        private static final int JOB_FINISHED_TRANSACTION = transactionCode();
+        private static final int DEQUEUE_WORK_TRANSACTION = transactionCode(
+                "TRANSACTION_dequeueWork", 3);
+        private static final int COMPLETE_WORK_TRANSACTION = transactionCode(
+                "TRANSACTION_completeWork", 4);
+        private static final int JOB_FINISHED_TRANSACTION = transactionCode(
+                "TRANSACTION_jobFinished", 5);
         private final int guestJobId;
         private final VirtualSystemServiceAuthority.JobExecution execution;
         private final Runnable completion;
@@ -231,6 +289,32 @@ final class GuestJobServiceBridge implements AutoCloseable {
             if (code == IBinder.INTERFACE_TRANSACTION) {
                 if (reply != null) reply.writeString(DESCRIPTOR); return true;
             }
+            if (code == DEQUEUE_WORK_TRANSACTION) {
+                data.enforceInterface(DESCRIPTOR);
+                int reportedJobId = data.readInt();
+                if (reportedJobId != guestJobId) {
+                    throw new SecurityException("VIRTUAL_JOB_CALLBACK_ID_MISMATCH");
+                }
+                VirtualJobWorkItemSnapshot snapshot = active() ? execution.dequeueWork() : null;
+                JobWorkItem item = GuestJobWorkItemFactory.create(snapshot);
+                if (reply != null) {
+                    reply.writeNoException();
+                    if (item == null) reply.writeInt(0);
+                    else { reply.writeInt(1); item.writeToParcel(reply, 1); }
+                }
+                return true;
+            }
+            if (code == COMPLETE_WORK_TRANSACTION) {
+                data.enforceInterface(DESCRIPTOR);
+                int reportedJobId = data.readInt();
+                int workId = data.readInt();
+                if (reportedJobId != guestJobId) {
+                    throw new SecurityException("VIRTUAL_JOB_CALLBACK_ID_MISMATCH");
+                }
+                boolean completed = active() && execution.completeWork(workId);
+                if (reply != null) { reply.writeNoException(); reply.writeInt(completed ? 1 : 0); }
+                return true;
+            }
             if (code == JOB_FINISHED_TRANSACTION) {
                 data.enforceInterface(DESCRIPTOR);
                 int reportedJobId = data.readInt();
@@ -245,16 +329,66 @@ final class GuestJobServiceBridge implements AutoCloseable {
             try { return super.onTransact(code, data, reply, flags); }
             catch (Exception error) { throw new IllegalStateException(error); }
         }
-        private static int transactionCode() {
+        private static int transactionCode(String fieldName, int fallback) {
             try {
                 Class<?> type = Class.forName("android.app.job.IJobCallback$Stub");
-                Field field = type.getDeclaredField("TRANSACTION_jobFinished");
+                Field field = type.getDeclaredField(fieldName);
                 field.setAccessible(true); return field.getInt(null);
             } catch (Throwable ignored) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
-                // API 26+ has dequeueWork/completeWork before jobFinished.
-                return 5;
+                return fallback;
             }
+        }
+    }
+
+    /** Reconstructs a real framework JobWorkItem only after the Guest callback asks for it. */
+    static final class GuestJobWorkItemFactory {
+        static JobWorkItem create(VirtualJobWorkItemSnapshot value) {
+            if (value == null) return null;
+            Intent intent = parcelable(value.intent(), Intent.class);
+            if (intent == null) throw new IllegalStateException("VIRTUAL_JOB_WORK_INTENT_MISSING");
+            JobWorkItem item = new JobWorkItem(intent);
+            if (!setField(item, value.workId(), "mWorkId", "workId")) {
+                throw new IllegalStateException("VIRTUAL_JOB_WORK_ID_FIELD_UNSUPPORTED");
+            }
+            setField(item, value.deliveryCount(), "mDeliveryCount", "deliveryCount");
+            setField(item, value.estimatedNetworkDownloadBytes(),
+                    "mEstimatedNetworkDownloadBytes", "estimatedNetworkDownloadBytes");
+            setField(item, value.estimatedNetworkUploadBytes(),
+                    "mEstimatedNetworkUploadBytes", "estimatedNetworkUploadBytes");
+            setField(item, value.minimumNetworkChunkBytes(),
+                    "mMinimumNetworkChunkBytes", "minimumNetworkChunkBytes");
+            Object extras = parcelable(value.extras(), PersistableBundle.class);
+            if (extras != null) setField(item, extras, "mExtras", "extras");
+            return item;
+        }
+
+        private static <T> T parcelable(byte[] payload, Class<T> expected) {
+            if (payload == null || payload.length == 0) return null;
+            Parcel parcel = Parcel.obtain();
+            try {
+                parcel.unmarshall(payload, 0, payload.length);
+                parcel.setDataPosition(0);
+                Object value = parcel.readParcelable(expected.getClassLoader());
+                return expected == Object.class || expected.isInstance(value)
+                        ? expected.cast(value) : null;
+            } finally { parcel.recycle(); }
+        }
+
+        private static boolean setField(Object target, Object value, String... names) {
+            for (String name : names) {
+                for (Class<?> cursor = target.getClass(); cursor != null; cursor = cursor.getSuperclass()) {
+                    try {
+                        Field field = cursor.getDeclaredField(name);
+                        field.setAccessible(true); field.set(target, value); return true;
+                    } catch (NoSuchFieldException ignored) {
+                    } catch (Throwable error) {
+                        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                        return false;
+                    }
+                }
+            }
+            return false;
         }
     }
 

@@ -38,9 +38,12 @@ factory=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runt
  'DocumentLaunchMode.ALWAYS','DocumentLaunchMode.INTO_EXISTING','LaunchFlags.NEW_DOCUMENT',
  'LaunchFlags.MULTIPLE_TASK')
 broker=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
- 'activityRuntime.clearMismatchedRevision','activityRuntime.clearPackageInstance',
  'activityTaskOperation(ActivityTaskRequest request)',
  'activityResultOperation(ActivityResultRequest request)')
+lifecycle=require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java',
+ 'stopMismatchedRevisionSessions','activityRuntime.clearMismatchedRevision',
+ 'activityRuntime.clearPackageInstance','componentRecoveryCoordinator.recover',
+ 'bindApplication/LoadedApk/Application bootstrap')
 require('sandbox-contract/src/main/aidl/com/warden/controlledsandbox/contract/IRuntimeBroker.aidl',
  'ActivityTaskResult activityTaskOperation(in ActivityTaskRequest request);',
  'ActivityResultResult activityResultOperation(in ActivityResultRequest request);')

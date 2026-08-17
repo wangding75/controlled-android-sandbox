@@ -27,6 +27,15 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
     OrderedReceiverFinishInterceptor orderedReceivers() { return orderedReceivers; }
     PendingIntentFrameworkInterceptor pendingIntents() { return pendingIntents; }
     boolean sendPersistentPendingIntent(String tokenId) { return pendingIntents.sendPersistent(tokenId); }
+    boolean sendPersistentPendingIntent(String tokenId,
+                                        com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry.SendRequest request) {
+        return pendingIntents.sendPersistent(tokenId, request);
+    }
+    PendingIntentFrameworkInterceptor.PersistentSendResult sendPersistentPendingIntentResult(
+            String tokenId,
+            com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistry.SendRequest request) {
+        return pendingIntents.sendPersistentResult(tokenId, request);
+    }
 
     @Override public Interception intercept(String serviceName, Method method, Object[] arguments) throws Throwable {
         Interception provider = contentProviders.intercept(serviceName, method, arguments);

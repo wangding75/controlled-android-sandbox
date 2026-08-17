@@ -55,14 +55,18 @@ public final class ProviderLifecycleCoordinator {
 
     public static final class RecoveryResult {
         private final int authoritiesRebound;
+        private final int grantsRebound;
         private final CleanupResult staleResources;
 
-        private RecoveryResult(int authoritiesRebound, CleanupResult staleResources) {
+        private RecoveryResult(int authoritiesRebound, int grantsRebound,
+                               CleanupResult staleResources) {
             this.authoritiesRebound = authoritiesRebound;
+            this.grantsRebound = grantsRebound;
             this.staleResources = staleResources;
         }
 
         int authoritiesRebound() { return authoritiesRebound; }
+        public int grantsRebound() { return grantsRebound; }
         public CleanupResult staleResources() { return staleResources; }
     }
 
@@ -94,12 +98,22 @@ public final class ProviderLifecycleCoordinator {
     private final BrokerCursorRuntime cursors;
     private final BrokerFileRuntime files;
     private final BrokerObserverRuntime observers;
+    private final BrokerProviderQueryCancellation queryCancellations;
     private final UriGrantRegistry grants;
 
     public ProviderLifecycleCoordinator(BrokerProviderRuntime providers,
                                  BrokerCursorRuntime cursors,
                                  BrokerFileRuntime files,
                                  BrokerObserverRuntime observers,
+                                 UriGrantRegistry grants) {
+        this(providers, cursors, files, observers, new BrokerProviderQueryCancellation(), grants);
+    }
+
+    public ProviderLifecycleCoordinator(BrokerProviderRuntime providers,
+                                 BrokerCursorRuntime cursors,
+                                 BrokerFileRuntime files,
+                                 BrokerObserverRuntime observers,
+                                 BrokerProviderQueryCancellation queryCancellations,
                                  UriGrantRegistry grants) {
         if (providers == null || cursors == null || files == null || observers == null || grants == null) {
             throw new IllegalArgumentException("Provider lifecycle registries are required");
@@ -108,20 +122,25 @@ public final class ProviderLifecycleCoordinator {
         this.cursors = cursors;
         this.files = files;
         this.observers = observers;
+        this.queryCancellations = queryCancellations == null
+                ? new BrokerProviderQueryCancellation() : queryCancellations;
         this.grants = grants;
     }
 
-    /** Preserve authority only for a recoverable disconnect; terminal disconnects remove all ownership. */
+    /**
+     * Preserve recoverable authority and URI permissions; revoke process-bound capabilities.
+     * Terminal disconnects remove all ownership.
+     */
     public synchronized CleanupResult disconnectSession(GuestSession session) {
         requireSession(session);
         int authorityCount = session.state() == SessionState.RECOVERING ? 0 : providers.invalidate(session);
-        return cleanupSessionCapabilities(session, authorityCount);
+        return cleanupSessionCapabilities(session, authorityCount, session.state() != SessionState.RECOVERING);
     }
 
     /** Remove authority ownership and every capability tied to an explicitly stopped or failed Session. */
     public synchronized CleanupResult stopSession(GuestSession session) {
         requireSession(session);
-        return cleanupSessionCapabilities(session, providers.invalidate(session));
+        return cleanupSessionCapabilities(session, providers.invalidate(session), true);
     }
 
     /** Rebind authority ownership and revoke every capability issued under the stale generation. */
@@ -129,7 +148,10 @@ public final class ProviderLifecycleCoordinator {
         requireSession(stale);
         requireSession(current);
         int rebound = providers.processRecovered(stale, current);
-        return new RecoveryResult(rebound, cleanupSessionCapabilities(stale, 0));
+        int grantsRebound = grants.rebindSession(stale.sessionId(), stale.generation(),
+                current.sessionId(), current.generation());
+        return new RecoveryResult(rebound, grantsRebound,
+                cleanupSessionCapabilities(stale, 0, false));
     }
 
     /** Remove all Provider resources owned by or issued to one virtual App instance. */
@@ -138,6 +160,7 @@ public final class ProviderLifecycleCoordinator {
         int authorityCount = providers.invalidateInstance(packageName, virtualUserId);
         int observerCount = observers.invalidateInstance(instance);
         int grantCount = grants.revokeInstance(instance);
+        queryCancellations.invalidateInstance(instance);
         return new CleanupResult(authorityCount, observerCount, grantCount,
                 cursors.invalidateInstance(instance), files.invalidateInstance(instance));
     }
@@ -145,6 +168,7 @@ public final class ProviderLifecycleCoordinator {
     /** Purge all time-bounded Provider capabilities using one Broker timestamp. */
     public synchronized CleanupResult purgeExpired(long nowMs) {
         int expiredGrants = grants.purgeExpiredGrants(nowMs);
+        queryCancellations.purgeExpired();
         return new CleanupResult(0, 0, expiredGrants,
                 cursors.purgeExpired(nowMs), files.purgeExpired(nowMs));
     }
@@ -154,9 +178,12 @@ public final class ProviderLifecycleCoordinator {
                 cursors.size(nowMs), files.size());
     }
 
-    private CleanupResult cleanupSessionCapabilities(GuestSession session, int authorityCount) {
+    private CleanupResult cleanupSessionCapabilities(GuestSession session, int authorityCount,
+                                                     boolean revokeGrants) {
         int observerCount = observers.invalidateSession(session.sessionId(), session.generation());
-        int grantCount = grants.revokeSession(session.sessionId(), session.generation());
+        int grantCount = revokeGrants
+                ? grants.revokeSession(session.sessionId(), session.generation()) : 0;
+        queryCancellations.invalidateSession(session.sessionId(), session.generation());
         return new CleanupResult(authorityCount, observerCount, grantCount,
                 cursors.invalidateSession(session.sessionId(), session.generation()),
                 files.invalidateSession(session.sessionId(), session.generation()));

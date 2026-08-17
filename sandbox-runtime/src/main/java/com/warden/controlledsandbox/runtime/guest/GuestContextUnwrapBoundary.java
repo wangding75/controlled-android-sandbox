@@ -17,6 +17,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.database.DatabaseErrorHandler;
 import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -69,6 +70,15 @@ final class GuestContextUnwrapBoundary extends GuestHostOperationDenyContext {
     }
     @Override public void enforcePermission(String permission, int pid, int uid, String message) {
         owner.enforcePermission(permission, pid, uid, message);
+    }
+    @Override public void grantUriPermission(String toPackage, Uri uri, int modeFlags) {
+        owner.grantUriPermission(toPackage, uri, modeFlags);
+    }
+    @Override public void revokeUriPermission(Uri uri, int modeFlags) {
+        owner.revokeUriPermission(uri, modeFlags);
+    }
+    @Override public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
+        return owner.checkUriPermission(uri, pid, uid, modeFlags);
     }
     @Override public Object getSystemService(String name) { return owner.getSystemService(name); }
     @Override public ContentResolver getContentResolver() { return owner.getContentResolver(); }

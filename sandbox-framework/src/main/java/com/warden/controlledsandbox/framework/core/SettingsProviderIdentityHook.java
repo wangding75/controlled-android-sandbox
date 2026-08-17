@@ -77,6 +77,9 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         if (cache == null) throw new IllegalStateException("Settings." + nestedName + " cache is unavailable");
         ProviderField provider = providerField(cache);
         Object original = provider.field.get(provider.owner);
+        if (original == null && identity.isolatedProcess()) {
+            original = syntheticProvider(provider.field.getType());
+        }
         if (original == null) {
             original = acquireProvider(context, namespace, providerLeases);
             if (original != null) provider.field.set(provider.owner, original);
@@ -90,6 +93,32 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         Object proxy = proxy(original, identity, device, settings, namespace, virtualAndroidId);
         provider.field.set(provider.owner, proxy);
         replacements.add(new ProviderReplacement(provider.owner, provider.field, original));
+    }
+
+    /**
+     * ActivityManager rejects getContentProvider from isolated_app. Settings is already backed
+     * by the virtual authority, so a capability process needs only the IContentProvider shape,
+     * not a real provider lease. Unknown calls return framework-neutral defaults; virtual reads
+     * and writes are handled by the outer proxy below.
+     */
+    private static Object syntheticProvider(Class<?> providerType) {
+        if (!providerType.isInterface()) return null;
+        ClassLoader loader = providerType.getClassLoader();
+        if (loader == null) loader = SettingsProviderIdentityHook.class.getClassLoader();
+        return Proxy.newProxyInstance(loader, new Class<?>[] {providerType}, (ignored, method, args) -> {
+            if ("asBinder".equals(method.getName())) return new android.os.Binder();
+            Class<?> returnType = method.getReturnType();
+            if (!returnType.isPrimitive()) return null;
+            if (returnType == boolean.class) return false;
+            if (returnType == byte.class) return (byte) 0;
+            if (returnType == short.class) return (short) 0;
+            if (returnType == int.class) return 0;
+            if (returnType == long.class) return 0L;
+            if (returnType == float.class) return 0F;
+            if (returnType == double.class) return 0D;
+            if (returnType == char.class) return (char) 0;
+            return null;
+        });
     }
 
     private static Object acquireProvider(Context context, String namespace,

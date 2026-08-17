@@ -4,13 +4,24 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
 import android.os.Process;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
-
 import com.warden.controlledsandbox.contract.IIsolatedGuestProcess;
+import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.ActivityResultRequest;
+import com.warden.controlledsandbox.contract.ActivityResultResult;
+import com.warden.controlledsandbox.contract.ActivityTaskRequest;
+import com.warden.controlledsandbox.contract.ActivityTaskResult;
+import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.IsolatedProcessRequest;
 import com.warden.controlledsandbox.contract.IsolatedProcessResult;
+import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.RuntimeOperationResult;
+import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
+import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.runtime.broker.CallerGuard;
+import com.warden.controlledsandbox.runtime.broker.FrameworkServiceRelay;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
@@ -45,11 +56,22 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                     throw new IllegalStateException("ISOLATED_SLOT_ALREADY_LEASED");
                 }
                 Bundle payload = request.payload();
+                NativePolicy.installHiddenApiBridge();
+                FrameworkServiceRelay.install(payload.getBundle(
+                        RuntimeKeys.ISOLATED_FRAMEWORK_SERVICE_RELAYS));
                 bindOuterIdentity(payload, request);
                 payload.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
                 payload.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, request.capabilityToken());
-                // Do not expose the full Runtime Broker Binder inside the isolated Guest.
-                payload.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER, null);
+                IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(
+                        payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER));
+                if (broker == null) throw new SecurityException("ISOLATED_RUNTIME_BROKER_MISSING");
+                // The Guest runtime still needs a Binder transport for framework component
+                // routes. Expose only a generation/package-scoped facade; the raw Broker Binder
+                // never enters Guest code and every typed request is revalidated here.
+                payload.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER,
+                        new ScopedRuntimeBroker(broker, request).asBinder());
+                ParcelFileDescriptor sourceApk = payload.getParcelable(RuntimeKeys.ISOLATED_APK_FD);
+                if (sourceApk == null) throw new IllegalStateException("ISOLATED_APK_CAPABILITY_MISSING");
                 Bundle prepared = GuestRuntimeEnvironment.prepare(
                         BaseIsolatedGuestProcessService.this, new GuestPackageSpec(payload));
                 String status = prepared.getString(RuntimeKeys.STATUS, "FAILED");
@@ -85,7 +107,11 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
                 bindOuterIdentity(payload, request);
                 payload.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
                 payload.putString(RuntimeKeys.ISOLATED_CAPABILITY_TOKEN, request.capabilityToken());
-                payload.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER, null);
+                IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(
+                        payload.getBinder(RuntimeKeys.RUNTIME_BROKER_BINDER));
+                if (broker == null) throw new SecurityException("ISOLATED_RUNTIME_BROKER_MISSING");
+                payload.putBinder(RuntimeKeys.RUNTIME_BROKER_BINDER,
+                        new ScopedRuntimeBroker(broker, request).asBinder());
                 Bundle result = GuestRuntimeEnvironment.require(
                         request.sessionId(), request.generation()).components.invoke(payload);
                 result.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
@@ -134,7 +160,14 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
 
     @Override public IBinder onBind(Intent intent) { return binder; }
 
+    @Override public boolean onUnbind(Intent intent) {
+        android.util.Log.w("CS_ISOLATED_BIND", "worker onUnbind slot=" + isolatedSlot());
+        return super.onUnbind(intent);
+    }
+
     @Override public void onDestroy() {
+        android.util.Log.w("CS_ISOLATED_BIND", "worker onDestroy slot=" + isolatedSlot()
+                + " pid=" + Process.myPid());
         try {
             GuestRuntimeEnvironment.shutdownIfCurrent();
         } finally {
@@ -217,5 +250,95 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
         activeCapability = "";
         activeComponent = "";
         activePackage = "";
+    }
+
+    private static final class ScopedRuntimeBroker extends IRuntimeBroker.Stub {
+        private final IRuntimeBroker delegate;
+        private final String sessionId;
+        private final long generation;
+        private final String packageName;
+        private final int virtualUserId;
+
+        ScopedRuntimeBroker(IRuntimeBroker delegate, IsolatedProcessRequest request) {
+            this.delegate = delegate;
+            this.sessionId = request.sessionId();
+            this.generation = request.generation();
+            this.packageName = request.packageName();
+            this.virtualUserId = request.virtualUserId();
+        }
+
+        @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request)
+                throws android.os.RemoteException {
+            require(request == null ? null : request.sessionId(),
+                    request == null ? 0 : request.generation(),
+                    request == null ? null : request.packageName(),
+                    request == null ? -1 : request.virtualUserId());
+            return delegate.executeV2(request);
+        }
+
+        @Override public ActivityTaskResult activityTaskOperation(ActivityTaskRequest request)
+                throws android.os.RemoteException {
+            require(request == null ? null : request.sessionId(),
+                    request == null ? 0 : request.generation(),
+                    request == null ? null : request.packageName(),
+                    request == null ? -1 : request.virtualUserId());
+            return delegate.activityTaskOperation(request);
+        }
+
+        @Override public ActivityResultResult activityResultOperation(ActivityResultRequest request)
+                throws android.os.RemoteException {
+            require(request == null ? null : request.sessionId(),
+                    request == null ? 0 : request.generation(),
+                    request == null ? null : request.packageName(),
+                    request == null ? -1 : request.virtualUserId());
+            return delegate.activityResultOperation(request);
+        }
+
+        @Override public PackageServiceResult requestRuntimePermission(String sessionId,
+                long generation, String permission, int requestCode)
+                throws android.os.RemoteException {
+            require(sessionId, generation, packageName, virtualUserId);
+            return delegate.requestRuntimePermission(sessionId, generation, permission, requestCode);
+        }
+
+        @Override public PackageServiceResult reportRuntimePermissionResult(String sessionId,
+                long generation, String permission, int requestCode, boolean hostGranted,
+                String reason) throws android.os.RemoteException {
+            require(sessionId, generation, packageName, virtualUserId);
+            return delegate.reportRuntimePermissionResult(sessionId, generation, permission,
+                    requestCode, hostGranted, reason);
+        }
+
+        @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request)
+                throws android.os.RemoteException {
+            if (request == null) throw new SecurityException("ISOLATED_STATUS_REQUEST_MISSING");
+            return delegate.runtimeStatusV2(request);
+        }
+
+        @Override public int virtualUidFor(String packageName, int virtualUserId)
+                throws android.os.RemoteException {
+            if (!ScopedRuntimeBroker.this.packageName.equals(packageName)
+                    || ScopedRuntimeBroker.this.virtualUserId != virtualUserId) {
+                throw new SecurityException("ISOLATED_UID_IDENTITY_MISMATCH");
+            }
+            return delegate.virtualUidFor(packageName, virtualUserId);
+        }
+
+        @Override public void stopGuest(String packageName, int virtualUserId)
+                throws android.os.RemoteException {
+            if (!ScopedRuntimeBroker.this.packageName.equals(packageName)
+                    || ScopedRuntimeBroker.this.virtualUserId != virtualUserId) {
+                throw new SecurityException("ISOLATED_STOP_IDENTITY_MISMATCH");
+            }
+            delegate.stopGuest(packageName, virtualUserId);
+        }
+
+        private void require(String requestSession, long requestGeneration,
+                             String requestPackage, int requestUser) {
+            if (!sessionId.equals(requestSession) || generation != requestGeneration
+                    || !packageName.equals(requestPackage) || virtualUserId != requestUser) {
+                throw new SecurityException("ISOLATED_RUNTIME_BROKER_IDENTITY_MISMATCH");
+            }
+        }
     }
 }

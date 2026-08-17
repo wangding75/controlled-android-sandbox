@@ -9,7 +9,8 @@ public record LaunchDecision(
         String activityToken,
         String routeToken,
         int removedActivityCount,
-        boolean createdNewTask) {
+        boolean createdNewTask,
+        boolean hostTaskRebindRequired) {
 
     public LaunchDecision {
         action = Objects.requireNonNull(action, "action");
@@ -21,6 +22,18 @@ public record LaunchDecision(
         if (removedActivityCount < 0) {
             throw new IllegalArgumentException("removedActivityCount must be non-negative");
         }
+    }
+
+    /** Compatibility constructor for callers that do not carry Host-task attachment state. */
+    public LaunchDecision(
+            LaunchAction action,
+            int taskId,
+            String activityToken,
+            String routeToken,
+            int removedActivityCount,
+            boolean createdNewTask) {
+        this(action, taskId, activityToken, routeToken, removedActivityCount,
+                createdNewTask, false);
     }
 
     private static String requireText(String value, String name) {

@@ -369,7 +369,7 @@
       "sourceStatus": "complete",
       "productionStatus": "partial",
       "deviceStatus": "blocked",
-      "notes": "A dedicated Service-only isolated transport is production-wired through four predeclared android:isolatedProcess workers, an independent SessionRegistry, per-generation capability tokens, typed outer identity, platform PID/UID evidence and Binder-death recovery. Non-Service isolated components fail closed. Real APK/data-root accessibility, platform UID/SELinux behavior and Android AMS lifecycle remain blocked on the unavailable locked Android build/device environment."
+      "notes": "A dedicated Service-only isolated transport is production-wired through sixteen predeclared android:isolatedProcess workers, an independent SessionRegistry, per-generation capability tokens, typed outer identity, platform PID/UID evidence and Binder-death recovery. Non-Service isolated components fail closed. Real APK/data-root accessibility, platform UID/SELinux behavior and Android AMS lifecycle remain blocked on the unavailable locked Android build/device environment."
     },
     {
       "id": "runtime.application",

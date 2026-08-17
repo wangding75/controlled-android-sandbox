@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
+import java.io.File;
 
 /** Builds Guest ApplicationInfo without copying Host-only identity or process metadata. */
 final class GuestApplicationInfoFactory {
@@ -37,7 +38,8 @@ final class GuestApplicationInfoFactory {
         info.publicSourceDir = spec.apkPath;
         info.splitSourceDirs = spec.splitPathArray();
         info.splitPublicSourceDirs = spec.splitPathArray();
-        info.nativeLibraryDir = spec.nativeLibraryDir;
+        info.nativeLibraryDir = GuestNativeRuntimeProjection.select(spec, new File(dataDir),
+                spec.effectiveNativeLibraryDir());
         info.dataDir = dataDir;
         info.uid = spec.virtualUid;
         info.enabled = spec.packageState.enabled();

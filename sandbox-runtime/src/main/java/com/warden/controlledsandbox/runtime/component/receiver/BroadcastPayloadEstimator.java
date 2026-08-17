@@ -30,6 +30,10 @@ public final class BroadcastPayloadEstimator {
         copyString(request, payload, RuntimeKeys.URI);
         copyString(request, payload, RuntimeKeys.BROADCAST_SCHEME);
         copyString(request, payload, RuntimeKeys.BROADCAST_HOST);
+        if (request != null && request.containsKey(RuntimeKeys.BROADCAST_PORT)) {
+            payload.putInt(RuntimeKeys.BROADCAST_PORT,
+                    request.getInt(RuntimeKeys.BROADCAST_PORT, -1));
+        }
         copyString(request, payload, RuntimeKeys.BROADCAST_PATH);
         copyString(request, payload, RuntimeKeys.BROADCAST_MIME_TYPE);
         if (request != null) {

@@ -29,6 +29,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     private final HostPermissionStateResolver hostPermissions;
     private final VirtualSystemServiceStore systemServices;
     private final PackageProfileAuthority profiles;
+    private final PackageProfileSession profileSession;
     private final InstallSessionPageAuthority installSessionPages;
 
     private final PackageManagementAuthorityGuard guard;
@@ -47,6 +48,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         installSessionPages = new InstallSessionPageAuthority(dependencies.filesDir);
         guard = new PackageManagementAuthorityGuard(ownerUid, ownerPid,
                 dependencies.capabilityRegistry, authorityCapability, authorityGeneration);
+        profileSession = new PackageProfileSession(profiles, guard);
         this.clientToken = clientToken;
     }
     @Override public PackageServiceResult loadCatalog() {
@@ -57,33 +59,38 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     @Override public PackageServiceResult importApk(String uri) {
         return execute("importApk", () -> PackageServiceResult.successRecord(
                 "importApk", PackageServiceMapper.toSnapshot(
-                        lifecycle.importApk(Uri.parse(required(uri, "uri"))))));
+                        lifecycle.importApk(Uri.parse(required(uri, "uri")),
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     @Override public PackageServiceResult importApkWithNativeTrust(
             String uri, String nativeGuestTrust) {
         return execute("importApkWithNativeTrust", () -> PackageServiceResult.successRecord(
                 "importApkWithNativeTrust", PackageServiceMapper.toSnapshot(
                         lifecycle.importApk(Uri.parse(required(uri, "uri")),
-                                required(nativeGuestTrust, "nativeGuestTrust")))));
+                                required(nativeGuestTrust, "nativeGuestTrust"),
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     @Override public PackageServiceResult importApkFile(String sourcePath) {
         return execute("importApkFile", () -> PackageServiceResult.successRecord(
                 "importApkFile", PackageServiceMapper.toSnapshot(
-                        lifecycle.importApkFile(new File(required(sourcePath, "sourcePath"))))));
+                        lifecycle.importApkFile(new File(required(sourcePath, "sourcePath")),
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     @Override public PackageServiceResult importApkFileWithNativeTrust(
             String sourcePath, String nativeGuestTrust) {
         return execute("importApkFileWithNativeTrust", () -> PackageServiceResult.successRecord(
                 "importApkFileWithNativeTrust", PackageServiceMapper.toSnapshot(
                         lifecycle.importApkFile(new File(required(sourcePath, "sourcePath")),
-                                required(nativeGuestTrust, "nativeGuestTrust")))));
+                                required(nativeGuestTrust, "nativeGuestTrust"),
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     public PackageServiceResult importInstalledApplication(
             String packageName, String nativeGuestTrust) {
         return execute("importInstalledApplication", () -> PackageServiceResult.successRecord(
                 "importInstalledApplication", PackageServiceMapper.toSnapshot(
                         lifecycle.importInstalledApplication(required(packageName, "packageName"),
-                                required(nativeGuestTrust, "nativeGuestTrust")))));
+                                required(nativeGuestTrust, "nativeGuestTrust"),
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     @Override public PackageServiceResult createInstallSession(String expectedPackageName) {
         return execute("createInstallSession", () -> PackageServiceResult.successInt(
@@ -127,7 +134,8 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     @Override public PackageServiceResult commitInstallSession(int sessionId) {
         return execute("commitInstallSession", () -> PackageServiceResult.successRecord(
                 "commitInstallSession", PackageServiceMapper.toSnapshot(
-                        lifecycle.commitInstallSession(sessionId))));
+                        lifecycle.commitInstallSession(sessionId,
+                                dependencies::stopGuestBeforeRevisionCommit))));
     }
     @Override public PackageServiceResult abandonInstallSession(int sessionId) {
         return execute("abandonInstallSession", () -> {
@@ -331,169 +339,113 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         });
     }
 
-    @Override
-    public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getDeviceServiceProfile(packageName, virtualUserId);
+    @Override public VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getDeviceServiceProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(
+    @Override public VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(
             String packageName, int virtualUserId, VirtualDeviceServiceProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setDeviceServiceProfile(packageName, virtualUserId, profile);
+        return profileSession.setDeviceServiceProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetDeviceServiceProfile(packageName, virtualUserId);
+    @Override public VirtualDeviceServiceProfileSnapshot resetDeviceServiceProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetDeviceServiceProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualInteractionProfileSnapshot getInteractionProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getInteractionProfile(packageName, virtualUserId);
+    @Override public VirtualInteractionProfileSnapshot getInteractionProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getInteractionProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualInteractionProfileSnapshot setInteractionProfile(
+    @Override public VirtualInteractionProfileSnapshot setInteractionProfile(
             String packageName, int virtualUserId, VirtualInteractionProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setInteractionProfile(packageName, virtualUserId, profile);
+        return profileSession.setInteractionProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualInteractionProfileSnapshot resetInteractionProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetInteractionProfile(packageName, virtualUserId);
+    @Override public VirtualInteractionProfileSnapshot resetInteractionProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetInteractionProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualNetworkServiceProfileSnapshot getNetworkServiceProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getNetworkServiceProfile(packageName, virtualUserId);
+    @Override public VirtualNetworkServiceProfileSnapshot getNetworkServiceProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getNetworkServiceProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualNetworkServiceProfileSnapshot setNetworkServiceProfile(
+    @Override public VirtualNetworkServiceProfileSnapshot setNetworkServiceProfile(
             String packageName, int virtualUserId, VirtualNetworkServiceProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setNetworkServiceProfile(packageName, virtualUserId, profile);
+        return profileSession.setNetworkServiceProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualNetworkServiceProfileSnapshot resetNetworkServiceProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetNetworkServiceProfile(packageName, virtualUserId);
+    @Override public VirtualNetworkServiceProfileSnapshot resetNetworkServiceProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetNetworkServiceProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getApplicationEnvironmentProfile(packageName, virtualUserId);
+    @Override public ApplicationEnvironmentProfileSnapshot getApplicationEnvironmentProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getApplicationEnvironmentProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public ApplicationEnvironmentProfileSnapshot setApplicationEnvironmentProfile(
+    @Override public ApplicationEnvironmentProfileSnapshot setApplicationEnvironmentProfile(
             String packageName, int virtualUserId, ApplicationEnvironmentProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setApplicationEnvironmentProfile(packageName, virtualUserId, profile);
+        return profileSession.setApplicationEnvironmentProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public ApplicationEnvironmentProfileSnapshot resetApplicationEnvironmentProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetApplicationEnvironmentProfile(packageName, virtualUserId);
+    @Override public ApplicationEnvironmentProfileSnapshot resetApplicationEnvironmentProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetApplicationEnvironmentProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualCompatibilityProfileSnapshot getCompatibilityProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getCompatibilityProfile(packageName, virtualUserId);
+    @Override public VirtualCompatibilityProfileSnapshot getCompatibilityProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getCompatibilityProfile(packageName, virtualUserId);
     }
-    @Override
-    public VirtualCompatibilityProfileSnapshot setCompatibilityProfile(
+    @Override public VirtualCompatibilityProfileSnapshot setCompatibilityProfile(
             String packageName, int virtualUserId, VirtualCompatibilityProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setCompatibilityProfile(packageName, virtualUserId, profile);
+        return profileSession.setCompatibilityProfile(packageName, virtualUserId, profile);
     }
-    @Override
-    public VirtualCompatibilityProfileSnapshot resetCompatibilityProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetCompatibilityProfile(packageName, virtualUserId);
+    @Override public VirtualCompatibilityProfileSnapshot resetCompatibilityProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetCompatibilityProfile(packageName, virtualUserId);
     }
-    @Override
-    public VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getPolicyServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPolicyServicesProfileSnapshot getPolicyServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getPolicyServicesProfile(packageName, virtualUserId);
     }
-    @Override
-    public VirtualPolicyServicesProfileSnapshot setPolicyServicesProfile(
+    @Override public VirtualPolicyServicesProfileSnapshot setPolicyServicesProfile(
             String packageName, int virtualUserId, VirtualPolicyServicesProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setPolicyServicesProfile(packageName, virtualUserId, profile);
+        return profileSession.setPolicyServicesProfile(packageName, virtualUserId, profile);
     }
-    @Override
-    public VirtualPolicyServicesProfileSnapshot resetPolicyServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetPolicyServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPolicyServicesProfileSnapshot resetPolicyServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetPolicyServicesProfile(packageName, virtualUserId);
     }
-    @Override
-    public VirtualMediaCommunicationProfileSnapshot getMediaCommunicationProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getMediaCommunicationProfile(packageName, virtualUserId);
+    @Override public VirtualMediaCommunicationProfileSnapshot getMediaCommunicationProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getMediaCommunicationProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualMediaCommunicationProfileSnapshot setMediaCommunicationProfile(
+    @Override public VirtualMediaCommunicationProfileSnapshot setMediaCommunicationProfile(
             String packageName, int virtualUserId, VirtualMediaCommunicationProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setMediaCommunicationProfile(packageName, virtualUserId, profile);
+        return profileSession.setMediaCommunicationProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualMediaCommunicationProfileSnapshot resetMediaCommunicationProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetMediaCommunicationProfile(packageName, virtualUserId);
+    @Override public VirtualMediaCommunicationProfileSnapshot resetMediaCommunicationProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetMediaCommunicationProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualPeripheralServicesProfileSnapshot getPeripheralServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getPeripheralServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPeripheralServicesProfileSnapshot getPeripheralServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getPeripheralServicesProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualPeripheralServicesProfileSnapshot setPeripheralServicesProfile(
+    @Override public VirtualPeripheralServicesProfileSnapshot setPeripheralServicesProfile(
             String packageName, int virtualUserId, VirtualPeripheralServicesProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setPeripheralServicesProfile(packageName, virtualUserId, profile);
+        return profileSession.setPeripheralServicesProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualPeripheralServicesProfileSnapshot resetPeripheralServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetPeripheralServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPeripheralServicesProfileSnapshot resetPeripheralServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetPeripheralServicesProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualPrivilegedServicesProfileSnapshot getPrivilegedServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.getPrivilegedServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPrivilegedServicesProfileSnapshot getPrivilegedServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.getPrivilegedServicesProfile(packageName, virtualUserId);
     }
-
-    @Override
-    public VirtualPrivilegedServicesProfileSnapshot setPrivilegedServicesProfile(
+    @Override public VirtualPrivilegedServicesProfileSnapshot setPrivilegedServicesProfile(
             String packageName, int virtualUserId, VirtualPrivilegedServicesProfileSnapshot profile) {
-        requireOwner();
-        return profiles.setPrivilegedServicesProfile(packageName, virtualUserId, profile);
+        return profileSession.setPrivilegedServicesProfile(packageName, virtualUserId, profile);
     }
-
-    @Override
-    public VirtualPrivilegedServicesProfileSnapshot resetPrivilegedServicesProfile(String packageName, int virtualUserId) {
-        requireOwner();
-        return profiles.resetPrivilegedServicesProfile(packageName, virtualUserId);
+    @Override public VirtualPrivilegedServicesProfileSnapshot resetPrivilegedServicesProfile(
+            String packageName, int virtualUserId) {
+        return profileSession.resetPrivilegedServicesProfile(packageName, virtualUserId);
     }
 
     @Override public PackageServiceResult maintenanceStatus() {

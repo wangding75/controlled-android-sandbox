@@ -116,7 +116,12 @@ final class PackageAuthorityCapabilityRegistry implements AutoCloseable {
         if (slot == null || !slot.active || !slot.capability.equals(capability)
                 || !slot.capability.isBinderAlive()) {
             if (slot != null && !slot.capability.isBinderAlive()) retire(slot);
-            throw new SecurityException(errorCode + ":" + role);
+            throw new SecurityException(errorCode + ":" + role
+                    + ":slot=" + (slot != null)
+                    + ":active=" + (slot != null && slot.active)
+                    + ":sameBinder=" + (slot != null && slot.capability.equals(capability))
+                    + ":slotAlive=" + (slot != null && slot.capability.isBinderAlive())
+                    + ":presentedAlive=" + (capability != null && capability.isBinderAlive()));
         }
     }
 
