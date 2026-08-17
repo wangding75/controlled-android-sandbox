@@ -1,0 +1,80 @@
+campaign: T57-R03
+generated_for: P3-R04
+environments:
+  - environment_id: RD_MUMU_RDTEST_API32
+    kind: emulator
+    vendor: NetEase MuMu / Redmi skin
+    model: 22041211A
+    android_version: "12"
+    api: 32
+    abi: x86_64
+    page_size: 4096
+    webview_provider: com.android.webview
+    webview_version: 101.0.4951.61
+    gms: unavailable
+    selinux: permissive-host
+    status: EXECUTED
+    notes: Dedicated instance RD测试. Dynamic serial only.
+
+  - environment_id: AVD_API35_X86_64
+    kind: emulator
+    vendor: AOSP / Google APIs
+    model: ControlledSandbox_API35_x86_64
+    android_version: "15"
+    api: 35
+    abi: x86_64
+    page_size: UNVERIFIED
+    gms: google_apis_image
+    status: AVAILABLE
+    notes: Existing user AVD left unmodified. Dedicated T57_R03_API35_x86_64 created and booted.
+
+  - environment_id: AVD_API36_X86_64
+    kind: emulator
+    vendor: AOSP / Google APIs
+    model: Pixel_Android16_API36_GoogleApis_x86_64
+    android_version: "16"
+    api: 36
+    abi: x86_64
+    page_size: UNVERIFIED
+    gms: google_apis_image
+    status: AVAILABLE
+
+  - environment_id: AVD_API33_X86_64
+    kind: emulator
+    vendor: AOSP / Google APIs
+    api: 33
+    abi: x86_64
+    status: ENVIRONMENT_NOT_AVAILABLE
+    notes: Official image install attempted; sdkmanager failed with IO exception while downloading manifest.
+
+  - environment_id: AVD_API34_X86_64
+    kind: emulator
+    vendor: AOSP / Google APIs
+    api: 34
+    abi: x86_64
+    status: ENVIRONMENT_NOT_AVAILABLE
+    notes: Official image install attempted; sdkmanager failed with IO exception while downloading manifest.
+
+  - environment_id: ARM64_NATIVE
+    kind: physical_or_cloud
+    api: UNVERIFIED
+    abi: arm64-v8a
+    status: UNVERIFIED_RUNTIME
+    notes: Host is Windows x86_64. arm64_test.avd exists but is not accepted as native ARM64 unless it executes ARM64 code natively.
+
+  - environment_id: OEM_PIXEL
+    status: ENVIRONMENT_NOT_AVAILABLE
+  - environment_id: OEM_XIAOMI_HYPEROS
+    status: ENVIRONMENT_NOT_AVAILABLE
+    notes: MuMu Redmi skin is not HyperOS OEM compatibility.
+  - environment_id: OEM_SAMSUNG
+    status: ENVIRONMENT_NOT_AVAILABLE
+  - environment_id: OEM_OPPO
+    status: ENVIRONMENT_NOT_AVAILABLE
+  - environment_id: OEM_VIVO
+    status: ENVIRONMENT_NOT_AVAILABLE
+  - environment_id: OEM_HUAWEI
+    status: ENVIRONMENT_NOT_AVAILABLE
+  - environment_id: PAGE_16KB
+    status: ENVIRONMENT_NOT_AVAILABLE
+    notes: RD page size is 4096.
