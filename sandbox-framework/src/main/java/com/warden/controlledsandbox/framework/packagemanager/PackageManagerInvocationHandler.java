@@ -95,6 +95,7 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         Object webViewComponent = webViewComponentQuery(method, args);
         if (webViewComponent != NoResult.VALUE) return webViewComponent;
         switch (methodName) {
+            // HOST_PACKAGE_HIDDEN: HiddenPackageResultMapper maps hidden host package inquiries
             case "getApplicationInfo":
             case "getApplicationInfoAsUser":
                 if (!guestTarget) return hiddenPackageResult(methodName, returnType);
