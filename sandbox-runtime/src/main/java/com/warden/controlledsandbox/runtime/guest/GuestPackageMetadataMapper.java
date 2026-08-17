@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
+import com.warden.controlledsandbox.contract.VirtualComponentMetadataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
@@ -56,7 +57,7 @@ public final class GuestPackageMetadataMapper {
             // it as the baseline for every package in the virtual universe; the primary Guest
             // may additionally have an APK-backed parser view, but cross-package projections do
             // not reopen the peer APK and therefore must not drop the snapshot value.
-            Bundle componentMetadata = component.metaData();
+            Bundle componentMetadata = toMetadataBundle(component.metaData());
             Bundle parsedComponentMetadata = manifestMetadata == null
                     ? null : manifestMetadata.componentForClass(component.className());
             if (parsedComponentMetadata != null) {
@@ -180,5 +181,25 @@ public final class GuestPackageMetadataMapper {
         applicationInfo.enabled = state.enabled();
         applicationInfo.flags |= ApplicationInfo.FLAG_HAS_CODE;
         return fromSnapshot(state, applicationInfo, null);
+    }
+
+    static Bundle toMetadataBundle(List<VirtualComponentMetadataSnapshot> entries) {
+        if (entries == null || entries.isEmpty()) return null;
+        Bundle bundle = new Bundle();
+        for (VirtualComponentMetadataSnapshot entry : entries) {
+            if (entry == null || entry.name() == null) continue;
+            String type = entry.type();
+            if (VirtualComponentMetadataSnapshot.TYPE_INTEGER.equals(type)
+                    || VirtualComponentMetadataSnapshot.TYPE_RESOURCE.equals(type)) {
+                bundle.putInt(entry.name(), entry.resourceId() != 0 ? entry.resourceId() : entry.intValue());
+            } else if (VirtualComponentMetadataSnapshot.TYPE_BOOLEAN.equals(type)) {
+                bundle.putBoolean(entry.name(), entry.booleanValue());
+            } else if (VirtualComponentMetadataSnapshot.TYPE_FLOAT.equals(type)) {
+                bundle.putFloat(entry.name(), entry.floatValue());
+            } else {
+                bundle.putString(entry.name(), entry.stringValue());
+            }
+        }
+        return bundle;
     }
 }

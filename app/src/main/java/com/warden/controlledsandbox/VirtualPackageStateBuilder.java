@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
+import com.warden.controlledsandbox.contract.VirtualComponentMetadataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentDataSnapshot;
 import com.warden.controlledsandbox.contract.VirtualIntentFilterSnapshot;
@@ -462,9 +463,30 @@ final class VirtualPackageStateBuilder {
                     component.supportsPictureInPicture(), component.foregroundServiceType(),
                     component.stopWithTask(), component.directBootAware(), component.multiprocess(),
                     component.initOrder(), component.syncable(), component.persistableMode(),
-                    component.targetActivity(), componentMetadata == null ? null
-                            : componentMetadata.get(component.className())));
+                    component.targetActivity(), toMetadataSnapshots(componentMetadata == null ? null
+                            : componentMetadata.get(component.className()))));
         }
+    }
+
+    static List<VirtualComponentMetadataSnapshot> toMetadataSnapshots(Bundle bundle) {
+        if (bundle == null || bundle.isEmpty()) return List.of();
+        List<VirtualComponentMetadataSnapshot> list = new ArrayList<>();
+        for (String key : bundle.keySet()) {
+            if (key == null) continue;
+            Object value = bundle.get(key);
+            if (value instanceof String) {
+                list.add(new VirtualComponentMetadataSnapshot(key, (String) value));
+            } else if (value instanceof Integer) {
+                list.add(new VirtualComponentMetadataSnapshot(key, ((Integer) value).intValue()));
+            } else if (value instanceof Boolean) {
+                list.add(new VirtualComponentMetadataSnapshot(key, ((Boolean) value).booleanValue()));
+            } else if (value instanceof Float) {
+                list.add(new VirtualComponentMetadataSnapshot(key, ((Float) value).floatValue()));
+            } else if (value != null) {
+                list.add(new VirtualComponentMetadataSnapshot(key, String.valueOf(value)));
+            }
+        }
+        return list;
     }
 
     private static void mergeComponentMetadata(Map<String, Bundle> target,

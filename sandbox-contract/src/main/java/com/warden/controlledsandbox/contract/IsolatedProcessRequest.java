@@ -66,9 +66,7 @@ public final class IsolatedProcessRequest implements Parcelable {
     public String operation() { return operation; }
     public String capabilityToken() { return capabilityToken; }
     public Bundle payload() {
-        Bundle copy = new Bundle(payload);
-        copy.setClassLoader(IsolatedProcessRequest.class.getClassLoader());
-        return copy;
+        return new Bundle(payload);
     }
 
     @Override public void writeToParcel(Parcel out, int flags) {

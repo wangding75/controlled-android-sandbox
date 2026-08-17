@@ -2,7 +2,6 @@ package com.warden.controlledsandbox.contract;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.os.Bundle;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -49,7 +48,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     private final boolean syncable;
     /** Non-empty for an activity-alias; the logical component remains className. */
     private String targetActivity;
-    private final Bundle metaData;
+    private final ArrayList<VirtualComponentMetadataSnapshot> metaData;
     private final ArrayList<String> actions;
     private final ArrayList<VirtualIntentFilterSnapshot> intentFilters;
     private final ArrayList<VirtualProviderPathRuleSnapshot> providerPathRules;
@@ -202,7 +201,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
                 alwaysRetainTaskState, allowTaskReparenting, resizeMode, maxAspectRatio,
                 minAspectRatio, supportsPictureInPicture, foregroundServiceType, stopWithTask,
                 directBootAware, multiprocess, initOrder, syncable, persistableMode,
-                targetActivity, null);
+                targetActivity, List.of());
     }
 
     /** Full component contract including alias target and component-level manifest metadata. */
@@ -223,7 +222,8 @@ public final class VirtualComponentSnapshot implements Parcelable {
                                      boolean supportsPictureInPicture, int foregroundServiceType,
                                      boolean stopWithTask, boolean directBootAware,
                                      boolean multiprocess, int initOrder, boolean syncable,
-                                     String persistableMode, String targetActivity, Bundle metaData) {
+                                     String persistableMode, String targetActivity,
+                                     List<VirtualComponentMetadataSnapshot> metaData) {
         this.type = componentType(type);
         this.className = required(className, "className");
         this.processName = value(processName);
@@ -269,7 +269,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
         this.initOrder = initOrder;
         this.syncable = syncable;
         this.targetActivity = value(targetActivity);
-        this.metaData = metaData == null ? null : new Bundle(metaData);
+        this.metaData = new ArrayList<>(metaData == null ? List.of() : metaData);
         if (!this.targetActivity.isEmpty() && !"ACTIVITY".equals(this.type)) {
             throw new IllegalArgumentException("targetActivity is activity-only metadata");
         }
@@ -300,7 +300,8 @@ public final class VirtualComponentSnapshot implements Parcelable {
                  in.readString(), Float.intBitsToFloat(in.readInt()),
                  Float.intBitsToFloat(in.readInt()), in.readInt() != 0, in.readInt(),
                  in.readInt() != 0, in.readInt() != 0, in.readInt() != 0, in.readInt(),
-                 in.readInt() != 0, in.readString(), in.readString(), readTrailingMetadata(in));
+                 in.readInt() != 0, in.readString(), in.readString(),
+                 in.createTypedArrayList(VirtualComponentMetadataSnapshot.CREATOR));
     }
 
     public String type() { return type; }
@@ -341,7 +342,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
     public int initOrder() { return initOrder; }
     public boolean syncable() { return syncable; }
     public String targetActivity() { return targetActivity; }
-    public Bundle metaData() { return metaData == null ? null : new Bundle(metaData); }
+    public List<VirtualComponentMetadataSnapshot> metaData() { return Collections.unmodifiableList(metaData); }
     public List<String> actions() { return Collections.unmodifiableList(actions); }
     public List<VirtualIntentFilterSnapshot> intentFilters() { return Collections.unmodifiableList(intentFilters); }
     public List<VirtualProviderPathRuleSnapshot> providerPathRules() {
@@ -372,8 +373,7 @@ public final class VirtualComponentSnapshot implements Parcelable {
           out.writeInt(syncable ? 1 : 0);
           out.writeString(persistableMode);
           out.writeString(targetActivity);
-          out.writeInt(metaData == null ? 0 : 1);
-          if (metaData != null) out.writeBundle(metaData);
+          out.writeTypedList(metaData);
     }
     @Override public int describeContents() { return 0; }
 
@@ -381,24 +381,6 @@ public final class VirtualComponentSnapshot implements Parcelable {
         @Override public VirtualComponentSnapshot createFromParcel(Parcel in) { return new VirtualComponentSnapshot(in); }
         @Override public VirtualComponentSnapshot[] newArray(int size) { return new VirtualComponentSnapshot[size]; }
     };
-
-    private static Bundle readTrailingMetadata(Parcel in) {
-        try {
-            java.lang.reflect.Method dataAvail = Parcel.class.getMethod("dataAvail");
-            if (((Number) dataAvail.invoke(in)).intValue() < 4) return null;
-            int marker = in.readInt();
-            if (marker == 0) return null;
-            if (marker != 1) return null;
-            java.lang.reflect.Method readBundle = Parcel.class.getMethod(
-                    "readBundle", ClassLoader.class);
-            Object value = readBundle.invoke(in, VirtualComponentSnapshot.class.getClassLoader());
-            return value instanceof Bundle ? new Bundle((Bundle) value) : null;
-        } catch (Throwable ignored) {
-            // Old reduced Parcel stubs and old peers have no metadata trailer.  The structural
-            // component contract remains readable and simply exposes null metadata there.
-            return null;
-        }
-    }
 
     private static String componentType(String value) {
         String normalized = required(value, "type").toUpperCase(java.util.Locale.ROOT);
