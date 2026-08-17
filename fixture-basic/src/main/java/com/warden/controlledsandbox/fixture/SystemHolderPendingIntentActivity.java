@@ -1,10 +1,6 @@
 package com.warden.controlledsandbox.fixture;
 
 import android.app.Activity;
-import android.app.AlarmManager;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.os.Build;
@@ -18,7 +14,8 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Posts a Notification and a short Alarm whose PendingIntents are intended to survive guest
- * process death and be held by the system process.
+ * process death and be held by the system process. Framework types are invoked reflectively so
+ * host static compile stubs stay minimal.
  */
 public final class SystemHolderPendingIntentActivity extends Activity {
     private static final String TAG = "CS_PI_HOLDER";
@@ -41,36 +38,14 @@ public final class SystemHolderPendingIntentActivity extends Activity {
                     .putExtra("cas.pi.kind", "notification");
             PendingIntent notificationSender = PendingIntent.getBroadcast(
                     this, 57031, notificationIntent, flags);
-
-            NotificationManager notifications =
-                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-            if (Build.VERSION.SDK_INT >= 26 && notifications != null) {
-                notifications.createNotificationChannel(new NotificationChannel(
-                        CHANNEL_ID, "CAS system holder", NotificationManager.IMPORTANCE_DEFAULT));
-            }
-            Notification.Builder builder = Build.VERSION.SDK_INT >= 26
-                    ? new Notification.Builder(this, CHANNEL_ID)
-                    : new Notification.Builder(this);
-            Notification posted = builder
-                    .setSmallIcon(android.R.drawable.stat_sys_warning)
-                    .setContentTitle("CAS system-holder")
-                    .setContentText("Notification holds guest PendingIntent")
-                    .setContentIntent(notificationSender)
-                    .setDeleteIntent(notificationSender)
-                    .setAutoCancel(false)
-                    .build();
-            if (notifications != null) notifications.notify(NOTIFICATION_ID, posted);
+            postNotification(notificationSender);
 
             Intent alarmIntent = new Intent(ACTION_ALARM)
                     .setPackage(getPackageName())
                     .putExtra("cas.pi.kind", "alarm");
             PendingIntent alarmSender = PendingIntent.getBroadcast(
                     this, 57032, alarmIntent, flags);
-            AlarmManager alarms = (AlarmManager) getSystemService(ALARM_SERVICE);
-            if (alarms != null) {
-                alarms.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                        SystemClock.elapsedRealtime() + 8_000L, alarmSender);
-            }
+            scheduleAlarm(alarmSender);
 
             String payload = "{\"status\":\"ARMED\",\"notificationId\":" + NOTIFICATION_ID
                     + ",\"alarmAction\":\"" + ACTION_ALARM + "\""
@@ -85,5 +60,43 @@ public final class SystemHolderPendingIntentActivity extends Activity {
             Log.e(TAG, "ARM_FAILED", error);
         }
         finish();
+    }
+
+    private void postNotification(PendingIntent content) throws Exception {
+        Object manager = getSystemService("notification");
+        if (manager == null) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            Class<?> channelClass = Class.forName("android.app.NotificationChannel");
+            int importance = Class.forName("android.app.NotificationManager")
+                    .getField("IMPORTANCE_DEFAULT").getInt(null);
+            Object channel = channelClass.getConstructor(String.class, CharSequence.class, int.class)
+                    .newInstance(CHANNEL_ID, "CAS system holder", importance);
+            manager.getClass().getMethod("createNotificationChannel", channelClass)
+                    .invoke(manager, channel);
+        }
+        Class<?> builderClass = Class.forName("android.app.Notification$Builder");
+        Object builder = Build.VERSION.SDK_INT >= 26
+                ? builderClass.getConstructor(android.content.Context.class, String.class)
+                .newInstance(this, CHANNEL_ID)
+                : builderClass.getConstructor(android.content.Context.class).newInstance(this);
+        builderClass.getMethod("setSmallIcon", int.class).invoke(builder, 0x0108004a);
+        builderClass.getMethod("setContentTitle", CharSequence.class).invoke(builder, "CAS system-holder");
+        builderClass.getMethod("setContentText", CharSequence.class)
+                .invoke(builder, "Notification holds guest PendingIntent");
+        builderClass.getMethod("setContentIntent", PendingIntent.class).invoke(builder, content);
+        builderClass.getMethod("setDeleteIntent", PendingIntent.class).invoke(builder, content);
+        builderClass.getMethod("setAutoCancel", boolean.class).invoke(builder, false);
+        Object posted = builderClass.getMethod("build").invoke(builder);
+        manager.getClass().getMethod("notify", int.class, Class.forName("android.app.Notification"))
+                .invoke(manager, NOTIFICATION_ID, posted);
+    }
+
+    private void scheduleAlarm(PendingIntent sender) throws Exception {
+        Object manager = getSystemService("alarm");
+        if (manager == null) return;
+        int type = Class.forName("android.app.AlarmManager")
+                .getField("ELAPSED_REALTIME_WAKEUP").getInt(null);
+        manager.getClass().getMethod("setExact", int.class, long.class, PendingIntent.class)
+                .invoke(manager, type, SystemClock.elapsedRealtime() + 8_000L, sender);
     }
 }

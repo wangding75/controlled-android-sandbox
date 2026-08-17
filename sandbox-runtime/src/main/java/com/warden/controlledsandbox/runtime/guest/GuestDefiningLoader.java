@@ -65,7 +65,11 @@ public final class GuestDefiningLoader {
         }
         try {
             Method findClass = ClassLoader.class.getDeclaredMethod("findClass", String.class);
-            findClass.setAccessible(true);
+            try {
+                findClass.setAccessible(true);
+            } catch (RuntimeException inaccessible) {
+                return loadFromDefining(defining, className);
+            }
             Object loaded = findClass.invoke(defining, className);
             if (loaded instanceof Class<?> type) return type;
             throw miss(className, defining, null);
@@ -75,13 +79,17 @@ public final class GuestDefiningLoader {
                 throw miss(className, defining, missing);
             }
             throw miss(className, defining, cause);
-        } catch (ReflectiveOperationException | SecurityException
-                | java.lang.reflect.InaccessibleObjectException inaccessible) {
-            try {
-                return defining.loadClass(className);
-            } catch (ClassNotFoundException missing) {
-                throw miss(className, defining, missing);
-            }
+        } catch (ReflectiveOperationException | SecurityException inaccessible) {
+            return loadFromDefining(defining, className);
+        }
+    }
+
+    private static Class<?> loadFromDefining(ClassLoader defining, String className)
+            throws ClassNotFoundException {
+        try {
+            return defining.loadClass(className);
+        } catch (ClassNotFoundException missing) {
+            throw miss(className, defining, missing);
         }
     }
 
