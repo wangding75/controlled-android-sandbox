@@ -25,7 +25,7 @@ INCLUDE_FILES = (
     "gradle.properties", "gradlew", "gradlew.bat", "README.md", "AGENTS.md",
 )
 EXCLUDE_PARTS = (
-    ".git", "build", ".gradle", ".idea", "node_modules", "caches",
+    ".git", "build", ".gradle", ".cxx", ".idea", "node_modules", "caches",
     "keystores", ".keystore", "local.properties",
 )
 
@@ -58,7 +58,7 @@ def copy_tree() -> None:
         src = ROOT / name
         if src.is_dir():
             shutil.copytree(src, source / name, ignore=shutil.ignore_patterns(
-                "build", ".gradle", "*.keystore", "*.jks", "local.properties"))
+                "build", ".gradle", ".cxx", "*.keystore", "*.jks", "local.properties"))
     for name in INCLUDE_FILES:
         src = ROOT / name
         if src.is_file():
