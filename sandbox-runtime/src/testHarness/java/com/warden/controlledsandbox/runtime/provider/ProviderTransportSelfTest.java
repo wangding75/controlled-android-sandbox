@@ -20,6 +20,7 @@ public final class ProviderTransportSelfTest {
         testExpiryCancellationAndCapacity();
         testLargeResultPagingAndMemoryLimits();
         testConcurrentSinglePageWinner();
+        testStaleGenerationAndProducerDeath();
         System.out.println("PASS Provider cursor transport self-test");
     }
 
@@ -146,6 +147,24 @@ public final class ProviderTransportSelfTest {
         executor.shutdownNow();
         require(winners.get() == 1, "one cursor page winner");
         transport.cancel("concurrent", "session-a", 1);
+    }
+
+    private static void testStaleGenerationAndProducerDeath() {
+        AtomicLong clock = new AtomicLong(100);
+        ProviderCursorTransport transport = transport(clock, 8, 4096, 1024, 10_000, 16);
+        FakeCursor cursor = FakeCursor.rows(8);
+        transport.open(cursor, "death-token", "session-a", "u0:pkg.provider", 4, 2, 100);
+        boolean stale = false;
+        try {
+            transport.page("death-token", "session-a", 5, 2, 1, 2);
+        } catch (RuntimeException expected) {
+            stale = true;
+        }
+        require(stale, "stale generation cannot page");
+        int closed = transport.closeSession("session-a", 4);
+        require(closed == 1, "producer death closes the live lease");
+        require(cursor.isClosed(), "producer death closes the Cursor");
+        require(transport.activeLeaseCount() == 0, "no leftover cursor lease after death");
     }
 
     private static ProviderCursorTransport transport(AtomicLong clock, int active, int pageBytes,
