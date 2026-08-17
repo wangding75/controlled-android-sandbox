@@ -168,7 +168,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
         try {
             created = onMain(() -> {
                 if (closed) throw new IllegalStateException("GUEST_JOB_BRIDGE_CLOSED");
-                Class<?> type = session.classLoader.loadClass(className);
+                Class<?> type = GuestDefiningLoader.loadComponent(session, className);
                 if (!JobService.class.isAssignableFrom(type)) {
                     throw new IllegalArgumentException("Component is not a JobService: " + className);
                 }
@@ -177,7 +177,7 @@ final class GuestJobServiceBridge implements AutoCloseable {
                 // bypassed factory-installed loader/bootstrap state and made JobScheduler a
                 // semantic exception to the normal component lifecycle.
                 Service instantiated = GuestComponentFactory.instantiateService(
-                        session.context.getClassLoader(),
+                        GuestDefiningLoader.of(session),
                         session.context.getApplicationInfo().appComponentFactory,
                         className, new Intent("android.app.job.JobService"));
                 if (!(instantiated instanceof JobService)) {

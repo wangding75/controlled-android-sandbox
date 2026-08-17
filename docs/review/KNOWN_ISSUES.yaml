@@ -661,23 +661,22 @@ issues:
     capability: native_loader_jni_io
     classification: CURRENT_DEFECT
     severity: MEDIUM
-    status: OPEN
+    status: FIXED
     discovered_by: T57-R03-P0A-01 RD campaign
     evidence:
       - artifacts/capability-audit/native/20260817T065551Z/sandbox.json
       - docs/review/T57_R03_P0C_FRAMEWORK_OWNERSHIP_RESULT.md
+      - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
     match_patterns:
       - NativeAdversarialProbeService
       - Didn't find class
     blocks_current_campaign: false
     fix_policy: FRAMEWORK_OWNED_GUEST_SERVICE_CLASSLOADER_P1
     notes: >
-      P0C re-evaluated the P0A-01 DexPathList evidence. startService of a guest
-      fixture Service still resolved the class against the host debug APK, not
-      the guest LoadedApk/ClassLoader. That is a production class-resolution
-      defect. P0A-03 isolated-hostile Native evidence does not use this path.
-      A framework-owned fix is deferred to P1 so this campaign does not revert
-      to manual Service lifecycle.
+      P1-00 introduced GuestDefiningLoader as the single Activity/Service/Receiver/Provider
+      defining-loader contract. Broker START_SERVICE now prefers the ActivityThread
+      framework bridge when installed. loadDefinedClass never falls back to the host
+      process DexPathList. Close KI-R03-NATIVE-010 as FIXED.
 
   - issue_id: KI-R03-NATIVE-ENF-001
     title: Isolated process can still create sockets and connect

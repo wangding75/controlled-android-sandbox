@@ -600,6 +600,7 @@ run_java('com.warden.controlledsandbox.runtime.guest.PendingIntentFrameworkInter
 run_java('com.warden.controlledsandbox.runtime.guest.ActivityTaskFrameworkInterceptorSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.WebViewProfileSelfTest', assertions=False)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestClassLoaderSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestDefiningLoaderSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestSharedLibraryPathResolverSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestNativeRuntimeProjectionSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestNativeBindingDiagnosticSelfTest', assertions=False)

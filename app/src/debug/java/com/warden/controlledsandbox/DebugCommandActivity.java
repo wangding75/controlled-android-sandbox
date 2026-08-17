@@ -184,12 +184,15 @@ public final class DebugCommandActivity extends Activity {
                 }
                 String processName = extras.getString("processName", "").trim();
                 String serviceOperation = extras.getString("serviceOperation", "start").trim();
+                int slotPad = extras.getInt("slotPadCount", extras.getInt("slotPad", 0));
+                int slotTarget = extras.getInt("slotTarget", -1);
                 if ("stop".equalsIgnoreCase(serviceOperation)) {
                     operation = runtime.stopService(record, virtualUserId, component, processName);
                     requireStatus("isolated-service-stop", operation,
                             "SERVICE_STOPPED", "SERVICE_NOT_RUNNING", "SERVICE_STOP_REQUESTED");
                 } else if ("start".equalsIgnoreCase(serviceOperation)) {
-                    operation = runtime.startService(record, virtualUserId, component, processName);
+                    operation = runtime.startService(record, virtualUserId, component, processName,
+                            slotPad, slotTarget);
                     requireStatus("isolated-service-start", operation,
                             "SERVICE_STARTED", "SERVICE_RECOVERED");
                 } else {
@@ -236,6 +239,34 @@ public final class DebugCommandActivity extends Activity {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("HOLD_PREPARE_INTERRUPTED", interrupted);
                 }
+            } else if ("slot-campaign".equals(command)) {
+                String processName = extras.getString("processName", "").trim();
+                int slotPad = extras.getInt("slotPadCount", extras.getInt("slotPad", 0));
+                int slotTarget = extras.getInt("slotTarget", -1);
+                operation = runtime.prepare(record, virtualUserId, processName, slotPad, slotTarget);
+                requireStatus("slot-campaign-prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "ALREADY_PREPARED_DEGRADED");
+                String serviceComponent = extras.getString("component",
+                        "com.warden.controlledsandbox.fixture.NativeAdversarialProbeService").trim();
+                if (extras.getBoolean("startService", true)) {
+                    Bundle started = runtime.startService(record, virtualUserId, serviceComponent,
+                            processName);
+                    requireStatus("slot-campaign-service", started,
+                            "SERVICE_STARTED", "SERVICE_RECOVERED");
+                    result.put("service", bundleJson(started));
+                }
+                result.put("slotPadCount", slotPad);
+                result.put("slotTarget", slotTarget);
+                result.put("processName", processName);
+            } else if ("pi-system-holder".equals(command)) {
+                operation = runtime.prepare(record, virtualUserId);
+                requireStatus("pi-system-holder-prepare", operation, "PREPARED", "ALREADY_PREPARED",
+                        "ALREADY_PREPARED_DEGRADED");
+                operation = runtime.launchComponent(record, virtualUserId,
+                        extras.getString("component",
+                                "com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity")
+                                .trim());
+                requireStatus("pi-system-holder-launch", operation, "LAUNCH_PASS");
             } else {
                 throw new IllegalArgumentException("Unsupported command: " + command);
             }

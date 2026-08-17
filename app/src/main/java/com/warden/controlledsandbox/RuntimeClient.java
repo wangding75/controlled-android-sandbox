@@ -44,7 +44,17 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle prepare(SandboxRecord record) throws Exception { return prepare(record, 0); }
     Bundle prepare(SandboxRecord record, int virtualUserId) throws Exception {
-        Bundle request = request(record, virtualUserId, record.launchProcess);
+        return prepare(record, virtualUserId, record.launchProcess, 0);
+    }
+    Bundle prepare(SandboxRecord record, int virtualUserId, String processName, int slotPadCount)
+            throws Exception {
+        return prepare(record, virtualUserId, processName, slotPadCount, -1);
+    }
+    Bundle prepare(SandboxRecord record, int virtualUserId, String processName, int slotPadCount,
+                   int slotTarget) throws Exception {
+        Bundle request = request(record, virtualUserId, processName);
+        if (slotPadCount > 0) request.putInt(RuntimeKeys.SLOT_PAD_COUNT, slotPadCount);
+        if (slotTarget >= 0) request.putInt(RuntimeKeys.SLOT_TARGET, slotTarget);
         return companionRoute(record)
                 ? nativeCompanion.prepare(record, virtualUserId, request)
                 : execute(RuntimeOperationRequest.PREPARE_GUEST, request);
@@ -73,8 +83,19 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle startService(SandboxRecord record, int virtualUserId, String component,
                         String processName) throws Exception {
-        return component(record, virtualUserId, ComponentOperations.START_SERVICE,
+        return startService(record, virtualUserId, component, processName, 0);
+    }
+    Bundle startService(SandboxRecord record, int virtualUserId, String component,
+                        String processName, int slotPadCount) throws Exception {
+        return startService(record, virtualUserId, component, processName, slotPadCount, -1);
+    }
+    Bundle startService(SandboxRecord record, int virtualUserId, String component,
+                        String processName, int slotPadCount, int slotTarget) throws Exception {
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.START_SERVICE,
                 component, processName, "", "");
+        if (slotPadCount > 0) request.putInt(RuntimeKeys.SLOT_PAD_COUNT, slotPadCount);
+        if (slotTarget >= 0) request.putInt(RuntimeKeys.SLOT_TARGET, slotTarget);
+        return invoke(record, virtualUserId, request);
     }
     Bundle stopService(SandboxRecord record) throws Exception { return stopService(record, 0); }
     Bundle stopService(SandboxRecord record, int virtualUserId) throws Exception {

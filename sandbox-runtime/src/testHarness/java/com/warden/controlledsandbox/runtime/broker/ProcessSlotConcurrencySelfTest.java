@@ -76,6 +76,24 @@ public final class ProcessSlotConcurrencySelfTest {
         GuestSession user1 = race.allocate("com.multi", 1, "com.multi", "rev", 14L);
         GuestSession user0 = race.allocate("com.multi", 0, "com.multi", "rev", 15L);
         check(user0.processSlot() != user1.processSlot(), "multi-user must not share slots");
+        SessionRegistry highSlot = new SessionRegistry(ProcessSlotContract.ORDINARY_SLOT_COUNT,
+                purpose -> purpose + "-h-" + counter.incrementAndGet());
+        for (int i = 0; i < ProcessSlotContract.ORDINARY_SLOT_COUNT; i++) {
+            if (i == 62) continue;
+            highSlot.allocateExact("com.high", 0, "com.high:__slot_pad_" + i, "rev", i, 20L);
+        }
+        GuestSession slot62 = highSlot.allocate("com.high", 0, "com.high:target62", "rev", 21L);
+        check(slot62.processSlot() == 62, "occupying every other slot leaves 62 for the live process");
+        expectNoSlot(() -> highSlot.allocate("com.high", 0, "com.high:overflow", "rev", 23L));
+        SessionRegistry slot63Reg = new SessionRegistry(ProcessSlotContract.ORDINARY_SLOT_COUNT,
+                purpose -> purpose + "-h63-" + counter.incrementAndGet());
+        for (int i = 0; i < ProcessSlotContract.ORDINARY_SLOT_COUNT; i++) {
+            if (i == 63) continue;
+            slot63Reg.allocateExact("com.high63", 0, "com.high63:__slot_pad_" + i, "rev", i, 24L);
+        }
+        GuestSession slot63 = slot63Reg.allocate("com.high63", 0, "com.high63:target63", "rev", 25L);
+        check(slot63.processSlot() == 63, "occupying every other slot leaves 63 for the live process");
+
         System.out.println("PASS process slot 64/16 concurrency and recovery self-test");
     }
 

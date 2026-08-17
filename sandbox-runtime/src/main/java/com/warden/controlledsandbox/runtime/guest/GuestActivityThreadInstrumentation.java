@@ -95,11 +95,11 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             String instantiateComponent = activityInstantiationClass(component);
             Intent guestIntent = RuntimeIntentWireCodec.decode(consumed);
             Activity guest = GuestComponentFactory.instantiateActivity(
-                    session.context().getClassLoader(),
+                    GuestDefiningLoader.of(session),
                     session.context().getApplicationInfo().appComponentFactory,
                     instantiateComponent, guestIntent);
             if (guest == null) throw new IllegalStateException("GUEST_ACTIVITY_FACTORY_RETURNED_NULL");
-            if (!session.classLoader().loadClass(instantiateComponent).isInstance(guest)) {
+            if (!GuestDefiningLoader.loadComponent(session, instantiateComponent).isInstance(guest)) {
                 throw new IllegalStateException("GUEST_ACTIVITY_FACTORY_CLASS_MISMATCH");
             }
             ClassLoader guestClassLoader = session.context().getClassLoader();

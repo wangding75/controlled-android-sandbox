@@ -130,6 +130,7 @@ public final class GuestClassLoaderSelfTest {
             throw new RuntimeException(e);
         }
         loadNonExistentThrows(loader);
+        verifyDefinedClassDoesNotFallBackToParent();
         verifyGuestFirstResourceLookup();
         System.out.println("PASS Guest class-loader host-boundary and detection policy self-test");
     }
@@ -246,6 +247,25 @@ public final class GuestClassLoaderSelfTest {
         Class<?> first = loader.loadClass("java.lang.String");
         Class<?> second = loader.loadClass("java.lang.String");
         require(first == second, "repeated load returns same class");
+    }
+
+    private static void verifyDefinedClassDoesNotFallBackToParent() {
+        ClassLoader parent = new ClassLoader(GuestClassLoaderSelfTest.class.getClassLoader()) {
+            @Override public Class<?> loadClass(String name) throws ClassNotFoundException {
+                if ("com.example.guest.OnlyOnParent".equals(name)) return String.class;
+                return super.loadClass(name);
+            }
+        };
+        GuestClassLoader loader = new GuestClassLoader("", "", null, parent, "com.example.guest");
+        boolean missed = false;
+        try {
+            loader.loadDefinedClass("com.example.guest.OnlyOnParent");
+        } catch (ClassNotFoundException expected) {
+            missed = true;
+            require(String.valueOf(expected.getMessage()).contains("GUEST_DEFINING_LOADER_MISS"),
+                    "defined-class miss is not a host DexPathList error");
+        }
+        require(missed, "guest-defined load does not take a host parent hit");
     }
 
     private static void loadNonExistentThrows(GuestClassLoader loader) {

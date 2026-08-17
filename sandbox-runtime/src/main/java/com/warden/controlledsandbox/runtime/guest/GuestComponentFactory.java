@@ -179,7 +179,7 @@ public final class GuestComponentFactory {
 
     private static <T> T newInstance(ClassLoader loader, String className, Class<T> expected)
             throws Exception {
-        Class<?> type = loader.loadClass(className);
+        Class<?> type = GuestDefiningLoader.loadComponent(loader, className);
         if (!expected.isAssignableFrom(type)) {
             throw new IllegalArgumentException(expected.getSimpleName() + " class has wrong type: "
                     + className);

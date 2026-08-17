@@ -45,11 +45,13 @@ public final class GuestActivityController {
         Bundle result = new Bundle();
         try {
             String instantiateComponent = activityInstantiationClass(componentClass);
-            Class<?> type = session.classLoader().loadClass(instantiateComponent);
+            Class<?> type = com.warden.controlledsandbox.runtime.guest.GuestDefiningLoader
+                    .loadComponent(session, instantiateComponent);
             com.warden.controlledsandbox.runtime.guest.GuestNativeBindingDiagnostic.recordClass(
                     "activity." + instantiateComponent, type);
             if (!Activity.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not an Activity: " + componentClass);
-            guest = GuestComponentFactory.instantiateActivity(session.context().getClassLoader(),
+            guest = GuestComponentFactory.instantiateActivity(
+                    com.warden.controlledsandbox.runtime.guest.GuestDefiningLoader.of(session),
                     session.context().getApplicationInfo().appComponentFactory,
                     instantiateComponent, launchIntent == null ? new Intent() : new Intent(launchIntent));
             attachFrameworkState(guest, componentClass);

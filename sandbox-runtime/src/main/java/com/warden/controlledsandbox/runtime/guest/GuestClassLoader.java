@@ -113,6 +113,35 @@ public final class GuestClassLoader extends ClassLoader {
     public ClassLoader definingLoader() { return dex; }
 
     /**
+     * Load a Guest-defined component class from the defining dex loader only.
+     * A miss must not fall back to the host process ClassLoader.
+     */
+    public Class<?> loadDefinedClass(String name) throws ClassNotFoundException {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("class name is required");
+        }
+        String className = name.trim();
+        synchronized (this) {
+            Class<?> loaded = findLoadedClass(className);
+            if (loaded == null) loaded = dexFindLoaded(className);
+            if (loaded != null) return loaded;
+            if (dexFindClass == null) {
+                throw new ClassNotFoundException(
+                        "GUEST_DEFINING_LOADER_MISS:" + className + ":"
+                                + dex.getClass().getName() + ":findClass-inaccessible");
+            }
+            try {
+                return dexFindClass(className);
+            } catch (ClassNotFoundException missing) {
+                throw new ClassNotFoundException(
+                        "GUEST_DEFINING_LOADER_MISS:" + className + ":"
+                                + dex.getClass().getName(),
+                        missing);
+            }
+        }
+    }
+
+    /**
      * Foreign-ABI code is executed by Android's native bridge. Host-ABI PLT patching and
      * Camera1 symbol replacement cannot safely cross that bridge, so translated guests use the
      * Java/framework camera route and leave platform native tables untouched.

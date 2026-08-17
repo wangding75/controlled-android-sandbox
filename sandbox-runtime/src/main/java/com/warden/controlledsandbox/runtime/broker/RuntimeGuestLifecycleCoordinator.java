@@ -42,6 +42,9 @@ final class RuntimeGuestLifecycleCoordinator {
             input.putString(RuntimeKeys.PROCESS_NAME, processName);
             stopMismatchedRevisionSessions(packageName, userId, packageRevision);
             owner.receiverCoordinator.indexPackage(input);
+            padOrdinarySlots(packageName, userId, packageRevision, processName,
+                    input.getInt(RuntimeKeys.SLOT_PAD_COUNT, 0),
+                    input.getInt(RuntimeKeys.SLOT_TARGET, -1));
             GuestSession session = owner.sessions.allocate(
                     packageName, userId, processName, packageRevision, owner.now());
             GuestSession staleRecovery = null;
@@ -279,6 +282,43 @@ final class RuntimeGuestLifecycleCoordinator {
             if (stopFailure instanceof RuntimeException runtime) throw runtime;
             if (stopFailure instanceof Error fatal) throw fatal;
             throw new IllegalStateException("GUEST_STOP_FAILED", stopFailure);
+        }
+    }
+
+    /**
+     * Occupies ordinary slots in the SessionRegistry without starting Guest processes.
+     * Used by RD high-slot transport probes so slot 31/32/62/63 can be exercised without
+     * keeping 64 live APK-loaded processes.
+     */
+    private void padOrdinarySlots(String packageName, int userId, String packageRevision,
+                                  String requestedProcess, int padCount, int slotTarget) {
+        int capacity = com.warden.controlledsandbox.contract.ProcessSlotContract.ORDINARY_SLOT_COUNT;
+        if (slotTarget >= 0) {
+            if (!com.warden.controlledsandbox.contract.ProcessSlotContract.isOrdinarySlot(slotTarget)) {
+                throw new IllegalArgumentException("SLOT_TARGET_OUT_OF_RANGE:" + slotTarget);
+            }
+            for (int slot = 0; slot < capacity; slot++) {
+                if (slot == slotTarget) continue;
+                String padProcess = packageName + ":__slot_pad_" + slot;
+                if (padProcess.equals(requestedProcess)) {
+                    throw new IllegalArgumentException("SLOT_PAD_COLLIDES_WITH_REQUEST");
+                }
+                owner.sessions.allocateExact(packageName, userId, padProcess, packageRevision,
+                        slot, owner.now());
+            }
+            return;
+        }
+        if (padCount <= 0) return;
+        if (padCount > capacity) {
+            throw new IllegalArgumentException("SLOT_PAD_COUNT_OUT_OF_RANGE:" + padCount);
+        }
+        for (int index = 0; index < padCount; index++) {
+            String padProcess = packageName + ":__slot_pad_" + index;
+            if (padProcess.equals(requestedProcess)) {
+                throw new IllegalArgumentException("SLOT_PAD_COLLIDES_WITH_REQUEST");
+            }
+            owner.sessions.allocateExact(packageName, userId, padProcess, packageRevision,
+                    index, owner.now());
         }
     }
 }

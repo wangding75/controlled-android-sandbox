@@ -14,6 +14,17 @@ public final class SlotPool {
         owners = new String[size];
     }
 
+    public synchronized int reserveExact(String packageName, int virtualUserId, int slot) {
+        if (slot < 0 || slot >= owners.length) return -1;
+        String owner = key(packageName, virtualUserId);
+        Integer existing = byOwner.get(owner);
+        if (existing != null) return existing == slot ? slot : -1;
+        if (owners[slot] != null) return -1;
+        owners[slot] = owner;
+        byOwner.put(owner, slot);
+        return slot;
+    }
+
     public synchronized int reserve(String packageName, int virtualUserId) {
         String owner = key(packageName, virtualUserId);
         Integer existing = byOwner.get(owner);

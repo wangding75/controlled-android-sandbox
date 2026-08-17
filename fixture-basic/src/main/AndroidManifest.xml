@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <application
         android:name="com.warden.controlledsandbox.fixture.FixtureApplication"
         android:allowBackup="false"
@@ -35,6 +37,16 @@
             android:noHistory="true" />
         <service android:name="com.warden.controlledsandbox.fixture.NativeAdversarialProbeService"
             android:exported="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity"
+            android:exported="true"
+            android:noHistory="true" />
+        <receiver android:name="com.warden.controlledsandbox.fixture.SystemHolderPendingIntentReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM" />
+                <action android:name="com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
         <service android:name="com.warden.controlledsandbox.fixture.NativeEnforcementSeccompService"
             android:exported="true"
             android:isolatedProcess="true"

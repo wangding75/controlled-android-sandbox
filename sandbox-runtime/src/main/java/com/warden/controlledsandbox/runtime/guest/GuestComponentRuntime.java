@@ -233,8 +233,10 @@ public final class GuestComponentRuntime {
     private Bundle invokeServiceOperation(String componentClass, Bundle request, String operation)
             throws Exception {
         return switch (operation) {
-            case ComponentOperations.START_SERVICE -> startService(componentClass, request, false);
-            case ComponentOperations.START_FOREGROUND_SERVICE -> startService(componentClass, request, true);
+            case ComponentOperations.START_SERVICE ->
+                    startServiceThroughFramework(componentClass, request, false);
+            case ComponentOperations.START_FOREGROUND_SERVICE ->
+                    startServiceThroughFramework(componentClass, request, true);
             case ComponentOperations.RECOVER_FRAMEWORK_SERVICE -> {
                 GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
                 if (framework == null) throw new IllegalStateException(
@@ -242,7 +244,7 @@ public final class GuestComponentRuntime {
                 yield framework.recover(request, componentClass,
                         request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_FOREGROUND, false));
             }
-            case ComponentOperations.STOP_SERVICE -> stopService(componentClass);
+            case ComponentOperations.STOP_SERVICE -> stopServiceThroughFramework(componentClass, request);
             case ComponentOperations.STOP_SERVICE_START_ID -> stopServiceStartId(componentClass,
                     request.getInt(RuntimeKeys.SERVICE_START_ID, -1));
             case ComponentOperations.SET_SERVICE_FOREGROUND -> setServiceForeground(componentClass, request);
@@ -365,6 +367,40 @@ public final class GuestComponentRuntime {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
             }
         }
+    }
+
+    private Bundle startServiceThroughFramework(String className, Bundle request,
+                                                boolean foregroundRequested) throws Exception {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework == null) {
+            return startService(className, request, foregroundRequested);
+        }
+        boolean recovery = request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
+        if (recovery) {
+            return framework.recover(request, className, foregroundRequested);
+        }
+        framework.start(request, className, foregroundRequested);
+        Bundle out = success("SERVICE_STARTED", className);
+        out.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);
+        out.putBoolean("created", true);
+        out.putInt("startId", 0);
+        out.putInt(RuntimeKeys.SERVICE_START_ID, 0);
+        out.putInt("startCount", 1);
+        out.putInt("connectionCount", 0);
+        out.putString("definingLoader", GuestDefiningLoader.of(session).getClass().getName());
+        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_START", out);
+        return out;
+    }
+
+    private Bundle stopServiceThroughFramework(String className, Bundle request) {
+        GuestActivityThreadServiceBridge framework = session.context.serviceFrameworkBridge();
+        if (framework == null) return stopService(className);
+        boolean stopped = framework.stop(request, className);
+        Bundle out = success(stopped ? "SERVICE_STOPPED" : "SERVICE_NOT_RUNNING", className);
+        out.putBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, true);
+        out.putBoolean("destroyed", stopped);
+        RuntimeEventLog.event("GUEST_SERVICE_FRAMEWORK_STOP", out);
+        return out;
     }
 
     private Bundle startService(String className, Bundle request, boolean foregroundRequested) throws Exception {
@@ -544,9 +580,9 @@ public final class GuestComponentRuntime {
         if (className == null || className.trim().isEmpty()) throw new IllegalArgumentException("Service class is required");
         ServiceRecord record = services.get(className);
         if (record != null) return record;
-        Class<?> type = session.classLoader.loadClass(className);
+        Class<?> type = GuestDefiningLoader.loadComponent(session, className);
         if (!Service.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not a Service: " + className);
-        Service service = GuestComponentFactory.instantiateService(session.context.getClassLoader(),
+        Service service = GuestComponentFactory.instantiateService(GuestDefiningLoader.of(session),
                 factoryClass(), className, new Intent());
         attachBaseContext(service, session.context);
         setOptionalField(service, "mApplication", session.application);
@@ -716,11 +752,11 @@ public final class GuestComponentRuntime {
     }
 
     private BroadcastReceiver newReceiver(String className) throws Exception {
-        Class<?> type = session.classLoader.loadClass(className);
+        Class<?> type = GuestDefiningLoader.loadComponent(session, className);
         if (!BroadcastReceiver.class.isAssignableFrom(type)) {
             throw new IllegalArgumentException("Component is not a BroadcastReceiver: " + className);
         }
-        return GuestComponentFactory.instantiateReceiver(session.context.getClassLoader(), factoryClass(),
+        return GuestComponentFactory.instantiateReceiver(GuestDefiningLoader.of(session), factoryClass(),
                 className, new Intent());
     }
 
@@ -740,12 +776,12 @@ public final class GuestComponentRuntime {
             synchronized (providerLock) { providersByAuthority.putIfAbsent(authority, byClass); }
             return providerResult("PROVIDER_AUTHORITY_ATTACHED", byClass);
         }
-        Class<?> type = session.classLoader.loadClass(className);
+        Class<?> type = GuestDefiningLoader.loadComponent(session, className);
         if (!ContentProvider.class.isAssignableFrom(type)) {
             throw new IllegalArgumentException("Component is not a ContentProvider: " + className);
         }
-        ContentProvider provider = GuestComponentFactory.instantiateProvider(session.context.getClassLoader(),
-                factoryClass(), className);
+        ContentProvider provider = GuestComponentFactory.instantiateProvider(
+                GuestDefiningLoader.of(session), factoryClass(), className);
         requireNativeHookRefresh("PROVIDER_CREATE");
         ProviderInfo info = session.packageMetadata.providerForClass(className);
         if (info == null) info = session.packageMetadata.provider(authority);

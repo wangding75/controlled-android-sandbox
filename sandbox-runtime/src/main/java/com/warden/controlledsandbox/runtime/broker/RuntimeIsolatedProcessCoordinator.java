@@ -159,6 +159,9 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         input.putString(RuntimeKeys.COMPONENT_CLASS, match.componentClass());
         input.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
         stopMismatchedSessions(packageName, userId, revision);
+        padIsolatedSlots(packageName, userId, revision, processName,
+                input.getInt(RuntimeKeys.SLOT_PAD_COUNT, 0),
+                input.getInt(RuntimeKeys.SLOT_TARGET, -1));
 
         GuestSession session = sessions.allocate(packageName, userId, processName, revision, now());
         GuestSession staleRecovery = null;
@@ -546,6 +549,35 @@ final class RuntimeIsolatedProcessCoordinator implements AutoCloseable {
         RuntimeSystemServiceCoordinator value = systemServices.get();
         if (value == null) throw new IllegalStateException("SYSTEM_SERVICE_COORDINATOR_NOT_INITIALIZED");
         return value;
+    }
+
+    private void padIsolatedSlots(String packageName, int userId, String revision,
+                                  String requestedProcess, int padCount, int slotTarget) {
+        if (slotTarget >= 0) {
+            if (!ProcessSlotContract.isIsolatedSlot(slotTarget)) {
+                throw new IllegalArgumentException("ISOLATED_SLOT_TARGET_OUT_OF_RANGE:" + slotTarget);
+            }
+            for (int slot = 0; slot < SLOT_COUNT; slot++) {
+                if (slot == slotTarget) continue;
+                String padProcess = packageName + ":__iso_slot_pad_" + slot;
+                if (padProcess.equals(requestedProcess)) {
+                    throw new IllegalArgumentException("ISOLATED_SLOT_PAD_COLLIDES_WITH_REQUEST");
+                }
+                sessions.allocateExact(packageName, userId, padProcess, revision, slot, now());
+            }
+            return;
+        }
+        if (padCount <= 0) return;
+        if (padCount > SLOT_COUNT) {
+            throw new IllegalArgumentException("ISOLATED_SLOT_PAD_COUNT_OUT_OF_RANGE:" + padCount);
+        }
+        for (int index = 0; index < padCount; index++) {
+            String padProcess = packageName + ":__iso_slot_pad_" + index;
+            if (padProcess.equals(requestedProcess)) {
+                throw new IllegalArgumentException("ISOLATED_SLOT_PAD_COLLIDES_WITH_REQUEST");
+            }
+            sessions.allocateExact(packageName, userId, padProcess, revision, index, now());
+        }
     }
 
     @Override public void close() {
