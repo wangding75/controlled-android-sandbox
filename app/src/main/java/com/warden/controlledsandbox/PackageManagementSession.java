@@ -290,6 +290,33 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
                 "createClone", lifecycle.createClone(required(packageName, "packageName"))));
     }
 
+    @Override public PackageServiceResult rollbackPackage(String packageName) {
+        return execute("rollbackPackage", () -> {
+            String normalized = required(packageName, "packageName");
+            dependencies.stopGuestBeforeDestructiveOperation(normalized, 0);
+            return PackageServiceResult.successText("rollbackPackage",
+                    lifecycle.rollbackPackage(normalized).toJson().toString());
+        });
+    }
+
+    @Override public PackageServiceResult resetIdentity(String packageName) {
+        return execute("resetIdentity", () -> {
+            String normalized = required(packageName, "packageName");
+            dependencies.stopGuestBeforeDestructiveOperation(normalized, 0);
+            return PackageServiceResult.successText("resetIdentity",
+                    lifecycle.resetIdentity(normalized).toJson().toString());
+        });
+    }
+
+    @Override public PackageServiceResult lifecycleTransaction(String packageName) {
+        return execute("lifecycleTransaction", () -> {
+            PackageLifecycleTransaction transaction = lifecycle.lifecycleTransaction(
+                    required(packageName, "packageName"));
+            return PackageServiceResult.successText("lifecycleTransaction",
+                    transaction == null ? "" : transaction.toJson().toString());
+        });
+    }
+
     @Override public PackageServiceResult updateInstanceStatus(String packageName,
                                                                 int virtualUserId,
                                                                 String status) {

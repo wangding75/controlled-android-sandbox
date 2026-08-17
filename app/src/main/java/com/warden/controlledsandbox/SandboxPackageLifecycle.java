@@ -18,6 +18,13 @@ import java.util.Set;
  * failed cleanup is retained as an explicit maintenance warning and retried on the next load.
  */
 final class SandboxPackageLifecycle {
+    /**
+     * Retired install-session flag token. Rollback is {@link PackageLifecycleTransaction},
+     * not an install-session boolean.
+     */
+    static final String INSTALL_SESSION_ROLLBACK_UNSUPPORTED =
+            "INSTALL_SESSION_ROLLBACK_UNSUPPORTED";
+
     @FunctionalInterface
     interface RevisionCommitBarrier {
         void beforeCommit(SandboxCatalogState current, SandboxRecord imported) throws Exception;
@@ -27,6 +34,7 @@ final class SandboxPackageLifecycle {
     private final SandboxCatalogRepository catalogRepository;
     private final ApkImportManager importer;
     private final PackageInstallSessionStore installSessions;
+    private final PackageLifecycleTransactionStore lifecycleTransactions;
     private String maintenanceWarning = "";
 
     SandboxPackageLifecycle(Context context) {
@@ -34,6 +42,7 @@ final class SandboxPackageLifecycle {
         catalogRepository = new SandboxCatalogRepository(this.context);
         importer = new ApkImportManager(this.context);
         installSessions = new PackageInstallSessionStore(this.context.getFilesDir());
+        lifecycleTransactions = new PackageLifecycleTransactionStore(this.context.getFilesDir());
     }
 
     synchronized SandboxCatalogState load() throws Exception {
@@ -209,9 +218,6 @@ final class SandboxPackageLifecycle {
         if (!InstallSessionParamsSnapshot.MODE_FULL.equals(params.mode())) {
             throw new IllegalArgumentException("INSTALL_SESSION_INHERIT_EXISTING_UNSUPPORTED");
         }
-        if (params.rollbackEnabled()) {
-            throw new IllegalArgumentException("INSTALL_SESSION_ROLLBACK_UNSUPPORTED");
-        }
         if (params.installFlags() != 0) {
             throw new IllegalArgumentException("INSTALL_SESSION_FLAGS_UNSUPPORTED");
         }
@@ -367,31 +373,100 @@ final class SandboxPackageLifecycle {
             }
             throw error;
         }
+        SandboxRecord previous = current.findRecord(imported.packageName);
+        PackageLifecycleTransaction transaction = lifecycleTransactions.get(imported.packageName);
+        long now = System.currentTimeMillis();
+        if (transaction != null) transaction.requireNotInFlight("commit");
+        if (previous != null && !previous.sha256.equals(imported.sha256)) {
+            transaction = (transaction == null
+                    ? PackageLifecycleTransaction.installed(previous, now)
+                    : transaction).prepareUpdate(previous, now);
+            lifecycleTransactions.put(transaction);
+        }
         if (barrier != null) {
             try {
                 barrier.beforeCommit(current, imported);
             } catch (Exception error) {
-                try {
-                    deletePublishedRevisionIfUnreferenced(current, imported);
-                } catch (Exception cleanupFailure) {
-                    error.addSuppressed(cleanupFailure);
-                }
+                abortPreparedUpdate(imported.packageName, current, imported, error);
                 throw error;
             }
         }
-        SandboxCatalogState next = current.withImported(imported, System.currentTimeMillis());
+        if (transaction != null && transaction.state == PackageLifecycleTransaction.State.UPDATING_PREPARE) {
+            transaction = transaction.switchUpdate(imported, now);
+            lifecycleTransactions.put(transaction);
+        }
+        SandboxCatalogState next = current.withImported(imported, now);
         try {
             catalogRepository.save(next);
         } catch (Exception error) {
-            try {
-                deletePublishedRevisionIfUnreferenced(current, imported);
-            } catch (Exception cleanupFailure) {
-                error.addSuppressed(cleanupFailure);
-            }
+            abortPreparedUpdate(imported.packageName, current, imported, error);
             throw error;
+        }
+        if (transaction != null && transaction.state == PackageLifecycleTransaction.State.UPDATING_SWITCH) {
+            lifecycleTransactions.put(transaction.activate(now, "update-active"));
+        } else if (previous == null) {
+            lifecycleTransactions.put(PackageLifecycleTransaction.installed(imported, now));
         }
         sweepUnreferencedFiles(next);
         return imported;
+    }
+
+    synchronized PackageLifecycleTransaction rollbackPackage(String packageName) throws Exception {
+        String normalized = requirePackageName(packageName);
+        PackageLifecycleTransaction transaction = lifecycleTransactions.get(normalized);
+        if (transaction == null) throw new IllegalStateException("LIFECYCLE_NO_ROLLBACK_REVISION");
+        transaction = transaction.beginRollback(System.currentTimeMillis());
+        lifecycleTransactions.put(transaction);
+        SandboxRecord previous = SandboxRecord.fromJson(new org.json.JSONObject(transaction.previousRecordJson));
+        File previousApk = new File(previous.apkPath);
+        if (!previousApk.isFile()) {
+            lifecycleTransactions.put(transaction.activate(System.currentTimeMillis(), "rollback-missing-apk"));
+            throw new IllegalStateException("LIFECYCLE_ROLLBACK_APK_MISSING");
+        }
+        SandboxCatalogState current = catalogRepository.load();
+        catalogRepository.save(current.withRestoredRevision(previous));
+        PackageLifecycleTransaction restored = transaction.abortToPrevious(System.currentTimeMillis());
+        lifecycleTransactions.put(restored);
+        return restored;
+    }
+
+    synchronized PackageLifecycleTransaction resetIdentity(String packageName) throws Exception {
+        String normalized = requirePackageName(packageName);
+        SandboxRecord record = findRecord(normalized);
+        if (record == null) throw new IllegalArgumentException("Package is not installed: " + normalized);
+        long now = System.currentTimeMillis();
+        PackageLifecycleTransaction transaction = lifecycleTransactions.get(normalized);
+        if (transaction == null) transaction = PackageLifecycleTransaction.installed(record, now);
+        transaction.requireNotInFlight("identity-reset");
+        transaction = transaction.withState(PackageLifecycleTransaction.State.RESETTING, now, "identity-reset");
+        lifecycleTransactions.put(transaction);
+        PackageLifecycleTransaction reset = transaction.resetIdentity(now);
+        lifecycleTransactions.put(reset);
+        return reset;
+    }
+
+    synchronized PackageLifecycleTransaction lifecycleTransaction(String packageName) throws Exception {
+        return lifecycleTransactions.get(requirePackageName(packageName));
+    }
+
+    private void abortPreparedUpdate(String packageName, SandboxCatalogState current,
+                                     SandboxRecord imported, Exception cause) {
+        try {
+            PackageLifecycleTransaction transaction = lifecycleTransactions.get(packageName);
+            if (transaction != null && (transaction.state == PackageLifecycleTransaction.State.UPDATING_PREPARE
+                    || transaction.state == PackageLifecycleTransaction.State.UPDATING_SWITCH)) {
+                lifecycleTransactions.put(transaction.abortToPrevious(System.currentTimeMillis()));
+            }
+            deletePublishedRevisionIfUnreferenced(current, imported);
+        } catch (Exception cleanupFailure) {
+            if (cause != null) cause.addSuppressed(cleanupFailure);
+        }
+    }
+
+    private static String requirePackageName(String packageName) {
+        String normalized = packageName == null ? "" : packageName.trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
+        return normalized;
     }
 
     synchronized int createClone(String packageName) throws Exception {
@@ -489,6 +564,14 @@ final class SandboxPackageLifecycle {
             } catch (Exception error) {
                 failures.add("Cannot resolve package revision for " + record.packageName + ": " + error.getMessage());
             }
+        }
+        try {
+            for (String retained : lifecycleTransactions.retainedRevisionPaths()) {
+                File parent = new File(retained).getCanonicalFile().getParentFile();
+                if (parent != null) referencedRevisionDirectories.add(parent.getCanonicalPath());
+            }
+        } catch (Exception error) {
+            failures.add("Cannot resolve retained rollback revisions: " + error.getMessage());
         }
         File[] children = packagesRoot.listFiles();
         if (children == null) {

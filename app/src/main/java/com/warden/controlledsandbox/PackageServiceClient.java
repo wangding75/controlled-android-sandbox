@@ -245,6 +245,18 @@ final class PackageServiceClient implements AutoCloseable {
         return requireSuccess(requireSession().createClone(packageName)).intValue();
     }
 
+    String rollbackPackage(String packageName) throws Exception {
+        return requireSuccess(requireSession().rollbackPackage(packageName)).textValue();
+    }
+
+    String resetIdentity(String packageName) throws Exception {
+        return requireSuccess(requireSession().resetIdentity(packageName)).textValue();
+    }
+
+    String lifecycleTransaction(String packageName) throws Exception {
+        return requireSuccess(requireSession().lifecycleTransaction(packageName)).textValue();
+    }
+
     void updateInstanceStatus(String packageName, int virtualUserId, String status) throws Exception {
         requireSuccess(requireSession().updateInstanceStatus(packageName, virtualUserId, status));
     }

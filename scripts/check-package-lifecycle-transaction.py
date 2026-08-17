@@ -97,9 +97,11 @@ if not errors:
         if fragment not in text['isolated']:
             errors.append(f'isolated process death barrier missing: {fragment}')
 
-    for fragment in ['RevisionCommitBarrier', 'commitImported(current, imported, barrier)']:
-        if fragment not in text['lifecycle']:
-            errors.append(f'APK revision commit barrier missing: {fragment}')
+    for fragment in ['RevisionCommitBarrier', 'commitImported(current, imported, barrier)',
+                     'PackageLifecycleTransaction', 'prepareUpdate', 'switchUpdate',
+                     'rollbackPackage', 'resetIdentity', 'withRestoredRevision']:
+        if fragment not in text['lifecycle'] and fragment not in text['catalog_state']:
+            errors.append(f'transactional package revision control missing: {fragment}')
     if text['package_session'].count('dependencies::stopGuestBeforeRevisionCommit') < 6:
         errors.append('all production APK import/install entry points must use the revision stop barrier')
     for fragment in ['stopGuestBeforeRevisionCommit',

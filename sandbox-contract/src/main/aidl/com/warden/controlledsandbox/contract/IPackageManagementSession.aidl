@@ -43,6 +43,9 @@ interface IPackageManagementSession {
     PackageServiceResult listPermissionAudit(String packageName, int virtualUserId, int limit);
     PackageServiceResult ensureInstance(String packageName, int virtualUserId);
     PackageServiceResult createClone(String packageName);
+    PackageServiceResult rollbackPackage(String packageName);
+    PackageServiceResult resetIdentity(String packageName);
+    PackageServiceResult lifecycleTransaction(String packageName);
     PackageServiceResult updateInstanceStatus(String packageName, int virtualUserId, String status);
     PackageServiceResult deleteInstance(String packageName, int virtualUserId);
     PackageServiceResult clearInstanceData(String packageName, int virtualUserId);

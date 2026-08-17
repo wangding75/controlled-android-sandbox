@@ -28,8 +28,7 @@ public final class FixtureProvider extends ContentProvider {
 
     @Override public synchronized Cursor query(Uri uri, String[] projection, String selection,
                                                 String[] selectionArgs, String sortOrder) {
-        if ("cas.anr".equals(selection)
-                || (uri != null && "anr".equals(uri.getQueryParameter("stall")))) {
+        if ("cas.anr".equals(selection)) {
             Log.i("CS_FAULT", "ANR_PROVIDER_BEGIN uri=" + uri);
             try {
                 Thread.sleep(25_000L);

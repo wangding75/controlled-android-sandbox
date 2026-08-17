@@ -96,6 +96,18 @@ final class SandboxCatalogState {
         return null;
     }
 
+    SandboxCatalogState withRestoredRevision(SandboxRecord previous) {
+        if (previous == null) throw new IllegalArgumentException("previous record is required");
+        if (findRecord(previous.packageName) == null) {
+            throw new IllegalArgumentException("Package is not installed: " + previous.packageName);
+        }
+        List<SandboxRecord> nextRecords = records();
+        nextRecords.removeIf(record -> record.packageName.equals(previous.packageName));
+        nextRecords.add(previous);
+        return new SandboxCatalogState(nextRecords, instances, policies,
+                permissionRequests, permissionAudit);
+    }
+
     SandboxCatalogState withImported(SandboxRecord imported, long nowMs) {
         if (imported == null) throw new IllegalArgumentException("imported record is required");
         SandboxRecord previous = findRecord(imported.packageName);

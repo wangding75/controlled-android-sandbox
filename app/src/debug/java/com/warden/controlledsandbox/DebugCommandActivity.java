@@ -96,6 +96,34 @@ public final class DebugCommandActivity extends Activity {
                         + campaign.optJSONObject("isolated"));
                 return;
             }
+            if ("lifecycle-clone".equals(command)
+                    || "lifecycle-reset-identity".equals(command)
+                    || "lifecycle-rollback".equals(command)
+                    || "lifecycle-status".equals(command)) {
+                if (packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("package extra is required");
+                }
+                packages = new PackageServiceClient(this);
+                Bundle lifecycleOp = new Bundle();
+                if ("lifecycle-clone".equals(command)) {
+                    int cloneUser = packages.createClone(packageName);
+                    lifecycleOp.putString(RuntimeKeys.STATUS, "CLONED");
+                    lifecycleOp.putInt(RuntimeKeys.VIRTUAL_USER_ID, cloneUser);
+                } else if ("lifecycle-reset-identity".equals(command)) {
+                    lifecycleOp.putString(RuntimeKeys.STATUS, "IDENTITY_RESET");
+                    lifecycleOp.putString("transaction", packages.resetIdentity(packageName));
+                } else if ("lifecycle-rollback".equals(command)) {
+                    lifecycleOp.putString(RuntimeKeys.STATUS, "ROLLED_BACK");
+                    lifecycleOp.putString("transaction", packages.rollbackPackage(packageName));
+                } else {
+                    lifecycleOp.putString(RuntimeKeys.STATUS, "LIFECYCLE");
+                    lifecycleOp.putString("transaction", packages.lifecycleTransaction(packageName));
+                }
+                result.put("operation", bundleJson(lifecycleOp));
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS " + command + " " + packageName);
+                return;
+            }
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
             Log.i(TAG, "PACKAGE_LOOKUP_BEGIN command=" + command + " package=" + packageName);
             packages = new PackageServiceClient(this);
