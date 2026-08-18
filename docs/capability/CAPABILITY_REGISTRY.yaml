@@ -105,14 +105,16 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: c8324fb4091fa081feb1c2bf056038cb0b08a54d
     evidence:
       - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
       - docs/runtime/T57_R02_P1_FIX_MATRIX.md
       - tools/device/t57_rd_pending_intent_real_path.ps1
       - scripts/check-pending-intent-lifecycle.py
+      - docs/review/T57_R03_P4_FIX01_D_SYSTEM_HOLDER_PI.md
+      - artifacts/capability-audit/fix01d/20260818T044548Z/evidence.json
     known_gaps:
-      - SystemUI/Alarm/NMS cross-process sender matrix is not proven.
+      - Guest receiver file after cold bind was not observed; alarm relay + new :guestN is the death proof.
       - Mutable/immutable/one-shot/cancel/update matrix is incomplete.
   - id: manifest_package_parser
     title: Manifest / package parser
@@ -296,14 +298,15 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: b6876cd7d3aa2a3530e8a703cdaa07417db52797
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - scripts/check-binder-system-services.py
       - scripts/check-system-services-broker-split.py
+      - docs/review/T57_R03_P4_FIX01_E_SYSTEM_SERVICE_SURFACE.md
     known_gaps:
-      - Alarm/NMS/Job/Account/Settings/UsageStats full framework semantics are not proven.
       - OEM manager transaction and callback variants are untested.
+      - Account listeners are virtual-only, not host AccountManager callbacks.
   - id: android_oem_compatibility
     title: Android version and OEM compatibility
     implementation_status: GAP
