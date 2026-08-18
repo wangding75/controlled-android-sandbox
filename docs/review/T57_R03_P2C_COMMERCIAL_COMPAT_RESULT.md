@@ -13,9 +13,9 @@ package-specific core hacks.
 
 | App | Class | Result |
 | --- | --- | --- |
-| Quark `com.quark.browser` | WebView/Chromium | PASS import-launch + relaunch + clear |
-| DingTalk `com.alibaba.android.rimet` | Framework-heavy | PASS |
-| Tomato/DragonRead `com.dragon.read` | Native/content | first FAIL `APK has too many ZIP entries` (20k bound). Generic importer bound raised to 200k. Retry PASS. |
+| Quark `com.quark.browser` | WebView/Chromium | `LAUNCH_SMOKE_PASS` import-launch + relaunch + clear |
+| DingTalk `com.alibaba.android.rimet` | Framework-heavy | `LAUNCH_SMOKE_PASS` |
+| Tomato/DragonRead `com.dragon.read` | Native/content | first FAIL `APK has too many ZIP entries` (20k bound). Generic importer bound raised to 200k. Retry `LAUNCH_SMOKE_PASS`. |
 | Fixture / Flash2 self-comparison | fixture | PASS |
 
 XH and old SX: `ENVIRONMENT_NOT_AVAILABLE` (not installed, no local APK).
