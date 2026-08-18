@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the T57-R03-P4-R04 independent review pack. No parity verdict."""
+"""Build the T57-R03-P4-R05 independent review pack. No parity verdict."""
 
 from __future__ import annotations
 
@@ -13,12 +13,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-independent-review"
-ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_R04_independent_review_pack.zip"
+ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_R05_independent_review_pack.zip"
 
 INCLUDE_DIRS = (
     "app", "sandbox-sdk", "sandbox-contract", "sandbox-domain", "sandbox-framework",
     "sandbox-runtime", "sandbox-native", "sandbox-companion32", "fixture-basic",
-    "fixture-compat32", "tools", "scripts", "docs", "verification", "gradle",
+    "fixture-compat32", "fixture-activity-scale", "fixture-lifecycle",
+    "tools", "scripts", "docs", "verification", "gradle",
 )
 INCLUDE_FILES = (
     "settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts",
@@ -125,7 +126,7 @@ def main() -> int:
     inventory = write_inventory()
     manifest = {
         "project": "controlled-android-sandbox",
-        "taskbook": "T57-R03-P4-R04",
+        "taskbook": "T57-R03-P4-FIX01",
         "branch": git("branch", "--show-current").strip(),
         "HEAD": head,
         "TREE": tree,
