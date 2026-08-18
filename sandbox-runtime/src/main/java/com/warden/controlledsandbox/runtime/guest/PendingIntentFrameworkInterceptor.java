@@ -203,7 +203,8 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             Intent[] rewritten = new Intent[intents.length];
             for (int cursor = 0; cursor < intents.length; cursor++) {
                 Intent shadow = new Intent(RuntimePendingIntentRelayReceiver.ACTION);
-                shadow.setClassName(hostPackageName, RuntimePendingIntentRelayReceiver.CLASS_NAME);
+                shadow.setComponent(new ComponentName(hostPackageName,
+                        RuntimePendingIntentRelayReceiver.CLASS_NAME));
                 shadow.setPackage(hostPackageName);
                 shadow.putExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
                 rewritten[cursor] = shadow;
