@@ -113,10 +113,25 @@ public final class VirtualSystemServiceInterceptor {
             return Call.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("accountauthenticated")) return Call.handled(accounts.password(firstAccount(arguments)) != null);
-        if (name.startsWith("getaccountvisibility") || name.startsWith("setaccountvisibility")) {
-            return Call.handled(method.getReturnType() == boolean.class ? Boolean.TRUE : Integer.valueOf(1));
+        if (name.startsWith("getaccountvisibility")) {
+            return Call.handled(Integer.valueOf(accounts.visibility(firstAccount(arguments))));
         }
-        if (name.startsWith("registeraccountlistener") || name.startsWith("unregisteraccountlistener")) {
+        if (name.startsWith("setaccountvisibility")) {
+            Object account = firstAccount(arguments);
+            int visibility = 1;
+            if (arguments != null) {
+                for (Object value : arguments) {
+                    if (value instanceof Integer integer) visibility = integer;
+                }
+            }
+            return Call.handled(Boolean.valueOf(accounts.setVisibility(account, visibility)));
+        }
+        if (name.startsWith("registeraccountlistener")) {
+            accounts.addListener(firstPayload(arguments));
+            return Call.handled(defaultValue(method.getReturnType()));
+        }
+        if (name.startsWith("unregisteraccountlistener")) {
+            accounts.removeListener(firstPayload(arguments));
             return Call.handled(defaultValue(method.getReturnType()));
         }
         throw new SecurityException("VIRTUAL_ACCOUNT_SIGNATURE_UNSUPPORTED:" + method.getName());
@@ -240,7 +255,9 @@ public final class VirtualSystemServiceInterceptor {
             rewriteChannelObjects(arguments, restores);
             return Call.passThroughLifecycle(restores, this::filterAndRestoreChannelResult, () -> { });
         }
-        if (name.startsWith("arenotificationsenabled")) return Call.handled(Boolean.TRUE);
+        if (name.startsWith("arenotificationsenabled")) {
+            return Call.passThrough();
+        }
         throw new SecurityException("VIRTUAL_NOTIFICATION_SIGNATURE_UNSUPPORTED:" + method.getName());
     }
 

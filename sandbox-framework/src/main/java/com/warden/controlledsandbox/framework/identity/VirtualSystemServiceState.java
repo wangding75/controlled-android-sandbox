@@ -269,6 +269,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
     public static final class AccountState {
         private final VirtualSystemServiceAuthority authority;
         private final Map<AccountKey, AccountEntry> entries = new LinkedHashMap<>();
+        private final List<Object> listeners = new ArrayList<>();
         AccountState(VirtualSystemServiceAuthority authority) { this.authority = authority; }
 
         public synchronized boolean add(Object account, String password) {
@@ -326,7 +327,29 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             return array;
         }
         public synchronized int size() { return authority == null ? entries.size() : authority.accounts("").size(); }
-        public synchronized void clear() { if (authority == null) entries.clear(); }
+        public synchronized int visibility(Object account) {
+            AccountEntry entry = entries.get(AccountKey.from(account));
+            return entry == null ? 0 : entry.visibility;
+        }
+        public synchronized boolean setVisibility(Object account, int visibility) {
+            AccountKey key = AccountKey.from(account);
+            AccountEntry entry = entries.get(key);
+            if (entry == null) {
+                if (authority == null) return false;
+                entry = new AccountEntry(account, "");
+                entries.put(key, entry);
+            }
+            entry.visibility = visibility;
+            return true;
+        }
+        public synchronized void addListener(Object listener) {
+            if (listener != null) listeners.add(listener);
+        }
+        public synchronized void removeListener(Object listener) {
+            if (listener != null) listeners.remove(listener);
+        }
+        public synchronized int listenerCount() { return listeners.size(); }
+        public synchronized void clear() { if (authority == null) entries.clear(); listeners.clear(); }
         private AccountEntry require(Object account) {
             AccountEntry entry = entries.get(AccountKey.from(account));
             if (entry == null) throw new IllegalArgumentException("VIRTUAL_ACCOUNT_NOT_FOUND");
@@ -786,7 +809,8 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         }
     }
     private static final class AccountEntry {
-        final Object account; String password; final Map<String, String> tokens = new LinkedHashMap<>();
+        final Object account; String password; int visibility = 1;
+        final Map<String, String> tokens = new LinkedHashMap<>();
         AccountEntry(Object account, String password) { this.account = account; this.password = password; }
     }
     private static final class AlarmEntry {

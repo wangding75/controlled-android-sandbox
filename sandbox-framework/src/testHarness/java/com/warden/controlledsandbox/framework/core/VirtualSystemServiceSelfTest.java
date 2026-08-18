@@ -71,6 +71,14 @@ public final class VirtualSystemServiceSelfTest {
         require(accounts.removeAccountExplicitly(account), "virtual account removed");
         require(accounts.getAccountsAsUser(2).length == 0 && delegate.calls == 0,
                 "host accounts remain hidden");
+        Account visible = new Account("bob", "mail");
+        require(accounts.addAccountExplicitly(visible, "pw", null), "visibility account added");
+        require(accounts.setAccountVisibility(visible, 3), "visibility stored");
+        require(accounts.getAccountVisibility(visible) == 3, "visibility retrieved");
+        Listener listener = new Listener();
+        accounts.registerAccountListener(listener);
+        accounts.unregisterAccountListener(listener);
+        require(delegate.calls == 0, "account visibility stays virtual");
     }
 
     private static void testAlarmLifecycle() throws Exception {
@@ -259,6 +267,10 @@ public final class VirtualSystemServiceSelfTest {
         String getPassword(Account account);
         void setAuthToken(Account account, String type, String token);
         String peekAuthToken(Account account, String type);
+        boolean setAccountVisibility(Account account, int visibility);
+        int getAccountVisibility(Account account);
+        void registerAccountListener(Listener listener);
+        void unregisterAccountListener(Listener listener);
     }
     static final class FakeAccountDelegate implements AccountApi {
         int calls;
@@ -270,6 +282,10 @@ public final class VirtualSystemServiceSelfTest {
         public String getPassword(Account account) { return called("host"); }
         public void setAuthToken(Account account, String type, String token) { calls++; }
         public String peekAuthToken(Account account, String type) { return called("host"); }
+        public boolean setAccountVisibility(Account account, int visibility) { return called(false); }
+        public int getAccountVisibility(Account account) { return called(0); }
+        public void registerAccountListener(Listener listener) { calls++; }
+        public void unregisterAccountListener(Listener listener) { calls++; }
     }
     static final class Account {
         public final String name; public final String type;
