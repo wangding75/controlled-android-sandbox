@@ -1,0 +1,37 @@
+plugins { id 'com.android.application' }
+
+apply from: rootProject.file('gradle/release-signing.gradle')
+
+android {
+    namespace = 'com.warden.controlledsandbox.fixture.lifecycle'
+    compileSdk = rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
+
+    defaultConfig {
+        applicationId 'com.warden.controlledsandbox.fixture.lifecycle'
+        minSdk = rootProject.ext.controlledMinSdk
+        targetSdk = rootProject.ext.controlledTargetSdk
+        versionCode 1
+        versionName '1.0-lifecycle'
+    }
+
+    flavorDimensions 'lineage'
+    productFlavors {
+        v1 {
+            dimension 'lineage'
+            versionCode 1
+            versionName '1.0-lifecycle'
+        }
+        v2 {
+            dimension 'lineage'
+            versionCode 2
+            versionName '2.0-lifecycle'
+        }
+    }
+
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

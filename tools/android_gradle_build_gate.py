@@ -23,6 +23,8 @@ TASKS = [
     ":fixture-basic:assembleDebug",
     ":fixture-compat32:assembleDebug",
     ":fixture-activity-scale:assembleDebug",
+    ":fixture-lifecycle:assembleV1Debug",
+    ":fixture-lifecycle:assembleV2Debug",
 ]
 
 

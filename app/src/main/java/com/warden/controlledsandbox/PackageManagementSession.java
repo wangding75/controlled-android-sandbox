@@ -293,7 +293,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     @Override public PackageServiceResult rollbackPackage(String packageName) {
         return execute("rollbackPackage", () -> {
             String normalized = required(packageName, "packageName");
-            dependencies.stopGuestBeforeDestructiveOperation(normalized, 0);
+            dependencies.stopAllGuestsForPackage(normalized);
             return PackageServiceResult.successText("rollbackPackage",
                     lifecycle.rollbackPackage(normalized).toJson().toString());
         });
@@ -302,7 +302,7 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
     @Override public PackageServiceResult resetIdentity(String packageName) {
         return execute("resetIdentity", () -> {
             String normalized = required(packageName, "packageName");
-            dependencies.stopGuestBeforeDestructiveOperation(normalized, 0);
+            dependencies.stopAllGuestsForPackage(normalized);
             return PackageServiceResult.successText("resetIdentity",
                     lifecycle.resetIdentity(normalized).toJson().toString());
         });

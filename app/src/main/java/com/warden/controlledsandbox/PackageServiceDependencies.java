@@ -161,6 +161,20 @@ final class PackageServiceDependencies implements AutoCloseable {
         runtimeClient.stop(record, virtualUserId);
     }
 
+    /** Package-wide destructive switch: every catalog virtual user, not only user0. */
+    void stopAllGuestsForPackage(String packageName) throws Exception {
+        SandboxCatalogState current = lifecycle.load();
+        java.util.LinkedHashSet<Integer> users = new java.util.LinkedHashSet<>();
+        for (SandboxInstance instance : current.instances()) {
+            if (packageName.equals(instance.packageName)) users.add(instance.virtualUserId);
+        }
+        if (users.isEmpty()) users.add(0);
+        for (int userId : users) {
+            stopGuestBeforeDestructiveOperation(packageName, userId);
+            deleteScopeBestEffort(new VirtualSystemServiceStore.Scope(packageName, userId));
+        }
+    }
+
     /**
      * Stops every catalog instance before an APK revision becomes authoritative. An upgrade is
      * destructive to the running ClassLoader/native workspace even though the old immutable APK

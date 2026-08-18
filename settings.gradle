@@ -24,6 +24,7 @@ include ':sandbox-framework'
 include ':fixture-basic'
 include ':fixture-compat32'
 include ':fixture-activity-scale'
+include ':fixture-lifecycle'
 include ':sandbox-native'
 
 include ':sandbox-companion32'

@@ -11,16 +11,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from campaign_status import RD_INSTANCE_NAME
-from common import artifacts_dir, git_identity, host_os, now_iso, validate_evidence, write_json
+from common import ROOT, artifacts_dir, git_identity, host_os, now_iso, validate_evidence, write_json
 from run_p1_00_rd import debug_command
-from run_rd_campaign import GUEST_PACKAGE, apk_metadata, install_rd_apks, resolve_rd_environment
+from run_rd_campaign import (
+    GUEST_PACKAGE,
+    apk_metadata,
+    install_rd_apks,
+    resolve_rd_environment,
+    run_adb,
+)
 
 CAMPAIGN_ID = "T57-R03-P2B"
 TRUST = ("--ez", "trustNativeGuest", "true")
+LIFECYCLE_PACKAGE = "com.warden.controlledsandbox.fixture.lifecycle"
+LIFECYCLE_V1 = ROOT / "fixture-lifecycle/build/outputs/apk/v1/debug/fixture-lifecycle-v1-debug.apk"
+LIFECYCLE_V2 = ROOT / "fixture-lifecycle/build/outputs/apk/v2/debug/fixture-lifecycle-v2-debug.apk"
 
 
-def cmd(serial: str, command: str, extra: list[str] | None = None) -> dict:
-    extras = ["-e", "command", command, "-e", "package", GUEST_PACKAGE, *TRUST]
+def cmd(serial: str, command: str, package: str = GUEST_PACKAGE, extra: list[str] | None = None) -> dict:
+    extras = ["-e", "command", command, "-e", "package", package, *TRUST]
     if extra:
         extras.extend(extra)
     return debug_command(serial, extras, deadline_sec=90)
@@ -45,6 +54,33 @@ def main() -> int:
     write_json(output / "clone.json", clone)
     status_after_clone = cmd(serial, "lifecycle-status")
     write_json(output / "status_after_clone.json", status_after_clone)
+
+    lineage = {"v1": str(LIFECYCLE_V1), "v2": str(LIFECYCLE_V2),
+               "v1_exists": LIFECYCLE_V1.is_file(), "v2_exists": LIFECYCLE_V2.is_file()}
+    if LIFECYCLE_V1.is_file():
+        lineage["install_v1"] = {
+            "returncode": run_adb(serial, ["install", "-r", str(LIFECYCLE_V1)], check=False).returncode
+        }
+        lineage["import_v1"] = cmd(serial, "import-prepare", LIFECYCLE_PACKAGE)
+        lineage["clone_v1"] = cmd(serial, "lifecycle-clone", LIFECYCLE_PACKAGE)
+        lineage["launch_v1_user0"] = cmd(serial, "launch-component", LIFECYCLE_PACKAGE, [
+            "-e", "component", "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity",
+        ])
+    if LIFECYCLE_V2.is_file():
+        lineage["install_v2"] = {
+            "returncode": run_adb(serial, ["install", "-r", str(LIFECYCLE_V2)], check=False).returncode
+        }
+        lineage["import_v2"] = cmd(serial, "import-prepare", LIFECYCLE_PACKAGE)
+        lineage["launch_v2"] = cmd(serial, "launch-component", LIFECYCLE_PACKAGE, [
+            "-e", "component", "com.warden.controlledsandbox.fixture.lifecycle.LifecycleV2Activity",
+        ])
+        lineage["rollback_v2"] = cmd(serial, "lifecycle-rollback", LIFECYCLE_PACKAGE)
+        lineage["launch_after_rollback"] = cmd(serial, "launch-component", LIFECYCLE_PACKAGE, [
+            "-e", "component", "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity",
+        ])
+    lineage["reset_identity"] = cmd(serial, "lifecycle-reset-identity", LIFECYCLE_PACKAGE)
+    write_json(output / "lineage.json", lineage)
+
     reset = cmd(serial, "lifecycle-reset-identity")
     write_json(output / "reset_identity.json", reset)
     replace = cmd(serial, "import-prepare")
@@ -71,6 +107,7 @@ def main() -> int:
         "recover": recover,
         "status_after_clone": status_after_clone,
         "status_after_replace": status_after_replace,
+        "lineage": lineage,
     }
     write_json(output / "evidence.json", evidence)
     try:
