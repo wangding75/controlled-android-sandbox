@@ -27,7 +27,7 @@ INCLUDE_FILES = (
 )
 EXCLUDE_PARTS = (
     ".git", "build", ".gradle", ".cxx", ".idea", "node_modules", "caches",
-    "keystores", ".keystore", "local.properties",
+    "keystores", ".keystore", "local.properties", "_delivery",
 )
 
 
