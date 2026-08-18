@@ -32,17 +32,19 @@ capabilities:
     rd_api32_status: PASS
     api33_status: UNVERIFIED
     api34_status: UNVERIFIED
-    api35_status: UNVERIFIED
+    api35_status: PARTIAL
     api36_status: UNVERIFIED
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 2211df09f4bbe524187493d621b107db84a15087
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
       - tools/device/t57_rd_framework_transport_probe.ps1
+      - docs/review/T57_R03_P4_FIX01_A_ACTIVITY_STUB_ARCHITECTURE.md
+      - docs/review/T57_R03_P4_FIX01_I_ANDROID_REVALIDATION.md
       - scripts/check-activity-task-virtualization.py
     known_gaps:
       - Normal path is framework-owned ActivityThread/LoadedApk; GuestComponentRuntime remains an isolated/OEM fallback.
