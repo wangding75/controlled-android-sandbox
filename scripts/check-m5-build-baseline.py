@@ -15,13 +15,13 @@ def fail(message: str) -> None:
 
 
 def require(path: str, token: str) -> None:
-    text = (ROOT / path).read_text()
+    text = (ROOT / path).read_text(encoding="utf-8")
     if token not in text:
         fail(f"Missing M5 build baseline token in {path}: {token}")
 
 
 def main() -> int:
-    lock = json.loads((ROOT / "build-environment.lock.json").read_text())
+    lock = json.loads((ROOT / "build-environment.lock.json").read_text(encoding="utf-8"))
     android = lock["toolchain"]["android"]
     build = lock.get("deviceTestBuild", {})
     if build.get("schemaVersion") != 1 or build.get("variant") != "debug":
@@ -44,16 +44,16 @@ def main() -> int:
     if set(android.get("sdkPackages", [])) != expected_packages:
         fail("Locked Android SDK package set changed")
 
-    settings = (ROOT / "settings.gradle").read_text()
+    settings = (ROOT / "settings.gradle").read_text(encoding="utf-8")
     for module in (":app", ":fixture-basic", ":fixture-compat32", ":sandbox-companion32"):
         if f"include '{module}'" not in settings:
             fail(f"Missing device-test module in settings.gradle: {module}")
 
     module_text = {
-        "host": (ROOT / "app/build.gradle").read_text(),
-        "sharedNative": (ROOT / "sandbox-native/build.gradle").read_text(),
-        "fixture": (ROOT / "fixture-basic/build.gradle").read_text(),
-        "companion32": (ROOT / "sandbox-companion32/build.gradle").read_text(),
+        "host": (ROOT / "app/build.gradle").read_text(encoding="utf-8"),
+        "sharedNative": (ROOT / "sandbox-native/build.gradle").read_text(encoding="utf-8"),
+        "fixture": (ROOT / "fixture-basic/build.gradle").read_text(encoding="utf-8"),
+        "companion32": (ROOT / "sandbox-companion32/build.gradle").read_text(encoding="utf-8"),
     }
     for abi in android["hostAbis"]:
         if abi not in module_text["host"] or abi not in module_text["fixture"]:
@@ -85,7 +85,7 @@ def main() -> int:
     require("sandbox-companion32/src/main/AndroidManifest.xml", "android:exported=\"true\"")
     require("docs/plans/M5_T1_DEVELOPMENT_PLAN.md", "M5-T1")
     require("docs/M5_T1_DEVELOPMENT_REPORT.md", "Actual Android APK build in this execution environment: **BLOCKED**")
-    preflight = json.loads((ROOT / "verification/m5-t1-build-preflight.json").read_text())
+    preflight = json.loads((ROOT / "verification/m5-t1-build-preflight.json").read_text(encoding="utf-8"))
     if preflight.get("schemaVersion") != 1 or preflight.get("sourceImplementation") != "PASS":
         fail("M5-T1 source preflight status is not PASS")
     if preflight.get("androidBuild") != "BLOCKED" or preflight.get("androidBuildEvidence") is not False:

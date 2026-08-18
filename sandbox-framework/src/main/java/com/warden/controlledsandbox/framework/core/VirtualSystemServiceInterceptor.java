@@ -114,7 +114,17 @@ public final class VirtualSystemServiceInterceptor {
         }
         if (name.startsWith("accountauthenticated")) return Call.handled(accounts.password(firstAccount(arguments)) != null);
         if (name.startsWith("getaccountvisibility")) {
-            return Call.handled(Integer.valueOf(accounts.visibility(firstAccount(arguments))));
+            Object account = tryFirstAccount(arguments);
+            Class<?> type = method.getReturnType();
+            if (account == null) {
+                return Call.handled(type == boolean.class || type == Boolean.class
+                        ? Boolean.TRUE : Integer.valueOf(1));
+            }
+            int visibility = accounts.visibility(account);
+            if (type == boolean.class || type == Boolean.class) {
+                return Call.handled(Boolean.valueOf(visibility != 0));
+            }
+            return Call.handled(Integer.valueOf(visibility));
         }
         if (name.startsWith("setaccountvisibility")) {
             Object account = firstAccount(arguments);
@@ -968,6 +978,11 @@ public final class VirtualSystemServiceInterceptor {
         return null;
     }
     private static Object firstAccount(Object[] arguments) {
+        Object account = tryFirstAccount(arguments);
+        if (account == null) throw new IllegalArgumentException("VIRTUAL_ACCOUNT_REQUIRED");
+        return account;
+    }
+    private static Object tryFirstAccount(Object[] arguments) {
         if (arguments != null) for (Object value : arguments) {
             if (value == null) continue;
             String type = value.getClass().getName();
@@ -975,7 +990,7 @@ public final class VirtualSystemServiceInterceptor {
                     || (!VirtualSystemServiceState.stringMember(value, "name", "mName", "getName").isEmpty()
                     && !VirtualSystemServiceState.stringMember(value, "type", "mType", "getType").isEmpty())) return value;
         }
-        throw new IllegalArgumentException("VIRTUAL_ACCOUNT_REQUIRED");
+        return null;
     }
     private static String firstAccountType(Object[] arguments) {
         if (arguments == null) return "";
