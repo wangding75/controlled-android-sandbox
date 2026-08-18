@@ -176,6 +176,7 @@ com.warden.controlledsandbox.framework.service|InputManagerServiceHook.java|publ
 com.warden.controlledsandbox.nativebridge|NativePolicy.java|public static boolean installHiddenApiBridge()
 com.warden.controlledsandbox.runtime.diagnostics|RuntimeEventLog.java|public static void failure(String name, Throwable error)
 com.warden.controlledsandbox.contract|RuntimeOperationRequest.java|public static final String APPLY_ACTIVITY_HOST_DECISION =
+com.warden.controlledsandbox.runtime.protocol|RuntimeKeys.java|public static final String PLATFORM_PID =
 com.warden.controlledsandbox.framework.activity|ActivityTaskLedger.java|public synchronized List<String> lastLaunchRemovedActivityTokens()
 com.warden.controlledsandbox.runtime.component.activity|PhysicalActivityWindowFamily.java|public enum PhysicalActivityWindowFamily
 com.warden.controlledsandbox.runtime.component.activity|PhysicalActivityWindowFamily.java|public String componentName(int slot)

@@ -565,6 +565,8 @@ public final class DebugCommandActivity extends Activity {
         out.put("sessionId", bundle.getString(RuntimeKeys.SESSION_ID, ""));
         out.put("generation", bundle.getLong(RuntimeKeys.GENERATION, 0));
         out.put("processSlot", bundle.getInt(RuntimeKeys.PROCESS_SLOT, -1));
+        out.put("platformPid", bundle.getInt(RuntimeKeys.PLATFORM_PID, bundle.getInt("pid", 0)));
+        copyIfPresent(bundle, out, "pid");
         copyIfPresent(bundle, out, "profileClass");
         copyIfPresent(bundle, out, "targetReason");
         copyIfPresent(bundle, out, "targetSupported");

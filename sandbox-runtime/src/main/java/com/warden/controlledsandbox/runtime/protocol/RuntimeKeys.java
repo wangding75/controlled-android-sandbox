@@ -17,6 +17,7 @@ public final class RuntimeKeys {
     public static final String RUNTIME_BROKER_BINDER = "runtimeBrokerBinder";
     public static final String RUNTIME_STORAGE_BINDER = "runtimeStorageBinder";
     public static final String PROCESS_SLOT = "processSlot";
+    public static final String PLATFORM_PID = "platformPid";
     /** Debug/RD only: occupy N low slots (0..N-1) before preparing the requested process. */
     public static final String SLOT_PAD_COUNT = "slotPadCount";
     /** Debug/RD only: occupy every other slot so the prepared process receives this slot. */

@@ -166,6 +166,8 @@ final class RuntimeGuestLifecycleCoordinator {
             owner.receiverCoordinator.bindSession(ready);
             Bundle out = new Bundle(spec);
             out.putAll(guestResult);
+            int guestPid = guestResult.getInt("pid", guestResult.getInt(RuntimeKeys.PLATFORM_PID, 0));
+            if (guestPid > 0) out.putInt(RuntimeKeys.PLATFORM_PID, guestPid);
             out.putString(RuntimeKeys.STATUS, degraded ? "PREPARED_DEGRADED" : "PREPARED");
             out.putString("sessionState", ready.state().name());
             return out;
