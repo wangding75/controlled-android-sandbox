@@ -42,3 +42,15 @@ No claim of "no leak" is made without the after snapshot.
 
 100-iteration targets are not met. The aggregator exists and can be
 resumed. Hostile/clear/death loops were not reached in the short run.
+
+## Second continuation attempt (2026-08-18 session 2)
+
+MuMu `RD测试` was not running when the continuation was attempted
+(2026-08-18T07:24Z, `adb devices` returned empty). The aggregator
+(`tools/capability/run_fix01f_rd.py`) is ready to resume from any
+partial state; it writes cumulative `counts.json` per run. The
+`leak-before.json` collected in session 1 remains on disk; an
+`leak-after.json` will be needed before any PASS claim.
+
+Status stays `CUMULATIVE_PARTIAL`. No fabricated counts were added.
+
