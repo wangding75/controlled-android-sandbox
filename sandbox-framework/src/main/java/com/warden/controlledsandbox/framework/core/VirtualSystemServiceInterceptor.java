@@ -234,7 +234,6 @@ public final class VirtualSystemServiceInterceptor {
             return Call.passThroughLifecycle(restores, this::filterAndRestoreChannelResult, () -> { });
         }
         if (name.startsWith("arenotificationsenabled")) return Call.handled(Boolean.TRUE);
-        if (isQueryName(name)) return Call.handled(defaultValue(method.getReturnType()));
         throw new SecurityException("VIRTUAL_NOTIFICATION_SIGNATURE_UNSUPPORTED:" + method.getName());
     }
 
@@ -284,13 +283,7 @@ public final class VirtualSystemServiceInterceptor {
             return Call.passThroughLifecycle(restores, this::rewriteSingleJobResult, () -> { });
         }
         if (name.startsWith("getallpendingjobs")) return Call.passThroughWithResult(this::rewriteJobResults);
-        if (isQueryName(name)) return Call.handled(defaultValue(method.getReturnType()));
         throw new SecurityException("VIRTUAL_JOB_SIGNATURE_UNSUPPORTED:" + method.getName());
-    }
-
-    private static boolean isQueryName(String name) {
-        return name.startsWith("get") || name.startsWith("query") || name.startsWith("is")
-                || name.startsWith("has") || name.startsWith("are") || name.startsWith("can");
     }
 
     private Object rewriteJobResults(Object result) {
