@@ -18,11 +18,17 @@ does not see create/resume/window on this SwiftShader AVD.
 This is not treated as a Host PackageParser / stub-cardinality failure.
 API35 Host install remains PASS.
 
-## API36
+## API36 (`emulator-5556`, `T57_R03_API36_x86_64`)
 
-The `system-images;android-36;google_apis;x86_64` image is present locally.
-A `T57_R03_API36_x86_64` AVD is created if the manager accepts it; smoke is
-recorded when that emulator reaches `adb` `device`.
+Host + fixture + scale fixture install: Success.
+
+| Fixture | import-prepare | launch |
+| --- | --- | --- |
+| `com.warden.controlledsandbox.fixture` | PASS | FAIL `LAUNCH_GATE_FAILED` |
+| `com.warden.controlledsandbox.fixture.scale` | PASS | FAIL `LAUNCH_GATE_FAILED` |
+
+Same launch-gate pattern as API35 on SwiftShader. Host PackageParser
+accepts the stub-refactored APK.
 
 ## API32
 
