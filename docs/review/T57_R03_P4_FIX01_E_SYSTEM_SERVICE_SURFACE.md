@@ -101,3 +101,17 @@ Unknown EXPLICIT_UNSUPPORTED.
 
 Alarm PendingIntent delegation is required by FIX01-D. Listener alarms
 remain virtual so the existing in-process self-test still holds.
+
+## Post-commit fix (1900ad78)
+
+`getaccountvisibility` now uses `tryFirstAccount()` instead of
+`firstAccount()`. When the caller passes no `Account`-shaped argument (e.g.
+`areVisibleAccounts` / API variant without Account param) the method returns
+a boolean or int default (`true` / `1`) instead of throwing
+`IllegalArgumentException(VIRTUAL_ACCOUNT_REQUIRED)`. This resolves
+compatibility with API 26+ `getAccountVisibility(Account, String)` callers
+that may omit the Account argument in certain reflection paths.
+
+`first Account()` now wraps `tryFirstAccount()` with the same throw, so all
+callers that require an Account continue to fail fast.
+
