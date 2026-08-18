@@ -79,6 +79,15 @@ public final class DebugCommandActivity extends Activity {
                         + campaign.optJSONObject("isolated"));
                 return;
             }
+            if ("pi-system-holder-cancel".equals(command)) {
+                int cancelled = cancelSystemHolderNotifications();
+                result.put("cancelled", cancelled);
+                result.put("operation", new JSONObject().put("status",
+                        cancelled > 0 ? "CANCELLED" : "NONE"));
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS pi-system-holder-cancel cancelled=" + cancelled);
+                return;
+            }
             if ("native-enforcement".equals(command)) {
                 // Host debug isolated process. Do not touch guest Activity/Service runtime
                 // (KI-R03-NATIVE-010). No production Broker/policy path.
@@ -546,6 +555,42 @@ public final class DebugCommandActivity extends Activity {
         } catch (Exception error) {
             return null;
         }
+    }
+
+    private int cancelSystemHolderNotifications() throws Exception {
+        Object manager = getSystemService("notification");
+        if (manager == null) return 0;
+        Object raw = manager.getClass().getMethod("getActiveNotifications").invoke(manager);
+        if (!(raw instanceof Object[] active)) return 0;
+        int cancelled = 0;
+        for (Object sbn : active) {
+            if (sbn == null) continue;
+            Object notification = sbn.getClass().getMethod("getNotification").invoke(sbn);
+            String haystack = String.valueOf(notification);
+            try {
+                haystack += String.valueOf(notification.getClass().getMethod("getChannelId").invoke(notification));
+            } catch (Exception ignored) { }
+            try {
+                Object extras = notification.getClass().getField("extras").get(notification);
+                haystack += String.valueOf(extras.getClass()
+                        .getMethod("getCharSequence", String.class)
+                        .invoke(extras, "android.title"));
+            } catch (Exception ignored) { }
+            if (!haystack.contains("system.holder") && !haystack.contains("system-holder")
+                    && !haystack.contains("CAS system")) {
+                continue;
+            }
+            String tag = (String) sbn.getClass().getMethod("getTag").invoke(sbn);
+            int id = (Integer) sbn.getClass().getMethod("getId").invoke(sbn);
+            if (tag == null || tag.isEmpty()) {
+                manager.getClass().getMethod("cancel", int.class).invoke(manager, id);
+            } else {
+                manager.getClass().getMethod("cancel", String.class, int.class).invoke(manager, tag, id);
+            }
+            cancelled++;
+            Log.i(TAG, "SYSTEM_HOLDER_NOTIFICATION_CANCEL tag=" + tag + " id=" + id);
+        }
+        return cancelled;
     }
 
     private static void requireStatus(String operation, Bundle bundle, String... accepted) {

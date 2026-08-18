@@ -38,7 +38,11 @@ public final class SystemHolderPendingIntentActivity extends Activity {
                     .putExtra("cas.pi.kind", "notification");
             PendingIntent notificationSender = PendingIntent.getBroadcast(
                     this, 57031, notificationIntent, flags);
-            postNotification(notificationSender);
+            try {
+                postNotification(notificationSender);
+            } catch (Exception notificationError) {
+                Log.e(TAG, "NOTIFICATION_ARM_FAILED", notificationError);
+            }
 
             Intent alarmIntent = new Intent(ACTION_ALARM)
                     .setPackage(getPackageName())
@@ -50,12 +54,19 @@ public final class SystemHolderPendingIntentActivity extends Activity {
             String payload = "{\"status\":\"ARMED\",\"notificationId\":" + NOTIFICATION_ID
                     + ",\"alarmAction\":\"" + ACTION_ALARM + "\""
                     + ",\"notificationAction\":\"" + ACTION_NOTIFICATION + "\""
+                    + ",\"alarmDelayMs\":20000"
                     + ",\"pid\":" + android.os.Process.myPid() + "}";
             File out = new File(getFilesDir(), "system-holder.json");
             try (FileOutputStream stream = new FileOutputStream(out)) {
                 stream.write(payload.getBytes(StandardCharsets.UTF_8));
             }
-            Log.i(TAG, "ARMED notification=" + NOTIFICATION_ID + " alarm=8s file=" + out);
+            try {
+                startService(new android.content.Intent(this, SystemHolderKeepAliveService.class));
+            } catch (Exception keepAlive) {
+                Log.w(TAG, "KEEP_ALIVE_FAILED", keepAlive);
+            }
+            Log.i(TAG, "ARMED notification=" + NOTIFICATION_ID + " alarm=20s pid="
+                    + android.os.Process.myPid() + " file=" + out);
         } catch (Exception error) {
             Log.e(TAG, "ARM_FAILED", error);
         }
@@ -63,7 +74,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        new android.os.Handler(getMainLooper()).postDelayed(this::finish, 2_500L);
+        // Stay alive so the harness can SIGKILL this :guestN after system holders are armed.
     }
 
     private void postNotification(PendingIntent content) throws Exception {
@@ -100,7 +111,25 @@ public final class SystemHolderPendingIntentActivity extends Activity {
         if (manager == null) return;
         int type = Class.forName("android.app.AlarmManager")
                 .getField("ELAPSED_REALTIME_WAKEUP").getInt(null);
-        manager.getClass().getMethod("setExact", int.class, long.class, PendingIntent.class)
-                .invoke(manager, type, SystemClock.elapsedRealtime() + 8_000L, sender);
+        long when = SystemClock.elapsedRealtime() + 20_000L;
+        try {
+            manager.getClass().getMethod("setExact", int.class, long.class, PendingIntent.class)
+                    .invoke(manager, type, when, sender);
+            Log.i(TAG, "ALARM_SCHEDULED mode=setExact whenElapsed=" + when);
+            return;
+        } catch (Exception exactDenied) {
+            Log.w(TAG, "setExact unavailable, falling back", exactDenied);
+        }
+        try {
+            manager.getClass().getMethod("setAndAllowWhileIdle", int.class, long.class, PendingIntent.class)
+                    .invoke(manager, type, when, sender);
+            Log.i(TAG, "ALARM_SCHEDULED mode=setAndAllowWhileIdle whenElapsed=" + when);
+            return;
+        } catch (Exception idleDenied) {
+            Log.w(TAG, "setAndAllowWhileIdle unavailable, falling back", idleDenied);
+        }
+        manager.getClass().getMethod("set", int.class, long.class, PendingIntent.class)
+                .invoke(manager, type, when, sender);
+        Log.i(TAG, "ALARM_SCHEDULED mode=set whenElapsed=" + when);
     }
 }

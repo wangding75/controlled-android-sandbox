@@ -340,7 +340,11 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
         return notification(call(() -> session.reserveNotification(notification(candidate, false))));
     }
     @Override public void commitNotification(NotificationRecord value) {
-        call(() -> { session.commitNotification(notification(value, true)); return null; });
+        // Notification payloads carry PendingIntent Binders. Those Binders are already
+        // represented as durable token IDs; marshalling the live object into the Broker
+        // store fails with "Tried to marshall a Parcel that contained Binder objects"
+        // and would abort the host NotificationManager.notify() result path.
+        call(() -> { session.commitNotification(notification(value, false)); return null; });
     }
     @Override public boolean removeNotification(int guestId, String guestTag) {
         return call(() -> session.removeNotification(guestId, safe(guestTag)));
@@ -521,6 +525,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
                 throw new SecurityException("VIRTUAL_SYSTEM_SERVICE_PAYLOAD_TOO_LARGE");
             }
             return payload;
+        } catch (RuntimeException error) {
+            String message = String.valueOf(error.getMessage());
+            if (message.contains("Binder objects") || message.contains("FDS not allowed")) {
+                return new byte[0];
+            }
+            throw error;
         } finally { parcel.recycle(); }
     }
     private Object unmarshal(byte[] payload) {

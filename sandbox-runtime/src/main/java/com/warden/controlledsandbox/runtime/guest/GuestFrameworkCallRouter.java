@@ -19,7 +19,7 @@ final class GuestFrameworkCallRouter implements FrameworkCallInterceptor, AutoCl
                 new GuestActivityTaskClient(spec), hostPackageName);
         orderedReceivers = new OrderedReceiverFinishInterceptor();
         pendingIntents = new PendingIntentFrameworkInterceptor(spec, pendingIntentState,
-                activityTasks::virtualActivityToken, dispatcher);
+                activityTasks::virtualActivityToken, dispatcher, hostPackageName);
         contentProviders = new GuestContentProviderFrameworkInterceptor(context, spec);
     }
 

@@ -369,6 +369,20 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
+
+    @Override public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null
+                && RuntimePendingIntentRelayReceiver.ACTION.equals(intent.getAction())) {
+            String tokenId = intent.getStringExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID);
+            try {
+                frameworkOperationCoordinator.dispatchSystemHeld(tokenId);
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                android.util.Log.e("CS_PENDING_INTENT", "SYSTEM_HOLDER_RELAY_FAILED token=" + tokenId, error);
+            }
+        }
+        return START_STICKY;
+    }
     synchronized Bundle prepareGuestInternal(Bundle request) {
         return guestLifecycleCoordinator.prepareGuest(request);
     }

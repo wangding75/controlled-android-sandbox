@@ -16,12 +16,14 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.provider.BrokerProviderRuntime;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 final class RuntimeFrameworkOperationCoordinator {
     private final RuntimeBrokerService brokerOwner;
     private final SessionRegistry sessions;
     private final BrokerStateStore brokerState;
     private final RuntimeServiceCoordinator serviceCoordinator;
+    private final ConcurrentHashMap<String, PendingIntentOwner> systemHeldOwners = new ConcurrentHashMap<>();
 
     RuntimeFrameworkOperationCoordinator(RuntimeBrokerService brokerOwner) {
         this.brokerOwner = brokerOwner;
@@ -129,6 +131,7 @@ final class RuntimeFrameworkOperationCoordinator {
         PendingIntentOwner owner = new PendingIntentOwner(session.packageName(),
                 session.virtualUserId(), session.processName(), session.generation(),
                 session.packageRevision());
+        systemHeldOwners.put(tokenId, owner);
         RuntimePendingIntentSender sender = new RuntimePendingIntentSender(tokenId,
                 request.getString("pendingIntentSenderDescriptor", "android.content.IIntentSender"),
                 (id, resultCode, fillIn, flagsMask, flagsValues, permission) -> dispatchPendingIntent(
@@ -146,6 +149,15 @@ final class RuntimeFrameworkOperationCoordinator {
         audit.putBoolean("brokerOwned", true);
         RuntimeEventLog.event("PENDING_INTENT_BROKER_RELAY_CREATED", audit);
         return result;
+    }
+
+    void dispatchSystemHeld(String tokenId) throws Exception {
+        if (tokenId == null || tokenId.trim().isEmpty()) {
+            throw new SecurityException("PENDING_INTENT_TOKEN_REQUIRED");
+        }
+        PendingIntentOwner owner = systemHeldOwners.get(tokenId.trim());
+        if (owner == null) throw new SecurityException("PENDING_INTENT_SYSTEM_HOLDER_UNKNOWN");
+        dispatchPendingIntent(owner, tokenId.trim(), 0, null, 0, 0, "");
     }
 
     /** Handles an IIntentSender.send from any system process, including after Guest death. */

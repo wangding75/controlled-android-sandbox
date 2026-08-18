@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <service android:name="com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService" android:exported="false" android:process=":sandbox_server" android:stopWithTask="false" />
+        <receiver android:name="com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayReceiver"
+            android:exported="false"
+            android:process=":sandbox_server">
+            <intent-filter>
+                <action android:name="com.warden.controlledsandbox.action.RELAY_PENDING_INTENT" />
+            </intent-filter>
+        </receiver>
         <service android:name="com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService" android:exported="false" android:process=":sandbox_server" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService0" android:exported="false" android:process=":guest0" android:stopWithTask="false" />
         <service android:name="com.warden.controlledsandbox.runtime.guest.GuestProcessService1" android:exported="false" android:process=":guest1" android:stopWithTask="false" />

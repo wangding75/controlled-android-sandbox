@@ -129,7 +129,8 @@ public final class VirtualSystemServiceInterceptor {
             long trigger = normalizedTrigger(arguments);
             long interval = repeating(name) ? interval(arguments, trigger) : 0L;
             String pendingIntentTokenId = pendingIntentTokenId(token);
-            String deliveryPath = pendingIntentTokenId.isEmpty() ? "LISTENER" : "PENDING_INTENT";
+            boolean hostHeld = isHostHeldAlarmToken(token) || !pendingIntentTokenId.isEmpty();
+            String deliveryPath = hostHeld ? "PENDING_INTENT" : "LISTENER";
             boolean exact = name.contains("exact") || name.contains("alarmclock");
             boolean allowWhileIdle = name.contains("allowwhileidle");
             boolean alarmClock = name.contains("alarmclock");
@@ -139,11 +140,17 @@ public final class VirtualSystemServiceInterceptor {
             state.alarms().schedule(token, trigger, interval, exact, allowWhileIdle, deliveryPath,
                     pendingIntentTokenId, identity.processName(), identity.generation(), identity.packageRevision(),
                     alarmClock, alarmClockShowIntent);
-            return Call.handled(defaultValue(method.getReturnType()));
+            // PendingIntent alarms must be held by Android AlarmManager so the Broker-owned
+            // IIntentSender can fire after the Guest stub process dies. Listener tokens stay
+            // virtual: they are process-local and cannot outlive the creator.
+            return hostHeld ? Call.passThrough() : Call.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("remove") || name.startsWith("cancel")) {
-            state.alarms().cancel(alarmToken(arguments));
-            return Call.handled(defaultValue(method.getReturnType()));
+            Object token = alarmToken(arguments);
+            state.alarms().cancel(token);
+            return isHostHeldAlarmToken(token) || !pendingIntentTokenId(token).isEmpty()
+                    ? Call.passThrough()
+                    : Call.handled(defaultValue(method.getReturnType()));
         }
         if (name.startsWith("canScheduleExactAlarms".toLowerCase(Locale.ROOT))) {
             return Call.handled(identity.permissionPolicy().isGranted("android.permission.SCHEDULE_EXACT_ALARM"));
@@ -855,6 +862,12 @@ public final class VirtualSystemServiceInterceptor {
     private static int intMember(Object value, String field, String alternateField, String method) {
         Object raw = member(value, field, alternateField, method);
         return raw instanceof Number ? ((Number) raw).intValue() : 0;
+    }
+
+    private static boolean isHostHeldAlarmToken(Object token) {
+        if (token == null) return false;
+        String type = token.getClass().getName();
+        return type.contains("PendingIntent") && !type.contains("Listener");
     }
 
     private static Object alarmToken(Object[] arguments) {

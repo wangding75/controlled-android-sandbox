@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegist
 import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.runtime.broker.RuntimePendingIntentRelayReceiver;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -42,6 +43,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     private final GuestPackageSpec spec;
     private final VirtualPendingIntentRegistry registry;
     private final ActivityTokenResolver activityTokenResolver;
+    private final String hostPackageName;
     private final Map<Object, Object> proxies = new IdentityHashMap<>();
     /** Maps the locally-owned registry key to the Binder exposed to host/system processes. */
     private final Map<Object, IBinder> exposedBinders = new IdentityHashMap<>();
@@ -49,14 +51,22 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
     private final Map<Object, Object> remoteTokens = new IdentityHashMap<>();
 
     PendingIntentFrameworkInterceptor(GuestPackageSpec spec, Dispatcher dispatcher) {
-        this(spec, null, token -> { throw new SecurityException("VIRTUAL_ACTIVITY_FRAMEWORK_TOKEN_UNKNOWN"); }, dispatcher);
+        this(spec, null, token -> { throw new SecurityException("VIRTUAL_ACTIVITY_FRAMEWORK_TOKEN_UNKNOWN"); }, dispatcher, "");
     }
 
     PendingIntentFrameworkInterceptor(GuestPackageSpec spec,
             VirtualSystemServiceState.PendingIntentState persistence,
             ActivityTokenResolver activityTokenResolver, Dispatcher dispatcher) {
+        this(spec, persistence, activityTokenResolver, dispatcher, "");
+    }
+
+    PendingIntentFrameworkInterceptor(GuestPackageSpec spec,
+            VirtualSystemServiceState.PendingIntentState persistence,
+            ActivityTokenResolver activityTokenResolver, Dispatcher dispatcher,
+            String hostPackageName) {
         this.spec = java.util.Objects.requireNonNull(spec, "spec");
         this.activityTokenResolver = java.util.Objects.requireNonNull(activityTokenResolver, "activityTokenResolver");
+        this.hostPackageName = hostPackageName == null ? "" : hostPackageName.trim();
         this.registry = new VirtualPendingIntentRegistry(spec.packageName, spec.virtualUserId,
                 spec.virtualUid, spec.generation, spec.processName, spec.packageRevision,
                 persistence == null ? null : new PendingIntentPersistenceAdapter(persistence),
@@ -172,7 +182,34 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             sender = createSenderProxy(method.getReturnType(), token, exposed);
             proxies.put(token, sender);
         }
+        // System holders (NotificationManager / AlarmManager) can only send a real AMS
+        // PendingIntentRecord. Rewrite the payload to a Broker-process relay and let AMS
+        // own the record. Guest-local send still uses the Broker IIntentSender proxy.
+        if (spec.runtimeBrokerBinder != null && !hostPackageName.isEmpty()) {
+            rewriteIntentsForSystemHolder(arguments, issued.record().persistentTokenId());
+            return Interception.passThrough();
+        }
         return Interception.handled(sender);
+    }
+
+    private void rewriteIntentsForSystemHolder(Object[] arguments, String tokenId) {
+        if (arguments == null || tokenId == null || tokenId.isEmpty()) return;
+        for (int index = 0; index < arguments.length; index++) {
+            if (arguments[index] instanceof String value && spec.packageName.equals(value)) {
+                arguments[index] = hostPackageName;
+                continue;
+            }
+            if (!(arguments[index] instanceof Intent[] intents)) continue;
+            Intent[] rewritten = new Intent[intents.length];
+            for (int cursor = 0; cursor < intents.length; cursor++) {
+                Intent shadow = new Intent(RuntimePendingIntentRelayReceiver.ACTION);
+                shadow.setClassName(hostPackageName, RuntimePendingIntentRelayReceiver.CLASS_NAME);
+                shadow.setPackage(hostPackageName);
+                shadow.putExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
+                rewritten[cursor] = shadow;
+            }
+            arguments[index] = rewritten;
+        }
     }
 
     private IBinder createBrokerSender(String tokenId, String senderDescriptor) {

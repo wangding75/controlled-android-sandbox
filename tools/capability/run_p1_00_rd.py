@@ -34,8 +34,15 @@ ORDINARY_TARGETS = (0, 1, 7, 8, 31, 32, 62, 63)
 ISOLATED_TARGETS = (0, 7, 8, 14, 15)
 
 
-def debug_command(serial: str, extras: list[str], deadline_sec: int = 90) -> dict[str, Any]:
-    run_adb(serial, ["shell", "am", "force-stop", HOST_PACKAGE], check=False)
+def debug_command(
+    serial: str,
+    extras: list[str],
+    deadline_sec: int = 90,
+    *,
+    force_stop_host: bool = True,
+) -> dict[str, Any]:
+    if force_stop_host:
+        run_adb(serial, ["shell", "am", "force-stop", HOST_PACKAGE], check=False)
     run_adb(
         serial,
         ["shell", "run-as", HOST_PACKAGE, "rm", "-f", "files/debug-command-result.json"],

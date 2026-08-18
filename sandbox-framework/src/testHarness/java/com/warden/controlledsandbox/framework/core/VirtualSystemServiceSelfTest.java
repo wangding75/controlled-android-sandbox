@@ -19,6 +19,7 @@ public final class VirtualSystemServiceSelfTest {
         testBinderAuthorityClipboardDispatch();
         testAccountIsolation();
         testAlarmLifecycle();
+        testPendingIntentAlarmDelegatesToHost();
         testNotificationNamespace();
         testNotificationChannelObjects();
         testNotificationFailureRollback();
@@ -84,6 +85,19 @@ public final class VirtualSystemServiceSelfTest {
         alarms.remove(cancelled, "guest.alarm");
         require(!cancelled.latch.await(100, TimeUnit.MILLISECONDS), "virtual alarm cancellation");
         require(delegate.calls == 0, "host alarm namespace not used");
+    }
+
+    private static void testPendingIntentAlarmDelegatesToHost() {
+        GuestIdentity identity = identity("guest.alarm.pi", 0, 5L);
+        FakeAlarmDelegate delegate = new FakeAlarmDelegate();
+        AlarmApi alarms = proxy(AlarmApi.class, delegate, identity, "alarm");
+        FakePendingIntent sender = new FakePendingIntent();
+        alarms.setExact(0, System.currentTimeMillis() + 20_000L, sender, "guest.alarm.pi");
+        require(delegate.calls == 1, "PendingIntent alarm must be held by host AlarmManager");
+        require(identity.virtualServices().alarms().size() == 1,
+                "PendingIntent alarm remains in virtual SystemService state");
+        alarms.remove(sender, "guest.alarm.pi");
+        require(delegate.calls == 2, "PendingIntent alarm cancel must reach host AlarmManager");
     }
 
     private static void testNotificationNamespace() {
@@ -264,16 +278,23 @@ public final class VirtualSystemServiceSelfTest {
 
     interface AlarmApi {
         void set(int type, long triggerAtMs, AlarmTarget target, String packageName);
+        void setExact(int type, long triggerAtMs, FakePendingIntent sender, String packageName);
         void remove(AlarmTarget target, String packageName);
+        void remove(FakePendingIntent sender, String packageName);
     }
     static final class FakeAlarmDelegate implements AlarmApi {
         int calls;
         public void set(int type, long triggerAtMs, AlarmTarget target, String packageName) { calls++; }
+        public void setExact(int type, long triggerAtMs, FakePendingIntent sender, String packageName) { calls++; }
         public void remove(AlarmTarget target, String packageName) { calls++; }
+        public void remove(FakePendingIntent sender, String packageName) { calls++; }
     }
     static final class AlarmTarget {
         final CountDownLatch latch = new CountDownLatch(1);
         public void send() { latch.countDown(); }
+    }
+    static final class FakePendingIntent {
+        public void send() { }
     }
 
     interface NotificationApi {
