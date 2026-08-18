@@ -1,6 +1,12 @@
 from pathlib import Path
 import hashlib, json, os, re, subprocess, shutil, textwrap, sys, time
 root = Path(__file__).resolve().parents[1]
+if str(root) not in sys.path:
+    sys.path.insert(0, str(root))
+from tools.architecture_governance import host_activity_stub_bounds
+_host_stub_bounds = host_activity_stub_bounds(root)
+if _host_stub_bounds['errors']:
+    raise SystemExit('HOST_ACTIVITY_STUB_BOUNDS:' + ';'.join(_host_stub_bounds['errors']))
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'reconfigure'):
@@ -419,6 +425,8 @@ fixture=compile_module('fixture-basic',
     java_sources('fixture-basic/src/main/java'), (platform,))
 fixture32=compile_module('fixture-compat32',
     java_sources('fixture-basic/src/main/java'), (platform,))
+fixture_scale=compile_module('fixture-activity-scale',
+    java_sources('fixture-activity-scale/src/main/java'), (platform,))
 tests=compile_module('test-harness', java_sources(
     'sandbox-domain/src/testHarness/java',
     'sandbox-framework/src/testHarness/java',
@@ -426,7 +434,7 @@ tests=compile_module('test-harness', java_sources(
     'sandbox-companion32/src/testHarness/java',
     'sandbox-runtime/src/testHarness/java',
     'app/src/testHarness/java'),
-    (platform,domain,contract,framework,native,runtime,sdk,app,companion,fixture,fixture32))
+    (platform,domain,contract,framework,native,runtime,sdk,app,companion,fixture,fixture32,fixture_scale))
 
 for receipt in compile_receipts:
     module = receipt['module']
@@ -440,7 +448,7 @@ for receipt in compile_receipts:
                          + ':declared=' + ','.join(declared)
                          + ':actual=' + ','.join(actual))
 
-for output in (platform,domain,contract,framework,native,runtime,sdk,app,companion,fixture,fixture32,tests):
+for output in (platform,domain,contract,framework,native,runtime,sdk,app,companion,fixture,fixture32,fixture_scale,tests):
     for source in output.rglob('*'):
         if source.is_file():
             target=classes/source.relative_to(output)

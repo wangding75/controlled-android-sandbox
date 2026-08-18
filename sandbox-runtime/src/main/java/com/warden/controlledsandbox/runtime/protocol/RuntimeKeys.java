@@ -116,6 +116,7 @@ public final class RuntimeKeys {
     public static final String CONFIGURATION_TOKEN = "configurationToken";
     public static final String HANDLES_CONFIGURATION = "handlesConfiguration";
     public static final String REMOVED_ACTIVITY_COUNT = "removedActivityCount";
+    public static final String REMOVED_ACTIVITY_TOKENS = "removedActivityTokens";
     public static final String ACTIVITY_COUNT = "activityCount";
     public static final String TASK_COUNT = "taskCount";
     public static final String RESTORED_ACTIVITY_COUNT = "restoredActivityCount";

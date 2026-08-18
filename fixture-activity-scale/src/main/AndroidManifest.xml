@@ -1,0 +1,142 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:name="com.warden.controlledsandbox.fixture.scale.ScaleApplication"
+        android:allowBackup="false"
+        android:label="CAS Activity Scale Fixture"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity000" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity001" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity002" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity003" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity004" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity005" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity006" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity007" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity008" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity009" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity010" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity011" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity012" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity013" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity014" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity015" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity016" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity017" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity018" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity019" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity020" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity021" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity022" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity023" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity024" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity025" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity026" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity027" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity028" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity029" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity030" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity031" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity032" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity033" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity034" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity035" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity036" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity037" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity038" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity039" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity040" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity041" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity042" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity043" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity044" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity045" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity046" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity047" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity048" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity049" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity050" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity051" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity052" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity053" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity054" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity055" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity056" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity057" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity058" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity059" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity060" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity061" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity062" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity063" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity064" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity065" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity066" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity067" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity068" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity069" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity070" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity071" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity072" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity073" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity074" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity075" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity076" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity077" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity078" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity079" android:exported="false" android:launchMode="singleTop" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity080" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity081" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity082" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity083" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity084" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity085" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity086" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity087" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity088" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity089" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity090" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity091" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity092" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity093" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity094" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity095" android:exported="false" android:launchMode="singleTask" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity096" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity097" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity098" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity099" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity100" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity101" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity102" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity103" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity104" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity105" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity106" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity107" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity108" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity109" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity110" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity111" android:exported="false" android:launchMode="singleInstance" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity112" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity113" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity114" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity115" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity116" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity117" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity118" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity119" android:exported="false" android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity120" android:exported="false" android:documentLaunchMode="always" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity121" android:exported="false" android:documentLaunchMode="always" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity122" android:exported="false" android:documentLaunchMode="always" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity123" android:exported="false" android:documentLaunchMode="always" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity124" android:exported="false" android:taskAffinity="com.warden.controlledsandbox.fixture.scale.affinity.a" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity125" android:exported="false" android:taskAffinity="com.warden.controlledsandbox.fixture.scale.affinity.b" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity126" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleActivity127" android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.scale.ScaleResultCallerActivity" android:exported="true" />
+    </application>
+</manifest>

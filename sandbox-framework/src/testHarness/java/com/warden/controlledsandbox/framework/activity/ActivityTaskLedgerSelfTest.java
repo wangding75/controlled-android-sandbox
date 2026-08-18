@@ -65,6 +65,8 @@ public final class ActivityTaskLedgerSelfTest {
         LaunchDecision reused = ledger.launch(request(0, "A", LaunchMode.SINGLE_TASK, 0, null, 1));
         check(reused.action() == LaunchAction.CLEARED_TOP, "singleTask should clear above existing");
         check(reused.removedActivityCount() == 2, "two Activities should be removed");
+        check(ledger.lastLaunchRemovedActivityTokens().size() == 2,
+                "CLEAR_TOP must expose the removed virtual Activity tokens");
         check(ledger.activityCount() == 1, "only target Activity should remain");
     }
 

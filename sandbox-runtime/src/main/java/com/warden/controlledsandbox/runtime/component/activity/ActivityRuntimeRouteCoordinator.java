@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.runtime.broker.BrokerStateStore;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -317,7 +318,7 @@ final class ActivityRuntimeRouteCoordinator {
         return envelope;
     }
 
-    private static void addDecision(Bundle out, ActivityLaunchTransaction transaction) {
+    private void addDecision(Bundle out, ActivityLaunchTransaction transaction) {
         out.putString(RuntimeKeys.ROUTE_TOKEN, transaction.routeToken().value());
         out.putString(RuntimeKeys.ACTIVITY_TOKEN, transaction.decision().activityToken());
         out.putInt(RuntimeKeys.TASK_ID, transaction.decision().taskId());
@@ -326,6 +327,8 @@ final class ActivityRuntimeRouteCoordinator {
         out.putBoolean(RuntimeKeys.HOST_TASK_REBIND_REQUIRED,
                 transaction.decision().hostTaskRebindRequired());
         out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, transaction.decision().removedActivityCount());
+        ArrayList<String> removed = new ArrayList<>(ledger.lastLaunchRemovedActivityTokens());
+        if (!removed.isEmpty()) out.putStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS, removed);
     }
 
     private static final class ConsumedRoute {

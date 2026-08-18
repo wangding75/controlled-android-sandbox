@@ -22,6 +22,7 @@ TASKS = [
     ":sandbox-companion32:assembleDebug",
     ":fixture-basic:assembleDebug",
     ":fixture-compat32:assembleDebug",
+    ":fixture-activity-scale:assembleDebug",
 ]
 
 

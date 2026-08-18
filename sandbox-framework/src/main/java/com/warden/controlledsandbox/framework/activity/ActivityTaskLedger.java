@@ -49,7 +49,24 @@ public final class ActivityTaskLedger {
                     nextActivationSequence, tasks, recentTasks, activitiesByToken,
                     resultDeliveriesByCaller, MAX_RECENT_TASKS);
 
+    private boolean recordingLaunchRemovals;
+    private final ArrayList<String> lastLaunchRemovedActivityTokens = new ArrayList<>();
+
     public synchronized LaunchDecision launch(LaunchRequest request) {
+        lastLaunchRemovedActivityTokens.clear();
+        recordingLaunchRemovals = true;
+        try {
+            return launchRecorded(request);
+        } finally {
+            recordingLaunchRemovals = false;
+        }
+    }
+
+    public synchronized List<String> lastLaunchRemovedActivityTokens() {
+        return List.copyOf(lastLaunchRemovedActivityTokens);
+    }
+
+    private LaunchDecision launchRecorded(LaunchRequest request) {
         Objects.requireNonNull(request, "request");
         validateLaunchFlagCombinations(request);
         validateCallerTask(request);
@@ -1172,6 +1189,7 @@ public final class ActivityTaskLedger {
         boolean archiveWhenEmpty = removeEmptyTask && task.activities.size() == 1;
         if (archiveWhenEmpty) archiveTask(task);
         ActivityTaskMutableActivity removed = task.activities.remove(index);
+        if (recordingLaunchRemovals) lastLaunchRemovedActivityTokens.add(removed.token);
         finalizeActivity(removed, resultCode, dataToken, resultIntent);
         if (removeEmptyTask && task.activities.isEmpty()) {
             tasks.remove(task.taskId);

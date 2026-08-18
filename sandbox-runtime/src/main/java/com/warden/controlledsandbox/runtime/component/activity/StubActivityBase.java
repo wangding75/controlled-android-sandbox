@@ -134,6 +134,7 @@ public abstract class StubActivityBase extends Activity {
             activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
             int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
             frameworkActivityToken = ActivityFieldBridge.hostToken(this);
+            StubActivityHostRegistry.register(activityToken, this);
             session.bindActivityTaskHost(frameworkActivityToken, activityToken, taskId,
                     this::moveHostTaskToFront, this::moveHostTaskToBack,
                     this::finishHostAffinity, this::finishHostAndRemoveTask);
@@ -223,6 +224,7 @@ public abstract class StubActivityBase extends Activity {
         if (guestSession != null && destroyedToken != null) {
             guestSession.unbindActivityTaskHost(destroyedToken);
         }
+        StubActivityHostRegistry.unregister(activityToken, this);
         clearMissingWindowRoot();
         super.onDestroy();
     }
@@ -422,6 +424,24 @@ public abstract class StubActivityBase extends Activity {
     private boolean moveHostTaskToBack() { return super.moveTaskToBack(true); }
     private void finishHostAffinity() { super.finishAffinity(); }
     private void finishHostAndRemoveTask() { super.finishAndRemoveTask(); }
+
+    void postMoveHostTaskToFront() {
+        runOnUiThread(this::moveHostTaskToFront);
+    }
+
+    void postFinishHost() {
+        runOnUiThread(this::finish);
+    }
+
+    void postRoutedNewIntent(Bundle request) {
+        if (request == null) return;
+        Intent intent = new Intent();
+        intent.putExtra(RuntimeKeys.ROUTE_TOKEN, request.getString(RuntimeKeys.ROUTE_TOKEN, ""));
+        intent.putExtra(RuntimeKeys.SESSION_ID, request.getString(RuntimeKeys.SESSION_ID, sessionId));
+        intent.putExtra(RuntimeKeys.GENERATION, request.getLong(RuntimeKeys.GENERATION, generation));
+        intent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, request.getString(RuntimeKeys.ACTIVITY_TOKEN, activityToken));
+        runOnUiThread(() -> onNewIntent(intent));
+    }
 
     private void showFailure(String type, String message) {
         if (diagnostic != null) {

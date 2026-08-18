@@ -113,7 +113,9 @@ final class RuntimeActivityLaunchCoordinator {
                 out.putInt(RuntimeKeys.HOST_ACTIVITY_FLAGS, hostFlags);
                 return out;
             }
-            owner.startActivity(launch);
+            if (!RuntimeActivityHostDecisionApplicator.apply(owner, session, transaction)) {
+                owner.startActivity(launch);
+            }
             if (routedRequest.getInt(RuntimeKeys.CALLER_TASK_ID, 0) > 0) {
                 Bundle nested = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
                 nested.putAll(transaction);
@@ -201,15 +203,9 @@ final class RuntimeActivityLaunchCoordinator {
         if (createdNewTask) {
             flags |= LaunchFlags.MULTIPLE_TASK | LaunchFlags.RESET_TASK_IF_NEEDED;
         }
-        String action = transaction == null ? ""
-                : transaction.getString(RuntimeKeys.ACTIVITY_ACTION, "");
-        if ("DELIVERED_NEW_INTENT".equals(action)) {
-            flags |= LaunchFlags.SINGLE_TOP;
-        } else if ("CLEARED_TOP".equals(action)) {
-            flags |= LaunchFlags.CLEAR_TOP | LaunchFlags.SINGLE_TOP;
-        } else if ("REORDERED_TO_FRONT".equals(action)) {
-            flags |= LaunchFlags.REORDER_TO_FRONT;
-        }
+        // Reuse decisions are applied by token to the live trampoline. Physical stubs are a
+        // bounded window family and must stay launchMode=standard, so Android SINGLE_TOP /
+        // CLEAR_TOP must not rematch a different Guest Activity that shares the stub class.
         return flags;
     }
 }

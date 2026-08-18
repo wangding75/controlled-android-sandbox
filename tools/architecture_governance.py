@@ -209,3 +209,38 @@ def metrics(root: Path, commit: str | None = None) -> dict[str, object]:
         'publicApiSignatures': sorted(api),
         'publicApiCount': len(api),
     }
+
+
+HOST_STUB_ACTIVITY_PACKAGE = 'com.warden.controlledsandbox.runtime.component.activity.'
+HOST_PHYSICAL_ACTIVITY_LIMIT = 128
+HOST_PHYSICAL_ALIAS_LIMIT = 0
+
+
+def host_activity_stub_bounds(root: Path) -> dict[str, object]:
+    """Host physical Activity/alias count is a bounded architecture constant."""
+    manifest = (root / 'sandbox-runtime/src/main/AndroidManifest.xml').read_text(
+        encoding='utf-8')
+    activities = re.findall(r'<activity\s+android:name="([^"]+)"', manifest)
+    aliases = re.findall(r'<activity-alias\s+android:name="([^"]+)"', manifest)
+    stub_activities = [name for name in activities if name.startswith(HOST_STUB_ACTIVITY_PACKAGE)]
+    forbidden = [
+        name for name in stub_activities + aliases
+        if 'SlotVariants' in name or 'StubActivityAlias' in name or 'StubActivityVariants' in name
+    ]
+    errors = []
+    if len(stub_activities) > HOST_PHYSICAL_ACTIVITY_LIMIT:
+        errors.append(
+            f'host physical Activity count {len(stub_activities)} exceeds '
+            f'{HOST_PHYSICAL_ACTIVITY_LIMIT}')
+    if len(aliases) > HOST_PHYSICAL_ALIAS_LIMIT:
+        errors.append(
+            f'host activity-alias count {len(aliases)} exceeds {HOST_PHYSICAL_ALIAS_LIMIT}')
+    if forbidden:
+        errors.append('index-coupled Host stub remnants: ' + ','.join(forbidden[:8]))
+    return {
+        'activityCount': len(stub_activities),
+        'aliasCount': len(aliases),
+        'limitActivities': HOST_PHYSICAL_ACTIVITY_LIMIT,
+        'limitAliases': HOST_PHYSICAL_ALIAS_LIMIT,
+        'errors': errors,
+    }

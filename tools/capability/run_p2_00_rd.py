@@ -62,7 +62,7 @@ def classify_holder(holder: dict) -> dict:
     message = str(((armed.get("result") or {}).get("errorMessage")) or "")
     if armed.get("status") == "PASS" and holder.get("notification_held_before_kill"):
         classification = "ARMED"
-    elif "GUEST_ACTIVITY_NOT_IN_PACKAGE_STATE" in message or "alias pool exhausted" in message:
+    elif "GUEST_ACTIVITY_NOT_IN_PACKAGE_STATE" in message:
         classification = "ALIAS_OR_PACKAGE_STATE"
     elif armed.get("status") == "PASS":
         classification = "LAUNCHED_NOT_HELD"

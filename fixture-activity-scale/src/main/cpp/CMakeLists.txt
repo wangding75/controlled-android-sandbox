@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(controlled_sandbox_fixture_scale LANGUAGES CXX)
+add_library(controlled_sandbox_fixture_scale SHARED scale_native.cpp)
+target_compile_features(controlled_sandbox_fixture_scale PRIVATE cxx_std_20)
+target_compile_options(controlled_sandbox_fixture_scale PRIVATE -Wall -Wextra -Werror)
+target_link_libraries(controlled_sandbox_fixture_scale PRIVATE log)

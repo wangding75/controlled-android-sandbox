@@ -26,6 +26,8 @@ public abstract class BaseGuestProcessService extends Service {
                     case RuntimeOperationRequest.SEND_PENDING_INTENT ->
                             sendPendingIntentInternal(request.sessionId(), request.generation(),
                                     request.payload());
+                    case RuntimeOperationRequest.APPLY_ACTIVITY_HOST_DECISION ->
+                            applyActivityHostDecision(request.payload());
                     default -> throw new IllegalArgumentException(
                             "unsupported guest operation: " + request.operation());
                 };
@@ -59,6 +61,11 @@ public abstract class BaseGuestProcessService extends Service {
 
     private Bundle sendPendingIntentInternal(String sessionId, long generation, Bundle request) {
         return GuestRuntimeEnvironment.sendPersistentPendingIntent(sessionId, generation, request);
+    }
+
+    private Bundle applyActivityHostDecision(Bundle request) {
+        return com.warden.controlledsandbox.runtime.component.activity.StubActivityHostRegistry
+                .apply(request);
     }
 
     @Override public IBinder onBind(Intent intent) { return binder; }
