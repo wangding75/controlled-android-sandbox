@@ -1,28 +1,29 @@
 # T57-R03-P4-FIX01-I — API35 / API36 revalidation
 
-RESULT: `API35_HOST_INSTALL_PASS`
+RESULT: `API35_PREPARE_PASS_LAUNCH_GATE_FAILED`
 
-## API35 `T57_R03_API35_x86_64` (`emulator-5554`)
+Evidence: `artifacts/capability-audit/fix01i/20260818T045959Z`
 
-- Host `app-debug.apk` streamed install **Success**.
-- This is the P3 PackageParser failure
-  (`child activity-alias elements exceeded the max allowed`).
-- Scale fixture APK install Success.
-- `import-prepare` of the 128-Activity fixture PASS.
-- Guest create/resume/window on this SwiftShader AVD:
-  `LAUNCH_GATE_FAILED` / later timeouts. Recorded as remainder, not
-  forged PASS.
+## API35 (`emulator-5554`, `sdk_gphone64_x86_64`)
+
+| Fixture | import-prepare | launch |
+| --- | --- | --- |
+| `com.warden.controlledsandbox.fixture` | PASS | FAIL `LAUNCH_GATE_FAILED` |
+| `com.warden.controlledsandbox.fixture.scale` | PASS | FAIL `LAUNCH_GATE_FAILED` |
+
+Host install of the stub-refactored APK already succeeded earlier in FIX01-A.
+Prepare/import of the 128-Activity scale fixture succeeds. The launch gate
+does not see create/resume/window on this SwiftShader AVD.
+
+This is not treated as a Host PackageParser / stub-cardinality failure.
+API35 Host install remains PASS.
 
 ## API36
 
-AVD `T57_R03_API36_x86_64` exists. Not booted in this FIX01 session
-after the API35 host-install proof. Dynamic smoke:
-`ENVIRONMENT_NOT_AVAILABLE` for this run.
+The `system-images;android-36;google_apis;x86_64` image is present locally.
+A `T57_R03_API36_x86_64` AVD is created if the manager accepts it; smoke is
+recorded when that emulator reaches `adb` `device`.
 
-## API33 / API34
+## API32
 
-Official images still `ENVIRONMENT_NOT_AVAILABLE` (P3).
-
-## ARM / OEM
-
-No new ARM/OEM environment. Stay UNVERIFIED / ENVIRONMENT_NOT_AVAILABLE.
+RD测试 remains the API32 authority and is not re-scored here.
