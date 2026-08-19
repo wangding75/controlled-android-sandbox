@@ -27,3 +27,5 @@ artifacts/m5-device-lab-rd-*/
 
 # Capability campaign runtime evidence. Registries stay in Git; raw audit/RD output does not.
 artifacts/capability-audit/
+
+_delivery/
