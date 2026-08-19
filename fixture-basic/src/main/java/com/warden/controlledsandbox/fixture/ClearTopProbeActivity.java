@@ -7,14 +7,18 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-/** Verifies CLEAR_TOP semantics (clears child activity, reuses target with onNewIntent). */
+/** Verifies CLEAR_TOP with singleTop: clears the child and reuses the target via onNewIntent. */
 public final class ClearTopProbeActivity extends Activity {
     private static final String TAG = "CS_FIXTURE";
     private static final String RELAUNCH_FLAG = "clearTopRelaunch";
-    private boolean newIntentReceived;
+    static int onCreateCount;
+    static int onNewIntentCount;
+    static int onStartCount;
+    static int onResumeCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=SECOND_ON_CREATE");
             finish();
@@ -30,7 +34,10 @@ public final class ClearTopProbeActivity extends Activity {
             startActivity(clearTop);
         }, 1500L);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!newIntentReceived) {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_COUNTS create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount);
+            if (onNewIntentCount == 0 && onCreateCount == 1) {
                 Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=NO_NEW_INTENT");
             }
             finish();
@@ -39,12 +46,19 @@ public final class ClearTopProbeActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        onNewIntentCount++;
         if (!intent.getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=EXTRA_MISSING");
             return;
         }
-        newIntentReceived = true;
-        Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS");
+        if (onCreateCount == 1 && onNewIntentCount == 1) {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS");
+        } else {
+            Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=BAD_COUNTS");
+        }
         finish();
     }
+
+    @Override protected void onStart() { super.onStart(); onStartCount++; }
+    @Override protected void onResume() { super.onResume(); onResumeCount++; }
 }

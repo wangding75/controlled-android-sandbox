@@ -6,6 +6,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
+import com.warden.controlledsandbox.contract.PackageServiceResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
@@ -186,6 +187,37 @@ final class RuntimeClient implements AutoCloseable {
     void stop(SandboxRecord record, int virtualUserId) throws Exception {
         if (companionRoute(record)) nativeCompanion.stopGuest(record, virtualUserId);
         else requireBroker().stopGuest(record.packageName, virtualUserId);
+    }
+
+    /**
+     * Issues a real generation/session-fenced Broker operation using an explicitly supplied,
+     * possibly stale, session identity.  Returns whether the Broker accepted it and, on
+     * rejection, the failure error code.  Used by the A01 acceptance runner to prove stale-session
+     * fencing instead of comparing session ids locally.
+     */
+    Bundle staleSessionProbe(SandboxRecord record, String staleSessionId, long staleGeneration,
+                             String permission, int requestCode) throws Exception {
+        PackageServiceResult result = requireBroker().requestRuntimePermission(
+                staleSessionId, staleGeneration,
+                permission == null ? "" : permission, requestCode);
+        Bundle out = new Bundle();
+        out.putBoolean("accepted", result.successful());
+        out.putString(RuntimeKeys.ERROR_TYPE, result.errorCode());
+        out.putString(RuntimeKeys.ERROR_MESSAGE, result.errorMessage());
+        return out;
+    }
+
+    /** Issues a non-destructive Guest Provider query so the Provider smoke proves a real route. */
+    Bundle queryProviderSmoke(SandboxRecord record, int virtualUserId, String component,
+                              String authority) throws Exception {
+        String resolvedAuthority = (authority == null || authority.trim().isEmpty())
+                ? record.providerAuthority : authority.trim();
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.PROVIDER_QUERY,
+                component, "", "", resolvedAuthority);
+        request.putString(RuntimeKeys.URI, "content://" + resolvedAuthority + "/rows");
+        request.putString(RuntimeKeys.PROVIDER_SELECTION, "");
+        request.putString(RuntimeKeys.CURSOR_TOKEN, "a01-smoke-" + UUID.randomUUID());
+        return invoke(record, virtualUserId, request);
     }
 
     private Bundle component(SandboxRecord record, int virtualUserId, String operation, String component,

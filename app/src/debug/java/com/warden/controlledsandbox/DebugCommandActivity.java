@@ -352,6 +352,37 @@ public final class DebugCommandActivity extends Activity {
                                 "com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity")
                                 .trim());
                 requireStatus("pi-system-holder-launch", operation, "LAUNCH_PASS");
+            } else if ("neighbor-smoke".equals(command)) {
+                runtime.prepare(record, virtualUserId);
+                Bundle serviceStart = runtime.startService(record, virtualUserId);
+                requireStatus("neighbor-service", serviceStart, "SERVICE_STARTED", "SERVICE_RECOVERED");
+                Bundle providerPrepare = runtime.prepareProvider(record, virtualUserId,
+                        record.providerClass, record.providerAuthority);
+                requireStatus("neighbor-provider-prepare", providerPrepare,
+                        "PROVIDER_READY", "PROVIDER_ALREADY_READY", "PROVIDER_AUTHORITY_ATTACHED");
+                Bundle providerQuery = runtime.queryProviderSmoke(record, virtualUserId,
+                        record.providerClass, record.providerAuthority);
+                if ("FAILED".equals(providerQuery.getString(RuntimeKeys.STATUS, ""))) {
+                    requireStatus("neighbor-provider-query", providerQuery, "OK");
+                }
+                result.put("service", bundleJson(serviceStart));
+                result.put("providerPrepare", bundleJson(providerPrepare));
+                result.put("providerQuery", bundleJson(providerQuery));
+                operation = providerQuery;
+            } else if ("stale-session".equals(command)) {
+                String staleSessionId = extras.getString("staleSessionId", "").trim();
+                long staleGeneration = extras.getLong("staleGeneration", -1L);
+                if (staleSessionId.isEmpty() || staleGeneration < 1) {
+                    throw new IllegalArgumentException("staleSessionId and staleGeneration are required");
+                }
+                Bundle probe = runtime.staleSessionProbe(record, staleSessionId, staleGeneration,
+                        "android.permission.VIBRATE", 1000);
+                result.put("staleSessionProbe", bundleJson(probe));
+                operation = probe;
+                if (probe.getBoolean("accepted", false)) {
+                    throw new IllegalStateException("STALE_SESSION_ACCEPTED:"
+                            + probe.getString(RuntimeKeys.ERROR_MESSAGE, ""));
+                }
             } else {
                 throw new IllegalArgumentException("Unsupported command: " + command);
             }
@@ -630,6 +661,7 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "componentClass");
         copyIfPresent(bundle, out, "startId");
         copyIfPresent(bundle, out, "created");
+        copyIfPresent(bundle, out, "accepted");
         return out;
     }
 

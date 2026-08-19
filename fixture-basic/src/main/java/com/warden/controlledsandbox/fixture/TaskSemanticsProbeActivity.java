@@ -7,41 +7,70 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-/** Exercises a real framework reuse edge instead of only checking PackageManager metadata. */
+/**
+ * Verifies singleTask semantics with a real A(singleTask) -> B -> A transition: relaunching the
+ * singleTask root after a child Activity is pushed must remove the child, reuse the original
+ * ActivityRecord (no second onCreate), bring it back to top and deliver onNewIntent.
+ */
 public final class TaskSemanticsProbeActivity extends Activity {
     private static final String TAG = "CS_FIXTURE";
-    private static final String SECOND_LAUNCH = "taskSemanticsSecondLaunch";
-    private boolean newIntentReceived;
+    static final String RELAUNCH_FLAG = "taskSemanticsRelaunch";
+    static int onCreateCount;
+    static int onNewIntentCount;
+    static int onStartCount;
+    static int onResumeCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        if (getIntent().getBooleanExtra(SECOND_LAUNCH, false)) {
+        onCreateCount++;
+        if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=SECOND_ON_CREATE");
             finish();
             return;
         }
+        if (onCreateCount > 1) {
+            Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=MULTIPLE_CREATE");
+            finish();
+            return;
+        }
         Log.i(TAG, "FRAMEWORK_PROBE_TASK_CREATE");
-        Intent relaunch = new Intent(this, TaskSemanticsProbeActivity.class)
-                .setAction(getPackageName() + ".TASK_REUSE")
-                .putExtra(SECOND_LAUNCH, true);
-        startActivity(relaunch);
+        Intent child = new Intent(this, DetailActivity.class);
+        startActivity(child);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!newIntentReceived) {
+            // Relaunch the singleTask root after the child is on top.  The virtual ledger must
+            // clear B above A, reuse A and deliver onNewIntent instead of creating a second A.
+            Intent relaunch = new Intent(this, TaskSemanticsProbeActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    .putExtra(RELAUNCH_FLAG, true);
+            startActivity(relaunch);
+        }, 1500L);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_COUNTS create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount);
+            if (onNewIntentCount == 0 && onCreateCount == 1) {
                 Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=NO_NEW_INTENT");
             }
             finish();
-        }, 1200L);
+        }, 5000L);
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (!intent.getBooleanExtra(SECOND_LAUNCH, false)) {
+        onNewIntentCount++;
+        if (!intent.getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=EXTRA_MISSING");
             return;
         }
-        newIntentReceived = true;
-        Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_PASS action=" + intent.getAction()
-                + " component=" + String.valueOf(intent.getComponent()));
+        if (onCreateCount == 1 && onNewIntentCount == 1) {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_PASS action=" + intent.getAction()
+                    + " component=" + String.valueOf(intent.getComponent()));
+        } else {
+            Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=BAD_COUNTS");
+        }
         finish();
     }
+
+    @Override protected void onStart() { super.onStart(); onStartCount++; }
+    @Override protected void onResume() { super.onResume(); onResumeCount++; }
 }

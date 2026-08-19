@@ -7,14 +7,19 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-/** Verifies REORDER_TO_FRONT semantics (brings existing instance to front with onNewIntent). */
+/** Verifies REORDER_TO_FRONT: brings an existing non-top instance to front with onNewIntent. */
 public final class ReorderToFrontProbeActivity extends Activity {
     private static final String TAG = "CS_FIXTURE";
     private static final String RELAUNCH_FLAG = "reorderRelaunch";
-    private boolean newIntentReceived;
+    static int onCreateCount;
+    static int onNewIntentCount;
+    static int onStartCount;
+    static int onResumeCount;
+    static int onStopCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=SECOND_ON_CREATE");
             finish();
@@ -30,7 +35,10 @@ public final class ReorderToFrontProbeActivity extends Activity {
             startActivity(reorder);
         }, 1500L);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (!newIntentReceived) {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_COUNTS create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount + " stop=" + onStopCount);
+            if (onNewIntentCount == 0 && onCreateCount == 1) {
                 Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=NO_NEW_INTENT");
             }
             finish();
@@ -39,12 +47,20 @@ public final class ReorderToFrontProbeActivity extends Activity {
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        onNewIntentCount++;
         if (!intent.getBooleanExtra(RELAUNCH_FLAG, false)) {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=EXTRA_MISSING");
             return;
         }
-        newIntentReceived = true;
-        Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS");
+        if (onCreateCount == 1 && onNewIntentCount == 1) {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS");
+        } else {
+            Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=BAD_COUNTS");
+        }
         finish();
     }
+
+    @Override protected void onStart() { super.onStart(); onStartCount++; }
+    @Override protected void onResume() { super.onResume(); onResumeCount++; }
+    @Override protected void onStop() { super.onStop(); onStopCount++; }
 }
