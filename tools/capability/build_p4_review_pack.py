@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-independent-review"
-ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_R05_independent_review_pack.zip"
+ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_FIX02_independent_review_pack.zip"
 
 INCLUDE_DIRS = (
     "app", "sandbox-sdk", "sandbox-contract", "sandbox-domain", "sandbox-framework",
@@ -92,6 +92,29 @@ def write_reports() -> None:
     if artifacts.is_dir():
         shutil.copytree(artifacts, PACK_DIR / "device-evidence" / "capability-audit",
                         dirs_exist_ok=True)
+    rd_evidence = ROOT / "build" / "t57-rd-evidence"
+    if rd_evidence.is_dir():
+        shutil.copytree(rd_evidence, PACK_DIR / "device-evidence" / "t57-rd-evidence",
+                        dirs_exist_ok=True)
+
+
+def write_manifest(head: str, tree: str, file_count: int = 0) -> dict:
+    manifest = {
+        "project": "controlled-android-sandbox",
+        "taskbook": "T57-R03-P4-FIX02",
+        "branch": git("branch", "--show-current").strip(),
+        "HEAD": head,
+        "TREE": tree,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "source_file_count": file_count,
+        "result": "REVIEW_PACK_READY",
+        "va_pro_verdict": "NOT_ISSUED_BY_AGENT",
+        "exclusions": list(EXCLUDE_PARTS),
+    }
+    (PACK_DIR / "manifest").mkdir(exist_ok=True)
+    (PACK_DIR / "manifest" / "REVIEW_PACK_MANIFEST.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
 
 
 def write_inventory() -> dict:
@@ -123,21 +146,9 @@ def main() -> int:
     copy_tree()
     write_git(head, tree)
     write_reports()
+    write_manifest(head, tree)
     inventory = write_inventory()
-    manifest = {
-        "project": "controlled-android-sandbox",
-        "taskbook": "T57-R03-P4-FIX01",
-        "branch": git("branch", "--show-current").strip(),
-        "HEAD": head,
-        "TREE": tree,
-        "generated_at": inventory["generated_at"],
-        "source_file_count": inventory["file_count"],
-        "result": "REVIEW_PACK_READY",
-        "va_pro_verdict": "NOT_ISSUED_BY_AGENT",
-        "exclusions": list(EXCLUDE_PARTS),
-    }
-    (PACK_DIR / "manifest" / "REVIEW_PACK_MANIFEST.json").write_text(
-        json.dumps(manifest, indent=2), encoding="utf-8")
+    write_manifest(head, tree, inventory["file_count"])
     if ZIP_PATH.exists():
         ZIP_PATH.unlink()
     with zipfile.ZipFile(ZIP_PATH, "w", zipfile.ZIP_DEFLATED) as archive:

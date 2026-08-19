@@ -28,7 +28,16 @@ function Get-T57MuMuWindowTitle([string]$Index) {
     foreach ($player in $players) {
         if ($player.CommandLine -notmatch '(?:^|\s)-v\s+' + [regex]::Escape($Index) + '(?:\s|$)') { continue }
         $process = Get-Process -Id $player.ProcessId -ErrorAction SilentlyContinue
-        if ($process) { return [string]$process.MainWindowTitle }
+        if ($process -and !([string]::IsNullOrWhiteSpace($process.MainWindowTitle))) {
+            return [string]$process.MainWindowTitle
+        }
+    }
+    $configPath = "C:\Program Files\Netease\MuMu Player 12\vms\MuMuPlayer-12.0-$Index\configs\extra_config.json"
+    if (Test-Path $configPath) {
+        try {
+            $json = Get-Content $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($json.playerName) { return [string]$json.playerName }
+        } catch { }
     }
     return ''
 }
