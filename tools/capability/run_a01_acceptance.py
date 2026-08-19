@@ -28,7 +28,9 @@ REQUIRED_GATES = (
     "activity_result",
     "standard",
     "single_top",
+    "single_top_non_top",
     "single_task",
+    "clear_top_standard",
     "clear_top",
     "reorder_to_front",
     "process_death",
@@ -46,7 +48,10 @@ def check_logcat_marker(
     wait_sec: float = 2.0,
 ) -> dict[str, Any]:
     time.sleep(wait_sec)
-    logcat = run_adb(serial, ["logcat", "-d", "-v", "threadtime"], check=False).stdout or ""
+    try:
+        logcat = run_adb(serial, ["logcat", "-d", "-v", "threadtime"], check=False).stdout or ""
+    except Exception:
+        logcat = ""
     has_pass = pass_marker in logcat
     has_fail = (fail_marker in logcat) if fail_marker else False
     if has_fail:
@@ -78,6 +83,16 @@ def evaluate_gates(tests: dict[str, Any]) -> tuple[bool, list[str]]:
     return (not failed), failed
 
 
+def safe_debug_command(serial: str, extras: list[str], deadline_sec: int = 60,
+                       force_stop_host: bool = True) -> dict[str, Any]:
+    try:
+        return debug_command(serial, extras, deadline_sec=deadline_sec,
+                             force_stop_host=force_stop_host)
+    except Exception as error:
+        return {"status": "ERROR", "returncode": 1,
+                "detail": f"{error.__class__.__name__}: {error}"}
+
+
 def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     print(f"\n==========================================")
     print(f"Running A01 Acceptance Matrix on {serial} (API {api}, Model {model})")
@@ -92,7 +107,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     scale_results = {}
     for idx in SCALE_INDICES:
         comp = f"com.warden.controlledsandbox.fixture.scale.ScaleActivity{idx:03d}"
-        r = debug_command(
+        r = safe_debug_command(
             serial,
             ["-e", "command", "launch-component", "-e", "package",
              "com.warden.controlledsandbox.fixture.scale", "-e", "component", comp, *TRUST],
@@ -110,7 +125,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
 
     # 2. Basic package / Activity launch
     pkg = "com.warden.controlledsandbox.fixture.scale" if api == "36" else "com.warden.controlledsandbox.fixture"
-    r_basic = debug_command(serial, ["-e", "command", "import-launch", "-e", "package", pkg, *TRUST], deadline_sec=60)
+    r_basic = safe_debug_command(serial, ["-e", "command", "import-launch", "-e", "package", pkg, *TRUST], deadline_sec=60)
     tests["basic_launch"] = {
         "package": pkg,
         "status": r_basic.get("status"),
@@ -121,7 +136,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     # 3. ActivityResult delivery
     run_adb(serial, ["logcat", "-c"], check=False)
     comp_result = "com.warden.controlledsandbox.fixture.FrameworkActivityResultParentActivity"
-    r_result = debug_command(
+    r_result = safe_debug_command(
         serial,
         ["-e", "command", "launch-component", "-e", "package",
          "com.warden.controlledsandbox.fixture", "-e", "component", comp_result, *TRUST],
@@ -144,15 +159,19 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
          "FRAMEWORK_PROBE_TASK_STANDARD_PASS", "FRAMEWORK_PROBE_TASK_STANDARD_FAIL", 2.0),
         ("single_top", "com.warden.controlledsandbox.fixture.SingleTopProbeActivity",
          "FRAMEWORK_PROBE_TASK_SINGLETOP_PASS", "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL", 2.0),
+        ("single_top_non_top", "com.warden.controlledsandbox.fixture.SingleTopNonTopProbeActivity",
+         "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_PASS", "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_FAIL", 6.0),
         ("single_task", "com.warden.controlledsandbox.fixture.TaskSemanticsProbeActivity",
          "FRAMEWORK_PROBE_TASK_REUSE_PASS", "FRAMEWORK_PROBE_TASK_REUSE_FAIL", 2.5),
+        ("clear_top_standard", "com.warden.controlledsandbox.fixture.ClearTopStandardProbeActivity",
+         "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_FAIL", 6.0),
         ("clear_top", "com.warden.controlledsandbox.fixture.ClearTopProbeActivity",
          "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL", 4.0),
         ("reorder_to_front", "com.warden.controlledsandbox.fixture.ReorderToFrontProbeActivity",
          "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS", "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL", 4.0),
     ):
         run_adb(serial, ["logcat", "-c"], check=False)
-        r = debug_command(
+        r = safe_debug_command(
             serial,
             ["-e", "command", "launch-component", "-e", "package",
              "com.warden.controlledsandbox.fixture", "-e", "component", comp, *TRUST],
@@ -169,7 +188,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     tests.update(task_matrix)
 
     # 5. Process death and real stale-session fencing
-    r_proc1 = debug_command(
+    r_proc1 = safe_debug_command(
         serial,
         ["-e", "command", "import-prepare", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
         deadline_sec=60,
@@ -182,7 +201,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     if pid1:
         run_adb(serial, ["shell", "kill", "-9", str(pid1)], check=False)
 
-    r_proc2 = debug_command(
+    r_proc2 = safe_debug_command(
         serial,
         ["-e", "command", "import-prepare", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
         deadline_sec=60,
@@ -200,7 +219,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     stale_probe = {}
     stale_rejection = False
     if sess1 and gen1 and (sess1 != sess2 or gen1 != gen2):
-        r_stale = debug_command(
+        r_stale = safe_debug_command(
             serial,
             ["-e", "command", "stale-session", "-e", "package",
              "com.warden.controlledsandbox.fixture", "-e", "staleSessionId", sess1,
@@ -224,12 +243,12 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     }
 
     # 6. Neighbor smoke: real Service start, real Provider prepare/query, real PendingIntent.
-    r_svc_provider = debug_command(
+    r_svc_provider = safe_debug_command(
         serial,
         ["-e", "command", "neighbor-smoke", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
         deadline_sec=60,
     )
-    r_pi = debug_command(
+    r_pi = safe_debug_command(
         serial,
         ["-e", "command", "pi-system-holder", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
         deadline_sec=60,

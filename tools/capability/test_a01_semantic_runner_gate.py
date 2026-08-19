@@ -99,8 +99,9 @@ class TestRequiredGateAggregation(unittest.TestCase):
         self.assertEqual(
             set(REQUIRED_GATES),
             {"scale", "basic_launch", "activity_result", "standard", "single_top",
-             "single_task", "clear_top", "reorder_to_front", "process_death",
-             "session_fencing", "service", "provider", "pending_intent"},
+             "single_top_non_top", "single_task", "clear_top_standard", "clear_top",
+             "reorder_to_front", "process_death", "session_fencing", "service", "provider",
+             "pending_intent"},
         )
 
 
