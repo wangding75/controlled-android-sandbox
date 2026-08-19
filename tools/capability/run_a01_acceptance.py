@@ -284,7 +284,19 @@ def main() -> int:
     out_dir = artifacts_dir("a01-acceptance")
     all_results = []
     for serial, api, model in device_rows:
-        res = run_device_matrix(serial, api, model)
+        try:
+            res = run_device_matrix(serial, api, model)
+        except Exception as error:
+            res = {
+                "serial": serial,
+                "api": api,
+                "model": model,
+                "tests": {},
+                "overall_pass": False,
+                "failed_gates": list(REQUIRED_GATES),
+                "error": f"{error.__class__.__name__}: {error}",
+            }
+            print(f"[FAIL-CLOSED] {serial}: {error.__class__.__name__}: {error}")
         all_results.append(res)
 
     overall_pass = bool(all_results) and all(res.get("overall_pass") for res in all_results)
