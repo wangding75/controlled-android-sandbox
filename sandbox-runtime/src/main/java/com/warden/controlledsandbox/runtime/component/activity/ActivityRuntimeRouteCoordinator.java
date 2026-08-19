@@ -37,6 +37,10 @@ final class ActivityRuntimeRouteCoordinator {
     private final ConcurrentMap<String, ActivityLaunchTransaction> pending = new ConcurrentHashMap<>();
     /** Consumed routes retained only as process-restart candidates until their task is finalized. */
     private final ConcurrentMap<String, ConsumedRoute> consumed = new ConcurrentHashMap<>();
+    /** Physical activity-window index per live virtual Activity token (bounded per process slot). */
+    private final ConcurrentMap<String, Integer> physicalWindows = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, java.util.concurrent.atomic.AtomicInteger> windowCounters =
+            new ConcurrentHashMap<>();
 
     ActivityRuntimeRouteCoordinator(
             ActivityTaskLedger ledger,
@@ -82,6 +86,8 @@ final class ActivityRuntimeRouteCoordinator {
             envelope.putString(RuntimeKeys.COMPONENT_CLASS, component);
             envelope.putString(RuntimeKeys.ROUTE_TOKEN, token);
             addDecision(envelope, transaction);
+            envelope.putInt(RuntimeKeys.PHYSICAL_ACTIVITY_WINDOW,
+                    physicalWindow(session.processSlot(), transaction));
             attachSavedState(envelope, transaction.decision().activityToken());
             transport.putRoute(token, envelope);
             if (pending.putIfAbsent(token, transaction) != null) {
@@ -139,6 +145,7 @@ final class ActivityRuntimeRouteCoordinator {
             LaunchAction action = transaction.decision().action();
             if (action == LaunchAction.CREATED_ACTIVITY || action == LaunchAction.CREATED_TASK) {
                 transactions.mutate(() -> ledger.finish(transaction.decision().activityToken()));
+                physicalWindows.remove(transaction.decision().activityToken());
             }
             pending.remove(token, transaction);
         }
@@ -160,6 +167,7 @@ final class ActivityRuntimeRouteCoordinator {
         for (Map.Entry<String, ActivityLaunchTransaction> entry : pending.entrySet()) {
             if (entry.getValue().routeOwner().equals(owner(stale))
                     && pending.remove(entry.getKey(), entry.getValue())) {
+                physicalWindows.remove(entry.getValue().decision().activityToken());
                 transport.removeRoute(entry.getKey());
                 routeStore.revoke(entry.getKey());
                 consumed.remove(entry.getKey());
@@ -189,6 +197,8 @@ final class ActivityRuntimeRouteCoordinator {
                     transaction.decision().removedActivityCount(),
                     transaction.decision().createdNewTask(),
                     transaction.decision().hostTaskRebindRequired());
+            Integer window = physicalWindows.remove(transaction.decision().activityToken());
+            if (window != null) physicalWindows.put(currentActivityToken, window);
             ActivityLaunchTransaction rebound = new ActivityLaunchTransaction(
                     decision,
                     new RouteToken(transaction.routeToken().value(), transaction.routeToken().expiresAtMillis()),
@@ -215,6 +225,7 @@ final class ActivityRuntimeRouteCoordinator {
             transport.removeRoute(entry.getKey());
             routeStore.revoke(entry.getKey());
         }
+        physicalWindows.remove(activityToken);
     }
 
     Bundle routeForPreparation(String token) {
@@ -227,6 +238,29 @@ final class ActivityRuntimeRouteCoordinator {
     int pendingRouteCount() { return pending.size(); }
 
     ActivityLaunchCoordinator coordinator() { return coordinator; }
+
+    /**
+     * Resolves the bounded physical activity-window index for a launch.  A created Activity owns a
+     * fresh window from the per-process pool; a reuse decision (singleTop/singleTask/CLEAR_TOP/
+     * REORDER_TO_FRONT) must reuse the window its original record already owns so the Host
+     * ActivityStarter can resolve the exact physical ActivityRecord by component.
+     */
+    private int physicalWindow(int processSlot, ActivityLaunchTransaction transaction) {
+        String activityToken = transaction.decision().activityToken();
+        Integer existing = physicalWindows.get(activityToken);
+        if (existing != null) return existing;
+        LaunchAction action = transaction.decision().action();
+        if (action == LaunchAction.DELIVERED_NEW_INTENT
+                || action == LaunchAction.CLEARED_TOP
+                || action == LaunchAction.REORDERED_TO_FRONT) {
+            throw new IllegalStateException("PHYSICAL_ACTIVITY_WINDOW_MISSING:" + activityToken);
+        }
+        java.util.concurrent.atomic.AtomicInteger counter = windowCounters.computeIfAbsent(
+                processSlot, s -> new java.util.concurrent.atomic.AtomicInteger());
+        int window = counter.getAndIncrement() % PhysicalActivityWindowFamily.WINDOW_SLOT_COUNT;
+        physicalWindows.put(activityToken, window);
+        return window;
+    }
 
     void verifyOwner(String activityToken, GuestSession session) {
         ActivityProcessIdentity identity = ledger.processIdentity(activityToken);

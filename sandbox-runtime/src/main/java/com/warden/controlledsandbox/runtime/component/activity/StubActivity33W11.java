@@ -1,0 +1,2 @@
+package com.warden.controlledsandbox.runtime.component.activity;
+public final class StubActivity33W11 extends StubActivityBase { }

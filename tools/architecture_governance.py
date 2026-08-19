@@ -212,7 +212,10 @@ def metrics(root: Path, commit: str | None = None) -> dict[str, object]:
 
 
 HOST_STUB_ACTIVITY_PACKAGE = 'com.warden.controlledsandbox.runtime.component.activity.'
-HOST_PHYSICAL_ACTIVITY_LIMIT = 128
+# Physical Host Activity count is a bounded constant: process slot (64) x window family (2) x
+# activity window (16).  The activity-window axis exists so ActivityStarter can reorder /
+# clear-top / single-top exactly one physical ActivityRecord instead of a shared per-slot stub.
+HOST_PHYSICAL_ACTIVITY_LIMIT = 64 * 2 * 16
 HOST_PHYSICAL_ALIAS_LIMIT = 0
 
 

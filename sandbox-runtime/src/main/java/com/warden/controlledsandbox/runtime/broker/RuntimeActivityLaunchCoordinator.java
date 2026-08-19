@@ -83,7 +83,8 @@ final class RuntimeActivityLaunchCoordinator {
             Intent launch = new Intent();
             launch.setComponent(new ComponentName(owner.getPackageName(),
                     RuntimeStubComponents.activityComponentFor(session.processSlot(), component,
-                            RuntimeBrokerService.packageState(prepared))));
+                            RuntimeBrokerService.packageState(prepared),
+                            transaction.getInt(RuntimeKeys.PHYSICAL_ACTIVITY_WINDOW, 0))));
             int hostFlags = hostActivityLaunchFlags(transaction, frameworkHost);
             launch.addFlags(hostFlags);
             launch.putExtra(RuntimeKeys.ROUTE_TOKEN, issuedRouteToken);

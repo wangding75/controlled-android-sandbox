@@ -14,6 +14,14 @@ public enum PhysicalActivityWindowFamily {
     TRANSLUCENT;
 
     static final int ORDINARY_SLOT_COUNT = 64;
+    /**
+     * Bounded activity-window multiplexing: within one process slot the physical ComponentName is
+     * no longer a single shared Stub class.  A live virtual Activity owns one window index from a
+     * fixed pool so Android's ActivityStarter can reorder / clear-top / single-top match exactly
+     * that ActivityRecord instead of the topmost sibling that shares the old single stub class.
+     * The manifest stays a constant (slot x window x family); it never grows with Guest declarations.
+     */
+    public static final int WINDOW_SLOT_COUNT = 16;
     private static final String PACKAGE = "com.warden.controlledsandbox.runtime.component.activity.";
 
     /**
@@ -31,11 +39,20 @@ public enum PhysicalActivityWindowFamily {
             16974545, 16974546, 16974547, 16974548, 16974549, 16974550);
 
     public String componentName(int slot) {
+        return componentName(slot, 0);
+    }
+
+    public String componentName(int slot, int window) {
         requireSlot(slot);
+        requireWindow(window);
         if (this == TRANSLUCENT) {
-            return PACKAGE + "StubActivityTranslucent" + slot;
+            return window == 0
+                    ? PACKAGE + "StubActivityTranslucent" + slot
+                    : PACKAGE + "StubActivityTranslucent" + slot + "W" + window;
         }
-        return PACKAGE + "StubActivity" + slot;
+        return window == 0
+                ? PACKAGE + "StubActivity" + slot
+                : PACKAGE + "StubActivity" + slot + "W" + window;
     }
 
     public static PhysicalActivityWindowFamily of(String guestComponent,
@@ -70,6 +87,12 @@ public enum PhysicalActivityWindowFamily {
     public static void requireSlot(int slot) {
         if (slot < 0 || slot >= ORDINARY_SLOT_COUNT) {
             throw new IllegalArgumentException("ordinary process slot out of range: " + slot);
+        }
+    }
+
+    public static void requireWindow(int window) {
+        if (window < 0 || window >= WINDOW_SLOT_COUNT) {
+            throw new IllegalArgumentException("activity window slot out of range: " + window);
         }
     }
 }

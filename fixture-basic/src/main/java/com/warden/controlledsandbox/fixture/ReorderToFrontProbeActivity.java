@@ -57,7 +57,18 @@ public final class ReorderToFrontProbeActivity extends Activity {
         } else {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=BAD_COUNTS");
         }
-        finish();
+        // Do not finish inside onNewIntent: let the framework drive the real
+        // STOPPED -> STARTED -> RESUMED transition to completion, then verify the record became
+        // the resumed top from a post callback.
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_LIFECYCLE create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount + " stop=" + onStopCount);
+            if (onResumeCount < 2 || onStartCount < 2) {
+                Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=NOT_RESUMED");
+            }
+            finish();
+        }, 900L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }

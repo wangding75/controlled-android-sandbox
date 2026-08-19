@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate the bounded Host Activity stub family and the scale fixture.
 
-Physical Host Activity count is a process-slot x window-family constant.
-It must not grow with Guest Activity declaration count.
+Physical Host Activity count is a process-slot x window-family x activity-window constant:
+64 x 2 x 16 = 2048.  It must not grow with Guest Activity declaration count.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ORDINARY_SLOTS = 64
+WINDOW_SLOTS = 16
 ACTIVITY_PKG = "com.warden.controlledsandbox.runtime.component.activity"
 STUB_DIR = ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity"
 MANIFEST = ROOT / "sandbox-runtime/src/main/AndroidManifest.xml"
@@ -33,6 +34,47 @@ def generate_translucent_stubs() -> None:
             + str(slot)
             + " extends StubActivityBase { }\n",
         )
+
+
+def generate_window_stubs() -> None:
+    """Activity-window multiplexing (window 1..15) so ActivityStarter can match the exact record.
+
+    Window 0 reuses the existing StubActivity{slot} / StubActivityTranslucent{slot} classes.
+    Each additional window is a distinct physical ComponentName so reorder/clear-top/single-top
+    reuse of a non-top sibling does not collide with the shared slot stub.
+    """
+    for window in range(1, WINDOW_SLOTS):
+        for slot in range(ORDINARY_SLOTS):
+            write(
+                STUB_DIR / f"StubActivity{slot}W{window}.java",
+                "package " + ACTIVITY_PKG + ";\n"
+                "public final class StubActivity" + str(slot) + "W" + str(window)
+                + " extends StubActivityBase { }\n",
+            )
+            write(
+                STUB_DIR / f"StubActivityTranslucent{slot}W{window}.java",
+                "package " + ACTIVITY_PKG + ";\n"
+                "public final class StubActivityTranslucent" + str(slot) + "W" + str(window)
+                + " extends StubActivityBase { }\n",
+            )
+
+
+def _window_manifest_lines() -> list[str]:
+    opaque = []
+    translucent = []
+    for window in range(1, WINDOW_SLOTS):
+        for slot in range(ORDINARY_SLOTS):
+            opaque.append(
+                f'        <activity android:name="{ACTIVITY_PKG}.StubActivity{slot}W{window}" '
+                f'android:exported="false" android:process=":guest{slot}" '
+                f'android:launchMode="standard" android:theme="@style/ControlledSandbox.Stub" />'
+            )
+            translucent.append(
+                f'        <activity android:name="{ACTIVITY_PKG}.StubActivityTranslucent{slot}W{window}" '
+                f'android:exported="false" android:process=":guest{slot}" '
+                f'android:launchMode="standard" android:theme="@style/ControlledSandbox.Stub.Translucent" />'
+            )
+    return opaque + translucent
 
 
 def delete_index_coupled_stubs() -> None:
@@ -65,6 +107,7 @@ def rewrite_runtime_manifest() -> None:
         f'android:launchMode="standard" android:theme="@style/ControlledSandbox.Stub.Translucent" />'
         for slot in range(ORDINARY_SLOTS)
     )
+    lines.extend(_window_manifest_lines())
     insertion = "\n" + "\n".join(lines)
     if "</application>" not in text:
         raise SystemExit("MANIFEST_APPLICATION_CLOSE_MISSING")
@@ -230,6 +273,7 @@ public final class ScaleResultCallerActivity extends Activity {
 
 def main() -> int:
     generate_translucent_stubs()
+    generate_window_stubs()
     delete_index_coupled_stubs()
     rewrite_runtime_manifest()
     generate_scale_fixture()

@@ -56,7 +56,15 @@ public final class ClearTopProbeActivity extends Activity {
         } else {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=BAD_COUNTS");
         }
-        finish();
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_LIFECYCLE create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount);
+            if (onResumeCount < 2 || onStartCount < 2) {
+                Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=NOT_RESUMED");
+            }
+            finish();
+        }, 900L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }

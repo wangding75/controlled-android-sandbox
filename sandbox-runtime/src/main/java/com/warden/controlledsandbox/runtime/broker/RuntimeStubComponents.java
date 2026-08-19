@@ -45,35 +45,55 @@ final class RuntimeStubComponents {
     }
 
     static Class<?> activityClassFor(int slot) {
-        switch (slot) {
-            case 0: return StubActivity0.class;
-            case 1: return StubActivity1.class;
-            case 2: return StubActivity2.class;
-            case 3: return StubActivity3.class;
-            case 4: return StubActivity4.class;
-            case 5: return StubActivity5.class;
-            case 6: return StubActivity6.class;
-            case 7: return StubActivity7.class;
-            default: return load("com.warden.controlledsandbox.runtime.component.activity.StubActivity" + slot);
+        return activityClassFor(slot, 0);
+    }
+
+    static Class<?> activityClassFor(int slot, int window) {
+        if (window == 0) {
+            switch (slot) {
+                case 0: return StubActivity0.class;
+                case 1: return StubActivity1.class;
+                case 2: return StubActivity2.class;
+                case 3: return StubActivity3.class;
+                case 4: return StubActivity4.class;
+                case 5: return StubActivity5.class;
+                case 6: return StubActivity6.class;
+                case 7: return StubActivity7.class;
+                default: return load("com.warden.controlledsandbox.runtime.component.activity.StubActivity" + slot);
+            }
         }
+        return load("com.warden.controlledsandbox.runtime.component.activity.StubActivity" + slot + "W" + window);
     }
 
     /**
-     * Physical Host Activity identity is {@code process slot × window family}. Guest
-     * declaration order is not a Host component. Virtual launchMode / CLEAR_TOP /
-     * SINGLE_TOP matching lives in {@code ActivityTaskLedger}.
+     * Physical Host Activity identity is {@code process slot × window family × activity window}.
+     * Guest declaration order is not a Host component.  Virtual launchMode / CLEAR_TOP /
+     * SINGLE_TOP matching lives in {@code ActivityTaskLedger}; the activity-window index exists
+     * solely so Android ActivityStarter can reorder/clear-top/single-top the exact physical record.
      */
     static String activityComponentFor(int slot, String guestComponent,
                                        VirtualPackageStateSnapshot packageState) {
+        return activityComponentFor(slot, guestComponent, packageState, 0);
+    }
+
+    static String activityComponentFor(int slot, String guestComponent,
+                                       VirtualPackageStateSnapshot packageState, int window) {
         return com.warden.controlledsandbox.runtime.component.activity.PhysicalActivityWindowFamily
                 .of(guestComponent, packageState)
-                .componentName(slot);
+                .componentName(slot, window);
+    }
+
+    static String activityComponentFor(int slot, String guestComponent, int window) {
+        com.warden.controlledsandbox.runtime.component.activity.PhysicalActivityWindowFamily
+                .requireSlot(slot);
+        com.warden.controlledsandbox.runtime.component.activity.PhysicalActivityWindowFamily
+                .requireWindow(window);
+        if (window == 0) return activityClassFor(slot).getName();
+        return "com.warden.controlledsandbox.runtime.component.activity.StubActivity" + slot + "W" + window;
     }
 
     static String activityComponentFor(int slot, String guestComponent) {
-        com.warden.controlledsandbox.runtime.component.activity.PhysicalActivityWindowFamily
-                .requireSlot(slot);
-        return activityClassFor(slot).getName();
+        return activityComponentFor(slot, guestComponent, 0);
     }
 
     static Class<?> componentServiceClassFor(int slot) {
