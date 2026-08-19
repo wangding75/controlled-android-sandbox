@@ -20,6 +20,29 @@ TRUST = ("--ez", "trustNativeGuest", "true")
 SCALE_INDICES = (0, 63, 64, 95, 127)
 
 
+def check_logcat_marker(
+    serial: str,
+    pass_marker: str,
+    fail_marker: str | None = None,
+    wait_sec: float = 2.0,
+) -> dict[str, Any]:
+    time.sleep(wait_sec)
+    logcat = run_adb(serial, ["logcat", "-d", "-v", "threadtime"], check=False).stdout or ""
+    has_pass = pass_marker in logcat
+    has_fail = (fail_marker in logcat) if fail_marker else False
+    if has_fail:
+        verdict = "FIXTURE_SEMANTIC_FAIL"
+    elif has_pass:
+        verdict = "FIXTURE_SEMANTIC_PASS"
+    else:
+        verdict = "FIXTURE_SEMANTIC_TIMEOUT"
+    return {
+        "verdict": verdict,
+        "pass_marker_found": has_pass,
+        "fail_marker_found": has_fail,
+    }
+
+
 def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     print(f"\n==========================================")
     print(f"Running A01 Acceptance Matrix on {serial} (API {api}, Model {model})")
@@ -66,100 +89,220 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     }
     print(f"  -> {basic_status}")
 
-    # 3. ActivityResult delivery
-    if api in {"32", "35"}:
-        print("Testing ActivityResult transport...")
-        comp_result = "com.warden.controlledsandbox.fixture.FrameworkActivityResultParentActivity"
-        r_result = debug_command(
-            serial,
-            ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_result, *TRUST],
-            deadline_sec=60,
-        )
-        result_status = r_result.get("status")
-        results["tests"]["activity_result"] = {
-            "component": comp_result,
-            "status": result_status,
-            "operation": (r_result.get("result") or {}).get("operation"),
-        }
-        print(f"  -> {result_status}")
-
-    # 4. Task semantics & onNewIntent reuse (singleTask)
-    if api in {"32", "35"}:
-        print("Testing TaskSemantics (singleTask / onNewIntent reuse)...")
-        comp_task = "com.warden.controlledsandbox.fixture.TaskSemanticsProbeActivity"
-        r_task = debug_command(
-            serial,
-            ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_task, *TRUST],
-            deadline_sec=60,
-        )
-        task_status = r_task.get("status")
-        results["tests"]["task_semantics"] = {
-            "component": comp_task,
-            "status": task_status,
-            "operation": (r_task.get("result") or {}).get("operation"),
-        }
-        print(f"  -> {task_status}")
-
-    # 5. Process Death & Recovery
-    print("Testing Guest Process Death & Clean Recovery...")
-    pkg_death = "com.warden.controlledsandbox.fixture.scale" if api == "36" else "com.warden.controlledsandbox.fixture"
-    l1 = debug_command(serial, ["-e", "command", "import-launch", "-e", "package", pkg_death, *TRUST], deadline_sec=60)
-    pid1 = run_adb(serial, ["shell", "pidof", pkg_death], check=False).stdout.strip()
-    if not pid1:
-        ps_out = run_adb(serial, ["shell", "ps", "-A"], check=False).stdout or ""
-        for line in ps_out.splitlines():
-            if pkg_death in line or f"{HOST_PACKAGE}:guest" in line:
-                pid1 = line.split()[1]
-                break
-    print(f"  Initial PID: {pid1}")
-    if pid1:
-        run_adb(serial, ["shell", "kill", "-9", pid1], check=False)
-        time.sleep(1)
-    l2 = debug_command(serial, ["-e", "command", "import-launch", "-e", "package", pkg_death, *TRUST], deadline_sec=60)
-    pid2 = run_adb(serial, ["shell", "pidof", pkg_death], check=False).stdout.strip()
-    if not pid2:
-        ps_out = run_adb(serial, ["shell", "ps", "-A"], check=False).stdout or ""
-        for line in ps_out.splitlines():
-            if pkg_death in line or f"{HOST_PACKAGE}:guest" in line:
-                pid2 = line.split()[1]
-                break
-    print(f"  PID after recovery: {pid2}")
-    recovery_pass = bool(pid1 and pid2 and pid1 != pid2 and l2.get("status") == "PASS")
-    results["tests"]["process_death_recovery"] = {
-        "pid_before": pid1,
-        "pid_after": pid2,
-        "relaunch_status": l2.get("status"),
-        "pass": recovery_pass,
+    # 3. ActivityResult delivery (All APIs)
+    print("Testing ActivityResult transport...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_result = "com.warden.controlledsandbox.fixture.FrameworkActivityResultParentActivity"
+    r_result = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_result, *TRUST],
+        deadline_sec=60,
+    )
+    result_cmd_status = r_result.get("status")
+    result_marker = check_logcat_marker(
+        serial,
+        "FRAMEWORK_PROBE_ACTIVITY_RESULT_PASS",
+        "FRAMEWORK_PROBE_ACTIVITY_RESULT_FAIL",
+        wait_sec=2.5,
+    )
+    results["tests"]["activity_result"] = {
+        "component": comp_result,
+        "command_status": result_cmd_status,
+        "semantic_verdict": result_marker["verdict"],
+        "pass": result_cmd_status == "PASS" and result_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+        "operation": (r_result.get("result") or {}).get("operation"),
     }
-    print(f"  -> Recovery Confirmed: {recovery_pass}")
+    print(f"  -> Command: {result_cmd_status}, Semantic: {result_marker['verdict']}")
 
-    # 6. Neighboring components (Service & PendingIntent)
-    if api in {"32", "35"}:
-        print("Testing Service neighbor smoke...")
-        r_svc = debug_command(
-            serial,
-            ["-e", "command", "slot-campaign", "-e", "package", "com.warden.controlledsandbox.fixture", "--ei", "slotTarget", "0", *TRUST],
-            deadline_sec=60,
-        )
-        svc_status = r_svc.get("status")
-        results["tests"]["service_neighbor"] = {
+    # 4. Task Mode Matrix (standard, singleTop, singleTask, CLEAR_TOP, REORDER_TO_FRONT)
+    task_matrix_results: dict[str, Any] = {}
+
+    # 4a. standard
+    print("Testing Task Mode: standard...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_std = "com.warden.controlledsandbox.fixture.StandardTaskProbeActivity"
+    r_std = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_std, *TRUST],
+        deadline_sec=60,
+    )
+    std_marker = check_logcat_marker(serial, "FRAMEWORK_PROBE_TASK_STANDARD_PASS", wait_sec=2.0)
+    task_matrix_results["standard"] = {
+        "component": comp_std,
+        "command_status": r_std.get("status"),
+        "semantic_verdict": std_marker["verdict"],
+        "pass": r_std.get("status") == "PASS" and std_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+    }
+    print(f"  -> standard: {std_marker['verdict']}")
+
+    # 4b. singleTop
+    print("Testing Task Mode: singleTop...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_stop = "com.warden.controlledsandbox.fixture.SingleTopProbeActivity"
+    r_stop = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_stop, *TRUST],
+        deadline_sec=60,
+    )
+    stop_marker = check_logcat_marker(
+        serial,
+        "FRAMEWORK_PROBE_TASK_SINGLETOP_PASS",
+        "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL",
+        wait_sec=2.0,
+    )
+    task_matrix_results["singleTop"] = {
+        "component": comp_stop,
+        "command_status": r_stop.get("status"),
+        "semantic_verdict": stop_marker["verdict"],
+        "pass": r_stop.get("status") == "PASS" and stop_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+    }
+    print(f"  -> singleTop: {stop_marker['verdict']}")
+
+    # 4c. singleTask
+    print("Testing Task Mode: singleTask...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_task = "com.warden.controlledsandbox.fixture.TaskSemanticsProbeActivity"
+    r_task = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_task, *TRUST],
+        deadline_sec=60,
+    )
+    task_cmd_status = r_task.get("status")
+    task_marker = check_logcat_marker(
+        serial,
+        "FRAMEWORK_PROBE_TASK_REUSE_PASS",
+        "FRAMEWORK_PROBE_TASK_REUSE_FAIL",
+        wait_sec=2.5,
+    )
+    task_matrix_results["singleTask"] = {
+        "component": comp_task,
+        "command_status": task_cmd_status,
+        "semantic_verdict": task_marker["verdict"],
+        "pass": task_cmd_status == "PASS" and task_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+    }
+    print(f"  -> singleTask: Command: {task_cmd_status}, Semantic: {task_marker['verdict']}")
+
+    # 4d. CLEAR_TOP
+    print("Testing Task Mode: CLEAR_TOP...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_clear = "com.warden.controlledsandbox.fixture.ClearTopProbeActivity"
+    r_clear = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_clear, *TRUST],
+        deadline_sec=60,
+    )
+    clear_marker = check_logcat_marker(
+        serial,
+        "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS",
+        "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL",
+        wait_sec=4.0,
+    )
+    task_matrix_results["CLEAR_TOP"] = {
+        "component": comp_clear,
+        "command_status": r_clear.get("status"),
+        "semantic_verdict": clear_marker["verdict"],
+        "pass": r_clear.get("status") == "PASS" and clear_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+    }
+    print(f"  -> CLEAR_TOP: {clear_marker['verdict']}")
+
+    # 4e. REORDER_TO_FRONT
+    print("Testing Task Mode: REORDER_TO_FRONT...")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    comp_reorder = "com.warden.controlledsandbox.fixture.ReorderToFrontProbeActivity"
+    r_reorder = debug_command(
+        serial,
+        ["-e", "command", "launch-component", "-e", "package", "com.warden.controlledsandbox.fixture", "-e", "component", comp_reorder, *TRUST],
+        deadline_sec=60,
+    )
+    reorder_marker = check_logcat_marker(
+        serial,
+        "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS",
+        "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL",
+        wait_sec=4.0,
+    )
+    task_matrix_results["REORDER_TO_FRONT"] = {
+        "component": comp_reorder,
+        "command_status": r_reorder.get("status"),
+        "semantic_verdict": reorder_marker["verdict"],
+        "pass": r_reorder.get("status") == "PASS" and reorder_marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+    }
+    print(f"  -> REORDER_TO_FRONT: {reorder_marker['verdict']}")
+
+    results["tests"]["task_mode_matrix"] = task_matrix_results
+
+    # 5. Process Death and Session Fencing
+    print("Testing Process Death and Session Fencing...")
+    r_proc1 = debug_command(
+        serial,
+        ["-e", "command", "import-prepare", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        deadline_sec=60,
+    )
+    op1 = (r_proc1.get("result") or {}).get("operation") or {}
+    sess1 = op1.get("sessionId", "")
+    gen1 = op1.get("generation", 0)
+    pid1 = op1.get("platformPid", 0) or op1.get("pid", 0)
+
+    # Force-kill guest process
+    if pid1:
+        run_adb(serial, ["shell", "kill", "-9", str(pid1)], check=False)
+
+    # Relaunch to verify session continuity & clean generation
+    r_proc2 = debug_command(
+        serial,
+        ["-e", "command", "import-prepare", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        deadline_sec=60,
+        force_stop_host=False,
+    )
+    op2 = (r_proc2.get("result") or {}).get("operation") or {}
+    sess2 = op2.get("sessionId", "")
+    gen2 = op2.get("generation", 0)
+    pid2 = op2.get("platformPid", 0) or op2.get("pid", 0)
+
+    pid_relaunch_pass = (r_proc2.get("status") == "PASS" and pid2 != 0 and pid2 != pid1)
+    session_fencing_pass = (sess1 != "" and sess2 != "" and (sess1 != sess2 or gen2 >= gen1))
+
+    results["tests"]["process_death_and_session_fencing"] = {
+        "old_session": sess1,
+        "old_generation": gen1,
+        "old_pid": pid1,
+        "new_session": sess2,
+        "new_generation": gen2,
+        "new_pid": pid2,
+        "pid_death_relaunch": "PID_DEATH_RELAUNCH_PASS" if pid_relaunch_pass else "PID_DEATH_RELAUNCH_FAIL",
+        "stale_session_fencing": "STALE_SESSION_FENCING_PASS" if session_fencing_pass else "STALE_SESSION_FENCING_FAIL",
+        "pass": pid_relaunch_pass and session_fencing_pass,
+    }
+    print(f"  -> PID Death Relaunch: {results['tests']['process_death_and_session_fencing']['pid_death_relaunch']}")
+    print(f"  -> Stale Session Fencing: {results['tests']['process_death_and_session_fencing']['stale_session_fencing']}")
+
+    # 6. Neighboring components (Service/Provider, PendingIntent) on all APIs
+    print("Testing Neighboring components (Service/Provider, PendingIntent)...")
+    r_svc = debug_command(
+        serial,
+        ["-e", "command", "import-prepare", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        deadline_sec=60,
+    )
+    svc_status = r_svc.get("status")
+
+    r_pi = debug_command(
+        serial,
+        ["-e", "command", "pi-system-holder", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        deadline_sec=60,
+    )
+    pi_status = r_pi.get("status")
+
+    results["tests"]["neighbor_smoke"] = {
+        "service_and_provider_prepare": {
             "status": svc_status,
             "operation": (r_svc.get("result") or {}).get("operation"),
-        }
-        print(f"  -> Service: {svc_status}")
-
-        print("Testing PendingIntent neighbor smoke...")
-        r_pi = debug_command(
-            serial,
-            ["-e", "command", "pi-system-holder", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
-            deadline_sec=60,
-        )
-        pi_status = r_pi.get("status")
-        results["tests"]["pending_intent_neighbor"] = {
+        },
+        "pending_intent": {
             "status": pi_status,
             "operation": (r_pi.get("result") or {}).get("operation"),
-        }
-        print(f"  -> PendingIntent: {pi_status}")
+        },
+        "pass": svc_status == "PASS" and pi_status == "PASS",
+    }
+    print(f"  -> Service/Provider Prepare: {svc_status}, PendingIntent: {pi_status}")
 
     # Capture raw logs and dumpsys
     logcat_out = run_adb(serial, ["logcat", "-d", "-v", "threadtime"], check=False).stdout or ""

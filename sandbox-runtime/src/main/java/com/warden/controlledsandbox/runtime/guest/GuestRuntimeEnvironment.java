@@ -740,6 +740,14 @@ public final class GuestRuntimeEnvironment {
                 android.os.SystemClock.elapsedRealtime());
     }
 
+    static Bundle applyActivityHostDecision(Bundle request) {
+        Session session = current;
+        if (session != null && session.activityThreadInstrumentation != null) {
+            return session.activityThreadInstrumentation.applyHostDecision(request);
+        }
+        return null;
+    }
+
     static void shutdown(String sessionId, long generation) {
         Session session;
         synchronized (GuestRuntimeEnvironment.class) {

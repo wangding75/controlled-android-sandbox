@@ -152,6 +152,15 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             Bundle result = session.context().startActivityFromFrameworkActivity(
                     intent, options, route.taskId, requestCode);
+            String action = result == null ? "" : result.getString(RuntimeKeys.ACTIVITY_ACTION, "");
+            if (isReuseAction(action)) {
+                String targetToken = result == null ? "" : result.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+                Activity targetActivity = targetToken.isBlank() ? null : findActivityByToken(targetToken);
+                if (targetActivity != null) {
+                    applyHostDecision(result);
+                    return null;
+                }
+            }
             Intent hostIntent = hostIntent(result);
             if (hostIntent == null) {
                 throw new IllegalStateException("FRAMEWORK_HOST_ACTIVITY_INTENT_MISSING");
@@ -917,6 +926,75 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "event dispatch failed", error);
             }
         });
+    }
+
+    Activity findActivityByToken(String activityToken) {
+        if (activityToken == null || activityToken.isBlank()) return null;
+        synchronized (launches) {
+            for (Map.Entry<Activity, Launch> entry : launches.entrySet()) {
+                if (activityToken.equals(entry.getValue().activityToken)) {
+                    return entry.getKey();
+                }
+            }
+        }
+        return null;
+    }
+
+    void deliverNewIntent(Activity targetActivity, String routeToken) {
+        if (targetActivity == null || routeToken == null || routeToken.isBlank()) return;
+        Intent hostIntent = new Intent();
+        hostIntent.putExtra(RuntimeKeys.ROUTE_TOKEN, routeToken);
+        callActivityOnNewIntent(targetActivity, hostIntent);
+    }
+
+    Bundle applyHostDecision(Bundle request) {
+        Bundle out = new Bundle();
+        if (request == null) {
+            out.putString(RuntimeKeys.STATUS, "FAILED");
+            out.putString(RuntimeKeys.ERROR_TYPE, "HOST_ACTIVITY_DECISION_MISSING");
+            return out;
+        }
+        java.util.List<String> removed = request.getStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS);
+        int finished = 0;
+        android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        if (removed != null) {
+            for (String token : removed) {
+                Activity removedActivity = findActivityByToken(token);
+                if (removedActivity != null) {
+                    mainHandler.post(removedActivity::finish);
+                    finished++;
+                }
+            }
+        }
+        String targetToken = request.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+        String action = request.getString(RuntimeKeys.ACTIVITY_ACTION, "");
+        String routeToken = request.getString(RuntimeKeys.ROUTE_TOKEN, "");
+        Activity targetActivity = targetToken.isBlank() ? null : findActivityByToken(targetToken);
+        if (targetActivity == null) {
+            out.putString(RuntimeKeys.STATUS, "HOST_ACTIVITY_NOT_LIVE");
+            out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, finished);
+            return out;
+        }
+        if (isReuseAction(action)) {
+            mainHandler.post(() -> {
+                try {
+                    deliverNewIntent(targetActivity, routeToken);
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                    android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "deliverNewIntent failed", error);
+                }
+            });
+        }
+        out.putString(RuntimeKeys.STATUS, "APPLIED");
+        out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, finished);
+        out.putString(RuntimeKeys.ACTIVITY_TOKEN, targetToken);
+        return out;
+    }
+
+    static boolean isReuseAction(String action) {
+        return "DELIVERED_NEW_INTENT".equals(action)
+                || "CLEARED_TOP".equals(action)
+                || "REORDERED_TO_FRONT".equals(action);
     }
 
     private static Bundle evidence(Launch route, Activity activity) {

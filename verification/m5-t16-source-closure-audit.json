@@ -100,11 +100,11 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
-      "lines": 1561
+      "lines": 1569
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
-      "lines": 1547
+      "lines": 1549
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
@@ -131,12 +131,12 @@
       "lines": 1165
     },
     {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-      "lines": 1115
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadInstrumentation.java",
+      "lines": 1128
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadInstrumentation.java",
-      "lines": 1050
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
+      "lines": 1115
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",

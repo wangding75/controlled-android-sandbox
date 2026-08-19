@@ -146,9 +146,9 @@ def main() -> int:
     copy_tree()
     write_git(head, tree)
     write_reports()
-    write_manifest(head, tree)
+    source_count = sum(1 for p in (PACK_DIR / "source").rglob("*") if p.is_file())
+    write_manifest(head, tree, source_count)
     inventory = write_inventory()
-    write_manifest(head, tree, inventory["file_count"])
     if ZIP_PATH.exists():
         ZIP_PATH.unlink()
     with zipfile.ZipFile(ZIP_PATH, "w", zipfile.ZIP_DEFLATED) as archive:

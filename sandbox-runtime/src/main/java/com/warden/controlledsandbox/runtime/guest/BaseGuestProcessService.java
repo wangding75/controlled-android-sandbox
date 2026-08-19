@@ -64,6 +64,8 @@ public abstract class BaseGuestProcessService extends Service {
     }
 
     private Bundle applyActivityHostDecision(Bundle request) {
+        Bundle result = GuestRuntimeEnvironment.applyActivityHostDecision(request);
+        if (result != null) return result;
         return com.warden.controlledsandbox.runtime.component.activity.StubActivityHostRegistry
                 .apply(request);
     }

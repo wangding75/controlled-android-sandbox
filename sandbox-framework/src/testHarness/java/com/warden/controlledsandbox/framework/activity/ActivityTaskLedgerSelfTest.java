@@ -40,6 +40,10 @@ public final class ActivityTaskLedgerSelfTest {
         testCheckpointRestoresPendingResultOwnership();
         testExactRollbackState();
         testFiveHundredLaunchesWithoutLedgerLeak();
+        testSingleTaskLookupAndOnNewIntentDelivery();
+        testSingleTopTopVsNonTop();
+        testClearTopStandardVsSingleTop();
+        testReorderToFrontOnNewIntent();
         System.out.println("PASS ActivityTaskLedgerSelfTest");
     }
 
@@ -1031,6 +1035,111 @@ public final class ActivityTaskLedgerSelfTest {
             check(expected.getMessage().contains("Unknown activity token"),
                     "stale token failure should be explicit");
         }
+    }
+
+    private static void testSingleTaskLookupAndOnNewIntentDelivery() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision first = ledger.launch(requestWithRoute(
+                0, "SingleTaskA", LaunchMode.SINGLE_TASK, 0, null, 1, "route-single-1"));
+        check(first.action() == LaunchAction.CREATED_TASK, "first singleTask should create task");
+        check(ledger.activityCount() == 1, "ledger should have 1 activity");
+
+        // Push another standard activity onto the task
+        LaunchDecision child = ledger.launch(requestWithRoute(
+                0, "StandardB", LaunchMode.STANDARD, 0, first.taskId(), 1, "route-child-1"));
+        check(child.action() == LaunchAction.CREATED_ACTIVITY, "child should be created in task");
+        check(ledger.activityCount() == 2, "ledger should have 2 activities");
+
+        // Launch singleTask again from another caller or without callerTaskId
+        LaunchDecision second = ledger.launch(requestWithRoute(
+                0, "SingleTaskA", LaunchMode.SINGLE_TASK, 0, null, 1, "route-single-2"));
+        check(second.action() == LaunchAction.CLEARED_TOP, "second launch should clear top");
+        check(second.activityToken().equals(first.activityToken()), "singleTask token must be reused");
+        check(second.routeToken().equals("route-single-2"), "route token must reflect current launch");
+        check(second.removedActivityCount() == 1, "child activity must be cleared");
+        check(ledger.activityCount() == 1, "only singleTask target should remain");
+        check(ledger.drainNewIntents(first.activityToken()).size() == 1,
+                "singleTask target must receive enqueued onNewIntent");
+    }
+
+    private static void testSingleTopTopVsNonTop() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(requestWithRoute(
+                0, "SingleTopRoot", LaunchMode.SINGLE_TOP, 0, null, 1, "route-root"));
+        check(root.action() == LaunchAction.CREATED_TASK, "root should create task");
+
+        // Relaunch when on top -> DELIVERED_NEW_INTENT
+        LaunchDecision onTop = ledger.launch(requestWithRoute(
+                0, "SingleTopRoot", LaunchMode.SINGLE_TOP, 0, root.taskId(), 1, "route-top-reused"));
+        check(onTop.action() == LaunchAction.DELIVERED_NEW_INTENT, "singleTop on top must reuse");
+        check(onTop.activityToken().equals(root.activityToken()), "token must match");
+        check(ledger.activityCount() == 1, "activityCount must stay 1");
+        check(ledger.drainNewIntents(root.activityToken()).size() == 1, "must enqueue new intent");
+
+        // Launch intermediate child
+        LaunchDecision child = ledger.launch(requestWithRoute(
+                0, "OtherChild", LaunchMode.STANDARD, 0, root.taskId(), 1, "route-child"));
+        check(child.action() == LaunchAction.CREATED_ACTIVITY, "child should be created");
+        check(ledger.activityCount() == 2, "activityCount must be 2");
+
+        // Launch SingleTopRoot when NOT on top -> CREATED_ACTIVITY (new instance)
+        LaunchDecision nonTop = ledger.launch(requestWithRoute(
+                0, "SingleTopRoot", LaunchMode.SINGLE_TOP, 0, root.taskId(), 1, "route-new-instance"));
+        check(nonTop.action() == LaunchAction.CREATED_ACTIVITY, "singleTop when not on top must create new instance");
+        check(!nonTop.activityToken().equals(root.activityToken()), "must create fresh token");
+        check(ledger.activityCount() == 3, "activityCount must be 3");
+    }
+
+    private static void testClearTopStandardVsSingleTop() {
+        // Test standard CLEAR_TOP (creates replacement instance)
+        ActivityTaskLedger ledgerStd = new ActivityTaskLedger();
+        LaunchDecision stdRoot = ledgerStd.launch(requestWithRoute(
+                0, "StdTarget", LaunchMode.STANDARD, 0, null, 1, "route-std-1"));
+        ledgerStd.launch(requestWithRoute(
+                0, "Child1", LaunchMode.STANDARD, 0, stdRoot.taskId(), 1, "route-child-1"));
+        LaunchDecision stdCleared = ledgerStd.launch(requestWithRoute(
+                0, "StdTarget", LaunchMode.STANDARD, LaunchFlags.CLEAR_TOP, stdRoot.taskId(), 1, "route-std-2"));
+        check(stdCleared.action() == LaunchAction.CREATED_ACTIVITY,
+                "standard CLEAR_TOP without SINGLE_TOP must create replacement instance");
+        check(!stdCleared.activityToken().equals(stdRoot.activityToken()),
+                "standard CLEAR_TOP replacement must have new activity token");
+        check(ledgerStd.activityCount() == 1, "ledger must clear back-stack and have 1 replacement activity");
+        check(ledgerStd.lastLaunchRemovedActivityTokens().contains(stdRoot.activityToken()),
+                "old standard activity must be in removedActivityTokens list");
+
+        // Test singleTop CLEAR_TOP (reuses existing instance)
+        ActivityTaskLedger ledgerTop = new ActivityTaskLedger();
+        LaunchDecision topRoot = ledgerTop.launch(requestWithRoute(
+                0, "TopTarget", LaunchMode.SINGLE_TOP, 0, null, 1, "route-top-1"));
+        ledgerTop.launch(requestWithRoute(
+                0, "Child2", LaunchMode.STANDARD, 0, topRoot.taskId(), 1, "route-child-2"));
+        LaunchDecision topCleared = ledgerTop.launch(requestWithRoute(
+                0, "TopTarget", LaunchMode.SINGLE_TOP, LaunchFlags.CLEAR_TOP, topRoot.taskId(), 1, "route-top-2"));
+        check(topCleared.action() == LaunchAction.CLEARED_TOP,
+                "singleTop CLEAR_TOP must reuse existing instance");
+        check(topCleared.activityToken().equals(topRoot.activityToken()),
+                "singleTop CLEAR_TOP must retain original activity token");
+        check(ledgerTop.activityCount() == 1, "ledger must have 1 reused activity");
+        check(ledgerTop.drainNewIntents(topRoot.activityToken()).size() == 1,
+                "singleTop CLEAR_TOP must receive enqueued onNewIntent");
+    }
+
+    private static void testReorderToFrontOnNewIntent() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision a = ledger.launch(requestWithRoute(
+                0, "ActivityA", LaunchMode.STANDARD, 0, null, 1, "route-a"));
+        LaunchDecision b = ledger.launch(requestWithRoute(
+                0, "ActivityB", LaunchMode.STANDARD, 0, a.taskId(), 1, "route-b"));
+        check(ledger.activityCount() == 2, "ledger must have 2 activities");
+
+        LaunchDecision reorderedA = ledger.launch(requestWithRoute(
+                0, "ActivityA", LaunchMode.STANDARD, LaunchFlags.REORDER_TO_FRONT, a.taskId(), 1, "route-a-reorder"));
+        check(reorderedA.action() == LaunchAction.REORDERED_TO_FRONT,
+                "REORDER_TO_FRONT must return REORDERED_TO_FRONT action");
+        check(reorderedA.activityToken().equals(a.activityToken()),
+                "REORDER_TO_FRONT must preserve original activity token");
+        check(ledger.drainNewIntents(a.activityToken()).size() == 1,
+                "REORDER_TO_FRONT must enqueue onNewIntent for reordered activity");
     }
 
     private static void check(boolean condition, String message) {

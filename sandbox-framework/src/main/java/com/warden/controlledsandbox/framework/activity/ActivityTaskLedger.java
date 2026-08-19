@@ -181,6 +181,7 @@ public final class ActivityTaskLedger {
             if (existingIndex >= 0) {
                 ActivityTaskMutableActivity activity = target.activities.remove(existingIndex);
                 target.activities.add(activity);
+                enqueueNewIntent(activity, request);
                 registerResultLink(activity, resultCallerToken, callerActivityToken, request);
                 return completeDecision(
                         LaunchAction.REORDERED_TO_FRONT,
@@ -219,7 +220,7 @@ public final class ActivityTaskLedger {
                 registerResultLink(replacement, resultCallerToken, callerActivityToken, request);
                 ensureTaskRegistered(target);
                 return completeDecision(
-                        LaunchAction.CLEARED_TOP,
+                        LaunchAction.CREATED_ACTIVITY,
                         target,
                         replacement,
                         removed + resetRemoved,
@@ -892,7 +893,8 @@ public final class ActivityTaskLedger {
         }
 
         ActivityTaskMutableTask candidate;
-        if (LaunchFlags.has(request.flags(), LaunchFlags.NEW_TASK)) {
+        if (LaunchFlags.has(request.flags(), LaunchFlags.NEW_TASK)
+                || request.launchMode() == LaunchMode.SINGLE_TASK) {
             candidate = findByAffinity(
                     request.identity().virtualUserId(),
                     request.identity().packageName(),
