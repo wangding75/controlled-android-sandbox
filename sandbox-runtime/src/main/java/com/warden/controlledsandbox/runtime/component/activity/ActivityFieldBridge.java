@@ -202,10 +202,16 @@ public final class ActivityFieldBridge {
     }
 
     /**
-     * LaunchActivityItem.preExecute() creates the record before EXECUTE_TRANSACTION reaches the
-     * main Handler.  ActivityThread then consumes mLaunchingActivities[token], not the item
-     * fields again.  Keep both objects coherent so the platform's own ActivityClientRecord
-     * receives the Guest metadata and Guest LoadedApk before performLaunchActivity().
+     * On Android 9–14, LaunchActivityItem.preExecute() creates the ActivityClientRecord before
+     * EXECUTE_TRANSACTION reaches the main Handler and stores it in mLaunchingActivities.
+     * ActivityThread then consumes mLaunchingActivities[token], not the item fields again.
+     * Keep both objects coherent so the platform's own ActivityClientRecord receives the Guest
+     * metadata and Guest LoadedApk before performLaunchActivity().
+     *
+     * <p>On Android 15 (API 35+), mLaunchingActivities was removed from ActivityThread.  The
+     * pre-launch record no longer exists; only the LaunchActivityItem fields patched in
+     * projectFrameworkLaunchTransaction() carry the Guest contract to performLaunchActivity().
+     * This method returns early without error in that case.
      */
     private static void projectLaunchingRecord(Object activityThread, Object transaction,
                                                Intent hostIntent, Intent guestIntent,
@@ -267,6 +273,16 @@ public final class ActivityFieldBridge {
             }
         }
         if (record == null) {
+            if (launchingField == null) {
+                // Android 15 (API 35+) removed ActivityThread.mLaunchingActivities and its
+                // companion getLaunchingActivity() accessor.  The framework no longer pre-creates
+                // an ActivityClientRecord before EXECUTE_TRANSACTION; the LaunchActivityItem
+                // fields already patched above carry the Guest contract into performLaunchActivity.
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                        "PRELAUNCH_RECORD_SKIPPED api=" + Build.VERSION.SDK_INT
+                                + " token=" + token);
+                return;
+            }
             throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_LAUNCHING_NOT_FOUND");
         }
         Field infoField = findField(record.getClass(), "activityInfo");
