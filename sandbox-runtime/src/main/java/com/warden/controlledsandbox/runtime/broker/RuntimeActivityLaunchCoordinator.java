@@ -186,6 +186,11 @@ final class RuntimeActivityLaunchCoordinator {
     private static int hostActivityLaunchFlags(Bundle transaction, boolean frameworkHost) {
         int flags = transaction == null ? 0
                 : transaction.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0);
+        // The virtual ledger is the authority for reuse: the raw Guest flags (which may carry a
+        // launchMode-originated SINGLE_TOP/CLEAR_TOP/REORDER_TO_FRONT) are stripped here and
+        // re-derived below from the recorded launch decision.  Keeping the raw flags would let a
+        // shared bounded Stub class make ActivityStarter rematch the wrong physical record.
+        flags &= ~(LaunchFlags.SINGLE_TOP | LaunchFlags.CLEAR_TOP | LaunchFlags.REORDER_TO_FRONT);
         // The virtual ledger is the source of truth for task creation.  VA/NBB add a separate
         // host task boundary when their virtual AMS creates a task; using only NEW_TASK here lets
         // Android reuse an old task belonging to the same host package, which is especially
@@ -203,9 +208,32 @@ final class RuntimeActivityLaunchCoordinator {
         if (createdNewTask) {
             flags |= LaunchFlags.MULTIPLE_TASK | LaunchFlags.RESET_TASK_IF_NEEDED;
         }
-        // Reuse decisions are applied by token to the live trampoline. Physical stubs are a
-        // bounded window family and must stay launchMode=standard, so Android SINGLE_TOP /
-        // CLEAR_TOP must not rematch a different Guest Activity that shares the stub class.
+        // Project the virtual reuse decision back into real ActivityStarter flags so the Host
+        // AMS/ATMS owns the transition.  The virtual ledger has already selected the reusable
+        // record and emitted the records it removes above it (REMOVED_ACTIVITY_TOKENS); the Guest
+        // side finishes those through Activity.finish() before forwarding this Intent, so the
+        // reused target is the task top when ActivityStarter applies SINGLE_TOP.  CLEAR_TOP /
+        // REORDER_TO_FRONT need a distinct physical component to be unambiguous, so keep them
+        // intentional rather than relying on the shared bounded Stub class to disambiguate.
+        String action = transaction == null ? ""
+                : transaction.getString(RuntimeKeys.ACTIVITY_ACTION, "");
+        switch (action) {
+            // singleTop-onto-top and singleInstance reuse never move the target: the top already
+            // holds the selected record so ActivityStarter.deliverToCurrentTopIfNeeded matches it.
+            case "DELIVERED_NEW_INTENT":
+            // singleTask / CLEAR_TOP reuse the record that becomes top once its children are
+            // finished above it: forward SINGLE_TOP so ActivityStarter delivers onNewIntent to
+            // exactly that now-top record.  CLEAR_TOP is deliberately not forwarded because it
+            // would re-resolve the shared Stub component to the wrong (child) record.
+            case "CLEARED_TOP":
+                flags |= LaunchFlags.SINGLE_TOP;
+                break;
+            case "REORDERED_TO_FRONT":
+                flags |= LaunchFlags.REORDER_TO_FRONT;
+                break;
+            default:
+                break;
+        }
         return flags;
     }
 }

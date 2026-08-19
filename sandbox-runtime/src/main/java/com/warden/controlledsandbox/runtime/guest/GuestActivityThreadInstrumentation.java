@@ -152,15 +152,14 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             Bundle result = session.context().startActivityFromFrameworkActivity(
                     intent, options, route.taskId, requestCode);
-            String action = result == null ? "" : result.getString(RuntimeKeys.ACTIVITY_ACTION, "");
-            if (isReuseAction(action)) {
-                String targetToken = result == null ? "" : result.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
-                Activity targetActivity = targetToken.isBlank() ? null : findActivityByToken(targetToken);
-                if (targetActivity != null) {
-                    applyHostDecision(result);
-                    return null;
-                }
-            }
+            // A virtual reuse decision (singleTask / CLEAR_TOP / singleTop) must still be
+            // realized by the Host AMS/ATMS, never by replanting callbacks onto a live Guest
+            // Activity.  The ledger marks the physical records it removes; finish them through
+            // the framework here so Android owns the onDestroy/onPause/onStop chain and the
+            // reused target naturally becomes the task top.  The forwarded host Intent then
+            // carries the reuse flags produced by the Broker so ActivityStarter performs the
+            // matching move-to-front / single-top onNewIntent as a genuine ClientTransaction.
+            finishRemovedActivities(result);
             Intent hostIntent = hostIntent(result);
             if (hostIntent == null) {
                 throw new IllegalStateException("FRAMEWORK_HOST_ACTIVITY_INTENT_MISSING");
@@ -940,13 +939,32 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         return null;
     }
 
-    void deliverNewIntent(Activity targetActivity, String routeToken) {
-        if (targetActivity == null || routeToken == null || routeToken.isBlank()) return;
-        Intent hostIntent = new Intent();
-        hostIntent.putExtra(RuntimeKeys.ROUTE_TOKEN, routeToken);
-        callActivityOnNewIntent(targetActivity, hostIntent);
+    /**
+     * Realizes only the removal half of a virtual reuse decision.  The target's onNewIntent /
+     * move-to-front is intentionally NOT replayed here: it is the Host AMS/ATMS ActivityStarter
+     * flag set carried by the forwarded host Intent that owns that transition.  Directly invoking
+     * callActivityOnNewIntent would strip the framework-owned ClientTransaction and let a Guest
+     * bridge mark a STOPPED Activity as reused without any real ActivityRecord movement.
+     */
+    private int finishRemovedActivities(Bundle result) {
+        if (result == null) return 0;
+        java.util.List<String> removed = result.getStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS);
+        if (removed == null) return 0;
+        int finished = 0;
+        for (String token : removed) {
+            Activity removedActivity = findActivityByToken(token);
+            if (removedActivity == null) continue;
+            removedActivity.finish();
+            finished++;
+        }
+        return finished;
     }
 
+    /**
+     * Broker-side APPLY_ACTIVITY_HOST_DECISION handler.  This runs on the Guest Binder thread, so
+     * the concrete framework finish must be posted to the Activity main looper.  Reuse delivery is
+     * left to the forwarded host Intent; this method is removal-only and never injects onNewIntent.
+     */
     Bundle applyHostDecision(Bundle request) {
         Bundle out = new Bundle();
         if (request == null) {
@@ -955,46 +973,18 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             return out;
         }
         java.util.List<String> removed = request.getStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS);
-        int finished = 0;
         android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
         if (removed != null) {
             for (String token : removed) {
                 Activity removedActivity = findActivityByToken(token);
                 if (removedActivity != null) {
                     mainHandler.post(removedActivity::finish);
-                    finished++;
                 }
             }
         }
-        String targetToken = request.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
-        String action = request.getString(RuntimeKeys.ACTIVITY_ACTION, "");
-        String routeToken = request.getString(RuntimeKeys.ROUTE_TOKEN, "");
-        Activity targetActivity = targetToken.isBlank() ? null : findActivityByToken(targetToken);
-        if (targetActivity == null) {
-            out.putString(RuntimeKeys.STATUS, "HOST_ACTIVITY_NOT_LIVE");
-            out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, finished);
-            return out;
-        }
-        if (isReuseAction(action)) {
-            mainHandler.post(() -> {
-                try {
-                    deliverNewIntent(targetActivity, routeToken);
-                } catch (Throwable error) {
-                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                    android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "deliverNewIntent failed", error);
-                }
-            });
-        }
         out.putString(RuntimeKeys.STATUS, "APPLIED");
-        out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, finished);
-        out.putString(RuntimeKeys.ACTIVITY_TOKEN, targetToken);
+        out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, removed == null ? 0 : removed.size());
         return out;
-    }
-
-    static boolean isReuseAction(String action) {
-        return "DELIVERED_NEW_INTENT".equals(action)
-                || "CLEARED_TOP".equals(action)
-                || "REORDERED_TO_FRONT".equals(action);
     }
 
     private static Bundle evidence(Launch route, Activity activity) {
