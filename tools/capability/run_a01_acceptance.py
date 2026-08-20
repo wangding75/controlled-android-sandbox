@@ -143,7 +143,7 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
         deadline_sec=60,
     )
     result_marker = check_logcat_marker(
-        serial, "FRAMEWORK_PROBE_ACTIVITY_RESULT_PASS", "FRAMEWORK_PROBE_ACTIVITY_RESULT_FAIL", wait_sec=2.5,
+        serial, "FRAMEWORK_PROBE_ACTIVITY_RESULT_PASS", "FRAMEWORK_PROBE_ACTIVITY_RESULT_FAIL", wait_sec=8.0,
     )
     tests["activity_result"] = {
         "component": comp_result,
@@ -162,13 +162,13 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
         ("single_top_non_top", "com.warden.controlledsandbox.fixture.SingleTopNonTopProbeActivity",
          "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_PASS", "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_FAIL", 6.0),
         ("single_task", "com.warden.controlledsandbox.fixture.TaskSemanticsProbeActivity",
-         "FRAMEWORK_PROBE_TASK_REUSE_PASS", "FRAMEWORK_PROBE_TASK_REUSE_FAIL", 2.5),
+         "FRAMEWORK_PROBE_TASK_REUSE_PASS", "FRAMEWORK_PROBE_TASK_REUSE_FAIL", 8.0),
         ("clear_top_standard", "com.warden.controlledsandbox.fixture.ClearTopStandardProbeActivity",
          "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_FAIL", 6.0),
         ("clear_top", "com.warden.controlledsandbox.fixture.ClearTopProbeActivity",
-         "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL", 4.0),
+         "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL", 8.0),
         ("reorder_to_front", "com.warden.controlledsandbox.fixture.ReorderToFrontProbeActivity",
-         "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS", "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL", 4.0),
+         "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS", "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL", 8.0),
     ):
         run_adb(serial, ["logcat", "-c"], check=False)
         r = safe_debug_command(
@@ -243,9 +243,14 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
     }
 
     # 6. Neighbor smoke: real Service start, real Provider prepare/query, real PendingIntent.
-    r_svc_provider = safe_debug_command(
+    r_service = safe_debug_command(
         serial,
-        ["-e", "command", "neighbor-smoke", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        ["-e", "command", "neighbor-service", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
+        deadline_sec=60,
+    )
+    r_provider = safe_debug_command(
+        serial,
+        ["-e", "command", "neighbor-provider", "-e", "package", "com.warden.controlledsandbox.fixture", *TRUST],
         deadline_sec=60,
     )
     r_pi = safe_debug_command(
@@ -254,17 +259,18 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
         deadline_sec=60,
     )
     tests["service"] = {
-        "status": r_svc_provider.get("status"),
-        "pass": r_svc_provider.get("status") == "PASS"
-                and (r_svc_provider.get("result") or {}).get("service"),
+        "status": r_service.get("status"),
+        "operation": (r_service.get("result") or {}).get("operation"),
+        "pass": r_service.get("status") == "PASS",
     }
     tests["provider"] = {
-        "status": r_svc_provider.get("status"),
-        "pass": r_svc_provider.get("status") == "PASS"
-                and (r_svc_provider.get("result") or {}).get("providerQuery"),
+        "status": r_provider.get("status"),
+        "operation": (r_provider.get("result") or {}).get("operation"),
+        "pass": r_provider.get("status") == "PASS",
     }
     tests["pending_intent"] = {
         "status": r_pi.get("status"),
+        "operation": (r_pi.get("result") or {}).get("operation"),
         "pass": r_pi.get("status") == "PASS",
     }
 

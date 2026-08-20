@@ -352,20 +352,25 @@ public final class DebugCommandActivity extends Activity {
                                 "com.warden.controlledsandbox.fixture.SystemHolderPendingIntentActivity")
                                 .trim());
                 requireStatus("pi-system-holder-launch", operation, "LAUNCH_PASS");
-            } else if ("neighbor-smoke".equals(command)) {
+            } else if ("neighbor-service".equals(command)) {
                 runtime.prepare(record, virtualUserId);
-                Bundle serviceStart = runtime.startService(record, virtualUserId);
-                requireStatus("neighbor-service", serviceStart, "SERVICE_STARTED", "SERVICE_RECOVERED");
+                operation = runtime.startService(record, virtualUserId);
+                requireStatus("neighbor-service", operation, "SERVICE_STARTED", "SERVICE_RECOVERED");
+            } else if ("neighbor-provider".equals(command)) {
+                runtime.prepare(record, virtualUserId);
+                // record.providerClass resolves to the FaultAnrProvider ANR fixture; exercise the
+                // real data provider explicitly so the smoke does not stall the guest on an ANR.
+                String providerComponent = "com.warden.controlledsandbox.fixture.FixtureProvider";
+                String providerAuthority = "com.warden.controlledsandbox.fixture.provider";
                 Bundle providerPrepare = runtime.prepareProvider(record, virtualUserId,
-                        record.providerClass, record.providerAuthority);
+                        providerComponent, providerAuthority);
                 requireStatus("neighbor-provider-prepare", providerPrepare,
                         "PROVIDER_READY", "PROVIDER_ALREADY_READY", "PROVIDER_AUTHORITY_ATTACHED");
                 Bundle providerQuery = runtime.queryProviderSmoke(record, virtualUserId,
-                        record.providerClass, record.providerAuthority);
+                        providerComponent, providerAuthority);
                 if ("FAILED".equals(providerQuery.getString(RuntimeKeys.STATUS, ""))) {
                     requireStatus("neighbor-provider-query", providerQuery, "OK");
                 }
-                result.put("service", bundleJson(serviceStart));
                 result.put("providerPrepare", bundleJson(providerPrepare));
                 result.put("providerQuery", bundleJson(providerQuery));
                 operation = providerQuery;
