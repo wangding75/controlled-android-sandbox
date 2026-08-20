@@ -136,7 +136,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadInstrumentation.java",
-      "lines": 1073
+      "lines": 1096
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",

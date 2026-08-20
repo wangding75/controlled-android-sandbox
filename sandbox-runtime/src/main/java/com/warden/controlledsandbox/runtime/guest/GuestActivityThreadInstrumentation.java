@@ -121,10 +121,12 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     RuntimeKeys.SESSION_ID, route.sessionId);
             long consumedGeneration = consumed.getLong(RuntimeKeys.GENERATION, route.generation);
             int consumedTaskId = consumed.getInt(RuntimeKeys.TASK_ID, route.taskId);
-            launches.put(guest, new Launch(route.token, consumedActivityToken,
+            Launch launch = new Launch(route.token, consumedActivityToken,
                     consumedSessionId, consumedGeneration, consumedTaskId, component, guestIntent,
                     restoredState, restoredPersistableState,
-                    consumed.getLong(RuntimeKeys.SAVED_STATE_VERSION, 0L)));
+                    consumed.getLong(RuntimeKeys.SAVED_STATE_VERSION, 0L));
+            launch.physicalActivityComponent = route.physicalActivityComponent;
+            launches.put(guest, launch);
             Bundle evidence = evidence(route, guest);
             evidence.putBoolean("restoredStatePresent", restoredState != null);
             evidence.putBoolean("restoredPersistableStatePresent", restoredPersistableState != null);
@@ -235,8 +237,10 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             ActivityFieldBridge.installGuest(activity, session, route.component,
                     route.intent, route.taskId);
-            ActivityFieldBridge.promoteFrameworkRecord(activity, session,
+            Bundle frameworkEvidence = ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
+            emitActivityRecordMapping(activity, route, route.token, route.activityToken,
+                    frameworkEvidence);
             Bundle effectiveState = effectiveState(route, state);
             delegate.callActivityOnCreate(activity, effectiveState);
             dispatchMissingRestoreCallbacks(activity, route, state, null, effectiveState, null);
@@ -429,6 +433,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             guestIntent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
             ActivityFieldBridge.projectFrameworkNewIntent(activity, session, route.component,
                     guestIntent);
+            emitActivityRecordMapping(activity, route, routeToken, activityToken,
+                    ActivityFieldBridge.frameworkEvidence(activity));
             delegate.callActivityOnNewIntent(activity, guestIntent);
             Bundle details = new Bundle();
             details.putString(RuntimeKeys.ROUTE_TOKEN, routeToken);
@@ -853,9 +859,25 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         if (token == null || token.trim().isEmpty() || sessionId == null
                 || !session.sessionId().equals(sessionId) || generation != session.generation()
                 || component == null || component.trim().isEmpty()) return null;
-        return new Launch(token, intent.getStringExtra(RuntimeKeys.ACTIVITY_TOKEN),
+        Launch route = new Launch(token, intent.getStringExtra(RuntimeKeys.ACTIVITY_TOKEN),
                 sessionId, generation, intent.getIntExtra(RuntimeKeys.TASK_ID, 0),
                 component, null);
+        route.physicalActivityComponent = intent.getStringExtra(
+                RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT);
+        return route;
+    }
+
+    private void emitActivityRecordMapping(Activity activity, Launch route, String routeToken,
+                                           String activityToken, Bundle frameworkEvidence) {
+        Bundle mapping = new Bundle();
+        mapping.putString(RuntimeKeys.ROUTE_TOKEN, routeToken);
+        mapping.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+        mapping.putInt(RuntimeKeys.TASK_ID, route.taskId);
+        mapping.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
+                route.physicalActivityComponent == null ? "" : route.physicalActivityComponent);
+        mapping.putString("frameworkActivityToken",
+                frameworkEvidence == null ? "" : frameworkEvidence.getString("frameworkToken", ""));
+        RuntimeEventLog.event("ATMS_ACTIVITY_RECORD_MAPPING", mapping);
     }
 
     private Bundle consume(String token) throws Exception {
@@ -1036,6 +1058,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         final long generation;
         final int taskId;
         final String component;
+        String physicalActivityComponent;
         final Intent intent;
         final Bundle restoredState;
         final PersistableBundle restoredPersistableState;
