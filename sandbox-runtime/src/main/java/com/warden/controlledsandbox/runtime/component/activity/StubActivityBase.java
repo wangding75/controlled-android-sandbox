@@ -134,16 +134,8 @@ public abstract class StubActivityBase extends Activity {
             activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
             int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
             frameworkActivityToken = ActivityFieldBridge.hostToken(this);
-            Bundle mappingEvidence = new Bundle();
-            mappingEvidence.putString(RuntimeKeys.ROUTE_TOKEN,
-                    route.getString(RuntimeKeys.ROUTE_TOKEN, ""));
-            mappingEvidence.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
-            mappingEvidence.putInt(RuntimeKeys.TASK_ID, taskId);
-            mappingEvidence.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
-                    getClass().getName());
-            mappingEvidence.putString("frameworkActivityToken",
-                    String.valueOf(frameworkActivityToken));
-            RuntimeEventLog.event("ATMS_ACTIVITY_RECORD_MAPPING", mappingEvidence);
+            logActivityRecordMapping(route.getString(RuntimeKeys.ROUTE_TOKEN, ""),
+                    activityToken, taskId);
             session.bindActivityTaskHost(frameworkActivityToken, activityToken, taskId,
                     this::moveHostTaskToFront, this::moveHostTaskToBack,
                     this::finishHostAffinity, this::finishHostAndRemoveTask);
@@ -265,18 +257,29 @@ public abstract class StubActivityBase extends Activity {
                 showFailure("NEW_INTENT_ACTIVITY_MISMATCH", "Route targets another virtual Activity");
                 return;
             }
-            Bundle mappingEvidence = new Bundle();
-            mappingEvidence.putString(RuntimeKeys.ROUTE_TOKEN, token);
-            mappingEvidence.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
-            mappingEvidence.putInt(RuntimeKeys.TASK_ID, virtualTaskId);
-            mappingEvidence.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
-                    getClass().getName());
-            mappingEvidence.putString("frameworkActivityToken",
-                    String.valueOf(frameworkActivityToken));
-            RuntimeEventLog.event("ATMS_ACTIVITY_RECORD_MAPPING", mappingEvidence);
+            logActivityRecordMapping(token, activityToken, virtualTaskId);
             if (controller != null) controller.newIntent(
                     com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route));
         });
+    }
+
+    /** Emit an explicit, parseable physical ActivityRecord correlation witness. */
+    private void logActivityRecordMapping(String routeToken, String token, int taskId) {
+        Bundle mappingEvidence = new Bundle();
+        mappingEvidence.putString(RuntimeKeys.ROUTE_TOKEN, routeToken);
+        mappingEvidence.putString(RuntimeKeys.ACTIVITY_TOKEN, token);
+        mappingEvidence.putInt(RuntimeKeys.TASK_ID, taskId);
+        mappingEvidence.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
+                getClass().getName());
+        String frameworkToken = String.valueOf(frameworkActivityToken);
+        mappingEvidence.putString("frameworkActivityToken", frameworkToken);
+        RuntimeEventLog.event("ATMS_ACTIVITY_RECORD_MAPPING", mappingEvidence);
+        android.util.Log.i("CS_RUNTIME", "ATMS_ACTIVITY_RECORD_MAPPING"
+                + " routeToken=" + value(routeToken)
+                + " activityToken=" + value(token)
+                + " physicalActivityComponent=" + getClass().getName()
+                + " frameworkActivityToken=" + value(frameworkToken)
+                + " taskId=" + taskId);
     }
 
     @Override public void onConfigurationChanged(Configuration configuration) {

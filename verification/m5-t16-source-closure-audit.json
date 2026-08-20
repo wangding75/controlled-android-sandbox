@@ -136,7 +136,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadInstrumentation.java",
-      "lines": 1066
+      "lines": 1073
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",
@@ -179,12 +179,12 @@
       "lines": 728
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java",
       "lines": 692
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java",
-      "lines": 689
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestStorageNameCodec.java",
+      "lines": 692
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",

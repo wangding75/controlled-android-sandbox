@@ -273,9 +273,13 @@ def evaluate_task_system_evidence(
     target_physical = {row.get("physicalActivityComponent", "") for row in launches
                        if row.get("physicalActivityComponent")}
     target_tokens = {row.get("activityToken", "") for row in launches if row.get("activityToken")}
-    target_task = next((int(row["taskId"]) for row in launches if row.get("taskId", "").isdigit()), None)
+    virtual_task = next((int(row["taskId"]) for row in launches
+                         if row.get("taskId", "").isdigit()), None)
+    physical_task = None
+    if transition.get("top_resumed"):
+        physical_task = int(transition["top_resumed"]["task"])
     stack = [row for row in transition["history"]
-             if target_task is not None and row["task"] == target_task]
+             if physical_task is not None and row["task"] == physical_task]
     stack.sort(key=lambda row: row["index"])
     top = transition.get("top_resumed")
     top_is_target = bool(top and any(_component_matches(top.get("component", ""), physical)
@@ -335,7 +339,7 @@ def evaluate_task_system_evidence(
     mapping_record_present = bool(mappings) and any(
         any(_component_matches(record["component"], physical)
             for physical in target_physical)
-        for record in transition["history"]
+        for record in stack
     )
     token_mapping_pass = mapping_complete and mapping_record_present
     physical_record_reused = same_physical and same_virtual
@@ -345,7 +349,10 @@ def evaluate_task_system_evidence(
     if case == "reorder_to_front":
         stack_order = bool(target_stack and child_stack and
                            target_stack[0]["index"] < child_stack[0]["index"])
-    transition_dumpsys_pass = before["present"] and transition["present"] and after["present"]
+    transition_dumpsys_pass = (
+        before["present"] and transition["present"] and after["present"]
+        and bool(transition.get("top_resumed")) and bool(stack)
+    )
     back_expected = {
         "standard": after_top_target and len(target_after) == 1,
         "single_top_top": not after_top_target,
@@ -370,6 +377,8 @@ def evaluate_task_system_evidence(
     assertions = {
         "launch_request_present": len(launches) >= 2,
         "launch_request_count": len(launches),
+        "virtual_task_id": virtual_task,
+        "physical_task_id": physical_task,
         "launch_actions": launch_actions,
         "top_activity_correct": top_is_target,
         "physical_top_component": top_is_target,

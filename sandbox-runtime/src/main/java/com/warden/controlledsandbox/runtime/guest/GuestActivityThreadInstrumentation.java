@@ -94,6 +94,13 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             // class for the normal manifest form and failed only for apps that use aliases.
             String instantiateComponent = activityInstantiationClass(component);
             Intent guestIntent = RuntimeIntentWireCodec.decode(consumed);
+            // Keep the authoritative route/activity identity visible to the Guest callback so
+            // fixture evidence can report raw identity observations.  The runner still verifies
+            // these values against ATMS and dumpsys; they are not semantic assertions.
+            String consumedActivityToken = consumed.getString(
+                    RuntimeKeys.ACTIVITY_TOKEN, route.activityToken);
+            guestIntent.putExtra(RuntimeKeys.ROUTE_TOKEN, route.token);
+            guestIntent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, consumedActivityToken);
             Activity guest = GuestComponentFactory.instantiateActivity(
                     GuestDefiningLoader.of(session),
                     session.context().getApplicationInfo().appComponentFactory,
@@ -110,8 +117,6 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     SavedStateWireCodec.unmarshallPersistableBundle(
                             consumed.getByteArray(RuntimeKeys.SAVED_STATE_PERSISTABLE_PAYLOAD),
                             guestClassLoader);
-            String consumedActivityToken = consumed.getString(
-                    RuntimeKeys.ACTIVITY_TOKEN, route.activityToken);
             String consumedSessionId = consumed.getString(
                     RuntimeKeys.SESSION_ID, route.sessionId);
             long consumedGeneration = consumed.getLong(RuntimeKeys.GENERATION, route.generation);
@@ -420,6 +425,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 throw new SecurityException("GUEST_ACTIVITY_NEW_INTENT_ACTIVITY_MISMATCH");
             }
             Intent guestIntent = RuntimeIntentWireCodec.decode(consumed);
+            guestIntent.putExtra(RuntimeKeys.ROUTE_TOKEN, routeToken);
+            guestIntent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
             ActivityFieldBridge.projectFrameworkNewIntent(activity, session, route.component,
                     guestIntent);
             delegate.callActivityOnNewIntent(activity, guestIntent);
