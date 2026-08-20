@@ -105,11 +105,14 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
             }
             lease.guestReceiver.onReceive(session.context, guestIntent);
             Object guestPending = pendingResult(lease.guestReceiver);
-            // If teardown won while Guest code was running, leave the original Host result in
-            // place so Android can complete its ReceiverDispatcher without calling old Guest
-            // code again.
-            setPendingResult(lease.hostReceiver, closed
-                    ? hostPending : (guestPending == null ? null : guestPending));
+            // The Host ReceiverDispatcher owns the registered receiver object, while Guest
+            // code owns the same PendingResult after goAsync(). Clear the Host field before
+            // finishing a synchronous delivery; otherwise LoadedApk.Args can finish the same
+            // result a second time (or retain it forever on API32 registered broadcasts).
+            setPendingResult(lease.hostReceiver, null);
+            if (guestPending != null || closed) {
+                finishPendingResult(hostPending);
+            }
             Bundle event = identityResult();
             event.putString(RuntimeKeys.STATUS, "BROADCAST_DELIVERED");
             event.putString(RuntimeKeys.RECEIVER_ID, lease.receiverId);
@@ -119,10 +122,18 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
             RuntimeEventLog.event("GUEST_RECEIVER_FRAMEWORK_DYNAMIC_DELIVERED", event);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            try { setPendingResult(lease.hostReceiver, hostPending); }
+            try { setPendingResult(lease.hostReceiver, null); }
             catch (Throwable ignored) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
                         ignored);
+            }
+            // A Guest exception must not strand the Host ReceiverDispatcher.  If Guest called
+            // goAsync() before failing, finishing the shared result is also the only safe
+            // terminal action because the Guest callback has already aborted.
+            try { finishPendingResult(hostPending); }
+            catch (Throwable cleanup) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
+                        cleanup);
             }
             Bundle event = identityResult();
             event.putString(RuntimeKeys.STATUS, "FAILED");
@@ -201,6 +212,21 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         Class<?> type = Class.forName("android.content.BroadcastReceiver$PendingResult");
         BroadcastReceiver.class.getMethod("setPendingResult", type).invoke(receiver,
                 new Object[]{result});
+    }
+
+    private static void finishPendingResult(Object result) throws Exception {
+        if (result == null) return;
+        try {
+            result.getClass().getMethod("finish").invoke(result);
+        } catch (java.lang.reflect.InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof IllegalStateException
+                    && cause.getMessage() != null
+                    && cause.getMessage().contains("already finished")) return;
+            if (cause instanceof Exception exception) throw exception;
+            if (cause instanceof Error fatal) throw fatal;
+            throw error;
+        }
     }
 
     private void requireOpen() {
