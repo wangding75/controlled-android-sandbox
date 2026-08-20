@@ -170,7 +170,7 @@ def _key_values(line: str) -> dict[str, str]:
 def parse_runtime_activity_events(logcat: str) -> list[dict[str, Any]]:
     """Parse runtime activity diagnostics without trusting fixture assertions."""
     events: list[dict[str, Any]] = []
-    for line in (logcat or "").splitlines():
+    for line_no, line in enumerate((logcat or "").splitlines()):
         marker = line.find("CS_RUNTIME: ")
         if marker < 0:
             continue
