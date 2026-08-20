@@ -2,6 +2,8 @@ package com.warden.controlledsandbox.framework.core;
 
 import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
 
+import com.warden.controlledsandbox.framework.binder.BinderIdentity;
+import com.warden.controlledsandbox.framework.binder.BinderInterceptionFoundation;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
@@ -31,6 +33,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final MediaCommunicationInvocationInterceptor mediaCommunicationInterceptor;
     private final PeripheralServicesInvocationInterceptor peripheralServicesInterceptor;
     private final PrivilegedServicesInvocationInterceptor privilegedServicesInterceptor;
+    private volatile BinderInterceptionFoundation binderBoundary;
 
     SystemServiceInvocationHandler(Object delegate, GuestIdentity identity) {
         this(delegate, identity, "");
@@ -77,7 +80,41 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 "contexthub", "persistentdatablock", "systemupdate").contains(
                 this.serviceName.toLowerCase(java.util.Locale.ROOT))
                 ? new PrivilegedServicesInvocationInterceptor(identity, this.serviceName) : null;
+        this.binderBoundary = null;
     }
+
+    /**
+     * Attaches the single low-level Binder boundary after the typed proxy has been created.  The
+     * local interface is intentionally the CAS proxy, never the Host IInterface, so a caller that
+     * obtains the root Binder through ServiceManager cannot recover the Host implementation via
+     * queryLocalInterface().
+     */
+    void attachBinderBoundary(Object localInterface) {
+        if (binderBoundary != null || delegate == null || identity == null) return;
+        if (!(delegate instanceof android.os.IInterface typed)) return;
+        android.os.IBinder binder;
+        try {
+            binder = typed.asBinder();
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy.rethrowIfFatal(error);
+            throw new IllegalStateException("BINDER_SERVICE_AS_BINDER_FAILED:" + serviceName, error);
+        }
+        if (binder == null) return;
+        BinderIdentity binderIdentity = BinderIdentity.fromGuestIdentity(identity);
+        binderBoundary = BinderInterceptionFoundation.builder(binder, binderIdentity)
+                .serviceName(serviceName)
+                .localInterface(localInterface)
+                .sessionFence(identity.binderSessionFence())
+                .preserveBinderType("android.app.IApplicationThread")
+                .build();
+    }
+
+    void invalidateBinderBoundary(String reason) {
+        BinderInterceptionFoundation boundary = binderBoundary;
+        if (boundary != null) boundary.invalidate(reason);
+    }
+
+    BinderInterceptionFoundation binderBoundary() { return binderBoundary; }
 
     @Override public Object invoke(Object proxy, Method method, Object[] arguments) throws Throwable {
         if (serviceName.equals("telephony") || serviceName.equals("phonesubinfo")
@@ -89,28 +126,42 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             if (delegate != null) return method.invoke(delegate, arguments);
             return syntheticObjectMethod(proxy, method, arguments);
         }
+        if ("asBinder".equals(method.getName()) && method.getParameterCount() == 0
+                && binderBoundary != null) {
+            return binderBoundary.binder();
+        }
         if (delegate == null && "asBinder".equals(method.getName())
                 && method.getParameterCount() == 0) return null;
         Object activityManagerResult = activityManagerResult(method);
-        if (activityManagerResult != NoResult.VALUE) return activityManagerResult;
+        if (activityManagerResult != NoResult.VALUE) {
+            return wrapBoundaryResult(activityManagerResult, serviceName + ".activity.return");
+        }
         Object virtual = virtualDecision(method, arguments);
-        if (virtual != NoResult.VALUE) return virtual;
+        if (virtual != NoResult.VALUE) {
+            return wrapBoundaryResult(virtual, serviceName + ".virtual.return");
+        }
         CapabilityServiceInterceptor.Call capabilityCall = capabilityInterceptor == null
                 ? null : capabilityInterceptor.before(method, arguments);
         PolicyServicesInvocationInterceptor.Decision policyServicesCall = policyServicesInterceptor == null
                 ? PolicyServicesInvocationInterceptor.Decision.passThrough()
                 : policyServicesInterceptor.before(method, arguments);
-        if (policyServicesCall.handled()) return policyServicesCall.result();
+        if (policyServicesCall.handled()) {
+            return wrapBoundaryResult(policyServicesCall.result(), serviceName + ".policy.return");
+        }
         MediaCommunicationInvocationInterceptor.Decision mediaCommunicationCall =
                 mediaCommunicationInterceptor == null
                         ? MediaCommunicationInvocationInterceptor.Decision.passThrough()
                         : mediaCommunicationInterceptor.before(method, arguments);
-        if (mediaCommunicationCall.handled()) return mediaCommunicationCall.result();
+        if (mediaCommunicationCall.handled()) {
+            return wrapBoundaryResult(mediaCommunicationCall.result(), serviceName + ".media.return");
+        }
         PrivilegedServicesInvocationInterceptor.Decision privilegedCall =
                 privilegedServicesInterceptor == null
                         ? PrivilegedServicesInvocationInterceptor.Decision.passThrough()
                         : privilegedServicesInterceptor.before(method, arguments);
-        if (privilegedCall.handled()) return privilegedCall.result();
+        if (privilegedCall.handled()) {
+            return wrapBoundaryResult(privilegedCall.result(), serviceName + ".privileged.return");
+        }
         PeripheralServicesInvocationInterceptor.Decision peripheralCall =
                 peripheralServicesInterceptor == null
                         ? PeripheralServicesInvocationInterceptor.Decision.passThrough()
@@ -119,27 +170,33 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             if (capabilityInterceptor != null) {
                 capabilityInterceptor.afterVirtualSuccess(capabilityCall, arguments);
             }
-            return peripheralCall.result();
+            return wrapBoundaryResult(peripheralCall.result(), serviceName + ".peripheral.return");
         }
         CompatibilityInvocationInterceptor.Decision compatibilityCall = compatibilityInterceptor == null
                 ? CompatibilityInvocationInterceptor.Decision.passThrough()
                 : compatibilityInterceptor.before(method, arguments);
-        if (compatibilityCall.handled()) return compatibilityCall.result();
+        if (compatibilityCall.handled()) {
+            return wrapBoundaryResult(compatibilityCall.result(), serviceName + ".compatibility.return");
+        }
         ApplicationEnvironmentInvocationInterceptor.Decision applicationEnvironmentCall =
                 applicationEnvironmentInterceptor == null
                         ? ApplicationEnvironmentInvocationInterceptor.Decision.passThrough()
                         : applicationEnvironmentInterceptor.before(method, arguments);
-        if (applicationEnvironmentCall.handled()) return applicationEnvironmentCall.result();
+        if (applicationEnvironmentCall.handled()) {
+            return wrapBoundaryResult(applicationEnvironmentCall.result(), serviceName + ".environment.return");
+        }
         NetworkServiceInvocationInterceptor.Decision networkCall = networkInterceptor == null
                 ? NetworkServiceInvocationInterceptor.Decision.passThrough()
                 : networkInterceptor.before(method, arguments);
-        if (networkCall.handled()) return networkCall.result();
+        if (networkCall.handled()) {
+            return wrapBoundaryResult(networkCall.result(), serviceName + ".network.return");
+        }
         DeviceServiceInvocationInterceptor.Decision deviceCall = deviceServiceInterceptor == null
                 ? DeviceServiceInvocationInterceptor.Decision.passThrough()
                 : deviceServiceInterceptor.before(method, arguments);
         if (deviceCall.handled()) {
             if (capabilityInterceptor != null) capabilityInterceptor.afterVirtualSuccess(capabilityCall, arguments);
-            return deviceCall.result();
+            return wrapBoundaryResult(deviceCall.result(), serviceName + ".device.return");
         }
         Object[] rewritten = arguments == null ? null : arguments.clone();
         InteractionServiceInvocationInterceptor.Call interactionCall = interactionInterceptor == null
@@ -147,18 +204,23 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 : interactionInterceptor.before(method, rewritten);
         if (interactionCall.handled()) {
             recordInteractionInvocation(method, false);
-            try { return interactionCall.result(); }
+            try { return wrapBoundaryResult(interactionCall.result(), serviceName + ".interaction.return"); }
             finally { interactionCall.close(); }
         }
         VirtualSystemServiceInterceptor.Call virtualCall = virtualServiceInterceptor == null
                 ? VirtualSystemServiceInterceptor.Call.passThrough()
                 : virtualServiceInterceptor.before(method, rewritten);
         if (virtualCall.handled()) {
-            try { return virtualCall.result(); }
+            try { return wrapBoundaryResult(virtualCall.result(), serviceName + ".virtual-adapter.return"); }
             finally { interactionCall.close(); }
         }
         if (virtualCall.direct()) {
-            try { return interactionCall.after(virtualCall.invokeDirect(delegate, method)); }
+            try {
+                Object result = interactionCall.after(virtualCall.invokeDirect(delegate, method));
+                return binderBoundary == null ? result
+                        : binderBoundary.wrapReturned(result, method.getReturnType(),
+                                serviceName + ".direct.return");
+            }
             finally { virtualCall.close(); interactionCall.close(); }
         }
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
@@ -170,13 +232,19 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                                     + "_SIGNATURE_UNSUPPORTED:" + method.getName());
                 }
                 recordInteractionInvocation(method, true);
-                Object result = method.invoke(delegate, rewritten);
+                Object[] binderArguments = binderBoundary == null ? rewritten
+                        : binderBoundary.wrapArguments(rewritten, method.getParameterTypes(),
+                                serviceName + ".callback");
+                Object result = method.invoke(delegate, binderArguments);
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
                 }
                 Object identityRewritten = IdentityObjectRewriter.rewriteResult(result, identity);
                 Object interactionRewritten = interactionCall.after(identityRewritten);
-                return virtualCall.rewriteResult(interactionRewritten);
+                Object projected = virtualCall.rewriteResult(interactionRewritten);
+                return binderBoundary == null ? projected
+                        : binderBoundary.wrapReturned(projected, method.getReturnType(),
+                                serviceName + ".return");
             } catch (InvocationTargetException error) {
                 Throwable cause = error.getCause();
                 interactionCall.onFailure();
@@ -238,6 +306,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     String serviceName() { return serviceName; }
+
+    private Object wrapBoundaryResult(Object value, String role) {
+        return binderBoundary == null ? value : binderBoundary.wrapReturned(value, role);
+    }
 
     private void recordInteractionInvocation(Method method, boolean delegated) {
         if (interactionInterceptor == null || identity == null) return;

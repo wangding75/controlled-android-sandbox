@@ -53,8 +53,11 @@ public final class PackageManagerHook implements AutoCloseable {
 
     @Override public void close() {
         for (int index = bindings.size() - 1; index >= 0; index--) {
-            try { bindings.get(index).field.set(bindings.get(index).packageManager,
-                    bindings.get(index).original); } catch (Throwable ignored) { }
+            Binding binding = bindings.get(index);
+            try { binding.handler.invalidateBinderBoundary("HOOK_CLOSED"); }
+            catch (Throwable ignored) { }
+            try { binding.field.set(binding.packageManager, binding.original); }
+            catch (Throwable ignored) { }
         }
     }
 
@@ -69,12 +72,14 @@ public final class PackageManagerHook implements AutoCloseable {
         if (interfaces.length == 0) throw new IllegalStateException("IPackageManager proxy exposes no interfaces");
         InvocationHandler handler = new PackageManagerInvocationHandler(original, identity);
         Object proxy = Proxy.newProxyInstance(original.getClass().getClassLoader(), interfaces, handler);
+        ((PackageManagerInvocationHandler) handler).attachBinderBoundary(proxy);
         mPm.set(packageManager, proxy);
         android.util.Log.i("CS_PM_HOOK", "installed packageManager="
                 + packageManager.getClass().getName() + "@"
                 + System.identityHashCode(packageManager) + " original="
                 + original.getClass().getName() + "@" + System.identityHashCode(original));
-        installed.add(new Binding(packageManager, mPm, original));
+        installed.add(new Binding(packageManager, mPm, original,
+                (PackageManagerInvocationHandler) handler));
     }
 
     /** ApplicationPackageManager instances created after bootstrap obtain this static source. */
@@ -90,15 +95,18 @@ public final class PackageManagerHook implements AutoCloseable {
             if (interfaces.length == 0) return;
             InvocationHandler handler = new PackageManagerInvocationHandler(original, identity);
             Object proxy = Proxy.newProxyInstance(original.getClass().getClassLoader(), interfaces, handler);
+            ((PackageManagerInvocationHandler) handler).attachBinderBoundary(proxy);
             field.set(null, proxy);
             android.util.Log.i("CS_PM_HOOK", "installed ActivityThread.sPackageManager source");
-            installed.add(new Binding(null, field, original));
+            installed.add(new Binding(null, field, original,
+                    (PackageManagerInvocationHandler) handler));
         } catch (Throwable error) {
             android.util.Log.w("CS_PM_HOOK", "ActivityThread PackageManager source unavailable", error);
         }
     }
 
-    private record Binding(Object packageManager, Field field, Object original) { }
+    private record Binding(Object packageManager, Field field, Object original,
+                           PackageManagerInvocationHandler handler) { }
 
     private static Field findField(Class<?> type, String name) throws NoSuchFieldException {
         Class<?> cursor = type;

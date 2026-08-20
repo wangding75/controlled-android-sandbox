@@ -22,6 +22,11 @@ public final class IdentityArgumentRewriter {
         this.context = Objects.requireNonNull(context, "context");
     }
 
+    /** Exposes the immutable installation context to the shared Binder identity layer. */
+    public IdentityContext context() {
+        return context;
+    }
+
     public Object[] rewriteInbound(Object[] arguments, MethodIdentityPolicy policy) {
         Objects.requireNonNull(policy, "policy");
         if (arguments == null || arguments.length == 0) {

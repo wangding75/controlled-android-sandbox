@@ -11,6 +11,7 @@ public final class InstalledFrameworkProxy {
     private final Field instanceField;
     private final Object original;
     private final Object proxy;
+    private final FrameworkIdentityInvocationHandler handler;
     private final AtomicBoolean active = new AtomicBoolean(true);
 
     InstalledFrameworkProxy(
@@ -18,12 +19,14 @@ public final class InstalledFrameworkProxy {
             Object singleton,
             Field instanceField,
             Object original,
-            Object proxy) {
+            Object proxy,
+            FrameworkIdentityInvocationHandler handler) {
         this.spec = Objects.requireNonNull(spec, "spec");
         this.singleton = Objects.requireNonNull(singleton, "singleton");
         this.instanceField = Objects.requireNonNull(instanceField, "instanceField");
         this.original = Objects.requireNonNull(original, "original");
         this.proxy = Objects.requireNonNull(proxy, "proxy");
+        this.handler = Objects.requireNonNull(handler, "handler");
     }
 
     public String serviceName() {
@@ -38,6 +41,7 @@ public final class InstalledFrameworkProxy {
         if (!active.get()) {
             return false;
         }
+        handler.invalidateBinderBoundary("ROLLBACK");
         Object current = instanceField.get(singleton);
         if (current == proxy) {
             instanceField.set(singleton, original);

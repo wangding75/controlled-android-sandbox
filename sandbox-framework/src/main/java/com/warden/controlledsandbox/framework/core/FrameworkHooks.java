@@ -80,10 +80,13 @@ import java.util.Map;
 public final class FrameworkHooks implements AutoCloseable {
     private final List<AutoCloseable> hooks;
     private final FrameworkHookReport report;
+    private final GuestIdentity identity;
 
-    private FrameworkHooks(List<AutoCloseable> hooks, FrameworkHookReport report) {
+    private FrameworkHooks(List<AutoCloseable> hooks, FrameworkHookReport report,
+                           GuestIdentity identity) {
         this.hooks = hooks;
         this.report = report;
+        this.identity = identity;
     }
 
     public static FrameworkHooks install(Context context, GuestIdentity identity) {
@@ -152,7 +155,8 @@ public final class FrameworkHooks implements AutoCloseable {
         FrameworkHookReport mandatoryReport = new FrameworkHookReport(installed, failures);
         if (mandatoryReport.readiness() == FrameworkHookReport.Readiness.BLOCKED) {
             rollbackInstalled(hooks, installed, failures);
-            return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures, bindingDetails));
+            return new FrameworkHooks(hooks,
+                    new FrameworkHookReport(installed, failures, bindingDetails), identity);
         }
         attempt("camera", installed, failures, hooks, bindingDetails,
                 () -> CameraServiceHook.install(hostServiceContext, identity));
@@ -276,12 +280,16 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("sensorCatalog", installed, failures, hooks, bindingDetails,
                 () -> SensorServiceHook.install(hostServiceContext, identity));
         attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
-        return new FrameworkHooks(hooks, new FrameworkHookReport(installed, failures, bindingDetails));
+        return new FrameworkHooks(hooks,
+                new FrameworkHookReport(installed, failures, bindingDetails), identity);
     }
 
     public FrameworkHookReport report() { return report; }
 
     @Override public void close() {
+        // Fence Binder leases before reversing framework hooks. Late callbacks can therefore
+        // fail closed while ActivityThread/Service teardown is still draining.
+        identity.closeBinderSession();
         for (int index = hooks.size() - 1; index >= 0; index--) {
             try { hooks.get(index).close(); } catch (Exception ignored) { }
         }
@@ -306,7 +314,8 @@ public final class FrameworkHooks implements AutoCloseable {
                     identity.virtualUserId(),
                     identity.generation());
             FrameworkProxyController controller = FrameworkProxyController.installDefault(
-                    context, ProxyTelemetry.NO_OP, callInterceptor);
+                    context, ProxyTelemetry.NO_OP, callInterceptor,
+                    identity.binderSessionFence());
             if (!controller.passed()) {
                 installed.put(activityManager, false);
                 installed.put(activityTaskManager, false);

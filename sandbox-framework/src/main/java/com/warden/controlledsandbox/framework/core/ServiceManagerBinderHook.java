@@ -1,10 +1,9 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.binder.BinderInterceptionFoundation;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.Map;
 
 /** Reversible ServiceManager cache hook returning a local Binder interface proxy. */
@@ -48,6 +47,10 @@ public final class ServiceManagerBinderHook implements AutoCloseable {
         if (original == null) {
             throw new IllegalStateException("System service unavailable: " + androidServiceName);
         }
+        if (original instanceof android.os.IBinder binder
+                && BinderInterceptionFoundation.isBoundary(binder)) {
+            return () -> { };
+        }
 
         Class<?> stub = Class.forName(stubClassName);
         Method asInterface = findAsInterface(stub);
@@ -58,26 +61,11 @@ public final class ServiceManagerBinderHook implements AutoCloseable {
         }
         Object serviceProxy = ReflectiveServiceHook.createProxy(
                 service, identity, logicalServiceName);
-
-        Class<?> binderInterface = Class.forName("android.os.IBinder");
-        ClassLoader loader = original.getClass().getClassLoader();
-        if (loader == null) {
-            loader = ServiceManagerBinderHook.class.getClassLoader();
+        if (!(serviceProxy instanceof android.os.IInterface projectedInterface)
+                || projectedInterface.asBinder() == null) {
+            throw new IllegalStateException("Binder projection unavailable: " + logicalServiceName);
         }
-        Object delegate = original;
-        Object binderProxy = Proxy.newProxyInstance(
-                loader,
-                new Class<?>[] {binderInterface},
-                (proxy, method, args) -> {
-                    if (method.getName().equals("queryLocalInterface")) {
-                        return serviceProxy;
-                    }
-                    try {
-                        return method.invoke(delegate, args);
-                    } catch (InvocationTargetException error) {
-                        throw error.getCause();
-                    }
-                });
+        Object binderProxy = projectedInterface.asBinder();
         synchronized (cache) {
             cache.put(androidServiceName, binderProxy);
         }
@@ -117,6 +105,9 @@ public final class ServiceManagerBinderHook implements AutoCloseable {
 
     @Override
     public void close() {
+        if (replacement instanceof android.os.IBinder binder) {
+            BinderInterceptionFoundation.invalidate(binder, "HOOK_CLOSED");
+        }
         synchronized (cache) {
             if (cache.get(key) == replacement) {
                 cache.put(key, original);

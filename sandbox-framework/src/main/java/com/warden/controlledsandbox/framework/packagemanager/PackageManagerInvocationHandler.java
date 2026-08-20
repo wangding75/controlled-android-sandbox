@@ -4,6 +4,8 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse;
+import com.warden.controlledsandbox.framework.binder.BinderIdentity;
+import com.warden.controlledsandbox.framework.binder.BinderInterceptionFoundation;
 import com.warden.controlledsandbox.framework.contract.CameraServiceContract;
 import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
 import com.warden.controlledsandbox.framework.contract.NfcServiceContract;
@@ -39,32 +41,73 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
     private final GuestIdentity identity;
     private final VirtualPackageMetadata metadata;
     private final com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse universe;
+    private volatile BinderInterceptionFoundation binderBoundary;
 
     PackageManagerInvocationHandler(Object delegate, GuestIdentity identity) {
         this.delegate = delegate;
         this.identity = identity;
         this.metadata = identity.packageMetadata();
         this.universe = identity.packageUniverse();
+        this.binderBoundary = null;
+    }
+
+    /** Installs the common low-level boundary below the PMS semantic adapter. */
+    void attachBinderBoundary(Object localInterface) {
+        if (binderBoundary != null || !(delegate instanceof android.os.IInterface typed)) return;
+        android.os.IBinder binder = typed.asBinder();
+        if (binder == null) throw new IllegalStateException("BINDER_PMS_AS_BINDER_UNAVAILABLE");
+        binderBoundary = BinderInterceptionFoundation.builder(
+                        binder, BinderIdentity.fromGuestIdentity(identity))
+                .serviceName("packagemanager")
+                .localInterface(localInterface)
+                .sessionFence(identity.binderSessionFence())
+                .build();
+    }
+
+    void invalidateBinderBoundary(String reason) {
+        BinderInterceptionFoundation boundary = binderBoundary;
+        if (boundary != null) boundary.invalidate(reason);
     }
 
     @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
         if (method.getDeclaringClass() == Object.class) return method.invoke(delegate, args);
+        if ("asBinder".equals(name) && method.getParameterCount() == 0
+                && binderBoundary != null) return binderBoundary.binder();
         Object virtual = virtualResult(method, name, method.getReturnType(), args);
         boolean hostFeaturePassThrough = virtual == HostFeaturePassThrough.VALUE;
-        if (!hostFeaturePassThrough && virtual != NoResult.VALUE) return virtual;
+        if (!hostFeaturePassThrough && virtual != NoResult.VALUE) {
+            return wrapResult(virtual, method.getReturnType(), name + ".virtual");
+        }
         if (!hostFeaturePassThrough && isQueryMethod(name)) {
-            return isolatedQueryDefault(method.getReturnType());
+            return wrapResult(isolatedQueryDefault(method.getReturnType()), method.getReturnType(),
+                    name + ".default");
         }
 
         Object[] rewritten = args == null ? null : args.clone();
         IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
         try {
-            try { return IdentityObjectRewriter.rewriteResult(method.invoke(delegate, rewritten), identity); }
+            try {
+                Object[] binderArguments = binderBoundary == null ? rewritten
+                        : binderBoundary.wrapArguments(rewritten, method.getParameterTypes(),
+                                "packagemanager.callback");
+                Object result = IdentityObjectRewriter.rewriteResult(
+                        method.invoke(delegate, binderArguments), identity);
+                return wrapResult(result, method.getReturnType(), name + ".return");
+            }
             catch (InvocationTargetException error) { throw error.getCause(); }
         } finally {
             scope.close();
         }
+    }
+
+    private Object wrapResult(Object value, String role) {
+        return wrapResult(value, null, role);
+    }
+
+    private Object wrapResult(Object value, Class<?> expectedType, String role) {
+        return binderBoundary == null ? value
+                : binderBoundary.wrapReturned(value, expectedType, role);
     }
 
     private Object virtualResult(Method method, String methodName, Class<?> returnType, Object[] args)

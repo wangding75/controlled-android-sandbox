@@ -4,6 +4,8 @@ import android.content.pm.ApplicationInfo;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import com.warden.controlledsandbox.framework.binder.BinderSessionFence;
 import com.warden.controlledsandbox.framework.capability.CapabilityAccessPolicy;
 import com.warden.controlledsandbox.framework.capability.CapabilityAuditSink;
 import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry;
@@ -30,6 +32,8 @@ public final class GuestIdentity {
     private final VirtualSystemServiceState virtualServices;
     private final GuestInteractionState interactions;
     private final GuestNetworkState networks;
+    private final AtomicBoolean binderSessionActive;
+    private final BinderSessionFence binderSessionFence;
     private volatile ContentObserverBridge contentObserverBridge;
 
     public GuestIdentity(String packageName, int virtualUid, ApplicationInfo applicationInfo,
@@ -169,6 +173,15 @@ public final class GuestIdentity {
         this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
         this.interactions = new GuestInteractionState();
         this.networks = new GuestNetworkState();
+        this.binderSessionActive = new AtomicBoolean(true);
+        this.binderSessionFence = candidate -> binderSessionActive.get()
+                && candidate != null
+                && packageName.equals(candidate.packageName())
+                && virtualUid == candidate.virtualUid()
+                && virtualUserId == candidate.virtualUserId()
+                && generation == candidate.generation()
+                && processName.equals(candidate.processName())
+                && (packageName + "@" + processName).equals(candidate.sessionId());
         this.contentObserverBridge = null;
     }
 
@@ -194,6 +207,12 @@ public final class GuestIdentity {
     public VirtualSystemServiceState virtualServices() { return virtualServices; }
     public GuestInteractionState interactions() { return interactions; }
     public GuestNetworkState networks() { return networks; }
+
+    /** Shared process-generation fence for every Binder lease created from this identity. */
+    public BinderSessionFence binderSessionFence() { return binderSessionFence; }
+
+    /** Retires all Binder leases before component/resource teardown begins. */
+    public void closeBinderSession() { binderSessionActive.set(false); }
 
     /** Installs the process-scoped Broker relay before Framework service proxies are published. */
     public void installContentObserverBridge(ContentObserverBridge bridge) {

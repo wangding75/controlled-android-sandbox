@@ -124,7 +124,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
-      "lines": 1189
+      "lines": 1232
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestBrokerContentProvider.java",
@@ -140,7 +140,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",
-      "lines": 1038
+      "lines": 1019
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/ManifestModel.java",
@@ -203,6 +203,10 @@
       "lines": 605
     },
     {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/binder/BinderInterceptionFoundation.java",
+      "lines": 604
+    },
+    {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageInstallSessionStore.java",
       "lines": 597
     },
@@ -213,6 +217,10 @@
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
       "lines": 583
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+      "lines": 579
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
@@ -245,10 +253,6 @@
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java",
       "lines": 520
-    },
-    {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
-      "lines": 507
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedShareManager.java",

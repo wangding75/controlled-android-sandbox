@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.binder.BinderSessionFence;
 import com.warden.controlledsandbox.framework.identity.IdentityContext;
 
 import java.util.ArrayList;
@@ -28,8 +29,17 @@ public final class FrameworkProxyController {
             IdentityContext context,
             ProxyTelemetry telemetry,
             FrameworkCallInterceptor callInterceptor) {
+        return installDefault(context, telemetry, callInterceptor,
+                BinderSessionFence.ALWAYS_ACTIVE);
+    }
+
+    public static FrameworkProxyController installDefault(
+            IdentityContext context,
+            ProxyTelemetry telemetry,
+            FrameworkCallInterceptor callInterceptor,
+            BinderSessionFence sessionFence) {
         Objects.requireNonNull(context, "context");
-        FrameworkProxyInstaller installer = new FrameworkProxyInstaller();
+        FrameworkProxyInstaller installer = new FrameworkProxyInstaller(sessionFence);
         List<ProxyInstallReport> reports = new ArrayList<>();
         List<InstalledFrameworkProxy> installed = new ArrayList<>();
         for (FrameworkServiceSpec spec : List.of(

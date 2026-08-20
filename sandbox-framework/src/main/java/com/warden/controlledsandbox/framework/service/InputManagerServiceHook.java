@@ -3,6 +3,8 @@ package com.warden.controlledsandbox.framework.service;
 import com.warden.controlledsandbox.framework.core.InputManagerServiceContract;
 import com.warden.controlledsandbox.framework.core.GuestSystemServiceOverrideRegistry;
 import com.warden.controlledsandbox.framework.core.ReflectiveServiceHook;
+import com.warden.controlledsandbox.framework.binder.BinderInterceptionFoundation;
+import com.warden.controlledsandbox.framework.binder.BinderIdentity;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 
 import android.content.Context;
@@ -33,6 +35,7 @@ public final class InputManagerServiceHook implements AutoCloseable {
     private final Field cacheField;
     private final Object originalManagerCache;
     private final Object replacementManagerCache;
+    private final BinderInterceptionFoundation binderBoundary;
 
     private InputManagerServiceHook(
             Map<String, Object> cache,
@@ -42,7 +45,8 @@ public final class InputManagerServiceHook implements AutoCloseable {
             AutoCloseable override,
             Field cacheField,
             Object originalManagerCache,
-            Object replacementManagerCache) {
+            Object replacementManagerCache,
+            BinderInterceptionFoundation binderBoundary) {
         this.cache = cache;
         this.originalBinder = originalBinder;
         this.replacementBinder = replacementBinder;
@@ -51,6 +55,7 @@ public final class InputManagerServiceHook implements AutoCloseable {
         this.cacheField = cacheField;
         this.originalManagerCache = originalManagerCache;
         this.replacementManagerCache = replacementManagerCache;
+        this.binderBoundary = binderBoundary;
     }
 
     public static AutoCloseable install(Context guestContext, GuestIdentity identity)
@@ -97,11 +102,16 @@ public final class InputManagerServiceHook implements AutoCloseable {
                 proxyLoader(originalService.getClass()),
                 new Class<?>[] {serviceInterface},
                 new ControlledInputServiceInvocationHandler(binderHolder));
-        IBinder replacementBinder = (IBinder) Proxy.newProxyInstance(
-                proxyLoader(originalBinder.getClass()),
-                new Class<?>[] {IBinder.class},
-                new ControlledInputBinderInvocationHandler(
-                        binder, InputManagerServiceContract.DESCRIPTOR, controlledService));
+        BinderInterceptionFoundation binderBoundary = BinderInterceptionFoundation
+                .builder(binder, BinderIdentity.fromGuestIdentity(identity))
+                .descriptor(InputManagerServiceContract.DESCRIPTOR)
+                .serviceName("input")
+                .localInterface(controlledService)
+                // The controlled input service owns the public virtual result surface. Raw
+                // transactions must not fall through to the Host input server.
+                .interceptor((transaction, next) -> false)
+                .build();
+        IBinder replacementBinder = binderBoundary.binder();
         binderHolder[0] = replacementBinder;
 
         synchronized (serviceCache) {
@@ -115,8 +125,9 @@ public final class InputManagerServiceHook implements AutoCloseable {
                     guestContext, InputManagerServiceContract.ANDROID_SERVICE, managerState.guestManager);
             return new InputManagerServiceHook(serviceCache, originalBinder, replacementBinder,
                     guestContext, override, managerState.field, managerState.original,
-                    managerState.replacement);
+                    managerState.replacement, binderBoundary);
         } catch (Throwable error) {
+            BinderInterceptionFoundation.invalidate(replacementBinder, "INSTALL_FAILED");
             managerState.restore();
             synchronized (serviceCache) {
                 if (serviceCache.get(InputManagerServiceContract.ANDROID_SERVICE) == replacementBinder) {
@@ -228,6 +239,7 @@ public final class InputManagerServiceHook implements AutoCloseable {
     }
 
     @Override public void close() {
+        binderBoundary.invalidate("HOOK_CLOSED");
         try { override.close(); } catch (Throwable ignored) { }
         try {
             if (cacheField.get(null) == replacementManagerCache) {
@@ -284,45 +296,4 @@ public final class InputManagerServiceHook implements AutoCloseable {
         }
     }
 
-    private static final class ControlledInputBinderInvocationHandler
-            implements InvocationHandler {
-        private final IBinder original;
-        private final String descriptor;
-        private final Object service;
-
-        ControlledInputBinderInvocationHandler(IBinder original, String descriptor, Object service) {
-            this.original = original;
-            this.descriptor = descriptor;
-            this.service = service;
-        }
-
-        @Override public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            if (method.getDeclaringClass() == Object.class) {
-                return switch (method.getName()) {
-                    case "toString" -> "VirtualBinder[" + descriptor + "]";
-                    case "hashCode" -> System.identityHashCode(proxy);
-                    case "equals" -> proxy == (args == null ? null : args[0]);
-                    default -> null;
-                };
-            }
-            return switch (method.getName()) {
-                case "getInterfaceDescriptor" -> descriptor;
-                case "queryLocalInterface" -> args != null && args.length == 1
-                        && descriptor.equals(args[0]) ? service : null;
-                case "isBinderAlive", "pingBinder" -> true;
-                case "linkToDeath" -> null;
-                case "unlinkToDeath" -> true;
-                case "transact" -> false;
-                default -> defaultBinderResult(method.getReturnType());
-            };
-        }
-
-        private static Object defaultBinderResult(Class<?> type) {
-            if (type == boolean.class) return false;
-            if (type == int.class) return 0;
-            if (type == long.class) return 0L;
-            if (type == void.class) return null;
-            return null;
-        }
-    }
 }

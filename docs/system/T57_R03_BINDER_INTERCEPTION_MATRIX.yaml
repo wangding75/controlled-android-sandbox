@@ -1,62 +1,100 @@
-schema_version: 1
-campaign: T57-R03-P1F
-title: SystemService Binder interception
+schema_version: 2
+campaign: T57-R03-P1
+title: Binder interception and virtual identity boundary
+
 classes:
-  A: Java dynamic proxy / InvocationHandler
+  A: Java dynamic proxy / InvocationHandler for semantic argument and compatibility adaptation
   B: typed Binder adapter / service-specific bridge
-  C: transaction-level Binder relay
+  C: BinderInterceptionFoundation transaction boundary with real local Binder transport
   D: kernel binder driver mediation
+
 services:
   PackageManager:
-    mechanism: A
-    class: PackageManagerInvocationHandler
+    mechanism: A+C
+    class: PackageManagerInvocationHandler + BinderInterceptionFoundation
     hidden_api: low
     class_presence: IPackageManager always present
-    api_drift: method-name switch
+    api_drift: method-name switch remains in semantic adapter
     parcel: ApplicationPackageManager
-    callback: none
+    callback: returned typed Binder values use the common boundary
     keep: true
-    reason: Visibility/query surface is already typed above the proxy.
+    reason: Package visibility and package identity remain high-level policy; root Binder and
+      returned interfaces now share the transaction/session boundary.
   Alarm/Notification/Job/Account/Clipboard/Settings/UsageStats/Shortcut/AppWidget:
-    mechanism: B
-    class: VirtualSystemServiceAuthority
+    mechanism: B+C
+    class: VirtualSystemServiceAuthority + BinderInterceptionFoundation where a physical typed
+      Binder is exposed
     hidden_api: low
     keep: true
-    reason: State already lives in the shared store, not a Hook Map.
+    reason: Existing shared capability stores remain the semantic owner; the common boundary is
+      below them and does not replace real runtime operations with ledger-only success.
   Settings provider identity:
-    mechanism: A
-    class: SettingsProviderIdentityHook
+    mechanism: A+C
+    class: SettingsProviderIdentityHook + BinderInterceptionFoundation
     keep: true
-    reason: No API-drift failure proven in P1E.
+    reason: Provider identity projection remains semantic; returned/callback Binder values use the
+      shared lease and session fence.
   ServiceManager:
-    mechanism: A
-    class: ServiceManagerBinderHook
+    mechanism: A+C
+    class: ServiceManagerBinderHook + ReflectiveServiceHook + BinderInterceptionFoundation
     keep: true
+    cache: getService/checkService cache entries are descriptor-validated and projected through a
+      CAS local Binder boundary before being returned to the Guest.
+    wait_for_service: AOSP native waitForService path is audited separately; it bypasses the Java
+      sCache in supported Android implementations. CAS does not expose a direct Guest contract
+      that can obtain an unprojected Host service through that hidden path. Direct hidden API
+      interception remains an integration/native issue, not an unsafe Java replacement.
   Reflective generic services:
-    mechanism: A
-    class: ReflectiveServiceHook
+    mechanism: A+C
+    class: ReflectiveServiceHook + SystemServiceInvocationHandler + BinderInterceptionFoundation
     keep: true
-    reason: Decision rule not met for a blanket typed-adapter rewrite.
+    reason: Existing Java proxy remains the high-level method adapter; the root Binder, typed
+      returned Binder, callback Binder and death/session lease are centralized below it.
   InputManager:
-    mechanism: A
-    class: InputManagerServiceHook
+    mechanism: B+C
+    class: InputManagerServiceHook + BinderInterceptionFoundation
     keep: true
+    reason: The raw service path now uses the same Binder boundary instead of a service-local
+      IBinder proxy.
   Camera user callbacks:
-    mechanism: A
-    class: PeripheralCameraInvocationHandler
+    mechanism: A+C
+    class: PeripheralCameraInvocationHandler + common returned/callback Binder wrapping
     keep: true
   Binder driver /dev/binder:
     mechanism: D
-    status: PARTIAL
+    status: DEFERRED
     classification: REQUIRES_PRIVILEGE
-    note: P1F does not add root/system binder driver hacks.
+    note: P1 does not add root/system Binder driver mediation. The app-level real Binder boundary
+      is the supported interception point.
+
+boundary_contract:
+  root_service: descriptor-validated CAS Binder boundary
+  transaction: descriptor, service, code, input Parcel, output Parcel, flags, one-way and
+    exception propagation are represented by BinderTransaction
+  caller_identity: packageName, virtualUid, opPackageName, attributionTag, virtualUserId,
+    processName, physicalPid diagnostic and session/generation are carried by BinderIdentity
+  returned_binder: stable child lease for typed AIDL interfaces, including nested returns
+  raw_authority_tokens: exact IBinder values are preserved for AOSP process/activity/service/
+    resultTo/published-service token parameters whose identity is the framework lookup key
+  callback_binder: declared AIDL callback/listener types are wrapped before outbound framework
+    calls; the local CAS proxy is exposed through queryLocalInterface
+  death: linkToDeath/unlinkToDeath and explicit invalidation retire root and child leases
+  session_fence: GuestIdentity owns the active generation fence; FrameworkHooks.close fences the
+    session before hook teardown
+
+dynamic_proxy_sites_after: 7 source files / 13 construction sites
+dynamic_proxy_policy: retained only for typed semantic adaptation and compatibility; low-level
+  Binder identity, transaction dispatch, returned Binder, callback Binder and death are not
+  implemented solely by Java Proxy.
+
 va_pro_signals:
-  VA-604: compatibility_signal_only
-  VA-619: compatibility_signal_only
-  VA-629: compatibility_signal_only
-  VA-631: compatibility_signal_only
-  VA-683: compatibility_signal_only
-dynamic_proxy_count_production: 15
-migrated_this_campaign: 0
-decision: No service was migrated. Java Proxy remains where P1E did not prove
-  API drift, class absence, parcel instability, or callback/death failure.
+  VA-604: grouped under service lifecycle and publishService callback convergence
+  VA-619: grouped under Job callback/unbind and API-version adapter convergence
+  VA-629: grouped under process startup/re-entry deadlock prevention
+  VA-631: grouped under Binder callback/returned Binder boundary
+  VA-683: grouped under service start validation and runtime routing
+
+decision: Keep existing semantic proxies. Add one reusable Binder transaction/session boundary
+  underneath them, use a real local Binder object on Android native transport, preserve exact raw
+  AOSP authority tokens, and wrap typed returned/callback interfaces. No blanket proxy deletion,
+  app-specific package rule or OEM-specific branch was added.

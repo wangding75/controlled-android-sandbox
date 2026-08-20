@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.framework.core;
 
+import com.warden.controlledsandbox.framework.binder.BinderSessionFence;
 import com.warden.controlledsandbox.framework.identity.IdentityContext;
 
 import java.lang.reflect.Field;
@@ -15,6 +16,17 @@ import java.util.Objects;
 import java.util.Set;
 
 public final class FrameworkProxyInstaller {
+    private final BinderSessionFence sessionFence;
+
+    public FrameworkProxyInstaller() {
+        this(BinderSessionFence.ALWAYS_ACTIVE);
+    }
+
+    FrameworkProxyInstaller(BinderSessionFence sessionFence) {
+        this.sessionFence = sessionFence == null
+                ? BinderSessionFence.ALWAYS_ACTIVE : sessionFence;
+    }
+
     public InstallOutcome install(
             FrameworkServiceSpec spec,
             IdentityContext context,
@@ -82,12 +94,21 @@ public final class FrameworkProxyInstaller {
             }
             ClassLoader loader = chooseClassLoader(delegate.getClass(), interfaces);
             FrameworkIdentityInvocationHandler handler = new FrameworkIdentityInvocationHandler(
-                    spec, delegate, context, telemetry, callInterceptor);
+                    spec, delegate, context, telemetry, callInterceptor, sessionFence);
             Object proxy = Proxy.newProxyInstance(loader, interfaces, handler);
-            instanceField.set(singleton, proxy);
+            try {
+                handler.attachBinderBoundary(proxy);
+                instanceField.set(singleton, proxy);
+            } catch (ReflectiveOperationException | RuntimeException error) {
+                handler.invalidateBinderBoundary("INSTALL_FAILED");
+                throw error;
+            } catch (Error error) {
+                handler.invalidateBinderBoundary("INSTALL_FAILED");
+                throw error;
+            }
 
             InstalledFrameworkProxy installed = new InstalledFrameworkProxy(
-                    spec, singleton, instanceField, delegate, proxy);
+                    spec, singleton, instanceField, delegate, proxy, handler);
             ProxyInstallReport report = report(
                     spec, true, false, delegate.getClass(), interfaceList, "");
             return new InstallOutcome(report, installed);

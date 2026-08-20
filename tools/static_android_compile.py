@@ -723,6 +723,7 @@ for main_class in [
     'com.warden.controlledsandbox.framework.activity.StubActivityWindowOwnershipSelfTest',
     'com.warden.controlledsandbox.framework.routing.OneTimeRouteStoreSelfTest',
     'com.warden.controlledsandbox.framework.routing.VirtualPendingIntentRegistrySelfTest',
+    'com.warden.controlledsandbox.framework.binder.BinderInterceptionFoundationSelfTest',
 ]:
     run_java(main_class, assertions=True)
 
