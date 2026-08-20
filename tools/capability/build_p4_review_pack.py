@@ -143,7 +143,7 @@ def write_manifest(head: str, tree: str, file_count: int = 0) -> dict:
     for row in selected_rows:
         raw_path = str(row.get("path", "")).replace("\\", "/")
         if raw_path.startswith("artifacts/"):
-            copied_path = PACK_DIR / "device-evidence" / "capability-audit" / raw_path[len("artifacts/"):]
+            copied_path = PACK_DIR / "device-evidence" / raw_path[len("artifacts/"):]
         else:
             copied_path = Path(raw_path)
         try:
