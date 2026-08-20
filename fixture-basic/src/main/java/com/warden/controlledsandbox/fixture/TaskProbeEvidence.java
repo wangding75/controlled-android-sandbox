@@ -9,6 +9,11 @@ import android.util.Log;
 final class TaskProbeEvidence {
     private static final String PREFIX = "FRAMEWORK_TASK_EVIDENCE ";
     private static final String EVENT_PREFIX = "FRAMEWORK_TASK_EVENT ";
+    // Android 15 can keep the physical ActivityRecord in a closing transition after the
+    // ActivityClient finish call has returned.  Emit BACK_COMPLETE only after that framework
+    // transition has had time to settle; the runner still decides the semantic result from
+    // dumpsys and runtime evidence.
+    private static final long BACK_SETTLE_DELAY_MS = 1500L;
 
     private TaskProbeEvidence() { }
 
@@ -66,7 +71,7 @@ final class TaskProbeEvidence {
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 event(activity, caseName, "BACK_COMPLETE");
                 if (afterBack != null) afterBack.run();
-            }, 450L);
+            }, BACK_SETTLE_DELAY_MS);
         }, 300L);
     }
 
