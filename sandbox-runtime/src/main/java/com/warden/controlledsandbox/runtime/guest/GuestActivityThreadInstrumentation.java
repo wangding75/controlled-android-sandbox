@@ -440,6 +440,18 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
     }
 
     /**
+     * Android 15+ ActivityThread.deliverNewIntents calls the three-argument overload when
+     * contentUriPermissionApis is enabled.  Without this override the platform Instrumentation
+     * would pass the raw Stub transport Intent straight to the Guest onNewIntent, dropping the
+     * decoded Guest intent and its extras.  Route it through the same framework-owned decode and
+     * projection as the legacy two-argument path.
+     */
+    @Override public void callActivityOnNewIntent(Activity activity, Intent intent,
+            android.app.ComponentCaller caller) {
+        callActivityOnNewIntent(activity, intent);
+    }
+
+    /**
      * ActivityThread invokes this hidden/public compatibility callback when the Guest's
      * ActivityInfo declares the relevant configuration bits.  The legacy StubActivity controller
      * already reported this edge, but the real ActivityThread path previously let the callback
