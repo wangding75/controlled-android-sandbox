@@ -109,6 +109,11 @@ def write_manifest(head: str, tree: str, file_count: int = 0) -> dict:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
+            # Device evidence is source-commit-bound.  Never let an older API36 (or API32/API35)
+            # run satisfy this task's required matrix after a new clean commit.
+            evidence_commit = str(payload.get("git", {}).get("commit", ""))
+            if evidence_commit != head:
+                continue
             for device in payload.get("devices", []):
                 api = str(device.get("api", ""))
                 if api in api_evidence:
