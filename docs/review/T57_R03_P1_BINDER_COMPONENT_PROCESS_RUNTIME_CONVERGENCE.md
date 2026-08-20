@@ -214,7 +214,7 @@ Required source checks:
 
 ```text
 python tools/static_android_compile.py                         PASS
-python tools/capability/run_local_capability_audit.py --all     PASS, NEW_REGRESSION=0
+python tools/capability/run_local_capability_audit.py --all     diagnostic PASS, 29 PASS / 13 existing KNOWN_ISSUE, NEW_REGRESSION=0
 git diff --check                                                PASS
 BinderInterceptionFoundationSelfTest                            PASS
 ```
