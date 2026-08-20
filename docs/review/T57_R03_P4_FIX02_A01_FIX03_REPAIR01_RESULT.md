@@ -1,36 +1,44 @@
-# T57-R03-P4-FIX02-A01-FIX03-REPAIR01
+# T57-R03-P4-FIX02-A01-FIX03-REPAIR02
 
 ## 任务结果
 
-本修复将 Activity/Task reuse 的最终决策与物理 ActivityRecord 转换收敛到 Host framework 的 ATMS/ActivityStarter 链路。Guest 侧只提交带有虚拟语义、真实物理组件和原始 launch flags 的 Host Intent，不再执行 finish-child、move-task-to-front 或手工 `onNewIntent` 拼接。
+本次只修复 FIX03 REPAIR01 独立审核发现的验收 false-pass、API matrix 聚合和 physical evidence / frozen architecture 交付一致性问题；不启动 A02。
 
-## 架构闭环
+结果：PASS。
 
-```text
-Guest Context/Application Context
-  -> RuntimeActivityLaunchCoordinator
-  -> Host Intent (physical component + launch flags)
-  -> ActivityStarter / ATMS
-  -> ActivityRecord / task stack / lifecycle
-  -> Guest ActivityThread instrumentation
-```
+tested source commit：`31c8684bec0ddcd4f5263dd7c232910e03a48151`
 
-- B1：`CLEAR_TOP`、`SINGLE_TOP`、`SINGLE_TASK`、`REORDER_TO_FRONT` 的所有复用动作由 Host ATMS 执行；Guest instrumentation 不再清理子 Activity。
-- B2：所有复用来源统一走 `Context.startActivity` / instrumentation delegate 进入 ATMS，移除了直接返回 `APPLIED` 的决策 applicator 和注册表。
-- 物理 identity：`PhysicalActivityIdentityAllocator` 使用固定 bounded pool，无 modulo wrap；第 17 个同时存活 identity fail-closed，释放/重绑/恢复均校验碰撞。
-- 冻结架构：普通进程 64 slots、isolated 进程 16 slots、每 slot 16 个 bounded physical windows；物理组件只由 slot × window family 生成。
+tested source tree：`3ad178ecd54dcff3f8ee12302961ae0f5e620349`
 
-## 结构化语义证据
+## 验收闭环
 
-`FRAMEWORK_TASK_EVIDENCE {JSON}` 由 fixture 发出，A01 runner 按字段校验 standard、singleTop top/non-top、singleTask、CLEAR_TOP standard/singleTop、REORDER_TO_FRONT。旧的 marker-only PASS 不再作为 task 语义通过条件。每个设备/用例保留 before、transition、after 的 dumpsys activity 与映射/生命周期证据；缺字段、超时或缺 API 均 fail-closed。
+Guest 只输出 lifecycle callback count/sequence、route/activity token 和 request timing/event。runner 从 runtime `ATMS_ACTIVITY_LAUNCH_REQUEST`、`ATMS_ACTIVITY_RECORD_MAPPING`、`dumpsys activity activities`、top-resumed ActivityRecord、物理 Host component 和 lifecycle log 计算 semantic assertions；缺字段、超时、缺 API 或 digest 不一致均 fail-closed。
 
-## 已执行验证
+API32、API35、API36 的 7 个 task mode 均通过 fixture lifecycle、system task、physical top / ActivityRecord stack、token mapping 和真实 Back 后栈 gate。Android 15/16 的 physical closing transition 只在 framework transition settle 后发出 `BACK_COMPLETE`，不改变 semantic 判定来源。
 
-- `python tools/static_android_compile.py`：PASS；包含 Activity/Task self-tests、physical identity allocator fail-closed self-test。
-- `python tools/capability/test_a01_semantic_runner_gate.py`：PASS。
-- `python tools/capability/run_local_capability_audit.py --all`：要求 `NEW_REGRESSION=0`；其余 FAIL 均按仓库既有 known issue 分类，不改变无关阶段。
-- `adb devices -l`：当前环境无连接设备，因此 API 32/35/36 设备验收不能伪造为 PASS；A01 矩阵明确记录 `missing_api_32`、`missing_api_35`、`missing_api_36` 并 fail-closed。
+## API matrix
 
-## 交付边界
+显式聚合器验证了同一 tested commit、clean worktree、canonical evidence SHA256、每个 API device `overall_pass=true`，并生成：
 
-本任务不启动 A02，不签发 VA Pro 通过结论。最终 HEAD/TREE、API 证据路径与 SHA256 由 `tools/capability/build_p4_review_pack.py` 写入 review pack manifest。
+`overall_pass=true`, `observed_api_levels=[32,35,36]`, `failed_gates=[]`。
+
+- API32：`device-api32-127.0.0.1_16416.json`，overall PASS。
+- API35：`device-api35-emulator-5554.json`，overall PASS。
+- API36：`device-api36-emulator-5554.json`，overall PASS。
+- Final matrix：[final_matrix_evidence.json](../../artifacts/capability-audit/a01-acceptance/final-matrix-31c8684b/final_matrix_evidence.json)。
+
+## 架构状态
+
+当前采用 Architecture Revision `AR-02`，正式 supersede FIX01 的 `64×2=128` 旧表述：ordinary slots=64、isolated slots=16、每个 ordinary slot 的 bounded physical window pool=16、Host Activity components=`64×2×16=2048`、aliases=0；第 17 个同时存活 identity 返回 `PHYSICAL_ACTIVITY_IDENTITY_POOL_EXHAUSTED`。PackageParser/API32/API35/API36 和 canonical SHA 要求均记录在 [AR-02 architecture revision](T57_R03_P4_FIX02_A01_FIX03_REPAIR02_ARCHITECTURE_REVISION.md)。
+
+本次没有重设计生产 Activity mapping / task ledger；生产侧仅补充 framework identity mapping 的可观察 evidence，semantic 结论仍由 runner 计算。
+
+## 本地验证
+
+- `python tools/capability/test_a01_semantic_runner_gate.py`：18 tests PASS。
+- `python tools/static_android_compile.py`：PASS，输出包含 `PASS bounded physical Activity identity allocator`。
+- `python tools/capability/run_local_capability_audit.py --all`：29 PASS / 13 KNOWN_ISSUE，`NEW_REGRESSION=0`；该诊断命令按既有 policy 返回非 0。
+- `git diff --check`：PASS。
+- Gradle `fixture-basic:assembleDebug` 与 static Android compile：PASS。
+
+最终 review pack manifest 会同时保留 review-pack HEAD/TREE、tested source commit、API evidence SHA256 和 final matrix；不签发 VA Pro 结论。

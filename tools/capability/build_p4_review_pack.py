@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the T57-R03-P4-FIX03-REPAIR01 independent review pack."""
+"""Build the T57-R03-P4-FIX02-A01-FIX03-REPAIR02 independent review pack."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-FIX03-REPAIR01-independent-review"
-ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_FIX03_REPAIR01_review_pack.zip"
+PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-FIX02-A01-FIX03-REPAIR02-independent-review"
+ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_FIX02_A01_FIX03_REPAIR02_review_pack.zip"
 
 INCLUDE_DIRS = (
     "app", "sandbox-sdk", "sandbox-contract", "sandbox-domain", "sandbox-framework",
@@ -103,40 +103,84 @@ def write_manifest(head: str, tree: str, file_count: int = 0) -> dict:
         "32": [], "35": [], "36": []
     }
     evidence_root = PACK_DIR / "device-evidence"
+    matrix_candidates: list[tuple[Path, dict]] = []
     if evidence_root.is_dir():
-        for path in evidence_root.rglob("evidence.json"):
+        for path in evidence_root.rglob("final_matrix_evidence.json"):
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
                 continue
-            # Device evidence is source-commit-bound.  Never let an older API36 (or API32/API35)
-            # run satisfy this task's required matrix after a new clean commit.
-            evidence_commit = str(payload.get("git", {}).get("commit", ""))
-            if evidence_commit != head:
-                continue
-            for device in payload.get("devices", []):
-                api = str(device.get("api", ""))
-                if api in api_evidence:
-                    api_evidence[api].append({
-                        "path": path.relative_to(PACK_DIR).as_posix(),
-                        "sha256": sha256_file(path),
-                        "serial": str(device.get("serial", "")),
-                        "overall_pass": str(device.get("overall_pass", False)),
-                    })
+            if isinstance(payload, dict):
+                matrix_candidates.append((path, payload))
+
+    # Prefer a complete PASS matrix.  The source tree also contains earlier fail-closed
+    # per-device matrices from the serial API runs; those must never satisfy the final pack.
+    matrix_candidates.sort(
+        key=lambda row: (
+            row[1].get("overall_pass") is True,
+            len(row[1].get("failed_gates", [])) == 0,
+            row[0].as_posix(),
+        ),
+        reverse=True,
+    )
+    matrix_path, matrix = matrix_candidates[0] if matrix_candidates else (None, {})
+    tested_commit = str(matrix.get("tested_source_commit", "")).strip() or head
+    tested_tree = ""
+    matrix_rows = matrix.get("per_api_evidence", {}) if isinstance(matrix, dict) else {}
+    for rows in (matrix_rows.values() if isinstance(matrix_rows, dict) else []):
+        for row in (rows if isinstance(rows, list) else []):
+            if row.get("tested_tree"):
+                tested_tree = str(row["tested_tree"])
+                break
+        if tested_tree:
+            break
+
+    selected_rows = [
+        row
+        for rows in (matrix_rows.values() if isinstance(matrix_rows, dict) else [])
+        for row in (rows if isinstance(rows, list) else [])
+    ]
+    for row in selected_rows:
+        raw_path = str(row.get("path", "")).replace("\\", "/")
+        if raw_path.startswith("artifacts/"):
+            copied_path = PACK_DIR / "device-evidence" / "capability-audit" / raw_path[len("artifacts/"):]
+        else:
+            copied_path = Path(raw_path)
+        try:
+            payload = json.loads(copied_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        api = str(payload.get("api", ""))
+        if api in api_evidence and str(payload.get("tested_source_commit", "")) == tested_commit:
+            api_evidence[api].append({
+                "path": copied_path.relative_to(PACK_DIR).as_posix(),
+                "sha256": sha256_file(copied_path),
+                "evidence_sha256": str(payload.get("evidence_sha256", "")),
+                "serial": str(payload.get("serial", "")),
+                "overall_pass": str(payload.get("overall_pass", False)),
+            })
     for api in api_evidence:
         if not api_evidence[api]:
             api_evidence[api] = [{"path": "MISSING", "sha256": "MISSING"}]
+    matrix_manifest = {
+        "path": matrix_path.relative_to(PACK_DIR).as_posix() if matrix_path else "MISSING",
+        "sha256": sha256_file(matrix_path) if matrix_path else "MISSING",
+        "overall_pass": matrix.get("overall_pass") is True,
+        "failed_gates": matrix.get("failed_gates", []),
+    }
     manifest = {
         "project": "controlled-android-sandbox",
-        "taskbook": "T57-R03-P4-FIX02-A01-FIX03-REPAIR01",
+        "taskbook": "T57-R03-P4-FIX02-A01-FIX03-REPAIR02",
         "branch": git("branch", "--show-current").strip(),
         "HEAD": head,
         "TREE": tree,
-        "tested_source_commit": head,
+        "tested_tree": tested_tree,
+        "tested_source_commit": tested_commit,
         "review_pack_commit": head,
         "required_api_levels": ["32", "35", "36"],
         "api_evidence": api_evidence,
-        "inventory": "100% PASS",
+        "final_matrix_evidence": matrix_manifest,
+        "inventory": "DERIVED_FROM_REVIEW_PACK_SHA256",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_file_count": file_count,
         "result": "REVIEW_PACK_READY",
