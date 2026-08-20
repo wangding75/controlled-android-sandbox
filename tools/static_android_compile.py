@@ -615,6 +615,7 @@ run_java('com.warden.controlledsandbox.runtime.guest.GuestSharedLibraryPathResol
 run_java('com.warden.controlledsandbox.runtime.guest.GuestNativeRuntimeProjectionSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestNativeBindingDiagnosticSelfTest', assertions=False)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestContextBoundarySelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestContextCacheKeySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestIntentResolverSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestContextStorageTransferSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestStorageNameCodecSelfTest', assertions=True)
@@ -711,6 +712,7 @@ run_java('com.warden.controlledsandbox.runtime.guest.PeripheralServicesProxyRead
 run_java('com.warden.controlledsandbox.runtime.guest.PrivilegedServicesProxyReadinessSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.RuntimePermissionCoordinatorSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.packagemanager.VirtualPackageQuerySelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.framework.identity.VirtualPackageMetadataProjectionSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.DynamicAccessPolicySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.VirtualProfileContractSelfTest', assertions=True)
 for main_class in [

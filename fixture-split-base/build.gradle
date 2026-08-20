@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' }
+
+apply from: rootProject.file('gradle/release-signing.gradle')
+
+android {
+    namespace = 'com.warden.controlledsandbox.fixture.split'
+    compileSdk = rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
+
+    defaultConfig {
+        applicationId 'com.warden.controlledsandbox.fixture.split'
+        minSdk = rootProject.ext.controlledMinSdk
+        targetSdk = rootProject.ext.controlledTargetSdk
+        versionCode 1
+        versionName '1.0-split'
+    }
+
+    dynamicFeatures = [':fixtureSplitFeature']
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

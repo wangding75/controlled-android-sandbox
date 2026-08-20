@@ -25,6 +25,8 @@ TASKS = [
     ":fixture-activity-scale:assembleDebug",
     ":fixture-lifecycle:assembleV1Debug",
     ":fixture-lifecycle:assembleV2Debug",
+    ":fixture-split-base:assembleDebug",
+    ":fixtureSplitFeature:assembleDebug",
 ]
 
 

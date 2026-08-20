@@ -55,6 +55,10 @@ public final class GuestComponentFactorySelfTest {
         Application fallback = GuestComponentFactory.instantiateApplication(processLoader, "",
                 GuestApplication.class.getName());
         require(fallback instanceof GuestApplication, "empty factory class falls back");
+        Application platformDefault = GuestComponentFactory.instantiateApplication(processLoader,
+                "", Application.class.getName());
+        require(platformDefault.getClass() == Application.class,
+                "default Application is framework-owned");
 
         boolean wrongType = false;
         try {

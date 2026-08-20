@@ -1,0 +1,22 @@
+plugins { id 'com.android.dynamic-feature' }
+
+apply from: rootProject.file('gradle/release-signing.gradle')
+
+android {
+    namespace = 'com.warden.controlledsandbox.fixture.split.feature'
+    compileSdk = rootProject.ext.controlledCompileSdk
+    buildToolsVersion rootProject.ext.controlledBuildTools
+
+    defaultConfig {
+        minSdk = rootProject.ext.controlledMinSdk
+        targetSdk = rootProject.ext.controlledTargetSdk
+    }
+
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { implementation project(':fixture-split-base') }

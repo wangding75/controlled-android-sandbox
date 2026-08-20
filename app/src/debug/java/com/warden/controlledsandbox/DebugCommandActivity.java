@@ -138,15 +138,24 @@ public final class DebugCommandActivity extends Activity {
             packages = new PackageServiceClient(this);
             SandboxRecord record = packages.findRecord(packageName);
             Log.i(TAG, "PACKAGE_LOOKUP_RETURN command=" + command + " package=" + packageName);
-            boolean importRequested = "import-launch".equals(command)
+            // Destructive/data lifecycle operations target the authoritative virtual record. Do
+            // not re-import the currently installed host APK before clear/delete/stop: the host
+            // may already be uninstalled or may be an older physical revision while the virtual
+            // record is intentionally being retired.
+            boolean virtualLifecycleOnly = "stop".equals(command)
+                    || "clear".equals(command) || "delete".equals(command);
+            boolean importRequested = !virtualLifecycleOnly && ("import-launch".equals(command)
                     || "import-prepare".equals(command) || record == null
-                    || installedApkRevisionChanged(record, packageName);
+                    || installedApkRevisionChanged(record, packageName));
             if (importRequested) {
-                ApplicationInfo installed = getPackageManager().getApplicationInfo(packageName, 0);
-                File source = new File(installed.sourceDir);
-                record = trustNativeGuest
-                        ? trustedNativeImport(packages, packageName, source)
-                        : packages.importApkFile(source);
+                // Resolve the complete host-installed artifact set.  A package with a dynamic
+                // feature or ABI/resource split must enter the same multi-artifact pipeline as
+                // the foreground import flow; importing only sourceDir silently publishes a
+                // base-only revision and makes split classes invisible at runtime.
+                record = packages.importInstalledApplication(packageName,
+                        trustNativeGuest
+                                ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                                : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED);
             }
             result.put("nativeGuestTrust", record.nativeGuestTrust);
             packages.ensureInstance(packageName, virtualUserId);

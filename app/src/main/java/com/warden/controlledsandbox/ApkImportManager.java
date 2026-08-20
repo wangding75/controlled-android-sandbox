@@ -133,7 +133,8 @@ final class ApkImportManager {
         PackageInfo baseInfo = packageInfoForArchive(baseFile);
         if (baseInfo == null) throw new IllegalArgumentException("PackageManager rejected the base APK artifact");
         for (int index = 0; index < stagedFiles.size(); index++) {
-            artifacts.add(inspect(stagedFiles.get(index), stagedDigests.get(index), baseInfo));
+            artifacts.add(inspect(stagedFiles.get(index), stagedDigests.get(index), baseInfo,
+                    sources.get(index)));
         }
         validateArtifactSet(artifacts);
         Collections.sort(artifacts);
@@ -178,6 +179,9 @@ final class ApkImportManager {
         NativeGuestExecutionPolicy.requireInstallAllowed(containsNativeCode, nativeGuestTrust);
         File stagedNativeDir = new File(transactionDir, "lib");
         String selectedAbi = extractNativeLibraries(stagedRecords, stagedNativeDir);
+        if (containsNativeCode && selectedAbi.isEmpty()) {
+            throw new SecurityException("NATIVE_ABI_UNSUPPORTED");
+        }
         File revisionsRoot = storageLayout.revisionsDirectory(packageName);
         if (!revisionsRoot.isDirectory() && !revisionsRoot.mkdirs() && !revisionsRoot.isDirectory()) {
             throw new IllegalStateException("Cannot create package revision root");
@@ -238,7 +242,8 @@ final class ApkImportManager {
                 importedAt, importedAt, "NOT_TESTED", 0);
     }
 
-    private InspectedArtifact inspect(File file, String sha256, PackageInfo baseInfo) throws Exception {
+    private InspectedArtifact inspect(File file, String sha256, PackageInfo baseInfo,
+                                      File originalSource) throws Exception {
         ManifestModel manifest = parseManifest(file);
         PackageInfo info = packageInfoForArchive(file);
         if (!manifest.packageName().matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
@@ -251,8 +256,9 @@ final class ApkImportManager {
             if (manifest.versionCode() <= 0) {
                 throw new IllegalArgumentException("Split APK revision is missing: " + file.getName());
             }
+            String signer = splitSignerDigest(file, originalSource, baseInfo);
             return new InspectedArtifact(file, sha256, manifest, splitIdentity(manifest),
-                    manifest.versionCode(), signingDigestFromApk(file));
+                    manifest.versionCode(), signer);
         }
         if (!manifest.packageName().equals(info.packageName)) {
             throw new IllegalArgumentException("Manifest and PackageManager package names differ");
@@ -353,6 +359,35 @@ final class ApkImportManager {
                 && input.read() == 'L' && input.read() == 'F';
     }
 
+    private static void requireCompatibleElf(File file, String abi) throws Exception {
+        int expectedClass;
+        int expectedMachine;
+        switch (abi) {
+            case "arm64-v8a": expectedClass = 2; expectedMachine = 183; break;
+            case "armeabi-v7a": expectedClass = 1; expectedMachine = 40; break;
+            case "x86_64": expectedClass = 2; expectedMachine = 62; break;
+            case "x86": expectedClass = 1; expectedMachine = 3; break;
+            default: throw new SecurityException("NATIVE_ABI_UNSUPPORTED:" + abi);
+        }
+        byte[] header = new byte[20];
+        try (InputStream input = new FileInputStream(file)) {
+            int offset = 0;
+            while (offset < header.length) {
+                int count = input.read(header, offset, header.length - offset);
+                if (count < 0) throw new SecurityException("NATIVE_ELF_HEADER_SHORT");
+                offset += count;
+            }
+        }
+        int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
+        int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
+        if ((header[0] & 0xff) != 0x7f || header[1] != 'E' || header[2] != 'L'
+                || header[3] != 'F' || (header[4] & 0xff) != expectedClass
+                || (header[5] & 0xff) != 1 || (header[6] & 0xff) != 1
+                || type != 3 || machine != expectedMachine) {
+            throw new SecurityException("NATIVE_ELF_ABI_MISMATCH:" + abi);
+        }
+    }
+
     private String extractNativeLibraries(List<PackageArtifactRecord> artifacts, File outputDir)
             throws Exception {
         Set<String> available = new HashSet<>();
@@ -404,6 +439,7 @@ final class ApkImportManager {
                         total += copyLimited(input, out, remaining);
                         out.flush(); file.getFD().sync();
                     }
+                    requireCompatibleElf(temporary, selected);
                     String digest = sha256(temporary);
                     String existing = extractedDigests.get(fileName);
                     if (existing != null && !existing.equals(digest)) {
@@ -641,6 +677,49 @@ final class ApkImportManager {
         }
         Collections.sort(digests);
         return String.join(",", digests);
+    }
+
+    /**
+     * Split APKs delivered through a modern package session can be v2/v3 signed without a
+     * JAR certificate that JarFile exposes.  The platform has already verified such a split
+     * when it is present in the installed package; only that exact installed source path may
+     * inherit the independently parsed base signer.  Arbitrary external split files remain
+     * fail-closed when their certificate cannot be inspected.
+     */
+    private String splitSignerDigest(File stagedFile, File originalSource, PackageInfo baseInfo)
+            throws Exception {
+        try {
+            return signingDigestFromApk(stagedFile);
+        } catch (SecurityException missingCertificate) {
+            if (!isCurrentInstalledArtifact(originalSource, baseInfo.packageName)) {
+                throw missingCertificate;
+            }
+            return signingDigest(baseInfo);
+        }
+    }
+
+    private boolean isCurrentInstalledArtifact(File source, String packageName) {
+        if (source == null || packageName == null || packageName.trim().isEmpty()) return false;
+        try {
+            ApplicationInfo installed = context.getPackageManager().getApplicationInfo(
+                    packageName, 0);
+            String expected = source.getCanonicalPath();
+            if (sameCanonicalPath(expected, installed.sourceDir)) return true;
+            if (installed.splitSourceDirs != null) {
+                for (String split : installed.splitSourceDirs) {
+                    if (sameCanonicalPath(expected, split)) return true;
+                }
+            }
+        } catch (Exception ignored) {
+            // A path that cannot be tied to the live PMS package is not eligible for signer
+            // inheritance and will be rejected by the caller.
+        }
+        return false;
+    }
+
+    private static boolean sameCanonicalPath(String expected, String candidate) throws Exception {
+        return candidate != null && !candidate.trim().isEmpty()
+                && expected.equals(new File(candidate).getCanonicalPath());
     }
 
     private static String signingDigest(PackageInfo info) throws Exception {

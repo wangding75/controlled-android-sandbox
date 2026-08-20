@@ -81,8 +81,14 @@ final class GuestPackageContext extends GuestHostOperationDenyContext {
     @Override public java.util.concurrent.Executor getMainExecutor() {
         return owner.getMainExecutor();
     }
-    @Override public String getPackageCodePath() { return virtualApkPath(targetPackage); }
-    @Override public String getPackageResourcePath() { return virtualApkPath(targetPackage); }
+    @Override public String getPackageCodePath() {
+        return applicationInfo.sourceDir == null ? virtualApkPath(targetPackage)
+                : applicationInfo.sourceDir;
+    }
+    @Override public String getPackageResourcePath() {
+        return applicationInfo.publicSourceDir == null ? virtualApkPath(targetPackage)
+                : applicationInfo.publicSourceDir;
+    }
 
     /** ContextWrapper delegates component and storage operations to owner via its safe base. */
     @Override public Context createPackageContext(String packageName, int flags)

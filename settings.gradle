@@ -25,6 +25,9 @@ include ':fixture-basic'
 include ':fixture-compat32'
 include ':fixture-activity-scale'
 include ':fixture-lifecycle'
+include ':fixture-split-base'
+include ':fixtureSplitFeature'
+project(':fixtureSplitFeature').projectDir = file('fixture-split-feature')
 include ':sandbox-native'
 
 include ':sandbox-companion32'

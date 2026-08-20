@@ -205,8 +205,11 @@ public final class GuestRuntimeEnvironment {
             // probe is diagnostic only; disabling it for an ABI mismatch preserves the
             // native bridge's calling convention while retaining the probe for native
             // guests running with the host ABI.
-            boolean translatedGuestAbi = isTranslatedGuestAbi(spec.nativeAbi);
-            boolean jniEx = !translatedGuestAbi && NativePolicy.installJniPendingExceptionProbe();
+            boolean nativeCodePresent = spec.containsNativeCode
+                    && spec.nativeAbi != null && !spec.nativeAbi.trim().isEmpty();
+            boolean translatedGuestAbi = nativeCodePresent && isTranslatedGuestAbi(spec.nativeAbi);
+            boolean jniEx = nativeCodePresent && !translatedGuestAbi
+                    && NativePolicy.installJniPendingExceptionProbe();
             android.util.Log.i("CS_JNI_EX", "PROBE installed=" + jniEx
                     + " translatedAbi=" + translatedGuestAbi
                     + " guestAbi=" + safe(spec.nativeAbi)
@@ -277,7 +280,11 @@ public final class GuestRuntimeEnvironment {
                     loadedResources.resources, loadedResources.assets, processPackageManager,
                     loadedResources.manifestMetadata.application(), appComponentFactory,
                     parsedApplicationInfo);
-            boolean requiresNativeHooks = spec.nativeLibraryDir != null && !spec.nativeLibraryDir.trim().isEmpty();
+            // Native policy also owns the process-wide framework/native boundary for a pure
+            // Java Guest (not only APK-provided .so files).  Such a Guest has no package ABI,
+            // but its process still has the host ABI and must not enter the policy with an
+            // empty abiName.
+            boolean requiresNativeHooks = !spec.isolatedProcess;
             // A foreign-ABI guest is executed by Android's native bridge. The host process
             // cannot safely rewrite that guest ELF's PLT/GOT, so the platform bridge remains
             // the loader boundary and Java framework proxies provide the compatibility path.
@@ -288,8 +295,8 @@ public final class GuestRuntimeEnvironment {
             // translated syscall boundary is available, do not patch host PLT/lifetime symbols
             // from the guest process: the bridge can legitimately enter those host modules with
             // translated register state, and a host-side replacement is not ABI-transparent.
-            boolean enableNativeHooks = requiresNativeHooks && !translatedGuestAbi
-                    && !spec.isolatedProcess;
+            boolean enableNativeHooks = requiresNativeHooks && nativePolicyConfigured
+                    && !translatedGuestAbi;
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
             }
@@ -304,7 +311,7 @@ public final class GuestRuntimeEnvironment {
             // bridge owns the foreign-ABI load path and may call it from a translated frame.
             // Native guests keep the diagnostic wrapper; translated guests use the platform
             // loader unchanged and rely on the structured loader evidence around it.
-            boolean nativeLoadDiag = !translatedGuestAbi
+            boolean nativeLoadDiag = nativeCodePresent && !translatedGuestAbi
                     && NativePolicy.installNativeLoadDiagnostic();
             // A translated guest cannot safely receive host-ABI PLT/GOT patches.  It also must
             // not replace Runtime.nativeLoad globally: the Android foreign-ABI bridge and
@@ -601,6 +608,10 @@ public final class GuestRuntimeEnvironment {
     private static NativeBootstrap prepareNativeBootstrap(Context host, GuestPackageSpec spec,
                                                            IVirtualSystemServiceSession systemServiceSession)
             throws Exception {
+        // Verify every base/split byte and the deterministic set revision before configuring
+        // NativeLoader, IO capabilities, crash handling, or any process-local projection. A
+        // replaced split must fail before native state can observe the old revision.
+        verifyPackageRevision(spec);
         VirtualNetworkServiceProfileSnapshot nativeNetworkProfile =
                 systemServiceSession.getNetworkServiceProfile();
         if (nativeNetworkProfile == null) {
@@ -624,9 +635,17 @@ public final class GuestRuntimeEnvironment {
         // revision, even though Java already observes runtimeNativeLibraryDir.
         String nativePolicyLibraryRoot = runtimeNativeLibraryDir.isEmpty()
                 ? spec.nativeLibraryDir : runtimeNativeLibraryDir;
-        boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId, spec.generation,
-                spec.packageName, spec.processName, spec.virtualUserId, spec.virtualUid,
-                virtualPid, nativeAbi, spec.dataRoot, spec.apkPath,
+        if (nativePolicyLibraryRoot == null || nativePolicyLibraryRoot.trim().isEmpty()) {
+            // A Java-only package has no APK lib/<abi> directory, but the process-wide native
+            // boundary still needs a Guest-contained root for path policy and DNS hooks.
+            nativePolicyLibraryRoot = spec.dataRoot;
+        }
+        boolean nativeCodePresent = spec.containsNativeCode
+                && nativeAbi != null && !nativeAbi.trim().isEmpty();
+        String policyAbi = nativeCodePresent ? nativeAbi : hostAbi();
+        boolean nativePolicyConfigured = NativePolicy.configure(spec.sessionId,
+                spec.generation, spec.packageName, spec.processName, spec.virtualUserId,
+                spec.virtualUid, virtualPid, policyAbi, spec.dataRoot, spec.apkPath,
                 nativePolicyLibraryRoot, true, new String[0], new String[0], new String[0], new String[0],
                 new String[0], new String[0],
                 nativeNetworkIdentity(spec.packageName, spec.virtualUserId, nativeNetworkProfile));
@@ -638,10 +657,9 @@ public final class GuestRuntimeEnvironment {
         // Do not install a second signal-chain handler in a foreign-ABI process.  The
         // platform bridge and Quark's CrashSDK already own that chain; CAS's recorder is
         // retained for native-ABI guests where the calling convention is ours.
-        boolean nativeCrashRecorderInstalled = !isTranslatedGuestAbi(spec.nativeAbi)
+        boolean nativeCrashRecorderInstalled = nativePolicyConfigured && !isTranslatedGuestAbi(spec.nativeAbi)
                 && nativeCrashFile != null
                 && NativePolicy.installCrashRecorder(nativeCrashFile.getAbsolutePath());
-        verifyPackageRevision(spec);
         return new NativeBootstrap(nativeAbi, packagedNativeLibraryDir, guestDataRoot,
                 runtimeNativeLibraryDir, nativeLibrarySearchPath, guestDexPath, coreDexMode,
                 nativePolicyLibraryRoot, nativePolicyConfigured, systemIoHooksInstalled,

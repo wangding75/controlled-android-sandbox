@@ -153,7 +153,7 @@ public final class GuestPackageMetadataMapper {
                 state.installerPackageName(), state.sharedLibraries(), sharedLibraryDetails,
                 instrumentations, permissions, state.enabled(), queryPackages,
                 queryProviderAuthorities, queryIntentFilters, permissionGrants,
-                permissionDeclarations, permissionGroups);
+                permissionDeclarations, permissionGroups, state.signingCertificates());
     }
 
     private static String activityAliasTarget(VirtualComponentSnapshot component,
@@ -169,14 +169,20 @@ public final class GuestPackageMetadataMapper {
     public static VirtualPackageMetadata fromProjection(
             VirtualPackageProjectionSnapshot projection) {
         VirtualPackageStateSnapshot state = projection.packageState();
-        ApplicationInfo applicationInfo = projection.parsedApplicationInfo();
-        if (applicationInfo == null) applicationInfo = state.applicationInfo();
+        // The parsedApplicationInfo field is an optional legacy transport hint. It may have
+        // originated from the host PackageManager and is never authoritative for a peer Guest;
+        // start from the package authority snapshot so host identity/path metadata cannot cross
+        // the virtual PMS boundary.
+        ApplicationInfo applicationInfo = state.applicationInfo();
         if (applicationInfo == null) applicationInfo = new ApplicationInfo();
         applicationInfo.packageName = state.packageName();
         applicationInfo.name = state.applicationClass().isEmpty() ? null : state.applicationClass();
         applicationInfo.sourceDir = projection.apkPath();
         applicationInfo.publicSourceDir = projection.apkPath();
-        applicationInfo.nativeLibraryDir = projection.nativeLibraryDir();
+        if (applicationInfo.nativeLibraryDir == null || applicationInfo.nativeLibraryDir.trim().isEmpty()) {
+            applicationInfo.nativeLibraryDir = projection.nativeLibraryDir();
+        }
+        applicationInfo.dataDir = null;
         applicationInfo.uid = projection.virtualUid();
         applicationInfo.enabled = state.enabled();
         applicationInfo.flags |= ApplicationInfo.FLAG_HAS_CODE;

@@ -15,6 +15,10 @@ import com.warden.controlledsandbox.contract.VirtualPackageQuerySnapshot;
 import com.warden.controlledsandbox.contract.VirtualProviderPathRuleSnapshot;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
+import android.os.Build;
 import android.os.Bundle;
 import com.warden.controlledsandbox.domain.packageinfo.SharedLibraryResolver;
 import com.warden.controlledsandbox.domain.packageinfo.manifest.BinaryXmlManifestParser;
@@ -160,7 +164,7 @@ final class VirtualPackageStateBuilder {
                 new ArrayList<>(set.sharedLibraries), librarySnapshots, instrumentationSnapshots,
                 queries,
                 components, permissions, permissionDeclarations, permissionGroups, appOps,
-                applicationInfoTemplate(record, set));
+                applicationInfoTemplate(record, set), signingCertificates(record));
     }
 
     static boolean effectivePackageEnabled(String state) {
@@ -556,6 +560,25 @@ final class VirtualPackageStateBuilder {
         info.processName = applicationProcessName(record.packageName, set.applicationProcessName);
         info.sourceDir = baseArtifactPath(record);
         info.publicSourceDir = info.sourceDir;
+        List<String> splitNames = new ArrayList<>();
+        List<String> splitPaths = new ArrayList<>();
+        for (PackageArtifactRecord artifact : record.artifacts) {
+            if (artifact.base()) continue;
+            splitNames.add(artifact.splitName);
+            splitPaths.add(artifact.path);
+        }
+        setOptionalApplicationField(info, "splitNames", splitNames.toArray(new String[0]));
+        info.splitSourceDirs = splitPaths.isEmpty() ? null : splitPaths.toArray(new String[0]);
+        info.splitPublicSourceDirs = info.splitSourceDirs == null
+                ? null : info.splitSourceDirs.clone();
+        info.nativeLibraryDir = nativeLibraryPath(record);
+        setOptionalApplicationField(info, "primaryCpuAbi",
+                record.nativeAbi.isEmpty() || "legacy-unknown".equals(record.nativeAbi)
+                        ? null : record.nativeAbi);
+        setOptionalApplicationField(info, "secondaryCpuAbi", null);
+        // Shared-library paths are resolved by the Guest loader from the immutable package
+        // universe. Never inherit a host parser's path-bearing array into the virtual PMS view.
+        setOptionalApplicationField(info, "sharedLibraryFiles", null);
         info.minSdkVersion = set.minSdk;
         info.targetSdkVersion = set.targetSdk;
         info.flags = ApplicationInfo.FLAG_HAS_CODE;
@@ -571,6 +594,56 @@ final class VirtualPackageStateBuilder {
         setOptionalApplicationField(info, "networkSecurityConfigRes",
                 set.applicationNetworkSecurityConfigResId);
         return info;
+    }
+
+    private List<byte[]> signingCertificates(SandboxRecord record) {
+        File base = new File(baseArtifactPath(record));
+        try {
+            int flags = PackageManager.GET_SIGNATURES;
+            if (Build.VERSION.SDK_INT >= 28) flags |= PackageManager.GET_SIGNING_CERTIFICATES;
+            PackageInfo info = context.getPackageManager().getPackageArchiveInfo(
+                    base.getAbsolutePath(), flags);
+            List<byte[]> values = new ArrayList<>();
+            Signature[] current = null;
+            if (info != null && Build.VERSION.SDK_INT >= 28 && info.signingInfo != null) {
+                current = info.signingInfo.getApkContentsSigners();
+            }
+            if ((current == null || current.length == 0) && info != null) current = info.signatures;
+            if (current != null) {
+                for (Signature signature : current) {
+                    if (signature != null && signature.toByteArray().length > 0) {
+                        values.add(signature.toByteArray());
+                    }
+                }
+            }
+            if (!values.isEmpty()) return values;
+        } catch (RuntimeException ignored) {
+            // The package parser is an optional projection. The immutable signer digest below
+            // still gives the PMS a stable virtual identity when an old parser cannot expose
+            // certificate bytes for an already trusted revision.
+        }
+        byte[] fallback = firstDigestBytes(record.signatureSha256);
+        return fallback.length == 0 ? List.of() : List.of(fallback);
+    }
+
+    private static byte[] firstDigestBytes(String value) {
+        String first = value == null ? "" : value.split(",", 2)[0].trim();
+        if (!first.matches("[0-9a-fA-F]{64}")) return new byte[0];
+        byte[] result = new byte[32];
+        for (int index = 0; index < result.length; index++) {
+            result[index] = (byte) Integer.parseInt(first.substring(index * 2, index * 2 + 2), 16);
+        }
+        return result;
+    }
+
+    private static String nativeLibraryPath(SandboxRecord record) {
+        if (record.nativeLibraryDir == null || record.nativeLibraryDir.trim().isEmpty()) return "";
+        File root = new File(record.nativeLibraryDir);
+        if (!record.nativeAbi.isEmpty() && !"legacy-unknown".equals(record.nativeAbi)) {
+            File abi = new File(root, record.nativeAbi);
+            if (abi.isDirectory()) return abi.getAbsolutePath();
+        }
+        return root.getAbsolutePath();
     }
 
     private static String applicationProcessName(String packageName, String declared) {

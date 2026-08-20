@@ -191,8 +191,10 @@ if not errors:
     for forbidden in ['new SandboxRepository(', 'new ApkImportManager(', 'repository.save(']:
         if forbidden in text['debug_activity']:
             errors.append(f'DebugCommandActivity bypasses lifecycle authority: {forbidden}')
-    for required in ['packages.importApkFile(', 'packages.ensureInstance(',
-                     'packages.findRecord(']:
+    if not any(required in text['debug_activity'] for required in (
+            'packages.importApkFile(', 'packages.importInstalledApplication(')):
+        errors.append('DebugCommandActivity lifecycle wiring missing: package import entry point')
+    for required in ['packages.ensureInstance(', 'packages.findRecord(']:
         if required not in text['debug_activity']:
             errors.append(f'DebugCommandActivity lifecycle wiring missing: {required}')
 

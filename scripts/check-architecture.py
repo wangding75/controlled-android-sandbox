@@ -23,6 +23,11 @@ PRODUCTION_ROOTS = [
 TARGET_SPECIAL_CASES = ('com.alibaba.android.rimet', 'com.tencent.wework', 'com.ss.android.lark', 'com.lark')
 ALLOWED_TARGET_GATE_ROOT = 'app/src/main/java/com/warden/controlledsandbox/compatibility/dingtalk/'
 UPSTREAM_NAMES = ('virtualapp', 'newblackbox', 'twoyi')
+GENERATED_ROOTS = (ROOT / 'build', ROOT / '.gradle')
+
+
+def is_generated(path: Path) -> bool:
+    return any(root == path or root in path.parents for root in GENERATED_ROOTS)
 
 errors: list[str] = []
 for module, rule in MODULES.items():
@@ -110,7 +115,8 @@ for source in DOMAIN_PACKAGE_ROOT.rglob('*.java'):
 
 # Prevent a foreign import from shadowing a same-package top-level type.
 java_sources = [source for source in ROOT.rglob('*.java')
-                if source.is_file() and REFERENCE_ROOT not in source.parents]
+                if source.is_file() and REFERENCE_ROOT not in source.parents
+                and not is_generated(source)]
 package_types: dict[str, set[str]] = {}
 source_meta: list[tuple[Path, str, str]] = []
 for source in java_sources:

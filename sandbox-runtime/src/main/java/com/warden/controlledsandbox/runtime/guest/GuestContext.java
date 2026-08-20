@@ -586,11 +586,6 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         }
         String targetPackage = packageName.trim();
         if (spec.packageName.equals(targetPackage)) return this;
-        String cacheKey = packageContextCacheKey(targetPackage, flags);
-        synchronized (this) {
-            GuestPackageContext cached = packageContexts.get(cacheKey);
-            if (cached != null) return cached;
-        }
         VirtualPackageProjectionSnapshot projection = null;
         for (VirtualPackageProjectionSnapshot candidate : spec.packageUniverse) {
             if (candidate != null && targetPackage.equals(candidate.packageState().packageName())) {
@@ -606,6 +601,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         if (!targetState.enabled()) {
             throw new PackageManager.NameNotFoundException(
                     "Guest package is disabled: " + targetPackage);
+        }
+        // ContextImpl distinguishes package code/resource views, and CAS additionally binds the
+        // view to the immutable target revision. A package-name-only key would retain an old
+        // peer ClassLoader after a split/base upgrade if the process survives long enough to
+        // receive a new projection.
+        String cacheKey = packageContextCacheKey(targetPackage, targetState.apkSha256(), flags);
+        synchronized (this) {
+            GuestPackageContext cached = packageContexts.get(cacheKey);
+            if (cached != null) return cached;
         }
         try {
             GuestResourceLoader.LoadedResources loaded =
@@ -642,11 +646,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         }
     }
 
-    private static String packageContextCacheKey(String targetPackage, int flags) {
+    static String packageContextCacheKey(String targetPackage, String packageRevision, int flags) {
         // ContextImpl keeps code-bearing and resources-only package contexts distinct. A caller
         // may legitimately request resources first and CONTEXT_INCLUDE_CODE later; collapsing
         // those views would permanently return the weaker ClassLoader contract.
-        return targetPackage + ((flags & 0x00000001) != 0 ? "\ninclude-code" : "\nresources-only");
+        return targetPackage + "\nrevision=" + (packageRevision == null ? "" : packageRevision)
+                + ((flags & 0x00000001) != 0 ? "\ninclude-code" : "\nresources-only");
     }
 
     private ClassLoader packageContextClassLoader(
@@ -717,8 +722,10 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private ApplicationInfo packageContextApplicationInfo(
             VirtualPackageProjectionSnapshot projection) {
         VirtualPackageStateSnapshot state = projection.packageState();
-        ApplicationInfo info = projection.parsedApplicationInfo();
-        if (info == null) info = state.applicationInfo();
+        // Peer ApplicationInfo is built only from the virtual package authority. The optional
+        // parsedApplicationInfo transport field can contain host parser defaults and is not a
+        // source for identity, paths, flags, or ABI metadata.
+        ApplicationInfo info = state.applicationInfo();
         if (info == null) info = new ApplicationInfo();
         info.packageName = state.packageName();
         info.uid = projection.virtualUid();
@@ -726,6 +733,15 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 info.processName);
         info.sourceDir = "/data/app/" + state.packageName() + "/base.apk";
         info.publicSourceDir = info.sourceDir;
+        String[] splitNames = state.splitNames().toArray(new String[0]);
+        setOptionalField(info, "splitNames", splitNames);
+        String[] splitPaths = new String[splitNames.length];
+        for (int index = 0; index < splitNames.length; index++) {
+            splitPaths[index] = "/data/app/" + state.packageName() + "/split-"
+                    + safeSyntheticName(splitNames[index]) + ".apk";
+        }
+        info.splitSourceDirs = splitPaths.length == 0 ? null : splitPaths;
+        info.splitPublicSourceDirs = info.splitSourceDirs == null ? null : splitPaths.clone();
         info.dataDir = "/data/user/" + spec.virtualUserId + "/" + state.packageName();
         info.nativeLibraryDir = "";
         info.enabled = state.enabled();
@@ -734,6 +750,21 @@ public final class GuestContext extends GuestHostOperationDenyContext {
             info.className = state.applicationClass();
         }
         return info;
+    }
+
+    private static void setOptionalField(ApplicationInfo info, String name, Object value) {
+        try {
+            java.lang.reflect.Field field = ApplicationInfo.class.getDeclaredField(name);
+            field.setAccessible(true);
+            field.set(info, value);
+        } catch (NoSuchFieldException ignored) {
+            // API 32 compile stubs omit newer package projection fields.
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+    }
+
+    private static String safeSyntheticName(String value) {
+        if (value == null || value.trim().isEmpty()) return "split";
+        return value.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
     private static String normalizePackageProcess(String packageName, String processName) {

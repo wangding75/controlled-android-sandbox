@@ -555,6 +555,7 @@ public final class VirtualPackageMetadata {
     private final String versionName;
     private final long versionCode;
     private final String signatureSha256;
+    private final List<byte[]> signingCertificates;
     private final long firstInstallTime;
     private final long lastUpdateTime;
     private final String installerPackageName;
@@ -665,12 +666,35 @@ public final class VirtualPackageMetadata {
                                   Map<String, Boolean> permissionGrants,
                                   List<PermissionDeclaration> permissionDeclarations,
                                   List<PermissionGroup> permissionGroups) {
+        this(packageName, launcherActivity, applicationInfo, components, versionName, versionCode,
+                signatureSha256, firstInstallTime, lastUpdateTime, installerPackageName,
+                sharedLibraries, sharedLibraryDetails, instrumentations, requestedPermissions,
+                enabled, queryPackages, queryProviderAuthorities, queryIntentFilters,
+                permissionGrants, permissionDeclarations, permissionGroups, List.of());
+    }
+
+    /** Full package projection with current signer and signer-lineage certificates. */
+    public VirtualPackageMetadata(String packageName, String launcherActivity,
+                                  ApplicationInfo applicationInfo, List<Component> components,
+                                  String versionName, long versionCode, String signatureSha256,
+                                  long firstInstallTime, long lastUpdateTime,
+                                  String installerPackageName, List<String> sharedLibraries,
+                                  List<SharedLibrary> sharedLibraryDetails,
+                                  List<Instrumentation> instrumentations,
+                                  List<String> requestedPermissions, boolean enabled,
+                                  Set<String> queryPackages, Set<String> queryProviderAuthorities,
+                                  List<Filter> queryIntentFilters,
+                                  Map<String, Boolean> permissionGrants,
+                                  List<PermissionDeclaration> permissionDeclarations,
+                                  List<PermissionGroup> permissionGroups,
+                                  List<byte[]> signingCertificates) {
         this.packageName = requireText(packageName, "packageName");
         this.launcherActivity = value(launcherActivity);
         this.applicationInfo = new ApplicationInfo(applicationInfo);
         this.versionName = value(versionName);
         this.versionCode = Math.max(0L, versionCode);
         this.signatureSha256 = value(signatureSha256).toLowerCase(Locale.ROOT);
+        this.signingCertificates = immutableCertificates(signingCertificates);
         this.firstInstallTime = Math.max(0L, firstInstallTime);
         this.lastUpdateTime = Math.max(this.firstInstallTime, lastUpdateTime);
         this.installerPackageName = value(installerPackageName);
@@ -849,6 +873,11 @@ public final class VirtualPackageMetadata {
     }
     public Map<String, Boolean> permissionGrants() { return permissionGrants; }
     public String signatureSha256() { return signatureSha256; }
+    public List<byte[]> signingCertificates() {
+        List<byte[]> copy = new ArrayList<>(signingCertificates.size());
+        for (byte[] certificate : signingCertificates) copy.add(certificate.clone());
+        return Collections.unmodifiableList(copy);
+    }
     public boolean enabled() { return enabled; }
 
     /**
@@ -891,6 +920,18 @@ public final class VirtualPackageMetadata {
         info.versionCode = versionCode > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) versionCode;
         info.firstInstallTime = firstInstallTime; info.lastUpdateTime = lastUpdateTime;
         info.applicationInfo = applicationInfo();
+        setField(info, "splitNames", applicationSplitNames(info.applicationInfo));
+        // GET_SIGNATURES and GET_SIGNING_CERTIFICATES use the same immutable signer source. The
+        // latter additionally receives a SigningInfo object on API levels exposing its public
+        // construction path; older releases still get a non-null object and the legacy array.
+        if ((flags & 0x00000040L) != 0 || (flags & 0x08000000L) != 0) {
+            Object signatures = signatureArray();
+            if (signatures != null) setField(info, "signatures", signatures);
+        }
+        if ((flags & 0x08000000L) != 0) {
+            Object signingInfo = signingInfoProjection();
+            if (signingInfo != null) setField(info, "signingInfo", signingInfo);
+        }
         if ((flags & 0x00000001L) != 0) info.activities = activityInfos(Type.ACTIVITY, flags);
         if ((flags & 0x00000002L) != 0) info.receivers = activityInfos(Type.RECEIVER, flags);
         if ((flags & 0x00000004L) != 0) info.services = serviceInfos(flags);
@@ -909,6 +950,62 @@ public final class VirtualPackageMetadata {
         return info;
     }
 
+    private Object signatureArray() {
+        if (signingCertificates.isEmpty()) return null;
+        try {
+            Class<?> signatureType = Class.forName("android.content.pm.Signature");
+            Object result = Array.newInstance(signatureType, signingCertificates.size());
+            for (int index = 0; index < signingCertificates.size(); index++) {
+                Array.set(result, index, newSignature(signatureType, signingCertificates.get(index)));
+            }
+            return result;
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private Object signingInfoProjection() {
+        Object signatureArray = signatureArray();
+        if (signatureArray == null) return null;
+        try {
+            Class<?> signingInfoType = Class.forName("android.content.pm.SigningInfo");
+            List<Object> current = new ArrayList<>();
+            int count = Array.getLength(signatureArray);
+            for (int index = 0; index < count; index++) current.add(Array.get(signatureArray, index));
+            for (Constructor<?> constructor : signingInfoType.getConstructors()) {
+                Class<?>[] types = constructor.getParameterTypes();
+                if (types.length == 4 && types[0] == int.class
+                        && java.util.Collection.class.isAssignableFrom(types[1])
+                        && java.util.Collection.class.isAssignableFrom(types[2])
+                        && java.util.Collection.class.isAssignableFrom(types[3])) {
+                    // Android's public constructor is
+                    // (schemeVersion, apkContentsSigners, publicKeys, signerHistory).  The
+                    // immutable CAS record currently carries the verified current signer set;
+                    // do not invent a rotation lineage, so history remains empty.
+                    return constructor.newInstance(3, current, Collections.emptyList(),
+                            Collections.emptyList());
+                }
+            }
+            Constructor<?> empty = signingInfoType.getDeclaredConstructor();
+            empty.setAccessible(true);
+            return empty.newInstance();
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
+        }
+    }
+
+    private static Object newSignature(Class<?> signatureType, byte[] certificate)
+            throws ReflectiveOperationException {
+        try {
+            Constructor<?> constructor = signatureType.getConstructor(byte[].class);
+            return constructor.newInstance((Object) certificate.clone());
+        } catch (NoSuchMethodException unavailable) {
+            Constructor<?> constructor = signatureType.getDeclaredConstructor();
+            constructor.setAccessible(true);
+            return constructor.newInstance();
+        }
+    }
+
     private Object declaredPermissionInfoArray() {
         try {
             Class<?> type = Class.forName("android.content.pm.PermissionInfo");
@@ -919,6 +1016,16 @@ public final class VirtualPackageMetadata {
             return array;
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("VIRTUAL_PACKAGE_PERMISSIONS_UNAVAILABLE", error);
+        }
+    }
+
+    private static Object applicationSplitNames(ApplicationInfo info) {
+        if (info == null) return null;
+        try {
+            java.lang.reflect.Field field = info.getClass().getField("splitNames");
+            return field.get(info);
+        } catch (ReflectiveOperationException | RuntimeException unavailable) {
+            return null;
         }
     }
 
@@ -1846,6 +1953,18 @@ public final class VirtualPackageMetadata {
     }
     private static List<String> immutableList(List<String> input) {
         return Collections.unmodifiableList(new ArrayList<>(input == null ? List.of() : input));
+    }
+    private static List<byte[]> immutableCertificates(List<byte[]> input) {
+        ArrayList<byte[]> values = new ArrayList<>();
+        if (input == null) return Collections.unmodifiableList(values);
+        if (input.size() > 64) throw new IllegalArgumentException("signing certificate list is too large");
+        for (byte[] certificate : input) {
+            if (certificate == null || certificate.length == 0 || certificate.length > 128 * 1024) {
+                throw new IllegalArgumentException("signing certificate bytes are invalid");
+            }
+            values.add(certificate.clone());
+        }
+        return Collections.unmodifiableList(values);
     }
     private static List<PermissionDeclaration> immutablePermissionDeclarations(
             List<PermissionDeclaration> input) {

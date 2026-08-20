@@ -39,6 +39,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     private final ArrayList<VirtualPermissionGroupSnapshot> permissionGroups;
     private final ArrayList<PackageAppOpSnapshot> appOps;
     private final ApplicationInfo applicationInfo;
+    /** Current signer bytes, followed by any signer-lineage certificates when available. */
+    private final ArrayList<byte[]> signingCertificates;
 
     public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
                                        String versionName, long versionCode,
@@ -143,6 +145,31 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                                        List<VirtualPermissionGroupSnapshot> permissionGroups,
                                        List<PackageAppOpSnapshot> appOps,
                                        ApplicationInfo applicationInfo) {
+        this(packageName, virtualUserId, label, versionName, versionCode, signatureSha256,
+                apkSha256, launchActivity, applicationClass, enabled, firstInstallTime,
+                lastUpdateTime, installerPackageName, splitNames, sharedLibraries,
+                sharedLibraryDetails, instrumentations, queries, components, permissions,
+                permissionDeclarations, permissionGroups, appOps, applicationInfo, List.of());
+    }
+
+    /** Full package projection with immutable current signer/history certificates. */
+    public VirtualPackageStateSnapshot(String packageName, int virtualUserId, String label,
+                                       String versionName, long versionCode,
+                                       String signatureSha256, String apkSha256,
+                                       String launchActivity, String applicationClass,
+                                       boolean enabled, long firstInstallTime,
+                                       long lastUpdateTime, String installerPackageName,
+                                       List<String> splitNames, List<String> sharedLibraries,
+                                       List<VirtualSharedLibrarySnapshot> sharedLibraryDetails,
+                                       List<VirtualInstrumentationSnapshot> instrumentations,
+                                       List<VirtualPackageQuerySnapshot> queries,
+                                       List<VirtualComponentSnapshot> components,
+                                       List<VirtualPermissionSnapshot> permissions,
+                                       List<VirtualPermissionDeclarationSnapshot> permissionDeclarations,
+                                       List<VirtualPermissionGroupSnapshot> permissionGroups,
+                                       List<PackageAppOpSnapshot> appOps,
+                                       ApplicationInfo applicationInfo,
+                                       List<byte[]> signingCertificates) {
         this.packageName = required(packageName, "packageName");
         if (virtualUserId < 0 || virtualUserId > 999) {
             throw new IllegalArgumentException("virtualUserId out of range");
@@ -191,6 +218,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         }
         this.appOps = new ArrayList<>(appOps == null ? List.of() : appOps);
         this.applicationInfo = applicationInfo == null ? null : new ApplicationInfo(applicationInfo);
+        this.signingCertificates = validatedCertificates(signingCertificates);
     }
 
     private VirtualPackageStateSnapshot(Parcel in) {
@@ -210,7 +238,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                 in.createTypedArrayList(VirtualPermissionDeclarationSnapshot.CREATOR),
                 in.createTypedArrayList(VirtualPermissionGroupSnapshot.CREATOR),
                 in.createTypedArrayList(PackageAppOpSnapshot.CREATOR),
-                in.readTypedObject(ApplicationInfo.CREATOR));
+                in.readTypedObject(ApplicationInfo.CREATOR), readCertificates(in));
     }
 
     private VirtualPackageStateSnapshot(VirtualPackageStateSnapshot source) {
@@ -221,7 +249,7 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
                 source.splitNames, source.sharedLibraries, source.sharedLibraryDetails,
                 source.instrumentations, source.queries, source.components, source.permissions,
                 source.permissionDeclarations, source.permissionGroups, source.appOps,
-                source.applicationInfo);
+                source.applicationInfo, source.signingCertificates);
     }
 
     public String packageName() { return packageName; }
@@ -260,6 +288,11 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
     public ApplicationInfo applicationInfo() {
         return applicationInfo == null ? null : new ApplicationInfo(applicationInfo);
     }
+    public List<byte[]> signingCertificates() {
+        ArrayList<byte[]> copy = new ArrayList<>(signingCertificates.size());
+        for (byte[] certificate : signingCertificates) copy.add(certificate.clone());
+        return Collections.unmodifiableList(copy);
+    }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         Parcel payload = Parcel.obtain();
@@ -293,6 +326,8 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
         out.writeTypedList(permissions); out.writeTypedList(permissionDeclarations);
         out.writeTypedList(permissionGroups); out.writeTypedList(appOps);
         out.writeTypedObject(applicationInfo, flags);
+        out.writeInt(signingCertificates.size());
+        for (byte[] certificate : signingCertificates) out.writeByteArray(certificate);
     }
     @Override public int describeContents() { return 0; }
 
@@ -383,6 +418,29 @@ public final class VirtualPackageStateSnapshot implements Parcelable {
             output.add(normalized);
         }
         return output;
+    }
+
+    private static ArrayList<byte[]> readCertificates(Parcel in) {
+        int count = in.readInt();
+        if (count < 0 || count > 64) {
+            throw new IllegalArgumentException("signing certificate list is too large");
+        }
+        ArrayList<byte[]> values = new ArrayList<>(count);
+        for (int index = 0; index < count; index++) values.add(in.createByteArray());
+        return values;
+    }
+
+    private static ArrayList<byte[]> validatedCertificates(List<byte[]> input) {
+        ArrayList<byte[]> values = new ArrayList<>();
+        if (input == null) return values;
+        if (input.size() > 64) throw new IllegalArgumentException("signing certificate list is too large");
+        for (byte[] certificate : input) {
+            if (certificate == null || certificate.length == 0 || certificate.length > 128 * 1024) {
+                throw new IllegalArgumentException("signing certificate bytes are invalid");
+            }
+            values.add(certificate.clone());
+        }
+        return values;
     }
     private static String digest(String value, String name) {
         String normalized = required(value, name).toLowerCase(java.util.Locale.ROOT);

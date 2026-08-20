@@ -63,6 +63,10 @@ public final class GuestComponentFactory {
                                                       String applicationClass) throws Exception {
         AppComponentFactory factory = load(loader, factoryClass);
         if (factory != null) return factory.instantiateApplication(loader, applicationClass);
+        // Android's default Application is framework-owned rather than Guest-defined.  Calling
+        // GuestDefiningLoader for it would incorrectly require android.app.Application to exist
+        // in the APK dex path, which breaks otherwise valid base+feature split installations.
+        if (Application.class.getName().equals(applicationClass)) return new Application();
         return newInstance(loader, applicationClass, Application.class);
     }
 

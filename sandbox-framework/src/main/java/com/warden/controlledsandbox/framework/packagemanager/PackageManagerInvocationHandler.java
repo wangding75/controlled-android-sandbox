@@ -172,7 +172,10 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 VirtualPackageMetadata installerTarget = universe.packageMetadata(targetPackage);
                 return installerTarget == null ? null : installerTarget.installerPackageName();
             case "getInstallSourceInfo":
-                return guestTarget ? installSourceInfo(returnType) : null;
+                if (!guestTarget) return null;
+                VirtualPackageMetadata sourceTarget = identity.packageName().equals(targetPackage)
+                        ? metadata : universe.packageMetadata(targetPackage);
+                return installSourceInfo(returnType, sourceTarget);
             case "checkPermission":
                 if (!guestTarget) return PackageManager.PERMISSION_DENIED;
                 String permission = firstString(args);
@@ -941,8 +944,9 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         return null;
     }
 
-    private Object installSourceInfo(Class<?> returnType) {
-        if (returnType == null || returnType == Object.class || metadata.installerPackageName().isEmpty()) return null;
+    private Object installSourceInfo(Class<?> returnType, VirtualPackageMetadata sourceTarget) {
+        if (returnType == null || returnType == Object.class || sourceTarget == null
+                || sourceTarget.installerPackageName().isEmpty()) return null;
         for (java.lang.reflect.Constructor<?> constructor : returnType.getDeclaredConstructors()) {
             try {
                 Class<?>[] types = constructor.getParameterTypes();
@@ -950,8 +954,8 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
                 int stringIndex = 0;
                 for (int index = 0; index < types.length; index++) {
                     if (types[index] == String.class) {
-                        values[index] = stringIndex++ == 0 ? metadata.installerPackageName()
-                                : (stringIndex >= 3 ? metadata.installerPackageName() : null);
+                        values[index] = stringIndex++ == 0
+                                ? sourceTarget.installerPackageName() : null;
                     } else if (types[index] == int.class || types[index] == Integer.class) {
                         values[index] = 0;
                     } else if (types[index] == boolean.class || types[index] == Boolean.class) {
