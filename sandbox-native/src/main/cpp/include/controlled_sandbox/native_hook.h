@@ -41,6 +41,7 @@ public:
     [[nodiscard]] NativeHookStatus status() const;
 
     static bool is_target_symbol(std::string_view symbol) noexcept;
+    static bool is_system_io_symbol(std::string_view symbol) noexcept;
     static bool is_process_lifetime_symbol(std::string_view symbol) noexcept;
     static bool is_process_lifetime_system_module(std::string_view module_path) noexcept;
     static bool is_process_io_system_module(std::string_view module_path) noexcept;

@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace controlled_sandbox {
@@ -54,12 +55,26 @@ private:
 };
 
 struct NativePathDecision {
+    NativePathDecision() = default;
+    NativePathDecision(std::string path_value, std::string confinement_root_value,
+                       std::uint64_t policy_revision_value,
+                       bool rewritten_value = false, int directory_fd_value = -100,
+                       bool capability_value = false, std::string virtual_path_value = {})
+        : path(std::move(path_value)),
+          confinement_root(std::move(confinement_root_value)),
+          policy_revision(policy_revision_value),
+          rewritten(rewritten_value),
+          directory_fd(directory_fd_value),
+          capability(capability_value),
+          virtual_path(std::move(virtual_path_value)) {}
+
     std::string path;
     std::string confinement_root;
     std::uint64_t policy_revision{};
     bool rewritten{false};
     int directory_fd{-100};
     bool capability{false};
+    std::string virtual_path;
 };
 
 struct NativePolicySnapshot {
@@ -76,6 +91,7 @@ struct NativePolicySnapshot {
     std::string instance_root;
     std::string apk_path;
     std::string native_library_root;
+    std::string guest_cwd;
     NativeNetworkIdentity network_identity;
 };
 
@@ -105,6 +121,10 @@ public:
     void unregister_capability_fd(int descriptor) noexcept;
     [[nodiscard]] NativePathDecision resolve_capability_relative(
             int directory_fd, std::string_view relative_path) const;
+    [[nodiscard]] int capability_data_root_fd() const noexcept;
+    [[nodiscard]] bool revision_current(std::uint64_t revision) const noexcept;
+    [[nodiscard]] std::string guest_cwd() const;
+    void set_guest_cwd(std::string guest_path);
 
     void reset() noexcept;
 
@@ -132,6 +152,7 @@ private:
     std::string instance_root_;
     std::string apk_path_;
     std::string native_library_root_;
+    std::string guest_cwd_{"/"};
     bool default_network_allow_{true};
     bool configured_{false};
     std::vector<std::string> allow_hosts_;

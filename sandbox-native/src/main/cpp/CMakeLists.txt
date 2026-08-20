@@ -3,8 +3,11 @@ project(controlled_sandbox_native LANGUAGES CXX)
 
 add_library(controlled_sandbox_native SHARED
     native_policy.cpp
+    native_boundary.cpp
+    native_fd_ledger.cpp
     native_file_system.cpp
     native_procfs.cpp
+    native_process_interceptors.cpp
     native_network.cpp
     native_network_interceptors.cpp
     native_audio.cpp

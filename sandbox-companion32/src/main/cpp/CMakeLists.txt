@@ -5,8 +5,11 @@ set(SHARED_NATIVE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../../../sandbox-native/src
 add_library(controlled_sandbox_native32 SHARED
     native_companion_jni.cpp
     ${SHARED_NATIVE_ROOT}/native_policy.cpp
+    ${SHARED_NATIVE_ROOT}/native_boundary.cpp
+    ${SHARED_NATIVE_ROOT}/native_fd_ledger.cpp
     ${SHARED_NATIVE_ROOT}/native_file_system.cpp
     ${SHARED_NATIVE_ROOT}/native_procfs.cpp
+    ${SHARED_NATIVE_ROOT}/native_process_interceptors.cpp
     ${SHARED_NATIVE_ROOT}/native_loader.cpp
     ${SHARED_NATIVE_ROOT}/native_network.cpp
     ${SHARED_NATIVE_ROOT}/native_network_interceptors.cpp

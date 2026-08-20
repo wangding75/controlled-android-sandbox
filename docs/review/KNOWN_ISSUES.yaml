@@ -42,6 +42,7 @@ issues:
     classification: KNOWN_DEBT
     severity: MEDIUM
     status: RECORDED
+    p3_status: STILL_OPEN
     discovered_by: T57-M10
     evidence:
       - docs/review/T57_M10_DISCOVERED_ISSUES_20260817.md
@@ -51,7 +52,7 @@ issues:
       - native_interceptors.cpp
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY_NO_MACRO_COMPRESSION
-    notes: CONFIRMED in M10. About 1838/1839 lines versus 1600. Macro compression was reverted and is forbidden.
+    notes: CONFIRMED in M10. The file is now 2155 lines versus the 1600-line threshold; P3 added separate policy, procfs, FD, and process modules but did not use macro compression or claim the God File debt closed.
 
   - issue_id: KI-M10-003
     title: Gradle unsafe cross-project configuration resolution
@@ -167,6 +168,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: NOT_PROVEN
+    p3_status: PARTIAL
     discovered_by: T57-R02
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
@@ -509,6 +511,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
@@ -520,8 +523,9 @@ issues:
     blocks_current_campaign: false
     fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
     notes: >
-      Userspace PLT rewrite cannot observe architecture raw syscall/SVC.
-      libc syscall() PLT is only TRUSTED_COMPAT. Expected architecture gap.
+      P3 routes supported libc PLT calls and the libc syscall() entry through
+      NativeSyscallPolicy. Userspace PLT rewrite still cannot observe an
+      architecture raw syscall/SVC instruction. Expected architecture gap.
 
   - issue_id: KI-R03-NATIVE-002
     title: Process identity syscalls and ptrace/execve/clone are not intercepted
@@ -529,6 +533,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
@@ -539,7 +544,10 @@ issues:
       - execve
     blocks_current_campaign: false
     fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
-    notes: getpid/getuid/prctl/ptrace/clone/fork/execve are absent from the 74-symbol table.
+    notes: >
+      P3 adds libc/PLT and syscall() dispatch for identity, prctl, ptrace,
+      clone/fork, and execve. Foreign targets, unbrokered process creation,
+      and execve fail closed; inline raw instructions remain outside coverage.
 
   - issue_id: KI-R03-NATIVE-003
     title: Procfs virtualization covers known leaves only
@@ -547,6 +555,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - sandbox-native/src/main/cpp/native_procfs.cpp
@@ -557,8 +566,10 @@ issues:
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY
     notes: >
-      maps/cmdline/status/mountinfo/stat/statm/io are projected on hooked open.
-      fd, task listing, map_files, and /proc/net are not.
+      P3 projects status/cmdline/maps/smaps/mountinfo/mounts/cgroup/stat/statm/io,
+      dynamic fd/fdinfo/task directories, and map_files symlink targets. Unknown
+      proc leaves, inherited-FD enumeration, and /proc/net remain fail-closed or
+      deferred rather than being fabricated.
 
   - issue_id: KI-R03-NATIVE-004
     title: Filesystem metadata and cwd APIs are not hooked
@@ -566,6 +577,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: MEDIUM
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
@@ -574,7 +586,10 @@ issues:
       - getcwd
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY
-    notes: chmod/chown/xattr/getcwd/chdir/realpath/mprotect are not guest targets.
+    notes: >
+      P3 covers getcwd/chdir/fchdir/realpath, chmod/chown/truncate/fstat and
+      the corresponding supported syscall forms. xattr/mprotect and complete
+      metadata parity remain outside this campaign.
 
   - issue_id: KI-R03-NATIVE-005
     title: Custom loader and linker namespace are outside current admission
@@ -582,6 +597,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - sandbox-native/src/main/cpp/native_loader.cpp
@@ -591,7 +607,10 @@ issues:
       - FOREIGN_LINKER_NAMESPACE_DENIED
     blocks_current_campaign: false
     fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
-    notes: dlopen/android_dlopen_ext are mediated. mmap custom ELF and JNI_OnLoad wrap are not.
+    notes: >
+      dlopen/android_dlopen_ext are mediated and late-loaded Guest modules are
+      re-scanned. Custom mmap/relocation loaders and complete JNI_OnLoad custom
+      loader semantics remain deferred.
 
   - issue_id: KI-R03-NATIVE-006
     title: Native guest can observe Binder device nodes
@@ -599,6 +618,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: STILL_OPEN
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
@@ -614,6 +634,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: DEFERRED
     discovered_by: T57-R03-P0A-01
     evidence:
       - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java
@@ -621,7 +642,10 @@ issues:
       - translatedGuestAbi
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
-    notes: Host-ABI PLT rewrite is not ABI-transparent for the platform native bridge.
+    notes: >
+      The 32-bit companion source/build path is wired and Android ABI builds
+      pass, but a translated-ABI Guest executing through a different host ABI
+      is not device-proven and remains deferred.
 
   - issue_id: KI-R03-NATIVE-008
     title: seccomp-BPF / user-notify is not implemented
@@ -629,6 +653,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_ENFORCEMENT_OPTIONS.md
@@ -638,8 +663,9 @@ issues:
     blocks_current_campaign: false
     fix_policy: DESIGN_REQUIRED_NO_MORE_PLT_HOOKS_AS_PROOF
     notes: >
-      VA-555/572/600/601/637/640/647/676 are commercial signals only.
-      CAS has no seccomp installer. User-notify is REQUIRES_PRIVILEGE.
+      P3 documents the owner and keeps HostileSeccompInstaller as an isolated
+      process deny-only BPF policy. Guest seccomp install is mediated/denied to
+      protect the substrate; user-notify/trap virtualization is not implemented.
 
   - issue_id: KI-R03-NATIVE-009
     title: FD escape via /proc/self/fd, dup, and inherited FDs
@@ -647,6 +673,7 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
+    p3_status: PARTIAL
     discovered_by: T57-R03-P0A-01
     evidence:
       - docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml
@@ -654,7 +681,11 @@ issues:
       - /proc/self/fd
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY
-    notes: Hooked open of /proc/self/fd is denied; readlink of own fd and raw open remain.
+    notes: >
+      P3 adds a process-local FD ledger, proc-fd/fdinfo projection, dup/dup2/dup3
+      and F_DUPFD ownership propagation, and host-internal FD denial. Unknown
+      inherited descriptors and all Provider/Binder FD producers are not yet a
+      complete ledger-backed proof; raw direct syscalls remain a known boundary.
 
   - issue_id: KI-R03-NATIVE-010
     title: In-sandbox native-adversarial service resolved against host APK

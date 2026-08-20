@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ptrace.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -384,6 +385,19 @@ void case_005(int out) {
     }
     detail += ";getpid=" + std::to_string(static_cast<long>(getpid()));
     detail += ";getuid=" + std::to_string(static_cast<long>(getuid()));
+    char process_name[16] = {};
+    const int process_name_rc = prctl(PR_GET_NAME, process_name);
+    detail += ";prctl_name_rc=" + std::to_string(process_name_rc)
+            + ";prctl_name=" + std::string(process_name);
+#ifdef PR_GET_DUMPABLE
+    detail += ";prctl_dumpable=" + std::to_string(prctl(PR_GET_DUMPABLE));
+#endif
+#ifdef PR_GET_SECCOMP
+    detail += ";prctl_seccomp=" + std::to_string(prctl(PR_GET_SECCOMP));
+#endif
+#ifdef PR_GET_NO_NEW_PRIVS
+    detail += ";prctl_no_new_privs=" + std::to_string(prctl(PR_GET_NO_NEW_PRIVS));
+#endif
     std::string libc_maps = slurp_path("/proc/self/maps", false);
     std::string sys_maps = slurp_path("/proc/self/maps", true);
     const char* status = "PASS_COMPAT";
@@ -403,8 +417,8 @@ void case_006(int out) {
         _exit(0);
     }
     if (child < 0) {
-        write_all(out, case_json("NATIVE-ADV-006", "ERROR",
-                std::string("fork failed errno=") + std::to_string(errno)));
+        write_all(out, case_json("NATIVE-ADV-006", "BLOCKED_BY_POLICY",
+                std::string("fork denied errno=") + std::to_string(errno)));
         return;
     }
     int status = 0;
@@ -451,6 +465,13 @@ void case_007(int out) {
         return;
     }
     pid_t child = fork();
+    if (child < 0) {
+        close(fds[0]);
+        close(fds[1]);
+        write_all(out, case_json("NATIVE-ADV-007", "BLOCKED_BY_POLICY",
+                std::string("fork denied before execve errno=") + std::to_string(errno)));
+        return;
+    }
     if (child == 0) {
         close(fds[0]);
         dup2(fds[1], STDOUT_FILENO);
@@ -546,14 +567,20 @@ void case_009(int out) {
             write_all(fds[1], child_view);
             _exit(0);
         }
-        close(fds[1]);
-        char buffer[512];
-        ssize_t n = read(fds[0], buffer, sizeof(buffer) - 1);
-        close(fds[0]);
-        if (n < 0) n = 0;
-        buffer[n] = 0;
-        inherited = std::string(buffer, static_cast<size_t>(n));
-        (void) waitpid(child, nullptr, 0);
+        if (child < 0) {
+            close(fds[0]);
+            close(fds[1]);
+            inherited = "fork_denied_by_policy";
+        } else {
+            close(fds[1]);
+            char buffer[512];
+            ssize_t n = read(fds[0], buffer, sizeof(buffer) - 1);
+            close(fds[0]);
+            if (n < 0) n = 0;
+            buffer[n] = 0;
+            inherited = std::string(buffer, static_cast<size_t>(n));
+            (void) waitpid(child, nullptr, 0);
+        }
     }
     if (duped >= 0) close(duped);
     close(fd);
@@ -621,9 +648,21 @@ std::string run_one(const CaseSpec& spec) {
         _exit(0);
     }
     if (pid < 0) {
-        close(fds[0]);
+        // CAS deliberately denies unbrokered process creation.  Run the case in the
+        // current Guest thread so filesystem/proc/FD assertions still execute, while
+        // cases that require a child report BLOCKED_BY_POLICY themselves.
+        spec.fn(fds[1]);
         close(fds[1]);
-        return case_json(spec.id, "ERROR", "fork failed");
+        std::string collected;
+        char buffer[1024];
+        ssize_t n;
+        while ((n = read(fds[0], buffer, sizeof(buffer))) > 0) {
+            collected.append(buffer, static_cast<size_t>(n));
+        }
+        close(fds[0]);
+        return collected.empty()
+                ? case_json(spec.id, "ERROR", "inline policy fallback produced no result")
+                : collected;
     }
     close(fds[1]);
     std::string collected;

@@ -52,11 +52,15 @@ mkdir -p "$OUT"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_policy_self_test.cpp" \
   -o "$OUT/native_policy_self_test"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_file_system_self_test.cpp" \
@@ -65,7 +69,20 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 "$OUT/native_policy_self_test"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_process_interceptors.cpp" \
+  "$ROOT/sandbox-native/src/test/cpp/native_convergence_policy_self_test.cpp" \
+  -o "$OUT/native_convergence_policy_self_test"
+"$OUT/native_convergence_policy_self_test"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_syscall_boundary_self_test.cpp" \
@@ -74,12 +91,16 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_procfs_self_test.cpp" \
   -o "$OUT/native_procfs_self_test"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_network_self_test.cpp" \
   -o "$OUT/native_network_self_test"
@@ -87,12 +108,15 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_process_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_network_interceptors_self_test.cpp" \
@@ -108,6 +132,8 @@ g++ -std=c++20 -Wall -Wextra -Werror -pthread \
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
@@ -124,12 +150,15 @@ g++ -std=c++20 -Wall -Wextra -Werror -fPIC -shared \
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   "$ROOT/sandbox-native/src/main/cpp/native_policy.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_procfs.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_loader.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_network_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_audio.cpp" \
+  "$ROOT/sandbox-native/src/main/cpp/native_process_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_interceptors.cpp" \
   "$ROOT/sandbox-native/src/main/cpp/native_hook.cpp" \
   "$ROOT/sandbox-native/src/test/cpp/native_hook_self_test.cpp" \
@@ -180,6 +209,21 @@ g++ -std=c++20 -Wall -Wextra -Werror \
   -idirafter "$NDK_SYSROOT_REAL/usr/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_policy_jni.cpp" \
   -o "$OUT/native_policy_jni.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -idirafter "$NDK_SYSROOT_REAL/usr/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_boundary.cpp" \
+  -o "$OUT/native_boundary.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -idirafter "$NDK_SYSROOT_REAL/usr/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_fd_ledger.cpp" \
+  -o "$OUT/native_fd_ledger.o"
+g++ -std=c++20 -Wall -Wextra -Werror -pthread \
+  -I"$ROOT/sandbox-native/src/main/cpp/include" \
+  -idirafter "$NDK_SYSROOT_REAL/usr/include" \
+  -c "$ROOT/sandbox-native/src/main/cpp/native_process_interceptors.cpp" \
+  -o "$OUT/native_process_interceptors.o"
 g++ -std=c++20 -Wall -Wextra -Werror -pthread \
   -I"$ROOT/sandbox-native/src/main/cpp/include" \
   -c "$ROOT/sandbox-native/src/main/cpp/native_file_system.cpp" \

@@ -466,6 +466,11 @@ public final class GuestComponentRuntime {
         int resultCode;
         try {
             resultCode = record.service.onStartCommand(intent, flags, startId);
+            // A Service callback is a legitimate late native-load boundary: static JNI
+            // initialization often occurs from onStartCommand rather than construction. Refresh
+            // the process-local relocation policy after the callback so the newly loaded Guest
+            // module receives the same identity/FS/FD policy as modules present at bootstrap.
+            requireNativeHookRefresh("SERVICE_START");
         } catch (Throwable error) {
             try {
                 if (foregroundRequested) record.foregroundPolicy.terminate("SERVICE_START_CALLBACK_FAILED");
@@ -623,7 +628,11 @@ public final class GuestComponentRuntime {
     }
 
     private void requireNativeHookRefresh(String stage) {
-        if (session.nativeHooksInstalled && !NativePolicy.refreshHooks()) {
+        if (session.nativeHooksInstalled) {
+            boolean refreshed = NativePolicy.refreshHooks();
+            android.util.Log.i("CS_NATIVE_HOOK", "REFRESH stage=" + stage
+                    + " refreshed=" + refreshed + " status=" + NativePolicy.hookStatus());
+            if (refreshed) return;
             throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_" + stage + ":"
                     + NativePolicy.hookStatus());
         }

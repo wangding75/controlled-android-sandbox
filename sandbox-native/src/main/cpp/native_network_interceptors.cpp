@@ -1,6 +1,7 @@
 #include "controlled_sandbox/native_network_interceptors.h"
 #include "controlled_sandbox/native_network.h"
 #include "controlled_sandbox/native_policy.h"
+#include "controlled_sandbox/native_fd_ledger.h"
 
 #include <algorithm>
 #include <array>
@@ -288,7 +289,26 @@ void close_received_file_descriptors(msghdr& message) noexcept {
         CloseFn close_function = require_real(real_close, "close");
         if (close_function == nullptr) return;
         for (std::size_t index = 0; index < descriptor_count; index++) {
-            if (descriptors[index] >= 0) (void) close_function(descriptors[index]);
+            if (descriptors[index] >= 0) {
+                NativeFdLedger::close(descriptors[index]);
+                (void) close_function(descriptors[index]);
+            }
+        }
+    }
+}
+
+void observe_received_file_descriptors(const msghdr& message) noexcept {
+    for (cmsghdr* header = CMSG_FIRSTHDR(const_cast<msghdr*>(&message)); header != nullptr;
+         header = CMSG_NXTHDR(const_cast<msghdr*>(&message), header)) {
+        if (header->cmsg_level != SOL_SOCKET || header->cmsg_type != SCM_RIGHTS
+                || header->cmsg_len < CMSG_LEN(0)) continue;
+        const std::size_t descriptor_count = (header->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+        const int* descriptors = reinterpret_cast<const int*>(CMSG_DATA(header));
+        const std::uint64_t revision = global_policy().snapshot().revision;
+        for (std::size_t index = 0; index < descriptor_count; index++) {
+            if (descriptors[index] >= 0) {
+                NativeFdLedger::observe_inherited(descriptors[index], revision);
+            }
         }
     }
 }
@@ -375,6 +395,8 @@ extern "C" int controlled_socket(int domain, int type, int protocol) {
         errno = EMFILE;
         return -1;
     }
+    NativeFdLedger::register_fd(socket_fd, NativeFdOwnership::GuestOwned,
+            global_policy().snapshot().revision);
     return socket_fd;
 }
 
@@ -385,19 +407,25 @@ extern "C" int controlled_close(int descriptor) {
     // another thread cannot reuse the numeric descriptor and then have its new state erased here.
     native_unregister_socket(descriptor);
     global_policy().unregister_capability_fd(descriptor);
+    NativeFdLedger::close(descriptor);
     return function(descriptor);
 }
 
 bool bind_duplicate_or_close(int source, int duplicated) noexcept {
     if (duplicated < 0) return false;
     const bool capability = global_policy().is_capability_fd(source);
-    if (native_rebind_duplicated_descriptor(source, duplicated)) {
+    const bool tracked_socket = native_is_tracked_socket(source);
+    if (native_rebind_duplicated_descriptor(source, duplicated)
+            || capability || !tracked_socket) {
         if (capability) global_policy().register_capability_fd(duplicated);
+        NativeFdLedger::duplicate(source, duplicated);
         return true;
     }
-    if (capability) global_policy().register_capability_fd(duplicated);
     CloseFn close_function = require_real(real_close, "close");
-    if (close_function != nullptr) (void) close_function(duplicated);
+    if (close_function != nullptr) {
+        NativeFdLedger::close(duplicated);
+        (void) close_function(duplicated);
+    }
     errno = EMFILE;
     return false;
 }
@@ -597,6 +625,7 @@ extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags)
         }
         message->msg_controllen = temporary.msg_controllen;
         message->msg_flags = temporary.msg_flags;
+        observe_received_file_descriptors(*message);
         return received;
     } catch (const std::bad_alloc&) {
         errno = ENOMEM;
@@ -649,6 +678,8 @@ int controlled_accept_common(int socket_fd, sockaddr* address, socklen_t* length
         errno = EMFILE;
         return -1;
     }
+    NativeFdLedger::register_fd(accepted, NativeFdOwnership::GuestOwned,
+            global_policy().snapshot().revision);
     copy_socket_address(address, length, address_capacity, temporary_address, temporary_length);
     return accepted;
 }

@@ -1,5 +1,8 @@
 #include "controlled_sandbox/native_policy.h"
 
+#include "controlled_sandbox/native_boundary.h"
+#include "controlled_sandbox/native_fd_ledger.h"
+
 #include <algorithm>
 #include <array>
 #include <arpa/inet.h>
@@ -161,7 +164,7 @@ std::string normalize_relative(std::string_view path) {
 }
 
 void close_fd_raw(int descriptor) noexcept {
-    if (descriptor >= 0) (void) syscall(SYS_close, descriptor);
+    if (descriptor >= 0) (void) trusted_syscall6(SYS_close, descriptor);
 }
 
 int duplicate_fd(int descriptor) {
@@ -385,6 +388,7 @@ void NativePolicyEngine::configure(std::string session_id, std::uint64_t generat
     instance_root_ = std::move(instance_root);
     apk_path_ = std::move(apk_path);
     native_library_root_ = std::move(native_library_root);
+    guest_cwd_ = "/";
     default_network_allow_ = default_network_allow;
     allow_hosts_ = std::move(allow_hosts);
     deny_hosts_ = std::move(deny_hosts);
@@ -417,6 +421,7 @@ void NativePolicyEngine::configure_file_capabilities(int data_root_fd, int apk_f
     }
 
     std::unique_lock lock(mutex_);
+    NativeFdLedger::reset();
     for (const int descriptor : capability_fds_) {
         if (descriptor != data_root_fd_ && descriptor != apk_file_fd_
                 && descriptor != native_library_fd_) close_fd_raw(descriptor);
@@ -433,10 +438,19 @@ void NativePolicyEngine::configure_file_capabilities(int data_root_fd, int apk_f
     capability_fds_.insert(apk_file_fd_);
     if (native_library_fd_ >= 0) capability_fds_.insert(native_library_fd_);
     revision_++;
+    NativeFdLedger::register_fd(data_root_fd_, NativeFdOwnership::HostInternal,
+            revision_);
+    NativeFdLedger::register_fd(apk_file_fd_, NativeFdOwnership::HostInternal,
+            revision_);
+    if (native_library_fd_ >= 0) {
+        NativeFdLedger::register_fd(native_library_fd_, NativeFdOwnership::HostInternal,
+                revision_);
+    }
 }
 
 void NativePolicyEngine::clear_file_capabilities() noexcept {
     std::unique_lock lock(mutex_);
+    NativeFdLedger::reset();
     for (const int descriptor : capability_fds_) close_fd_raw(descriptor);
     capability_fds_.clear();
     data_root_fd_ = -1;
@@ -461,6 +475,29 @@ bool NativePolicyEngine::is_capability_file_fd(int descriptor) const noexcept {
     if (descriptor < 0) return false;
     std::shared_lock lock(mutex_);
     return descriptor == apk_file_fd_;
+}
+
+int NativePolicyEngine::capability_data_root_fd() const noexcept {
+    std::shared_lock lock(mutex_);
+    return data_root_fd_;
+}
+
+bool NativePolicyEngine::revision_current(std::uint64_t revision) const noexcept {
+    std::shared_lock lock(mutex_);
+    return configured_ && revision != 0 && revision == revision_;
+}
+
+std::string NativePolicyEngine::guest_cwd() const {
+    std::shared_lock lock(mutex_);
+    if (!configured_) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
+    return guest_cwd_;
+}
+
+void NativePolicyEngine::set_guest_cwd(std::string guest_path) {
+    const std::string normalized = normalize_absolute(guest_path);
+    std::unique_lock lock(mutex_);
+    if (!configured_) throw PathPolicyError(EACCES, "NATIVE_POLICY_NOT_CONFIGURED");
+    guest_cwd_ = normalized;
 }
 
 void NativePolicyEngine::register_capability_fd(int descriptor) noexcept {
@@ -491,6 +528,7 @@ NativePathDecision NativePolicyEngine::resolve_capability_relative(
 
 void NativePolicyEngine::reset() noexcept {
     std::unique_lock lock(mutex_);
+    NativeFdLedger::reset();
     for (const int descriptor : capability_fds_) close_fd_raw(descriptor);
     capability_fds_.clear();
     data_root_fd_ = -1;
@@ -508,6 +546,7 @@ void NativePolicyEngine::reset() noexcept {
     instance_root_.clear();
     apk_path_.clear();
     native_library_root_.clear();
+    guest_cwd_ = "/";
     default_network_allow_ = true;
     allow_hosts_.clear();
     deny_hosts_.clear();
@@ -537,9 +576,17 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
     const std::string external_target = instance_root_ + "/external";
 
     const std::array<std::string, 4> private_prefixes{data_data, data_user, data_user_zero, data_user_de};
+    const std::string raw_path(guest_path);
     for (const auto& prefix : private_prefixes) {
-        if (!path_has_prefix(guest_path, prefix)) continue;
-        if (!path_has_prefix(normalized, prefix)) throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
+        if (path_has_prefix(raw_path, prefix) && !path_has_prefix(normalized, prefix)) {
+            throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
+        }
+    }
+    if (path_has_prefix(raw_path, external) && !path_has_prefix(normalized, external)) {
+        throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
+    }
+    for (const auto& prefix : private_prefixes) {
+        if (!path_has_prefix(normalized, prefix)) continue;
         const std::string relative = suffix_after(normalized, prefix);
         if (relative == "lib" || path_has_prefix(relative, "lib")) {
             if (native_library_fd_ >= 0) {
@@ -560,8 +607,7 @@ NativePathDecision NativePolicyEngine::resolve_path(std::string_view guest_path)
         return NativePathDecision{append_relative(data_target, relative), instance_root_, revision_, true};
     }
 
-    if (path_has_prefix(guest_path, external)) {
-        if (!path_has_prefix(normalized, external)) throw PathPolicyError(EACCES, "PATH_TRAVERSAL");
+    if (path_has_prefix(normalized, external)) {
         if (data_root_fd_ >= 0) {
             const std::string suffix = suffix_after(normalized, external);
             const std::string relative = suffix.empty() ? "external" : "external/" + suffix;
@@ -694,7 +740,7 @@ NativePolicySnapshot NativePolicyEngine::snapshot() const {
     std::shared_lock lock(mutex_);
     return NativePolicySnapshot{configured_, session_id_, generation_, revision_, package_name_,
             process_name_, virtual_user_id_, virtual_uid_, virtual_pid_, abi_name_,
-            instance_root_, apk_path_, native_library_root_, network_identity_};
+            instance_root_, apk_path_, native_library_root_, guest_cwd_, network_identity_};
 }
 
 NativePolicyEngine& global_policy() {

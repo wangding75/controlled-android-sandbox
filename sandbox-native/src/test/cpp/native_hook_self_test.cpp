@@ -73,15 +73,21 @@ int main(int argc, char** argv) {
     require_hook(NativeHookRuntime::is_target_symbol("kill"), "process lifetime kill target");
     require_hook(NativeHookRuntime::is_target_symbol("_exit"), "process lifetime exit target");
     require_hook(NativeHookRuntime::is_target_symbol("abort"), "process lifetime abort target");
+    require_hook(NativeHookRuntime::is_target_symbol("getpid"), "process identity getpid target");
+    require_hook(NativeHookRuntime::is_target_symbol("getuid"), "process identity getuid target");
+    require_hook(NativeHookRuntime::is_target_symbol("fork"), "process creation fork target");
     require_hook(NativeHookRuntime::is_process_lifetime_symbol("tgkill"), "lifetime tgkill");
     require_hook(NativeHookRuntime::is_process_lifetime_system_module(
             "/apex/com.android.runtime/lib64/libandroid_runtime.so"),
             "android_runtime lifetime module");
     require_hook(!NativeHookRuntime::is_process_lifetime_system_module("/system/lib64/libc.so"),
             "libc is not a lifetime system module");
-    require_hook(!NativeHookRuntime::is_target_symbol("fork"), "non-target");
     require_hook(NativeHookRuntime::is_guest_module(fixture_path.string(), fixture_root.string()),
             "guest module");
+    const std::string legacy_data_root = "/data/user/0" + fixture_root.string();
+    const std::string legacy_data_module = legacy_data_root + "/libfixture.so";
+    require_hook(NativeHookRuntime::is_guest_module(legacy_data_module, "/data/data" + fixture_root.string()),
+            "Android data directory alias module");
     require_hook(!NativeHookRuntime::is_guest_module("/system/lib64/libc.so", fixture_root.string()),
             "system module excluded");
 

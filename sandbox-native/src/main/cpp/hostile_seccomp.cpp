@@ -1,4 +1,5 @@
 #include "controlled_sandbox/hostile_seccomp.h"
+#include "controlled_sandbox/native_boundary.h"
 
 #include <cerrno>
 #include <cstddef>
@@ -102,6 +103,9 @@ std::vector<std::string> hostile_seccomp_deny_names() {
 }
 
 int install_hostile_seccomp(std::string* status) {
+    // This filter is deliberately scoped to ISOLATED_HOSTILE workers.  It is
+    // a kernel deny policy for a fixed high-risk set, not the Guest syscall
+    // projection/mediation boundary implemented by native_interceptors.
     if (HOSTILE_AUDIT_ARCH == 0) {
         if (status) *status = "UNSUPPORTED_ARCH";
         errno = ENOSYS;
@@ -149,7 +153,8 @@ int install_hostile_seccomp(std::string* status) {
     prog.len = static_cast<unsigned short>(filter.size());
     prog.filter = filter.data();
 #ifdef SYS_seccomp
-    long rc = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog);
+    long rc = trusted_syscall6(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0,
+            reinterpret_cast<long>(&prog));
     if (rc == 0) {
         if (status) *status = "SECCOMP_FILTER_INSTALLED";
         return 0;

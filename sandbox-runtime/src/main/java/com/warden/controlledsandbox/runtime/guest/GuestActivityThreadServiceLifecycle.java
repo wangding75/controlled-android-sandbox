@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.nativebridge.NativePolicy;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
@@ -344,6 +345,15 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             result = START_TASK_REMOVED_COMPLETE;
         } else {
             result = record.service.onStartCommand(intent, flags, startId);
+            if (session.nativeHooksInstalled) {
+                boolean refreshed = NativePolicy.refreshHooks();
+                android.util.Log.i("CS_NATIVE_HOOK", "REFRESH stage=FRAMEWORK_SERVICE_START refreshed="
+                        + refreshed + " status=" + NativePolicy.hookStatus());
+                if (!refreshed) {
+                    throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_FRAMEWORK_SERVICE_START:"
+                            + NativePolicy.hookStatus());
+                }
+            }
         }
         serviceDone(record.token, SERVICE_DONE_EXECUTING_START, startId, result);
         if (!completeFrameworkRecovery(record, route, startId, result)) {

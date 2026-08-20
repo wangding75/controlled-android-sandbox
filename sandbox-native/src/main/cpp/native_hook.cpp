@@ -1,6 +1,7 @@
 #include "controlled_sandbox/native_hook.h"
 #include "controlled_sandbox/native_camera1.h"
 #include "controlled_sandbox/native_interceptors.h"
+#include "controlled_sandbox/native_process_interceptors.h"
 #include "controlled_sandbox/native_policy.h"
 
 #include <cstdio>
@@ -131,7 +132,7 @@ std::size_t patch_relocations(std::uintptr_t base, const Relocation* entries, st
         if (name == nullptr) continue;
         if (camera_system ? !is_camera1_system_symbol(name)
                 : lifetime_system ? !NativeHookRuntime::is_process_lifetime_symbol(name)
-                : system_io ? !NativeHookRuntime::is_target_symbol(name)
+                : system_io ? !NativeHookRuntime::is_system_io_symbol(name)
                 : !NativeHookRuntime::is_target_symbol(name)) continue;
         void* replacement = camera_system ? replacement_for_camera1_symbol(name)
                                           : replacement_for_symbol(name);
@@ -392,7 +393,7 @@ bool NativeHookRuntime::is_process_io_system_module(std::string_view module_path
 }
 
 bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
-    static constexpr std::array<std::string_view, 74> targets{
+    static constexpr auto targets = std::to_array<std::string_view>({
             "open", "open64", "openat", "openat64", "__open_2", "__openat_2", "openat2",
             "access", "faccessat", "faccessat2", "stat", "lstat", "fstatat", "statx",
             "rename", "renameat", "renameat2", "unlink", "unlinkat", "mkdir", "mkdirat", "rmdir", "opendir",
@@ -405,13 +406,52 @@ bool NativeHookRuntime::is_target_symbol(std::string_view symbol) noexcept {
             "getifaddrs", "freeifaddrs", "AAudioStream_requestStart",
             "AAudioStream_requestStop", "AMediaRecorder_start", "AMediaRecorder_stop",
             "dlopen", "android_dlopen_ext", "syscall",
-            "kill", "killpg", "tgkill", "tkill", "exit", "_exit", "_Exit", "abort"};
+            "kill", "killpg", "tgkill", "tkill", "exit", "_exit", "_Exit", "abort",
+            "getpid", "getppid", "gettid", "getuid", "geteuid", "getgid", "getegid",
+            "prctl", "ptrace", "fork", "vfork", "clone", "clone3", "execve", "execveat",
+            "seccomp", "getcwd", "chdir", "fchdir", "realpath", "chmod", "fchmod",
+            "fchmodat", "chown", "fchown", "fchownat", "truncate", "ftruncate", "fstat",
+            "getdents", "closedir", "dlsym"});
     return std::find(targets.begin(), targets.end(), symbol) != targets.end();
+}
+
+bool NativeHookRuntime::is_system_io_symbol(std::string_view symbol) noexcept {
+    if (!is_target_symbol(symbol)) return false;
+    static constexpr auto process_only = std::to_array<std::string_view>({
+            "getpid", "getppid", "gettid", "getuid", "geteuid", "getgid", "getegid",
+            "prctl", "ptrace", "fork", "vfork", "clone", "clone3", "execve", "execveat",
+            "seccomp", "dlsym"});
+    return std::find(process_only.begin(), process_only.end(), symbol) == process_only.end();
 }
 
 bool NativeHookRuntime::is_guest_module(std::string_view module_path,
                                         std::string_view guest_library_root) noexcept {
     if (module_path.empty() || guest_library_root.empty()) return false;
+    // Android exposes the same credentialed data directory through both historical
+    // spellings.  The linker reports the real path (`/data/data/...`) while Java's
+    // projected ApplicationInfo/nativeLibraryDir commonly carries `/data/user/0/...`.
+    // Compare the aliases as one boundary; otherwise a late-loaded Guest .so is
+    // silently skipped even though bootstrap and class-loader policy agree.
+    auto data_alias_suffix = [](std::string_view path) -> std::string_view {
+        constexpr std::string_view legacy = "/data/data";
+        constexpr std::string_view user = "/data/user/0";
+        auto matches = [](std::string_view value, std::string_view prefix) {
+            return value.size() >= prefix.size()
+                    && value.compare(0, prefix.size(), prefix) == 0
+                    && (value.size() == prefix.size() || value[prefix.size()] == '/');
+        };
+        if (matches(path, legacy)) return path.substr(legacy.size());
+        if (matches(path, user)) return path.substr(user.size());
+        return {};
+    };
+    const std::string_view module_suffix = data_alias_suffix(module_path);
+    const std::string_view root_suffix = data_alias_suffix(guest_library_root);
+    if (!module_suffix.empty() && !root_suffix.empty()) {
+        return module_suffix.size() >= root_suffix.size()
+                && module_suffix.compare(0, root_suffix.size(), root_suffix) == 0
+                && (module_suffix.size() == root_suffix.size()
+                        || module_suffix[root_suffix.size()] == '/');
+    }
     if (module_path.size() < guest_library_root.size()) return false;
     if (module_path.compare(0, guest_library_root.size(), guest_library_root) != 0) return false;
     return module_path.size() == guest_library_root.size()

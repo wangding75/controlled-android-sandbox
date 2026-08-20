@@ -96,11 +96,11 @@
   "productionClassesOver500Lines": [
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualPackageMetadata.java",
-      "lines": 1908
+      "lines": 2027
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
-      "lines": 1561
+      "lines": 1579
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
@@ -112,7 +112,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
-      "lines": 1367
+      "lines": 1376
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
@@ -124,7 +124,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
-      "lines": 1232
+      "lines": 1236
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestBrokerContentProvider.java",
@@ -148,14 +148,14 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java",
-      "lines": 926
-    },
-    {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
-      "lines": 873
+      "lines": 1005
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
+      "lines": 904
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
       "lines": 873
     },
     {
@@ -172,7 +172,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceLifecycle.java",
-      "lines": 754
+      "lines": 764
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
@@ -187,6 +187,10 @@
       "lines": 692
     },
     {
+      "path": "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
+      "lines": 678
+    },
+    {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
       "lines": 654
     },
@@ -197,10 +201,6 @@
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
       "lines": 610
-    },
-    {
-      "path": "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
-      "lines": 605
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/binder/BinderInterceptionFoundation.java",
