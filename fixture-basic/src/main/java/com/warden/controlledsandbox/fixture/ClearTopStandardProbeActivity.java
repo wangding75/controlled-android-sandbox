@@ -65,7 +65,7 @@ public final class ClearTopStandardProbeActivity extends Activity {
                         onStartCount, onResumeCount, onStopCount, onDestroyCount);
                 TaskProbeEvidence.requestBackAfterEvidence(this, "clear_top_standard",
                         () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-            }, 450L);
+            }, 1200L);
         }
     }
 
