@@ -17,23 +17,15 @@ public final class ClearTopStandardProbeActivity extends Activity {
     static int onCreateCount;
     static int onNewIntentCount;
     static int onDestroyCount;
+    static int onStartCount;
+    static int onResumeCount;
+    static int onStopCount;
+    static boolean evidenceEmitted;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
-            boolean pass = onCreateCount == 2 && onNewIntentCount == 0 && onDestroyCount >= 1;
-            TaskProbeEvidence.clearTopStandard(this, pass, onCreateCount, onNewIntentCount,
-                    onDestroyCount);
-            if (pass) {
-                Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_PASS create=" + onCreateCount
-                        + " newIntent=" + onNewIntentCount + " destroy=" + onDestroyCount);
-            } else {
-                Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_FAIL reason=BAD_COUNTS create="
-                        + onCreateCount + " newIntent=" + onNewIntentCount
-                        + " destroy=" + onDestroyCount);
-            }
-            finish();
             return;
         }
         Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_CREATE");
@@ -56,5 +48,29 @@ public final class ClearTopStandardProbeActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         onDestroyCount++;
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        onStartCount++;
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        onResumeCount++;
+        if (!evidenceEmitted && getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
+            evidenceEmitted = true;
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                TaskProbeEvidence.clearTopStandard(this, onCreateCount, onNewIntentCount,
+                        onStartCount, onResumeCount, onStopCount, onDestroyCount);
+                TaskProbeEvidence.requestBackAfterEvidence(this, "clear_top_standard",
+                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
+            }, 450L);
+        }
+    }
+
+    @Override protected void onStop() {
+        super.onStop();
+        onStopCount++;
     }
 }

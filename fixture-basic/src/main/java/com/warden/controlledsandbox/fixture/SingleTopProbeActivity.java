@@ -15,6 +15,8 @@ public final class SingleTopProbeActivity extends Activity {
     static int onNewIntentCount;
     static int onStartCount;
     static int onResumeCount;
+    static int onStopCount;
+    static int onDestroyCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -32,13 +34,10 @@ public final class SingleTopProbeActivity extends Activity {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_COUNTS create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount);
-            boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
-            TaskProbeEvidence.singleTopTop(this, pass, onCreateCount, onNewIntentCount,
-                    onStartCount, onResumeCount);
-            if (!pass) {
-                Log.e(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL reason=BAD_COUNTS");
-            }
-            finish();
+            TaskProbeEvidence.singleTopTop(this, onCreateCount, onNewIntentCount,
+                    onStartCount, onResumeCount, onStopCount, onDestroyCount);
+            TaskProbeEvidence.requestBackAfterEvidence(this, "single_top_top",
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
         }, 1200L);
     }
 
@@ -49,11 +48,10 @@ public final class SingleTopProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL reason=EXTRA_MISSING");
             return;
         }
-        if (onCreateCount == 1 && onNewIntentCount == 1) {
-            Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_PASS");
-        }
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }
     @Override protected void onResume() { super.onResume(); onResumeCount++; }
+    @Override protected void onStop() { super.onStop(); onStopCount++; }
+    @Override protected void onDestroy() { super.onDestroy(); onDestroyCount++; }
 }

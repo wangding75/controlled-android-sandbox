@@ -120,17 +120,23 @@ class TestStructuredTaskEvidence(unittest.TestCase):
                   '{"case":"single_task","pass":true,"on_new_intent":true}\n')
         result = parse_task_semantic_evidence(logcat, "single_task")
         self.assertEqual(result["verdict"], "FIXTURE_SEMANTIC_FAIL")
-        self.assertIn("physical_record_reused", result["missing_fields"])
+        self.assertIn("lifecycle", result["missing_fields"])
+        self.assertIn("pass", result["forbidden_fields"])
 
     def test_structured_evidence_passes(self):
         fields = {
-            "case": "single_top_top", "pass": True, "on_new_intent": True,
-            "no_second_on_create": True, "top_activity_correct": True,
+            "case": "single_top_top",
+            "lifecycle": {
+                "onCreate": 1, "onNewIntent": 1, "onStart": 1,
+                "onResume": 2, "onStop": 0, "onDestroy": 0,
+            },
+            "route_token": "route-1",
+            "activity_token": "activity-1",
         }
         result = parse_task_semantic_evidence(
             "FRAMEWORK_TASK_EVIDENCE " + __import__("json").dumps(fields),
             "single_top_top")
-        self.assertEqual(result["verdict"], "FIXTURE_SEMANTIC_PASS")
+        self.assertEqual(result["verdict"], "FIXTURE_OBSERVATION")
 
 
 class TestRequiredApiMatrix(unittest.TestCase):

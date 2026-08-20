@@ -19,6 +19,8 @@ public final class TaskSemanticsProbeActivity extends Activity {
     static int onNewIntentCount;
     static int onStartCount;
     static int onResumeCount;
+    static int onStopCount;
+    static int onDestroyCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -61,26 +63,19 @@ public final class TaskSemanticsProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=EXTRA_MISSING");
             return;
         }
-        boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
-        TaskProbeEvidence.singleTask(this, pass, onCreateCount, onNewIntentCount,
-                onStartCount, onResumeCount);
-        if (pass) {
-            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_PASS action=" + intent.getAction()
-                    + " component=" + String.valueOf(intent.getComponent()));
-        } else {
-            Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=BAD_COUNTS");
-        }
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_LIFECYCLE create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount);
-            if (onResumeCount < 2 || onStartCount < 2) {
-                Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=NOT_RESUMED");
-            }
-            finish();
+            TaskProbeEvidence.singleTask(this, onCreateCount, onNewIntentCount,
+                    onStartCount, onResumeCount, onStopCount, onDestroyCount);
+            TaskProbeEvidence.requestBackAfterEvidence(this, "single_task",
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
         }, 900L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }
     @Override protected void onResume() { super.onResume(); onResumeCount++; }
+    @Override protected void onStop() { super.onStop(); onStopCount++; }
+    @Override protected void onDestroy() { super.onDestroy(); onDestroyCount++; }
 }

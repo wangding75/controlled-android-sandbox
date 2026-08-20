@@ -14,28 +14,20 @@ public final class StandardTaskProbeActivity extends Activity {
     static int onCreateCount;
     static int onStartCount;
     static int onResumeCount;
-    static boolean backReturnedToFirst;
+    static int onStopCount;
+    static int onDestroyCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         onCreateCount++;
         if (getIntent().getBooleanExtra(SECOND_LAUNCH, false)) {
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                // The second real ActivityRecord must be removed by the framework Back path,
-                // revealing the original record in the same task.
-                onBackPressed();
-                new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    boolean pass = onCreateCount == 2 && backReturnedToFirst;
-                    TaskProbeEvidence.standard(this, pass, onCreateCount, onStartCount,
-                            onResumeCount);
+            TaskProbeEvidence.requestBackAfterEvidence(this, "standard", () -> {
+                    TaskProbeEvidence.standard(this, onCreateCount, 0, onStartCount,
+                            onResumeCount, onStopCount, onDestroyCount);
                     Log.i(TAG, "FRAMEWORK_PROBE_TASK_STANDARD_COUNTS create=" + onCreateCount
-                            + " start=" + onStartCount + " resume=" + onResumeCount
-                            + " backReturned=" + backReturnedToFirst);
-                    if (pass) Log.i(TAG, "FRAMEWORK_PROBE_TASK_STANDARD_PASS");
-                    else Log.e(TAG, "FRAMEWORK_PROBE_TASK_STANDARD_FAIL reason=BACK_STACK");
-                    finish();
-                }, 400L);
-            }, 250L);
+                            + " start=" + onStartCount + " resume=" + onResumeCount);
+                    new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L);
+            });
             return;
         }
         Log.i(TAG, "FRAMEWORK_PROBE_TASK_STANDARD_FIRST_CREATE");
@@ -48,8 +40,7 @@ public final class StandardTaskProbeActivity extends Activity {
     @Override protected void onResume() {
         super.onResume();
         onResumeCount++;
-        if (onCreateCount >= 2 && !getIntent().getBooleanExtra(SECOND_LAUNCH, false)) {
-            backReturnedToFirst = true;
-        }
     }
+    @Override protected void onStop() { super.onStop(); onStopCount++; }
+    @Override protected void onDestroy() { super.onDestroy(); onDestroyCount++; }
 }

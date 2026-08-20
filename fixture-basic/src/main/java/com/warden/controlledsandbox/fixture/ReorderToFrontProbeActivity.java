@@ -16,7 +16,7 @@ public final class ReorderToFrontProbeActivity extends Activity {
     static int onStartCount;
     static int onResumeCount;
     static int onStopCount;
-    static boolean stoppedBeforeRequest;
+    static int onDestroyCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -53,12 +53,6 @@ public final class ReorderToFrontProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=EXTRA_MISSING");
             return;
         }
-        boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
-        if (pass) {
-            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS");
-        } else {
-            Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=BAD_COUNTS");
-        }
         // Do not finish inside onNewIntent: let the framework drive the real
         // STOPPED -> STARTED -> RESUMED transition to completion, then verify the record became
         // the resumed top from a post callback.
@@ -66,14 +60,10 @@ public final class ReorderToFrontProbeActivity extends Activity {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_LIFECYCLE create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount + " stop=" + onStopCount);
-            TaskProbeEvidence.reorderToFront(this,
-                    pass && onResumeCount >= 2 && onStartCount >= 2,
-                    onCreateCount, onNewIntentCount, onStartCount, onResumeCount,
-                    onStopCount, stoppedBeforeRequest);
-            if (onResumeCount < 2 || onStartCount < 2) {
-                Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=NOT_RESUMED");
-            }
-            finish();
+            TaskProbeEvidence.reorderToFront(this, onCreateCount, onNewIntentCount,
+                    onStartCount, onResumeCount, onStopCount, onDestroyCount);
+            TaskProbeEvidence.requestBackAfterEvidence(this, "reorder_to_front",
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
         }, 900L);
     }
 
@@ -82,6 +72,6 @@ public final class ReorderToFrontProbeActivity extends Activity {
     @Override protected void onStop() {
         super.onStop();
         onStopCount++;
-        stoppedBeforeRequest = true;
     }
+    @Override protected void onDestroy() { super.onDestroy(); onDestroyCount++; }
 }

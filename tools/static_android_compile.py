@@ -668,6 +668,7 @@ run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCo
 run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityResultContractSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntimeSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.component.activity.ActivityTaskCheckpointStoreSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.component.activity.PhysicalActivityIdentityAllocatorSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.FrameworkIdentityProxySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.packagemanager.PackageVisibilityPolicySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.packagemanager.HiddenPackageResultMapperSelfTest', assertions=True)

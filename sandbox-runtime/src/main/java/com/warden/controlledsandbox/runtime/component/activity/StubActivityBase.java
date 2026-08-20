@@ -265,6 +265,15 @@ public abstract class StubActivityBase extends Activity {
                 showFailure("NEW_INTENT_ACTIVITY_MISMATCH", "Route targets another virtual Activity");
                 return;
             }
+            Bundle mappingEvidence = new Bundle();
+            mappingEvidence.putString(RuntimeKeys.ROUTE_TOKEN, token);
+            mappingEvidence.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+            mappingEvidence.putInt(RuntimeKeys.TASK_ID, virtualTaskId);
+            mappingEvidence.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
+                    getClass().getName());
+            mappingEvidence.putString("frameworkActivityToken",
+                    String.valueOf(frameworkActivityToken));
+            RuntimeEventLog.event("ATMS_ACTIVITY_RECORD_MAPPING", mappingEvidence);
             if (controller != null) controller.newIntent(
                     com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.decode(route));
         });

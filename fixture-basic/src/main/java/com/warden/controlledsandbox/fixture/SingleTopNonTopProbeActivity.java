@@ -16,21 +16,21 @@ public final class SingleTopNonTopProbeActivity extends Activity {
     private static final String RELAUNCH_FLAG = "singleTopNonTopRelaunch";
     static int onCreateCount;
     static int onNewIntentCount;
+    static int onStartCount;
+    static int onResumeCount;
+    static int onStopCount;
+    static int onDestroyCount;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
-            boolean pass = onCreateCount == 2 && onNewIntentCount == 0;
-            TaskProbeEvidence.singleTopNonTop(this, pass, onCreateCount, onNewIntentCount);
-            if (pass) {
-                Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_PASS create=" + onCreateCount
-                        + " newIntent=" + onNewIntentCount);
-            } else {
-                Log.e(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_FAIL reason=BAD_COUNTS create="
-                        + onCreateCount + " newIntent=" + onNewIntentCount);
-            }
-            finish();
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                TaskProbeEvidence.singleTopNonTop(this, onCreateCount, onNewIntentCount,
+                        onStartCount, onResumeCount, onStopCount, onDestroyCount);
+                TaskProbeEvidence.requestBackAfterEvidence(this, "single_top_non_top",
+                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
+            }, 900L);
             return;
         }
         Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_CREATE");
@@ -48,4 +48,8 @@ public final class SingleTopNonTopProbeActivity extends Activity {
         onNewIntentCount++;
         Log.e(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_FAIL reason=UNEXPECTED_NEW_INTENT");
     }
+    @Override protected void onStart() { super.onStart(); onStartCount++; }
+    @Override protected void onResume() { super.onResume(); onResumeCount++; }
+    @Override protected void onStop() { super.onStop(); onStopCount++; }
+    @Override protected void onDestroy() { super.onDestroy(); onDestroyCount++; }
 }
