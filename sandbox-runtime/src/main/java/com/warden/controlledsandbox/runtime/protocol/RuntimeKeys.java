@@ -83,6 +83,8 @@ public final class RuntimeKeys {
     public static final String ACTIVITY_ACTION = "activityAction";
     /** Physical activity-window index that disambiguates a Guest Activity from its task siblings. */
     public static final String PHYSICAL_ACTIVITY_WINDOW = "physicalActivityWindow";
+    /** Host component selected for the physical ActivityRecord mapping. */
+    public static final String PHYSICAL_ACTIVITY_COMPONENT = "physicalActivityComponent";
     /** True when the virtual Activity ledger created a new virtual task for this launch. */
     public static final String CREATED_NEW_TASK = "createdNewTask";
     public static final String HOST_TASK_REBIND_REQUIRED = "hostTaskRebindRequired";

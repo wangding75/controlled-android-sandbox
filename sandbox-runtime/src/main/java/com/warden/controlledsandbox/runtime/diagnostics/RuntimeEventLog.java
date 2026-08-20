@@ -35,6 +35,10 @@ public final class RuntimeEventLog {
             line.append(" physicalPid=").append(normalized.getInt("physicalPid", -1));
             line.append(" threadTid=").append(normalized.getInt("threadTid", -1));
             append(line, "component", normalized.getString(RuntimeKeys.COMPONENT_CLASS, ""));
+            append(line, "routeToken", normalized.getString(RuntimeKeys.ROUTE_TOKEN, ""));
+            append(line, "physicalActivityComponent",
+                    normalized.getString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT, ""));
+            append(line, "activityAction", normalized.getString(RuntimeKeys.ACTIVITY_ACTION, ""));
             append(line, "activityToken", normalized.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
             if (normalized.containsKey(RuntimeKeys.TASK_ID)) {
                 line.append(" taskId=").append(normalized.getInt(RuntimeKeys.TASK_ID, 0));

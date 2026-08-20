@@ -61,7 +61,10 @@ public final class TaskSemanticsProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REUSE_FAIL reason=EXTRA_MISSING");
             return;
         }
-        if (onCreateCount == 1 && onNewIntentCount == 1) {
+        boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
+        TaskProbeEvidence.singleTask(this, pass, onCreateCount, onNewIntentCount,
+                onStartCount, onResumeCount);
+        if (pass) {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_PASS action=" + intent.getAction()
                     + " component=" + String.valueOf(intent.getComponent()));
         } else {

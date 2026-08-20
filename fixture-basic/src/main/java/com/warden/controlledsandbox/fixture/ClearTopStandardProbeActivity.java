@@ -22,7 +22,10 @@ public final class ClearTopStandardProbeActivity extends Activity {
         super.onCreate(state);
         onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
-            if (onCreateCount == 2 && onNewIntentCount == 0 && onDestroyCount >= 1) {
+            boolean pass = onCreateCount == 2 && onNewIntentCount == 0 && onDestroyCount >= 1;
+            TaskProbeEvidence.clearTopStandard(this, pass, onCreateCount, onNewIntentCount,
+                    onDestroyCount);
+            if (pass) {
                 Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_PASS create=" + onCreateCount
                         + " newIntent=" + onNewIntentCount + " destroy=" + onDestroyCount);
             } else {

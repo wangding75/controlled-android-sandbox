@@ -16,6 +16,7 @@ public final class ReorderToFrontProbeActivity extends Activity {
     static int onStartCount;
     static int onResumeCount;
     static int onStopCount;
+    static boolean stoppedBeforeRequest;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -52,7 +53,8 @@ public final class ReorderToFrontProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=EXTRA_MISSING");
             return;
         }
-        if (onCreateCount == 1 && onNewIntentCount == 1) {
+        boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
+        if (pass) {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS");
         } else {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=BAD_COUNTS");
@@ -64,6 +66,10 @@ public final class ReorderToFrontProbeActivity extends Activity {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_LIFECYCLE create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount + " stop=" + onStopCount);
+            TaskProbeEvidence.reorderToFront(this,
+                    pass && onResumeCount >= 2 && onStartCount >= 2,
+                    onCreateCount, onNewIntentCount, onStartCount, onResumeCount,
+                    onStopCount, stoppedBeforeRequest);
             if (onResumeCount < 2 || onStartCount < 2) {
                 Log.e(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL reason=NOT_RESUMED");
             }
@@ -73,5 +79,9 @@ public final class ReorderToFrontProbeActivity extends Activity {
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }
     @Override protected void onResume() { super.onResume(); onResumeCount++; }
-    @Override protected void onStop() { super.onStop(); onStopCount++; }
+    @Override protected void onStop() {
+        super.onStop();
+        onStopCount++;
+        stoppedBeforeRequest = true;
+    }
 }

@@ -22,18 +22,12 @@ public final class RuntimeOperationRequest implements Parcelable {
     public static final String GUEST_RUNTIME_STATUS = "GUEST_RUNTIME_STATUS";
     /** Broker-to-Guest delivery of a durable PendingIntent after the creator process changed. */
     public static final String SEND_PENDING_INTENT = "SEND_PENDING_INTENT";
-    /**
-     * Broker-to-Guest application of a virtual task decision to a live Host trampoline.
-     * Used when multiple Guest Activities share one physical stub class.
-     */
-    public static final String APPLY_ACTIVITY_HOST_DECISION = "APPLY_ACTIVITY_HOST_DECISION";
-
     private static final Set<String> OPERATIONS = Set.of(
             PREPARE_GUEST, LAUNCH_ACTIVITY, INVOKE_COMPONENT,
             GRANT_URI_PERMISSION, REVOKE_URI_PERMISSION, CHECK_URI_PERMISSION,
             OPEN_PACKAGE_RESOURCES, CONSUME_ROUTE,
             ACTIVITY_EVENT, STORAGE, SESSION_STATUS, GUEST_RUNTIME_STATUS,
-            SEND_PENDING_INTENT, APPLY_ACTIVITY_HOST_DECISION);
+            SEND_PENDING_INTENT);
 
     public static final Creator<RuntimeOperationRequest> CREATOR = new Creator<>() {
         @Override public RuntimeOperationRequest createFromParcel(Parcel source) {

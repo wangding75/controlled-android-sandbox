@@ -32,7 +32,10 @@ public final class SingleTopProbeActivity extends Activity {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_COUNTS create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount);
-            if (onCreateCount != 1 || onNewIntentCount != 1) {
+            boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
+            TaskProbeEvidence.singleTopTop(this, pass, onCreateCount, onNewIntentCount,
+                    onStartCount, onResumeCount);
+            if (!pass) {
                 Log.e(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL reason=BAD_COUNTS");
             }
             finish();

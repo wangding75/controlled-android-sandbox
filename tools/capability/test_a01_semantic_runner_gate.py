@@ -9,9 +9,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from run_a01_acceptance import (
+    REQUIRED_API_LEVELS,
     REQUIRED_GATES,
     check_logcat_marker,
+    evaluate_required_api_matrix,
     evaluate_gates,
+    parse_task_semantic_evidence,
 )
 
 
@@ -103,6 +106,59 @@ class TestRequiredGateAggregation(unittest.TestCase):
              "reorder_to_front", "process_death", "session_fencing", "service", "provider",
              "pending_intent"},
         )
+
+
+class TestStructuredTaskEvidence(unittest.TestCase):
+    def test_legacy_pass_marker_is_not_semantic_evidence(self):
+        logcat = "FRAMEWORK_PROBE_TASK_REUSE_PASS\n"
+        result = parse_task_semantic_evidence(logcat, "single_task")
+        self.assertEqual(result["verdict"], "FIXTURE_SEMANTIC_TIMEOUT")
+        self.assertTrue(result["legacy_marker_ignored"])
+
+    def test_structured_evidence_requires_all_fields(self):
+        logcat = ('FRAMEWORK_TASK_EVIDENCE '
+                  '{"case":"single_task","pass":true,"on_new_intent":true}\n')
+        result = parse_task_semantic_evidence(logcat, "single_task")
+        self.assertEqual(result["verdict"], "FIXTURE_SEMANTIC_FAIL")
+        self.assertIn("physical_record_reused", result["missing_fields"])
+
+    def test_structured_evidence_passes(self):
+        fields = {
+            "case": "single_top_top", "pass": True, "on_new_intent": True,
+            "no_second_on_create": True, "top_activity_correct": True,
+        }
+        result = parse_task_semantic_evidence(
+            "FRAMEWORK_TASK_EVIDENCE " + __import__("json").dumps(fields),
+            "single_top_top")
+        self.assertEqual(result["verdict"], "FIXTURE_SEMANTIC_PASS")
+
+
+class TestRequiredApiMatrix(unittest.TestCase):
+    def passing_devices(self, apis):
+        return [{"api": api, "overall_pass": True} for api in apis]
+
+    def test_missing_api_36_fails_closed(self):
+        passed, failed = evaluate_required_api_matrix(self.passing_devices(("32", "35")))
+        self.assertFalse(passed)
+        self.assertEqual(failed, ["missing_api_36"])
+
+    def test_api36_semantic_fail_fails_closed(self):
+        devices = self.passing_devices(REQUIRED_API_LEVELS)
+        devices[-1]["overall_pass"] = False
+        passed, failed = evaluate_required_api_matrix(devices)
+        self.assertFalse(passed)
+        self.assertEqual(failed, ["api_36_semantic"])
+
+    def test_all_required_api_levels_pass(self):
+        passed, failed = evaluate_required_api_matrix(self.passing_devices(REQUIRED_API_LEVELS))
+        self.assertTrue(passed)
+        self.assertEqual(failed, [])
+
+    def test_extra_device_does_not_fill_missing_required_api(self):
+        devices = self.passing_devices(("32", "35", "35", "33"))
+        passed, failed = evaluate_required_api_matrix(devices)
+        self.assertFalse(passed)
+        self.assertIn("missing_api_36", failed)
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -18,6 +19,23 @@ from run_rd_campaign import HOST_PACKAGE, apk_metadata, run_adb
 CAMPAIGN_ID = "T57-R03-P4-FIX02-A01"
 TRUST = ("--ez", "trustNativeGuest", "true")
 SCALE_INDICES = (0, 63, 64, 95, 127)
+REQUIRED_API_LEVELS = ("32", "35", "36")
+TASK_EVIDENCE_PREFIX = "FRAMEWORK_TASK_EVIDENCE "
+
+TASK_EVIDENCE_REQUIREMENTS = {
+    "standard": ("created_two_records", "on_create_twice", "top_activity_correct", "back_stack_correct"),
+    "single_top_top": ("on_new_intent", "no_second_on_create", "top_activity_correct"),
+    "single_top_non_top": ("new_activity_created", "no_reuse", "top_activity_correct"),
+    "single_task": ("child_cleared_by_framework", "physical_record_reused", "on_new_intent",
+                     "no_second_on_create", "resumed", "back_stack_correct"),
+    "clear_top_standard": ("target_destroyed", "child_removed", "target_recreated",
+                            "no_on_new_intent"),
+    "clear_top_single_top": ("child_removed", "target_reused", "on_new_intent",
+                              "no_on_create"),
+    "reorder_to_front": ("stopped_before_request", "started_after_request", "resumed_after_request",
+                          "physical_top_component", "activity_record_stack_order",
+                          "virtual_token_mapping", "no_second_on_create", "back_stack_correct"),
+}
 
 # Every one of these gates must pass or the whole matrix is failed closed.  A single
 # FAIL in scale, basic launch, ActivityResult, any task-mode semantic, process death,
@@ -65,6 +83,73 @@ def check_logcat_marker(
         "pass_marker_found": has_pass,
         "fail_marker_found": has_fail,
     }
+
+
+def parse_task_semantic_evidence(logcat: str, case: str) -> dict[str, Any]:
+    """Parse structured task evidence; legacy PASS markers are intentionally ignored."""
+    records: list[dict[str, Any]] = []
+    for line in (logcat or "").splitlines():
+        marker = line.find(TASK_EVIDENCE_PREFIX)
+        if marker < 0:
+            continue
+        payload = line[marker + len(TASK_EVIDENCE_PREFIX):].strip()
+        try:
+            evidence = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(evidence, dict) and evidence.get("case") == case:
+            records.append(evidence)
+    if not records:
+        return {"verdict": "FIXTURE_SEMANTIC_TIMEOUT", "evidence": None,
+                "missing_fields": list(TASK_EVIDENCE_REQUIREMENTS.get(case, ())),
+                "legacy_marker_ignored": True}
+    evidence = records[-1]
+    required = TASK_EVIDENCE_REQUIREMENTS.get(case, ())
+    missing = [field for field in required if evidence.get(field) is not True]
+    passed = evidence.get("pass") is True and not missing
+    return {
+        "verdict": "FIXTURE_SEMANTIC_PASS" if passed else "FIXTURE_SEMANTIC_FAIL",
+        "evidence": evidence,
+        "missing_fields": missing,
+        "legacy_marker_ignored": True,
+    }
+
+
+def evaluate_required_api_matrix(devices: list[dict[str, Any]]) -> tuple[bool, list[str]]:
+    """Require every frozen API level and a passing semantic matrix for each level."""
+    failed: list[str] = []
+    by_api: dict[str, list[dict[str, Any]]] = {}
+    for device in devices if isinstance(devices, list) else []:
+        if isinstance(device, dict):
+            by_api.setdefault(str(device.get("api", "")), []).append(device)
+    for api in REQUIRED_API_LEVELS:
+        entries = by_api.get(api, [])
+        if not entries:
+            failed.append(f"missing_api_{api}")
+        elif not any(entry.get("overall_pass") is True for entry in entries):
+            failed.append(f"api_{api}_semantic")
+    return not failed, failed
+
+
+def capture_activity_evidence(serial: str, device_dir: Path, case: str, phase: str,
+                              command: dict[str, Any] | None = None,
+                              logcat: str | None = None) -> Path:
+    """Persist per-case before/transition/after evidence instead of one final dump."""
+    safe_case = re.sub(r"[^A-Za-z0-9_.-]+", "_", case)
+    safe_phase = re.sub(r"[^A-Za-z0-9_.-]+", "_", phase)
+    path = device_dir / f"{serial.replace(':', '_')}-{safe_case}-{safe_phase}.json"
+    if phase == "transition":
+        payload: dict[str, Any] = {"case": case, "phase": phase, "request": command or {},
+                                   "lifecycle_logcat": logcat or ""}
+    else:
+        dumpsys = run_adb(serial, ["shell", "dumpsys", "activity", "activities"], check=False).stdout or ""
+        payload = {"case": case, "phase": phase, "dumpsys_activity_activities": dumpsys,
+                   "topResumedActivity_lines": [line for line in dumpsys.splitlines()
+                                                 if "topResumedActivity" in line],
+                   "task_stack_lines": [line for line in dumpsys.splitlines()
+                                        if "* Task" in line or "Hist #" in line]}
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    return path
 
 
 def evaluate_gates(tests: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -154,37 +239,51 @@ def run_device_matrix(serial: str, api: str, model: str) -> dict[str, Any]:
 
     # 4. Task Mode Matrix (standard, singleTop, singleTask, CLEAR_TOP, REORDER_TO_FRONT)
     task_matrix: dict[str, Any] = {}
-    for gate, comp, pass_marker, fail_marker, wait_sec in (
+    for gate, comp, evidence_case, pass_marker, fail_marker, wait_sec in (
         ("standard", "com.warden.controlledsandbox.fixture.StandardTaskProbeActivity",
+         "standard",
          "FRAMEWORK_PROBE_TASK_STANDARD_PASS", "FRAMEWORK_PROBE_TASK_STANDARD_FAIL", 2.0),
         ("single_top", "com.warden.controlledsandbox.fixture.SingleTopProbeActivity",
+         "single_top_top",
          "FRAMEWORK_PROBE_TASK_SINGLETOP_PASS", "FRAMEWORK_PROBE_TASK_SINGLETOP_FAIL", 2.0),
         ("single_top_non_top", "com.warden.controlledsandbox.fixture.SingleTopNonTopProbeActivity",
+         "single_top_non_top",
          "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_PASS", "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_FAIL", 6.0),
         ("single_task", "com.warden.controlledsandbox.fixture.TaskSemanticsProbeActivity",
+         "single_task",
          "FRAMEWORK_PROBE_TASK_REUSE_PASS", "FRAMEWORK_PROBE_TASK_REUSE_FAIL", 8.0),
         ("clear_top_standard", "com.warden.controlledsandbox.fixture.ClearTopStandardProbeActivity",
+         "clear_top_standard",
          "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_STANDARD_FAIL", 6.0),
         ("clear_top", "com.warden.controlledsandbox.fixture.ClearTopProbeActivity",
+         "clear_top_single_top",
          "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS", "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL", 8.0),
         ("reorder_to_front", "com.warden.controlledsandbox.fixture.ReorderToFrontProbeActivity",
+         "reorder_to_front",
          "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_PASS", "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_FAIL", 8.0),
     ):
         run_adb(serial, ["logcat", "-c"], check=False)
+        capture_activity_evidence(serial, device_dir, gate, "before")
         r = safe_debug_command(
             serial,
             ["-e", "command", "launch-component", "-e", "package",
              "com.warden.controlledsandbox.fixture", "-e", "component", comp, *TRUST],
             deadline_sec=60,
         )
-        marker = check_logcat_marker(serial, pass_marker, fail_marker, wait_sec=wait_sec)
+        time.sleep(wait_sec)
+        task_logcat = run_adb(serial, ["logcat", "-d", "-v", "threadtime"], check=False).stdout or ""
+        semantic = parse_task_semantic_evidence(task_logcat, evidence_case)
+        capture_activity_evidence(serial, device_dir, gate, "transition", r, task_logcat)
+        capture_activity_evidence(serial, device_dir, gate, "after")
         task_matrix[gate] = {
             "component": comp,
             "command_status": r.get("status"),
-            "semantic_verdict": marker["verdict"],
-            "pass": r.get("status") == "PASS" and marker["verdict"] == "FIXTURE_SEMANTIC_PASS",
+            "semantic_verdict": semantic["verdict"],
+            "structured_evidence": semantic,
+            "legacy_marker_pass_not_used": True,
+            "pass": r.get("status") == "PASS" and semantic["verdict"] == "FIXTURE_SEMANTIC_PASS",
         }
-        print(f"  -> {gate}: {marker['verdict']}")
+        print(f"  -> {gate}: {semantic['verdict']}")
     tests.update(task_matrix)
 
     # 5. Process death and real stale-session fencing
@@ -324,10 +423,13 @@ def main() -> int:
             print(f"[FAIL-CLOSED] {serial}: {error.__class__.__name__}: {error}")
         all_results.append(res)
 
-    overall_pass = bool(all_results) and all(res.get("overall_pass") for res in all_results)
+    api_matrix_pass, api_matrix_failed = evaluate_required_api_matrix(all_results)
+    overall_pass = bool(all_results) and all(res.get("overall_pass") for res in all_results) \
+        and api_matrix_pass
     failed_gates: list[str] = []
     for res in all_results:
         failed_gates.extend(res.get("failed_gates", []))
+    failed_gates.extend(api_matrix_failed)
 
     evidence = {
         "campaign": CAMPAIGN_ID,
@@ -338,6 +440,8 @@ def main() -> int:
         "devices": all_results,
         "overall_pass": overall_pass,
         "failed_gates": failed_gates,
+        "required_api_levels": list(REQUIRED_API_LEVELS),
+        "required_api_matrix_pass": api_matrix_pass,
     }
     write_json(out_dir / "evidence.json", evidence)
     print("\n==========================================")

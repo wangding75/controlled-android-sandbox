@@ -50,7 +50,10 @@ public final class ClearTopProbeActivity extends Activity {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=EXTRA_MISSING");
             return;
         }
-        if (onCreateCount == 1 && onNewIntentCount == 1) {
+        boolean pass = onCreateCount == 1 && onNewIntentCount == 1;
+        TaskProbeEvidence.clearTopSingleTop(this, pass, onCreateCount, onNewIntentCount,
+                onStartCount, onResumeCount);
+        if (pass) {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_PASS");
         } else {
             Log.e(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_FAIL reason=BAD_COUNTS");

@@ -152,14 +152,9 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             Bundle result = session.context().startActivityFromFrameworkActivity(
                     intent, options, route.taskId, requestCode);
-            // A virtual reuse decision (singleTask / CLEAR_TOP / singleTop) must still be
-            // realized by the Host AMS/ATMS, never by replanting callbacks onto a live Guest
-            // Activity.  The ledger marks the physical records it removes; finish them through
-            // the framework here so Android owns the onDestroy/onPause/onStop chain and the
-            // reused target naturally becomes the task top.  The forwarded host Intent then
-            // carries the reuse flags produced by the Broker so ActivityStarter performs the
-            // matching move-to-front / single-top onNewIntent as a genuine ClientTransaction.
-            finishRemovedActivities(result);
+            // The Broker returns a Host Intent carrying the selected physical component and
+            // desired operation flags.  Forward it unchanged so ActivityStarter/ATMS owns the
+            // complete ActivityRecord transition and ClientTransaction lifecycle projection.
             Intent hostIntent = hostIntent(result);
             if (hostIntent == null) {
                 throw new IllegalStateException("FRAMEWORK_HOST_ACTIVITY_INTENT_MISSING");
@@ -189,6 +184,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         copyString(result, host, RuntimeKeys.INTENT_COMPONENT_PACKAGE);
         copyString(result, host, RuntimeKeys.INTENT_COMPONENT_CLASS);
         copyString(result, host, RuntimeKeys.ACTIVITY_ACTION);
+        copyString(result, host, RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT);
         copyString(result, host, RuntimeKeys.ACTIVITY_TOKEN);
         copyInt(result, host, RuntimeKeys.TASK_ID);
         copyInt(result, host, RuntimeKeys.ACTIVITY_FLAGS);
@@ -937,66 +933,6 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "event dispatch failed", error);
             }
         });
-    }
-
-    Activity findActivityByToken(String activityToken) {
-        if (activityToken == null || activityToken.isBlank()) return null;
-        synchronized (launches) {
-            for (Map.Entry<Activity, Launch> entry : launches.entrySet()) {
-                if (activityToken.equals(entry.getValue().activityToken)) {
-                    return entry.getKey();
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Realizes only the removal half of a virtual reuse decision.  The target's onNewIntent /
-     * move-to-front is intentionally NOT replayed here: it is the Host AMS/ATMS ActivityStarter
-     * flag set carried by the forwarded host Intent that owns that transition.  Directly invoking
-     * callActivityOnNewIntent would strip the framework-owned ClientTransaction and let a Guest
-     * bridge mark a STOPPED Activity as reused without any real ActivityRecord movement.
-     */
-    private int finishRemovedActivities(Bundle result) {
-        if (result == null) return 0;
-        java.util.List<String> removed = result.getStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS);
-        if (removed == null) return 0;
-        int finished = 0;
-        for (String token : removed) {
-            Activity removedActivity = findActivityByToken(token);
-            if (removedActivity == null) continue;
-            removedActivity.finish();
-            finished++;
-        }
-        return finished;
-    }
-
-    /**
-     * Broker-side APPLY_ACTIVITY_HOST_DECISION handler.  This runs on the Guest Binder thread, so
-     * the concrete framework finish must be posted to the Activity main looper.  Reuse delivery is
-     * left to the forwarded host Intent; this method is removal-only and never injects onNewIntent.
-     */
-    Bundle applyHostDecision(Bundle request) {
-        Bundle out = new Bundle();
-        if (request == null) {
-            out.putString(RuntimeKeys.STATUS, "FAILED");
-            out.putString(RuntimeKeys.ERROR_TYPE, "HOST_ACTIVITY_DECISION_MISSING");
-            return out;
-        }
-        java.util.List<String> removed = request.getStringArrayList(RuntimeKeys.REMOVED_ACTIVITY_TOKENS);
-        android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
-        if (removed != null) {
-            for (String token : removed) {
-                Activity removedActivity = findActivityByToken(token);
-                if (removedActivity != null) {
-                    mainHandler.post(removedActivity::finish);
-                }
-            }
-        }
-        out.putString(RuntimeKeys.STATUS, "APPLIED");
-        out.putInt(RuntimeKeys.REMOVED_ACTIVITY_COUNT, removed == null ? 0 : removed.size());
-        return out;
     }
 
     private static Bundle evidence(Launch route, Activity activity) {

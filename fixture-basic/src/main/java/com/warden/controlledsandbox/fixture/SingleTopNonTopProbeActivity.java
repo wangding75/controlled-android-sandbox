@@ -21,7 +21,9 @@ public final class SingleTopNonTopProbeActivity extends Activity {
         super.onCreate(state);
         onCreateCount++;
         if (getIntent().getBooleanExtra(RELAUNCH_FLAG, false)) {
-            if (onCreateCount == 2 && onNewIntentCount == 0) {
+            boolean pass = onCreateCount == 2 && onNewIntentCount == 0;
+            TaskProbeEvidence.singleTopNonTop(this, pass, onCreateCount, onNewIntentCount);
+            if (pass) {
                 Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_PASS create=" + onCreateCount
                         + " newIntent=" + onNewIntentCount);
             } else {

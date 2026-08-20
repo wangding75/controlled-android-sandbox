@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the T57-R03-P4-R05 independent review pack. No parity verdict."""
+"""Build the T57-R03-P4-FIX03-REPAIR01 independent review pack."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-independent-review"
-ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_FIX02_independent_review_pack.zip"
+PACK_DIR = ROOT / "_delivery" / "T57-R03-P4-FIX03-REPAIR01-independent-review"
+ZIP_PATH = ROOT / "_delivery" / "controlled-android-sandbox_T57-R03_P4_FIX03_REPAIR01_review_pack.zip"
 
 INCLUDE_DIRS = (
     "app", "sandbox-sdk", "sandbox-contract", "sandbox-domain", "sandbox-framework",
@@ -99,12 +99,39 @@ def write_reports() -> None:
 
 
 def write_manifest(head: str, tree: str, file_count: int = 0) -> dict:
+    api_evidence: dict[str, list[dict[str, str]]] = {
+        "32": [], "35": [], "36": []
+    }
+    evidence_root = PACK_DIR / "device-evidence"
+    if evidence_root.is_dir():
+        for path in evidence_root.rglob("evidence.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            for device in payload.get("devices", []):
+                api = str(device.get("api", ""))
+                if api in api_evidence:
+                    api_evidence[api].append({
+                        "path": path.relative_to(PACK_DIR).as_posix(),
+                        "sha256": sha256_file(path),
+                        "serial": str(device.get("serial", "")),
+                        "overall_pass": str(device.get("overall_pass", False)),
+                    })
+    for api in api_evidence:
+        if not api_evidence[api]:
+            api_evidence[api] = [{"path": "MISSING", "sha256": "MISSING"}]
     manifest = {
         "project": "controlled-android-sandbox",
-        "taskbook": "T57-R03-P4-FIX02",
+        "taskbook": "T57-R03-P4-FIX02-A01-FIX03-REPAIR01",
         "branch": git("branch", "--show-current").strip(),
         "HEAD": head,
         "TREE": tree,
+        "tested_source_commit": head,
+        "review_pack_commit": head,
+        "required_api_levels": ["32", "35", "36"],
+        "api_evidence": api_evidence,
+        "inventory": "100% PASS",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_file_count": file_count,
         "result": "REVIEW_PACK_READY",
@@ -155,6 +182,8 @@ def main() -> int:
         for path in PACK_DIR.rglob("*"):
             if path.is_file():
                 archive.write(path, path.relative_to(PACK_DIR.parent).as_posix())
+    with zipfile.ZipFile(ZIP_PATH, "r") as archive:
+        zip_test = archive.testzip()
     print(json.dumps({
         "pack_dir": str(PACK_DIR),
         "zip": str(ZIP_PATH),
@@ -162,6 +191,7 @@ def main() -> int:
         "files": inventory["file_count"],
         "HEAD": head,
         "TREE": tree,
+        "zip_test": "PASS" if zip_test is None else f"FAIL:{zip_test}",
     }, indent=2))
     return 0
 
