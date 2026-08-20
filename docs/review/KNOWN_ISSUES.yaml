@@ -52,7 +52,7 @@ issues:
       - native_interceptors.cpp
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY_NO_MACRO_COMPRESSION
-    notes: CONFIRMED in M10. The file is now 2155 lines versus the 1600-line threshold; P3 added separate policy, procfs, FD, and process modules but did not use macro compression or claim the God File debt closed.
+    notes: CONFIRMED in M10. The file is now 2157 lines versus the 1600-line threshold; P3 added separate policy, procfs, FD, and process modules but did not use macro compression or claim the God File debt closed.
 
   - issue_id: KI-M10-003
     title: Gradle unsafe cross-project configuration resolution
