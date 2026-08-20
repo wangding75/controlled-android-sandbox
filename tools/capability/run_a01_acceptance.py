@@ -275,6 +275,13 @@ def evaluate_task_system_evidence(
     target_tokens = {row.get("activityToken", "") for row in launches if row.get("activityToken")}
     virtual_task = next((int(row["taskId"]) for row in launches
                          if row.get("taskId", "").isdigit()), None)
+    task_launches = [row for row in runtime_events
+                     if row["event"] == "ATMS_ACTIVITY_LAUNCH_REQUEST"
+                     and virtual_task is not None
+                     and row.get("taskId", "").isdigit()
+                     and int(row["taskId"]) == virtual_task]
+    guest_physical = {row.get("physicalActivityComponent", "") for row in task_launches
+                      if row.get("physicalActivityComponent")}
     physical_task = None
     if transition.get("top_resumed"):
         physical_task = int(transition["top_resumed"]["task"])
@@ -284,10 +291,15 @@ def evaluate_task_system_evidence(
     top = transition.get("top_resumed")
     top_is_target = bool(top and any(_component_matches(top.get("component", ""), physical)
                                      for physical in target_physical))
-    target_stack = [row for row in stack
+    guest_stack = [row for row in stack
+                   if any(_component_matches(row["component"], physical)
+                          for physical in guest_physical)]
+    target_stack = [row for row in guest_stack
                     if any(_component_matches(row["component"], physical)
                            for physical in target_physical)]
-    child_stack = [row for row in stack if "DetailActivity" in row["component"]]
+    child_stack = [row for row in guest_stack
+                   if not any(_component_matches(row["component"], physical)
+                              for physical in target_physical)]
     target_after = [row for row in after["history"]
                     if any(_component_matches(row["component"], physical)
                            for physical in target_physical)]
@@ -295,7 +307,10 @@ def evaluate_task_system_evidence(
     after_top_target = bool(after_top and any(
         _component_matches(after_top.get("component", ""), physical)
         for physical in target_physical))
-    after_top_detail = bool(after_top and "DetailActivity" in after_top.get("component", ""))
+    after_top_child = bool(after_top and any(
+        _component_matches(after_top.get("component", ""), physical)
+        for physical in (guest_physical - target_physical)
+    ))
     launch_actions = [row.get("activityAction", "") for row in launches]
     fixture_pass, fixture_details = _fixture_lifecycle_pass(case, observation, task_events)
     guest_names = [row["event"] for row in target_guest]
@@ -345,10 +360,8 @@ def evaluate_task_system_evidence(
     physical_record_reused = same_physical and same_virtual
     new_record = len(launches) >= 2 and not same_virtual
     child_cleared = not child_stack
-    stack_order = bool(target_stack and target_stack[0]["index"] == min(row["index"] for row in stack))
-    if case == "reorder_to_front":
-        stack_order = bool(target_stack and child_stack and
-                           target_stack[0]["index"] < child_stack[0]["index"])
+    stack_order = bool(target_stack and guest_stack
+                       and target_stack[-1]["index"] == max(row["index"] for row in guest_stack))
     transition_dumpsys_pass = (
         before["present"] and transition["present"] and after["present"]
         and bool(transition.get("top_resumed")) and bool(stack)
@@ -356,11 +369,11 @@ def evaluate_task_system_evidence(
     back_expected = {
         "standard": after_top_target and len(target_after) == 1,
         "single_top_top": not after_top_target,
-        "single_top_non_top": after_top_target and len(target_after) == 1,
+        "single_top_non_top": after_top_child and not after_top_target and len(target_after) == 1,
         "single_task": not after_top_target,
         "clear_top_standard": not after_top_target,
         "clear_top_single_top": not after_top_target,
-        "reorder_to_front": after_top_detail and not after_top_target,
+        "reorder_to_front": after_top_child and not after_top_target,
     }
     back_stack_pass = (
         any(event.get("event") == "BACK_REQUEST" for event in task_events)
