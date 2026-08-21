@@ -6,8 +6,8 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T03`
-最后完成任务：`C0-T02`
+下一任务：`C0-T04`
+最后完成任务：`C0-T03`
 
 ## 1. 使用规则
 
@@ -36,7 +36,7 @@
 |---|---|---|---|---|---|
 | C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
 | C0-T02 | 当前 HEAD 可复现构建基线 | DONE | C0-T01 | `beef510b2993a38b010dd8c09a51a497247fd783` | §5 C0-T02 final recovery |
-| C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
+| C0-T03 | MuMu RD 完整基线 | DONE | C0-T02 | `222211efebad3c4adfc66804d32e5c3e60e8f3dd` | §5 C0-T03 |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
 | C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
 | C1-T02 | Service/FGS/Job | PENDING | C1-T01 | - | - |
@@ -254,6 +254,52 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C0-T03 仍需在动态解析的 MuMu `RD测试` 上执行双轮完整基线；ARM/16KB、设备 runtime、
   SX/XH 业务和后续 API/OEM 组合尚未验证。
 - **下一任务**：`C0-T03`；本轮不执行。
+
+### C0-T03：MuMu RD 完整基线
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 13:50 / 2026-08-21 14:35（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13；
+  MuMu 实例通过 `python scripts/mumu_instance.py --instance-name 'RD测试'` 动态解析。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `25ee6ba5afced5abf1c991aa94d3bc559d03022f`；开始前工作区干净，远端分支同 HEAD；上一回执为
+  C0-T02 final recovery，上一实现提交 `beef510b2993a38b010dd8c09a51a497247fd783`，上一回执提交
+  `b47eb12ea9cc7c5566621986b99cc6fa38edab98`。
+- **实现摘要**：完成 MuMu `RD测试` 的 RD_BASELINE 双轮完整回归；补建任务要求的
+  `fixture-compat32` debug APK；修复 transport probe 未订阅 `CS_CROSS_PACKAGE_ROUTE` 与
+  `CS_CROSS_ABI_ROUTE` logcat tag 的 harness 缺口；保留失败原始日志、分类说明、设备快照、APK
+  SHA-256 和 Git bundle 证据。
+- **变更文件**：`tools/device/t57_rd_framework_transport_probe.ps1`；
+  `verification/catch-up/C0-T01/continuation-preflight.json`；
+  `verification/catch-up/C0-T03/`（证据索引、两轮完整回归、针对性重跑、失败原始日志、Git bundle、
+  acceptance-evidence）。
+- **验收命令与结果**：`python scripts/verify-catch-up-continuation.py` PASS；
+  `python tools/capability/run_local_capability_audit.py --all` 按治理要求 collect-all 并分类后返回
+  非零，属于 diagnostic-only，不作为本任务 runtime gate；锁定命令
+  `gradlew.bat --no-daemon --no-build-cache --no-parallel --stacktrace --offline :fixture-compat32:assembleDebug`
+  PASS；transport probe PowerShell AST parse PASS；针对性 transport 与 cross-ABI recovery PASS；
+  `tools/device/t57_rd_full_regression.ps1` 在同一设备快照连续两轮均 PASS，9/9 case 分类一致；
+  `scripts/capture-acceptance-evidence.ps1` PASS；`git diff --check` PASS。
+- **设备证据**：MuMu `RD测试`，动态 serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，
+  boot ID `7cac15ce-d76e-44ea-968b-959d91d03be7`；两轮设备快照位于
+  `verification/catch-up/C0-T03/round-1-complete/` 与 `round-2-complete/`；四枚 APK 和 bundle 的
+  SHA-256 由 `acceptance-evidence/artifact-hashes.txt` 生成，Git bundle 由
+  `acceptance-evidence/bundle-verify.txt` 验证。
+- **Known Issues**：未新增或关闭 Known Issue；现有 `KI-T57-015`（RD API32 上完整
+  process-death matrix 尚未证明）仍保留；本回执仅声明 RD_BASELINE，不外推 Android Matrix、ARM/16KB、
+  OEM、SX/XH 或商业应用等能力。
+- **偏离任务书**：无验收范围偏离。执行中按 DISCOVER/CLASSIFY 分类并修复了测试前置 APK 缺口和
+  harness logcat tag 缺口；首次 cross-ABI recovery 瞬态失败已保留原始证据并在同一设备快照下针对性
+  重跑及两轮完整回归通过；无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`222211efebad3c4adfc66804d32e5c3e60e8f3dd`
+- **推送与远端验证**：本回执提交使用主题 `docs(progress): record [C0-T03] receipt` 单独提交；实现
+  提交与本回执提交均按任务书要求非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 `HEAD`。
+- **遗留风险**：仅完成 MuMu `RD测试` API32 RD_BASELINE；API33+、ARM/跨宽度/16KB、OEM、SX/XH、
+  商业应用和完整 process-death matrix 仍待后续任务验证。
+- **下一任务**：`C0-T04`；本轮不执行。
 
 ## 6. 回执追加模板
 
