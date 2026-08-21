@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 00:12（Asia/Shanghai）
+更新时间：2026-08-22 02:24（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T07`
-最后完成任务：`C1-T06`
+下一任务：`C1 阶段门禁（完成后进入 C2-T01）`
+最后完成任务：`C1-T07`
 
 ## 1. 使用规则
 
@@ -44,7 +44,7 @@
 | C1-T04 | ContentProvider | DONE | C1-T01 | `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d` | §5 C1-T04 |
 | C1-T05 | PendingIntent/Alarm/Notification holder | DONE | C1-T02,C1-T03 | `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` | §5 C1-T05 |
 | C1-T06 | Package 生命周期 | DONE | C1-T04,C1-T05 | `68f28f43b5d35bc4b85a03938b5d7009f9e6f277` | §5 C1-T06 |
-| C1-T07 | Process/ABI/Recovery | BLOCKED | C1-T01..T06 | `PENDING` | §5 C1-T07 |
+| C1-T07 | Process/ABI/Recovery | DONE | C1-T01..T06 | `5d7195cb475108d7c2e864913a18ce6b778a70c2` | §5 C1-T07 |
 | C2-T01 | SX/XH 系统服务方法清单 | PENDING | C1 | - | - |
 | C2-T02 | PMS/Permission/AppOps/Attribution | PENDING | C2-T01 | - | - |
 | C2-T03 | Location | PENDING | C2-T01,C2-T02 | - | - |
@@ -723,3 +723,53 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **推送与远端验证**：实现提交先行推送；回执提交完成后再次以 `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比本地 HEAD。
 - **遗留风险**：50 次 kill/restart、并发压力、双用户污染隔离和完整槽位收敛尚未形成 C1-T07 专属设备证据；恢复条件为修复/解释 probe 收尾判定并完成至少 50 轮。
 - **下一任务**：仍为 `C1-T07`；满足恢复条件前不得进入 C2。
+
+### C1-T07：进程槽位、跨 ABI 与故障恢复闭环（恢复执行）
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 00:26 / 2026-08-22 02:24（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；MuMu `RD测试` 动态解析；API 32；ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`；serial `127.0.0.1:16416`；boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`；Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `f36775d458ba330b350cba74710e5fa858c68927`；开始前工作区干净，远端同 HEAD；上一轮
+  `C1-T07` BLOCKED 回执保留为历史记录，本节为用户明确要求的恢复执行回执。
+- **实现摘要**：修复 API32 Guest 死亡重连后 InputMethodManager 对已失效 Binder client
+  返回 `unknown client` 导致 Guest 崩溃的问题：仅对精确的 inputmethod
+  `startInputOrWindowGainedFocus`/`IllegalArgumentException`/`unknown client` 组合 fail-closed，
+  返回方法默认值，其他异常继续抛出。修复 C1-T07 runner 的 marker 轮询、完整失败 logcat、
+  ADB daemon 短暂失败重试；修复 P1-00 普通主进程不应传空 `processName` 的 harness 缺陷。
+- **变更文件**：`sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java`、
+  `tools/device/t57_rd_c1_t07_process_abi_recovery.ps1`、`tools/device/t57_rd_cross_abi_recovery_probe.ps1`、
+  `tools/capability/run_p1_00_rd.py`、`docs/review/C1_T07_PROCESS_ABI_RECOVERY_DESIGN.md`，以及
+  `verification/catch-up/C1-T07*`、P1-00 与设备测试 APK manifest/hash 证据。
+- **验收命令与结果**：
+  `python tools/static_android_compile.py` PASS；`python scripts/check-pre-device-runtime-hardening.py`
+  PASS（160）；campaign validator PASS、12 个 infra tests PASS；Companion identity、timeout
+  recovery、binder-death、guest-pool reconnect、system-service recovery、interaction-service、
+  architecture 与 supply-chain 门禁均 PASS；`scripts/build-device-test-apks.ps1 -NoClean` PASS。
+  C1-T07 runner 返回 `RESULT: PASS task=C1-T07 loops=50`，逐轮结果 50/50 PASS，generation
+  `1→2`、PID 全部替换、Companion `x86`/32-bit、`GUEST_PROCESS_DISCONNECTED`；普通 recovery、
+  cross-ABI clear/delete/reinstall、isolated service 均 PASS。P1-00 槽位证据中 ordinary
+  `0/1/7/8/31/32/62/63` 与 isolated `0/7/8/14/15` 全部命中，耗尽分别为预期的
+  `NO_PROCESS_SLOT`。
+- **设备证据**：`verification/catch-up/C1-T07/c1-t07-rerun-acceptance.json`、
+  `verification/catch-up/C1-T07-rerun-final2/`、`verification/catch-up/C1-T07-diagnostic/`、
+  `verification/catch-up/C1-T07-recovery-final/`、`verification/catch-up/C1-T07-cross-abi-lifecycle-final/`、
+  `verification/catch-up/C1-T07-isolated-final/`、`artifacts/capability-audit/p1-00/20260821T180354Z/`。
+- **Known Issues**：诊断轮次捕获的旧 IME stale-client 崩溃已由本次生产修复关闭。相邻完整
+  RD regression 的 transport case 在动态 receiver marker 已到达后卡在 `adb shell am broadcast`；
+  原始目录 `verification/catch-up/C1-T07-full-regression-final/` 已保留并分类为相邻
+  transport/harness 问题，不作为 C1-T07 进程/ABI/死亡重连验收的 PASS 依据。P1-00 的
+  system-holder 结果属于 C1-T05 范围，不改变本任务的槽位验收结论。
+- **偏离任务书**：未修改任务书或验收标准；本任务 50 次 kill/restart、槽位、Companion32、
+  死亡重连与直接相关回归均完成。C1 阶段级“双用户 + 30 分钟压力 + 资源收敛”门禁仍标记
+  `PENDING`，不提前宣称 C1 阶段完成。
+- **实现提交 SHA**：`5d7195cb475108d7c2e864913a18ce6b778a70c2`
+  （`fix(process): [C1-T07] close death recovery and slot gates`）。
+- **推送与远端验证**：实现提交先行提交；本回执提交随后以主题
+  `docs(progress): record [C1-T07] receipt` 单独提交；两提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads` 校验最终远端 HEAD。
+- **遗留风险**：C1 阶段门禁的双用户全 fixture、30 分钟并发压力和 clear/delete/restart/death
+  全资源收敛仍需阶段收口时单独补齐；本任务不宣称 API33+、ARM/16KB、OEM、SX/XH 或商业等价性。
+- **下一任务**：`C1 阶段门禁（完成后进入 C2-T01）`；本轮不执行后续任务。
