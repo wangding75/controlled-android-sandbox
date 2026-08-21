@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.0
-更新时间：2026-08-21 21:00（Asia/Shanghai）
+账本版本：1.1
+更新时间：2026-08-21 23:12（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T05`
-最后完成任务：`C1-T04`
+下一任务：`C1-T06`
+最后完成任务：`C1-T05`
 
 ## 1. 使用规则
 
@@ -25,7 +25,7 @@
 | C1 组件/包/进程 | PENDING | 双用户、50 轮与任务书规定压力 | - |
 | C2 系统服务/F2-F5 | PENDING | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | - |
 | C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
-| C4 SX 迁移 | PENDING | CAS-only，100 轮和 8 小时业务 soak | - |
+| C4 SX 迁移 | PENDING | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
 | C5 XH 支持 | PENDING | 原始 XH 通过，可选模块有决策 | - |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -42,7 +42,7 @@
 | C1-T02 | Service/FGS/Job | DONE | C1-T01 | `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0` | §5 C1-T02 |
 | C1-T03 | Broadcast | DONE | C1-T01 | `236ce46b` | §5 C1-T03 |
 | C1-T04 | ContentProvider | DONE | C1-T01 | `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d` | §5 C1-T04 |
-| C1-T05 | PendingIntent/Alarm/Notification holder | PENDING | C1-T02,C1-T03 | - | - |
+| C1-T05 | PendingIntent/Alarm/Notification holder | DONE | C1-T02,C1-T03 | `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` | §5 C1-T05 |
 | C1-T06 | Package 生命周期 | PENDING | C1-T04,C1-T05 | - | - |
 | C1-T07 | Process/ABI/Recovery | PENDING | C1-T01..T06 | - | - |
 | C2-T01 | SX/XH 系统服务方法清单 | PENDING | C1 | - | - |
@@ -575,6 +575,56 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：仅完成 MuMu `RD测试` API32 `RD_BASELINE`，且本次按指示未完成 1800 秒长压；
   API33+、ARM/16KB、OEM、完整 soak、SX/XH、商业应用和 VA PRO 等价性仍未证明。
 - **下一任务**：`C1-T05`；本轮不执行。
+
+### C1-T05：PendingIntent、Alarm、Notification 系统持有者闭环
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 21:27 / 2026-08-21 23:12（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13。
+  MuMu `RD测试` 每次按实例名动态解析；本次实际 serial `127.0.0.1:16416`，Redmi `22041211A`，
+  API 32 / Android 12，ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`，Android ID `398eea33120cd887`。runner 未固化 ADB endpoint。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign` @
+  `585e1ace6fedeb9d43784545327b691ce44f234b`；开始前工作区干净、远端分支同 HEAD；上一回执为
+  `C1-T04`，实现/回执提交 `8a4a36e5737d970a838259d492dc516234bddad5`。
+- **实现摘要**：系统持有方 PendingIntent 强制改写为显式 Host relay，并在无可改写 Intent 时
+  fail-closed；AMS `IIntentSender` 返回保持 raw，Broker relay recovery 改为异步避免 Guest 冷启动
+  回调死锁；补齐 Intent/Intent[]、Alarm、Notification、update/cancel、revision/stale fencing、
+  Guest death/rebind 和清理证据；runner 加入动态设备解析、框架探针预热及持续 logcat 采集。
+- **变更文件**：`sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityInvocationHandler.java`；
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java`；
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java`；
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/SystemHolderPendingIntentActivity.java`；
+  `scripts/check-alarm-notification-lifecycle.py`；`tools/capability/run_c1_t05_rd.py`；
+  `docs/review/C1_T05_PENDING_INTENT_ALARM_NOTIFICATION_DESIGN.md`；`docs/review/KNOWN_ISSUES.yaml`；
+  `verification/catch-up/C1-T05/c1-t05-rd-summary.json` 及 `artifacts/capability-audit/catch-up-c1-t05/`。
+- **验收命令与结果**：`python tools/capability/run_c1_t05_rd.py --loops 50` overall PASS；框架
+  PendingIntent/Binder/callback、Notification readback、Alarm clock readback、cross PendingIntent
+  六项 marker 全 PASS，无 `FATAL EXCEPTION`；用户 0/1 均 50/50 command pass，relay delivery 分别
+  53/50；Guest death recovery、正确 user、旧 session 拒绝、Notification/Alarm residue 均 PASS。
+  `scripts/build-device-test-apks.ps1 -NoClean` PASS；`check-pending-intent-lifecycle.py`、
+  `check-alarm-notification-lifecycle.py`、`check-contracts.py`、campaign infra validate/tests、
+  `generate-sbom.py --check`、本地 `android_oem_compatibility` audit（4/4 PASS）及 `git diff --check`
+  均 PASS。`check-system-services-broker-split.py` 仍报告既有 `KI-R03-027` token drift，已登记且
+  `blocks_current_campaign: false`，不属于本任务范围。
+- **设备证据**：主回执 `verification/catch-up/C1-T05/c1-t05-rd-summary.json`；本次 raw 证据
+  `artifacts/capability-audit/catch-up-c1-t05/20260821T145454Z/`，含 campaign logcat、框架探针、
+  recovery 前后 dumpsys、kill/rebind 和双用户命令记录；pre-fix 事实见
+  `artifacts/capability-audit/catch-up-c1-t05/pre-fix-system-holder-logcat.txt`。
+- **Known Issues**：`KI-R03-033` 已由显式 Host relay、raw AMS sender、异步 recovery 与设备证据
+  修复，状态更新为 `FIXED` 且不再阻断；`KI-R03-027` 保持既有非阻断记录；`KI-R03-032` 保持
+  `RECORDED`，明确八小时稳定性未验证。
+- **偏离任务书**：无。任务书 1.1 已移除显式八小时 soak/长稳门槛，本回执不作八小时稳定性声明；
+  C1-T05 runner 未启用额外 30 分钟压力参数，已完成任务书要求的双用户各 50 个闭环，C1 阶段总门禁
+  仍由后续任务汇总，不提前宣称阶段完成。失败项均已修复并重跑，无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`d50d8d91cb98a1c96524efbe2bd00edbc40dddb5`
+  （`fix(runtime): [C1-T05] close system-held PendingIntent routes`）。
+- **推送与远端验证**：实现提交已以 canonical identity `OpenAI <openai@users.noreply.github.com>`
+  推送到 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交推送后远端 HEAD 已验证为
+  `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5`。本段账本更新将在下一笔独立回执提交中固化并再次
+  推送验证。
+- **下一任务**：`C1-T06`。
 
 ## 6. 回执追加模板
 
