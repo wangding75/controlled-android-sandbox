@@ -6,8 +6,8 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T02`（修复 fixture lint/source 阻断后重试）
-最后完成任务：`C0-T01`
+下一任务：`C0-T03`（MuMu RD 完整基线）
+最后完成任务：`C0-T02`
 
 ## 1. 使用规则
 
@@ -35,7 +35,7 @@
 | 任务 ID | 任务名称 | 状态 | 依赖 | 实现提交 | 回执位置 |
 |---|---|---|---|---|---|
 | C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
-| C0-T02 | 当前 HEAD 可复现构建基线 | BLOCKED | C0-T01 | `b933d1a0ea45ecea8554302c1718dab91eca0161` | §5 C0-T02 |
+| C0-T02 | 当前 HEAD 可复现构建基线 | DONE | C0-T01 | `beef510b2993a38b010dd8c09a51a497247fd783` | §5 C0-T02 final recovery |
 | C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
 | C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
@@ -76,11 +76,9 @@
 
 ## 4. 阻断项
 
-当前阻断：原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与 M5-T19.1-U
-供应链门均通过；恢复构建在 `check`/lint 阶段仍失败（43 errors、30 warnings），首要问题为 fixture
-权限/API/常量/私有 API 探测调用未满足 lint 门禁。恢复条件：审查 package-neutral fixture 语义，增加必要的
-显式权限检查、API level guard 或精确注解/配置，不能用 blanket suppression 隐藏运行时缺陷，然后重新运行
-任务锁定构建命令；禁止进入 C0-T03。
+当前阻断：无。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
+两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认，不得提前据此跳过 C0-C5 主线。
 
 ## 5. 任务回执
@@ -215,6 +213,47 @@
 - **遗留风险**：三枚 APK 尚未生成；fixture lint 的权限、API、常量和私有 API 问题未修复/复验；C0-T02 仍未建立
   可复现构建基线。
 - **下一任务**：仍为 `C0-T02`；修复并分类 `KI-R03-BUILD-002` 后重新执行，不得进入 `C0-T03`。
+
+### C0-T02 final recovery：当前 HEAD 可复现构建基线
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 / 2026-08-21（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `b35ca0feccf6c2d150766d8b9a740680d6f30057`；恢复前工作区干净；上一回执为 C0-T02 recovery，
+  实现提交 `b933d1a0ea45ecea8554302c1718dab91eca0161`，回执提交 `b35ca0feccf6c2d150766d8b9a740680d6f30057`。
+- **实现摘要**：按 DISCOVER/CLASSIFY 结果修复 package-neutral fixture、framework、runtime 和 app
+  的 lint 阻断；使用显式 API level guard、官方常量、精确方法级权限注解、目标私有 API 注解和可选
+  camera feature 声明；将可选 `ApplicationInfo.appComponentFactory` 访问改为受控兼容读取；未使用
+  blanket suppression、lint bypass 或运行时缺陷改名。
+- **变更文件**：fixture-basic 探针与 manifest；`sandbox-framework` 服务代理；`sandbox-runtime`
+  Guest 兼容读取、classloader、component/connection bridge；app debug/native campaign 与 manifest；
+  `docs/review/KNOWN_ISSUES.yaml`；`verification/catch-up/C0-T02/build-baseline-blocked.md`；
+  `.gitignore`（忽略本地 M5 device-test APK 输出）。
+- **验收命令与结果**：构建环境、wrapper、Gradle lock、M5-T19.1-U supply-chain、campaign validator
+  和 9 个 campaign infra tests 全部 PASS；fixture、framework、runtime、app 的 targeted lint 全部
+  `BUILD SUCCESSFUL`；锁定命令
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-device-test-apks.ps1`
+  连续两轮 PASS，均生成 Host/fixture/Companion32 三枚 APK（3710513B / 1766894B / 42218435B）；
+  两轮 SHA-256 逐项一致：Host
+  `e6c565f7f9349901f5ac91fc234a052e86c6409d1d7eeaa2e1695c33b8fdeb9d`，fixture
+  `af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169`，Companion32
+  `cdb690449ee858954625a24f2683e15208dd7727bed9cb13a55bb82b61712483`；manifest applicationId、
+  signature、ABI 和 native library inventory 校验 PASS；`git diff --check` PASS。
+- **设备证据**：本任务不运行 MuMu；APK 构建产物和 SHA-256 位于本地
+  `artifacts/m5-device-test-build/b35ca0feccf6/`，清单为 `build-manifest.json`，摘要为
+  `SHA256SUMS.txt`。不宣称 Android runtime、RD、ARM/16KB 或业务 PASS。
+- **Known Issues**：`KI-R03-BUILD-001`、`KI-R03-BUILD-002` 均更新为 `FIXED`，且
+  `blocks_current_campaign: false`；历史 BLOCKED 回执和失败日志保留用于审计。
+- **偏离任务书**：无。恢复按原失败分类继续；修复后完成两轮锁定构建和确定性哈希核验；未进入 C0-T03。
+- **实现提交 SHA**：`beef510b2993a38b010dd8c09a51a497247fd783`
+- **回执提交**：使用主题 `docs(progress): record [C0-T02] receipt` 单独提交；实现提交与回执提交均
+  按任务书要求非强制推送到 `origin/feature/t57-r03-va-pro-capability-campaign`，并用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 校验远端 HEAD。
+- **遗留风险**：C0-T03 仍需在动态解析的 MuMu `RD测试` 上执行双轮完整基线；ARM/16KB、设备 runtime、
+  SX/XH 业务和后续 API/OEM 组合尚未验证。
+- **下一任务**：`C0-T03`；本轮不执行。
 
 ## 6. 回执追加模板
 
