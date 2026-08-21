@@ -6,7 +6,7 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T02`
+下一任务：`C0-T02`（解除构建供应链阻断后重试）
 最后完成任务：`C0-T01`
 
 ## 1. 使用规则
@@ -35,7 +35,7 @@
 | 任务 ID | 任务名称 | 状态 | 依赖 | 实现提交 | 回执位置 |
 |---|---|---|---|---|---|
 | C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
-| C0-T02 | 当前 HEAD 可复现构建基线 | PENDING | C0-T01 | - | - |
+| C0-T02 | 当前 HEAD 可复现构建基线 | BLOCKED | C0-T01 | `d0800113e5679dfebae97627e646e5cc88cfd6b8` | §5 C0-T02 |
 | C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
 | C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
@@ -76,8 +76,11 @@
 
 ## 4. 阻断项
 
-当前无任务执行阻断。外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认，
-不得提前据此跳过 C0-C5 主线。
+当前阻断：`C0-T02` 的离线设备测试 APK 构建在 Gradle 严格依赖验证阶段拒绝
+`com.android.tools.build:aapt2:8.11.1-12782657` 的 POM，仓库
+`gradle/verification-metadata.xml` 缺少其校验条目。恢复条件：受信维护者完成产物来源审查并补充已验证
+checksum/signature，或恢复与现有 metadata 匹配的缓存产物，然后重新运行任务锁定构建命令；禁止绕过依赖验证。
+外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认，不得提前据此跳过 C0-C5 主线。
 
 ## 5. 任务回执
 
@@ -140,6 +143,41 @@
 - **遗留风险**：C0-T02 可复现构建、C0-T03 双轮 RD 完整基线和后续 API/OEM/业务范围仍未验证；
   allowlisted historical serial 仅存在于负向静态 guard，不作为设备选择依据。
 - **下一任务**：`C0-T02`
+
+### C0-T02：当前 HEAD 可复现构建基线
+
+- **状态**：BLOCKED
+- **开始/结束时间**：2026-08-21 12:05 / 2026-08-21 12:06（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `78d0a96e322a46912b061e53e750aa3a338de37e`；开始前工作区干净；上一任务回执 `C0-T01`，实现提交
+  `602da7e65a145e1fa277723bd0a97f2abc473c15`，回执提交 `78d0a96e322a46912b061e53e750aa3a338de37e`
+- **实现摘要**：完成工具链、wrapper、Gradle 锁定依赖和供应链身份前检；执行锁定的离线设备测试 APK 构建；
+  在 `:sandbox-contract:compileDebugLibraryResources` 因 `aapt2:8.11.1-12782657` POM 缺少严格验证 metadata
+  而失败；未产生 APK，未修改生产运行时代码；新增 `KI-R03-BUILD-001` 并记录恢复条件。
+- **变更文件**：`verification/catch-up/C0-T02/build-baseline-blocked.md`；
+  `docs/review/KNOWN_ISSUES.yaml`；`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md`
+- **验收命令与结果**：
+  `python scripts/check-build-environment.py --android` PASS；
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-wrapper-bootstrap.ps1` PASS；
+  `python tools/gradle_lock_state.py verify --require-clean` PASS（48 files, 0 coordinates）；
+  `python scripts/check-m5-t19-1-u-supply-chain-governance.py` PASS；
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-device-test-apks.ps1` BLOCKED，
+  失败详情与 Gradle report 路径见 `verification/catch-up/C0-T02/build-baseline-blocked.md`；治理 validator 与
+  9 个 campaign infra tests PASS；未按失败停止规则重试构建。
+- **设备证据**：不适用；本任务未运行 MuMu；Host、fixture、Companion32 APK 均未生成，因此无 APK SHA-256；
+  构建报告位于 `build/reports/dependency-verification/at-1787285099295/dependency-verification-report.html`
+- **Known Issues**：新增 `KI-R03-BUILD-001`（`TEST_EVIDENCE_GAP`，构建供应链 metadata 缺口）；无关闭项。
+- **偏离任务书**：按任务书失败即记录 `BLOCKED` 并停止；未绕过依赖验证、未修改 `gradle/verification-metadata.xml`、
+  未执行第二轮构建。
+- **实现提交 SHA**：`d0800113e5679dfebae97627e646e5cc88cfd6b8`
+- **回执提交**：通过提交主题 `docs(progress): record [C0-T02] receipt` 在 Git 历史定位。
+- **推送目标与远端验证**：目标 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交与本回执提交均须
+  非强制推送；完成后以 `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比本地 `HEAD`；
+  构建阻断不改变推送和回执保全要求。
+- **遗留风险**：未取得三枚设备测试 APK 及其 hash；无法建立 C0-T02 的可复现构建基线；严格依赖验证缺口未解决。
+- **下一任务**：仍为 `C0-T02`；满足恢复条件后重新执行，不得进入 `C0-T03`。
 
 ## 6. 回执追加模板
 
