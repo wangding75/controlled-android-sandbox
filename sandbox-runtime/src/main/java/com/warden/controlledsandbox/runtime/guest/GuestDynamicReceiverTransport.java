@@ -86,6 +86,10 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
             android.util.Log.w("CS_RECEIVER_FRAMEWORK",
                     "dynamic unregister failed id=" + receiverId, error);
         }
+        Bundle event = identityResult();
+        event.putString(RuntimeKeys.STATUS, "FRAMEWORK_DYNAMIC_RECEIVER_UNREGISTERED");
+        event.putString(RuntimeKeys.RECEIVER_ID, receiverId);
+        RuntimeEventLog.event("GUEST_RECEIVER_FRAMEWORK_UNREGISTERED", event);
     }
 
     private void onReceive(DynamicReceiverLease lease, Intent hostIntent) {

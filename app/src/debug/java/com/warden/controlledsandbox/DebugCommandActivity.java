@@ -208,6 +208,12 @@ public final class DebugCommandActivity extends Activity {
                 }
                 operation = runtime.launchComponent(record, virtualUserId, component);
                 requireStatus("launch-component", operation, "LAUNCH_PASS");
+            } else if ("broadcast-campaign".equals(command)) {
+                int iterations = Math.max(1, Math.min(100,
+                        extras.getInt("iterations", 1)));
+                operation = runBroadcastCampaign(runtime, record, virtualUserId, iterations);
+                result.put("broadcastCampaign", bundleJson(operation));
+                requireStatus("broadcast-campaign", operation, "BROADCAST_CAMPAIGN_LAUNCHED");
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
                 requireStatus("launch", operation, "LAUNCH_PASS");
@@ -753,6 +759,28 @@ public final class DebugCommandActivity extends Activity {
             Log.i(TAG, "SYSTEM_HOLDER_NOTIFICATION_CANCEL tag=" + tag + " id=" + id);
         }
         return cancelled;
+    }
+
+    private static Bundle runBroadcastCampaign(RuntimeClient runtime, SandboxRecord record,
+                                               int virtualUserId, int iterations) throws Exception {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, "BROADCAST_CAMPAIGN_LAUNCHED");
+        out.putInt("iterations", iterations);
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        for (int iteration = 1; iteration <= iterations; iteration++) {
+            try {
+                Bundle launch = runtime.launchComponent(record, virtualUserId,
+                        "com.warden.controlledsandbox.fixture.BroadcastCampaignActivity");
+                requireStatus("broadcast-campaign-launch-" + iteration, launch, "LAUNCH_PASS");
+                // The Guest Activity logs the real API results. Keep the Host command alive long
+                // enough for ordered async completion and Activity teardown before the next round.
+                Thread.sleep(1_400L);
+            } finally {
+                runtime.stop(record, virtualUserId);
+            }
+            Thread.sleep(200L);
+        }
+        return out;
     }
 
     private static void requireStatus(String operation, Bundle bundle, String... accepted) {

@@ -144,6 +144,33 @@
                 <action android:name="com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE" />
             </intent-filter>
         </receiver>
+        <receiver android:name="com.warden.controlledsandbox.fixture.BroadcastCampaignHighReceiver"
+            android:exported="true">
+            <intent-filter android:priority="200">
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_ORDERED" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_ABORT" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_PERMISSION" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.warden.controlledsandbox.fixture.BroadcastCampaignLowReceiver"
+            android:exported="true">
+            <intent-filter android:priority="100">
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_ORDERED" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_ABORT" />
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_PERMISSION" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.warden.controlledsandbox.fixture.BroadcastCampaignAsyncReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.warden.controlledsandbox.fixture.C1_T03_ASYNC" />
+            </intent-filter>
+        </receiver>
+        <activity android:name="com.warden.controlledsandbox.fixture.BroadcastCampaignActivity"
+            android:exported="false" />
         <provider
             android:name="com.warden.controlledsandbox.fixture.FixtureProvider"
             android:authorities="${applicationId}.provider"

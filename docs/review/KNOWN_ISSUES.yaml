@@ -356,9 +356,9 @@ issues:
   - issue_id: KI-R03-022
     title: Broadcast-model Receiver coordinator tokens lag T57 Broker
     capability: activity_framework
-    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    classification: TEST_EVIDENCE_GAP
     severity: MEDIUM
-    status: RECORDED
+    status: FIXED
     discovered_by: T57-R03-01 collect-all
     evidence:
       - scripts/check-broadcast-model.py
@@ -366,8 +366,10 @@ issues:
     match_patterns:
       - Receiver coordinator delegation
     blocks_current_campaign: false
-    fix_policy: RECORD_ONLY_DO_NOT_CHANGE_RUNTIME
-    notes: Pre-existing gate/source token drift on the T57-M09 baseline.
+    fix_policy: FIXED_UPDATE_GATE_TO_CURRENT_COORDINATOR_BOUNDARIES
+    notes: Fixed in C1-T03 by updating the governance gate to inspect the current operation/lifecycle
+      coordinators and the RuntimeKeys-backed ordered Receiver timeout; no production Receiver runtime
+      behavior was changed for this issue.
 
   - issue_id: KI-R03-023
     title: Native trust-boundary requireAllowed token missing in Broker

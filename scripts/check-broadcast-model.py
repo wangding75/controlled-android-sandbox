@@ -48,21 +48,30 @@ for token in ['SEND_IMPLICIT_BROADCAST', 'SEND_ORDERED_BROADCAST']:
         errors.append(f'ComponentOperations missing {token}')
 
 broker = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java').read_text()
+operation_coordinator = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java').read_text()
+guest_lifecycle = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java').read_text()
 coordinator = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java').read_text()
+if 'RuntimeReceiverCoordinator receiverCoordinator' not in broker:
+    errors.append('RuntimeBrokerService missing Receiver coordinator declaration')
 for token in [
-    'RuntimeReceiverCoordinator receiverCoordinator',
     'receiverCoordinator.dispatchManifestBroadcast(',
     'receiverCoordinator.dispatchImplicitManifestBroadcast(',
     'receiverCoordinator.dispatchDynamicBroadcast(',
+]:
+    if token not in operation_coordinator:
+        errors.append(f'RuntimeComponentOperationCoordinator missing Receiver broadcast delegation: {token}')
+for token in [
     'receiverCoordinator.disconnectSession(',
-    'componentRecoveryCoordinator.recover(',
     'receiverCoordinator.stopSession(',
     'receiverCoordinator.invalidateInstance(',
-    'receiverCoordinator.invalidateAll(',
-    'receiverCoordinator.purgeExpired(',
 ]:
+    if token not in broker and token not in guest_lifecycle:
+        errors.append(f'Receiver lifecycle owner missing delegation: {token}')
+if 'componentRecoveryCoordinator.recover(' not in guest_lifecycle:
+    errors.append('RuntimeGuestLifecycleCoordinator missing component recovery delegation')
+for token in ['receiverCoordinator.invalidateAll(', 'receiverCoordinator.purgeExpired(']:
     if token not in broker:
-        errors.append(f'RuntimeBrokerService missing Receiver coordinator delegation: {token}')
+        errors.append(f'RuntimeBrokerService missing Receiver lifecycle delegation: {token}')
 recovery = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentRecoveryCoordinator.java').read_text()
 if 'receivers.recoverSession(' not in recovery:
     errors.append('RuntimeComponentRecoveryCoordinator missing Receiver recovery delegation')
@@ -163,7 +172,9 @@ for token in [
 
 receiver_tokens = (ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/receiver/OrderedReceiverTokenRegistry.java').read_text()
 for token in [
-    'MAX_ACTIVE = 256', 'MAX_TIMEOUT_MS = 10_000L', 'CompletableFuture',
+    'MAX_ACTIVE = 256',
+    'MAX_TIMEOUT_MS = RuntimeKeys.FRAMEWORK_RECEIVER_DISPATCH_TIMEOUT_MS',
+    'CompletableFuture',
     'cancelSession(', 'cancelInstance(', 'ORDERED_RECEIVER_LATE_COMPLETION',
     'ORDERED_RECEIVER_IDENTITY_MISMATCH', 'ORDERED_RECEIVER_RESULT_REJECTED',
 ]:
