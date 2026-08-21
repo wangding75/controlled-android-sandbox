@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.0
-更新时间：2026-08-21 18:43（Asia/Shanghai）
+更新时间：2026-08-21 19:39（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T03`
-最后完成任务：`C1-T02`
+下一任务：`C1-T04`
+最后完成任务：`C1-T03`
 
 ## 1. 使用规则
 
@@ -40,7 +40,7 @@
 | C0-T04 | 统一能力事实源与 VA PRO corpus | DONE | C0-T03 | `8bb4470c6054b728f64e83529a22f7e2222f6a7d` | §5 C0-T04 |
 | C1-T01 | Activity/Application 与任务栈 | DONE | C0 | `87d96611` | §5 C1-T01 |
 | C1-T02 | Service/FGS/Job | DONE | C1-T01 | `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0` | §5 C1-T02 |
-| C1-T03 | Broadcast | PENDING | C1-T01 | - | - |
+| C1-T03 | Broadcast | DONE | C1-T01 | `236ce46b` | §5 C1-T03 |
 | C1-T04 | ContentProvider | PENDING | C1-T01 | - | - |
 | C1-T05 | PendingIntent/Alarm/Notification holder | PENDING | C1-T02,C1-T03 | - | - |
 | C1-T06 | Package 生命周期 | PENDING | C1-T04,C1-T05 | - | - |
@@ -458,6 +458,63 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：仅完成 MuMu `RD测试` API32 `RD_BASELINE` 与 30 分钟短测；8 小时 soak、API33+、
   ARM/跨宽度/16KB、OEM、SX/XH、商业应用和 VA PRO 等价性仍未证明。
 - **下一任务**：`C1-T03`；本轮不执行。
+
+### C1-T03：Broadcast 事件模型闭环
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 18:44 / 2026-08-21 19:39（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13；
+  MuMu `RD测试` 通过动态解析器定位。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `602bdc944408cedcdde5e042e3af2e1ec76d3eb2`；开始前工作区干净、远端同 HEAD；上一回执为
+  `C1-T02`，实现提交 `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0`，回执提交
+  `602bdc944408cedcdde5e042e3af2e1ec76d3eb2`。
+- **实现摘要**：将 Broadcast 架构检查器更新到当前 operation/lifecycle coordinator 边界并同步
+  `RuntimeKeys` timeout；新增 package-neutral manifest/dynamic fixture，覆盖 explicit/implicit、
+  ordered result/abort、`goAsync`、receiver permission/拒绝、动态注册注销、双虚拟用户和进程停止清理；
+  新增 fail-closed RD runner 与设计/证据回执。运行时仅增加动态注销观测事件，未改变广播语义；`KI-R03-022`
+  已修复为 `TEST_EVIDENCE_GAP`。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`；
+  `fixture-basic/src/main/AndroidManifest.xml` 及 `BroadcastCampaign*.java` 5 个 fixture；
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestDynamicReceiverTransport.java`；
+  `scripts/check-broadcast-model.py`；`tools/capability/run_c1_t03_rd.py`；
+  `docs/review/C1_T03_BROADCAST_DESIGN.md`；`docs/review/KNOWN_ISSUES.yaml`；
+  `verification/catch-up/C1-T03/c1-t03-rd-summary.json`；`verification/m5-t16-source-closure-audit.json`；
+  `verification/sbom.json`。
+- **验收命令与结果**：
+  `python tools/capability/run_local_capability_audit.py --all` 按治理要求 collect-all，42 gates 为
+  PASS=30、KNOWN_ISSUE=12、NEW_REGRESSION=0；`python scripts/check-broadcast-model.py` PASS；
+  `python scripts/check-m5-t3-broadcast-fgs.py` PASS；`python tools/capability/validate_campaign_infra.py`
+  PASS；`python tools/static_android_compile.py` PASS；app/fixture lint 与 assemble PASS；
+  `scripts/build-device-test-apks.ps1` PASS。该脚本未包含 `fixture-compat32`，按既有锁定命令补建
+  `:fixture-compat32:assembleDebug` PASS。初次 50 轮尝试暴露单次 Host 命令/环形 logcat 证据截断（19/50、
+  17/50），已修复 runner 为逐轮即时抓取后重跑；最终
+  `python tools/capability/run_c1_t03_rd.py --instance 'RD测试' --loops 50` PASS：user0/user1
+  各 50 轮，15 类核心标记与 4 类 ordered result 均精确 50/50；无 runtime FAIL、abort low、async
+  finish failure 或 fatal marker。`python scripts/generate-sbom.py --check` 与 `git diff --check` PASS。
+- **设备证据**：主回执为 `verification/catch-up/C1-T03/c1-t03-rd-summary.json`；原始逐轮日志与
+  debug 回执位于 `artifacts/capability-audit/catch-up-c1-t03/20260821T112654Z/user-0/` 和
+  `user-1/`。动态设备为 MuMu `RD测试`，serial `127.0.0.1:16416`，model `22041211A`，API 32 /
+  Android 12，ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`。APK SHA-256：host
+  `208916e29d3dca45e08a7ecf4fe038fd548771a1fa38584d6a99c7e0d6095b07`；fixture
+  `d5025a8a30acc5fe961531a2b66229b8dae9f5d86c21af1ea0a3f7779024c6ef`；companion32
+  `7f4bb7d740040dd840dca4e7488c895eaf838a1dabc2307301bbe5dd3cf94567`；fixture32
+  `4f6a0332c15aa09275876a08102712b8af1f89b35275ec65659866ef3e063d7d`。
+- **Known Issues**：关闭 `KI-R03-022` 的当前架构检查器漂移记录；未新增 runtime issue。仅声明 MuMu
+  API32 `RD_BASELINE`，不外推 API33+、ARM/16KB、OEM、SX/XH、商业应用或 VA PRO 等价性。
+- **偏离任务书**：无验收范围偏离；按失败优先修复规则补建缺失的 fixture32 APK，并修复 runner 的
+  Host 长命令与 logcat 环形缓冲证据缺口后重跑通过；无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`236ce46b2736f4177d6ce14f8ee576218b47a9d1`
+  （`test(broadcast): [C1-T03] close RD event model gates`）。
+- **回执提交**：通过提交主题 `docs(progress): record [C1-T03] receipt` 在 Git 历史定位。
+- **推送与远端验证**：目标 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交与本回执提交
+  均按任务书要求非强制推送，完成后以 `git ls-remote --heads origin
+  feature/t57-r03-va-pro-capability-campaign` 对比最终本地 `HEAD`。
+- **遗留风险**：本任务仅完成 MuMu `RD测试` API32 `RD_BASELINE`；跨 API、ARM/16KB、OEM、完整 8 小时
+  soak、SX/XH、商业应用和 VA PRO 等价性仍待后续任务验证。
+- **下一任务**：`C1-T04`；本轮不执行。
 
 ## 6. 回执追加模板
 
