@@ -100,7 +100,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
-      "lines": 1579
+      "lines": 1580
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
@@ -108,7 +108,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStore.java",
-      "lines": 1460
+      "lines": 1470
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
@@ -124,7 +124,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/packagemanager/PackageManagerInvocationHandler.java",
-      "lines": 1236
+      "lines": 1260
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestBrokerContentProvider.java",
@@ -132,7 +132,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-      "lines": 1115
+      "lines": 1130
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadInstrumentation.java",
@@ -156,7 +156,7 @@
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
-      "lines": 873
+      "lines": 897
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java",
@@ -212,15 +212,15 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
-      "lines": 588
+      "lines": 595
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+      "lines": 587
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
       "lines": 583
-    },
-    {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
-      "lines": 579
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
