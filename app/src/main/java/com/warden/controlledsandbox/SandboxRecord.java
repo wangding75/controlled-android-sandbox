@@ -221,6 +221,16 @@ final class SandboxRecord {
                 lastUpdateAt, lastProbeStatus, lastProbeAt);
     }
 
+    SandboxRecord withServiceComponent(String newServiceClass, String newServiceProcess) {
+        return new SandboxRecord(packageName, label, versionName, versionCode,
+                signatureSha256, apkPath, nativeLibraryDir, nativeAbi, containsNativeCode,
+                nativeGuestTrust, launchActivity, launchProcess, applicationClass,
+                newServiceClass, newServiceProcess, receiverClass, receiverProcess,
+                receiverAction, providerClass, providerProcess, providerAuthority, permissions,
+                sharedLibraries, sha256, baseApkSha256, artifacts, importedAt, firstInstallAt,
+                lastUpdateAt, lastProbeStatus, lastProbeAt);
+    }
+
     SandboxRecord withInstallTimes(long firstInstallAt, long lastUpdateAt) {
         return new SandboxRecord(packageName, label, versionName, versionCode, signatureSha256,
                 apkPath, nativeLibraryDir, nativeAbi, containsNativeCode, nativeGuestTrust,

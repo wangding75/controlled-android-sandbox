@@ -18,6 +18,11 @@ public class FixtureService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         Log.i("CS_FIXTURE", "SERVICE_START id=" + startId
                 + " action=" + (intent == null ? "" : intent.getAction()));
+        if (intent != null && "C1-T02_DEMOTE".equals(intent.getAction())) {
+            invokeStopForeground();
+            Log.i("CS_FIXTURE", "FRAMEWORK_FGS_STOP_FOREGROUND_PASS");
+            return START_STICKY;
+        }
         // A sticky foreground Service is restarted with a null Intent.  It must still promote
         // itself again on the replacement ActivityThread Service instance; otherwise real AMS
         // and the virtual foreground registry diverge after process death.
@@ -86,6 +91,17 @@ public class FixtureService extends Service {
             }
         }
         throw new NoSuchMethodException(name);
+    }
+
+    private void invokeStopForeground() {
+        try {
+            java.lang.reflect.Method stop = Service.class.getDeclaredMethod(
+                    "stopForeground", boolean.class);
+            stop.setAccessible(true);
+            stop.invoke(this, true);
+        } catch (Throwable error) {
+            throw new AssertionError("FRAMEWORK_FGS_STOP_REFLECTION_FAILED", error);
+        }
     }
     @Override public void onDestroy() {
         Log.i("CS_FIXTURE", "SERVICE_DESTROY " + getClass().getName());

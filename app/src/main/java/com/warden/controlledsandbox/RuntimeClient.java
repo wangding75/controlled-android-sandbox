@@ -87,6 +87,12 @@ final class RuntimeClient implements AutoCloseable {
         return startService(record, virtualUserId, component, processName, 0);
     }
     Bundle startService(SandboxRecord record, int virtualUserId, String component,
+                        String processName, String action) throws Exception {
+        Bundle request = componentRequest(record, virtualUserId, ComponentOperations.START_SERVICE,
+                component, processName, action, "");
+        return invoke(record, virtualUserId, request);
+    }
+    Bundle startService(SandboxRecord record, int virtualUserId, String component,
                         String processName, int slotPadCount) throws Exception {
         return startService(record, virtualUserId, component, processName, slotPadCount, -1);
     }

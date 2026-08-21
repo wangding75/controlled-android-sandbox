@@ -89,8 +89,11 @@ provider_coordinator = require(
 broker = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
     "RuntimeProviderResourceCoordinator providerResources", "providerResources.stopSession",
-    "componentRecoveryCoordinator.recover", "providerResources.invalidateInstance")
-require(
+    "RuntimeComponentRecoveryCoordinator")
+guest_lifecycle = require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java",
+    "providerResources.invalidateInstance")
+recovery = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentRecoveryCoordinator.java",
     "providers.recoverSession", "providers.stopSession")
 for forbidden in ["closeGuestCursorBestEffort", "closeGuestFileBestEffort", "applyProviderCleanup"]:

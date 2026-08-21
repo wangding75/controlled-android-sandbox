@@ -550,7 +550,15 @@ final class RuntimeComponentOperationCoordinator {
                 ComponentOperations.SET_SERVICE_FOREGROUND.equals(invocation.operation)
                         && invocation.request.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, false)
                         && invocation.request.getBoolean(RuntimeKeys.SERVICE_RECOVERY, false);
-        if (!deferredRecoveryForeground) {
+        // ActivityThread Service callbacks commit their authoritative start record through
+        // START_BEGIN/START events.  The initial Guest operation only requests that framework
+        // transaction; applying it here as well increments the Broker startId twice and makes
+        // the final callback fail SERVICE_START_ID_MISMATCH.
+        boolean frameworkStartAlreadyRecorded =
+                result.getBoolean(RuntimeKeys.FRAMEWORK_SERVICE_OWNED, false)
+                        && (ComponentOperations.START_SERVICE.equals(invocation.operation)
+                        || ComponentOperations.START_FOREGROUND_SERVICE.equals(invocation.operation));
+        if (!deferredRecoveryForeground && !frameworkStartAlreadyRecorded) {
             serviceCoordinator.applySuccessfulOperation(invocation.session, invocation.request, result);
         }
         if (ComponentOperations.UNREGISTER_RECEIVER.equals(invocation.operation)) {

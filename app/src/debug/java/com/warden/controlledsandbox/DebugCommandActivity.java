@@ -25,6 +25,7 @@ import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 /** Debug-build-only ADB entrypoint for deterministic emulator gates. */
 public final class DebugCommandActivity extends Activity {
@@ -227,6 +228,99 @@ public final class DebugCommandActivity extends Activity {
                 result.put("components", components);
                 operation = runtime.prepare(record, virtualUserId);
                 requireStatus("prepare", operation, "PREPARED", "ALREADY_PREPARED");
+            } else if ("service-lifecycle-suite".equals(command)) {
+                String component = extras.getString("serviceComponent", record.serviceClass).trim();
+                if (component.isEmpty()) throw new IllegalArgumentException(
+                        "serviceComponent extra is required");
+                String processName = extras.getString("serviceProcess", record.serviceProcess);
+                SandboxRecord serviceRecord = record.withServiceComponent(component, processName);
+                operation = runtime.prepare(serviceRecord, virtualUserId);
+                requireStatus("service-lifecycle-prepare", operation,
+                        "PREPARED", "ALREADY_PREPARED");
+                int iterations = Math.max(1, Math.min(100,
+                        extras.getInt("iterations", 1)));
+                JSONArray cycles = new JSONArray();
+                for (int iteration = 1; iteration <= iterations; iteration++) {
+                    Bundle firstStart = runtime.startService(serviceRecord, virtualUserId,
+                            component, processName, "C1-T02_START");
+                    requireStatus("service-lifecycle-first-start", firstStart, "SERVICE_STARTED");
+                    int firstStartId = awaitServiceStartId(runtime, serviceRecord, virtualUserId);
+                    Bundle secondStart = runtime.startService(serviceRecord, virtualUserId,
+                            component, processName, "C1-T02_START");
+                    requireStatus("service-lifecycle-second-start", secondStart, "SERVICE_STARTED");
+                    int secondStartId = awaitServiceStartId(runtime, serviceRecord, virtualUserId);
+                    if (firstStartId < 1 || secondStartId <= firstStartId) {
+                        throw new IllegalStateException("SERVICE_START_ID_NOT_MONOTONIC:first="
+                                + firstStartId + ":second=" + secondStartId);
+                    }
+                    Bundle staleStop = runtime.stopServiceStartId(serviceRecord, virtualUserId, firstStartId);
+                    if (staleStop.getBoolean(RuntimeKeys.SERVICE_STOPPED_BY_START_ID, false)
+                            || staleStop.getInt(RuntimeKeys.SERVICE_LAST_START_ID, -1) != secondStartId
+                            || staleStop.getInt(RuntimeKeys.SERVICE_START_COUNT, -1) < 2) {
+                        throw new IllegalStateException("STALE_SERVICE_START_ID_STOPPED_NEWER_START");
+                    }
+
+                    RuntimeClient.BoundServiceLease firstLease = null;
+                    RuntimeClient.BoundServiceLease secondLease = null;
+                    boolean firstBinder = false;
+                    boolean secondBinder = false;
+                    try {
+                        firstLease = runtime.bindService(serviceRecord, virtualUserId,
+                                "c1-t02-" + iteration + "-a");
+                        secondLease = runtime.bindService(serviceRecord, virtualUserId,
+                                "c1-t02-" + iteration + "-b");
+                        firstBinder = firstLease.binder() != null;
+                        secondBinder = secondLease.binder() != null;
+                        if (!firstBinder || !secondBinder) {
+                            throw new IllegalStateException("SERVICE_BINDER_MISSING");
+                        }
+                    } finally {
+                        if (secondLease != null) secondLease.close();
+                        if (firstLease != null) firstLease.close();
+                    }
+
+                    Bundle foregroundStart = runtime.startForegroundService(serviceRecord, virtualUserId,
+                            true, "C1-T02", 0, 5_000L);
+                    requireStatus("service-lifecycle-foreground-start", foregroundStart,
+                            "SERVICE_STARTED", "SERVICE_RECOVERED");
+                    Bundle promoted = awaitServiceSnapshot(runtime, serviceRecord, virtualUserId);
+                    if (!promoted.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, false)
+                            || !promoted.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, false)) {
+                        throw new IllegalStateException("SERVICE_FOREGROUND_PROMOTION_NOT_RECORDED");
+                    }
+                    Bundle demoteStart = runtime.startService(serviceRecord, virtualUserId,
+                            component, processName, "C1-T02_DEMOTE");
+                    requireStatus("service-lifecycle-foreground-demote", demoteStart,
+                            "SERVICE_STARTED");
+                    Bundle demoted = awaitServiceSnapshot(runtime, serviceRecord, virtualUserId);
+                    if (demoted.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, true)
+                            || demoted.getBoolean(RuntimeKeys.SERVICE_FOREGROUND_REQUESTED, true)) {
+                        throw new IllegalStateException("SERVICE_FOREGROUND_DEMOTION_NOT_RECORDED");
+                    }
+                    Bundle stopped = runtime.stopService(serviceRecord, virtualUserId);
+                    if (stopped.getInt(RuntimeKeys.SERVICE_START_COUNT, -1) != 0
+                            || stopped.getInt(RuntimeKeys.SERVICE_CONNECTION_COUNT, -1) != 0
+                            || stopped.getBoolean(RuntimeKeys.SERVICE_FOREGROUND, true)) {
+                        throw new IllegalStateException("SERVICE_OWNERSHIP_DID_NOT_CONVERGE");
+                    }
+                    JSONObject cycle = new JSONObject();
+                    cycle.put("iteration", iteration);
+                    cycle.put("firstStartId", firstStartId);
+                    cycle.put("secondStartId", secondStartId);
+                    cycle.put("staleStartIdPreserved", true);
+                    cycle.put("firstBinder", firstBinder);
+                    cycle.put("secondBinder", secondBinder);
+                    cycle.put("foregroundPromoted", promoted.getBoolean(
+                            RuntimeKeys.SERVICE_FOREGROUND, false));
+                    cycle.put("foregroundDemoted", !demoted.getBoolean(
+                            RuntimeKeys.SERVICE_FOREGROUND, true));
+                    cycle.put("stoppedState", stopped.getString(RuntimeKeys.SERVICE_STATE, ""));
+                    cycles.put(cycle);
+                }
+                result.put("serviceLifecycleIterations", iterations);
+                result.put("serviceLifecycleCycles", cycles);
+                operation = new Bundle();
+                operation.putString(RuntimeKeys.STATUS, "SERVICE_LIFECYCLE_PASS");
             } else if ("isolated-service".equals(command)) {
                 String component = extras.getString("component", "").trim();
                 if (component.isEmpty()) {
@@ -429,6 +523,28 @@ public final class DebugCommandActivity extends Activity {
             if (!"hold-prepare".equals(command)) writeResult(result);
             runOnUiThread(() -> { finish(); worker.shutdown(); });
         }
+    }
+
+    private static int awaitServiceStartId(RuntimeClient runtime, SandboxRecord record,
+                                            int virtualUserId) throws Exception {
+        return awaitServiceSnapshot(runtime, record, virtualUserId)
+                .getInt(RuntimeKeys.SERVICE_LAST_START_ID, -1);
+    }
+
+    private static Bundle awaitServiceSnapshot(RuntimeClient runtime, SandboxRecord record,
+                                               int virtualUserId) throws Exception {
+        for (int attempt = 0; attempt < 30; attempt++) {
+            // MAX_VALUE can never equal the live startId. The Broker still returns its snapshot,
+            // which gives this debug-only verifier the callback-assigned id without mutating the
+            // started ownership.
+            Bundle snapshot = runtime.stopServiceStartId(record, virtualUserId, Integer.MAX_VALUE);
+            int lastStartId = snapshot.getInt(RuntimeKeys.SERVICE_LAST_START_ID, -1);
+            if (lastStartId > 0 && snapshot.containsKey(RuntimeKeys.SERVICE_START_COUNT)) {
+                return snapshot;
+            }
+            Thread.sleep(100L);
+        }
+        throw new IllegalStateException("SERVICE_START_CALLBACK_TIMEOUT");
     }
 
     private Bundle configureProfiles(PackageServiceClient packages, SandboxRecord record,

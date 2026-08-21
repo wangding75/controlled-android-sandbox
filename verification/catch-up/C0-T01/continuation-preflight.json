@@ -1,34 +1,35 @@
 {
   "schema_version": 1,
-  "task_id": "C0-T03",
+  "task_id": "C1-T02",
   "status": "PASS",
-  "captured_at": "2026-08-21T05:50:48.964428+00:00",
+  "captured_at": "2026-08-21T09:21:41.007915+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C0-T03",
+    "next_task": "C1-T02",
     "active_task": "",
-    "last_completed": "C0-T02",
-    "first_ready_pending": "C0-T03",
-    "dependencies": "C0-T02"
+    "last_completed": "C1-T01",
+    "first_ready_pending": "C1-T02",
+    "dependencies": "C1-T01"
   },
   "last_receipt": {
-    "task_id": "C0-T02",
+    "task_id": "C1-T01",
     "status": "DONE",
     "implementation_commits": [
-      "beef510b2993a38b010dd8c09a51a497247fd783"
+      "87d96611"
     ],
-    "receipt_commit": "b47eb12ea9cc7c5566621986b99cc6fa38edab98",
-    "baseline_commit": "b35ca0feccf6c2d150766d8b9a740680d6f30057",
+    "receipt_commit": "1d0f351160db665ab91b3cdfa26e3c1f1f39d2b6",
+    "baseline_commit": "81f41418e29ad3bd8183fdaa7ecb1a16cf138c33",
     "evidence_paths": [
-      "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C0-T02/build-baseline-blocked.md"
+      "docs/review/C1_T01_ACTIVITY_TASK_DESIGN.md",
+      "verification/catch-up/C1-T01/c1-t01-rd-summary.json",
+      "verification/catch-up/C1-T01/c1-t01-supplemental-probes.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "25ee6ba5afced5abf1c991aa94d3bc559d03022f",
+    "head": "1d0f351160db665ab91b3cdfa26e3c1f1f39d2b6",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "25ee6ba5afced5abf1c991aa94d3bc559d03022f",
+    "remote_head": "1d0f351160db665ab91b3cdfa26e3c1f1f39d2b6",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
@@ -72,5 +73,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C0-T03"
+  "evidence_directory": "verification/catch-up/C1-T02"
 }
