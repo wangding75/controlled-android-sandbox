@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.Objects;
 
 public final class FrameworkIdentityInvocationHandler implements InvocationHandler {
+    private static final String ANDROID_INTENT_SENDER_CLASS = "android.content.IIntentSender";
     private final FrameworkServiceSpec spec;
     private final Object delegate;
     private final IdentityArgumentRewriter rewriter;
@@ -154,6 +155,17 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
                     rewriter.rewriteOutboundInPlace(argument);
                 }
             }
+            if (methodName.startsWith("getIntentSender")
+                    && spec.serviceName().equals("activity-manager")) {
+                boolean raw = preserveRawPendingIntentSender(method);
+                safeRecord(ProxyEvent.now(
+                        spec.serviceName(), methodName, "pending-intent-ams-return", raw,
+                        "type=" + method.getReturnType().getName()));
+                android.util.Log.i("CS_PENDING_INTENT", "SYSTEM_HOLDER_AMS_RETURN method="
+                        + methodName + " type=" + method.getReturnType().getName()
+                        + " raw=" + raw);
+                if (raw) return result;
+            }
             if (spec.outboundMethods().contains(methodName)) {
                 Object rewritten = rewriter.rewriteOutbound(result);
                 safeRecord(ProxyEvent.now(
@@ -200,5 +212,11 @@ public final class FrameworkIdentityInvocationHandler implements InvocationHandl
     private Object wrapBoundaryResult(Object value, Class<?> expectedType, String role) {
         return binderBoundary == null ? value
                 : binderBoundary.wrapReturned(value, expectedType, role);
+    }
+
+    private static boolean preserveRawPendingIntentSender(Method method) {
+        return method != null
+                && method.getName().startsWith("getIntentSender")
+                && method.getReturnType().getName().contains(ANDROID_INTENT_SENDER_CLASS);
     }
 }

@@ -75,6 +75,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
     private static final int SLOT_COUNT = ProcessSlotContract.ORDINARY_SLOT_COUNT;
@@ -90,6 +92,12 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     RuntimeOwnershipSweep ownershipSweep;
     final UriGrantRegistry uriGrants = new UriGrantRegistry();
     final BrokerStateStore brokerState = new BrokerStateStore();
+    /** System-held PendingIntent recovery may synchronously bind a Guest that calls back to Host. */
+    private final ExecutorService pendingIntentRelayExecutor = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "sandbox-pending-intent-relay");
+        thread.setDaemon(true);
+        return thread;
+    });
     final RuntimeIsolatedShareManager isolatedShares =
             new RuntimeIsolatedShareManager(this);
     final RuntimeIsolatedProcessCoordinator isolatedProcessCoordinator =
@@ -374,14 +382,19 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         if (intent != null
                 && RuntimePendingIntentRelayReceiver.ACTION.equals(intent.getAction())) {
             String tokenId = intent.getStringExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID);
-            try {
-                frameworkOperationCoordinator.dispatchSystemHeld(tokenId);
-            } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                android.util.Log.e("CS_PENDING_INTENT", "SYSTEM_HOLDER_RELAY_FAILED token=" + tokenId, error);
-            }
+            pendingIntentRelayExecutor.execute(() -> dispatchSystemHeldAsync(tokenId));
         }
         return START_STICKY;
+    }
+
+    private void dispatchSystemHeldAsync(String tokenId) {
+        try {
+            android.util.Log.i("CS_PENDING_INTENT", "SYSTEM_HOLDER_RELAY_DISPATCH_ASYNC token=" + tokenId);
+            frameworkOperationCoordinator.dispatchSystemHeld(tokenId);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.e("CS_PENDING_INTENT", "SYSTEM_HOLDER_RELAY_FAILED token=" + tokenId, error);
+        }
     }
     synchronized Bundle prepareGuestInternal(Bundle request) {
         return guestLifecycleCoordinator.prepareGuest(request);
@@ -1178,6 +1191,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
     }
 
     @Override public void onDestroy() {
+        pendingIntentRelayExecutor.shutdownNow();
         for (GuestSession session : sessions.snapshot()) {
             if (ownershipSweep != null) {
                 ownershipSweep.stop(session, "ORDERED_RECEIVER_BROKER_DESTROYED");

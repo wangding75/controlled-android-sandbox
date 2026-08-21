@@ -189,31 +189,65 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         // action/data/extras that a direct PendingIntent send would deliver. Guest-local
         // send still uses the Broker IIntentSender proxy.
         if (spec.runtimeBrokerBinder != null && !hostPackageName.isEmpty()) {
-            rewriteIntentsForSystemHolder(arguments, issued.record().persistentTokenId());
+            if (!rewriteIntentsForSystemHolder(arguments, issued.record().persistentTokenId())) {
+                throw new SecurityException("SYSTEM_HOLDER_INTENT_NOT_REWRITTEN");
+            }
             return Interception.passThrough();
         }
         return Interception.handled(sender);
     }
 
-    private void rewriteIntentsForSystemHolder(Object[] arguments, String tokenId) {
-        if (arguments == null || tokenId == null || tokenId.isEmpty()) return;
+    private boolean rewriteIntentsForSystemHolder(Object[] arguments, String tokenId) {
+        if (arguments == null || tokenId == null || tokenId.isEmpty()) return false;
+        boolean rewritten = false;
         for (int index = 0; index < arguments.length; index++) {
             if (arguments[index] instanceof String value && spec.packageName.equals(value)) {
                 arguments[index] = hostPackageName;
                 continue;
             }
-            if (!(arguments[index] instanceof Intent[] intents)) continue;
-            Intent[] rewritten = new Intent[intents.length];
-            for (int cursor = 0; cursor < intents.length; cursor++) {
-                Intent shadow = new Intent(intents[cursor]);
-                shadow.setComponent(new ComponentName(hostPackageName,
-                        RuntimePendingIntentRelayReceiver.CLASS_NAME));
-                shadow.setPackage(hostPackageName);
-                shadow.putExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
-                rewritten[cursor] = shadow;
+            if (arguments[index] instanceof Intent intent) {
+                arguments[index] = systemHolderRelayIntent(intent, tokenId);
+                rewritten = true;
+                continue;
             }
-            arguments[index] = rewritten;
+            if (!(arguments[index] instanceof Intent[] intents) || intents.length == 0) continue;
+            Intent[] relayIntents = new Intent[intents.length];
+            for (int cursor = 0; cursor < intents.length; cursor++) {
+                relayIntents[cursor] = systemHolderRelayIntent(intents[cursor], tokenId);
+            }
+            arguments[index] = relayIntents;
+            rewritten = true;
         }
+        if (rewritten) {
+            android.util.Log.i("CS_PENDING_INTENT", "SYSTEM_HOLDER_REWRITE token=" + tokenId
+                    + " kind=" + issuedKind(arguments)
+                    + " host=" + hostPackageName + " component="
+                    + new ComponentName(hostPackageName, RuntimePendingIntentRelayReceiver.CLASS_NAME));
+        }
+        return rewritten;
+    }
+
+    private static String issuedKind(Object[] arguments) {
+        if (arguments != null) for (Object value : arguments) {
+            if (value instanceof Integer integer && integer >= 1 && integer <= 5) {
+                return String.valueOf(integer);
+            }
+        }
+        return "unknown";
+    }
+
+    private Intent systemHolderRelayIntent(Intent original, String tokenId) {
+        String originalAction = original == null ? null : original.getAction();
+        Intent relay = new Intent(originalAction == null || originalAction.isEmpty()
+                ? RuntimePendingIntentRelayReceiver.ACTION : originalAction);
+        relay.setComponent(new ComponentName(hostPackageName,
+                RuntimePendingIntentRelayReceiver.CLASS_NAME));
+        relay.setPackage(hostPackageName);
+        relay.putExtra(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
+        if (original != null) {
+            relay.putExtra("cas.originalPendingIntentAction", originalAction);
+        }
+        return relay;
     }
 
     private IBinder createBrokerSender(String tokenId, String senderDescriptor) {

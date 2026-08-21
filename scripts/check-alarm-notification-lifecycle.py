@@ -64,9 +64,20 @@ require(
     "systemServices.notificationChannels(scope, packageRevision)")
 require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java",
-    "String deliveryPath = pendingIntentTokenId.isEmpty() ? \"LISTENER\" : \"PENDING_INTENT\"", "name.contains(\"exact\")",
+    "String deliveryPath = hostHeld ? \"PENDING_INTENT\" : \"LISTENER\"", "name.contains(\"exact\")",
     "repeating(name)", "cancelAllNotifications", "notificationMetadata",
     "foregroundServiceKey", "filterAndRestoreChannelResult")
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
+    "SYSTEM_HOLDER_INTENT_NOT_REWRITTEN", "RuntimePendingIntentRelayReceiver.ACTION",
+    "systemHolderRelayIntent", "SYSTEM_HOLDER_REWRITE")
+require(
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkIdentityInvocationHandler.java",
+    "preserveRawPendingIntentSender", "android.content.IIntentSender", "SYSTEM_HOLDER_AMS_RETURN")
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+    "pendingIntentRelayExecutor", "SYSTEM_HOLDER_RELAY_DISPATCH_ASYNC",
+    "dispatchSystemHeldAsync")
 require(
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/routing/VirtualPendingIntentRegistry.java",
     "sendPersistent", "materializePersistent", "persistence.markSent")

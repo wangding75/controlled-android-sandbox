@@ -100,7 +100,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "0a88298e2656bbe702db04970351c6ff8e85f81acfc66f928c16fccf2d137ba4"
+      "sourceDigestSha256": "1975791b5415fc8f9c2deaaf0084a2d1f0e7fae84cfc1ae37ca57c340e566395"
     },
     {
       "type": "library",
@@ -116,7 +116,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "a1214e6e6361326d35612137232ce7a6dd7865bceb2e24cd107e8e390e0dba10"
+      "sourceDigestSha256": "fbe4ac9475f64c66054f29eca173027863ac16aefb60003f8971e1a712fcf39f"
     },
     {
       "type": "application",
@@ -125,7 +125,7 @@
       "gradleProjectPath": ":fixture-basic",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 62,
+      "fileCount": 63,
       "languages": [
         "C++",
         "Gradle",
@@ -134,7 +134,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "e5bae282ea8777d1aa43c9282467224fd85b6e3c3997cb53721ae647b932ac26"
+      "sourceDigestSha256": "b30aeba8762ac1e856f0d491f2f560ac38e5e02e5689e3067752ffdac06a6ea3"
     },
     {
       "type": "application",

@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "returncode": 0,
+  "result": {
+    "command": "pi-system-holder-cancel",
+    "package": "com.warden.controlledsandbox.fixture",
+    "virtualUserId": 0,
+    "trustNativeGuest": true,
+    "startedAt": 1787324148430,
+    "cancelled": 1,
+    "operation": {
+      "status": "CANCELLED"
+    },
+    "status": "PASS"
+  },
+  "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: UNKNOWN (0)\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nWaitTime: 34\nComplete\n",
+  "start_stderr": ""
+}

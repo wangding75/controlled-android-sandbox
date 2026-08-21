@@ -1,0 +1,8 @@
+{
+  "pid": 8563,
+  "command": "kill -9 8563",
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "old_pid_dead": true
+}

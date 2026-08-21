@@ -22,6 +22,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
     private static final String TAG = "CS_PI_HOLDER";
     private static final String CHANNEL_ID = "cas.system.holder";
     private static final int NOTIFICATION_ID = 5703;
+    private static final long ALARM_DELAY_MS = 5_000L;
     static final String ACTION_ALARM =
             "com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM";
     static final String ACTION_NOTIFICATION =
@@ -55,7 +56,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
             String payload = "{\"status\":\"ARMED\",\"notificationId\":" + NOTIFICATION_ID
                     + ",\"alarmAction\":\"" + ACTION_ALARM + "\""
                     + ",\"notificationAction\":\"" + ACTION_NOTIFICATION + "\""
-                    + ",\"alarmDelayMs\":20000"
+                    + ",\"alarmDelayMs\":" + ALARM_DELAY_MS
                     + ",\"pid\":" + android.os.Process.myPid() + "}";
             File out = new File(getFilesDir(), "system-holder.json");
             try (FileOutputStream stream = new FileOutputStream(out)) {
@@ -66,7 +67,8 @@ public final class SystemHolderPendingIntentActivity extends Activity {
             } catch (Exception keepAlive) {
                 Log.w(TAG, "KEEP_ALIVE_FAILED", keepAlive);
             }
-            Log.i(TAG, "ARMED notification=" + NOTIFICATION_ID + " alarm=20s pid="
+            Log.i(TAG, "ARMED notification=" + NOTIFICATION_ID + " alarm="
+                    + ALARM_DELAY_MS + "ms pid="
                     + android.os.Process.myPid() + " file=" + out);
         } catch (Exception error) {
             Log.e(TAG, "ARM_FAILED", error);
@@ -112,7 +114,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
         if (manager == null) return;
         int type = Class.forName("android.app.AlarmManager")
                 .getField("ELAPSED_REALTIME_WAKEUP").getInt(null);
-        long when = SystemClock.elapsedRealtime() + 20_000L;
+        long when = SystemClock.elapsedRealtime() + ALARM_DELAY_MS;
         try {
             manager.getClass().getMethod("setExact", int.class, long.class, PendingIntent.class)
                     .invoke(manager, type, when, sender);
@@ -120,6 +122,15 @@ public final class SystemHolderPendingIntentActivity extends Activity {
             return;
         } catch (Exception exactDenied) {
             Log.w(TAG, "setExact unavailable, falling back", exactDenied);
+        }
+        try {
+            manager.getClass().getMethod("setExactAndAllowWhileIdle", int.class, long.class,
+                    PendingIntent.class)
+                    .invoke(manager, type, when, sender);
+            Log.i(TAG, "ALARM_SCHEDULED mode=setExactAndAllowWhileIdle whenElapsed=" + when);
+            return;
+        } catch (Exception exactDenied) {
+            Log.w(TAG, "setExactAndAllowWhileIdle unavailable, falling back", exactDenied);
         }
         try {
             manager.getClass().getMethod("setAndAllowWhileIdle", int.class, long.class, PendingIntent.class)

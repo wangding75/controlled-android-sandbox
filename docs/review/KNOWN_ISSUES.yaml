@@ -834,3 +834,26 @@ issues:
       pressure, resource-convergence, and failure-closure requirements remain active. This record
       does not mean eight-hour stability was proven; a separately approved stability plan is
       required before making an eight-hour or equivalent long-stability claim.
+
+  - issue_id: KI-R03-033
+    title: System-holder PendingIntent can bypass the Broker relay on RD API32
+    capability: android_oem_compatibility
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: FIXED
+    discovered_by: C1-T05 RD discovery 2026-08-21
+    evidence:
+      - artifacts/capability-audit/catch-up-c1-t05/pre-fix-system-holder-logcat.txt
+      - docs/review/C1_T05_PENDING_INTENT_ALARM_NOTIFICATION_DESIGN.md
+    match_patterns:
+      - Permission Denial: com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM
+      - SYSTEM_HOLDER_RELAY missing
+    blocks_current_campaign: false
+    fix_policy: HOST_RELAY_INTENT_MUST_BE_EXPLICIT_AND_DEVICE_PROVEN
+    notes: >
+      The pre-fix RD API32 run created a Broker sender but the AlarmManager delivery did not
+      produce SYSTEM_HOLDER_RELAY; ActivityManager attempted the original Guest broadcast and
+      rejected it under background-start restrictions. C1-T05 fixed this with an explicit
+      Host-owned relay component, raw AMS sender preservation, identity/revision fencing, and
+      asynchronous recovery dispatch. The final RD receipt records relay delivery, stale-token
+      rejection, and notification/alarm cleanup.
