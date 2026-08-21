@@ -114,9 +114,13 @@ def find_ready_task(rows: dict[str, dict[str, str]], last_completed: str) -> str
 
 
 def receipt_section(text: str, task_id: str) -> str:
-    match = re.search(rf"^###\s+{re.escape(task_id)}(?:：|:).*?$", text, re.MULTILINE)
-    if not match:
+    heading = rf"^###\s+{re.escape(task_id)}(?:\s+[^\n:：]+)?(?:：|:).*?$"
+    matches = list(re.finditer(heading, text, re.MULTILINE))
+    if not matches:
         raise PreflightError(f"receipt not found for {task_id}")
+    # Receipts are append-only, so repeated task headings are historical
+    # attempts.  Continuation must inspect the latest appended receipt.
+    match = matches[-1]
     end = re.search(r"^###\s+|^##\s+", text[match.end():], re.MULTILINE)
     return text[match.end(): match.end() + (end.start() if end else len(text))]
 

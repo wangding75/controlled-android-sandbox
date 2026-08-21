@@ -30,6 +30,18 @@ class ContinuationLedgerTests(unittest.TestCase):
         }
         self.assertEqual(continuation.find_ready_task(rows, "BOOTSTRAP-DOCS"), "C0-T02")
 
+    def test_latest_appended_receipt_wins(self) -> None:
+        text = (
+            "### C0-T02：historical attempt\n"
+            "- **状态**：BLOCKED\n\n"
+            "### C0-T02 final recovery：completed attempt\n"
+            "- **状态**：DONE\n\n"
+            "## next section\n"
+        )
+        section = continuation.receipt_section(text, "C0-T02")
+        self.assertIn("DONE", section)
+        self.assertNotIn("BLOCKED", section)
+
     def test_fixed_issue_status_is_governed_elsewhere(self) -> None:
         from tools.capability import campaign_status
 
