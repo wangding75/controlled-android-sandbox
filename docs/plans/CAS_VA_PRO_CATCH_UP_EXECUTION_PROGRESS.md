@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.0
-更新时间：2026-08-21
+更新时间：2026-08-21 17:16（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T01`
-最后完成任务：`C0-T04`
+下一任务：`C1-T02`
+最后完成任务：`C1-T01`
 
 ## 1. 使用规则
 
@@ -38,7 +38,7 @@
 | C0-T02 | 当前 HEAD 可复现构建基线 | DONE | C0-T01 | `beef510b2993a38b010dd8c09a51a497247fd783` | §5 C0-T02 final recovery |
 | C0-T03 | MuMu RD 完整基线 | DONE | C0-T02 | `222211efebad3c4adfc66804d32e5c3e60e8f3dd` | §5 C0-T03 |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | DONE | C0-T03 | `8bb4470c6054b728f64e83529a22f7e2222f6a7d` | §5 C0-T04 |
-| C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
+| C1-T01 | Activity/Application 与任务栈 | DONE | C0 | `87d96611` | §5 C1-T01 |
 | C1-T02 | Service/FGS/Job | PENDING | C1-T01 | - | - |
 | C1-T03 | Broadcast | PENDING | C1-T01 | - | - |
 | C1-T04 | ContentProvider | PENDING | C1-T01 | - | - |
@@ -350,6 +350,53 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C0 已完成 RD_BASELINE 与事实源收敛，但 API33+、ARM/跨宽度/16KB、OEM、SX/XH、
   商业应用和 VA PRO 等价性仍未证明；下一任务按账本为 `C1-T01`。
 - **下一任务**：`C1-T01`；本轮不执行。
+
+### C1-T01：Activity/Application 与任务栈语义闭环
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 15:11 / 2026-08-21 17:16（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13。
+  MuMu `RD测试` 通过 `python scripts/mumu_instance.py --instance-name 'RD测试'` 动态解析。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign` @
+  `81f41418e29ad3bd8183fdaa7ecb1a16cf138c33`；开始前工作区干净、远端同 HEAD；上一回执为
+  `C0-T04`，实现/回执提交 `8bb4470c6054b728f64e83529a22f7e2222f6a7d`。
+- **实现摘要**：DISCOVER/CLASSIFY 将当前缺口归类为 `TEST_EVIDENCE_GAP`；新增 fail-closed 的
+  RD_BASELINE Activity/Task 矩阵 runner，动态解析设备并覆盖双虚拟用户、standard/singleTop
+  top/non-top/singleTask/CLEAR_TOP/REORDER_TO_FRONT；修复 fixture 的 Back 快照窗口和重复运行时序，
+  不改生产 Activity/Task runtime；补充 ActivityResult 与 process-death generation recovery 专项证据。
+- **变更文件**：`tools/capability/run_c1_t01_rd.py`、`docs/review/C1_T01_ACTIVITY_TASK_DESIGN.md`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/` 下 9 个 task fixture 文件、
+  `verification/catch-up/C1-T01/c1-t01-rd-summary.json`、
+  `verification/catch-up/C1-T01/c1-t01-supplemental-probes.json`。
+- **验收命令与结果**：
+  `python tools/capability/run_local_capability_audit.py --all` 收集 42 gates：30 `PASS`、12 已登记
+  `KNOWN_ISSUE`、0 `NEW_REGRESSION`；`python scripts/check-activity-task-virtualization.py` PASS；
+  `python -m unittest tools/capability/test_a01_semantic_runner_gate.py` PASS（18 tests）；
+  `python tools/static_android_compile.py` PASS；四枚 Debug APK assemble PASS；
+  `python tools/capability/run_c1_t01_rd.py --loops 50` PASS（user0/user1 各 50 轮，700/700，失败 0）；
+  `t57_rd_framework_activity_result_probe.ps1` PASS；`t57_rd_recovery_probe.ps1` PASS；
+  receipt JSON、700 个原始 `result.json`、supplemental JSON 和 `git diff --check` 均 PASS。
+- **设备证据**：MuMu `RD测试`，动态 serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，
+  ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`；主回执为
+  `verification/catch-up/C1-T01/c1-t01-rd-summary.json`，矩阵原始证据为
+  `artifacts/capability-audit/catch-up-c1-t01/20260821T074920Z`；专项证据索引为
+  `verification/catch-up/C1-T01/c1-t01-supplemental-probes.json`。
+- **Known Issues**：本任务未新增 runtime issue；显式 referrer 传播、物理 rotation/configuration change、
+  动态 singleInstance 设备路径未单独证明，已在 supplemental receipt 明确记录；现有 API/OEM/VA PRO
+  未证明项保持原状态。
+- **偏离任务书**：核心 RD 双用户 50 轮和专项 result/death 验收无偏离；为使 transition dump 与真实
+  Back 顺序可回溯，fixture 增加事件后 800ms 快照窗口并将 Back settle 限定为 600ms，runner 仍以
+  dumpsys、CAS route/token、生命周期和真实 Back 共同 fail-closed 判定；未把未覆盖维度推断为 PASS，
+  无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`87d96611`（`test(activity): [C1-T01] stabilize RD task evidence matrix`）。
+- **推送与远端验证**：回执提交完成后，两个提交将按任务书要求非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比本地 `HEAD`。
+- **遗留风险**：本任务仅声明 RD API32 `RD_BASELINE`；显式 referrer、物理 rotation/configuration change、
+  动态 singleInstance、API33+、ARM/16KB、OEM、商业应用和 VA PRO 等价性仍未证明。
+- **下一任务**：`C1-T02`；本轮不执行。
 
 ## 6. 回执追加模板
 
