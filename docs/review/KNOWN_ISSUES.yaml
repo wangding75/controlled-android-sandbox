@@ -730,3 +730,26 @@ issues:
       This is an architecture finding: Option B isolated process is not a
       network hostile boundary on an ordinary INTERNET APK. Do not add a
       production connect hook to fake the result.
+
+  - issue_id: KI-R03-BUILD-001
+    title: Locked Android build lacks verification metadata for aapt2 POM
+    capability: android_oem_compatibility
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C0-T02 build baseline
+    evidence:
+      - verification/catch-up/C0-T02/build-baseline-blocked.md
+      - gradle/verification-metadata.xml
+      - build/reports/dependency-verification/at-1787285099295/dependency-verification-report.html
+    match_patterns:
+      - com.android.tools.build:aapt2:8.11.1-12782657
+      - Checksums are missing from verification metadata
+    blocks_current_campaign: true
+    fix_policy: TRUSTED_ARTIFACT_REVIEW_REQUIRED_NO_VERIFICATION_BYPASS
+    notes: >
+      The locked Android toolchain and Gradle dependency-lock checks pass, but
+      the first offline device-test build is fail-closed because the aapt2 POM
+      has no checksum entry in gradle/verification-metadata.xml. Review the
+      artifact provenance and add verified metadata, or restore a cache artifact
+      matching existing metadata, before rerunning the exact build command.
