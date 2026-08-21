@@ -5,9 +5,9 @@
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C0`
-下一任务：`C0-T04`
-最后完成任务：`C0-T03`
+当前阶段：`C1`
+下一任务：`C1-T01`
+最后完成任务：`C0-T04`
 
 ## 1. 使用规则
 
@@ -21,7 +21,7 @@
 
 | 阶段 | 状态 | 阶段门禁 | 完成回执 |
 |---|---|---|---|
-| C0 事实源与 RD 基线 | PENDING | 两轮 RD 一致、事实源无冲突、可跨环境续接 | - |
+| C0 事实源与 RD 基线 | DONE | 两轮 RD 一致、事实源无冲突、可跨环境续接 | §5 C0-T04 |
 | C1 组件/包/进程 | PENDING | 双用户、50 轮、压力、8 小时 soak | - |
 | C2 系统服务/F2-F5 | PENDING | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | - |
 | C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
@@ -37,7 +37,7 @@
 | C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
 | C0-T02 | 当前 HEAD 可复现构建基线 | DONE | C0-T01 | `beef510b2993a38b010dd8c09a51a497247fd783` | §5 C0-T02 final recovery |
 | C0-T03 | MuMu RD 完整基线 | DONE | C0-T02 | `222211efebad3c4adfc66804d32e5c3e60e8f3dd` | §5 C0-T03 |
-| C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
+| C0-T04 | 统一能力事实源与 VA PRO corpus | DONE | C0-T03 | `8bb4470c6054b728f64e83529a22f7e2222f6a7d` | §5 C0-T04 |
 | C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
 | C1-T02 | Service/FGS/Job | PENDING | C1-T01 | - | - |
 | C1-T03 | Broadcast | PENDING | C1-T01 | - | - |
@@ -300,6 +300,56 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：仅完成 MuMu `RD测试` API32 RD_BASELINE；API33+、ARM/跨宽度/16KB、OEM、SX/XH、
   商业应用和完整 process-death matrix 仍待后续任务验证。
 - **下一任务**：`C0-T04`；本轮不执行。
+
+### C0-T04：统一能力事实源与 VA PRO corpus
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 14:44 / 2026-08-21 15:10（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `76d164795294b676a7cd9a2b20bbd829c5cd5ae3`；开始前工作区干净，远端分支同 HEAD；上一回执为
+  C0-T03，上一实现提交 `222211efebad3c4adfc66804d32e5c3e60e8f3dd`，上一回执提交
+  `76d164795294b676a7cd9a2b20bbd829c5cd5ae3`。
+- **实现摘要**：新增 CAS/VA PRO 事实对账器和 C0-T04 证据；将 83 条 corpus 统一分类为
+  `IN_SCOPE=51`、`OUT_OF_SCOPE=3`、`NEEDS_FIXTURE=28`、`PROVEN=1`、`DUPLICATE=0`；
+  修复 SBOM 对 Gradle `projectDir` 映射的识别；补齐静态编译 harness 的 API stub；修复审计 runner
+  对已修复/未声明 Known Issue 的分类逻辑；将 `KI-R03-021` 标记为 `FIXED`。
+- **变更文件**：`tools/capability/reconcile_cas_va_pro.py`、
+  `verification/catch-up/C0-T04/fact-convergence.json`、
+  `verification/catch-up/C0-T04/fact-convergence.md`、
+  `docs/capability/CAPABILITY_REGISTRY.yaml`、`docs/review/KNOWN_ISSUES.yaml`、
+  `scripts/generate-sbom.py`、`verification/sbom.json`、
+  `tools/capability/run_local_capability_audit.py`、`tools/capability/test_campaign_infra.py`、
+  `tools/static_android_compile.py`。
+- **验收命令与结果**：`python tools/capability/validate_campaign_infra.py` PASS；
+  `python tools/capability/test_campaign_infra.py` PASS（12 tests）；
+  `python -m unittest tools/capability/test_a01_semantic_runner_gate.py` PASS（18 tests）；
+  `python tools/static_android_compile.py` PASS（160 tests）；
+  `python scripts/check-pre-device-runtime-hardening.py` PASS；
+  `python scripts/generate-sbom.py --check` PASS（14 components）；
+  `python tools/capability/reconcile_cas_va_pro.py --audit-summary
+  artifacts/capability-audit/all/20260821T070134Z/summary.json` PASS；
+  `python tools/capability/run_local_capability_audit.py --all` 按治理要求 collect-all 后返回
+  diagnostic-only 非零：42 gates 中 PASS=30、KNOWN_ISSUE=12、NEW_REGRESSION=0、FAIL=12，
+  所有 FAIL 均已归类为现有 Known Issues；`python scripts/check-broadcast-model.py` 的失败对应
+  `KI-R03-022`，未误改 runtime；`git diff --check` PASS。
+- **设备证据**：本任务为事实源/治理对账任务，不新增设备运行声明；沿用 C0-T03 的 MuMu `RD测试`
+  证据，动态 serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`；两轮证据位于
+  `verification/catch-up/C0-T03/round-1-complete/` 与 `round-2-complete/`。
+- **Known Issues**：关闭 `KI-R03-021`（SBOM source digest stale）；未新增 runtime issue；
+  `KI-R03-022` 及其余未解决项仍保留，未宣称 API33+、ARM/16KB、OEM、SX/XH 或 VA PRO 等价性。
+- **偏离任务书**：无验收范围偏离；执行中按 DISCOVER/CLASSIFY 修复了静态编译 harness、SBOM
+  projectDir 映射和 runner 分类缺口，无需人工介入，不记录 BLOCKED；未执行下一任务。
+- **实现提交 SHA**：`8bb4470c6054b728f64e83529a22f7e2222f6a7d`
+- **推送与远端验证**：本回执提交使用主题 `docs(progress): record [C0-T04] receipt` 单独提交；
+  实现提交与本回执提交均按任务书要求非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 `HEAD`。
+- **遗留风险**：C0 已完成 RD_BASELINE 与事实源收敛，但 API33+、ARM/跨宽度/16KB、OEM、SX/XH、
+  商业应用和 VA PRO 等价性仍未证明；下一任务按账本为 `C1-T01`。
+- **下一任务**：`C1-T01`；本轮不执行。
 
 ## 6. 回执追加模板
 
