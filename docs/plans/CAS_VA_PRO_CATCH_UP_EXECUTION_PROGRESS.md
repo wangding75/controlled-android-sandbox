@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-21 23:12（Asia/Shanghai）
+更新时间：2026-08-22 00:12（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T06`
-最后完成任务：`C1-T05`
+下一任务：`C1-T07`
+最后完成任务：`C1-T06`
 
 ## 1. 使用规则
 
@@ -43,7 +43,7 @@
 | C1-T03 | Broadcast | DONE | C1-T01 | `236ce46b` | §5 C1-T03 |
 | C1-T04 | ContentProvider | DONE | C1-T01 | `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d` | §5 C1-T04 |
 | C1-T05 | PendingIntent/Alarm/Notification holder | DONE | C1-T02,C1-T03 | `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` | §5 C1-T05 |
-| C1-T06 | Package 生命周期 | PENDING | C1-T04,C1-T05 | - | - |
+| C1-T06 | Package 生命周期 | DONE | C1-T04,C1-T05 | `68f28f43b5d35bc4b85a03938b5d7009f9e6f277` | §5 C1-T06 |
 | C1-T07 | Process/ABI/Recovery | PENDING | C1-T01..T06 | - | - |
 | C2-T01 | SX/XH 系统服务方法清单 | PENDING | C1 | - | - |
 | C2-T02 | PMS/Permission/AppOps/Attribution | PENDING | C2-T01 | - | - |
@@ -625,6 +625,62 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5`。本段账本更新将在下一笔独立回执提交中固化并再次
   推送验证。
 - **下一任务**：`C1-T06`。
+
+### C1-T06：Package 生命周期
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 23:12 / 2026-08-22 00:10（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13；
+  MuMu `RD测试` 通过实例名动态解析，未在新增 runner 中固化 ADB endpoint。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign` @
+  `23ca42d45a1dab1f803248bb0c8f34efa2668fee`；开始前工作区干净、远端同 HEAD；上一回执为
+  `C1-T05`，实现/回执提交 `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` /
+  `23ca42d45a1dab1f803248bb0c8f34efa2668fee`。
+- **实现摘要**：新增 package-neutral 的 package state/query-resolve/permission-AppOps 与失败安装
+  session debug 验收；新增动态 `C1-T06` RD runner，覆盖 lifecycle v1/v2 revision、clone、升级后
+  rollback、identity reset、split base/feature、clear/delete/reinstall；修正 split checker 到当前
+  typed Binder/Guest verifier 边界；补齐请求 ID、宿主进程排空和 `am start -S`，保证 RD 回执不被旧
+  Activity 结果污染。生产路径未新增包名特判或第二状态源。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`；
+  `scripts/check-split-install-sessions.py`；`tools/capability/run_c1_t06_rd.py`、
+  `run_p1_00_rd.py`、`run_rd_campaign.py`；`docs/review/C1_T06_PACKAGE_LIFECYCLE_DESIGN.md`；
+  `docs/review/KNOWN_ISSUES.yaml`；`verification/catch-up/C1-T06/c1-t06-rd-summary.json`；
+  `verification/catch-up/C0-T01/continuation-preflight.json`、`verification/m5-t16-source-closure-audit.json`、
+  `verification/sbom.json`。
+- **验收命令与结果**：`python tools/static_android_compile.py` PASS（仓库既有 javac warnings）；
+  `:app:assembleDebug` PASS；package lifecycle、split install、PackageManager query/resolve、virtual
+  package state、package-service boundary、pre-device hardening（staticTests=160）、campaign infra、
+  SBOM check 均 PASS；`python tools/capability/run_c1_t06_rd.py --instance 'RD测试'` 最终 PASS，
+  29 步全部有匹配 request ID 的回执；`git diff --check` PASS。降级策略按预期记录
+  `import-prepare` 的 `Package downgrade rejected: 1 < 2`，不是未处理失败；失败安装 session 持久化
+  `FAILED`、retry 回到 `OPEN`、abandon 后 package revision 未变化。
+- **设备证据**：主回执 `verification/catch-up/C1-T06/c1-t06-rd-summary.json`；raw logcat 与逐步
+  evidence 位于 `artifacts/capability-audit/catch-up-c1-t06/20260821T160853Z/`。动态设备为 MuMu
+  `RD测试`，serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`，Android ID `398eea33120cd887`。APK SHA-256：host
+  `38e6067ab4be1233429cc650446e4f4d6444252a6654be38d5939aee46eb7c4c`；companion32
+  `ce9271ae537ec0b98dcdadd1a5933c7836a1dad24f676ec6033a6f5e0bc4d793`；fixture
+  `5afa749473194c49b9d1191980c74a6f6bc13c20e742dc5976539a2c3b1a178a`；fixture32
+  `1158888d35124e1c243684cb41f323109af87715ee4f28588a8e703b9c95ba3d`；lifecycle v1/v2
+  `3b1c7aad9d0c62134292d09ed96dc82932c35a62e69e605867783cf36811ac63` /
+  `cd5a5d868eb41b661da6a03e7993d6ce2efd12f7b19d4a69be6676bd85e51a31`；split base/feature
+  `0894ff252e16213a92132d02630d721d5190d8b7cf9f0d3b2868ea2bf5ab9c5a` /
+  `67947cd7e514cdbd5228f90295c0a403d25d814bed8912993fe847d055e3a598`。
+- **Known Issues**：`KI-T57-016` 保持 `NOT_PROVEN`，已重述为跨 API/OEM/VA PRO 覆盖缺口并登记本次
+  RD API32 lifecycle 证据；`KI-R03-026`、`KI-R03-029` 保持既有非阻断记录；`KI-R03-032` 保持
+  八小时稳定性需单独计划的记录；未新增 runtime issue。
+- **偏离任务书**：无验收范围偏离。任务书 1.1 已移除显式八小时 soak/长稳门槛，本回执不作八小时
+  稳定性声明；中间发现的 harness/编排竞态均已修复并重跑通过，无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`68f28f43b5d35bc4b85a03938b5d7009f9e6f277`
+  （`test(package): [C1-T06] verify package lifecycle on RD`）。
+- **推送与远端验证**：回执将以主题 `docs(progress): record [C1-T06] receipt` 单独提交；实现提交与
+  回执提交均按任务书要求非强制推送到 `origin/feature/t57-r03-va-pro-capability-campaign`，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 `HEAD`。
+- **遗留风险**：仅声明 MuMu `RD测试` API32 `RD_BASELINE`；API33+、ARM/16KB、OEM、SX/XH、商业
+  应用和 VA PRO 等价性及八小时稳定性仍未证明，后续按 Known Issue/任务书推进。
+- **下一任务**：`C1-T07`；本轮不执行。
 
 ## 6. 回执追加模板
 
