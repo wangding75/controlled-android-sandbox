@@ -1,5 +1,6 @@
 param(
-    [string]$Serial = "127.0.0.1:16416",
+    [string]$InstanceName = '',
+    [string]$Serial = '',
     [int]$DurationSeconds = 300,
     [int]$IntervalSeconds = 10,
     [string]$PackageName = "com.quark.browser",
@@ -10,9 +11,17 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$common = Join-Path $PSScriptRoot 't57_rd_common.ps1'
+if (-not (Test-Path -LiteralPath $common)) {
+    throw "RD_COMMON_RESOLVER_MISSING:$common"
+}
+. $common
+$device = Resolve-T57RdDevice -InstanceName $InstanceName -Serial $Serial
+$Serial = $device.Serial
 $root = (Get-Location).Path
 $output = Join-Path $root $OutputDirectory
 New-Item -ItemType Directory -Force -Path $output | Out-Null
+$null = Write-T57RdEvidence -Device $device -CaseName 'quark-stability' -OutputDirectory $output
 $evidence = Join-Path $output "monitor.log"
 if (Test-Path -LiteralPath $evidence) {
     Remove-Item -LiteralPath $evidence -Force

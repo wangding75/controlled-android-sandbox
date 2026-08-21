@@ -34,7 +34,7 @@
 
 | 任务 ID | 任务名称 | 状态 | 依赖 | 实现提交 | 回执位置 |
 |---|---|---|---|---|---|
-| C0-T01 | 固化任务续接与证据协议 | PENDING | BOOTSTRAP-DOCS | - | - |
+| C0-T01 | 固化任务续接与证据协议 | IN_PROGRESS | BOOTSTRAP-DOCS | - | - |
 | C0-T02 | 当前 HEAD 可复现构建基线 | PENDING | C0-T01 | - | - |
 | C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |

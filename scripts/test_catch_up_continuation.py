@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+import unittest
+import importlib.util
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+_MODULE_PATH = ROOT / "scripts/verify-catch-up-continuation.py"
+_SPEC = importlib.util.spec_from_file_location("verify_catch_up_continuation", _MODULE_PATH)
+assert _SPEC and _SPEC.loader
+continuation = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(continuation)
+
+
+class ContinuationLedgerTests(unittest.TestCase):
+    def test_expands_range_dependencies(self) -> None:
+        self.assertEqual(
+            continuation.expand_dependencies("C1-T01..T03,C2-T01"),
+            ["C1-T01", "C1-T02", "C1-T03", "C2-T01"],
+        )
+
+    def test_first_ready_pending_task(self) -> None:
+        rows = {
+            "C0-T01": {"status": "DONE", "dependencies": "BOOTSTRAP-DOCS"},
+            "C0-T02": {"status": "PENDING", "dependencies": "C0-T01"},
+            "C0-T03": {"status": "PENDING", "dependencies": "C0-T02"},
+        }
+        self.assertEqual(continuation.find_ready_task(rows, "BOOTSTRAP-DOCS"), "C0-T02")
+
+    def test_fixed_issue_status_is_governed_elsewhere(self) -> None:
+        from tools.capability import campaign_status
+
+        self.assertIn("FIXED", campaign_status.ISSUE_STATUS)
+
+    def test_serial_scan_allows_only_non_operational_guards(self) -> None:
+        scan = continuation.scan_executable_serials()
+        self.assertEqual(scan["unexpected"], [])
+
+
+if __name__ == "__main__":
+    unittest.main()

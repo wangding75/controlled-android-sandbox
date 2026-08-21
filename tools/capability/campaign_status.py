@@ -64,6 +64,7 @@ ISSUE_STATUS = frozenset(
         "UNCHANGED",
         "NOT_PROVEN",
         "BLOCKED",
+        "FIXED",
     }
 )
 
