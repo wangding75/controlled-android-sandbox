@@ -812,3 +812,25 @@ issues:
       build now succeeds twice and produces byte-identical Host, fixture, and
       Companion32 APKs. No blanket lint suppression or verification bypass was
       used.
+
+  - issue_id: KI-R03-032
+    title: Eight-hour soak removed from the current catch-up acceptance plan
+    capability: android_oem_compatibility
+    classification: KNOWN_DEBT
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: User-directed taskbook revision 2026-08-21
+    evidence:
+      - docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md
+      - docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md
+    match_patterns:
+      - 8 小时 soak
+      - 8 小时长稳
+    blocks_current_campaign: false
+    fix_policy: SEPARATE_STABILITY_PLAN_REQUIRED
+    notes: >
+      The explicit eight-hour soak and long-stability acceptance gates were removed from the
+      current catch-up taskbook at the user's direction. Remaining task-specific loop, 30-minute
+      pressure, resource-convergence, and failure-closure requirements remain active. This record
+      does not mean eight-hour stability was proven; a separately approved stability plan is
+      required before making an eight-hour or equivalent long-stability claim.

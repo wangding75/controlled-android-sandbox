@@ -22,7 +22,7 @@
 | 阶段 | 状态 | 阶段门禁 | 完成回执 |
 |---|---|---|---|
 | C0 事实源与 RD 基线 | DONE | 两轮 RD 一致、事实源无冲突、可跨环境续接 | §5 C0-T04 |
-| C1 组件/包/进程 | PENDING | 双用户、50 轮、压力、8 小时 soak | - |
+| C1 组件/包/进程 | PENDING | 双用户、50 轮与任务书规定压力 | - |
 | C2 系统服务/F2-F5 | PENDING | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | - |
 | C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
 | C4 SX 迁移 | PENDING | CAS-only，100 轮和 8 小时业务 soak | - |

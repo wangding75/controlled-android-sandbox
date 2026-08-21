@@ -1,10 +1,14 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.0
+版本：1.1
 制定日期：2026-08-21
 基准分支：`feature/t57-r03-va-pro-capability-campaign`
 首要验收环境：MuMu 模拟器实例 `RD测试`
 任务进度账本：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md`
+
+修订记录：2026-08-21 按用户明确指示移除本任务书全部显式 8 小时 soak/长稳验收门槛；保留各任务
+已有的轮次、30 分钟压力和资源收敛要求，并在 `docs/review/KNOWN_ISSUES.yaml` 登记后续稳定性
+计划债务。此修订不宣称 8 小时稳定性已验证。
 
 ## 1. 任务书目标
 
@@ -186,7 +190,7 @@
 - **执行方案**：覆盖 start/bind/publish/unbind/rebind/sticky、startForeground 时限、FGS type、JobWorkItem、
   cancel/reschedule、宿主及 Guest 死亡；加入 `FOREGROUND_SERVICE_LOCATION` fixture。
 - **验收标准**：生命周期顺序和 callback 正确；重复 bind/unbind 无泄漏；死亡后按策略恢复或 fail-closed；
-  30 分钟压力和 8 小时 soak 无未界定 ANR、泄漏或幽灵任务。
+  30 分钟压力无未界定 ANR、泄漏或幽灵任务。
 - **任务回执**：记录 service/job/FGS trace、压力数据、ANR/leak 指标、通知关联和恢复结果。
 
 ### C1-T03：Broadcast 事件模型闭环
@@ -236,7 +240,7 @@
 
 ### 5.3 阶段门禁
 
-C1 全部 fixture 在 `RD测试` 双用户通过；50 次关键循环、30 分钟压力和 8 小时 soak 达标；所有资源在
+C1 全部 fixture 在 `RD测试` 双用户通过；50 次关键循环、30 分钟压力达标；所有资源在
 clear/delete/restart/death 后可证明收敛。
 
 ## 6. 阶段 C2：高频系统服务与 F2-F5 深度
@@ -274,7 +278,7 @@ clear/delete/restart/death 后可证明收敛。
 - **执行方案**：覆盖 last/current/update、listener/PendingIntent 注册注销、provider 状态、GNSS/NMEA/time、
   foreground/background、权限变化、进程死亡和双用户 profile 更新。
 - **验收标准**：来源、坐标、时间、精度、provider 和 callback 次序可验证；注销/clear/death 后零回调；
-  user0/user1 不串值；30 分钟更新与 8 小时低频 soak 稳定。
+  user0/user1 不串值；30 分钟更新稳定。
 - **任务回执**：记录 API/回调矩阵、位置轨迹、时间误差、后台策略、资源回收和已知 HAL/OEM 边界。
 
 ### C2-T04：Camera1/Camera2 通用能力闭环
@@ -283,7 +287,7 @@ clear/delete/restart/death 后可证明收敛。
 - **执行方案**：扩展 package-neutral camera fixture，覆盖 NV21/JPEG/YUV、尺寸/方向、Surface、capture result、
   并发/抢占、权限撤销、进程死亡；区分 framework、native 和 HAL/OEM 边界。
 - **验收标准**：不能只验证空白预览不崩；必须证明来源帧、尺寸、格式、时间戳和 callback/result；连续打开关闭
-  100 次、30 分钟预览及 8 小时业务 soak 无句柄/Surface 泄漏。
+  100 次、30 分钟预览无句柄/Surface 泄漏。
 - **任务回执**：记录帧 hash/来源、格式矩阵、callback trace、reopen 统计、资源计数和未覆盖 vendor metadata。
 
 ### C2-T05：Notification、Alarm、Job、FGS、Window/Input/IME/Display
@@ -438,13 +442,13 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 - **任务目标**：验证虚拟相机、定位、设备、网络/基站、蓝牙及核心 SX 业务在 CAS 上完整运行。
 - **执行方案**：先用通用 fixture，再按 F1、F2、F4、F5、F3 顺序开启；覆盖 ConfigProvider、FileProvider、shortcut、
   FGS、notification、Job、WebView、多进程和指定 DingTalk revision。
-- **验收标准**：F1-F5 实际调用面全有证据；指定 DingTalk 冷/热启动、升级、登录、前后台通过；关键业务 100 轮、
-  8 小时 soak 达标；特化关闭后通用 fixture 不变。
+- **验收标准**：F1-F5 实际调用面全有证据；指定 DingTalk 冷/热启动、升级、登录、前后台通过；关键业务 100 轮
+  达标；特化关闭后通用 fixture 不变。
 - **任务回执**：记录 SX/DingTalk 版本、业务脚本、F1-F5 证据、循环/soak 指标、崩溃/ANR 和阶段门禁。
 
 ### 8.3 阶段门禁
 
-SX 生产路径只有 CAS 沙箱；目标业务在 `RD测试` 100 轮与 8 小时长稳通过；无未解释 P0/P1 业务阻断。
+SX 生产路径只有 CAS 沙箱；目标业务在 `RD测试` 100 轮通过；无未解释 P0/P1 业务阻断。
 
 ## 9. 阶段 C5：XH 产品支持与可选模块路线
 
@@ -478,7 +482,7 @@ SX 生产路径只有 CAS 沙箱；目标业务在 `RD测试` 100 轮与 8 小�
 - **任务目标**：完成原始 XH 产品范围的功能、稳定性和故障恢复验收。
 - **执行方案**：运行与 SX 相同的通用 suite，再执行 XH 差异用例、DingTalk revision、F1-F5、前后台、多进程、
   clear/upgrade/death/recovery 和长稳。
-- **验收标准**：产品契约 100% 有结论；关键业务 100 轮、8 小时 soak 达标；无旧 VA/Pine 运行时；
+- **验收标准**：产品契约 100% 有结论；关键业务 100 轮达标；无旧 VA/Pine 运行时；
   XH 特化关闭后通用行为不变。
 - **任务回执**：记录版本、业务矩阵、循环/soak、恢复、崩溃/ANR、残余差异和阶段门禁。
 
