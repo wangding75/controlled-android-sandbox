@@ -6,7 +6,7 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T03`（MuMu RD 完整基线）
+下一任务：`C0-T03`
 最后完成任务：`C0-T02`
 
 ## 1. 使用规则
