@@ -1,9 +1,9 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.0  
-制定日期：2026-08-21  
-基准分支：`feature/t57-r03-va-pro-capability-campaign`  
-首要验收环境：MuMu 模拟器实例 `RD测试`  
+版本：1.0
+制定日期：2026-08-21
+基准分支：`feature/t57-r03-va-pro-capability-campaign`
+首要验收环境：MuMu 模拟器实例 `RD测试`
 任务进度账本：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md`
 
 ## 1. 任务书目标
@@ -601,4 +601,3 @@ NOT_APPLICABLE 回执。
 > 不得硬编码端口。任务完成后先提交代码与证据，再把实现提交 SHA、验收结果、环境、证据、风险和下一任务
 > 写入进度账本并单独提交，随后推送两个提交并验证远端 HEAD。若验收或推送失败，写 BLOCKED 回执并停止，
 > 不得跳到下一任务。
-

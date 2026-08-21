@@ -1,9 +1,9 @@
 # CAS、VirtualApp、NewBlackbox 深度差距分析与追赶计划
 
-日期：2026-08-21  
-主项目：Controlled Android Sandbox（CAS）  
-第一稳定基线：MuMu `RD测试`，Android 12 / API 32  
-业务目标：为 XH、SX 提供完整、可复用的沙箱承载能力  
+日期：2026-08-21
+主项目：Controlled Android Sandbox（CAS）
+第一稳定基线：MuMu `RD测试`，Android 12 / API 32
+业务目标：为 XH、SX 提供完整、可复用的沙箱承载能力
 长期对标：VA PRO 的通用兼容能力，而不是旧 VA 公共源码的代码形态
 
 > 执行更新：结合用户补充的《CAS vs VA PRO / NBB 差距分析与追赶计划》完成交叉核验后，
