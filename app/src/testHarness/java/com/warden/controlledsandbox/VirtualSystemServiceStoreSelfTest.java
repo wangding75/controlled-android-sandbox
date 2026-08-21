@@ -82,6 +82,9 @@ public final class VirtualSystemServiceStoreSelfTest {
         store.setToken(owner, "alice", "mail", "access", "token");
         List<VirtualAccountSnapshot> accounts = store.accounts(owner, "mail");
         require(accounts.size() == 1 && accounts.get(0).tokens().contains("token"), "account state must be shared");
+        require(store.setAccountVisibility(owner, "alice", "mail", 3)
+                        && store.accountVisibility(owner, "alice", "mail") == 3,
+                "account visibility must be owned by the virtual scope");
         require(store.accounts(other, "").isEmpty(), "accounts must be isolated by virtual user");
 
         int host = store.ensureNamespace(owner, "notification", 7);
@@ -156,6 +159,8 @@ public final class VirtualSystemServiceStoreSelfTest {
                         && VirtualNotificationSnapshot.ACTIVE.equals(reloaded.notifications(owner).get(0).state())
                         && reloaded.notifications(owner).get(0).hostId() == reservedNotification.hostId(),
                 "active notification lifecycle must survive Package Service recreation");
+        require(reloaded.accountVisibility(owner, "alice", "mail") == 3,
+                "account visibility must survive Package Service recreation");
         require(reloaded.notificationChannels(owner).size() == 1
                         && "general".equals(reloaded.notificationChannels(owner).get(0).id()),
                 "notification channel lifecycle must survive Package Service recreation");

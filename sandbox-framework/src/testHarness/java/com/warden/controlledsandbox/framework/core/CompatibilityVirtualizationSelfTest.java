@@ -19,6 +19,7 @@ import com.warden.controlledsandbox.framework.capability.CapabilityLeaseRegistry
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.SandboxAppOpsPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
+import com.warden.controlledsandbox.framework.identity.VirtualPackageUniverse;
 import com.warden.controlledsandbox.framework.identity.VirtualPermissionPolicy;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.framework.packagemanager.PackageManagerInvocationHandlerTestAccess;
@@ -236,7 +237,22 @@ public final class CompatibilityVirtualizationSelfTest {
                 event -> { },
                 new CapabilityLeaseRegistry(),
                 new VirtualSystemServiceState(deviceServices, null, null, null, compatibility),
-                "rev");
+                "rev", gmsUniverse(app));
+    }
+
+    private static VirtualPackageUniverse gmsUniverse(ApplicationInfo guest) {
+        ApplicationInfo gms = new ApplicationInfo();
+        gms.packageName = "com.google.android.gms";
+        gms.uid = 20001;
+        gms.flags = ApplicationInfo.FLAG_SYSTEM;
+        ApplicationInfo gsf = new ApplicationInfo();
+        gsf.packageName = "com.google.android.gsf";
+        gsf.uid = 20002;
+        gsf.flags = ApplicationInfo.FLAG_SYSTEM;
+        return new VirtualPackageUniverse(List.of(
+                new VirtualPackageMetadata("guest.pkg", "", guest, List.of()),
+                new VirtualPackageMetadata("com.google.android.gms", "", gms, List.of()),
+                new VirtualPackageMetadata("com.google.android.gsf", "", gsf, List.of())));
     }
 
     @SuppressWarnings("unchecked")

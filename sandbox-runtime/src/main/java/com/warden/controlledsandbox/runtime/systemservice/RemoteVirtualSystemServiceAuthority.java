@@ -253,7 +253,8 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
                 request -> session.listAccountsPage(type, request), VirtualPageView::items);
         List<AccountRecord> result = new ArrayList<>(summaries.size());
         for (VirtualAccountSummary summary : summaries) {
-            result.add(new AccountRecord(summary.name(), summary.type(), "", Map.of()));
+            int visibility = call(() -> session.getAccountVisibility(summary.name(), summary.type()));
+            result.add(new AccountRecord(summary.name(), summary.type(), "", Map.of(), visibility));
         }
         return Collections.unmodifiableList(result);
     }
@@ -275,6 +276,12 @@ public final class RemoteVirtualSystemServiceAuthority implements VirtualSystemS
     }
     @Override public void invalidateToken(String accountType, String token) {
         call(() -> { session.invalidateAuthToken(accountType, token); return null; });
+    }
+    @Override public int accountVisibility(String name, String type) {
+        return call(() -> session.getAccountVisibility(name, type));
+    }
+    @Override public boolean setAccountVisibility(String name, String type, int visibility) {
+        return call(() -> session.setAccountVisibility(name, type, visibility));
     }
 
     @Override public PendingIntentRecord reservePendingIntent(PendingIntentRecord candidate,

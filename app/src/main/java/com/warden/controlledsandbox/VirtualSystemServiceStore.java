@@ -193,6 +193,15 @@ final class VirtualSystemServiceStore implements AutoCloseable {
     }
     synchronized String token(Scope scope, String name, String type, String tokenType) {
         return accountAuthority.token(state(scope), name, type, tokenType); }
+    synchronized int accountVisibility(Scope scope, String name, String type) {
+        return accountAuthority.visibility(state(scope), name, type);
+    }
+    synchronized boolean setAccountVisibility(Scope scope, String name, String type, int visibility) {
+        MutationSnapshot before = snapshotMutation(scope);
+        boolean changed = accountAuthority.setVisibility(state(scope), name, type, visibility);
+        if (changed) persistOrRestore(scope, before);
+        return changed;
+    }
     synchronized void invalidateToken(Scope scope, String accountType, String token) {
         MutationSnapshot before = snapshotMutation(scope);
         if (accountAuthority.invalidateToken(state(scope), accountType, token)) {
@@ -1051,6 +1060,7 @@ final class VirtualSystemServiceStore implements AutoCloseable {
         copy.clipboard = current.clipboard.clone();
         for (Map.Entry<AccountKey, AccountRecord> item : current.accounts.entrySet()) {
             AccountRecord account = new AccountRecord(item.getValue().password);
+            account.visibility = item.getValue().visibility;
             account.tokens.putAll(item.getValue().tokens);
             copy.accounts.put(item.getKey(), account);
         }

@@ -151,8 +151,8 @@ final class CompatibilityInvocationInterceptor {
         }
 
         String methodName = method.getName().toLowerCase(Locale.ROOT);
-        boolean available = !VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(profile.mode())
-                && profile.playServicesAvailable();
+        GmsCompatibilityBoundary.Assessment boundary = GmsCompatibilityBoundary.assess(identity);
+        boolean available = boundary.basicBoundaryReady();
         Class<?> returnType = method.getReturnType();
 
         if (InvocationMethodMatcher.containsAny(methodName, "advert")) {
@@ -185,8 +185,7 @@ final class CompatibilityInvocationInterceptor {
         if (InvocationMethodMatcher.containsAny(methodName, "token", "authenticate")
                 || InvocationMethodMatcher.named(methodName, "getservice")) {
             if (!available) {
-                throw new SecurityException(
-                        "VIRTUAL_GOOGLE_SERVICE_UNAVAILABLE:" + method.getName());
+                throw new SecurityException("DEFERRED_GMS_RUNTIME:" + method.getName());
             }
             return Decision.passThrough();
         }

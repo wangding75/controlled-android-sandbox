@@ -173,14 +173,13 @@ public final class FrameworkHooks implements AutoCloseable {
                 () -> DeviceIdentifiersServiceHook.install(identity));
         com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot googleProfile =
                 identity.virtualServices().compatibilityProfile().googleServices();
-        if (!com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot.MODE_HOST
-                .equals(googleProfile.mode()) && googleProfile.playServicesAvailable()) {
+        GmsCompatibilityBoundary.Assessment gmsBoundary = GmsCompatibilityBoundary.assess(identity);
+        if (gmsBoundary.basicBoundaryReady()) {
             attempt("googleServiceBroker", installed, failures, hooks,
                     () -> GoogleServiceBrokerHook.install(identity));
         } else {
-            android.util.Log.i("CS_GMS_PROXY", "GMS_BROKER_CONTROLLED_UNAVAILABLE mode="
-                    + googleProfile.mode() + " playServicesAvailable="
-                    + googleProfile.playServicesAvailable());
+            android.util.Log.i("CS_GMS_PROXY", "GMS_BROKER_CONTROLLED_UNAVAILABLE status="
+                    + gmsBoundary.status() + " detail=" + gmsBoundary.detail());
         }
         attempt("oemIdentifiers", installed, failures, hooks,
                 () -> OemIdentifierServiceHook.install(identity));

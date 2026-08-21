@@ -22,6 +22,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     private final Object delegate;
     private final GuestIdentity identity;
     private final String serviceName;
+    private final SystemServiceSemanticAdapter semanticAdapter;
     private final CapabilityServiceInterceptor capabilityInterceptor;
     private final VirtualSystemServiceInterceptor virtualServiceInterceptor;
     private final DeviceServiceInvocationInterceptor deviceServiceInterceptor;
@@ -43,6 +44,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         this.delegate = delegate;
         this.identity = identity;
         this.serviceName = serviceName == null ? "" : serviceName;
+        this.semanticAdapter = new SystemServiceSemanticAdapter(identity, this.serviceName);
         this.capabilityInterceptor = Set.of("camera", "location", "audio").contains(this.serviceName)
                 ? new CapabilityServiceInterceptor(identity, this.serviceName) : null;
         this.virtualServiceInterceptor = Set.of("alarm", "clipboard", "account", "notification", "jobscheduler")
@@ -223,7 +225,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             }
             finally { virtualCall.close(); interactionCall.close(); }
         }
-        IdentityObjectRewriter.RewriteScope scope = IdentityObjectRewriter.rewriteArguments(rewritten, identity);
+        IdentityObjectRewriter.RewriteScope scope = semanticAdapter.rewriteArguments(rewritten);
         try {
             try {
                 if (delegate == null) {
@@ -239,7 +241,7 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 if (capabilityInterceptor != null) {
                     capabilityInterceptor.afterSuccess(capabilityCall, delegate, rewritten, result);
                 }
-                Object identityRewritten = IdentityObjectRewriter.rewriteResult(result, identity);
+                Object identityRewritten = semanticAdapter.projectResult(result);
                 Object interactionRewritten = interactionCall.after(identityRewritten);
                 Object projected = virtualCall.rewriteResult(interactionRewritten);
                 return binderBoundary == null ? projected
@@ -372,6 +374,12 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
 
     private Object appOpsDecision(Method method, Object[] arguments) {
         String methodName = method.getName();
+        if (semanticAdapter.containsHostAttribution(arguments)) {
+            // A Guest must never be able to smuggle the Host opPackageName or an already-host
+            // AttributionSource into the framework service.  The normal outbound transform is
+            // Guest -> Host and therefore only runs after this validation point.
+            throw new SecurityException("VIRTUAL_APPOPS_HOST_ATTRIBUTION_HIDDEN");
+        }
         if ("checkPackage".equals(methodName)) {
             return appOpsCheckPackage(method, arguments);
         }

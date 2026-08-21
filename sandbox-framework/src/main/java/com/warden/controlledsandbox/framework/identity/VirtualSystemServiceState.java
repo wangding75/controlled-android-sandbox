@@ -274,18 +274,28 @@ public final class VirtualSystemServiceState implements AutoCloseable {
 
         public synchronized boolean add(Object account, String password) {
             AccountKey key = AccountKey.from(account);
-            if (authority != null) return authority.addAccount(key.name, key.type, safe(password));
+            if (authority != null) {
+                boolean added = authority.addAccount(key.name, key.type, safe(password));
+                if (added) dispatchListeners();
+                return added;
+            }
             if (entries.containsKey(key)) return false;
-            entries.put(key, new AccountEntry(account, safe(password))); return true;
+            entries.put(key, new AccountEntry(account, safe(password)));
+            dispatchListeners();
+            return true;
         }
         public synchronized boolean remove(Object account) {
             AccountKey key = AccountKey.from(account);
-            return authority != null ? authority.removeAccount(key.name, key.type) : entries.remove(key) != null;
+            boolean removed = authority != null ? authority.removeAccount(key.name, key.type)
+                    : entries.remove(key) != null;
+            if (removed) dispatchListeners();
+            return removed;
         }
         public synchronized void setPassword(Object account, String password) {
             AccountKey key = AccountKey.from(account);
             if (authority != null) authority.setPassword(key.name, key.type, safe(password));
             else require(account).password = safe(password);
+            dispatchListeners();
         }
         public synchronized String password(Object account) {
             AccountKey key = AccountKey.from(account);
@@ -296,6 +306,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
             AccountKey key = AccountKey.from(account);
             if (authority != null) authority.setToken(key.name, key.type, normalize(type), safe(token));
             else require(account).tokens.put(normalize(type), safe(token));
+            dispatchListeners();
         }
         public synchronized String token(Object account, String type) {
             AccountKey key = AccountKey.from(account);
@@ -309,6 +320,7 @@ public final class VirtualSystemServiceState implements AutoCloseable {
                 if (!normalizedType.isEmpty() && !normalizedType.equals(item.getKey().type)) continue;
                 item.getValue().tokens.values().removeIf(value -> java.util.Objects.equals(value, token));
             }
+            dispatchListeners();
         }
         public synchronized Object array(Class<?> componentType, String requestedType) {
             List<Object> values = new ArrayList<>();
@@ -329,17 +341,24 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         public synchronized int size() { return authority == null ? entries.size() : authority.accounts("").size(); }
         public synchronized int visibility(Object account) {
             AccountEntry entry = entries.get(AccountKey.from(account));
+            AccountKey key = AccountKey.from(account);
+            if (authority != null) return authority.accountVisibility(key.name, key.type);
             return entry == null ? 0 : entry.visibility;
         }
         public synchronized boolean setVisibility(Object account, int visibility) {
             AccountKey key = AccountKey.from(account);
-            AccountEntry entry = entries.get(key);
-            if (entry == null) {
-                if (authority == null) return false;
-                entry = new AccountEntry(account, "");
-                entries.put(key, entry);
+            if (visibility < 0 || visibility > 3) {
+                throw new IllegalArgumentException("VIRTUAL_ACCOUNT_VISIBILITY_INVALID");
             }
+            if (authority != null) {
+                boolean changed = authority.setAccountVisibility(key.name, key.type, visibility);
+                if (changed) dispatchListeners();
+                return changed;
+            }
+            AccountEntry entry = entries.get(key);
+            if (entry == null) return false;
             entry.visibility = visibility;
+            dispatchListeners();
             return true;
         }
         public synchronized void addListener(Object listener) {
@@ -350,6 +369,11 @@ public final class VirtualSystemServiceState implements AutoCloseable {
         }
         public synchronized int listenerCount() { return listeners.size(); }
         public synchronized void clear() { if (authority == null) entries.clear(); listeners.clear(); }
+        private void dispatchListeners() {
+            for (Object listener : new ArrayList<>(listeners)) {
+                invokeNoArg(listener, "onAccountsChanged", "onAccountsUpdated", "onChange");
+            }
+        }
         private AccountEntry require(Object account) {
             AccountEntry entry = entries.get(AccountKey.from(account));
             if (entry == null) throw new IllegalArgumentException("VIRTUAL_ACCOUNT_NOT_FOUND");

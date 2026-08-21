@@ -87,6 +87,23 @@ final class VirtualAccountAuthority {
                 : record.tokens.get(VirtualSystemServiceStore.normalize(tokenType));
     }
 
+    int visibility(VirtualSystemServiceRecords.ScopeState state, String name, String type) {
+        VirtualSystemServiceRecords.AccountRecord record = state.accounts.get(
+                VirtualSystemServiceStore.accountKey(name, type));
+        return record == null ? 0 : record.visibility;
+    }
+
+    boolean setVisibility(VirtualSystemServiceRecords.ScopeState state, String name, String type,
+            int visibility) {
+        if (visibility < 0 || visibility > 3) {
+            throw new IllegalArgumentException("VIRTUAL_ACCOUNT_VISIBILITY_INVALID");
+        }
+        VirtualSystemServiceRecords.AccountRecord record = require(state, name, type);
+        boolean changed = record.visibility != visibility;
+        record.visibility = visibility;
+        return changed;
+    }
+
     boolean invalidateToken(VirtualSystemServiceRecords.ScopeState state,
             String accountType, String token) {
         String normalizedType = VirtualSystemServiceStore.normalize(accountType);

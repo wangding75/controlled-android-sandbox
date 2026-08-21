@@ -121,4 +121,6 @@ interface IVirtualSystemServiceSession {
     VirtualWidgetPage listAppWidgetsPage(int hostId, in VirtualPageRequest request);
     VirtualSettingPage listSettingsPage(String namespace, in VirtualPageRequest request);
     ParcelFileDescriptor openPageBlob(String blobToken);
+    int getAccountVisibility(String name, String type);
+    boolean setAccountVisibility(String name, String type, int visibility);
 }

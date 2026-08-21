@@ -1545,6 +1545,7 @@ public final class GuestRuntimeEnvironment {
             if (components != null) components.shutdown();
             capabilityLeases.close(capabilityAudit);
             webViewProfile.renderers.close();
+            webViewProfile.storage.close();
             context.closeWebViewProviderServices();
             if (activityThreadInstrumentation != null) activityThreadInstrumentation.close();
             if (serviceFrameworkBridge != null) serviceFrameworkBridge.close();

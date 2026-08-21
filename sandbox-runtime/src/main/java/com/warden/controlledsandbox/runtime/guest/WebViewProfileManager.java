@@ -38,6 +38,9 @@ public final class WebViewProfileManager {
             createDirectory(profile.cache);
             createDirectory(profile.databases);
             createDirectory(profile.serviceWorker);
+            createDirectory(profile.cookies);
+            createDirectory(profile.webStorage);
+            createDirectory(profile.fileChooser);
         }
         if (Build.VERSION.SDK_INT >= 28) {
             try {
@@ -88,7 +91,9 @@ public final class WebViewProfileManager {
                         "com.android.webview", "virtual", suffix, "sandbox_webview", true, true, false, 4)
                 : policy;
         return new Profile(key, suffix, root, new File(root, "cache"),
-                new File(root, "databases"), new File(root, "service-worker"), Build.VERSION.SDK_INT >= 28,
+                new File(root, "databases"), new File(root, "service-worker"),
+                new File(root, "cookies"), new File(root, "web-storage"),
+                new File(root, "file-chooser"), Build.VERSION.SDK_INT >= 28,
                 new WebViewRendererRegistry(effective), effective.rendererProcessPrefix(),
                 effective.maximumRendererProcesses());
     }
@@ -112,13 +117,18 @@ public final class WebViewProfileManager {
         final File cache;
         final File databases;
         final File serviceWorker;
+        final File cookies;
+        final File webStorage;
+        final File fileChooser;
+        final WebViewStorageBoundary storage;
         final boolean suffixApplied;
         final WebViewRendererRegistry renderers;
         final String rendererProcessPrefix;
         final int maximumRendererProcesses;
 
         Profile(String key, String suffix, File root, File cache, File databases,
-                File serviceWorker, boolean suffixApplied, WebViewRendererRegistry renderers,
+                File serviceWorker, File cookies, File webStorage, File fileChooser,
+                boolean suffixApplied, WebViewRendererRegistry renderers,
                 String rendererProcessPrefix, int maximumRendererProcesses) {
             this.key = key;
             this.suffix = suffix;
@@ -126,6 +136,10 @@ public final class WebViewProfileManager {
             this.cache = cache;
             this.databases = databases;
             this.serviceWorker = serviceWorker;
+            this.cookies = cookies;
+            this.webStorage = webStorage;
+            this.fileChooser = fileChooser;
+            this.storage = new WebViewStorageBoundary(root);
             this.suffixApplied = suffixApplied;
             this.renderers = renderers;
             this.rendererProcessPrefix = rendererProcessPrefix;
@@ -140,6 +154,9 @@ public final class WebViewProfileManager {
             out.putString("webViewCacheRoot", cache.getAbsolutePath());
             out.putString("webViewDatabaseRoot", databases.getAbsolutePath());
             out.putString("webViewServiceWorkerRoot", serviceWorker.getAbsolutePath());
+            out.putString("webViewCookieRoot", cookies.getAbsolutePath());
+            out.putString("webViewStorageRoot", webStorage.getAbsolutePath());
+            out.putString("webViewFileChooserRoot", fileChooser.getAbsolutePath());
             out.putBoolean("webViewSuffixApplied", suffixApplied);
             out.putString("webViewRendererProcessPrefix", rendererProcessPrefix);
             out.putInt("webViewMaximumRendererProcesses", maximumRendererProcesses);

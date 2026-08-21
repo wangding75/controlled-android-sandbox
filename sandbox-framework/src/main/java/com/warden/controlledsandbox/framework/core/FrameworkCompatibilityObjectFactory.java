@@ -71,6 +71,7 @@ final class FrameworkCompatibilityObjectFactory {
                 PackageInfo installed = application.getPackageManager().getPackageInfo(
                         profile.providerPackage(), flags);
                 if (installed != null) {
+                    redactProviderDataPaths(installed);
                     return installed;
                 }
             }
@@ -80,6 +81,22 @@ final class FrameworkCompatibilityObjectFactory {
             // declared provider is not installed or cannot be verified on this device.
         }
         return webViewPackageInfo(profile);
+    }
+
+    private static void redactProviderDataPaths(PackageInfo value) {
+        if (value == null || value.applicationInfo == null) return;
+        ApplicationInfo info = new ApplicationInfo(value.applicationInfo);
+        setPath(info, "dataDir", "");
+        setPath(info, "deviceProtectedDataDir", "");
+        setPath(info, "credentialProtectedDataDir", "");
+        value.applicationInfo = info;
+    }
+
+    private static void setPath(Object target, String name, String value) {
+        try {
+            Field field = field(target.getClass(), name);
+            if (field != null) field.set(target, value);
+        } catch (IllegalAccessException | RuntimeException ignored) { }
     }
 
     private static Object instantiate(Class<?> type) {

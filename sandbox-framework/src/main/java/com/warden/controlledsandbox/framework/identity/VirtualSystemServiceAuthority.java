@@ -19,7 +19,12 @@ import java.util.List;
 /** Optional cross-process authority backing Guest-visible virtual system-service state. */
 public interface VirtualSystemServiceAuthority extends AutoCloseable {
     record AccountRecord(String name, String type, String password,
-                         java.util.Map<String, String> tokens) { }
+                         java.util.Map<String, String> tokens, int visibility) {
+        public AccountRecord(String name, String type, String password,
+                             java.util.Map<String, String> tokens) {
+            this(name, type, password, tokens, 1);
+        }
+    }
     record PendingIntentRecord(String tokenId, String kind, int requestCode, String action,
                                String component, String data, String filterIdentity, int flags, String creatorPackage,
                                int creatorUid, String requiredPermission, String ownerProcessName,
@@ -138,6 +143,15 @@ public interface VirtualSystemServiceAuthority extends AutoCloseable {
     void setToken(String name, String type, String tokenType, String token);
     String token(String name, String type, String tokenType);
     void invalidateToken(String accountType, String token);
+    default int accountVisibility(String name, String type) {
+        for (AccountRecord value : accounts(type == null ? "" : type)) {
+            if (value.name().equals(name) && value.type().equals(type)) return value.visibility();
+        }
+        return 0;
+    }
+    default boolean setAccountVisibility(String name, String type, int visibility) {
+        return false;
+    }
 
     default PendingIntentRecord reservePendingIntent(PendingIntentRecord candidate,
             boolean noCreate, boolean cancelCurrent, boolean updateCurrent) {

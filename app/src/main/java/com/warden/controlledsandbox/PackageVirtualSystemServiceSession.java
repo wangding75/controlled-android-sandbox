@@ -166,6 +166,12 @@ final class PackageVirtualSystemServiceSession extends IVirtualSystemServiceSess
     @Override public void invalidateAuthToken(String accountType, String token) {
         requireCapability(); systemServices.invalidateToken(scope, accountType, token);
     }
+    @Override public int getAccountVisibility(String name, String type) {
+        requireCapability(); return systemServices.accountVisibility(scope, name, type);
+    }
+    @Override public boolean setAccountVisibility(String name, String type, int visibility) {
+        requireCapability(); return systemServices.setAccountVisibility(scope, name, type, visibility);
+    }
     @Override public VirtualPendingIntentSnapshot reservePendingIntent(
             VirtualPendingIntentSnapshot candidate, boolean noCreate,
             boolean cancelCurrent, boolean updateCurrent) {

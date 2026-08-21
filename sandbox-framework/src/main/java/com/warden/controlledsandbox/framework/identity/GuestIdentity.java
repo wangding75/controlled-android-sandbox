@@ -211,8 +211,16 @@ public final class GuestIdentity {
     /** Shared process-generation fence for every Binder lease created from this identity. */
     public BinderSessionFence binderSessionFence() { return binderSessionFence; }
 
-    /** Retires all Binder leases before component/resource teardown begins. */
-    public void closeBinderSession() { binderSessionActive.set(false); }
+    /**
+     * Retires Binder leases before component/resource teardown begins and closes every callback
+     * ownership registry.  The fence flips first so a late callback cannot race cleanup and
+     * re-enter a Guest generation that is already being retired.
+     */
+    public void closeBinderSession() {
+        if (!binderSessionActive.compareAndSet(true, false)) return;
+        capabilityLeases.close(capabilityAudit);
+        networks.close();
+    }
 
     /** Installs the process-scoped Broker relay before Framework service proxies are published. */
     public void installContentObserverBridge(ContentObserverBridge bridge) {

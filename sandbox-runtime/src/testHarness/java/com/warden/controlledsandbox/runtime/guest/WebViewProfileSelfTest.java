@@ -32,8 +32,19 @@ public final class WebViewProfileSelfTest {
         require(limited, "renderer quota");
         require(governed.renderers.release("renderer-1") && governed.renderers.activeCount() == 1,
                 "renderer release");
+        governed.storage.putCookie("https://guest.example", "sid=guest");
+        governed.storage.putWebStorage("https://guest.example", "theme", "dark");
+        require("sid=guest".equals(governed.storage.cookie("https://guest.example"))
+                        && "dark".equals(governed.storage.webStorage("https://guest.example", "theme")),
+                "WebView cookie and web-storage state must stay in the Guest profile");
+        governed.storage.requireGuestPath(governed.fileChooser);
+        boolean hostPathRejected = false;
+        try { governed.storage.requireGuestPath(new File(root, "../host-webview-data")); }
+        catch (SecurityException expected) { hostPathRejected = true; }
+        require(hostPathRejected, "WebView storage must reject paths outside the Guest root");
         governed.renderers.close();
         require(governed.renderers.activeCount() == 0, "renderer shutdown cleanup");
+        governed.storage.close();
         System.out.println("PASS WebView profile isolation and renderer ownership self-test");
     }
 

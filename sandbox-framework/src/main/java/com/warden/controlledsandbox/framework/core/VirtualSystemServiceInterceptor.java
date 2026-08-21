@@ -107,6 +107,21 @@ public final class VirtualSystemServiceInterceptor {
             Object account = firstAccount(arguments);
             return Call.handled(accounts.token(account, stringAfter(arguments, account)));
         }
+        if (name.startsWith("getauthtoken")) {
+            Object account = firstAccount(arguments);
+            String tokenType = stringAfter(arguments, account);
+            String token = accounts.token(account, tokenType);
+            Object callback = firstObjectWithMethod(arguments, "onResult");
+            if (callback == null) callback = firstObjectWithMethod(arguments, "onError");
+            AccountAuthenticatorBoundary.completeToken(callback, account, token);
+            return Call.handled(defaultValue(method.getReturnType()));
+        }
+        if (name.startsWith("addaccount") || name.startsWith("confirmcredentials")
+                || name.startsWith("hasfeatures")) {
+            Object callback = firstObjectWithMethod(arguments, "onError");
+            AccountAuthenticatorBoundary.deferAuthenticator(callback);
+            return Call.handled(defaultValue(method.getReturnType()));
+        }
         if (name.startsWith("invalidateauthtoken")) {
             String[] strings = stringArguments(arguments);
             accounts.invalidateToken(strings.length > 0 ? strings[0] : "", strings.length > 1 ? strings[1] : "");

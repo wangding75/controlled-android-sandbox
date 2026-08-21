@@ -16,6 +16,7 @@ final class VirtualSystemServiceRecords {
     record AccountKey(String name, String type) { }
     static final class AccountRecord {
         String password;
+        int visibility = 1;
         final Map<String, String> tokens = new LinkedHashMap<>();
         AccountRecord(String password) { this.password = safe(password); }
     }

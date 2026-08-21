@@ -768,9 +768,33 @@ public final class PackageManagerInvocationHandler implements InvocationHandler 
         projected.uid = identity.virtualUid();
         String guestDataDir = identity.applicationInfo().dataDir;
         if (guestDataDir != null && !guestDataDir.trim().isEmpty()) {
-            projected.dataDir = new java.io.File(guestDataDir, "webview/provider").getAbsolutePath();
+            java.io.File providerRoot = new java.io.File(guestDataDir, "webview/provider");
+            projected.dataDir = providerRoot.getAbsolutePath();
+            // API 24+ can expose both credential- and device-protected roots.  Project every
+            // path-bearing field into the Guest namespace; leaving one Host field untouched is
+            // enough for Chromium diagnostics or cookie code to escape the boundary.
+            setPathField(projected, "deviceProtectedDataDir",
+                    new java.io.File(providerRoot, "device-protected").getAbsolutePath());
+            setPathField(projected, "credentialProtectedDataDir",
+                    new java.io.File(providerRoot, "credential-protected").getAbsolutePath());
+        } else {
+            projected.dataDir = "";
+            setPathField(projected, "deviceProtectedDataDir", "");
+            setPathField(projected, "credentialProtectedDataDir", "");
         }
         return projected;
+    }
+
+    private static void setPathField(ApplicationInfo value, String name, String path) {
+        copyFieldValue(value, value, name, path);
+    }
+
+    private static void copyFieldValue(Object source, Object target, String name, Object value) {
+        try {
+            java.lang.reflect.Field field = findField(source.getClass(), name);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
     }
 
     private static void copyField(Object source, Object target, String name) {

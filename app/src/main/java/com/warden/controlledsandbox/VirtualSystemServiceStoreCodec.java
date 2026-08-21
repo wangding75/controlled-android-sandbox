@@ -63,6 +63,10 @@ final class VirtualSystemServiceStoreCodec {
                                     account.getString("passwordEncrypted"))
                             : account.optString("password", "");
                     AccountRecord record = new AccountRecord(password);
+                    record.visibility = schema >= 6 ? account.optInt("visibility", 1) : 1;
+                    if (record.visibility < 0 || record.visibility > 3) {
+                        throw new IllegalStateException("Invalid virtual account visibility");
+                    }
                     JSONObject tokens = account.optJSONObject(schema >= 6
                             ? "tokensEncrypted" : "tokens");
                     if (tokens != null) {
@@ -250,6 +254,7 @@ final class VirtualSystemServiceStoreCodec {
                     }
                     accounts.put(new JSONObject().put("name", account.getKey().name())
                             .put("type", account.getKey().type())
+                            .put("visibility", account.getValue().visibility)
                             .put("passwordEncrypted", secretCipher.encrypt(
                                     secretAad(scope, account.getKey(), "password", ""),
                                     account.getValue().password))
