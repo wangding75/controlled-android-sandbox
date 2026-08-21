@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.0
-更新时间：2026-08-21 19:39（Asia/Shanghai）
+更新时间：2026-08-21 21:00（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T04`
-最后完成任务：`C1-T03`
+下一任务：`C1-T05`
+最后完成任务：`C1-T04`
 
 ## 1. 使用规则
 
@@ -41,7 +41,7 @@
 | C1-T01 | Activity/Application 与任务栈 | DONE | C0 | `87d96611` | §5 C1-T01 |
 | C1-T02 | Service/FGS/Job | DONE | C1-T01 | `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0` | §5 C1-T02 |
 | C1-T03 | Broadcast | DONE | C1-T01 | `236ce46b` | §5 C1-T03 |
-| C1-T04 | ContentProvider | IN_PROGRESS | C1-T01 | - | - |
+| C1-T04 | ContentProvider | DONE | C1-T01 | `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d` | §5 C1-T04 |
 | C1-T05 | PendingIntent/Alarm/Notification holder | PENDING | C1-T02,C1-T03 | - | - |
 | C1-T06 | Package 生命周期 | PENDING | C1-T04,C1-T05 | - | - |
 | C1-T07 | Process/ABI/Recovery | PENDING | C1-T01..T06 | - | - |
@@ -515,6 +515,66 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：本任务仅完成 MuMu `RD测试` API32 `RD_BASELINE`；跨 API、ARM/16KB、OEM、完整 8 小时
   soak、SX/XH、商业应用和 VA PRO 等价性仍待后续任务验证。
 - **下一任务**：`C1-T04`；本轮不执行。
+
+### C1-T04：ContentProvider 数据与授权生命周期闭环
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 19:40 / 2026-08-21 21:00（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13；
+  MuMu `RD测试` 由动态解析器定位，未在新增 runner 中固化 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `ada061ca695ccd88fe1605f9ae35172b4652a5c0`；开始前工作区干净、远端同 HEAD；上一回执为
+  `C1-T03`，实现提交 `236ce46b2736f4177d6ce14f8ee576218b47a9d1`，回执提交
+  `ada061ca695ccd88fe1605f9ae35172b4652a5c0`。
+- **实现摘要**：新增 package-neutral `ProviderCampaignActivity`，从 Guest 公开
+  `ContentResolver` / `Context` API 覆盖 authority/type、128 行 bulk + tail CRUD、cursor 分页与
+  requery、applyBatch/call/exception-allowed/back-reference/rollback、FD/asset/typed asset、
+  URI grant/revoke、CancellationSignal、跨包 Provider observer 和双虚拟用户 recovery；Debug Host
+  增加单用户/双用户 campaign 命令，并在并发启动前准备两个用户的 compat32 peer instance；新增
+  动态 `RD测试` runner、设计文档和结构化回执；同步 static Android compile stub、Fixture notifyChange、
+  SBOM 与续接证据。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`；
+  `fixture-basic/src/main/AndroidManifest.xml`、`FixtureProvider.java`、`ProviderCampaignActivity.java`；
+  `tools/capability/run_c1_t04_rd.py`、`tools/static_android_compile.py`；
+  `docs/review/C1_T04_PROVIDER_DESIGN.md`、`docs/review/KNOWN_ISSUES.yaml`；
+  `verification/catch-up/C0-T01/continuation-preflight.json`、`verification/catch-up/C1-T04/c1-t04-rd-summary.json`、
+  `verification/sbom.json`。
+- **验收命令与结果**：`python tools/static_android_compile.py` PASS；
+  `python scripts/check-pre-device-runtime-hardening.py` PASS（staticTests=160）；
+  `python tools/capability/validate_campaign_infra.py` PASS；
+  `python scripts/generate-sbom.py --check` PASS；四枚 Debug APK build/lint（
+  `scripts/build-device-test-apks.ps1 -NoClean`）PASS；`python tools/capability/run_local_capability_audit.py --all`
+  为 PASS=31、KNOWN_ISSUE=11、NEW_REGRESSION=0，11 个 FAIL 均映射既有 Known Issues；
+  `python tools/capability/run_c1_t04_rd.py --loops 1 --pressure-seconds 0` PASS；随后以
+  `python tools/capability/run_c1_t04_rd.py --loops 50` 启动双用户 campaign，按最新操作者指示在
+  1800 秒压力窗口前停止，raw logcat 已记录 116 个完整 pass marker（两用户并发各 58 轮）、10 类
+  marker 均为 116，`C1_T04_PROVIDER_FAIL`、runtime fail、fatal、ANR 均为 0。该停止事实已在回执
+  `acceptance_note` 中明确记录，未把 1800 秒写成已完成。
+- **设备证据**：主回执为 `verification/catch-up/C1-T04/c1-t04-rd-summary.json`；raw logcat 位于
+  `artifacts/capability-audit/catch-up-c1-t04/20260821T123725Z/provider-campaign-logcat.txt`；
+  动态设备为 MuMu `RD测试`，serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，
+  ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`，Android ID `398eea33120cd887`。APK SHA-256：host
+  `f1c8aaa12032e9b7c0faa850088eaba60f856e7b82f3345c58ee9d8dc89083ed`；fixture
+  `95a4f6484646a5ab2cb02e1ed9d1e26a7d71431f18aa334c836675c6a4e7b8e2`；companion32
+  `7f4bb7d740040dd840dca4e7488c895eaf838a1dabc2307301bbe5dd3cf94567`；fixture32
+  `58fb06e5a6db09892f2c671629aa8c088ca9d223cc9c047d19fd4e2e1e258e7b`。
+- **Known Issues**：新增 `KI-R03-031`（`TEST_EVIDENCE_GAP`，SBOM digest 在 C1-T03 fixture
+  additions 后过期）并立即重生成 SBOM 修复为 `FIXED`；未新增 runtime issue。仅声明 MuMu API32
+  `RD_BASELINE`，不外推 API33+、ARM/16KB、OEM、SX/XH、商业应用或 VA PRO 等价性。
+- **偏离任务书**：用户明确要求不等待 1800 秒，故长压在达到两用户各 50 轮以上后停止；本回执
+  透明记录该偏离，不宣称 1800 秒压力完成。其余 Provider 矩阵、双用户隔离、recovery、local/build/
+  governance 门禁均按失败优先修复并复验通过；无需人工介入，不记录 BLOCKED。
+- **实现提交 SHA**：`454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d`
+  （`test(provider): [C1-T04] close RD ContentProvider lifecycle gates`）。
+- **推送与远端验证**：实现提交已以 canonical identity `OpenAI <openai@users.noreply.github.com>`
+  推送到 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交推送后远端 HEAD 已验证为
+  `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d`。本段账本更新将在下一笔独立回执提交中固化并再次
+  推送验证。
+- **遗留风险**：仅完成 MuMu `RD测试` API32 `RD_BASELINE`，且本次按指示未完成 1800 秒长压；
+  API33+、ARM/16KB、OEM、完整 soak、SX/XH、商业应用和 VA PRO 等价性仍未证明。
+- **下一任务**：`C1-T05`；本轮不执行。
 
 ## 6. 回执追加模板
 
