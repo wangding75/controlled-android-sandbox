@@ -1,0 +1,726 @@
+﻿--------- beginning of main
+08-21 14:21:20.017 30934 30934 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+--------- beginning of system
+08-21 14:21:20.019  1285  1736 I ActivityTaskManager: START u0 {flg=0x14000000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras)} from uid 2000, pid 30934
+08-21 14:21:20.021  1285  1736 I ActivityTaskManager: [KeepAlive] disabled for com.warden.controlledsandbox.debug
+08-21 14:21:20.021  1285  1736 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=1201 attached=false
+08-21 14:21:20.022  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 174042980; UID 10196; state: DISABLED
+08-21 14:21:20.022  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 184838306; UID 10196; state: DISABLED
+08-21 14:21:20.022  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 185004937; UID 10196; state: DISABLED
+08-21 14:21:20.022  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 181136395; UID 10196; state: DISABLED
+08-21 14:21:20.023  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 174042936; UID 10196; state: DISABLED
+08-21 14:21:20.023  1285  1736 D CompatibilityChangeReporter: Compat change id reported: 197654537; UID 10196; state: ENABLED
+08-21 14:21:20.024  1285  1736 D RecentTaskMonitor: onRecentTaskAdded 1201:Task=1201
+08-21 14:21:20.026  1585  1585 D Launcher.DragController: cancelDrag: 
+08-21 14:21:20.026  1585  1585 D Launcher.DragController: endDrag: 
+08-21 14:21:20.028  1285  1305 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-21 14:21:20.028  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-21 14:21:20.028  1285  1305 W NemuTabUtil: Unable to get the icon of app: ApplicationInfo{e8a62ec com.warden.controlledsandbox.debug}
+08-21 14:21:20.028  1285  1305 W RecentTaskMonitor: null pid retry ...
+08-21 14:21:20.028  1285  1305 E RecentTaskMonitor: VAddressShellNotifier#notifyOpenTab null request
+08-21 14:21:20.035  1118  1118 D Zygote  : Forked child process 30937
+08-21 14:21:20.035  1285  1315 I ActivityManager: Start proc 30937:com.warden.controlledsandbox.debug/u0a196 for pre-top-activity {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity}
+08-21 14:21:20.036 30937 30937 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug
+08-21 14:21:20.036 30937 30937 I Zygote  : fake Product info com.warden.controlledsandbox.debug not matched any pattern
+08-21 14:21:20.036 30937 30937 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug
+08-21 14:21:20.037 30937 30937 E NemuAppNameUtil: save data success
+08-21 14:21:20.037  1474  1663 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.040 30937 30937 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.040 30937 30937 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.040 30937 30937 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:20.041  1474 30938 D ndroid.systemu: Features: 0 0 0
+08-21 14:21:20.041  1474 30938 E ndroid.systemu: vulkan version is 4202692
+08-21 14:21:20.042  1474 30938 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.042  1474 30938 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.043 30937 30937 I edsandbox.debu: Late-enabling -Xcheck:jni
+08-21 14:21:20.053 30937 30937 W edsandbox.debu: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:20.053 30937 30937 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-21 14:21:20.053 30937 30937 E libnb   : The translator implementation library has not been set.
+08-21 14:21:20.060 30937 30937 E libnb   : get_callbacks native_handle 0x954e243ac020a65d: 1 libnb:/system/lib64/libhoudini.so
+08-21 14:21:20.060 30937 30937 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-21 14:21:20.060 30937 30937 D HP      : no libmumuhooker.so
+08-21 14:21:20.060 30937 30937 D HP      : patch_linker_namespace
+08-21 14:21:20.060 30937 30937 D houdini : [30937] Initialize library(version: 12.0.0_z.38816.m RELEASE)... successfully.
+08-21 14:21:20.060 30937 30937 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x71a98e73c340 ret:1
+08-21 14:21:20.063  1142  1172 I adbd    : jdwp connection from 30937
+08-21 14:21:20.068 30937 30937 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:20.075  1285  1739 W OomAdjuster: Fallback pre-set sched group to default: not expected top priority
+08-21 14:21:20.078 30937 30952 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:20.093 30937 30937 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-21 14:21:20.129  1285  1305 W NemuTabUtil: Unable to get the icon of app: ApplicationInfo{e8a62ec com.warden.controlledsandbox.debug}
+08-21 14:21:20.129  1285  1305 D RecentTaskMonitor: task null or not sub display in notifyDisplayOpened
+08-21 14:21:20.130  1285  1305 D RecentTaskMonitor: VAddressShellNotifier#notifyOpenTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:1201","displayId":0,"userId":0,"name":"闪现2","originName":"闪现2","packageName":"com.warden.controlledsandbox.debug","launcher":false,"newTask":true,"icon":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAALSURBVAiZY2AAAgAABQABYlUyiAAAAABJRU5ErkJggg==","canChangeAppOrientation":false,"canReceiveFile":false,"pid":30937,"uid":10196,"action":"open"}}
+08-21 14:21:20.148 30937 30937 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.debug isMatchJavaPatch:false
+08-21 14:21:20.257  1285  1384 W BestClock: java.time.DateTimeException: Missing NTP fix
+08-21 14:21:20.280  1285  1285 I NetworkStats: type=1400 audit(0.0:158456): avc: denied { map_read } for scontext=u:r:system_server:s0 tcontext=u:r:init:s0 tclass=bpf permissive=1
+08-21 14:21:20.280  1285  1285 I NetworkStats: type=1400 audit(0.0:158457): avc: denied { map_write } for scontext=u:r:system_server:s0 tcontext=u:r:init:s0 tclass=bpf permissive=1
+08-21 14:21:20.280  1178  1178 I iptables-restor: type=1400 audit(0.0:158458): avc: denied { create } for scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=rawip_socket permissive=1
+08-21 14:21:20.280  1178  1178 I iptables-restor: type=1400 audit(0.0:158459): avc: denied { getopt } for lport=255 scontext=u:r:init:s0 tcontext=u:r:init:s0 tclass=rawip_socket permissive=1
+08-21 14:21:20.287  1285  1384 W BestClock: java.time.DateTimeException: Missing NTP fix
+08-21 14:21:20.290  1285  1385 W BestClock: java.time.DateTimeException: Missing NTP fix
+08-21 14:21:20.290  1285  1385 W BestClock: java.time.DateTimeException: Missing NTP fix
+08-21 14:21:20.296  1285  1385 E TelephonyManager: Error calling setDataEnabledForReason e:java.lang.IllegalStateException: telephony service is null.
+08-21 14:21:20.327 30937 30937 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:20.353 30937 30937 I edsandbox.debug: type=1400 audit(0.0:158460): avc: denied { getattr } for path="/system" dev="sda6" ino=2 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:20.426 30937 30937 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-21 14:21:20.426 30937 30937 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-21 14:21:20.426 30937 30937 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:20.428 30937 30937 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:20.428 30937 30937 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:20.445 30937 30969 D libEGL  : loaded /system/lib64/egl/libEGL_emulation.so
+08-21 14:21:20.453 30937 30969 D edsandbox.debu: Features: 0 0 0
+08-21 14:21:20.453 30937 30969 E edsandbox.debu: vulkan version is 4202692
+08-21 14:21:20.456 30937 30969 D libEGL  : loaded /system/lib64/egl/libGLESv1_CM_emulation.so
+08-21 14:21:20.459 30937 30969 D libEGL  : loaded /system/lib64/egl/libGLESv2_emulation.so
+08-21 14:21:20.461 30937 30937 I CS_COMMAND: COMMAND_BEGIN command=import-prepare package=com.warden.controlledsandbox.fixture user=0
+08-21 14:21:20.462 30937 30970 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=import-prepare package=com.warden.controlledsandbox.fixture
+08-21 14:21:20.466  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.PackageManagementService, isSkip: true
+08-21 14:21:20.467  1285  7367 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-21 14:21:20.467  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-21 14:21:20.473  1118  1118 D Zygote  : Forked child process 30971
+08-21 14:21:20.473  1285  1315 I ActivityManager: Start proc 30971:com.warden.controlledsandbox.debug:sandbox_package/u0a196 for service {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.PackageManagementService}
+08-21 14:21:20.476 30971 30971 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug:sandbox_package
+08-21 14:21:20.477 30971 30971 I Zygote  : fake Product info com.warden.controlledsandbox.debug:sandbox_package not matched any pattern
+08-21 14:21:20.477 30971 30971 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug:sandbox_package
+08-21 14:21:20.477 30971 30971 E NemuAppNameUtil: save data success
+08-21 14:21:20.479 30937 30969 E GraphicsEnv: Failed to get gpu service
+08-21 14:21:20.480 30971 30971 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.480 30971 30971 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.480 30971 30971 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:20.483 30971 30971 I sandbox_packag: Late-enabling -Xcheck:jni
+08-21 14:21:20.493 30971 30971 W sandbox_packag: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:20.493 30971 30971 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-21 14:21:20.493 30971 30971 E libnb   : The translator implementation library has not been set.
+08-21 14:21:20.499 30971 30971 E libnb   : get_callbacks native_handle 0x3f788c7ffe0117d3: 1 libnb:/system/lib64/libhoudini.so
+08-21 14:21:20.499 30971 30971 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-21 14:21:20.500 30971 30971 D HP      : no libmumuhooker.so
+08-21 14:21:20.500 30971 30971 D HP      : patch_linker_namespace
+08-21 14:21:20.500 30971 30971 D houdini : [30971] Initialize library(version: 12.0.0_z.38816.m RELEASE)... successfully.
+08-21 14:21:20.500 30971 30971 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x71a98e73c340 ret:1
+08-21 14:21:20.504  1142  1172 I adbd    : jdwp connection from 30971
+08-21 14:21:20.506 30971 30971 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:20.516  1285  1314 W BroadcastQueue: Background execution not allowed: receiving Intent { act=nemu.intent.action.NEW_TASK dat=package:com.warden.controlledsandbox.debug flg=0x10 (has extras) } to com.mumu.acc/.AccMsgReceiver
+08-21 14:21:20.516  1585  1585 D create_screen: onReceive: action = nemu.intent.action.NEW_TASK
+08-21 14:21:20.516  1436  1436 D TabManager: setFocusTaskProp 1201
+08-21 14:21:20.516  1436  1804 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendBroadcast:1181 android.content.ContextWrapper.sendBroadcast:479 com.netease.nemu_vapi_android.thread.NewFileUpdater.notifyFocusedTabChanged:494 com.netease.nemu_vapi_android.thread.NewFileUpdater.onOpenNewTask:410 com.netease.nemu_vapi_android.worker.LocalAppManager.updateOnNewTask:255 
+08-21 14:21:20.517  1285  1739 I RecentTaskMonitor: broadcast tab opened in android as it's new task1 1201
+08-21 14:21:20.517  1436  1804 D NewFileUpdater: onOpenNewTask focusPkgName set to com.warden.controlledsandbox.debug
+08-21 14:21:20.517  1436  1912 D Watchdog: upload event: {"architecture":"x86_64","channel":"nochannel-mumu12","country":"zh-CN","engine":"NEMUX","fchannel":"nochannel-mumu12","language":"zh-Hans","mpid":"1","package":"mumu","product":"","product_version":"4.1.33.3741","usage":"0","uuid":"d2810392-fbc0-4986-b371-9503ddb84ab1","version":"4.1.33.3741","x":{"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","app_version_code":19,"app_version_name":"0.5.19.1-source-debug","error":{"code":0,"msg":"ok"},"extra":{"NB":"{\"NB_MD5\":\"6A997A644DC56222DBC85F7856A8EF2C\",\"NB_NAME\":\"libhoudini.so\",\"NB_64BIT\":\"true\"}","amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}}	type: LaunchAPP	sign: W9HLdXnm+t9pezuhJBPqv/bLTAc=	uid: 1000	json:{"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","app_version_code":19,"app_version_name":"0.5.19.1-source-debug","error":{"code":0,"msg":"ok"},"extra":{"NB":"{\"NB_MD5\":\"6A997A644DC56222DBC85F7856A8EF2C\",\"NB_NAME\":\"libhoudini.so\",\"NB_64BIT\":\"true\"}","amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}
+08-21 14:21:20.518  1285  7367 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.mumu.acc/.AccService
+08-21 14:21:20.518  1285  1314 V ActivityManager: Attempted to start a foreground service (com.mumu.acc/.AccService) with a broken notification (no icon: Notification(channel=acc-service shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x40 color=0x00000000 vis=PRIVATE))
+08-21 14:21:20.519 30971 30986 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:20.520  1585  1661 D updatePackage: version com.warden.controlledsandbox.debug 19
+08-21 14:21:20.520  1585  1585 I Launcher: Deferring update until onResume
+08-21 14:21:20.528 30937 30967 D edsandbox.debu: Features: 0 0 0
+08-21 14:21:20.528 30937 30967 E edsandbox.debu: vulkan version is 4202692
+08-21 14:21:20.531 30937 30967 D hw-ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:20.531 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.configstore@1.0::ISurfaceFlingerConfigs instance: default
+08-21 14:21:20.532 30937 30967 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+08-21 14:21:20.537  1436  1912 D Watchdog: upload server response: {"errcode": 100, "errmsg": "ok"}
+08-21 14:21:20.537  1436  1912 D Watchdog: upload result: true
+08-21 14:21:20.542  1138  2216 E HWComposer: getSupportedContentTypes: getSupportedContentTypes failed for display 4619827820427265280: Unsupported (8)
+08-21 14:21:20.542  1045  1045 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+08-21 14:21:20.542 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@4.0::IMapper instance: default
+08-21 14:21:20.542  1045  1045 I hwservicemanager: Since android.hardware.graphics.mapper@4.0::IMapper/default is not registered, trying to start it as a lazy HAL.
+08-21 14:21:20.542 30937 30967 I Gralloc4: mapper 4.x is not supported
+08-21 14:21:20.542  1045  1045 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device VINTF manifest.
+08-21 14:21:20.542 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@3.0::IMapper instance: default
+08-21 14:21:20.543  1045  1045 I hwservicemanager: Since android.hardware.graphics.mapper@3.0::IMapper/default is not registered, trying to start it as a lazy HAL.
+08-21 14:21:20.543 30937 30967 W Gralloc3: mapper 3.x is not supported
+08-21 14:21:20.543 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.mapper@2.0::IMapper instance: default
+08-21 14:21:20.544  1045  1045 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.allocator@4.0::IAllocator/default in either framework or device VINTF manifest.
+08-21 14:21:20.544 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.allocator@4.0::IAllocator instance: default
+08-21 14:21:20.544  1045  1045 I hwservicemanager: Since android.hardware.graphics.allocator@4.0::IAllocator/default is not registered, trying to start it as a lazy HAL.
+08-21 14:21:20.544 30937 30967 W Gralloc4: allocator 4.x is not supported
+08-21 14:21:20.544  1045  1045 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.allocator@3.0::IAllocator/default in either framework or device VINTF manifest.
+08-21 14:21:20.544 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.allocator@3.0::IAllocator instance: default
+08-21 14:21:20.544  1045  1045 I hwservicemanager: Since android.hardware.graphics.allocator@3.0::IAllocator/default is not registered, trying to start it as a lazy HAL.
+08-21 14:21:20.544 30937 30967 W Gralloc3: allocator 3.x is not supported
+08-21 14:21:20.544 30937 30967 E HidlServiceManagement: getService: Potential race detected, descriptor: android.hardware.graphics.allocator@2.0::IAllocator instance: default
+08-21 14:21:20.545  1045 30989 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.mapper@4.0::IMapper/default": error code: 0x20
+08-21 14:21:20.546  1045 30989 I hwservicemanager: Tried to start android.hardware.graphics.mapper@4.0::IMapper/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-21 14:21:20.547 30971 30971 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-21 14:21:20.549  1045 30991 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.allocator@4.0::IAllocator/default": error code: 0x20
+08-21 14:21:20.549  1045 30991 I hwservicemanager: Tried to start android.hardware.graphics.allocator@4.0::IAllocator/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-21 14:21:20.552 30937 30967 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.553  1045 30992 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.allocator@3.0::IAllocator/default": error code: 0x20
+08-21 14:21:20.553  1045 30992 I hwservicemanager: Tried to start android.hardware.graphics.allocator@3.0::IAllocator/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-21 14:21:20.558  1045 30990 W libc    : Unable to set property "ctl.interface_start" to "android.hardware.graphics.mapper@3.0::IMapper/default": error code: 0x20
+08-21 14:21:20.558  1045 30990 I hwservicemanager: Tried to start android.hardware.graphics.mapper@3.0::IMapper/default as a lazy service, but was unable to. Usually this happens when a service is not installed, but if the service is intended to be used as a lazy service, then it may be configured incorrectly.
+08-21 14:21:20.561 30937 30994 D edsandbox.debu: Features: 0 0 0
+08-21 14:21:20.561 30937 30994 E edsandbox.debu: vulkan version is 4202692
+08-21 14:21:20.563 30937 30994 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.564 30937 30994 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:20.573  1436  1906 W NewFileUpdater: MSG_GET_PACKAGE_TAG_INFO, no available new tag for: com.warden.controlledsandbox.debug, workingTag: 12.2324
+08-21 14:21:20.587  1285  1302 I ActivityTaskManager: Displayed com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity: +567ms
+08-21 14:21:20.608 30971 30971 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.debug isMatchJavaPatch:false
+08-21 14:21:20.665 30971 30981 I sandbox_packag: Background young concurrent copying GC freed 1048732(28MB) AllocSpace objects, 1(20KB) LOS objects, 53% free, 20MB/44MB, paused 128us,66us total 156.496ms
+08-21 14:21:20.727 30971 30971 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:20.738  1285  1736 W InputManager-JNI: Input channel object '6bf53f9 Splash Screen com.warden.controlledsandbox.debug (client)' was disposed without first being removed with the input manager!
+08-21 14:21:20.831 30971 30971 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-21 14:21:20.831 30971 30971 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-21 14:21:20.831 30971 30971 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:20.834 30971 30971 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:20.834 30971 30971 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:20.946  1285  1739 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.HostPackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:20.948  1285  1739 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:20.948  1285  1739 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-21 14:21:20.949  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-21 14:21:20.950  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.companion32.debug, name:com.warden.controlledsandbox.runtime.protocol.CompanionRuntimePackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:20.951  1285  7367 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10187; state: DISABLED
+08-21 14:21:20.957  1118  1118 D Zygote  : Forked child process 31004
+08-21 14:21:20.958  1285  1315 I ActivityManager: Start proc 31004:com.warden.controlledsandbox.debug:sandbox_server/u0a196 for service {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService}
+08-21 14:21:20.958  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10187; state: ENABLED
+08-21 14:21:20.959 31004 31004 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug:sandbox_server
+08-21 14:21:20.959 31004 31004 I Zygote  : fake Product info com.warden.controlledsandbox.debug:sandbox_server not matched any pattern
+08-21 14:21:20.959 31004 31004 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug:sandbox_server
+08-21 14:21:20.960 31004 31004 E NemuAppNameUtil: save data success
+08-21 14:21:20.961  1119  1119 D Zygote  : Forked child process 31005
+08-21 14:21:20.961  1285  1315 I ActivityManager: Start proc 31005:com.warden.controlledsandbox.companion32.debug:sandbox_server32/u0a187 for service {com.warden.controlledsandbox.companion32.debug/com.warden.controlledsandbox.runtime.protocol.CompanionRuntimePackageAuthorityBootstrapService}
+08-21 14:21:20.962 31004 31004 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.962 31004 31004 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.962 31004 31004 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:20.968 31004 31004 I :sandbox_serve: Late-enabling -Xcheck:jni
+08-21 14:21:20.969 31005 31005 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.companion32.debug:sandbox_server32
+08-21 14:21:20.971 31005 31005 I Zygote  : fake Product info com.warden.controlledsandbox.companion32.debug:sandbox_server32 not matched any pattern
+08-21 14:21:20.971 31005 31005 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.companion32.debug:sandbox_server32
+08-21 14:21:20.973 31005 31005 E NemuAppNameUtil: save data success
+08-21 14:21:20.976 31005 31005 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.976 31005 31005 W nativebridge: Failed to bind-mount /system/lib/x86/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:20.976 31005 31005 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:20.978 31004 31004 W :sandbox_serve: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:20.978 31004 31004 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-21 14:21:20.978 31004 31004 E libnb   : The translator implementation library has not been set.
+08-21 14:21:20.983 31005 31005 I andbox_server3: Late-enabling -Xcheck:jni
+08-21 14:21:20.985 31004 31004 E libnb   : get_callbacks native_handle 0x84ac0bed6e01b8d1: 1 libnb:/system/lib64/libhoudini.so
+08-21 14:21:20.985 31004 31004 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-21 14:21:20.985 31004 31004 D HP      : no libmumuhooker.so
+08-21 14:21:20.985 31004 31004 D HP      : patch_linker_namespace
+08-21 14:21:20.986 31005 31005 W andbox_server3: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:20.986 31004 31004 D houdini : [31004] Initialize library(version: 12.0.0_z.38816.m RELEASE)... successfully.
+08-21 14:21:20.986 31005 31005 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.companion32.debug/code_cache arm
+08-21 14:21:20.986 31004 31004 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x71a98e73c340 ret:1
+08-21 14:21:20.986 31005 31005 E libnb   : The translator implementation library has not been set.
+08-21 14:21:20.988  1142  1172 I adbd    : jdwp connection from 31004
+08-21 14:21:20.992 31004 31004 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:20.992 31005 31005 E libnb   : get_callbacks native_handle 0x31110f39: 1 libnb:/system/lib/libhoudini.so
+08-21 14:21:20.992 31005 31005 I libnb   : Found /system/lib/libhoudini.so version 6
+08-21 14:21:20.992 31005 31005 D HP      : initialize private_dir:/data/user/0/com.warden.controlledsandbox.companion32.debug/code_cache instruction_set:arm
+08-21 14:21:20.992 31005 31005 D HP      : patch_linker_namespace_32
+08-21 14:21:20.992 31005 31005 D HP      : patch call constructors entrance 32
+08-21 14:21:20.993 31005 31005 D houdini : [31005] Initialize library(version: 12.0.0_y.38816.m RELEASE)... successfully.
+08-21 14:21:20.994  1142  1172 I adbd    : jdwp connection from 31005
+08-21 14:21:21.004 31005 31005 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:21.016 30937 30970 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=import-prepare package=com.warden.controlledsandbox.fixture
+08-21 14:21:21.024 31004 31031 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:21.026 31005 31033 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:21.035 31004 31004 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-21 14:21:21.041 31005 31005 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10187; state: ENABLED
+08-21 14:21:21.087 31004 31004 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.debug isMatchJavaPatch:false
+08-21 14:21:21.097 31005 31005 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.companion32.debug isMatchJavaPatch:false
+08-21 14:21:21.201 31004 31014 I :sandbox_serve: Background young concurrent copying GC freed 1049308(28MB) AllocSpace objects, 1(20KB) LOS objects, 53% free, 21MB/45MB, paused 28us,9us total 212.619ms
+08-21 14:21:21.303 31004 31004 I :sandbox_server: type=1400 audit(0.0:158615): avc: denied { search } for name="/" dev="sda6" ino=2 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:21.308 31004 31004 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:21.306 31004 31004 I :sandbox_server: type=1400 audit(0.0:158616): avc: denied { read } for name="Roboto-Regular.ttf" dev="sda6" ino=2193 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:21.310 31004 31004 I :sandbox_server: type=1400 audit(0.0:158617): avc: denied { open } for path="/system/fonts/Roboto-Regular.ttf" dev="sda6" ino=2193 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:21.310 31004 31004 I :sandbox_server: type=1400 audit(0.0:158618): avc: denied { getattr } for path="/system/fonts/Roboto-Regular.ttf" dev="sda6" ino=2193 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:21.310 31004 31004 I :sandbox_server: type=1400 audit(0.0:158619): avc: denied { map } for path="/system/fonts/Roboto-Regular.ttf" dev="sda6" ino=2193 scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:21.341 30937 30970 I CS_COMMAND: INSTANCE_READY command=import-prepare package=com.warden.controlledsandbox.fixture user=0
+08-21 14:21:21.367 30971 30987 W sandbox_packag: Accessing hidden method Landroid/content/res/AssetManager;-><init>()V (unsupported, reflection, allowed)
+08-21 14:21:21.367 30971 30987 W sandbox_packag: Accessing hidden method Landroid/content/res/AssetManager;->addAssetPath(Ljava/lang/String;)I (unsupported, reflection, allowed)
+08-21 14:21:21.369 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.371 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.371 30971 30987 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture artifact=base.apk components=4
+08-21 14:21:21.385 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.385 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.385 30971 30987 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture.lifecycle artifact=base.apk components=0
+08-21 14:21:21.386 31005 31005 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:21.398 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.399 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.399 30971 30987 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture.scale artifact=base.apk components=0
+08-21 14:21:21.402 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.436 31004 31004 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-21 14:21:21.436 31004 31004 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-21 14:21:21.436 31004 31004 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:21.438 30971 30987 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:21.438 31004 31004 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:21.438 30971 30987 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture32 artifact=base.apk components=4
+08-21 14:21:21.439 31004 31004 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:21.439 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->primaryCpuAbi:Ljava/lang/String; (unsupported, reflection, allowed)
+08-21 14:21:21.439 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->secondaryCpuAbi:Ljava/lang/String; (unsupported, reflection, allowed)
+08-21 14:21:21.439 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:21.460 31005 31005 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.companion32.debug' set to: 'default'
+08-21 14:21:21.461 31005 31005 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.companion32.debug: false
+08-21 14:21:21.461 31005 31005 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:21.463 31005 31005 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:21.463 31005 31005 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:21.499 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:21.507  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService, isSkip: true
+08-21 14:21:21.585 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:21.623 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:21.675 30971 30987 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:21.728  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.guest.GuestProcessService54, isSkip: true
+08-21 14:21:21.728  1285  7367 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-21 14:21:21.729  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-21 14:21:21.736  1118  1118 D Zygote  : Forked child process 31042
+08-21 14:21:21.736  1285  1315 I ActivityManager: Start proc 31042:com.warden.controlledsandbox.debug:guest54/u0a196 for service {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.guest.GuestProcessService54}
+08-21 14:21:21.736 31042 31042 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug:guest54
+08-21 14:21:21.737 31042 31042 I Zygote  : fake Product info com.warden.controlledsandbox.debug:guest54 not matched any pattern
+08-21 14:21:21.737 31042 31042 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug:guest54
+08-21 14:21:21.738 31042 31042 E NemuAppNameUtil: save data success
+08-21 14:21:21.741 31042 31042 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:21.741 31042 31042 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:21.741 31042 31042 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:21.745 31042 31042 I x.debug:guest5: Late-enabling -Xcheck:jni
+08-21 14:21:21.754 31042 31042 W x.debug:guest5: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:21.754 31042 31042 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-21 14:21:21.754 31042 31042 E libnb   : The translator implementation library has not been set.
+08-21 14:21:21.761 31042 31042 E libnb   : get_callbacks native_handle 0xa7b03e2aa0654b7d: 1 libnb:/system/lib64/libhoudini.so
+08-21 14:21:21.761 31042 31042 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-21 14:21:21.761 31042 31042 D HP      : no libmumuhooker.so
+08-21 14:21:21.761 31042 31042 D HP      : patch_linker_namespace
+08-21 14:21:21.761 31042 31042 D houdini : [31042] Initialize library(version: 12.0.0_z.38816.m RELEASE)... successfully.
+08-21 14:21:21.761 31042 31042 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x71a98e73c340 ret:1
+08-21 14:21:21.764  1142  1172 I adbd    : jdwp connection from 31042
+08-21 14:21:21.769 31042 31042 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:21.777 31042 31055 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:21.779 31042 31042 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-21 14:21:21.816 31042 31042 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.debug isMatchJavaPatch:false
+08-21 14:21:21.892 31042 31051 I x.debug:guest5: Background young concurrent copying GC freed 1050049(28MB) AllocSpace objects, 1(20KB) LOS objects, 49% free, 24MB/48MB, paused 62us,11us total 128.191ms
+08-21 14:21:21.923 31042 31042 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:22.018 31042 31042 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-21 14:21:22.018 31042 31042 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-21 14:21:22.018 31042 31042 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:22.020 31042 31042 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:22.021 31042 31042 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:22.108 31042 31042 I CS_NATIVE_RUNTIME: projection=false runtimeDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64 packagedDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64 dexPathProjected=false coreDexMode=apk
+08-21 14:21:22.127 31042 31042 I CS_HIDDEN_API_NATIVE: VMRuntime.setHiddenApiExemptions success=true
+08-21 14:21:22.128 31042 31042 I CS_JNI_EX: PROBE ExceptionCheck/Occurred installed via JNIEnv copy
+08-21 14:21:22.129 31042 31042 I CS_JNI_EX: PROBE installed=true translatedAbi=false guestAbi=x86_64 hostAbi=x86_64
+08-21 14:21:22.135 31042 31042 I CS_NATIVE_BIND: PROBE uncaughtLinkHandler=installed
+08-21 14:21:22.135 31042 31042 I CS_NATIVE_BIND: LOADER site=guest.base loader=com.warden.controlledsandbox.runtime.guest.GuestClassLoader@35ee2be guestLoader=true parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f
+08-21 14:21:22.135 31042 31042 W x.debug:guest5: Accessing hidden field Ldalvik/system/BaseDexClassLoader;->pathList:Ldalvik/system/DexPathList; (unsupported, reflection, allowed)
+08-21 14:21:22.135 31042 31042 W x.debug:guest5: Accessing hidden field Ldalvik/system/DexPathList;->nativeLibraryDirectories:Ljava/util/List; (unsupported, reflection, allowed)
+08-21 14:21:22.135 31042 31042 I CS_NATIVE_BIND: LOADER site=guest.dex loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:22.139 31042 31042 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:22.162 31042 31042 I CS_GUEST_STORAGE: bootstrap isolated=false dataFd=-1 dataRoot=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture
+08-21 14:21:22.176 31042 31042 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:22.176 31042 31042 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:22.176 31042 31042 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:22.176 31042 31042 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:22.176 31042 31042 E x.debug:guest5: Failed to register non-native method java.lang.Runtime.nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String; as native
+08-21 14:21:22.177 31042 31042 E x.debug:guest5: Failed to register non-native method java.lang.Runtime.nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String; as native
+08-21 14:21:22.177 31042 31042 I CS_NATIVE_BIND: PROBE nativeLoadWrap installed=0
+08-21 14:21:22.177 31042 31042 I CS_NATIVE_BIND: PROBE nativeLoadDiagnostic=false nativeLoadRedirect=false translatedAbi=false boundaryMode=native-plt-io
+08-21 14:21:22.179 31042 31042 W x.debug:guest5: Accessing hidden method Landroid/ddm/DdmHandleAppName;->setAppName(Ljava/lang/String;I)V (unsupported, reflection, allowed)
+08-21 14:21:22.183 31042 31042 I CS_GUEST_PROCESS_IDENTITY: installed package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture frameworkProcess=com.warden.controlledsandbox.fixture osProcess=com.warden.controlledsandbox.fixture argv0Published=true
+08-21 14:21:22.251 31042 31042 I CS_PM_HOOK: installed packageManager=android.app.ApplicationPackageManager@231791472 original=android.content.pm.IPackageManager$Stub$Proxy@46153372
+08-21 14:21:22.252 31042 31042 I CS_PM_HOOK: installed packageManager=android.app.ApplicationPackageManager@127295653 original=android.content.pm.IPackageManager$Stub$Proxy@46153372
+08-21 14:21:22.252 31042 31042 I CS_PM_HOOK: installed ActivityThread.sPackageManager source
+08-21 14:21:22.255 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/util/Singleton;->mInstance:Ljava/lang/Object; (unsupported, reflection, allowed)
+08-21 14:21:22.275 31042 31042 I CS_FRAMEWORK: ACTIVITY_FRAMEWORK_READY activityManager=android.app.IActivityManager activityTaskManager=android.app.IActivityTaskManager singleton/cache=validated
+08-21 14:21:22.275 31042 31042 I CS_INTERACTION_PROXY: ACTIVITY_CLIENT_STRUCTURE=api32-compatible
+08-21 14:21:22.277 31042 31042 I CS_HIDDEN_API: hidden-api access delegated to native platform bridge
+08-21 14:21:22.277 31042 31042 W x.debug:guest5: Accessing hidden method Landroid/util/Singleton;->get()Ljava/lang/Object; (unsupported, reflection, allowed)
+08-21 14:21:22.286 31042 31042 I CS_INTERACTION_PROXY: ACTIVITY_CLIENT_READY descriptor=android.app.IActivityClientController cache=mInstance,mKnownInstance
+08-21 14:21:22.292 31042 31042 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31042 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:22.292 31042 31042 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31042 thread=sandbox.fixture class=java.lang.ClassNotFoundException message=Didn't find class "android.hardware.input.InputManagerGlobal" on path: DexPathList[[zip file "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk"],nativeLibraryDirectories=[/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64, /data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64, /system/lib64, /system/system_ext/lib64, /system/product/lib64, /system/vendor/lib64]] top=dalvik.system.BaseDexClassLoader.findClass() declaring=dalvik.system.BaseDexClassLoader defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:218) <- java.lang.ClassLoader.loadClass(
+08-21 14:21:22.298 31042 31042 I CS_INTERACTION_PROXY: DISPLAY_STRUCTURE_READY descriptor=android.hardware.display.IDisplayManager manager=bound cache=synchronized
+08-21 14:21:22.299 31042 31042 W CS_PM_HIDDEN_BLOCK: method=checkPermission class=EXPLICITLY_DENIED package=com.warden.controlledsandbox.debug first=android.permission.READ_DEVICE_CONFIG
+08-21 14:21:22.311 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/accounts/AccountManager;->mService:Landroid/accounts/IAccountManager; (max-target-o, reflection, denied)
+08-21 14:21:22.319 31042 31042 I CS_CAMERA_PROXY: CAMERA_PROXY_READY service=media.camera descriptor=android.hardware.ICameraService manager=CameraManagerGlobal.mCameraService-or-lazy-ServiceManager method=descriptor-validated ServiceManager proxy cache=synchronized-if-populated features=android.hardware.camera,android.hardware.camera.front
+08-21 14:21:22.325 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/location/LocationManager;->mService:Landroid/location/ILocationManager; (blocked, reflection, denied)
+08-21 14:21:22.350 31062 31062 I adbd    : type=1400 audit(0.0:158693): avc: denied { search } for name="/" dev="sda6" ino=2 scontext=u:r:adbd:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1
+08-21 14:21:22.350 31062 31062 I adbd    : type=1400 audit(0.0:158694): avc: denied { read } for name="linker64" dev="sda6" ino=733 scontext=u:r:adbd:s0 tcontext=u:object_r:unlabeled:s0 tclass=lnk_file permissive=1
+08-21 14:21:22.353 31062 31062 I sh      : type=1400 audit(0.0:158695): avc: denied { read } for name="/" dev="sda6" ino=2 scontext=u:r:adbd:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1
+08-21 14:21:22.353 31062 31062 I sh      : type=1400 audit(0.0:158696): avc: denied { getattr } for path="/system" dev="sda6" ino=2 scontext=u:r:adbd:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1
+08-21 14:21:22.358 31042 31042 I CS_GMS_PROXY: GMS_BROKER_CONTROLLED_UNAVAILABLE status=DEFERRED_GMS_RUNTIME detail=profile-disabled
+08-21 14:21:22.356 31062 31062 I run-as  : type=1400 audit(0.0:158697): avc: denied { write } for name="context" dev="selinuxfs" ino=5 scontext=u:r:adbd:s0 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1
+08-21 14:21:22.367 31042 31042 W x.debug:guest5: Accessing hidden method Lcom/android/internal/telephony/ITelephony$Stub;->asInterface(Landroid/os/IBinder;)Lcom/android/internal/telephony/ITelephony; (unsupported, reflection, allowed)
+08-21 14:21:22.367 31042 31042 I CS_SYNTHETIC_BINDER: queryLocalInterface descriptor=com.android.internal.telephony.ITelephony
+08-21 14:21:22.367 31042 31042 I CS_TELEPHONY_CACHE: BOUND owner=android.telephony.TelephonyManager field=sITelephony service=phone
+08-21 14:21:22.367 31042 31042 I CS_TELEPHONY_CACHE: UNAVAILABLE service=iphonesubinfo descriptor=com.android.internal.telephony.IPhoneSubInfo
+08-21 14:21:22.368 31042 31042 I CS_TELEPHONY_CACHE: NO_STATIC_FIELD owner=android.telephony.SubscriptionManager descriptor=com.android.internal.telephony.ISub
+08-21 14:21:22.382 31042 31042 I CS_NETWORK_PROXY: DNS_RESOLVER_READY api=32 entry=android.net.DnsResolver boundary=NativePolicy.installHooks virtualDnsMode=STATIC
+08-21 14:21:22.390 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/appwidget/AppWidgetManager;->mService:Lcom/android/internal/appwidget/IAppWidgetService; (unsupported, reflection, allowed)
+08-21 14:21:22.412 31042 31042 I CS_SMS_PROXY: SMS_PROXY_READY service=absent:isms,isms2,isms_msim descriptor=com.android.internal.telephony.ISms manager=ServiceManager/TelephonyManager.sISms method=synthetic ServiceManager Binder (all bounded aliases absent) cache=synchronized-if-populated
+08-21 14:21:22.416 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/nfc/NfcAdapter;->sService:Landroid/nfc/INfcAdapter; (unsupported, reflection, allowed)
+08-21 14:21:22.416 31042 31042 I CS_NFC_PROXY: NFC_PROXY_READY service=absent:nfc descriptor=android.nfc.INfcAdapter manager=ServiceManager/NfcAdapter.sService method=synthetic ServiceManager Binder (all bounded aliases absent) cache=synchronized-if-populated feature=android.hardware.nfc
+08-21 14:21:22.423 31042 31042 I CS_SYNTHETIC_BINDER: queryLocalInterface descriptor=android.hardware.location.IContextHubService
+08-21 14:21:22.424 31042 31042 I CS_PERSISTENT_DATA_BLOCK: PERSISTENT_DATA_BLOCK_READY path=synthetic service=persistent_data_block descriptor=android.service.persistentdata.IPersistentDataBlockService managerCache=service-manager-only-api32
+08-21 14:21:22.425 31042 31042 I CS_SYSTEM_UPDATE: SYSTEM_UPDATE_READY path=real service=system_update descriptor=android.os.ISystemUpdateManager manager=android.os.SystemUpdateManager.mService
+08-21 14:21:22.427 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/bluetooth/BluetoothManager;->mAdapter:Landroid/bluetooth/BluetoothAdapter; (max-target-o, reflection, denied)
+08-21 14:21:22.427 31042 31042 W x.debug:guest5: Accessing hidden field Landroid/bluetooth/BluetoothManager;->mAdapter:Landroid/bluetooth/BluetoothAdapter; (max-target-o, reflection, denied)
+08-21 14:21:22.428  1285  7367 W ServiceManager: Permission failure: android.permission.HIGH_SAMPLING_RATE_SENSORS from uid=10196 pid=31042
+08-21 14:21:22.428 31042 31042 W CS_PM_HIDDEN_BLOCK: method=checkPermission class=EXPLICITLY_DENIED package=com.warden.controlledsandbox.debug first=android.permission.HIGH_SAMPLING_RATE_SENSORS
+08-21 14:21:22.438 31042 31042 I CS_AUDIO: AUDIO_ROUTING_PROXY_READY service=audio descriptor=android.media.IAudioService manager=AudioManager.sService-or-lazy-ServiceManager cache=synchronized
+08-21 14:21:22.438 31042 31042 I CS_SMS_PROXY: SMS_READY binding=service=absent:isms,isms2,isms_msim; descriptor=com.android.internal.telephony.ISms; manager=TelephonyManager.sISms-or-lazy-ServiceManager; method=synthetic ServiceManager Binder (all bounded aliases absent); aliases=isms,isms2,isms_msim
+08-21 14:21:22.438 31042 31042 I CS_DEVICE_SERVICE: location READY binding=location|classification=BINDER_SERVICE|androidPath=location|descriptor=android.location.ILocationManager|existingHook=ReflectiveServiceHook + ServiceManager|service=location; descriptor=android.location.ILocationManager; manager=LocationManager; method=descriptor-validated proxy
+08-21 14:21:22.438 31042 31042 I CS_DEVICE_SERVICE: settingsIdentity READY binding=settingsIdentity|classification=CONTENT_PROVIDER|androidPath=content://settings|descriptor=android.content.IContentProvider|existingHook=SettingsProviderIdentityHook|provider=content://settings; contract=android.content.IContentProvider
+08-21 14:21:22.438 31042 31042 I CS_DEVICE_SERVICE: telephony READY binding=telephony|classification=BINDER_SERVICE|androidPath=phone|descriptor=com.android.internal.telephony.ITelephony|existingHook=ReflectiveServiceHook + ServiceManager|service=phone(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.ITelephony; method=synthetic ServiceManager Binder
+08-21 14:21:22.438 31042 31042 I CS_DEVICE_SERVICE: phoneSubInfo READY binding=phoneSubInfo|classification=BINDER_SERVICE|androidPath=iphonesubinfo|descriptor=com.android.internal.telephony.IPhoneSubInfo|existingHook=ReflectiveServiceHook + ServiceManager|service=iphonesubinfo(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.IPhoneSubInfo; method=synthetic ServiceManager Binder
+08-21 14:21:22.438 31042 31042 I CS_DEVICE_SERVICE: telephonyRegistry READY binding=telephonyRegistry|classification=BINDER_SERVICE|androidPath=telephony.registry|descriptor=com.android.internal.telephony.ITelephonyRegistry|existingHook=ReflectiveServiceHook + ServiceManager|service=telephony.registry; descriptor=com.android.internal.telephony.ITelephonyRegistry; manager=TelephonyRegistry; method=descriptor-validated proxy
+08-21 14:21:22.439 31042 31042 I CS_DEVICE_SERVICE: subscription READY binding=subscription|classification=BINDER_SERVICE|androidPath=isub|descriptor=com.android.internal.telephony.ISub|existingHook=ReflectiveServiceHook + ServiceManager|service=isub,telephony_subscription_service(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.ISub; method=synthetic ServiceManager Binder
+08-21 14:21:22.439 31042 31042 I CS_DEVICE_SERVICE: wifiScanner READY binding=wifiScanner|classification=BINDER_SERVICE|androidPath=wifiscanner|descriptor=android.net.wifi.IWifiScanner|existingHook=ReflectiveServiceHook + ServiceManager|service=wifiscanner; descriptor=android.net.wifi.IWifiScanner; manager=WifiScanner; method=descriptor-validated proxy
+08-21 14:21:22.439 31042 31042 I CS_DEVICE_SERVICE: bluetooth READY binding=bluetooth|classification=BINDER_SERVICE|androidPath=bluetooth_manager|descriptor=android.bluetooth.IBluetoothManager|android.bluetooth.IBluetooth|existingHook=ReflectiveServiceHook + ServiceManager|service=bluetooth_manager; descriptor=manager/adapter Binder contracts; manager=BluetoothManager/BluetoothAdapter; method=descriptor-validated proxy pair
+08-21 14:21:22.439 31042 31042 I CS_DEVICE_SERVICE: sensorCatalog READY binding=sensorCatalog|classification=MANAGER_CATALOG|androidPath=sensorservice|descriptor=android.gui.SensorServer|android.frameworks.sensorservice.ISensorManager/default|existingHook=SensorCatalogHook + SensorService descriptor audit|service=sensorservice; descriptor=android.gui.SensorServer; provider=SensorManager catalog
+08-21 14:21:22.439 31042 31042 I CS_NFC_PROXY: NFC_READY binding=service=absent:nfc; descriptor=android.nfc.INfcAdapter; manager=NfcAdapter.sService-or-lazy-ServiceManager; method=synthetic ServiceManager Binder (all bounded aliases absent); feature=android.hardware.nfc feature=android.hardware.nfc
+08-21 14:21:22.439 31042 31042 I CS_CAMERA_PROXY: CAMERA_READY binding=service=media.camera; descriptor=android.hardware.ICameraService; manager=CameraManagerGlobal.mCameraService-or-lazy-ServiceManager; method=descriptor-validated ServiceManager proxy; cache=synchronized-if-populated; features=android.hardware.camera,android.hardware.camera.front feature=android.hardware.camera mode=STATIC available=false ids=0 frontIds=0
+08-21 14:21:22.440 31042 31042 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.440 31042 31042 E linker  : library "/system/lib64/libcamera_client.so" ("/system/lib64/libcamera_client.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.440 31042 31042 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.440 31042 31042 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.441 31042 31042 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.441 31042 31042 E linker  : library "/system/lib64/libutils.so" ("/system/lib64/libutils.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.441 31042 31042 E linker  : library "/system/lib64/libutils.so" ("/system/lib64/libutils.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:22.441 31042 31042 I CS_CAMERA1_NATIVE: SYMBOLS_LOOKUP connect=0x71ac38bd0940 getNative=0x71ac2fb395a0 copyAndPost=0x71ac2fb39d70 release=0x71ac2fb39a20 string16Ctor=0x71ac2f96e170 string16Dtor=0x71ac2f96dd60
+08-21 14:21:22.441 31042 31042 I CS_CAMERA1_NATIVE: SYMBOLS_READY connect=0x71ac38bd0940 getNative=0x71ac2fb395a0 copyAndPost=0x71ac2fb39d70 release=0x71ac2fb39a20 string16=0x71ac2f96e170
+08-21 14:21:22.445 31042 31042 I CS_CAMERA1_NATIVE: IDENTITY_READY guestPackage=com.warden.controlledsandbox.fixture virtualUid=10001 hostPackage=com.warden.controlledsandbox.debug hostUid=10196 virtualCamera=true allowOpen=false replacePreview=false replaceCapture=false
+08-21 14:21:22.445 31042 31042 I CS_CAMERA1_NATIVE: ADAPTER_READY status=symbolsReady=true;hooksReady=true;identityConfigured=true;virtualCamera=true;allowOpen=false;replacePreview=false;replaceCapture=false;previewFrames=0;captureFrames=0;previewDeliveries=0;captureDeliveries=0;contexts=0;hookTargets=4;hookPatched=4;hookFailures=0;guest=com.warden.controlledsandbox.fixture;host=com.warden.controlledsandbox.debug;virtualUid=10001;hostUid=10196;error=
+08-21 14:21:22.445 31042 31042 I CS_NATIVE_BIND: LOADER site=process.install loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:22.445 31042 31042 I CS_GUEST_FACTORY: classLoader factory= base=com.warden.controlledsandbox.runtime.guest.GuestClassLoader frameworkBase=dalvik.system.PathClassLoader process=dalvik.system.PathClassLoader
+08-21 14:21:22.445 31042 31042 I CS_NATIVE_BIND: LOADER site=guest.process loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:22.447 31042 31042 I CS_GUEST_LOADED_APK: installed package=com.warden.controlledsandbox.fixture loader=dalvik.system.PathClassLoader application=DEFERRED_UNTIL_BIND_APPLICATION
+08-21 14:21:22.448 31042 31042 I CS_GUEST_FACTORY: application factory= class=com.warden.controlledsandbox.fixture.FixtureApplication
+08-21 14:21:22.448 31042 31042 I CS_GUEST_LOADED_APK: frameworkMakeApplication=OWNED_BY_GUEST
+08-21 14:21:22.448 31042 31042 I CS_GUEST_LOADED_APK: frameworkMakeApplication=OWNED_BY_GUEST application=com.warden.controlledsandbox.fixture.FixtureApplication
+08-21 14:21:22.448 31042 31042 I CS_NATIVE_BIND: CLASS site=application class=com.warden.controlledsandbox.fixture.FixtureApplication loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:22.448 31042 31042 I CS_GUEST_PROCESS_IDENTITY: application attached package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture
+08-21 14:21:22.458 31042 31042 I CS_SERVICE_FRAMEWORK: installed process=com.warden.controlledsandbox.fixture
+08-21 14:21:22.460 31042 31042 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31042 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:22.461 31042 31042 I CS_FRAMEWORK_ACTIVITY: INSTRUMENTATION_READY mode=ACTIVITY_THREAD
+08-21 14:21:22.461 31042 31042 I CS_PROVIDER_DECL: source=snapshot class=com.warden.controlledsandbox.fixture.FaultAnrProvider process=com.warden.controlledsandbox.fixture:fault_anr_provider authority=com.warden.controlledsandbox.fixture.fault.anr
+08-21 14:21:22.461 31042 31042 I CS_PROVIDER_DECL: source=snapshot class=com.warden.controlledsandbox.fixture.FixtureProvider process=com.warden.controlledsandbox.fixture:provider authority=com.warden.controlledsandbox.fixture.provider
+08-21 14:21:22.462 31042 31042 I CS_PROVIDER_DECL: source=manifest class=com.warden.controlledsandbox.fixture.FaultAnrProvider process=:fault_anr_provider authority=com.warden.controlledsandbox.fixture.fault.anr
+08-21 14:21:22.462 31042 31042 I CS_PROVIDER_DECL: source=manifest class=com.warden.controlledsandbox.fixture.FixtureProvider process=:provider authority=com.warden.controlledsandbox.fixture.provider
+08-21 14:21:22.463 31042 31042 I CS_RUNTIME: GUEST_PROVIDERS_BOUND snapshot=0 manifestExtra=0 skippedOtherProcess=4 classes=0
+08-21 14:21:22.472 31042 31042 I CS_FIXTURE: APPLICATION_CREATE count=9 package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture
+08-21 14:21:22.477 31042 31042 I CS_FIXTURE: NATIVE_LOAD JNI_LOADED
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.483 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.484 31042 31042 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:22.486 31042 31042 I CS_RUNTIME: GUEST_PREPARED status=READY package=com.warden.controlledsandbox.fixture session=a48d198f-5c13-4e21-8ae5-c00f82d5ae3d traceDomain=GUEST processName=com.warden.controlledsandbox.fixture virtualUserId=0 physicalPid=31042 threadTid=31042 component=com.warden.controlledsandbox.fixture.MainActivity generation=1 slot=54
+08-21 14:21:22.512 30937 30970 I CS_COMMAND: PASS import-prepare com.warden.controlledsandbox.fixture user=0 PREPARED
+08-21 14:21:22.520  1138  2216 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:22.524  1285  1736 W ActivityManager: callingPackage:null, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.guest.GuestProcessService54, isSkip: true
+08-21 14:21:22.532 31042 31042 I CS_CAMERA1_NATIVE: RESET contexts=0
+08-21 14:21:22.532 31042 31042 I Process : Sending signal. PID: 31042 SIG: 9
+08-21 14:21:22.542  1585  1585 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendBroadcast:1181 android.content.ContextWrapper.sendBroadcast:479 com.mumu.launcher.Launcher.onResume:215 android.app.Instrumentation.callActivityOnResume:1492 android.app.Activity.performResume:8198 
+08-21 14:21:22.544 19630 19630 D ThrowableReceiver: intent.getAction() == Intent { act=android.intent.action.LAUNCHER_RESUME flg=0x10 pkg=com.mumu.store cmp=com.mumu.store/.install.ThrowableReceiver }
+08-21 14:21:22.544 19630 19630 D ThrowableReceiver: receive android.intent.action.LAUNCHER_RESUME
+08-21 14:21:22.556  1585  1677 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:22.561  1585 31070 D m.mumu.launche: Features: 0 0 0
+08-21 14:21:22.561  1585 31070 E m.mumu.launche: vulkan version is 4202692
+08-21 14:21:22.562  1585 31070 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:22.562  1585 31070 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:22.589  1285  7367 W InputManager-JNI: Input channel object '1da8caa com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (client)' was disposed without first being removed with the input manager!
+08-21 14:21:22.590  1285  7367 I ActivityManager: Process com.warden.controlledsandbox.debug:guest54 (pid 31042) has died: fg  SVC 
+08-21 14:21:22.591  1285  1316 I libprocessgroup: Successfully killed process cgroup uid 10196 pid 31042 in 0ms
+08-21 14:21:22.591  1118  1118 I Zygote  : Process 31042 exited due to signal 9 (Killed)
+08-21 14:21:22.592  1285  5053 D RecentTaskMonitor: onRecentTaskRemoved 1201:Task=1201
+08-21 14:21:22.592  1285  1306 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=1201 attached=false
+08-21 14:21:22.592  1285  1306 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=1201 attached=false
+08-21 14:21:22.595  1285  1305 D RecentTaskMonitor: VAddressShellNotifier#notifyOpenTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:2","displayId":0,"userId":0,"name":"Mumu Launcher","originName":"Mumu Launcher","packageName":"com.mumu.launcher","launcher":true,"newTask":false,"icon":"iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAHOSURBVEiJ7ZTBatRAGMd\/mclacMCF7ta20pNPsFBEjQf7CB48CsUX8GDFd\/DiE3hp0ZsHMZrTQtiTgr34AuJhhT2IlsS1ktnk87BJmm2TdqnrrT8YSGa+\/L\/v+89M4IIF4+bjvxEDCXBl0cIuMASyfMSAWaS4aK0lCALp9\/vSbrcFkHyNENzwH6yLtdbi+76EYSgFxhght2sf4k+QfKyxTp1R+RAwvu9jjMHzvHJxNBoVMd8Oz2HXjC2DwUCstXKcJEmk0+kIIB8aOmii1pYmqnbNU\/kQyN69fyuPXizLr8ODUmhn92ptgjiOhYbT5RwTtwBBEGCM4eatGzx5uUIyGQPwfPsHl9w23b3PRDY7avdhjyUyut0uURQBtIAJzG7yz2pm785tnr5aK8UBHu8ul8+9a6tsbqyzubGOcqp1AvC7sKt6dtfyzF89z2srR3Pv+msm6eQUR2tZBcb5mEkwLt611mSS8ubLff7YCBHIMlAKtu6mtJSD64A6UXipU7Y91+3LUtjbgQfPoKUV37d7J2KsTWu\/Pe2iHQXpqbi7NE\/0LLUdWGvRriJLodgC5U47sdbWCjXN1yU8YPojO+9ovAcFlxvm52V8dsgFFf4Csc8O5d4NxXMAAAAASUVORK5CYII=","canChangeAppOrientation":false,"canReceiveFile":false,"pid":1585,"uid":1000,"action":"open"}}
+08-21 14:21:22.595  1285  1305 D RecentTaskMonitor: VAddressShellNotifier#notifyCloseTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:1201","action":"close"}}
+08-21 14:21:22.596  1285  1305 I RecentTaskMonitor: broadcast tab closed in android as it's closed task taskId: 1201, elapseTime: 2463
+08-21 14:21:22.596  1285  1314 W BroadcastQueue: Background execution not allowed: receiving Intent { act=uu.intent.action.STOP_ACCELERATE flg=0x10 (has extras) } to com.mumu.acc/.AccMsgReceiver
+08-21 14:21:22.596  1585  1585 I Launcher: mRecentReceiver onReceive action = uu.intent.action.STOP_ACCELERATE
+08-21 14:21:22.597  1436  1912 D Watchdog: upload event: {"architecture":"x86_64","channel":"nochannel-mumu12","country":"zh-CN","engine":"NEMUX","fchannel":"nochannel-mumu12","language":"zh-Hans","mpid":"1","package":"mumu","product":"","product_version":"4.1.33.3741","usage":"0","uuid":"d2810392-fbc0-4986-b371-9503ddb84ab1","version":"4.1.33.3741","x":{"app_elapse":2,"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","error":{"code":0,"msg":"ok"},"extra":{"amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}}	type: ExitAPP	sign: RrPclBg4pqPNik/Cb/AMVe8TGBg=	uid: 1000	json:{"app_elapse":2,"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","error":{"code":0,"msg":"ok"},"extra":{"amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}
+08-21 14:21:22.601  1138  1138 W SurfaceFlinger: couldn't log to binary event log: overflow.
+08-21 14:21:22.617  1436  1912 D Watchdog: upload server response: {"errcode": 100, "errmsg": "ok"}
+08-21 14:21:22.617  1436  1912 D Watchdog: upload result: true
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.056  1585  1585 D drawPreviewItem: drawPreviewItem: drawPreviewItem
+08-21 14:21:23.069  1585  1677 W OpenGLRenderer: Incorrectly called buildLayer on View: E1, destroying layer...
+08-21 14:21:23.069  1585  1677 W OpenGLRenderer: Incorrectly called buildLayer on View: E1, destroying layer...
+08-21 14:21:23.110 31090 31090 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:23.112  1285  5053 I ActivityTaskManager: START u0 {flg=0x14000000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras)} from uid 2000, pid 31090
+08-21 14:21:23.113  1285  5053 I ActivityTaskManager: [KeepAlive] disabled for com.warden.controlledsandbox.debug
+08-21 14:21:23.113  1285  5053 W ActivityTaskManager: Can't find TaskDisplayArea to determine support for multi window. Task id=1202 attached=false
+08-21 14:21:23.116  1285  5053 D RecentTaskMonitor: onRecentTaskAdded 1202:Task=1202
+08-21 14:21:23.117  1585  1585 D Launcher.DragController: cancelDrag: 
+08-21 14:21:23.117  1585  1585 D Launcher.DragController: endDrag: 
+08-21 14:21:23.117  1285  1305 W NemuTabUtil: Unable to get the icon of app: ApplicationInfo{e77087d com.warden.controlledsandbox.debug}
+08-21 14:21:23.117  1285  7367 W ActivityTaskManager: Tried to set launchTime (0) < mLastActivityLaunchTime (76709073)
+08-21 14:21:23.117  1285  1305 D RecentTaskMonitor: task null or not sub display in notifyDisplayOpened
+08-21 14:21:23.117  1285  1305 D RecentTaskMonitor: VAddressShellNotifier#notifyOpenTab :{"uri":"player\/tab","need_response":false,"params":{"id":"task:1202","displayId":0,"userId":0,"name":"闪现2","originName":"闪现2","packageName":"com.warden.controlledsandbox.debug","launcher":false,"newTask":true,"icon":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAALSURBVAiZY2AAAgAABQABYlUyiAAAAABJRU5ErkJggg==","canChangeAppOrientation":false,"canReceiveFile":false,"pid":30937,"uid":10196,"action":"open"}}
+08-21 14:21:23.122 30937 30937 I CS_COMMAND: COMMAND_BEGIN command=launch-component package=com.warden.controlledsandbox.fixture user=0
+08-21 14:21:23.123 30937 31095 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=launch-component package=com.warden.controlledsandbox.fixture
+08-21 14:21:23.123  1285  5732 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.PackageManagementService, isSkip: true
+08-21 14:21:23.137  1474  1663 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.140 30937 30967 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.141  1474 31096 D ndroid.systemu: Features: 0 0 0
+08-21 14:21:23.141  1474 31096 E ndroid.systemu: vulkan version is 4202692
+08-21 14:21:23.142  1474 31096 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.143  1474 31096 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.144 30937 31097 D edsandbox.debu: Features: 0 0 0
+08-21 14:21:23.144 30937 31097 E edsandbox.debu: vulkan version is 4202692
+08-21 14:21:23.146 30937 31097 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.147 30937 31097 D gralloc_x86: gralloc_alloc: Creating ashmem region of size 8298496
+08-21 14:21:23.147  1285  3587 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.HostPackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:23.151  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:23.153  1285  1302 I ActivityTaskManager: Displayed com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity: +38ms
+08-21 14:21:23.157  1285  3587 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.companion32.debug, name:com.warden.controlledsandbox.runtime.protocol.CompanionRuntimePackageAuthorityBootstrapService, isSkip: true
+08-21 14:21:23.198 30937 31095 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=launch-component package=com.warden.controlledsandbox.fixture
+08-21 14:21:23.225 30937 31095 I CS_COMMAND: INSTANCE_READY command=launch-component package=com.warden.controlledsandbox.fixture user=0
+08-21 14:21:23.246 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.247 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.247 30971 31066 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture artifact=base.apk components=4
+08-21 14:21:23.251 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.252 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.252 30971 31066 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture.lifecycle artifact=base.apk components=0
+08-21 14:21:23.259 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.260 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.260 30971 31066 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture.scale artifact=base.apk components=0
+08-21 14:21:23.262 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.262 30971 31066 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.262 30971 31066 I CS_PMS_METADATA: parsed package=com.warden.controlledsandbox.fixture32 artifact=base.apk components=4
+08-21 14:21:23.263 30971 31066 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:23.305  1285  7367 W InputManager-JNI: Input channel object '6e3c3c3 Splash Screen com.warden.controlledsandbox.debug (client)' was disposed without first being removed with the input manager!
+08-21 14:21:23.311 30971 31066 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:23.318  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService, isSkip: true
+08-21 14:21:23.351 30971 31066 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:23.387 30971 31066 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:23.436 30971 31066 W sandbox_packag: Accessing hidden field Landroid/content/pm/ApplicationInfo;->networkSecurityConfigRes:I (max-target-o, reflection, denied)
+08-21 14:21:23.478  1285  7367 W ActivityManager: callingPackage:com.warden.controlledsandbox.debug, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.runtime.guest.GuestProcessService54, isSkip: true
+08-21 14:21:23.478  1285  7367 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10196; state: DISABLED
+08-21 14:21:23.478  1285  1315 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10196; state: ENABLED
+08-21 14:21:23.476  1118  1118 I main    : type=1400 audit(0.0:158774): avc: denied { getattr } for path="/apex/com.android.permission/javalib/framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1
+08-21 14:21:23.484  1118  1118 D Zygote  : Forked child process 31110
+08-21 14:21:23.483 31110 31110 I main    : type=1400 audit(0.0:158775): avc: denied { search } for name="com.android.permission" dev="sda6" ino=435 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=dir permissive=1 app=com.warden.controlledsandbox.fixture
+08-21 14:21:23.483 31110 31110 I main    : type=1400 audit(0.0:158776): avc: denied { read } for name="framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.fixture
+08-21 14:21:23.483 31110 31110 I main    : type=1400 audit(0.0:158777): avc: denied { open } for path="/apex/com.android.permission/javalib/framework-permission-s.jar" dev="sda6" ino=444 scontext=u:r:zygote:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.fixture
+08-21 14:21:23.485  1285  1315 I ActivityManager: Start proc 31110:com.warden.controlledsandbox.debug:guest54/u0a196 for service {com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.guest.GuestProcessService54}
+08-21 14:21:23.485 31110 31110 I Zygote  : fakeProductInfoIfNeed callded! com.warden.controlledsandbox.debug:guest54
+08-21 14:21:23.486 31110 31110 I Zygote  : fake Product info com.warden.controlledsandbox.debug:guest54 not matched any pattern
+08-21 14:21:23.486 31110 31110 I Zygote  : fakeProductInfoFromProperties callded! com.warden.controlledsandbox.debug:guest54
+08-21 14:21:23.483 31110 31110 I main    : type=1400 audit(0.0:158778): avc: denied { read } for name="u:object_r:serialno_prop:s0" dev="tmpfs" ino=10832 scontext=u:r:zygote:s0 tcontext=u:object_r:serialno_prop:s0 tclass=file permissive=1 app=com.warden.controlledsandbox.fixture
+08-21 14:21:23.489 31110 31110 E NemuAppNameUtil: save data success
+08-21 14:21:23.492 31110 31110 W nativebridge: Failed to bind-mount /system/etc/cpuinfo.x86_64.txt as /proc/cpuinfo: No such file or directory
+08-21 14:21:23.492 31110 31110 W nativebridge: Failed to bind-mount /system/lib64/x86_64/cpuinfo as /proc/cpuinfo: No such file or directory
+08-21 14:21:23.492 31110 31110 I Zygote  : seccomp disabled by setenforce 0
+08-21 14:21:23.497 31110 31110 I x.debug:guest5: Late-enabling -Xcheck:jni
+08-21 14:21:23.504 31110 31110 W x.debug:guest5: Unexpected CPU variant for X86 using defaults: x86_64
+08-21 14:21:23.504 31110 31110 V libnb   : enter native_bridge2_initialize /data/user/0/com.warden.controlledsandbox.debug/code_cache arm64
+08-21 14:21:23.505 31110 31110 E libnb   : The translator implementation library has not been set.
+08-21 14:21:23.511 31110 31110 E libnb   : get_callbacks native_handle 0x82d6975bd4faeb3d: 1 libnb:/system/lib64/libhoudini.so
+08-21 14:21:23.511 31110 31110 I libnb   : Found /system/lib64/libhoudini.so version 6
+08-21 14:21:23.511 31110 31110 D HP      : no libmumuhooker.so
+08-21 14:21:23.511 31110 31110 D HP      : patch_linker_namespace
+08-21 14:21:23.512 31110 31110 D houdini : [31110] Initialize library(version: 12.0.0_z.38816.m RELEASE)... successfully.
+08-21 14:21:23.512 31110 31110 W HP      : x_initialize private_dir:/data/user/0/com.warden.controlledsandbox.debug/code_cache instruction_set:arm64 getMethodShorty:0x71a98e73c340 ret:1
+08-21 14:21:23.514  1142  1172 I adbd    : jdwp connection from 31110
+08-21 14:21:23.518 31110 31110 D ProcessState: Binder ioctl to enable oneway spam detection failed: Invalid argument
+08-21 14:21:23.527 31110 31124 E ashmem  : memfd: ro.vndk.version not defined or invalid (), this is mandated since P.
+08-21 14:21:23.529 31110 31110 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10196; state: ENABLED
+08-21 14:21:23.568 31110 31110 D NemuJavaHotPatchHelper: onHandleBindApplication reportedPackageName:com.warden.controlledsandbox.debug isMatchJavaPatch:false
+08-21 14:21:23.642 31110 31119 I x.debug:guest5: Background young concurrent copying GC freed 1050792(28MB) AllocSpace objects, 1(20KB) LOS objects, 48% free, 25MB/49MB, paused 21us,10us total 127.403ms
+08-21 14:21:23.660 31110 31110 I Typeface: Preloading /system/fonts/Roboto-Regular.ttf
+08-21 14:21:23.755 31110 31110 V GraphicsEnvironment: ANGLE Developer option for 'com.warden.controlledsandbox.debug' set to: 'default'
+08-21 14:21:23.756 31110 31110 V GraphicsEnvironment: ANGLE GameManagerService for com.warden.controlledsandbox.debug: false
+08-21 14:21:23.756 31110 31110 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+08-21 14:21:23.758 31110 31110 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:23.758 31110 31110 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+08-21 14:21:23.820 30937 30937 W System.err: java.io.IOException: Is a directory
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.FileDispatcherImpl.read0(Native Method)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.FileDispatcherImpl.read(FileDispatcherImpl.java:53)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.IOUtil.read(IOUtil.java:197)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.FileChannelImpl.read(FileChannelImpl.java:197)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.ChannelInputStream.read(ChannelInputStream.java:66)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.ChannelInputStream.read(ChannelInputStream.java:110)
+08-21 14:21:23.820 30937 30937 W System.err: 	at sun.nio.ch.ChannelInputStream.read(ChannelInputStream.java:104)
+08-21 14:21:23.820 30937 30937 W System.err: 	at java.nio.file.Files.read(Files.java:3105)
+08-21 14:21:23.820 30937 30937 W System.err: 	at java.nio.file.Files.readAllBytes(Files.java:3158)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.app.ActivityThread$ApplicationThread$2.run(ActivityThread.java:1853)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.os.Handler.handleCallback(Handler.java:938)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.os.Looper.loopOnce(Looper.java:201)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.os.Looper.loop(Looper.java:288)
+08-21 14:21:23.820 30937 30937 W System.err: 	at android.app.ActivityThread.main(ActivityThread.java:8060)
+08-21 14:21:23.820 30937 30937 W System.err: 	at java.lang.reflect.Method.invoke(Native Method)
+08-21 14:21:23.820 30937 30937 W System.err: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:571)
+08-21 14:21:23.820 30937 30937 W System.err: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:1091)
+08-21 14:21:23.821  1585  1585 D create_screen: onReceive: action = nemu.intent.action.NEW_TASK
+08-21 14:21:23.821  1285  1314 W BroadcastQueue: Background execution not allowed: receiving Intent { act=nemu.intent.action.NEW_TASK dat=package:com.warden.controlledsandbox.debug flg=0x10 (has extras) } to com.mumu.acc/.AccMsgReceiver
+08-21 14:21:23.822  1436  1436 D TabManager: setFocusTaskProp 1202
+08-21 14:21:23.822  1285  7367 I RecentTaskMonitor: broadcast tab opened in android as it's new task1 1202
+08-21 14:21:23.823  1436  1804 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendBroadcast:1181 android.content.ContextWrapper.sendBroadcast:479 com.netease.nemu_vapi_android.thread.NewFileUpdater.notifyFocusedTabChanged:494 com.netease.nemu_vapi_android.thread.NewFileUpdater.onOpenNewTask:410 com.netease.nemu_vapi_android.worker.LocalAppManager.updateOnNewTask:255 
+08-21 14:21:23.824  1436  1804 D NewFileUpdater: onOpenNewTask focusPkgName set to com.warden.controlledsandbox.debug
+08-21 14:21:23.824  1585  1661 D updatePackage: version com.warden.controlledsandbox.debug 19
+08-21 14:21:23.824  1585  1585 I Launcher: Deferring update until onResume
+08-21 14:21:23.824  1285  1736 W ActivityManager: Foreground service started from background can not have location/camera/microphone access: service com.mumu.acc/.AccService
+08-21 14:21:23.824  1436  1912 D Watchdog: upload event: {"architecture":"x86_64","channel":"nochannel-mumu12","country":"zh-CN","engine":"NEMUX","fchannel":"nochannel-mumu12","language":"zh-Hans","mpid":"1","package":"mumu","product":"","product_version":"4.1.33.3741","usage":"0","uuid":"d2810392-fbc0-4986-b371-9503ddb84ab1","version":"4.1.33.3741","x":{"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","app_version_code":19,"app_version_name":"0.5.19.1-source-debug","error":{"code":0,"msg":"ok"},"extra":{"NB":"{\"NB_NAME\":\"\",\"NB_64BIT\":\"true\",\"NB_STATUS\":\"\"}","amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}}	type: LaunchAPP	sign: 2WjGLkhxPtYPCymPcrO45PD2oVI=	uid: 1000	json:{"app_name":"闪现2","app_package":"com.warden.controlledsandbox.debug","app_version_code":19,"app_version_name":"0.5.19.1-source-debug","error":{"code":0,"msg":"ok"},"extra":{"NB":"{\"NB_NAME\":\"\",\"NB_64BIT\":\"true\",\"NB_STATUS\":\"\"}","amp_name":"闪现2","ampid":0},"token":"73e37870-c60b-487e-8b20-a82111b96fbf"}
+08-21 14:21:23.825  1285  1314 V ActivityManager: Attempted to start a foreground service (com.mumu.acc/.AccService) with a broken notification (no icon: Notification(channel=acc-service shortcut=null contentView=null vibrate=null sound=null defaults=0x0 flags=0x40 color=0x00000000 vis=PRIVATE))
+08-21 14:21:23.842  1436  1906 W NewFileUpdater: MSG_GET_PACKAGE_TAG_INFO, no available new tag for: com.warden.controlledsandbox.debug, workingTag: 12.2324
+08-21 14:21:23.846  1436  1912 D Watchdog: upload server response: {"errcode": 100, "errmsg": "ok"}
+08-21 14:21:23.846  1436  1912 D Watchdog: upload result: true
+08-21 14:21:23.850 31110 31110 I CS_NATIVE_RUNTIME: projection=false runtimeDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64 packagedDir=/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64 dexPathProjected=false coreDexMode=apk
+08-21 14:21:23.868 31110 31110 I CS_HIDDEN_API_NATIVE: VMRuntime.setHiddenApiExemptions success=true
+08-21 14:21:23.869 31110 31110 I CS_JNI_EX: PROBE ExceptionCheck/Occurred installed via JNIEnv copy
+08-21 14:21:23.870 31110 31110 I CS_JNI_EX: PROBE installed=true translatedAbi=false guestAbi=x86_64 hostAbi=x86_64
+08-21 14:21:23.874 31110 31110 I CS_NATIVE_BIND: PROBE uncaughtLinkHandler=installed
+08-21 14:21:23.874 31110 31110 I CS_NATIVE_BIND: LOADER site=guest.base loader=com.warden.controlledsandbox.runtime.guest.GuestClassLoader@35ee2be guestLoader=true parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f
+08-21 14:21:23.874 31110 31110 W x.debug:guest5: Accessing hidden field Ldalvik/system/BaseDexClassLoader;->pathList:Ldalvik/system/DexPathList; (unsupported, reflection, allowed)
+08-21 14:21:23.874 31110 31110 W x.debug:guest5: Accessing hidden field Ldalvik/system/DexPathList;->nativeLibraryDirectories:Ljava/util/List; (unsupported, reflection, allowed)
+08-21 14:21:23.875 31110 31110 I CS_NATIVE_BIND: LOADER site=guest.dex loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:23.878 31110 31110 I CS_GUEST_METADATA: applicationMetaData=0
+08-21 14:21:23.895 31110 31110 I CS_GUEST_STORAGE: bootstrap isolated=false dataFd=-1 dataRoot=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture
+08-21 14:21:23.911 31110 31110 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:23.911 31110 31110 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:23.911 31110 31110 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:23.911 31110 31110 W x.debug:guest5: Accessing hidden method Ljava/lang/Runtime;->nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;Ljava/lang/Class;)Ljava/lang/String; (blocked, JNI, denied)
+08-21 14:21:23.912 31110 31110 E x.debug:guest5: Failed to register non-native method java.lang.Runtime.nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String; as native
+08-21 14:21:23.912 31110 31110 E x.debug:guest5: Failed to register non-native method java.lang.Runtime.nativeLoad(Ljava/lang/String;Ljava/lang/ClassLoader;)Ljava/lang/String; as native
+08-21 14:21:23.912 31110 31110 I CS_NATIVE_BIND: PROBE nativeLoadWrap installed=0
+08-21 14:21:23.912 31110 31110 I CS_NATIVE_BIND: PROBE nativeLoadDiagnostic=false nativeLoadRedirect=false translatedAbi=false boundaryMode=native-plt-io
+08-21 14:21:23.915 31110 31110 W x.debug:guest5: Accessing hidden method Landroid/ddm/DdmHandleAppName;->setAppName(Ljava/lang/String;I)V (unsupported, reflection, allowed)
+08-21 14:21:23.920 31110 31110 I CS_GUEST_PROCESS_IDENTITY: installed package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture frameworkProcess=com.warden.controlledsandbox.fixture osProcess=com.warden.controlledsandbox.fixture argv0Published=true
+08-21 14:21:23.985 31110 31110 I CS_PM_HOOK: installed packageManager=android.app.ApplicationPackageManager@231791472 original=android.content.pm.IPackageManager$Stub$Proxy@46153372
+08-21 14:21:23.985 31110 31110 I CS_PM_HOOK: installed packageManager=android.app.ApplicationPackageManager@127295653 original=android.content.pm.IPackageManager$Stub$Proxy@46153372
+08-21 14:21:23.985 31110 31110 I CS_PM_HOOK: installed ActivityThread.sPackageManager source
+08-21 14:21:23.988 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/util/Singleton;->mInstance:Ljava/lang/Object; (unsupported, reflection, allowed)
+08-21 14:21:24.006 31110 31110 I CS_FRAMEWORK: ACTIVITY_FRAMEWORK_READY activityManager=android.app.IActivityManager activityTaskManager=android.app.IActivityTaskManager singleton/cache=validated
+08-21 14:21:24.006 31110 31110 I CS_INTERACTION_PROXY: ACTIVITY_CLIENT_STRUCTURE=api32-compatible
+08-21 14:21:24.007 31110 31110 I CS_HIDDEN_API: hidden-api access delegated to native platform bridge
+08-21 14:21:24.007 31110 31110 W x.debug:guest5: Accessing hidden method Landroid/util/Singleton;->get()Ljava/lang/Object; (unsupported, reflection, allowed)
+08-21 14:21:24.015 31110 31110 I CS_INTERACTION_PROXY: ACTIVITY_CLIENT_READY descriptor=android.app.IActivityClientController cache=mInstance,mKnownInstance
+08-21 14:21:24.020 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:24.020 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.ClassNotFoundException message=Didn't find class "android.hardware.input.InputManagerGlobal" on path: DexPathList[[zip file "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk"],nativeLibraryDirectories=[/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64, /data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64, /system/lib64, /system/system_ext/lib64, /system/product/lib64, /system/vendor/lib64]] top=dalvik.system.BaseDexClassLoader.findClass() declaring=dalvik.system.BaseDexClassLoader defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:218) <- java.lang.ClassLoader.loadClass(
+08-21 14:21:24.025 31110 31110 I CS_INTERACTION_PROXY: DISPLAY_STRUCTURE_READY descriptor=android.hardware.display.IDisplayManager manager=bound cache=synchronized
+08-21 14:21:24.026 31110 31110 W CS_PM_HIDDEN_BLOCK: method=checkPermission class=EXPLICITLY_DENIED package=com.warden.controlledsandbox.debug first=android.permission.READ_DEVICE_CONFIG
+08-21 14:21:24.038 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/accounts/AccountManager;->mService:Landroid/accounts/IAccountManager; (max-target-o, reflection, denied)
+08-21 14:21:24.045 31110 31110 I CS_CAMERA_PROXY: CAMERA_PROXY_READY service=media.camera descriptor=android.hardware.ICameraService manager=CameraManagerGlobal.mCameraService-or-lazy-ServiceManager method=descriptor-validated ServiceManager proxy cache=synchronized-if-populated features=android.hardware.camera,android.hardware.camera.front
+08-21 14:21:24.052 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/location/LocationManager;->mService:Landroid/location/ILocationManager; (blocked, reflection, denied)
+08-21 14:21:24.090 31110 31110 I CS_GMS_PROXY: GMS_BROKER_CONTROLLED_UNAVAILABLE status=DEFERRED_GMS_RUNTIME detail=profile-disabled
+08-21 14:21:24.098 31110 31110 W x.debug:guest5: Accessing hidden method Lcom/android/internal/telephony/ITelephony$Stub;->asInterface(Landroid/os/IBinder;)Lcom/android/internal/telephony/ITelephony; (unsupported, reflection, allowed)
+08-21 14:21:24.098 31110 31110 I CS_SYNTHETIC_BINDER: queryLocalInterface descriptor=com.android.internal.telephony.ITelephony
+08-21 14:21:24.098 31110 31110 I CS_TELEPHONY_CACHE: BOUND owner=android.telephony.TelephonyManager field=sITelephony service=phone
+08-21 14:21:24.099 31110 31110 I CS_TELEPHONY_CACHE: UNAVAILABLE service=iphonesubinfo descriptor=com.android.internal.telephony.IPhoneSubInfo
+08-21 14:21:24.100 31110 31110 I CS_TELEPHONY_CACHE: NO_STATIC_FIELD owner=android.telephony.SubscriptionManager descriptor=com.android.internal.telephony.ISub
+08-21 14:21:24.118 31110 31110 I CS_NETWORK_PROXY: DNS_RESOLVER_READY api=32 entry=android.net.DnsResolver boundary=NativePolicy.installHooks virtualDnsMode=STATIC
+08-21 14:21:24.125 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/appwidget/AppWidgetManager;->mService:Lcom/android/internal/appwidget/IAppWidgetService; (unsupported, reflection, allowed)
+08-21 14:21:24.142 31110 31110 I CS_SMS_PROXY: SMS_PROXY_READY service=absent:isms,isms2,isms_msim descriptor=com.android.internal.telephony.ISms manager=ServiceManager/TelephonyManager.sISms method=synthetic ServiceManager Binder (all bounded aliases absent) cache=synchronized-if-populated
+08-21 14:21:24.145 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/nfc/NfcAdapter;->sService:Landroid/nfc/INfcAdapter; (unsupported, reflection, allowed)
+08-21 14:21:24.145 31110 31110 I CS_NFC_PROXY: NFC_PROXY_READY service=absent:nfc descriptor=android.nfc.INfcAdapter manager=ServiceManager/NfcAdapter.sService method=synthetic ServiceManager Binder (all bounded aliases absent) cache=synchronized-if-populated feature=android.hardware.nfc
+08-21 14:21:24.152 31110 31110 I CS_SYNTHETIC_BINDER: queryLocalInterface descriptor=android.hardware.location.IContextHubService
+08-21 14:21:24.152 31110 31110 I CS_PERSISTENT_DATA_BLOCK: PERSISTENT_DATA_BLOCK_READY path=synthetic service=persistent_data_block descriptor=android.service.persistentdata.IPersistentDataBlockService managerCache=service-manager-only-api32
+08-21 14:21:24.153 31110 31110 I CS_SYSTEM_UPDATE: SYSTEM_UPDATE_READY path=real service=system_update descriptor=android.os.ISystemUpdateManager manager=android.os.SystemUpdateManager.mService
+08-21 14:21:24.155 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/bluetooth/BluetoothManager;->mAdapter:Landroid/bluetooth/BluetoothAdapter; (max-target-o, reflection, denied)
+08-21 14:21:24.155 31110 31110 W x.debug:guest5: Accessing hidden field Landroid/bluetooth/BluetoothManager;->mAdapter:Landroid/bluetooth/BluetoothAdapter; (max-target-o, reflection, denied)
+08-21 14:21:24.156  1285  1736 W ServiceManager: Permission failure: android.permission.HIGH_SAMPLING_RATE_SENSORS from uid=10196 pid=31110
+08-21 14:21:24.156 31110 31110 W CS_PM_HIDDEN_BLOCK: method=checkPermission class=EXPLICITLY_DENIED package=com.warden.controlledsandbox.debug first=android.permission.HIGH_SAMPLING_RATE_SENSORS
+08-21 14:21:24.165 31110 31110 I CS_AUDIO: AUDIO_ROUTING_PROXY_READY service=audio descriptor=android.media.IAudioService manager=AudioManager.sService-or-lazy-ServiceManager cache=synchronized
+08-21 14:21:24.165 31110 31110 I CS_SMS_PROXY: SMS_READY binding=service=absent:isms,isms2,isms_msim; descriptor=com.android.internal.telephony.ISms; manager=TelephonyManager.sISms-or-lazy-ServiceManager; method=synthetic ServiceManager Binder (all bounded aliases absent); aliases=isms,isms2,isms_msim
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: location READY binding=location|classification=BINDER_SERVICE|androidPath=location|descriptor=android.location.ILocationManager|existingHook=ReflectiveServiceHook + ServiceManager|service=location; descriptor=android.location.ILocationManager; manager=LocationManager; method=descriptor-validated proxy
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: settingsIdentity READY binding=settingsIdentity|classification=CONTENT_PROVIDER|androidPath=content://settings|descriptor=android.content.IContentProvider|existingHook=SettingsProviderIdentityHook|provider=content://settings; contract=android.content.IContentProvider
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: telephony READY binding=telephony|classification=BINDER_SERVICE|androidPath=phone|descriptor=com.android.internal.telephony.ITelephony|existingHook=ReflectiveServiceHook + ServiceManager|service=phone(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.ITelephony; method=synthetic ServiceManager Binder
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: phoneSubInfo READY binding=phoneSubInfo|classification=BINDER_SERVICE|androidPath=iphonesubinfo|descriptor=com.android.internal.telephony.IPhoneSubInfo|existingHook=ReflectiveServiceHook + ServiceManager|service=iphonesubinfo(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.IPhoneSubInfo; method=synthetic ServiceManager Binder
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: telephonyRegistry READY binding=telephonyRegistry|classification=BINDER_SERVICE|androidPath=telephony.registry|descriptor=com.android.internal.telephony.ITelephonyRegistry|existingHook=ReflectiveServiceHook + ServiceManager|service=telephony.registry; descriptor=com.android.internal.telephony.ITelephonyRegistry; manager=TelephonyRegistry; method=descriptor-validated proxy
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: subscription READY binding=subscription|classification=BINDER_SERVICE|androidPath=isub|descriptor=com.android.internal.telephony.ISub|existingHook=ReflectiveServiceHook + ServiceManager|service=isub,telephony_subscription_service(absent); provider=virtual telephony; descriptor=com.android.internal.telephony.ISub; method=synthetic ServiceManager Binder
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: wifiScanner READY binding=wifiScanner|classification=BINDER_SERVICE|androidPath=wifiscanner|descriptor=android.net.wifi.IWifiScanner|existingHook=ReflectiveServiceHook + ServiceManager|service=wifiscanner; descriptor=android.net.wifi.IWifiScanner; manager=WifiScanner; method=descriptor-validated proxy
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: bluetooth READY binding=bluetooth|classification=BINDER_SERVICE|androidPath=bluetooth_manager|descriptor=android.bluetooth.IBluetoothManager|android.bluetooth.IBluetooth|existingHook=ReflectiveServiceHook + ServiceManager|service=bluetooth_manager; descriptor=manager/adapter Binder contracts; manager=BluetoothManager/BluetoothAdapter; method=descriptor-validated proxy pair
+08-21 14:21:24.166 31110 31110 I CS_DEVICE_SERVICE: sensorCatalog READY binding=sensorCatalog|classification=MANAGER_CATALOG|androidPath=sensorservice|descriptor=android.gui.SensorServer|android.frameworks.sensorservice.ISensorManager/default|existingHook=SensorCatalogHook + SensorService descriptor audit|service=sensorservice; descriptor=android.gui.SensorServer; provider=SensorManager catalog
+08-21 14:21:24.166 31110 31110 I CS_NFC_PROXY: NFC_READY binding=service=absent:nfc; descriptor=android.nfc.INfcAdapter; manager=NfcAdapter.sService-or-lazy-ServiceManager; method=synthetic ServiceManager Binder (all bounded aliases absent); feature=android.hardware.nfc feature=android.hardware.nfc
+08-21 14:21:24.167 31110 31110 I CS_CAMERA_PROXY: CAMERA_READY binding=service=media.camera; descriptor=android.hardware.ICameraService; manager=CameraManagerGlobal.mCameraService-or-lazy-ServiceManager; method=descriptor-validated ServiceManager proxy; cache=synchronized-if-populated; features=android.hardware.camera,android.hardware.camera.front feature=android.hardware.camera mode=STATIC available=false ids=0 frontIds=0
+08-21 14:21:24.167 31110 31110 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.168 31110 31110 E linker  : library "/system/lib64/libcamera_client.so" ("/system/lib64/libcamera_client.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.168 31110 31110 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.168 31110 31110 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.168 31110 31110 E linker  : library "/system/lib64/libandroid_runtime.so" ("/system/lib64/libandroid_runtime.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.169 31110 31110 E linker  : library "/system/lib64/libutils.so" ("/system/lib64/libutils.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.169 31110 31110 E linker  : library "/system/lib64/libutils.so" ("/system/lib64/libutils.so") needed or dlopened by "/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so" is not accessible for the namespace: [name="classloader-namespace", ld_library_paths="", default_library_paths="/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64:/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/base.apk!/lib/x86_64", permitted_paths="/data:/mnt/expand:/data/data/com.warden.controlledsandbox.debug"]
+08-21 14:21:24.169 31110 31110 I CS_CAMERA1_NATIVE: SYMBOLS_LOOKUP connect=0x71ac38bd0940 getNative=0x71ac2fb395a0 copyAndPost=0x71ac2fb39d70 release=0x71ac2fb39a20 string16Ctor=0x71ac2f96e170 string16Dtor=0x71ac2f96dd60
+08-21 14:21:24.169 31110 31110 I CS_CAMERA1_NATIVE: SYMBOLS_READY connect=0x71ac38bd0940 getNative=0x71ac2fb395a0 copyAndPost=0x71ac2fb39d70 release=0x71ac2fb39a20 string16=0x71ac2f96e170
+08-21 14:21:24.173 31110 31110 I CS_CAMERA1_NATIVE: IDENTITY_READY guestPackage=com.warden.controlledsandbox.fixture virtualUid=10001 hostPackage=com.warden.controlledsandbox.debug hostUid=10196 virtualCamera=true allowOpen=false replacePreview=false replaceCapture=false
+08-21 14:21:24.173 31110 31110 I CS_CAMERA1_NATIVE: ADAPTER_READY status=symbolsReady=true;hooksReady=true;identityConfigured=true;virtualCamera=true;allowOpen=false;replacePreview=false;replaceCapture=false;previewFrames=0;captureFrames=0;previewDeliveries=0;captureDeliveries=0;contexts=0;hookTargets=4;hookPatched=4;hookFailures=0;guest=com.warden.controlledsandbox.fixture;host=com.warden.controlledsandbox.debug;virtualUid=10001;hostUid=10196;error=
+08-21 14:21:24.173 31110 31110 I CS_NATIVE_BIND: LOADER site=process.install loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:24.174 31110 31110 I CS_GUEST_FACTORY: classLoader factory= base=com.warden.controlledsandbox.runtime.guest.GuestClassLoader frameworkBase=dalvik.system.PathClassLoader process=dalvik.system.PathClassLoader
+08-21 14:21:24.174 31110 31110 I CS_NATIVE_BIND: LOADER site=guest.process loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:24.175 31110 31110 I CS_GUEST_LOADED_APK: installed package=com.warden.controlledsandbox.fixture loader=dalvik.system.PathClassLoader application=DEFERRED_UNTIL_BIND_APPLICATION
+08-21 14:21:24.176 31110 31110 I CS_GUEST_FACTORY: application factory= class=com.warden.controlledsandbox.fixture.FixtureApplication
+08-21 14:21:24.176 31110 31110 I CS_GUEST_LOADED_APK: frameworkMakeApplication=OWNED_BY_GUEST
+08-21 14:21:24.176 31110 31110 I CS_GUEST_LOADED_APK: frameworkMakeApplication=OWNED_BY_GUEST application=com.warden.controlledsandbox.fixture.FixtureApplication
+08-21 14:21:24.176 31110 31110 I CS_NATIVE_BIND: CLASS site=application class=com.warden.controlledsandbox.fixture.FixtureApplication loader=dalvik.system.PathClassLoader@269626c guestLoader=false parents=dalvik.system.PathClassLoader@e314cd4>java.lang.BootClassLoader@5709f1f nativeDirs=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64]
+08-21 14:21:24.176 31110 31110 I CS_GUEST_PROCESS_IDENTITY: application attached package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture
+08-21 14:21:24.183 31110 31110 I CS_SERVICE_FRAMEWORK: installed process=com.warden.controlledsandbox.fixture
+08-21 14:21:24.184 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:24.185 31110 31110 I CS_FRAMEWORK_ACTIVITY: INSTRUMENTATION_READY mode=ACTIVITY_THREAD
+08-21 14:21:24.185 31110 31110 I CS_PROVIDER_DECL: source=snapshot class=com.warden.controlledsandbox.fixture.FaultAnrProvider process=com.warden.controlledsandbox.fixture:fault_anr_provider authority=com.warden.controlledsandbox.fixture.fault.anr
+08-21 14:21:24.185 31110 31110 I CS_PROVIDER_DECL: source=snapshot class=com.warden.controlledsandbox.fixture.FixtureProvider process=com.warden.controlledsandbox.fixture:provider authority=com.warden.controlledsandbox.fixture.provider
+08-21 14:21:24.186 31110 31110 I CS_PROVIDER_DECL: source=manifest class=com.warden.controlledsandbox.fixture.FaultAnrProvider process=:fault_anr_provider authority=com.warden.controlledsandbox.fixture.fault.anr
+08-21 14:21:24.186 31110 31110 I CS_PROVIDER_DECL: source=manifest class=com.warden.controlledsandbox.fixture.FixtureProvider process=:provider authority=com.warden.controlledsandbox.fixture.provider
+08-21 14:21:24.186 31110 31110 I CS_RUNTIME: GUEST_PROVIDERS_BOUND snapshot=0 manifestExtra=0 skippedOtherProcess=4 classes=0
+08-21 14:21:24.192 31110 31110 I CS_FIXTURE: APPLICATION_CREATE count=10 package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture
+08-21 14:21:24.193 31110 31110 I CS_FIXTURE: NATIVE_LOAD JNI_LOADED
+08-21 14:21:24.197 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.198 31110 31110 I CS_PM_STUB_COMPONENT_ABSENT: method=getServiceInfo
+08-21 14:21:24.200 31110 31110 I CS_RUNTIME: GUEST_PREPARED status=READY package=com.warden.controlledsandbox.fixture session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=GUEST processName=com.warden.controlledsandbox.fixture virtualUserId=0 physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity generation=1 slot=54
+08-21 14:21:24.224 31004 31034 I CS_RUNTIME: ATMS_ACTIVITY_LAUNCH_REQUEST status=PREPARED package=com.warden.controlledsandbox.fixture session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=FRAMEWORK processName=com.warden.controlledsandbox.fixture virtualUserId=0 physicalPid=31004 threadTid=31034 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity routeToken=8e8121ba-7335-43ae-bc72-147fb7cd40ee physicalActivityComponent=com.warden.controlledsandbox.runtime.component.activity.StubActivity54 activityAction=CREATED_ACTIVITY activityToken=6ad2334b-620a-4288-872f-49245677cf6c taskId=45 generation=1 slot=54
+08-21 14:21:24.227  1285  1736 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity54 (has extras)} from uid 10196, pid 31004
+08-21 14:21:24.228  1285  1736 I ActivityTaskManager: [KeepAlive] disabled for com.warden.controlledsandbox.debug
+08-21 14:21:24.240 31110 31110 I CS_FRAMEWORK_ACTIVITY: PRELAUNCH_RECORD_PROJECTED token=android.os.BinderProxy@e901b1 infoIdentity=41173527
+08-21 14:21:24.240 31110 31110 I CS_FRAMEWORK_ACTIVITY: PRELAUNCH_TRANSACTION_PROJECTED route=8e8121ba-7335-43ae-bc72-147fb7cd40ee component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity
+08-21 14:21:24.240 31110 31110 I CS_FRAMEWORK_ACTIVITY: PRELAUNCH_TRANSACTION_INFO component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity persistableMode=1 infoIdentity=41173527 infoClass=android.content.pm.ActivityInfo
+08-21 14:21:24.263 31110 31110 I CS_RUNTIME: GUEST_ACTIVITY_FRAMEWORK_INSTANTIATED traceDomain=GUEST physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity routeToken=8e8121ba-7335-43ae-bc72-147fb7cd40ee activityToken=6ad2334b-620a-4288-872f-49245677cf6c generation=0 slot=-1
+08-21 14:21:24.268 31110 31110 I CS_FRAMEWORK_ACTIVITY: CALLBACK_TWO_ARG component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity persistableMode=1 infoIdentity=41173527
+08-21 14:21:24.269 31110 31110 I CS_GUEST_STORAGE: bootstrap isolated=false dataFd=-1 dataRoot=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture
+08-21 14:21:24.270 31110 31110 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=window method=hasNavigationBar path=delegate
+08-21 14:21:24.272 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:24.273 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.ClassNotFoundException message=Didn't find class "android.widget.ViewStub" on path: DexPathList[[zip file "/data/data/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/base.apk"],nativeLibraryDirectories=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64, /system/lib64, /system/system_ext/lib64, /system/product/lib64, /system/vendor/lib64]] top=dalvik.system.BaseDexClassLoader.findClass() declaring=dalvik.system.BaseDexClassLoader defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:218) <- java.lang.Class
+08-21 14:21:24.273 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:24.273 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.ClassNotFoundException message=Didn't find class "android.webkit.ViewStub" on path: DexPathList[[zip file "/data/data/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/base.apk"],nativeLibraryDirectories=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64, /system/lib64, /system/system_ext/lib64, /system/product/lib64, /system/vendor/lib64]] top=dalvik.system.BaseDexClassLoader.findClass() declaring=dalvik.system.BaseDexClassLoader defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:218) <- java.lang.Class
+08-21 14:21:24.273 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.NoClassDefFoundError message=Class not found using the boot class loader; no stack trace available top= declaring= defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=
+08-21 14:21:24.274 31110 31110 E CS_JNI_EX: PENDING via=ExceptionOccurred tid=31110 thread=sandbox.fixture class=java.lang.ClassNotFoundException message=Didn't find class "android.app.ViewStub" on path: DexPathList[[zip file "/data/data/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/base.apk"],nativeLibraryDirectories=[/data/user/0/com.warden.controlledsandbox.debug/files/packages/com.warden.controlledsandbox.fixture/revisions/af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169/lib/x86_64, /system/lib64, /system/system_ext/lib64, /system/product/lib64, /system/vendor/lib64]] top=dalvik.system.BaseDexClassLoader.findClass() declaring=dalvik.system.BaseDexClassLoader defining= nativeCallers=/data/app/~~qrvA4RUoHNWd-RZEv9FHhw==/com.warden.controlledsandbox.debug-RR8cAGiLI_3_WhgIM2iNfQ==/lib/x86_64/libcontrolled_sandbox_native.so; stack=dalvik.system.BaseDexClassLoader.findClass(BaseDexClassLoader.java:218) <- java.lang.ClassLoa
+08-21 14:21:24.276 31110 31110 I CS_RUNTIME: ATMS_ACTIVITY_RECORD_MAPPING traceDomain=FRAMEWORK physicalPid=31110 threadTid=31110 routeToken=8e8121ba-7335-43ae-bc72-147fb7cd40ee physicalActivityComponent=com.warden.controlledsandbox.runtime.component.activity.StubActivity54 activityToken=6ad2334b-620a-4288-872f-49245677cf6c taskId=45 frameworkActivityToken=android.os.BinderProxy@e901b1 generation=0 slot=-1
+08-21 14:21:24.311 31110 31110 I CS_FIXTURE_JOB: JOB_WORK_ENQUEUE_RESULT jobId=2082 result=1 result1=1 result2=1 runId=work-item-1787293284277 pid=31110
+08-21 14:21:24.312 31110 31110 I CS_RUNTIME: GUEST_ACTIVITY_CREATED session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=GUEST physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity activityToken=6ad2334b-620a-4288-872f-49245677cf6c windowAttached=false generation=1 slot=-1
+08-21 14:21:24.315 31110 31110 I CS_RUNTIME: GUEST_ACTIVITY_STARTED session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=GUEST physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity activityToken=6ad2334b-620a-4288-872f-49245677cf6c windowAttached=false generation=1 slot=-1
+08-21 14:21:24.318 31110 31110 I CS_RUNTIME: GUEST_ACTIVITY_POST_CREATED session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=GUEST physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity activityToken=6ad2334b-620a-4288-872f-49245677cf6c windowAttached=false generation=1 slot=-1
+08-21 14:21:24.320 31110 31110 I CS_RUNTIME: GUEST_ACTIVITY_RESUMED session=105bec77-9092-4736-a336-6bc86764e843 traceDomain=GUEST physicalPid=31110 threadTid=31110 component=com.warden.controlledsandbox.fixture.FixtureJobWorkItemScheduleActivity activityToken=6ad2334b-620a-4288-872f-49245677cf6c windowAttached=false generation=1 slot=-1
+08-21 14:21:24.323 31110 31110 I CS_INTERACTION_PROXY: ACTUAL_PROXY_INVOCATION service=window method=openSession path=delegate
+08-21 14:21:24.355 30937 31095 I CS_COMMAND: PASS launch-component com.warden.controlledsandbox.fixture user=0 LAUNCH_PASS
+08-21 14:21:24.516 31138 31138 I logcat  : type=1400 audit(0.0:158862): avc: denied { write } for name="logdr" dev="tmpfs" ino=262 scontext=u:r:adbd:s0 tcontext=u:object_r:logdr_socket:s0 tclass=sock_file permissive=1
+08-21 14:21:25.288  1285  1285 W ActivityManager: callingPackage:android, packageName:com.warden.controlledsandbox.debug, name:com.warden.controlledsandbox.VirtualJobService, isSkip: true
+08-21 14:21:25.286  1285  1285 I system_server: type=1400 audit(0.0:158863): avc: denied { connectto } for path="/dev/socket/property_service" scontext=u:r:system_server:s0 tcontext=u:r:kernel:s0 tclass=unix_stream_socket permissive=1
+08-21 14:21:25.293 31004 31004 W :sandbox_serve: Accessing hidden method Landroid/app/job/JobParameters;->getDebugStopReason()Ljava/lang/String; (max-target-o, reflection, denied)
+08-21 14:21:25.290 31004 31004 I :sandbox_server: type=1400 audit(0.0:158864): avc: denied { sendto } for path="/dev/socket/logdw" scontext=u:r:untrusted_app:s0:c196,c256,c512,c768 tcontext=u:r:init:s0 tclass=unix_dgram_socket permissive=1 app=com.warden.controlledsandbox.debug
+08-21 14:21:25.307 31110 31110 I CS_FIXTURE_JOB: JOB_WORK_ITEM_COMPLETED jobId=2082 index=1 runId=work-item-1787293284277 deliveryCount=1 pid=31110
+08-21 14:21:25.309 31110 31110 I CS_FIXTURE_JOB: JOB_WORK_ITEM_COMPLETED jobId=2082 index=2 runId=work-item-1787293284277 deliveryCount=1 pid=31110
+08-21 14:21:25.311 31110 31110 I CS_FIXTURE_JOB: JOB_WORK_ITEMS_DRAINED jobId=2082 count=2 runId=work-item-1787293284277 pid=31110
+08-21 14:21:25.316 31004 31004 I CS_JOB_BRIDGE: JOB_AUTO_FINISHED_RECEIVED hostJobId=1375731727 source=service_destroy
+08-21 14:21:25.316 31110 31124 I CS_RUNTIME: GUEST_JOB_STARTED traceDomain=GUEST physicalPid=31110 threadTid=31124 generation=1 slot=-1
+08-21 14:21:25.317 31004 31144 I CS_JOB_BRIDGE: JOB_START_ACCEPTED hostJobId=1375731727 attempt=1
+

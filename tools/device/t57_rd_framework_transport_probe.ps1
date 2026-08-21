@@ -156,7 +156,7 @@ try {
     # bounded, but allow the real cross-process transaction to settle.
     $markerDeadline = (Get-Date).AddSeconds(45)
     do {
-        $log = (& adb -s $device.Serial logcat -d -v threadtime -s CS_RUNTIME:V CS_DIAGNOSTICS:V CS_FIXTURE:V CS_COMMAND:V '*:S' | Out-String)
+        $log = (& adb -s $device.Serial logcat -d -v threadtime -s CS_RUNTIME:V CS_DIAGNOSTICS:V CS_FIXTURE:V CS_COMMAND:V CS_CROSS_PACKAGE_ROUTE:V CS_CROSS_ABI_ROUTE:V '*:S' | Out-String)
         $missing = @($requiredMarkers | Where-Object {
             $log -notmatch [regex]::Escape($_)
         })

@@ -1,0 +1,82 @@
+﻿{
+    "case":  "RD-08-isolated-service-framework-transport",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "status":  "PASS",
+    "component":  "com.warden.controlledsandbox.fixture.IsolatedFixtureService",
+    "hostUid":  10196,
+    "prepare":  {
+                    "command":  "import-prepare",
+                    "package":  "com.warden.controlledsandbox.fixture",
+                    "virtualUserId":  0,
+                    "trustNativeGuest":  true,
+                    "startedAt":  1787293309565,
+                    "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                    "operation":  {
+                                      "status":  "PREPARED",
+                                      "errorType":  "",
+                                      "errorMessage":  "",
+                                      "sessionId":  "1abbbaa3-fc88-4f60-84ea-0c38274ae43c",
+                                      "generation":  1,
+                                      "processSlot":  54,
+                                      "platformPid":  31996,
+                                      "pid":  31996,
+                                      "isolatedProcess":  false,
+                                      "processName":  "com.warden.controlledsandbox.fixture",
+                                      "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                  },
+                    "status":  "PASS"
+                },
+    "start":  {
+                  "command":  "isolated-service",
+                  "package":  "com.warden.controlledsandbox.fixture",
+                  "virtualUserId":  0,
+                  "trustNativeGuest":  true,
+                  "startedAt":  1787293311830,
+                  "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                  "isolatedComponent":  "com.warden.controlledsandbox.fixture.IsolatedFixtureService",
+                  "isolatedServiceOperation":  "start",
+                  "operation":  {
+                                    "status":  "SERVICE_STARTED",
+                                    "errorType":  "",
+                                    "errorMessage":  "",
+                                    "sessionId":  "80f7e6fe-c7f1-4ddf-955d-10dfc4a28f0d",
+                                    "generation":  1,
+                                    "processSlot":  11,
+                                    "platformPid":  0,
+                                    "isolatedProcess":  true,
+                                    "isolatedPlatformPid":  32063,
+                                    "isolatedPlatformUid":  99038,
+                                    "processName":  "com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService",
+                                    "componentClass":  "com.warden.controlledsandbox.fixture.IsolatedFixtureService",
+                                    "startId":  1,
+                                    "created":  true
+                                },
+                  "status":  "PASS"
+              },
+    "stop":  {
+                 "command":  "isolated-service",
+                 "package":  "com.warden.controlledsandbox.fixture",
+                 "virtualUserId":  0,
+                 "trustNativeGuest":  true,
+                 "startedAt":  1787293313376,
+                 "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                 "isolatedComponent":  "com.warden.controlledsandbox.fixture.IsolatedFixtureService",
+                 "isolatedServiceOperation":  "stop",
+                 "operation":  {
+                                   "status":  "SERVICE_STOPPED",
+                                   "errorType":  "",
+                                   "errorMessage":  "",
+                                   "sessionId":  "80f7e6fe-c7f1-4ddf-955d-10dfc4a28f0d",
+                                   "generation":  1,
+                                   "processSlot":  11,
+                                   "platformPid":  0,
+                                   "isolatedProcess":  true,
+                                   "isolatedPlatformPid":  32063,
+                                   "isolatedPlatformUid":  99038,
+                                   "processName":  "com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService",
+                                   "componentClass":  "com.warden.controlledsandbox.fixture.IsolatedFixtureService"
+                               },
+                 "status":  "PASS"
+             }
+}

@@ -1,0 +1,7 @@
+commit 25ee6ba5afced5abf1c991aa94d3bc559d03022f
+Author:     OpenAI <openai@users.noreply.github.com>
+AuthorDate: Fri Aug 21 13:45:42 2026 +0800
+Commit:     OpenAI <openai@users.noreply.github.com>
+CommitDate: Fri Aug 21 13:45:42 2026 +0800
+
+    fix(continuation): select latest task receipt

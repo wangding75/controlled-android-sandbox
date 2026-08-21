@@ -1,40 +1,39 @@
 {
   "schema_version": 1,
-  "task_id": "C0-T01",
+  "task_id": "C0-T03",
   "status": "PASS",
-  "captured_at": "2026-08-21T03:58:02.908910+00:00",
+  "captured_at": "2026-08-21T05:50:48.964428+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C0-T01",
-    "active_task": "C0-T01",
-    "last_completed": "BOOTSTRAP-DOCS",
-    "first_ready_pending": null,
-    "dependencies": "BOOTSTRAP-DOCS"
+    "next_task": "C0-T03",
+    "active_task": "",
+    "last_completed": "C0-T02",
+    "first_ready_pending": "C0-T03",
+    "dependencies": "C0-T02"
   },
   "last_receipt": {
-    "task_id": "BOOTSTRAP-DOCS",
+    "task_id": "C0-T02",
     "status": "DONE",
     "implementation_commits": [
-      "d82ff91ed6cbdf1e6a48b8b46588e039ef5826a3",
-      "13c58005b2e10566dcb8d7ec9decc0e6cef3d2f5"
+      "beef510b2993a38b010dd8c09a51a497247fd783"
     ],
-    "receipt_commit": "36513fec4984a277324353974d454bc99abc71ef",
-    "baseline_commit": "75369847",
+    "receipt_commit": "b47eb12ea9cc7c5566621986b99cc6fa38edab98",
+    "baseline_commit": "b35ca0feccf6c2d150766d8b9a740680d6f30057",
     "evidence_paths": [
-      "docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
-      "docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md"
+      "docs/review/KNOWN_ISSUES.yaml",
+      "verification/catch-up/C0-T02/build-baseline-blocked.md"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "36513fec4984a277324353974d454bc99abc71ef",
+    "head": "25ee6ba5afced5abf1c991aa94d3bc559d03022f",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "36513fec4984a277324353974d454bc99abc71ef",
+    "remote_head": "25ee6ba5afced5abf1c991aa94d3bc559d03022f",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M tools/capability/campaign_status.py\n M tools/device/t57_quark_stability_probe.ps1\n?? scripts/test_catch_up_continuation.py\n?? scripts/verify-catch-up-continuation.py"
+    "status_short": ""
   },
   "device": {
     "instance_name": "RD测试",
@@ -73,5 +72,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C0-T01"
+  "evidence_directory": "verification/catch-up/C0-T03"
 }
