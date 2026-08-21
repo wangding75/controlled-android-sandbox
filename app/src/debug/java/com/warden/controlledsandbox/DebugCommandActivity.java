@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
@@ -214,6 +215,25 @@ public final class DebugCommandActivity extends Activity {
                 operation = runBroadcastCampaign(runtime, record, virtualUserId, iterations);
                 result.put("broadcastCampaign", bundleJson(operation));
                 requireStatus("broadcast-campaign", operation, "BROADCAST_CAMPAIGN_LAUNCHED");
+            } else if ("provider-campaign".equals(command)) {
+                int iterations = Math.max(1, Math.min(1000,
+                        extras.getInt("iterations", 1)));
+                int pressureSeconds = Math.max(0, Math.min(86_400,
+                        extras.getInt("pressureSeconds", 0)));
+                operation = runProviderCampaign(runtime, record, virtualUserId,
+                        iterations, pressureSeconds);
+                result.put("providerCampaign", bundleJson(operation));
+                requireStatus("provider-campaign", operation, "PROVIDER_CAMPAIGN_PASS");
+            } else if ("provider-concurrent-campaign".equals(command)) {
+                int iterations = Math.max(1, Math.min(1000,
+                        extras.getInt("iterations", 1)));
+                int pressureSeconds = Math.max(0, Math.min(86_400,
+                        extras.getInt("pressureSeconds", 0)));
+                operation = runProviderConcurrentCampaign(packages, record, packageName, runtime,
+                        virtualUserId, iterations, pressureSeconds);
+                result.put("providerCampaign", bundleJson(operation));
+                requireStatus("provider-concurrent-campaign", operation,
+                        "PROVIDER_CAMPAIGN_PASS");
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
                 requireStatus("launch", operation, "LAUNCH_PASS");
@@ -783,6 +803,83 @@ public final class DebugCommandActivity extends Activity {
         return out;
     }
 
+    private Bundle runProviderConcurrentCampaign(PackageServiceClient packages,
+                                                 SandboxRecord record, String packageName,
+                                                 RuntimeClient firstRuntime, int firstUser,
+                                                 int iterations, int pressureSeconds) throws Exception {
+        int secondUser = firstUser == 0 ? 1 : 0;
+        packages.ensureInstance(packageName, secondUser);
+        // The campaign observes and grants the exported compat32 Provider. Prepare that peer in
+        // both virtual users before launching the concurrent Guest Activities; otherwise the
+        // first user can race the peer's lazy instance creation and fail closed as "instance does
+        // not exist".
+        String peerPackage = "com.warden.controlledsandbox.fixture32";
+        packages.ensureInstance(peerPackage, firstUser);
+        packages.ensureInstance(peerPackage, secondUser);
+        ExecutorService campaigns = Executors.newFixedThreadPool(2);
+        try {
+            Future<Bundle> first = campaigns.submit(() -> runProviderCampaign(firstRuntime, record,
+                    firstUser, iterations, pressureSeconds));
+            Future<Bundle> second = campaigns.submit(() -> {
+                try (RuntimeClient runtime = new RuntimeClient(this)) {
+                    return runProviderCampaign(runtime, record, secondUser, iterations,
+                            pressureSeconds);
+                }
+            });
+            Bundle firstResult = first.get();
+            Bundle secondResult = second.get();
+            requireStatus("provider-concurrent-user-" + firstUser, firstResult,
+                    "PROVIDER_CAMPAIGN_PASS");
+            requireStatus("provider-concurrent-user-" + secondUser, secondResult,
+                    "PROVIDER_CAMPAIGN_PASS");
+            int firstCycles = firstResult.getInt("cycles", 0);
+            int secondCycles = secondResult.getInt("cycles", 0);
+            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + firstUser + " cycles=" + firstCycles);
+            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + secondUser + " cycles=" + secondCycles);
+            Bundle out = new Bundle();
+            out.putString(RuntimeKeys.STATUS, "PROVIDER_CAMPAIGN_PASS");
+            out.putInt("firstUser", firstUser);
+            out.putInt("secondUser", secondUser);
+            out.putInt("firstCycles", firstCycles);
+            out.putInt("secondCycles", secondCycles);
+            out.putInt("cycles", firstCycles + secondCycles);
+            out.putInt("pressureSeconds", pressureSeconds);
+            return out;
+        } finally {
+            campaigns.shutdownNow();
+        }
+    }
+
+    private Bundle runProviderCampaign(RuntimeClient runtime, SandboxRecord record,
+                                       int virtualUserId, int iterations,
+                                       int pressureSeconds) throws Exception {
+        long startedAt = System.currentTimeMillis();
+        long deadline = pressureSeconds > 0
+                ? startedAt + pressureSeconds * 1000L : Long.MIN_VALUE;
+        int cycles = 0;
+        while (cycles < iterations || (pressureSeconds > 0 && System.currentTimeMillis() < deadline)) {
+            cycles++;
+            try {
+                Bundle launch = runtime.launchComponent(record, virtualUserId,
+                        "com.warden.controlledsandbox.fixture.ProviderCampaignActivity");
+                requireStatus("provider-campaign-launch-" + virtualUserId + "-" + cycles,
+                        launch, "LAUNCH_PASS");
+                // The Guest Activity closes its own resources before finishing.  Keep the
+                // generation alive long enough for observer callbacks and cursor leases to settle.
+                Thread.sleep(15_000L);
+            } finally {
+                runtime.stop(record, virtualUserId);
+            }
+            Thread.sleep(250L);
+        }
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, "PROVIDER_CAMPAIGN_PASS");
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        out.putInt("cycles", cycles);
+        out.putLong("elapsedMs", System.currentTimeMillis() - startedAt);
+        return out;
+    }
+
     private static void requireStatus(String operation, Bundle bundle, String... accepted) {
         String status = bundle == null ? "" : bundle.getString(RuntimeKeys.STATUS, "");
         for (String candidate : accepted) if (candidate.equals(status)) return;
@@ -821,6 +918,13 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "startId");
         copyIfPresent(bundle, out, "created");
         copyIfPresent(bundle, out, "accepted");
+        copyIfPresent(bundle, out, "cycles");
+        copyIfPresent(bundle, out, "firstUser");
+        copyIfPresent(bundle, out, "secondUser");
+        copyIfPresent(bundle, out, "firstCycles");
+        copyIfPresent(bundle, out, "secondCycles");
+        copyIfPresent(bundle, out, "pressureSeconds");
+        copyIfPresent(bundle, out, "elapsedMs");
         return out;
     }
 

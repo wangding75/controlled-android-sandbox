@@ -1,0 +1,196 @@
+{
+  "campaign": "CAS-C1-T04-RD",
+  "generated_at": "2026-08-21T12:55:00+00:00",
+  "host_os": "Windows 11 AMD64",
+  "git": {
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "commit": "ada061ca695ccd88fe1605f9ae35172b4652a5c0",
+    "tree": "25912baded0ecd77bffd86ea0690aef8ad72cf73",
+    "parent": "236ce46b2736f4177d6ce14f8ee576218b47a9d1",
+    "status": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/AndroidManifest.xml\n M fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureProvider.java\n M tools/static_android_compile.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/sbom.json\n?? docs/review/C1_T04_PROVIDER_DESIGN.md\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/ProviderCampaignActivity.java\n?? tools/capability/run_c1_t04_rd.py\n?? verification/catch-up/C1-T04/"
+  },
+  "maturity_level": "RD_BASELINE",
+  "va_pro_equivalent": "NOT_PROVEN",
+  "instance_name": "RD测试",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "22041211A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "7cac15ce-d76e-44ea-968b-959d91d03be7",
+    "android_id": "398eea33120cd887",
+    "manufacturer": "Redmi",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400650936961264501",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "start_finished",
+      "mumuManager": {
+        "index": "1",
+        "name": "RD测试",
+        "is_main": false,
+        "error_code": 0,
+        "disk_size_bytes": 39880540488,
+        "created_timestamp": 1785131843951152,
+        "is_android_started": true,
+        "is_process_started": true,
+        "hyperv_enabled": true,
+        "main_wnd": "00340D0A",
+        "render_wnd": "00560D2A",
+        "adb_port": 16416,
+        "adb_host_ip": "127.0.0.1",
+        "pid": 31176,
+        "vt_enabled": true,
+        "player_state": "start_finished",
+        "launch_err_msg": "",
+        "launch_err_code": 0,
+        "launch_time": 12707668,
+        "headless_pid": 24508
+      },
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "Redmi",
+      "model": "22041211A",
+      "release": "12",
+      "api": "32",
+      "androidId": "398eea33120cd887",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "7cac15ce-d76e-44ea-968b-959d91d03be7",
+      "timestamp": "2026-08-21T12:34:37.884330+00:00",
+      "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
+      "config": {
+        "extraConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "Redmi",
+        "configuredModel": "22041211A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\n\n"
+  },
+  "apk": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "f1c8aaa12032e9b7c0faa850088eaba60f856e7b82f3345c58ee9d8dc89083ed"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "7f4bb7d740040dd840dca4e7488c895eaf838a1dabc2307301bbe5dd3cf94567"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "95a4f6484646a5ab2cb02e1ed9d1e26a7d71431f18aa334c836675c6a4e7b8e2"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "58fb06e5a6db09892f2c671629aa8c088ca9d223cc9c047d19fd4e2e1e258e7b"
+      }
+    ]
+  },
+  "install": {
+    "installs": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      }
+    ]
+  },
+  "loops_per_user_minimum": 50,
+  "virtual_users": [
+    0,
+    1
+  ],
+  "pressure_seconds_requested": 1800,
+  "raw_evidence_dir": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c1-t04\\20260821T123725Z",
+  "result": {
+    "loops_minimum_per_user": 50,
+    "pressure_seconds_requested": 1800,
+    "elapsed_seconds": 940.0,
+    "pass": true,
+    "reason": "PASS_WITH_OPERATOR_STOP_AFTER_THRESHOLD",
+    "marker_counts": {
+      "C1_T04_PROVIDER_CRUD_PASS": 116,
+      "C1_T04_PROVIDER_CURSOR_PASS": 116,
+      "C1_T04_PROVIDER_BATCH_PASS": 116,
+      "C1_T04_PROVIDER_FD_PASS": 116,
+      "C1_T04_PROVIDER_OBSERVER_DELIVERED": 116,
+      "C1_T04_PROVIDER_OBSERVER_PASS": 116,
+      "C1_T04_PROVIDER_GRANT_PASS": 116,
+      "C1_T04_PROVIDER_CANCEL_PASS": 116,
+      "C1_T04_PROVIDER_CROSS_PACKAGE_PASS": 116,
+      "C1_T04_PROVIDER_PASS": 116
+    },
+    "debug_command": "operator-interrupted-before-host-result.json",
+    "logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c1-t04\\20260821T123725Z\\provider-campaign-logcat.txt",
+    "operation": {
+      "status": "PROVIDER_CAMPAIGN_INTERRUPTED_AFTER_THRESHOLD",
+      "errorType": "",
+      "errorMessage": "",
+      "sessionId": "",
+      "generation": 0,
+      "processSlot": -1,
+      "platformPid": 0,
+      "cycles": 116,
+      "firstUser": 0,
+      "secondUser": 1,
+      "firstCycles": 58,
+      "secondCycles": 58,
+      "pressureSeconds": 1800
+    },
+    "cross_user_leakage": "not observed across 116 completed Guest campaign markers; operator stopped after both users exceeded 50 rounds, before the requested 1800-second pressure window"
+  },
+  "acceptance_note": "Accepted per latest operator instruction after 58 completed concurrent rounds per virtual user. The 1800-second pressure window was intentionally not awaited and is not claimed as completed.",
+  "overall_pass": true
+}

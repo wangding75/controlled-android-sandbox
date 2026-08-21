@@ -171,10 +171,13 @@
         </receiver>
         <activity android:name="com.warden.controlledsandbox.fixture.BroadcastCampaignActivity"
             android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.ProviderCampaignActivity"
+            android:exported="false" />
         <provider
             android:name="com.warden.controlledsandbox.fixture.FixtureProvider"
             android:authorities="${applicationId}.provider"
             android:exported="false"
+            android:grantUriPermissions="true"
             android:process=":provider">
             <meta-data android:name="cas.fixture.provider_meta" android:value="provider-main" />
         </provider>

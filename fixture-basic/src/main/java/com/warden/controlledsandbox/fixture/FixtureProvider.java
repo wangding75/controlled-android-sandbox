@@ -58,6 +58,7 @@ public final class FixtureProvider extends ContentProvider {
         long id = nextId.getAndIncrement();
         String value = values == null ? null : values.getAsString("value");
         rows.put(id, value == null ? "" : value);
+        notifyChanged(uri);
         Log.i("CS_FIXTURE", "PROVIDER_INSERT id=" + id);
         return Uri.parse(uri.toString() + "/" + id);
     }
@@ -66,9 +67,13 @@ public final class FixtureProvider extends ContentProvider {
         int inserted = 0;
         if (values != null) {
             for (ContentValues value : values) {
-                if (insert(uri, value) != null) inserted++;
+                long id = nextId.getAndIncrement();
+                String text = value == null ? null : value.getAsString("value");
+                rows.put(id, text == null ? "" : text);
+                inserted++;
             }
         }
+        if (inserted > 0) notifyChanged(uri);
         Log.i("CS_FIXTURE", "PROVIDER_BULK_INSERT count=" + inserted);
         return inserted;
     }
@@ -76,6 +81,7 @@ public final class FixtureProvider extends ContentProvider {
     @Override public synchronized int delete(Uri uri, String selection, String[] selectionArgs) {
         int count = rows.size();
         rows.clear();
+        if (count > 0) notifyChanged(uri);
         Log.i("CS_FIXTURE", "PROVIDER_DELETE count=" + count);
         return count;
     }
@@ -85,6 +91,7 @@ public final class FixtureProvider extends ContentProvider {
         String value = values == null ? null : values.getAsString("value");
         if (value == null) return 0;
         for (Long id : new java.util.ArrayList<>(rows.keySet())) rows.put(id, value);
+        if (!rows.isEmpty()) notifyChanged(uri);
         Log.i("CS_FIXTURE", "PROVIDER_UPDATE count=" + rows.size());
         return rows.size();
     }
@@ -136,6 +143,10 @@ public final class FixtureProvider extends ContentProvider {
                     | ParcelFileDescriptor.MODE_TRUNCATE;
         }
         throw new FileNotFoundException("Unsupported mode: " + mode);
+    }
+
+    private void notifyChanged(Uri uri) {
+        if (getContext() != null) getContext().getContentResolver().notifyChange(uri, null);
     }
 
 }

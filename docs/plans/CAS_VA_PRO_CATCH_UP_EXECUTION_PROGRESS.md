@@ -41,7 +41,7 @@
 | C1-T01 | Activity/Application 与任务栈 | DONE | C0 | `87d96611` | §5 C1-T01 |
 | C1-T02 | Service/FGS/Job | DONE | C1-T01 | `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0` | §5 C1-T02 |
 | C1-T03 | Broadcast | DONE | C1-T01 | `236ce46b` | §5 C1-T03 |
-| C1-T04 | ContentProvider | PENDING | C1-T01 | - | - |
+| C1-T04 | ContentProvider | IN_PROGRESS | C1-T01 | - | - |
 | C1-T05 | PendingIntent/Alarm/Notification holder | PENDING | C1-T02,C1-T03 | - | - |
 | C1-T06 | Package 生命周期 | PENDING | C1-T04,C1-T05 | - | - |
 | C1-T07 | Process/ABI/Recovery | PENDING | C1-T01..T06 | - | - |

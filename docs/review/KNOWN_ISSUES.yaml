@@ -508,6 +508,28 @@ issues:
       infrastructure defect. First-version runner smoke uses the existing
       import-prepare DebugCommand.
 
+  - issue_id: KI-R03-031
+    title: SBOM fixture-basic digest stale after C1-T03 fixture additions
+    capability: android_oem_compatibility
+    classification: TEST_EVIDENCE_GAP
+    severity: LOW
+    status: FIXED
+    discovered_by: C1-T04 DISCOVER/CLASSIFY
+    evidence:
+      - scripts/generate-sbom.py
+      - verification/sbom.json
+      - artifacts/capability-audit/all/20260821T114908Z/sbom-check.json
+    match_patterns:
+      - ':fixture-basic fileCount mismatch expected=62 actual=57'
+      - ':fixture-basic sourceDigestSha256 mismatch'
+    blocks_current_campaign: false
+    fix_policy: FIXED_REGENERATE_SBOM_AFTER_TRACKED_FIXTURE_CHANGES
+    notes: >
+      C1-T03 added five tracked fixture-basic files while the checked-in SBOM retained
+      the previous file count and digest. Regenerate the checked-in SBOM whenever the
+      tracked fixture source set changes; this is a governance evidence lag, not a runtime
+      Provider defect.
+
   - issue_id: KI-R03-NATIVE-001
     title: Raw syscall instruction / raw SVC bypasses PLT/GOT
     capability: native_loader_jni_io
