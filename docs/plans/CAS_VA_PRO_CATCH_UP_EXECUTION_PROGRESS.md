@@ -44,7 +44,7 @@
 | C1-T04 | ContentProvider | DONE | C1-T01 | `454c1b4a30cd78ce8eeadbadeca0369c7dcbe99d` | §5 C1-T04 |
 | C1-T05 | PendingIntent/Alarm/Notification holder | DONE | C1-T02,C1-T03 | `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` | §5 C1-T05 |
 | C1-T06 | Package 生命周期 | DONE | C1-T04,C1-T05 | `68f28f43b5d35bc4b85a03938b5d7009f9e6f277` | §5 C1-T06 |
-| C1-T07 | Process/ABI/Recovery | PENDING | C1-T01..T06 | - | - |
+| C1-T07 | Process/ABI/Recovery | BLOCKED | C1-T01..T06 | `PENDING` | §5 C1-T07 |
 | C2-T01 | SX/XH 系统服务方法清单 | PENDING | C1 | - | - |
 | C2-T02 | PMS/Permission/AppOps/Attribution | PENDING | C2-T01 | - | - |
 | C2-T03 | Location | PENDING | C2-T01,C2-T02 | - | - |
@@ -704,3 +704,22 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：
 - **下一任务**：
 ```
+
+### C1-T07：进程槽位、跨 ABI 与故障恢复闭环
+
+- **状态**：BLOCKED
+- **开始/结束时间**：2026-08-22 00:12 / 2026-08-22 00:25（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；MuMu `RD测试` 动态解析；API 32；ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`；serial `127.0.0.1:16416`；boot ID
+  `7cac15ce-d76e-44ea-968b-959d91d03be7`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @ `0df832982712c5ebd5c6fd14570ea84396f73462`；工作区干净；上一任务 `C1-T06` 已完成并推送。
+- **实现摘要**：新增 `t57_rd_c1_t07_process_abi_recovery.ps1`，按实例名动态解析设备、每轮清理测试包、委托现有跨 ABI 死亡恢复 probe，并要求至少 50 轮；新增 `C1_T07_PROCESS_ABI_RECOVERY_DESIGN.md`。
+- **变更文件**：`tools/device/t57_rd_c1_t07_process_abi_recovery.ps1`、`docs/review/C1_T07_PROCESS_ABI_RECOVERY_DESIGN.md`、`verification/catch-up/C1-T07/`、`verification/catch-up/C1-T07-rerun/`、`verification/catch-up/C1-T07-rerun2/`。
+- **验收命令与结果**：静态 campaign validator、12 个 infra tests、pre-device hardening（160）、Companion identity、timeout recovery、system-service recovery 均 PASS；设备 campaign 首轮跨 ABI recovery PASS，后续轮次未完成：probe 在收尾判定报告 `CROSS_ABI_RECOVERY_FATAL_MARKER`，保存的原始 logcat 未匹配 FATAL/ANR/stale/service-rejected marker；50 轮门禁未满足。
+- **设备证据**：`verification/catch-up/C1-T07/`、`verification/catch-up/C1-T07-rerun/`、`verification/catch-up/C1-T07-rerun2/`；包含动态设备快照与原始 logcat。已完成轮次证明 generation 递增、PID 替换、x86 native load 和 `GUEST_PROCESS_DISCONNECTED`；不足以宣称任务 PASS。
+- **Known Issues**：未新增 runtime issue；发现 probe/harness 收尾判定与设备原始日志不一致，待下一次执行先修复并分类。
+- **偏离任务书**：未修改生产运行时代码；因设备 probe 收尾失败且 50 轮未完成，按失败门禁记录 BLOCKED，不虚报 PASS。
+- **实现提交 SHA**：`2ac7502f5b0621c1c079a003e1e54650270bf5ef`。
+- **推送与远端验证**：实现提交先行推送；回执提交完成后再次以 `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比本地 HEAD。
+- **遗留风险**：50 次 kill/restart、并发压力、双用户污染隔离和完整槽位收敛尚未形成 C1-T07 专属设备证据；恢复条件为修复/解释 probe 收尾判定并完成至少 50 轮。
+- **下一任务**：仍为 `C1-T07`；满足恢复条件前不得进入 C2。
