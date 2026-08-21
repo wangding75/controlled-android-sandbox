@@ -26,7 +26,7 @@ public final class StandardTaskProbeActivity extends Activity {
                             onResumeCount, onStopCount, onDestroyCount);
                     Log.i(TAG, "FRAMEWORK_PROBE_TASK_STANDARD_COUNTS create=" + onCreateCount
                             + " start=" + onStartCount + " resume=" + onResumeCount);
-                    new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L);
+                    new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L);
             });
             return;
         }

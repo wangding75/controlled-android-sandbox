@@ -29,8 +29,8 @@ public final class SingleTopNonTopProbeActivity extends Activity {
                 TaskProbeEvidence.singleTopNonTop(this, onCreateCount, onNewIntentCount,
                         onStartCount, onResumeCount, onStopCount, onDestroyCount);
                 TaskProbeEvidence.requestBackAfterEvidence(this, "single_top_non_top",
-                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-            }, 900L);
+                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+            }, 600L);
             return;
         }
         Log.i(TAG, "FRAMEWORK_PROBE_TASK_SINGLETOP_NONTOP_CREATE");
@@ -40,7 +40,7 @@ public final class SingleTopNonTopProbeActivity extends Activity {
             Intent relaunch = new Intent(this, SingleTopNonTopProbeActivity.class)
                     .putExtra(RELAUNCH_FLAG, true);
             startActivity(relaunch);
-        }, 2500L);
+        }, 1200L);
     }
 
     @Override protected void onNewIntent(Intent intent) {

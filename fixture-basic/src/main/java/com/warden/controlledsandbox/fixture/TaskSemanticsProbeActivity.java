@@ -45,7 +45,7 @@ public final class TaskSemanticsProbeActivity extends Activity {
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     .putExtra(RELAUNCH_FLAG, true);
             startActivity(relaunch);
-        }, 2500L);
+        }, 1200L);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_COUNTS create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
@@ -70,8 +70,8 @@ public final class TaskSemanticsProbeActivity extends Activity {
             TaskProbeEvidence.singleTask(this, onCreateCount, onNewIntentCount,
                     onStartCount, onResumeCount, onStopCount, onDestroyCount);
             TaskProbeEvidence.requestBackAfterEvidence(this, "single_task",
-                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-        }, 900L);
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+        }, 600L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }

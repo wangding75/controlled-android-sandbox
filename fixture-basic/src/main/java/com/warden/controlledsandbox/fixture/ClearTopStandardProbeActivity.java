@@ -36,7 +36,7 @@ public final class ClearTopStandardProbeActivity extends Activity {
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     .putExtra(RELAUNCH_FLAG, true);
             startActivity(clearTop);
-        }, 2500L);
+        }, 1200L);
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -64,8 +64,8 @@ public final class ClearTopStandardProbeActivity extends Activity {
                 TaskProbeEvidence.clearTopStandard(this, onCreateCount, onNewIntentCount,
                         onStartCount, onResumeCount, onStopCount, onDestroyCount);
                 TaskProbeEvidence.requestBackAfterEvidence(this, "clear_top_standard",
-                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-            }, 1200L);
+                        () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+            }, 600L);
         }
     }
 

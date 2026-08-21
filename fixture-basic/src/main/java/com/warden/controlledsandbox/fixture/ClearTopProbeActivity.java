@@ -34,7 +34,7 @@ public final class ClearTopProbeActivity extends Activity {
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     .putExtra(RELAUNCH_FLAG, true);
             startActivity(clearTop);
-        }, 2500L);
+        }, 1200L);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_CLEAR_TOP_COUNTS create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
@@ -59,8 +59,8 @@ public final class ClearTopProbeActivity extends Activity {
             TaskProbeEvidence.clearTopSingleTop(this, onCreateCount, onNewIntentCount,
                     onStartCount, onResumeCount, onStopCount, onDestroyCount);
             TaskProbeEvidence.requestBackAfterEvidence(this, "clear_top_single_top",
-                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-        }, 900L);
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+        }, 600L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }

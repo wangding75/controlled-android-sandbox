@@ -37,8 +37,8 @@ public final class SingleTopProbeActivity extends Activity {
             TaskProbeEvidence.singleTopTop(this, onCreateCount, onNewIntentCount,
                     onStartCount, onResumeCount, onStopCount, onDestroyCount);
             TaskProbeEvidence.requestBackAfterEvidence(this, "single_top_top",
-                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-        }, 1200L);
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+        }, 600L);
     }
 
     @Override protected void onNewIntent(Intent intent) {

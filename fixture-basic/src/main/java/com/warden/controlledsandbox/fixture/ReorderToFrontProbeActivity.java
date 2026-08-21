@@ -34,7 +34,7 @@ public final class ReorderToFrontProbeActivity extends Activity {
                     .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     .putExtra(RELAUNCH_FLAG, true);
             startActivity(reorder);
-        }, 2500L);
+        }, 1200L);
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REORDER_TO_FRONT_COUNTS create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
@@ -63,8 +63,8 @@ public final class ReorderToFrontProbeActivity extends Activity {
             TaskProbeEvidence.reorderToFront(this, onCreateCount, onNewIntentCount,
                     onStartCount, onResumeCount, onStopCount, onDestroyCount);
             TaskProbeEvidence.requestBackAfterEvidence(this, "reorder_to_front",
-                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 1000L));
-        }, 900L);
+                    () -> new Handler(Looper.getMainLooper()).postDelayed(this::finish, 200L));
+        }, 600L);
     }
 
     @Override protected void onStart() { super.onStart(); onStartCount++; }
