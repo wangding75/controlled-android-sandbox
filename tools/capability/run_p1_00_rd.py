@@ -41,19 +41,40 @@ def debug_command(
     *,
     force_stop_host: bool = True,
 ) -> dict[str, Any]:
+    def extra_value(key: str) -> str:
+        try:
+            return extras[extras.index(key) + 1]
+        except (ValueError, IndexError):
+            return ""
+
     if force_stop_host:
         run_adb(serial, ["shell", "am", "force-stop", HOST_PACKAGE], check=False)
-    run_adb(
-        serial,
-        ["shell", "run-as", HOST_PACKAGE, "rm", "-f", "files/debug-command-result.json"],
-        check=False,
-    )
+        for _ in range(50):
+            process = run_adb(serial, ["shell", "pidof", HOST_PACKAGE], check=False)
+            if not process.stdout.strip():
+                break
+            time.sleep(0.1)
+    for _ in range(50):
+        run_adb(
+            serial,
+            ["shell", "run-as", HOST_PACKAGE, "rm", "-f", "files/debug-command-result.json"],
+            check=False,
+        )
+        probe = run_adb(
+            serial,
+            ["shell", "run-as", HOST_PACKAGE, "test", "-f", "files/debug-command-result.json"],
+            check=False,
+        )
+        if probe.returncode != 0:
+            break
+        time.sleep(0.1)
     started = run_adb(
         serial,
         [
             "shell",
             "am",
             "start",
+            "-S",
             "-W",
             "-f",
             "0x10008000",
@@ -64,7 +85,12 @@ def debug_command(
         check=False,
     )
     try:
-        result = read_debug_command_result(serial, deadline_sec=deadline_sec)
+        result = read_debug_command_result(
+            serial, deadline_sec=deadline_sec,
+            expected_command=extra_value("command"),
+            expected_package=extra_value("package"),
+            expected_request_id=extra_value("requestId"),
+        )
         status = str(result.get("status") or "").upper()
         return {
             "status": status,

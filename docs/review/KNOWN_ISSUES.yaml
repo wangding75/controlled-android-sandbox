@@ -263,7 +263,7 @@ issues:
     notes: killProcess/generation recovery on RD API32 is not the full death matrix.
 
   - issue_id: KI-T57-016
-    title: Package upgrade/rollback/clone/identity-reset unproven
+    title: Package lifecycle cross-environment coverage unproven
     capability: package_lifecycle_clear_delete_reinstall
     classification: TEST_EVIDENCE_GAP
     severity: MEDIUM
@@ -271,10 +271,13 @@ issues:
     discovered_by: T57-R02
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
+      - verification/catch-up/C1-T06/c1-t06-rd-summary.json
     match_patterns: []
     blocks_current_campaign: false
     fix_policy: RECORD_ONLY
-    notes: clear/delete/reinstall RD API32 evidence exists; upgrade/rollback/clone do not.
+    notes: >
+      C1-T06 proves upgrade/rollback/clone/identity-reset plus clear/delete/reinstall on the
+      RD API32 baseline. API 33+, OEM variance, ARM/16KB, and VA PRO equivalence remain unproven.
 
   - issue_id: KI-T57-017
     title: Android API 33-36 behavior matrix not executed

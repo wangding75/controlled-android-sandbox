@@ -116,7 +116,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
-      "lines": 1341
+      "lines": 1355
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java",
@@ -203,6 +203,10 @@
       "lines": 610
     },
     {
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
+      "lines": 607
+    },
+    {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/binder/BinderInterceptionFoundation.java",
       "lines": 604
     },
@@ -221,10 +225,6 @@
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
       "lines": 583
-    },
-    {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
-      "lines": 573
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/BrokerProviderRuntime.java",

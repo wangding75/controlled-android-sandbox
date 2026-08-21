@@ -192,7 +192,9 @@ def install_rd_apks(serial: str) -> dict[str, Any]:
     return {"installs": rows}
 
 
-def read_debug_command_result(serial: str, deadline_sec: int = 45) -> dict[str, Any]:
+def read_debug_command_result(serial: str, deadline_sec: int = 45, *,
+                              expected_command: str = "", expected_package: str = "",
+                              expected_request_id: str = "") -> dict[str, Any]:
     import time
 
     deadline = time.time() + deadline_sec
@@ -212,7 +214,17 @@ def read_debug_command_result(serial: str, deadline_sec: int = 45) -> dict[str, 
             text = (content.stdout or "").strip()
             last = text
             if text.startswith("{"):
-                return json.loads(text)
+                result = json.loads(text)
+                if expected_command and result.get("command") != expected_command:
+                    time.sleep(0.1)
+                    continue
+                if expected_package and result.get("package") != expected_package:
+                    time.sleep(0.1)
+                    continue
+                if expected_request_id and result.get("requestId") != expected_request_id:
+                    time.sleep(0.1)
+                    continue
+                return result
         time.sleep(0.4)
     raise CampaignBlocked(
         "RD_ENVIRONMENT_RESOLUTION_BLOCKED",

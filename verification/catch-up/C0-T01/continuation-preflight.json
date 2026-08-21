@@ -1,42 +1,41 @@
 {
   "schema_version": 1,
-  "task_id": "C1-T04",
+  "task_id": "C1-T06",
   "status": "PASS",
-  "captured_at": "2026-08-21T12:58:55.471143+00:00",
+  "captured_at": "2026-08-21T15:56:44.285501+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C1-T04",
-    "active_task": "C1-T04",
-    "last_completed": "C1-T03",
-    "first_ready_pending": "C1-T05",
-    "dependencies": "C1-T01"
+    "next_task": "C1-T06",
+    "active_task": "C1-T06",
+    "last_completed": "C1-T05",
+    "first_ready_pending": null,
+    "dependencies": "C1-T04,C1-T05"
   },
   "last_receipt": {
-    "task_id": "C1-T03",
+    "task_id": "C1-T05",
     "status": "DONE",
     "implementation_commits": [
-      "236ce46b2736f4177d6ce14f8ee576218b47a9d1"
+      "d50d8d91cb98a1c96524efbe2bd00edbc40dddb5"
     ],
-    "receipt_commit": "ada061ca695ccd88fe1605f9ae35172b4652a5c0",
-    "baseline_commit": "602bdc944408cedcdde5e042e3af2e1ec76d3eb2",
+    "receipt_commit": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
+    "baseline_commit": "585e1ace6fedeb9d43784545327b691ce44f234b",
     "evidence_paths": [
-      "docs/review/C1_T03_BROADCAST_DESIGN.md",
+      "docs/review/C1_T05_PENDING_INTENT_ALARM_NOTIFICATION_DESIGN.md",
       "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C1-T03/c1-t03-rd-summary.json",
-      "verification/m5-t16-source-closure-audit.json",
-      "verification/sbom.json"
+      "verification/catch-up/C1-T05/c1-t05-rd-summary.json",
+      "artifacts/capability-audit/catch-up-c1-t05/pre-fix-system-holder-logcat.txt"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "ada061ca695ccd88fe1605f9ae35172b4652a5c0",
+    "head": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "ada061ca695ccd88fe1605f9ae35172b4652a5c0",
+    "remote_head": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/AndroidManifest.xml\n M fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureProvider.java\n M tools/static_android_compile.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/sbom.json\n?? docs/review/C1_T04_PROVIDER_DESIGN.md\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/ProviderCampaignActivity.java\n?? tools/capability/run_c1_t04_rd.py\n?? verification/catch-up/C1-T04/"
+    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M scripts/check-split-install-sessions.py\n M tools/capability/run_p1_00_rd.py\n M tools/capability/run_rd_campaign.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/m5-t16-source-closure-audit.json\n M verification/sbom.json\n?? docs/review/C1_T06_PACKAGE_LIFECYCLE_DESIGN.md\n?? tools/capability/run_c1_t06_rd.py\n?? verification/catch-up/C1-T06/"
   },
   "device": {
     "instance_name": "RD测试",
@@ -75,5 +74,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C1-T04"
+  "evidence_directory": "verification/catch-up/C1-T06"
 }

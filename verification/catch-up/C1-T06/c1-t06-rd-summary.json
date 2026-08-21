@@ -1,0 +1,908 @@
+{
+  "task_id": "C1-T06",
+  "started_at": "2026-08-21T16:08:54.221190+00:00",
+  "host_os": "Windows 11 AMD64",
+  "git": {
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "commit": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
+    "tree": "92f287a92495fde28c51d49e3f76230ed6737758",
+    "parent": "d50d8d91cb98a1c96524efbe2bd00edbc40dddb5",
+    "status": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M scripts/check-split-install-sessions.py\n M tools/capability/run_p1_00_rd.py\n M tools/capability/run_rd_campaign.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/m5-t16-source-closure-audit.json\n M verification/sbom.json\n?? docs/review/C1_T06_PACKAGE_LIFECYCLE_DESIGN.md\n?? tools/capability/run_c1_t06_rd.py\n?? verification/catch-up/C1-T06/"
+  },
+  "artifacts": {
+    "lifecycle_v1": {
+      "path": "D:\\github\\controlled-android-sandbox\\fixture-lifecycle\\build\\outputs\\apk\\v1\\debug\\fixture-lifecycle-v1-debug.apk",
+      "exists": true,
+      "sha256": "3b1c7aad9d0c62134292d09ed96dc82932c35a62e69e605867783cf36811ac63",
+      "bytes": 6789
+    },
+    "lifecycle_v2": {
+      "path": "D:\\github\\controlled-android-sandbox\\fixture-lifecycle\\build\\outputs\\apk\\v2\\debug\\fixture-lifecycle-v2-debug.apk",
+      "exists": true,
+      "sha256": "cd5a5d868eb41b661da6a03e7993d6ce2efd12f7b19d4a69be6676bd85e51a31",
+      "bytes": 6905
+    },
+    "split_base": {
+      "path": "D:\\github\\controlled-android-sandbox\\fixture-split-base\\build\\outputs\\apk\\debug\\fixture-split-base-debug.apk",
+      "exists": true,
+      "sha256": "0894ff252e16213a92132d02630d721d5190d8b7cf9f0d3b2868ea2bf5ab9c5a",
+      "bytes": 6973
+    },
+    "split_feature": {
+      "path": "D:\\github\\controlled-android-sandbox\\fixture-split-feature\\build\\outputs\\apk\\debug\\fixtureSplitFeature-debug.apk",
+      "exists": true,
+      "sha256": "67947cd7e514cdbd5228f90295c0a403d25d814bed8912993fe847d055e3a598",
+      "bytes": 7550
+    }
+  },
+  "steps": [
+    {
+      "name": "reset_host_data",
+      "result": {
+        "package": "com.warden.controlledsandbox.debug",
+        "returncode": 0,
+        "stdout": "Success",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "install_host_fixture_apks",
+      "result": {
+        "installs": [
+          {
+            "name": "host",
+            "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "companion32",
+            "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "fixture",
+            "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "fixture32",
+            "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "reset_lifecycle_physical_install",
+      "result": {
+        "package": "com.warden.controlledsandbox.fixture.lifecycle",
+        "returncode": 0,
+        "stdout": "Success",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "install_lifecycle_v1",
+      "result": {
+        "args": [
+          "install",
+          "-r",
+          "D:\\github\\controlled-android-sandbox\\fixture-lifecycle\\build\\outputs\\apk\\v1\\debug\\fixture-lifecycle-v1-debug.apk"
+        ],
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v1_import",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "788cf563cc9d4ac5a3775a6d9b3691c9",
+          "startedAt": 1787328535590,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PREPARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "5b74901c-5acc-4d41-b4f8-104f3df77169",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 6562,
+            "pid": 6562,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 610\nWaitTime: 611\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_clone",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "lifecycle-clone",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "9c4baa78105b43b8b38bca0323abe405",
+          "startedAt": 1787328539241,
+          "operation": {
+            "status": "CLONED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 563\nWaitTime: 563\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v1_launch_user0",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-component",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "c865cad6b46b4888915024b59adcc81e",
+          "startedAt": 1787328541016,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "b0926659-fd47-4c41-8f09-d2df3c288042",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 6826,
+            "pid": 6826,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 561\nWaitTime: 562\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v1_launch_clone",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-component",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 1,
+          "trustNativeGuest": true,
+          "requestId": "3facabcdac0d4d1591fd12ffc41fbe07",
+          "startedAt": 1787328544733,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "c0813597-0d49-41e7-88b8-0e9dc5a455c8",
+            "generation": 1,
+            "processSlot": 55,
+            "platformPid": 7002,
+            "pid": 7002,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 579\nWaitTime: 581\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "install_lifecycle_v2",
+      "result": {
+        "args": [
+          "install",
+          "-r",
+          "D:\\github\\controlled-android-sandbox\\fixture-lifecycle\\build\\outputs\\apk\\v2\\debug\\fixture-lifecycle-v2-debug.apk"
+        ],
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v2_import",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "3a516b813e2b41dab97596aa47351bd7",
+          "startedAt": 1787328548592,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PREPARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "93336f79-8bcd-4eb6-b04e-679477747401",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 7200,
+            "pid": 7200,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 549\nWaitTime: 552\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v2_launch",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-component",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "a6da761c81064b12950b0d4b99c5bd9d",
+          "startedAt": 1787328552206,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "ed1eafc3-b9a4-4910-ac0c-0b8d9529c6b6",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 7346,
+            "pid": 7346,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleV2Activity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 576\nWaitTime: 578\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "install_lifecycle_v1_for_downgrade_policy",
+      "result": {
+        "args": [
+          "install",
+          "-r",
+          "-d",
+          "D:\\github\\controlled-android-sandbox\\fixture-lifecycle\\build\\outputs\\apk\\v1\\debug\\fixture-lifecycle-v1-debug.apk"
+        ],
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_downgrade_policy",
+      "result": {
+        "status": "FAIL",
+        "returncode": 1,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "9da4fe5f785445159dfbd1970e1c587f",
+          "startedAt": 1787328556078,
+          "status": "FAIL",
+          "errorType": "java.lang.IllegalStateException",
+          "errorMessage": "SecurityException: Package downgrade rejected: 1 < 2"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 574\nWaitTime: 576\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_rollback",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "lifecycle-rollback",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "a28db0f04b4d45bb896ec45e14677346",
+          "startedAt": 1787328558319,
+          "operation": {
+            "status": "ROLLED_BACK",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 564\nWaitTime: 566\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_v1_after_rollback",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-virtual-component",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "ca4b951bbf9149b288b1a7f0bfea587f",
+          "startedAt": 1787328561012,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "d47e33e1-d782-4887-aa4d-b1793b9513f5",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 7791,
+            "pid": 7791,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.lifecycle",
+            "componentClass": "com.warden.controlledsandbox.fixture.lifecycle.LifecycleActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 575\nWaitTime: 577\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "lifecycle_reset_identity",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "lifecycle-reset-identity",
+          "package": "com.warden.controlledsandbox.fixture.lifecycle",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "34c6ad7a59564695b105553b36dae58f",
+          "startedAt": 1787328564775,
+          "operation": {
+            "status": "IDENTITY_RESET",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 566\nWaitTime: 567\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "install_split_set",
+      "result": {
+        "args": [
+          "install-multiple",
+          "-r",
+          "D:\\github\\controlled-android-sandbox\\fixture-split-base\\build\\outputs\\apk\\debug\\fixture-split-base-debug.apk",
+          "D:\\github\\controlled-android-sandbox\\fixture-split-feature\\build\\outputs\\apk\\debug\\fixtureSplitFeature-debug.apk"
+        ],
+        "returncode": 0,
+        "stdout": "Success",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "split_import",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture.split",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "aba731edebeb4f37b5756e779acc9861",
+          "startedAt": 1787328567659,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PREPARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "b156eb06-5cc0-414e-ad85-3736ab87d5fb",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 8146,
+            "pid": 8146,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.split",
+            "componentClass": "com.warden.controlledsandbox.fixture.split.SplitBaseActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 603\nWaitTime: 604\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "split_base_launch",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-component",
+          "package": "com.warden.controlledsandbox.fixture.split",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "5a099475afdc4ca38d1b72effe7f92d4",
+          "startedAt": 1787328571320,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "77e0c7bc-3a7c-43c3-8222-37eb9adf8288",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 8292,
+            "pid": 8292,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.split",
+            "componentClass": "com.warden.controlledsandbox.fixture.split.SplitBaseActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 572\nWaitTime: 573\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "split_feature_launch",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch-component",
+          "package": "com.warden.controlledsandbox.fixture.split",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "5448de287e8e494799777816740f510b",
+          "startedAt": 1787328574996,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "804726ac-154a-4a3f-9e71-74d63937e11d",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 8469,
+            "pid": 8469,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture.split",
+            "componentClass": "com.warden.controlledsandbox.fixture.split.feature.FeatureActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 541\nWaitTime: 542\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "basic_import",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "a8e7b5f45522423e84dfa78e34e3d363",
+          "startedAt": 1787328578664,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PREPARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "6cd75c70-d4d2-42fc-8540-063d9c4e181f",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 8616,
+            "pid": 8616,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture",
+            "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 565\nWaitTime: 566\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "package_query_resolve_policy",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "package-state-campaign",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "aa587e5a201448f38361e92e01c91e70",
+          "startedAt": 1787328582339,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PACKAGE_STATE_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0,
+            "recordRevision": "5afa749473194c49b9d1191980c74a6f6bc13c20e742dc5976539a2c3b1a178a",
+            "recordVersionCode": 1,
+            "artifactCount": 1,
+            "splitCount": 0,
+            "queryCount": 3,
+            "componentCount": 49,
+            "changedPermission": "DENIED",
+            "changedAppOp": "IGNORED",
+            "otherUserPermission": "DEFAULT",
+            "otherUserAppOp": "IGNORED",
+            "isolatedVirtualUserId": 1
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 571\nWaitTime: 574\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "failed_install_session_rollback",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "install-session-failure",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "cfbe2d266eb34c8d873e786c6870d30f",
+          "startedAt": 1787328585087,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "INSTALL_FAILURE_ROLLED_BACK",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0,
+            "failedState": "FAILED",
+            "failureCode": "UNTRUSTED_NATIVE_GUEST_DENIED",
+            "failureMessage": "UNTRUSTED_NATIVE_GUEST_DENIED: native Guest install requires an explicit trust decision; PLT/GOT hooks are best-effort only",
+            "failureThrown": "UNTRUSTED_NATIVE_GUEST_DENIED: UNTRUSTED_NATIVE_GUEST_DENIED: native Guest install requires an explicit trust decision; PLT/GOT hooks are best-effort only",
+            "revisionAfter": "5afa749473194c49b9d1191980c74a6f6bc13c20e742dc5976539a2c3b1a178a"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 599\nWaitTime: 600\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "clear_user0",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "clear",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "750d3f947a214b38bdf9b738e3e5344b",
+          "startedAt": 1787328587873,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "CLEARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 610\nWaitTime: 611\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "clear_user1",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "clear",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 1,
+          "trustNativeGuest": true,
+          "requestId": "998efd22ff4c45208178ff579bdd7369",
+          "startedAt": 1787328590579,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "CLEARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 605\nWaitTime: 606\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "delete_user1",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "delete",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 1,
+          "trustNativeGuest": true,
+          "requestId": "f6cbd8c6224e48b293ed9c2561354516",
+          "startedAt": 1787328593262,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "DELETED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "",
+            "generation": 0,
+            "processSlot": -1,
+            "platformPid": 0
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 560\nWaitTime: 563\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "basic_reinstall",
+      "result": {
+        "installs": [
+          {
+            "name": "host",
+            "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "companion32",
+            "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "fixture",
+            "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          },
+          {
+            "name": "fixture32",
+            "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+            "returncode": 0,
+            "stdout": "Performing Streamed Install\nSuccess",
+            "stderr": ""
+          }
+        ]
+      }
+    },
+    {
+      "name": "basic_reimport_after_reinstall",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "import-prepare",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "24fe6702c83d4bc1a90124b882c81d08",
+          "startedAt": 1787328596650,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "PREPARED",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "76c94610-aba7-435a-a675-dd2d6acad2d4",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 9440,
+            "pid": 9440,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture",
+            "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 594\nWaitTime: 596\nComplete\n",
+        "start_stderr": ""
+      }
+    },
+    {
+      "name": "basic_launch_after_reinstall",
+      "result": {
+        "status": "PASS",
+        "returncode": 0,
+        "result": {
+          "command": "launch",
+          "package": "com.warden.controlledsandbox.fixture",
+          "virtualUserId": 0,
+          "trustNativeGuest": true,
+          "requestId": "fdf57941c8a84d29933a6794de841397",
+          "startedAt": 1787328600719,
+          "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+          "operation": {
+            "status": "LAUNCH_PASS",
+            "errorType": "",
+            "errorMessage": "",
+            "sessionId": "fef378a5-6b6a-47a3-ae9d-9fb0f3aabdac",
+            "generation": 1,
+            "processSlot": 54,
+            "platformPid": 9585,
+            "pid": 9585,
+            "isolatedProcess": false,
+            "processName": "com.warden.controlledsandbox.fixture",
+            "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+          },
+          "status": "PASS"
+        },
+        "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 541\nWaitTime: 544\nComplete\n",
+        "start_stderr": ""
+      }
+    }
+  ],
+  "known_issues": [
+    "KI-T57-016",
+    "KI-R03-026",
+    "KI-R03-029"
+  ],
+  "maturity_level": "RD_BASELINE",
+  "va_pro_equivalent": "NOT_PROVEN",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "22041211A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "7cac15ce-d76e-44ea-968b-959d91d03be7",
+    "android_id": "398eea33120cd887",
+    "manufacturer": "Redmi",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400650936961264501",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "start_finished",
+      "mumuManager": {
+        "index": "1",
+        "name": "RD测试",
+        "is_main": false,
+        "error_code": 0,
+        "disk_size_bytes": 39880540488,
+        "created_timestamp": 1785131843951152,
+        "is_android_started": true,
+        "is_process_started": true,
+        "hyperv_enabled": true,
+        "main_wnd": "00340D0A",
+        "render_wnd": "00560D2A",
+        "adb_port": 16416,
+        "adb_host_ip": "127.0.0.1",
+        "pid": 31176,
+        "vt_enabled": true,
+        "player_state": "start_finished",
+        "launch_err_msg": "",
+        "launch_err_code": 0,
+        "launch_time": 25564666,
+        "headless_pid": 24508
+      },
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "Redmi",
+      "model": "22041211A",
+      "release": "12",
+      "api": "32",
+      "androidId": "398eea33120cd887",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "7cac15ce-d76e-44ea-968b-959d91d03be7",
+      "timestamp": "2026-08-21T16:08:54.825865+00:00",
+      "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
+      "config": {
+        "extraConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "Redmi",
+        "configuredModel": "22041211A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\n\n"
+  },
+  "raw_logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c1-t06\\20260821T160853Z\\c1-t06-logcat.txt",
+  "status": "PASS",
+  "finished_at": "2026-08-21T16:10:06.245740+00:00"
+}

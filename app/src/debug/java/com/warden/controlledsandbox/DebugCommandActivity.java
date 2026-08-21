@@ -10,6 +10,9 @@ import android.util.Log;
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
+import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCameraSourceSnapshot;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
@@ -47,6 +50,7 @@ public final class DebugCommandActivity extends Activity {
     private void executeIntent(Intent intent) {
         String command = intent == null ? "" : intent.getStringExtra("command");
         String packageName = intent == null ? "" : intent.getStringExtra("package");
+        String requestId = intent == null ? "" : intent.getStringExtra("requestId");
         int virtualUserId = intent == null ? 0 : intent.getIntExtra("user", 0);
         Bundle extras = intent == null ? null : intent.getExtras();
         Bundle commandExtras = extras == null ? new Bundle() : new Bundle(extras);
@@ -55,17 +59,18 @@ public final class DebugCommandActivity extends Activity {
                 + " user=" + virtualUserId);
         worker.execute(() -> execute(command == null ? "" : command,
                 packageName == null ? "" : packageName, virtualUserId, trustNativeGuest,
-                commandExtras));
+                commandExtras, requestId == null ? "" : requestId));
     }
 
     private void execute(String command, String packageName, int virtualUserId,
-                         boolean trustNativeGuest, Bundle extras) {
+                         boolean trustNativeGuest, Bundle extras, String requestId) {
         JSONObject result = new JSONObject();
         RuntimeClient runtime = null;
         PackageServiceClient packages = null;
         try {
             result.put("command", command).put("package", packageName)
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
+                    .put("requestId", requestId)
                     .put("startedAt", System.currentTimeMillis());
             if ("native-hostile".equals(command)) {
                 JSONObject campaign = HostileProductionCampaign.run(this);
@@ -146,7 +151,8 @@ public final class DebugCommandActivity extends Activity {
             // may already be uninstalled or may be an older physical revision while the virtual
             // record is intentionally being retired.
             boolean virtualLifecycleOnly = "stop".equals(command)
-                    || "clear".equals(command) || "delete".equals(command);
+                    || "clear".equals(command) || "delete".equals(command)
+                    || "launch-virtual-component".equals(command);
             boolean importRequested = !virtualLifecycleOnly && ("import-launch".equals(command)
                     || "import-prepare".equals(command) || record == null
                     || installedApkRevisionChanged(record, packageName));
@@ -202,7 +208,8 @@ public final class DebugCommandActivity extends Activity {
                 operation = configureProfiles(packages, record, packageName, virtualUserId,
                         extras, dingtalk);
                 requireStatus("profile", operation, "PROFILE_CONFIGURED");
-            } else if ("launch-component".equals(command)) {
+            } else if ("launch-component".equals(command)
+                    || "launch-virtual-component".equals(command)) {
                 String component = extras.getString("component", "").trim();
                 if (component.isEmpty()) {
                     throw new IllegalArgumentException("component extra is required");
@@ -237,6 +244,12 @@ public final class DebugCommandActivity extends Activity {
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId);
                 requireStatus("launch", operation, "LAUNCH_PASS");
+            } else if ("package-state-campaign".equals(command)) {
+                operation = packageStateCampaign(packages, record, packageName, virtualUserId);
+                requireStatus("package-state-campaign", operation, "PACKAGE_STATE_PASS");
+            } else if ("install-session-failure".equals(command)) {
+                operation = installSessionFailureCampaign(this, packages, record, packageName);
+                requireStatus("install-session-failure", operation, "INSTALL_FAILURE_ROLLED_BACK");
             } else if ("component-suite".equals(command)) {
                 Bundle serviceStart = runtime.startService(record, virtualUserId);
                 requireStatus("serviceStart", serviceStart, "SERVICE_STARTED");
@@ -889,6 +902,104 @@ public final class DebugCommandActivity extends Activity {
                 + ", errorType=" + errorType + ", errorMessage=" + errorMessage);
     }
 
+    private static Bundle packageStateCampaign(PackageServiceClient packages, SandboxRecord record,
+                                                String packageName, int virtualUserId)
+            throws Exception {
+        int isolatedUser = virtualUserId == 0 ? 1 : 0;
+        packages.ensureInstance(packageName, isolatedUser);
+        packages.resetVirtualPolicy(packageName, virtualUserId);
+        packages.resetVirtualPolicy(packageName, isolatedUser);
+        VirtualPackageStateSnapshot before = packages.virtualPackageState(packageName, virtualUserId);
+        VirtualPackageStateSnapshot otherBefore = packages.virtualPackageState(packageName, isolatedUser);
+        VirtualPackageStateSnapshot changed = packages.setPermissionDecision(packageName,
+                virtualUserId, "android.permission.INTERNET", "DENIED");
+        changed = packages.setAppOpMode(packageName, virtualUserId, "android:camera", "IGNORED");
+        VirtualPackageStateSnapshot other = packages.virtualPackageState(packageName, isolatedUser);
+        String changedPermission = permissionDecision(changed, "android.permission.INTERNET");
+        String changedAppOp = appOpMode(changed, "android:camera");
+        String otherPermission = permissionDecision(other, "android.permission.INTERNET");
+        String otherAppOp = appOpMode(other, "android:camera");
+        if (!"DENIED".equals(changedPermission) || !"IGNORED".equals(changedAppOp)) {
+            throw new IllegalStateException("PACKAGE_POLICY_MUTATION_NOT_VISIBLE");
+        }
+        if (!permissionDecision(otherBefore, "android.permission.INTERNET").equals(otherPermission)
+                || !appOpMode(otherBefore, "android:camera").equals(otherAppOp)) {
+            throw new IllegalStateException("PACKAGE_POLICY_CROSSED_VIRTUAL_USER");
+        }
+        packages.resetVirtualPolicy(packageName, virtualUserId);
+        packages.resetVirtualPolicy(packageName, isolatedUser);
+        Bundle operation = new Bundle();
+        operation.putString(RuntimeKeys.STATUS, "PACKAGE_STATE_PASS");
+        operation.putString("recordRevision", record.sha256);
+        operation.putLong("recordVersionCode", record.versionCode);
+        operation.putInt("artifactCount", record.artifacts.size());
+        operation.putInt("splitCount", before.splitNames().size());
+        operation.putInt("queryCount", before.queries().size());
+        operation.putInt("componentCount", before.components().size());
+        operation.putString("changedPermission", changedPermission);
+        operation.putString("changedAppOp", changedAppOp);
+        operation.putString("otherUserPermission", otherPermission);
+        operation.putString("otherUserAppOp", otherAppOp);
+        operation.putInt("virtualUserId", virtualUserId);
+        operation.putInt("isolatedVirtualUserId", isolatedUser);
+        return operation;
+    }
+
+    private static Bundle installSessionFailureCampaign(Context context,
+                                                         PackageServiceClient packages,
+                                                         SandboxRecord before, String packageName)
+            throws Exception {
+        int sessionId = packages.createInstallSession(packageName + ".intentionalmismatch");
+        boolean commitFailed = false;
+        String failure = "";
+        try {
+            File hostApk = new File(context.getApplicationInfo().sourceDir);
+            packages.addInstallArtifact(sessionId, Uri.parse(hostApk.toURI().toString()));
+            packages.commitInstallSession(sessionId);
+        } catch (Exception expected) {
+            commitFailed = true;
+            failure = String.valueOf(expected.getMessage());
+        }
+        if (!commitFailed) throw new IllegalStateException("INSTALL_FAILURE_NOT_REJECTED");
+        InstallSessionInfoSnapshot failed = packages.installSessionInfo(sessionId);
+        if (!InstallSessionInfoSnapshot.STATE_FAILED.equals(failed.state())) {
+            throw new IllegalStateException("INSTALL_FAILURE_STATE_NOT_PERSISTED:" + failed.state());
+        }
+        InstallSessionInfoSnapshot reopened = packages.retryInstallSession(sessionId);
+        if (!InstallSessionInfoSnapshot.STATE_OPEN.equals(reopened.state())) {
+            throw new IllegalStateException("INSTALL_FAILURE_RETRY_NOT_OPEN:" + reopened.state());
+        }
+        packages.abandonInstallSession(sessionId);
+        SandboxRecord after = packages.findRecord(packageName);
+        if (before == null || after == null || !before.sha256.equals(after.sha256)
+                || before.versionCode != after.versionCode) {
+            throw new IllegalStateException("INSTALL_FAILURE_MUTATED_PACKAGE_STATE");
+        }
+        Bundle operation = new Bundle();
+        operation.putString(RuntimeKeys.STATUS, "INSTALL_FAILURE_ROLLED_BACK");
+        operation.putInt("sessionId", sessionId);
+        operation.putString("failedState", failed.state());
+        operation.putString("failureCode", failed.failureCode());
+        operation.putString("failureMessage", failed.failureMessage());
+        operation.putString("failureThrown", failure);
+        operation.putString("revisionAfter", after.sha256);
+        return operation;
+    }
+
+    private static String permissionDecision(VirtualPackageStateSnapshot state, String name) {
+        for (VirtualPermissionSnapshot permission : state.permissions()) {
+            if (name.equals(permission.name())) return permission.decision();
+        }
+        return "MISSING";
+    }
+
+    private static String appOpMode(VirtualPackageStateSnapshot state, String name) {
+        for (PackageAppOpSnapshot appOp : state.appOps()) {
+            if (name.equals(appOp.opName())) return appOp.mode();
+        }
+        return "MISSING";
+    }
+
     private JSONObject bundleJson(Bundle bundle) throws Exception {
         JSONObject out = new JSONObject();
         out.put("status", bundle.getString(RuntimeKeys.STATUS, ""));
@@ -925,6 +1036,22 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "secondCycles");
         copyIfPresent(bundle, out, "pressureSeconds");
         copyIfPresent(bundle, out, "elapsedMs");
+        copyIfPresent(bundle, out, "recordRevision");
+        copyIfPresent(bundle, out, "recordVersionCode");
+        copyIfPresent(bundle, out, "artifactCount");
+        copyIfPresent(bundle, out, "splitCount");
+        copyIfPresent(bundle, out, "queryCount");
+        copyIfPresent(bundle, out, "componentCount");
+        copyIfPresent(bundle, out, "changedPermission");
+        copyIfPresent(bundle, out, "changedAppOp");
+        copyIfPresent(bundle, out, "otherUserPermission");
+        copyIfPresent(bundle, out, "otherUserAppOp");
+        copyIfPresent(bundle, out, "isolatedVirtualUserId");
+        copyIfPresent(bundle, out, "failedState");
+        copyIfPresent(bundle, out, "failureCode");
+        copyIfPresent(bundle, out, "failureMessage");
+        copyIfPresent(bundle, out, "failureThrown");
+        copyIfPresent(bundle, out, "revisionAfter");
         return out;
     }
 

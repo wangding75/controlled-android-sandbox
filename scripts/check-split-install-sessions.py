@@ -43,9 +43,8 @@ require('app/src/main/java/com/warden/controlledsandbox/PackageArtifactOrder.jav
         'Split dependency cycle', 'Missing split dependency', 'runtimeOrder(')
 require('app/src/testHarness/java/com/warden/controlledsandbox/PackageArtifactOrderSelfTest.java',
         'configuration after target', 'split dependency cycle rejected')
-require('app/src/main/java/com/warden/controlledsandbox/MainActivity.java',
-        'Intent.EXTRA_ALLOW_MULTIPLE', 'packageService.createInstallSession(',
-        'packageService.commitInstallSession(')
+require('app/src/main/java/com/warden/controlledsandbox/SxSandboxAdapter.java',
+        'packageService.createInstallSession(', 'packageService.commitInstallSession(')
 require('app/src/main/java/com/warden/controlledsandbox/PackageArtifactRecord.java',
         'TYPE_BASE', 'TYPE_FEATURE', 'TYPE_CONFIG', 'sha256')
 require('app/src/main/java/com/warden/controlledsandbox/SandboxCatalogRepository.java',
@@ -66,7 +65,7 @@ require('app/src/main/java/com/warden/controlledsandbox/PackageStorageLayout.jav
 
 require('app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java',
         'RuntimeKeys.BASE_APK_SHA256', 'RuntimeKeys.SPLIT_PATHS', 'RuntimeKeys.SPLIT_SHA256S')
-require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
+require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestRequestValidator.java',
         'PackageRevisionSetVerifier.verify(', 'Split metadata arrays must have identical sizes')
 require('sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java',
         'dexPath()', 'splitPathArray()', 'hasSplit(')
