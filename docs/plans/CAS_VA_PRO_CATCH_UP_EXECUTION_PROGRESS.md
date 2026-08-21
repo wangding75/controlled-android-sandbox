@@ -6,8 +6,8 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T01`
-最后完成任务：`BOOTSTRAP-DOCS`
+下一任务：`C0-T02`
+最后完成任务：`C0-T01`
 
 ## 1. 使用规则
 
@@ -34,7 +34,7 @@
 
 | 任务 ID | 任务名称 | 状态 | 依赖 | 实现提交 | 回执位置 |
 |---|---|---|---|---|---|
-| C0-T01 | 固化任务续接与证据协议 | IN_PROGRESS | BOOTSTRAP-DOCS | - | - |
+| C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
 | C0-T02 | 当前 HEAD 可复现构建基线 | PENDING | C0-T01 | - | - |
 | C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
@@ -100,6 +100,46 @@
   `git ls-remote` 显示远端 HEAD 为 `13c58005b2e10566dcb8d7ec9decc0e6cef3d2f5`，与本地一致。
 - **遗留风险**：任务尚未进入设备执行；ARM/16KB 环境及 ART/Xposed 产品决策在对应阶段处理。
 - **下一任务**：`C0-T01`
+
+### C0-T01：固化任务续接与证据协议
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 11:46 / 2026-08-21 12:00（Asia/Shanghai）
+- **执行环境**：Windows PowerShell；仓库 `D:\github\controlled-android-sandbox`；Python 3；
+  本地 Git 身份 `OpenAI <openai@users.noreply.github.com>`；MuMu `RD测试` API 32；ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @ `36513fec4984a277324353974d454bc99abc71ef`；
+  工作区干净；上一任务回执 `BOOTSTRAP-DOCS`，实现提交 `d82ff91e`、补充格式提交 `13c58005`、
+  回执提交 `36513fec`
+- **实现摘要**：新增仓库级 fail-closed 续接校验器和单测，能够定位当前/下一任务、依赖、最后回执、
+  基线提交、证据路径、分支/远端 HEAD、canonical Git identity、动态 `RD测试` 和 evidence directory；
+  将 `FIXED` 纳入 Known Issues 状态枚举；移除 Quark RD 稳定性脚本的历史 serial 默认值并接入共享动态解析器。
+- **变更文件**：`scripts/verify-catch-up-continuation.py`、`scripts/test_catch_up_continuation.py`、
+  `tools/capability/campaign_status.py`、`tools/device/t57_quark_stability_probe.ps1`、
+  `docs/review/T57_R03_C0_T01_CONTINUATION_PROTOCOL.md`、
+  `verification/catch-up/C0-T01/continuation-preflight.json`、
+  `verification/catch-up/C0-T01/continuation-preflight-second-session.json`。
+- **验收命令与结果**：
+  `python scripts/mumu_instance.py --instance-name RD测试` PASS；PowerShell AST parse PASS；
+  `python scripts/test_catch_up_continuation.py` PASS（4 tests）；
+  `python tools/capability/validate_campaign_infra.py` PASS；
+  `python tools/capability/test_campaign_infra.py` PASS（9 tests）；第二 PowerShell 会话运行
+  `python scripts/verify-catch-up-continuation.py` PASS；`git diff --check` PASS。
+- **设备证据**：动态解析 `RD测试` 得到本次会话 serial `127.0.0.1:16416`，不是脚本常量；model
+  `22041211A`；API 32；boot ID `7cac15ce-d76e-44ea-968b-959d91d03be7`；证据 JSON 位于
+  `verification/catch-up/C0-T01/`。本任务未宣称任何 Android runtime/VA PRO 兼容性 PASS。
+- **Known Issues**：无新增 runtime issue；修复治理 validator 对既有 `KI-R03-NATIVE-010` 状态
+  `FIXED` 的枚举漂移；移除一个设备脚本的历史 endpoint 默认值。
+- **偏离任务书**：无。按要求先 DISCOVER/CLASSIFY，再 DESIGN/IMPLEMENT/LOCAL_VERIFY；本任务仅
+  修改续接治理、校验和设备入口，不提前执行 C0-T02/C0-T03。
+- **实现提交 SHA**：`602da7e65a145e1fa277723bd0a97f2abc473c15`
+- **回执提交**：通过提交主题 `docs(progress): record [C0-T01] receipt` 在 Git 历史定位。
+- **推送目标与远端验证结果**：目标 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交已在
+  回执提交前保留为当前父提交；回执提交完成后按任务书执行非强制推送，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 与本地 `HEAD` 对比。
+- **遗留风险**：C0-T02 可复现构建、C0-T03 双轮 RD 完整基线和后续 API/OEM/业务范围仍未验证；
+  allowlisted historical serial 仅存在于负向静态 guard，不作为设备选择依据。
+- **下一任务**：`C0-T02`
 
 ## 6. 回执追加模板
 
