@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.0
-更新时间：2026-08-21 17:16（Asia/Shanghai）
+更新时间：2026-08-21 18:43（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C1`
-下一任务：`C1-T02`
-最后完成任务：`C1-T01`
+下一任务：`C1-T03`
+最后完成任务：`C1-T02`
 
 ## 1. 使用规则
 
@@ -39,7 +39,7 @@
 | C0-T03 | MuMu RD 完整基线 | DONE | C0-T02 | `222211efebad3c4adfc66804d32e5c3e60e8f3dd` | §5 C0-T03 |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | DONE | C0-T03 | `8bb4470c6054b728f64e83529a22f7e2222f6a7d` | §5 C0-T04 |
 | C1-T01 | Activity/Application 与任务栈 | DONE | C0 | `87d96611` | §5 C1-T01 |
-| C1-T02 | Service/FGS/Job | PENDING | C1-T01 | - | - |
+| C1-T02 | Service/FGS/Job | DONE | C1-T01 | `ea3f9a322b2a4c0907644aa2160c5d16ed7835c0` | §5 C1-T02 |
 | C1-T03 | Broadcast | PENDING | C1-T01 | - | - |
 | C1-T04 | ContentProvider | PENDING | C1-T01 | - | - |
 | C1-T05 | PendingIntent/Alarm/Notification holder | PENDING | C1-T02,C1-T03 | - | - |
@@ -397,6 +397,67 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：本任务仅声明 RD API32 `RD_BASELINE`；显式 referrer、物理 rotation/configuration change、
   动态 singleInstance、API33+、ARM/16KB、OEM、商业应用和 VA PRO 等价性仍未证明。
 - **下一任务**：`C1-T02`；本轮不执行。
+
+### C1-T02：Service/FGS/Job
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-21 17:17 / 2026-08-21 18:43（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13；
+  MuMu `RD测试` 通过 `python scripts/mumu_instance.py --instance-name 'RD测试'` 动态解析。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign` @
+  `1d0f351160db665ab91b3cdfa26e3c1f1f39d2b6`；开始前工作区干净、远端同 HEAD；上一回执为
+  `C1-T01`，实现提交 `87d96611`，回执提交 `1d0f351160db665ab91b3cdfa26e3c1f1f39d2b6`；本轮只执行
+  `C1-T02`。
+- **实现摘要**：补齐 Service start/bind/publish/unbind/rebind/sticky 生命周期、启动序号和旧序号
+  停止语义、真实框架 FGS promotion/demotion、Binder lease 收敛、Job WorkItem/cancel/reschedule
+  与 process-death generation recovery 的 RD 验收路径；修复框架 Service 回调与 broker 成功路径的
+  重复计数风险；新增动态 MuMu 设备 runner、设计审查和可追溯证据索引。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java`、
+  `app/src/main/java/com/warden/controlledsandbox/SandboxRecord.java`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureService.java`、
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java`、
+  `scripts/check-notification-job-lifecycle.py`、`docs/review/C1_T02_SERVICE_JOB_DESIGN.md`、
+  `tools/capability/run_c1_t02_rd.py`、`verification/catch-up/C1-T02/`，以及更新后的
+  `verification/catch-up/C0-T01/continuation-preflight.json`、`verification/m5-t16-source-closure-audit.json`、
+  `verification/sbom.json`。
+- **验收命令与结果**：
+  `python scripts/check-notification-job-lifecycle.py` PASS；
+  `python scripts/check-service-lifecycle.py` PASS；
+  `python scripts/check-guest-jobservice-bridge.py` PASS；
+  `python -m py_compile tools/capability/run_c1_t02_rd.py` PASS；
+  `python tools/static_android_compile.py` PASS；
+  `python scripts/generate-sbom.py --check` PASS（14 components）；
+  `gradlew.bat :app:assembleDebug :fixture-basic:assembleDebug` PASS；
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\build-device-test-apks.ps1` PASS；
+  `gradlew.bat :fixture-compat32:assembleDebug` PASS；`git diff --check` 和 JSON evidence parse PASS。
+  正式短测 `python tools/capability/run_c1_t02_rd.py --instance 'RD测试' --loops 50
+  --batch-iterations 5 --pressure-seconds 1800` PASS：双用户各 15 分钟、总观测
+  `1812.74s`，期望 100 cycles、实际 715 cycles，143 batches，failed batches=0；最终设备 APK
+  构建摘要中的 host/fixture/companion32/fixture32 哈希见主回执 `final_build`。
+  Companion probes `RD-10`、`RD-11`、`RD-07` 均 PASS。
+- **设备证据**：MuMu `RD测试`，动态 serial `127.0.0.1:16416`，model `22041211A`，API 32 / Android 12，
+  boot ID `7cac15ce-d76e-44ea-968b-959d91d03be7`；主回执为
+  `verification/catch-up/C1-T02/c1-t02-rd-summary.json`，专项证据索引为
+  `verification/catch-up/C1-T02/c1-t02-companion-probes.json`，原始日志位于
+  `artifacts/capability-audit/catch-up-c1-t02/20260821T095942Z`，companion 原始文件位于
+  `build/c1-t02-companion/`。
+- **Known Issues**：记录 `C1-T02-ISSUE-8H-STABILITY-SOAK`（`FOLLOW_UP_REQUIRED`）。按本轮补充验收标准，
+  取消 8 小时稳定性 soak，仅以 30 分钟短测判定本任务 DONE；后续仍需补跑扩展 soak 并检查 leak、
+  ghost-task 和 ANR telemetry。本任务仅声明 RD API32 `RD_BASELINE`，不声明 VA PRO 等价性。
+- **偏离任务书**：8 小时 soak 为用户在本轮明确的验收标准覆盖；未执行且已记录后续 issue，30 分钟
+  短测完成即满足 DONE。其余验收范围无偏离；执行中发现的失败均已修复并重跑通过，无需人工介入，
+  不记录 BLOCKED。
+- **实现提交 SHA**：`ea3f9a322b2a4c0907644aa2160c5d16ed7835c0`
+  （`test(service): [C1-T02] close Service FGS Job lifecycle gates`）。
+- **推送与远端验证**：本回执提交使用主题 `docs(progress): record [C1-T02] receipt` 单独提交；实现
+  提交与本回执提交均按任务书要求非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 `HEAD`。
+- **遗留风险**：仅完成 MuMu `RD测试` API32 `RD_BASELINE` 与 30 分钟短测；8 小时 soak、API33+、
+  ARM/跨宽度/16KB、OEM、SX/XH、商业应用和 VA PRO 等价性仍未证明。
+- **下一任务**：`C1-T03`；本轮不执行。
 
 ## 6. 回执追加模板
 
