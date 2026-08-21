@@ -6,7 +6,7 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C0`
-下一任务：`C0-T02`（解除构建供应链阻断后重试）
+下一任务：`C0-T02`（修复 fixture lint/source 阻断后重试）
 最后完成任务：`C0-T01`
 
 ## 1. 使用规则
@@ -35,7 +35,7 @@
 | 任务 ID | 任务名称 | 状态 | 依赖 | 实现提交 | 回执位置 |
 |---|---|---|---|---|---|
 | C0-T01 | 固化任务续接与证据协议 | DONE | BOOTSTRAP-DOCS | `602da7e65a145e1fa277723bd0a97f2abc473c15` | §5 C0-T01 |
-| C0-T02 | 当前 HEAD 可复现构建基线 | BLOCKED | C0-T01 | `d0800113e5679dfebae97627e646e5cc88cfd6b8` | §5 C0-T02 |
+| C0-T02 | 当前 HEAD 可复现构建基线 | BLOCKED | C0-T01 | `b933d1a0ea45ecea8554302c1718dab91eca0161` | §5 C0-T02 |
 | C0-T03 | MuMu RD 完整基线 | PENDING | C0-T02 | - | - |
 | C0-T04 | 统一能力事实源与 VA PRO corpus | PENDING | C0-T03 | - | - |
 | C1-T01 | Activity/Application 与任务栈 | PENDING | C0 | - | - |
@@ -76,10 +76,11 @@
 
 ## 4. 阻断项
 
-当前阻断：`C0-T02` 的离线设备测试 APK 构建在 Gradle 严格依赖验证阶段拒绝
-`com.android.tools.build:aapt2:8.11.1-12782657` 的 POM，仓库
-`gradle/verification-metadata.xml` 缺少其校验条目。恢复条件：受信维护者完成产物来源审查并补充已验证
-checksum/signature，或恢复与现有 metadata 匹配的缓存产物，然后重新运行任务锁定构建命令；禁止绕过依赖验证。
+当前阻断：原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与 M5-T19.1-U
+供应链门均通过；恢复构建在 `check`/lint 阶段仍失败（43 errors、30 warnings），首要问题为 fixture
+权限/API/常量/私有 API 探测调用未满足 lint 门禁。恢复条件：审查 package-neutral fixture 语义，增加必要的
+显式权限检查、API level guard 或精确注解/配置，不能用 blanket suppression 隐藏运行时缺陷，然后重新运行
+任务锁定构建命令；禁止进入 C0-T03。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认，不得提前据此跳过 C0-C5 主线。
 
 ## 5. 任务回执
@@ -178,6 +179,42 @@ checksum/signature，或恢复与现有 metadata 匹配的缓存产物，然后�
   构建阻断不改变推送和回执保全要求。
 - **遗留风险**：未取得三枚设备测试 APK 及其 hash；无法建立 C0-T02 的可复现构建基线；严格依赖验证缺口未解决。
 - **下一任务**：仍为 `C0-T02`；满足恢复条件后重新执行，不得进入 `C0-T03`。
+
+### C0-T02 recovery：修复 aapt2 校验后重新验收
+
+- **状态**：BLOCKED
+- **开始/结束时间**：2026-08-21 12:36 / 2026-08-21 12:42（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；JDK 17.0.18（Zulu）；Android Gradle Plugin 8.11.1；
+  compile SDK 36；target SDK 35；Build Tools 35.0.0；NDK 27.2.12479018；CMake 3.22.1；Gradle 8.13
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `90ddc49a9a4e62cdbe238eb7c55436714d8044a8`；恢复前工作区干净；上一回执为 C0-T02 BLOCKED，
+  实现提交 `d0800113e5679dfebae97627e646e5cc88cfd6b8`，回执提交 `90ddc49a9a4e62cdbe238eb7c55436714d8044a8`
+- **实现摘要**：从官方 Google Maven 获取并逐字节比对 `aapt2:8.11.1-12782657` POM/JAR/签名文件与缓存；
+  补充 `gradle/verification-metadata.xml` 的精确 SHA-256，加入 reviewed coordinate 和 provenance；
+  原始依赖阻断关闭。第 1 轮完整构建进入 Gradle check/lint 后因 43 个错误、30 个警告失败；新增
+  `KI-R03-BUILD-002`，未执行第 2 轮。
+- **变更文件**：`gradle/verification-metadata.xml`；`gradle/reviewed-dependency-coordinates.json`；
+  `gradle/dependency-verification-provenance.json`；`docs/review/KNOWN_ISSUES.yaml`；
+  `verification/catch-up/C0-T02/build-baseline-blocked.md`；`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md`
+- **验收命令与结果**：Android 环境锁定 PASS；wrapper checksum PASS；Gradle lock state PASS（48 files, 0 coordinates）；
+  `python scripts/check-m5-t19-1-u-supply-chain-governance.py` PASS；严格离线 Gradle `help` PASS；
+  `python tools/capability/validate_campaign_infra.py` PASS；9 个 campaign infra tests PASS；
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-device-test-apks.ps1` BLOCKED，
+  lint 报告见 `fixture-compat32/build/reports/lint-results-debug.txt`，摘要和原始日志位置见
+  `verification/catch-up/C0-T02/build-baseline-blocked.md`。
+- **设备证据**：不适用；未运行 MuMu；构建在 APK assemble 前的 check/lint 阶段失败，Host、fixture、
+  Companion32 APK 均未生成，无 APK SHA-256；未执行第二轮。
+- **Known Issues**：关闭 `KI-R03-BUILD-001`；新增 `KI-R03-BUILD-002`（`CURRENT_DEFECT`，fixture lint/source
+  阻断）；无 runtime issue 被标记为 PASS。
+- **偏离任务书**：按失败即停止规则停止；未执行第二轮、未跳过 lint、未使用依赖验证绕过；本地无 `gpg`，未虚称
+  独立 GPG 签名验证通过，依赖官方字节比对与 Gradle 严格验证门。
+- **实现提交 SHA**：`b933d1a0ea45ecea8554302c1718dab91eca0161`
+- **回执提交**：通过提交主题 `docs(progress): record [C0-T02] receipt` 在 Git 历史定位。
+- **推送目标与远端验证**：目标 `origin/feature/t57-r03-va-pro-capability-campaign`；实现提交与本回执提交均须
+  非强制推送；完成后以 `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比本地 `HEAD`。
+- **遗留风险**：三枚 APK 尚未生成；fixture lint 的权限、API、常量和私有 API 问题未修复/复验；C0-T02 仍未建立
+  可复现构建基线。
+- **下一任务**：仍为 `C0-T02`；修复并分类 `KI-R03-BUILD-002` 后重新执行，不得进入 `C0-T03`。
 
 ## 6. 回执追加模板
 
