@@ -23,6 +23,9 @@ if VERSION_MATCH is None:
 PROJECT_VERSION = VERSION_MATCH.group(1)
 INCLUDE_STATEMENT = re.compile(r"(?ms)^\s*include\s*(?:\((.*?)\)|([^\n]*))")
 QUOTED_PROJECT = re.compile(r"['\"](:[^'\"]+)['\"]")
+PROJECT_DIR_STATEMENT = re.compile(
+    r"(?m)^\s*project\(\s*['\"](:[^'\"]+)['\"]\s*\)\.projectDir\s*=\s*file\(\s*['\"]([^'\"]+)['\"]\s*\)"
+)
 
 
 def sha256_file(path: Path) -> str:
@@ -37,6 +40,7 @@ def included_projects() -> list[tuple[str, str, Path]]:
     text = SETTINGS.read_text(encoding="utf-8")
     text = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
     text = "\n".join(line.split("//", 1)[0] for line in text.splitlines())
+    project_dirs = dict(PROJECT_DIR_STATEMENT.findall(text))
     projects: list[tuple[str, str, Path]] = []
     seen: set[str] = set()
     for match in INCLUDE_STATEMENT.finditer(text):
@@ -46,7 +50,7 @@ def included_projects() -> list[tuple[str, str, Path]]:
                 raise SystemExit(f"duplicate Gradle project include: {project_path}")
             seen.add(project_path)
             module_name = project_path[1:]
-            directory = ROOT.joinpath(*module_name.split(":"))
+            directory = ROOT / project_dirs.get(project_path, module_name)
             if not directory.is_dir():
                 raise SystemExit(f"Gradle project directory is missing: {project_path} -> {directory}")
             if not (directory / "build.gradle").is_file() and not (directory / "build.gradle.kts").is_file():
@@ -65,7 +69,7 @@ def component_identity(module_name: str, directory: Path) -> tuple[str, str]:
     component_type = "application" if "com.android.application" in build_text else "library"
     if module_name == "app":
         role = "host"
-    elif module_name.startswith("fixture-"):
+    elif module_name.startswith("fixture-") or directory.name.startswith("fixture-"):
         role = "fixture"
     elif "companion" in module_name:
         role = "companion"
@@ -84,8 +88,9 @@ def component_files(module_name: str, directory: Path) -> list[Path]:
     the pruned walk is only for source archives without Git metadata.
     """
     try:
+        source_prefix = directory.relative_to(ROOT).as_posix()
         result = subprocess.run(
-            ["git", "ls-files", "-z", "--", f"{module_name}/"],
+            ["git", "ls-files", "-z", "--", f"{source_prefix}/"],
             cwd=ROOT,
             check=True,
             stdout=subprocess.PIPE,

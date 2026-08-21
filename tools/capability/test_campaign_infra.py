@@ -27,6 +27,19 @@ class CampaignInfraTests(unittest.TestCase):
         self.assertEqual(validate_campaign_infra.validate_corpus(), [])
         self.assertEqual(validate_campaign_infra.validate_gates_and_schema(), [])
 
+    def test_c0_t04_fact_reconciliation(self) -> None:
+        from reconcile_cas_va_pro import reconcile
+
+        result = reconcile()
+        self.assertEqual(result["status"], "PASS", result["errors"])
+        self.assertEqual(result["counts"]["capabilities"], 14)
+        self.assertEqual(result["counts"]["corpus_entries"], 83)
+        self.assertEqual(
+            result["counts"]["corpus_scope_classification"],
+            {"IN_SCOPE": 51, "OUT_OF_SCOPE": 3, "DUPLICATE": 0,
+             "NEEDS_FIXTURE": 28, "PROVEN": 1},
+        )
+
     def test_fourteen_capabilities(self) -> None:
         self.assertEqual(len(REQUIRED_CAPABILITY_IDS), 14)
 
@@ -110,6 +123,32 @@ class CampaignInfraTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertIn("native-enforcement", completed.stdout)
+
+    def test_audit_requires_declared_issue_evidence(self) -> None:
+        from run_local_capability_audit import classify_gate
+
+        gate = {"known_issue_ids": ["KI-EXAMPLE"]}
+        issues = [{
+            "issue_id": "KI-EXAMPLE",
+            "status": "RECORDED",
+            "match_patterns": ["expected failure signature"],
+        }]
+        classification, matched = classify_gate(gate, "different failure signature", 1, issues)
+        self.assertEqual(classification, "NEW_REGRESSION")
+        self.assertEqual(matched, [])
+
+    def test_audit_does_not_resurrect_fixed_issue(self) -> None:
+        from run_local_capability_audit import classify_gate
+
+        gate = {"known_issue_ids": ["KI-EXAMPLE"]}
+        issues = [{
+            "issue_id": "KI-EXAMPLE",
+            "status": "FIXED",
+            "match_patterns": ["old failure signature"],
+        }]
+        classification, matched = classify_gate(gate, "old failure signature", 1, issues)
+        self.assertEqual(classification, "NEW_REGRESSION")
+        self.assertEqual(matched, [])
 
 
 if __name__ == "__main__":

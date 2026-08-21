@@ -83,10 +83,13 @@ def classify_gate(
     for issue in issues:
         issue_id = issue.get("issue_id")
         patterns = list(issue.get("match_patterns") or [])
-        if issue_id in declared:
-            matched.append(issue_id)
+        if issue.get("status") == "FIXED":
             continue
-        if any(pattern and pattern in output for pattern in patterns):
+        evidence_match = any(pattern and pattern in output for pattern in patterns)
+        # Gate declarations constrain the possible issue set; they do not replace
+        # the output evidence.  Otherwise an unrelated gate failure is silently
+        # downgraded to KNOWN_ISSUE and a new regression is hidden.
+        if evidence_match and (not declared or issue_id in declared):
             matched.append(issue_id)
     if matched:
         return "KNOWN_ISSUE", sorted(set(matched))

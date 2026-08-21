@@ -22,7 +22,7 @@ rules:
   - va_pro_equivalent remains NOT_PROVEN until ANDROID_MATRIX and OEM_COMMERCIAL_MATRIX complete.
   - Native hostile/direct-syscall/raw-SVC/custom-loader is not PASS.
   - compileSdk/targetSdk must not be treated as API matrix evidence.
-baseline_commit: 9e5d3e73628d80872c21776897898493925c7a97
+baseline_commit: 76d164795294b676a7cd9a2b20bbd829c5cd5ae3
 authoritative_handoff: docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
 capabilities:
   - id: activity_framework
@@ -37,7 +37,7 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 2211df09f4bbe524187493d621b107db84a15087
+    last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
@@ -46,6 +46,7 @@ capabilities:
       - docs/review/T57_R03_P4_FIX01_A_ACTIVITY_STUB_ARCHITECTURE.md
       - docs/review/T57_R03_P4_FIX01_I_ANDROID_REVALIDATION.md
       - scripts/check-activity-task-virtualization.py
+      - verification/catch-up/C0-T03/README.md
     known_gaps:
       - Normal path is framework-owned ActivityThread/LoadedApk; GuestComponentRuntime remains an isolated/OEM fallback.
       - Dedicated launch-mode/task-field fixture is still pending.
@@ -62,7 +63,7 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
@@ -70,6 +71,7 @@ capabilities:
       - tools/device/t57_rd_framework_foreground_service_probe.ps1
       - scripts/check-service-lifecycle.py
       - docs/review/T57_R03_P1_00_P0_EVIDENCE_AND_CLASSLOADER_CLOSURE.md
+      - verification/catch-up/C0-T03/README.md
     known_gaps:
       - Isolated/OEM fallback still uses GuestComponentRuntime.
       - JobService ANR/unbind and API 17 startService package-name checks remain VA commercial signals, not CAS proof.
@@ -168,11 +170,12 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - scripts/check-m5-t6-isolated-process.py
       - artifacts/capability-audit/p1-00/20260817T093213Z/ordinary_slots.json
+      - verification/catch-up/C0-T03/README.md
     known_gaps:
       - Production contract is 64 ordinary + 16 isolated; some tests still assume 8 ordinary slots.
       - Isolated live high-slot start is fail-closed on UNTRUSTED_RUNTIME_PEER_UID.
@@ -260,11 +263,12 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
       - tools/device/t57_rd_recovery_probe.ps1
       - scripts/check-m5-t19-1-c-rebind-timeout-recovery.py
+      - verification/catch-up/C0-T03/README.md
     known_gaps:
       - SIGSEGV, native abort, ANR, LMK, reboot restore, and late-callback matrices remain open.
   - id: package_lifecycle_clear_delete_reinstall
@@ -279,11 +283,12 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 222211efebad3c4adfc66804d32e5c3e60e8f3dd
     evidence:
       - docs/runtime/T57_R02_REAL_PATH_TEST_MATRIX.md
       - tools/device/t57_rd_lifecycle_probe.ps1
       - scripts/check-package-lifecycle-transaction.py
+      - verification/catch-up/C0-T03/README.md
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization

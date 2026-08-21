@@ -340,17 +340,18 @@ issues:
     capability: android_oem_compatibility
     classification: KNOWN_DEBT
     severity: LOW
-    status: RECORDED
+    status: FIXED
     discovered_by: T57-R03-01 collect-all
     evidence:
       - scripts/generate-sbom.py
       - verification/sbom.json
       - artifacts/capability-audit/all/20260817T061507Z/sbom-check.json
+      - verification/catch-up/C0-T04/fact-convergence.md
     match_patterns:
       - sourceDigestSha256 mismatch
     blocks_current_campaign: false
-    fix_policy: RECORD_ONLY
-    notes: 9e5d3e73 reverted M10 source without regenerating SBOM. Not a runtime defect.
+    fix_policy: FIXED_REGENERATE_SBOM_WITH_PROJECT_DIR_MAPPING
+    notes: Fixed in C0-T04 by making the SBOM generator honor settings.gradle projectDir mappings and regenerating verification/sbom.json; not a runtime defect.
 
   - issue_id: KI-R03-022
     title: Broadcast-model Receiver coordinator tokens lag T57 Broker
