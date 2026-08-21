@@ -183,8 +183,11 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             proxies.put(token, sender);
         }
         // System holders (NotificationManager / AlarmManager) can only send a real AMS
-        // PendingIntentRecord. Rewrite the payload to a Broker-process relay and let AMS
-        // own the record. Guest-local send still uses the Broker IIntentSender proxy.
+        // PendingIntentRecord. Rewrite only the route-owned component/package to a
+        // Broker-process relay and let AMS own the record. Preserve the original Intent
+        // semantics in the AMS record: IIntentReceiver callbacks must observe the same
+        // action/data/extras that a direct PendingIntent send would deliver. Guest-local
+        // send still uses the Broker IIntentSender proxy.
         if (spec.runtimeBrokerBinder != null && !hostPackageName.isEmpty()) {
             rewriteIntentsForSystemHolder(arguments, issued.record().persistentTokenId());
             return Interception.passThrough();
@@ -202,7 +205,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
             if (!(arguments[index] instanceof Intent[] intents)) continue;
             Intent[] rewritten = new Intent[intents.length];
             for (int cursor = 0; cursor < intents.length; cursor++) {
-                Intent shadow = new Intent(RuntimePendingIntentRelayReceiver.ACTION);
+                Intent shadow = new Intent(intents[cursor]);
                 shadow.setComponent(new ComponentName(hostPackageName,
                         RuntimePendingIntentRelayReceiver.CLASS_NAME));
                 shadow.setPackage(hostPackageName);

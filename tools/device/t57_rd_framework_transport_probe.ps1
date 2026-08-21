@@ -137,7 +137,8 @@ try {
         'FRAMEWORK_PROBE_CROSS_PROVIDER_OBSERVER_PASS',
         'FRAMEWORK_PROBE_ACTIVITY_CONTRACT_PASS',
         'GUEST_ACTIVITY_PERSISTABLE_CREATE',
-        'FRAMEWORK_PROBE_TASK_REUSE_PASS',
+        'FRAMEWORK_PROBE_TASK_REUSE_LIFECYCLE',
+        'FRAMEWORK_PROBE_TASK_REUSE_COUNTS',
         'FRAMEWORK_PROBE_CROSS_ACTIVITY_PASS',
         'FRAMEWORK_PROBE_CROSS_SERVICE_BIND_PASS',
         'FRAMEWORK_PROBE_CROSS_PENDING_INTENT_PASS',
@@ -146,7 +147,7 @@ try {
         'FRAMEWORK_PROBE_REMOTE_STOP_PASS',
         'FRAMEWORK_PROBE_CROSS_STOP_PASS',
         'FRAMEWORK_PROBE_PASS',
-        'VIRTUAL_PENDING_INTENT_DELIVERY status=LAUNCH_PASS'
+        'VIRTUAL_PENDING_INTENT_DELIVERY status=BROADCAST_DELIVERED'
     )
     $log = ''
     # Cross-package/32-bit provider work may still be draining through the Companion before
@@ -155,7 +156,7 @@ try {
     # bounded, but allow the real cross-process transaction to settle.
     $markerDeadline = (Get-Date).AddSeconds(45)
     do {
-        $log = (& adb -s $device.Serial logcat -d -v threadtime | Out-String)
+        $log = (& adb -s $device.Serial logcat -d -v threadtime -s CS_RUNTIME:V CS_DIAGNOSTICS:V CS_FIXTURE:V CS_COMMAND:V '*:S' | Out-String)
         $missing = @($requiredMarkers | Where-Object {
             $log -notmatch [regex]::Escape($_)
         })

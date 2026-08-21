@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 
 import com.warden.controlledsandbox.runtime.component.service.GuestServiceStubNames;
+import com.warden.controlledsandbox.framework.identity.VirtualNotificationNamespace;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 
@@ -130,6 +131,7 @@ final class GuestServiceForegroundTransport implements AutoCloseable {
         Bundle state = routeBroker.invokeComponent(request);
         Object[] forwarded = args == null ? null : args.clone();
         rewriteFrameworkServiceComponent(forwarded);
+        Runnable restoreNotification = rewriteForegroundNotificationChannel(forwarded);
         try {
             Object result = method.invoke(activityManager, forwarded);
             synchronized (foregroundTypes) {
@@ -137,14 +139,59 @@ final class GuestServiceForegroundTransport implements AutoCloseable {
                 if (call.promote) foregroundCalls.put(token, call);
                 else foregroundCalls.remove(token);
             }
+            restoreNotification.run();
             return result;
         } catch (java.lang.reflect.InvocationTargetException error) {
+            restoreNotification.run();
             rollbackFrameworkForeground(info, call);
             throw error.getCause();
         } catch (Throwable error) {
+            restoreNotification.run();
             rollbackFrameworkForeground(info, call);
             throw error;
         }
+    }
+
+    /**
+     * NotificationManager creates the real host channel under the virtual namespace, while the
+     * Guest Notification object still carries the Guest-visible channel ID.  AMS validates the
+     * object when it receives setServiceForeground, so project only that nested field for the
+     * host call and restore it before control returns to the Guest Service.
+     */
+    private Runnable rewriteForegroundNotificationChannel(Object[] args) {
+        if (args == null) return () -> { };
+        for (Object value : args) {
+            if (value == null || !"android.app.Notification".equals(value.getClass().getName())) {
+                continue;
+            }
+            Field field = findOptionalField(value.getClass(), "mChannelId", "channelId");
+            if (field == null) return () -> { };
+            try {
+                field.setAccessible(true);
+                Object raw = field.get(value);
+                if (!(raw instanceof String guestChannel) || guestChannel.isEmpty()) {
+                    return () -> { };
+                }
+                String hostChannel = VirtualNotificationNamespace.hostChannelId(
+                        session.spec.packageName, session.spec.virtualUserId, guestChannel);
+                field.set(value, hostChannel);
+                return () -> {
+                    try {
+                        field.set(value, raw);
+                    } catch (ReflectiveOperationException | RuntimeException error) {
+                        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy
+                                .rethrowIfFatal(error);
+                        android.util.Log.e("CS_SERVICE_FRAMEWORK",
+                                "foreground notification channel restore failed", error);
+                    }
+                };
+            } catch (ReflectiveOperationException | RuntimeException error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                throw new IllegalStateException("FRAMEWORK_FOREGROUND_NOTIFICATION_CHANNEL_REWRITE_FAILED",
+                        error);
+            }
+        }
+        return () -> { };
     }
 
     private Object getFrameworkServiceForegroundType(ServiceInfo info, IBinder token,
@@ -206,6 +253,14 @@ final class GuestServiceForegroundTransport implements AutoCloseable {
             catch (NoSuchFieldException ignored) { cursor = cursor.getSuperclass(); }
         }
         throw new NoSuchFieldException(type.getName() + "." + name);
+    }
+
+    private static Field findOptionalField(Class<?> type, String... names) {
+        for (String name : names) {
+            try { return findField(type, name); }
+            catch (NoSuchFieldException ignored) { }
+        }
+        return null;
     }
 
     private static int optionalIntField(Object target, String name) {

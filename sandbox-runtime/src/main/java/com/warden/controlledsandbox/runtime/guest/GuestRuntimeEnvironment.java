@@ -581,6 +581,11 @@ public final class GuestRuntimeEnvironment {
         try {
             opened = spec.apkDescriptor.dup();
             input = new FileInputStream(opened.getFileDescriptor());
+            // The descriptor crosses several Binder parcels before it reaches an
+            // isolated process.  It may share an open-file description whose offset
+            // was advanced by an earlier capability hop; capability validation must
+            // inspect the APK header from the beginning of the artifact.
+            input.getChannel().position(0L);
             byte[] probe = new byte[4];
             int read = input.read(probe);
             if (read != 4 || probe[0] != 'P' || probe[1] != 'K') {

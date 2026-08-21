@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.framework.core;
 import com.warden.controlledsandbox.framework.contract.InvocationMethodMatcher;
 
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
+import com.warden.controlledsandbox.framework.identity.VirtualNotificationNamespace;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceState;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import com.warden.controlledsandbox.framework.identity.VirtualPendingIntentToken;
@@ -812,12 +813,12 @@ public final class VirtualSystemServiceInterceptor {
     }
 
     private String channelNamespace(String value) {
-        String prefix = "cs.u" + identity.virtualUserId() + "." + identity.packageName() + ".";
-        return value.startsWith(prefix) ? value : prefix + value;
+        return VirtualNotificationNamespace.hostChannelId(identity.packageName(),
+                identity.virtualUserId(), value);
     }
     private String stripChannelNamespace(String value) {
-        String prefix = "cs.u" + identity.virtualUserId() + "." + identity.packageName() + ".";
-        return value.startsWith(prefix) ? value.substring(prefix.length()) : value;
+        return VirtualNotificationNamespace.guestChannelId(identity.packageName(),
+                identity.virtualUserId(), value);
     }
 
     private void rewriteChannelStrings(Object[] arguments, List<Restore> restores, String methodName) {

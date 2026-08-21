@@ -38,6 +38,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
     private final GuestRuntimeEnvironment.Session session;
     private final Map<Activity, Launch> launches =
             Collections.synchronizedMap(new IdentityHashMap<>());
+    private final Map<Activity, Boolean> staleRouteActivities =
+            Collections.synchronizedMap(new IdentityHashMap<>());
     private final ExecutorService events = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "cs-framework-activity-events");
         thread.setDaemon(true);
@@ -84,6 +86,15 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
             Bundle consumed = consume(route.token);
             if (!"ROUTE_GRANTED".equals(consumed.getString(RuntimeKeys.STATUS, ""))) {
+                if (isStaleRouteFailure(consumed)) {
+                    // ActivityTaskManager/OEM task recovery can replay the original Host
+                    // trampoline after the virtual Activity has already finalized its one-time
+                    // route.  Do not turn that stale framework transaction into a Guest
+                    // instantiation crash.  Re-enter the real Host trampoline, whose normal
+                    // stale-route path discards only the replayed task; no Guest lifecycle or
+                    // success event is synthesized.
+                    return instantiateStaleHostActivity(classLoader, route, intent, consumed);
+                }
                 throw new IllegalStateException(consumed.getString(RuntimeKeys.ERROR_TYPE,
                         "ACTIVITY_ROUTE_NOT_GRANTED"));
             }
@@ -138,6 +149,66 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     "GUEST_ACTIVITY_FRAMEWORK_INSTANTIATION_FAILED:" + error.getMessage());
             failure.initCause(error);
             throw failure;
+        }
+    }
+
+    private Activity instantiateStaleHostActivity(ClassLoader frameworkClassLoader, Launch route,
+                                                   Intent intent, Bundle consumed)
+            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+        String physical = route.physicalActivityComponent == null
+                ? "" : route.physicalActivityComponent.trim();
+        if (!isHostStubComponent(physical)) {
+            throw new IllegalStateException("ACTIVITY_ROUTE_REPLAY_HOST_COMPONENT_INVALID");
+        }
+        Bundle evidence = new Bundle();
+        evidence.putString(RuntimeKeys.ROUTE_TOKEN, route.token);
+        evidence.putString(RuntimeKeys.ACTIVITY_TOKEN, route.activityToken);
+        evidence.putString(RuntimeKeys.COMPONENT_CLASS, route.component);
+        evidence.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT, physical);
+        evidence.putString(RuntimeKeys.ERROR_TYPE, consumed.getString(RuntimeKeys.ERROR_TYPE,
+                consumed.getString(RuntimeKeys.ERROR_MESSAGE, "STALE_ROUTE")));
+        RuntimeEventLog.event("GUEST_ACTIVITY_FRAMEWORK_ROUTE_REPLAY_DROPPED", evidence);
+        android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                "STALE_ROUTE_REPLAY_DROPPED route=" + route.token
+                        + " component=" + route.component + " physical=" + physical);
+        ClassLoader hostClassLoader = GuestActivityThreadInstrumentation.class.getClassLoader();
+        if (hostClassLoader == null) hostClassLoader = frameworkClassLoader;
+        Activity stale = delegate.newActivity(hostClassLoader, Activity.class.getName(), intent);
+        if (stale == null) throw new IllegalStateException("STALE_ROUTE_ACTIVITY_UNAVAILABLE");
+        staleRouteActivities.put(stale, Boolean.TRUE);
+        return stale;
+    }
+
+    private static boolean isStaleRouteFailure(Bundle result) {
+        if (result == null) return false;
+        return containsStaleRouteCode(result.getString(RuntimeKeys.ERROR_TYPE, ""))
+                || containsStaleRouteCode(result.getString(RuntimeKeys.ERROR_MESSAGE, ""));
+    }
+
+    private static boolean containsStaleRouteCode(String value) {
+        return "SESSION_OR_GENERATION_MISMATCH".equals(value)
+                || "SESSION_NOT_FOUND".equals(value)
+                || "ACTIVITY_TRANSACTION_NOT_FOUND".equals(value)
+                || "ACTIVITY_ROUTE_ALREADY_CONSUMED".equals(value)
+                || "ACTIVITY_ROUTE_EXPIRED_OR_CONSUMED".equals(value)
+                || "ACTIVITY_ROUTE_ENVELOPE_MISSING".equals(value);
+    }
+
+    private static boolean isHostStubComponent(String component) {
+        String prefix = "com.warden.controlledsandbox.runtime.component.activity.StubActivity";
+        if (!component.startsWith(prefix) || component.length() == prefix.length()) return false;
+        for (int index = prefix.length(); index < component.length(); index++) {
+            if (!Character.isLetterOrDigit(component.charAt(index))) return false;
+        }
+        return true;
+    }
+
+    private static void finishStaleRouteActivity(Activity activity) {
+        try {
+            activity.finishAndRemoveTask();
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            activity.finish();
         }
     }
 
@@ -228,6 +299,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         Launch route = launches.get(activity);
         if (route == null) {
             delegate.callActivityOnCreate(activity, state);
+            if (staleRouteActivities.remove(activity) != null) finishStaleRouteActivity(activity);
             return;
         }
         android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_TWO_ARG component="
@@ -259,6 +331,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         Launch route = launches.get(activity);
         if (route == null) {
             delegate.callActivityOnCreate(activity, state, persistentState);
+            if (staleRouteActivities.remove(activity) != null) finishStaleRouteActivity(activity);
             return;
         }
         android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_THREE_ARG component="
@@ -848,6 +921,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "restore instrumentation failed", error);
         }
         launches.clear();
+        staleRouteActivities.clear();
     }
 
     private Launch route(Intent intent) {
