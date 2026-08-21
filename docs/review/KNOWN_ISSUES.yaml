@@ -736,7 +736,7 @@ issues:
     capability: android_oem_compatibility
     classification: TEST_EVIDENCE_GAP
     severity: HIGH
-    status: RECORDED
+    status: FIXED
     discovered_by: C0-T02 build baseline
     evidence:
       - verification/catch-up/C0-T02/build-baseline-blocked.md
@@ -745,11 +745,39 @@ issues:
     match_patterns:
       - com.android.tools.build:aapt2:8.11.1-12782657
       - Checksums are missing from verification metadata
-    blocks_current_campaign: true
+    blocks_current_campaign: false
     fix_policy: TRUSTED_ARTIFACT_REVIEW_REQUIRED_NO_VERIFICATION_BYPASS
     notes: >
-      The locked Android toolchain and Gradle dependency-lock checks pass, but
-      the first offline device-test build is fail-closed because the aapt2 POM
-      has no checksum entry in gradle/verification-metadata.xml. Review the
-      artifact provenance and add verified metadata, or restore a cache artifact
-      matching existing metadata, before rerunning the exact build command.
+      Official Google Maven POM/JAR bytes were compared with the cache, exact
+      SHA-256 entries were added to verification-metadata.xml, the reviewed
+      coordinate manifest and provenance were updated, and both strict Gradle
+      resolution and the M5-T19.1-U gate pass. The original metadata blocker is
+      closed; the recovery build exposed the separate fixture lint blocker below.
+
+  - issue_id: KI-R03-BUILD-002
+    title: Device-test fixture check fails on unguarded API and permission probes
+    capability: android_oem_compatibility
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C0-T02 recovery build
+    evidence:
+      - verification/catch-up/C0-T02/build-baseline-blocked.md
+      - fixture-compat32/build/reports/lint-results-debug.txt
+      - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/CapabilityProbeActivity.java
+      - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FrameworkProbeActivity.java
+    match_patterns:
+      - MissingPermission
+      - NewApi
+      - WrongConstant
+      - SoonBlockedPrivateApi
+    blocks_current_campaign: true
+    fix_policy: FIXTURE_LINT_REMEDIATION_REVIEW_REQUIRED
+    notes: >
+      The first recovery run reaches the Gradle check/lint stage but fails with
+      43 errors and 30 warnings. The report includes privileged telephony,
+      location, Wi-Fi and camera permission diagnostics, API 28-30 guards,
+      WrongConstant findings, and a SoonBlockedPrivateApi finding. Do not make
+      the build pass by hiding runtime defects with a blanket lint suppression;
+      review the package-neutral fixture probes, add explicit guards/annotations
+      where semantically correct, and rerun the locked build.

@@ -88,3 +88,40 @@ a cache artifact matching already approved metadata. Then rerun the exact
 locked command above and require all three APKs plus their SHA-256 evidence.
 Do not use dependency-verification bypass flags or mark C0-T02 complete from
 this failed run.
+
+## Recovery attempt — still BLOCKED
+
+- Recovery window: 2026-08-21 12:36–12:42 (Asia/Shanghai)
+- Recovery baseline: `90ddc49a9a4e62cdbe238eb7c55436714d8044a8`
+- Official source checked: Google Maven
+  (`https://dl.google.com/dl/android/maven2/com/android/tools/build/aapt2/8.11.1-12782657/`)
+- Official POM SHA-256: `43f1683656c6fcd2f24070bd781948427af61a67eb31a9a92fc0ffab9fc0953b`
+- Official Windows JAR SHA-256: `3ac122c7fc5a6b8bd5fd4b65b94fd00afc7ec69f51a00245fa05803517a588a7`
+- The official POM/JAR bytes and detached signatures matched the cached files.
+  The local environment has no `gpg` executable, so no standalone local GPG
+  verification is claimed; Gradle's strict verification and the repository's
+  existing `com.android.tools.build` trusted-key configuration remain the
+  enforcement path.
+- Changed governance files: `gradle/verification-metadata.xml`,
+  `gradle/reviewed-dependency-coordinates.json`, and
+  `gradle/dependency-verification-provenance.json`.
+- Recovery preflight: Android environment lock PASS; wrapper checksum PASS;
+  Gradle lock state PASS (48 files, 0 coordinates); M5-T19.1-U supply-chain
+  governance PASS; strict offline Gradle `help` PASS.
+
+The first post-recovery run of the exact command
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-device-test-apks.ps1`
+reached the Gradle `check`/lint stage but failed with `43 errors` and `30
+warnings`. The primary report is:
+
+`fixture-compat32/build/reports/lint-results-debug.txt`
+
+The first errors are package-neutral fixture probe findings in
+`fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/CapabilityProbeActivity.java`
+(`getImei`, `getMeid`, `getSubscriberId`, `getSimSerialNumber`, cell info,
+Wi-Fi scan, location, camera and `Build.getSerial`), followed by `NewApi`,
+`WrongConstant`, and `SoonBlockedPrivateApi` findings in the framework probes.
+No Host, fixture, or Companion32 APK was produced, and no second build was
+attempted after this failure. This recovery attempt is therefore still
+`BLOCKED` as `KI-R03-BUILD-002`; the next recovery must review the fixture
+semantics and lint findings before another exact build run.

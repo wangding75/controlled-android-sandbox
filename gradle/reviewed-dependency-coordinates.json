@@ -32,6 +32,7 @@
     "com.android.tools.build.jetifier:jetifier-core:1.0.0-beta10",
     "com.android.tools.build.jetifier:jetifier-processor:1.0.0-beta10",
     "com.android.tools.build:aapt2-proto:8.11.1-12782657",
+    "com.android.tools.build:aapt2:8.11.1-12782657",
     "com.android.tools.build:aaptcompiler:8.11.1",
     "com.android.tools.build:builder-model:8.11.1",
     "com.android.tools.build:builder-test-api:8.11.1",

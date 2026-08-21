@@ -8,11 +8,12 @@
     "verificationKeyringBlob": "733a758ae6062d68573bd180def799f98b45736e",
     "transformations": [
       "Removed all imported <trusted-artifacts> exceptions so every resolved artifact must have a reviewed signature or exact checksum.",
-      "Added exact SHA-256 entries for com.android.tools.build:gradle:8.11.1 JAR and POM."
+      "Added exact SHA-256 entries for com.android.tools.build:gradle:8.11.1 JAR and POM.",
+      "Added exact SHA-256 entries for com.android.tools.build:aapt2:8.11.1-12782657 Windows JAR and POM after official Google Maven byte comparison."
     ]
   },
   "files": {
-    "gradle/verification-metadata.xml": "a6181618356a5bff7f1462dee3ddfce055755ccbc4a912828915627a44ddedd4",
+    "gradle/verification-metadata.xml": "b78a4511ae4e07270812bd87fc91803dc92b8232ca7ba5b27392c2c97d72dc66",
     "gradle/verification-keyring.keys": "3549af9040eca933521a27e5b9c08199e5c020ad784a1a5190bcece35f96b438"
   },
   "policy": {
@@ -33,7 +34,7 @@
   },
   "reviewedCoordinateManifest": {
     "path": "gradle/reviewed-dependency-coordinates.json",
-    "sha256": "25e280b9b8b76c814dc51a58353add68eae8508eb95a4f0884106cf08337606b",
-    "coordinateCount": 57
+    "sha256": "4a434d82af2e69b59bcb52da30d5362d3e01c66e632c524cda9a748581aa1b58",
+    "coordinateCount": 58
   }
 }

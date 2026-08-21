@@ -792,6 +792,14 @@
             <sha256 value="5c4df7b2e31f17f20e4b8dbd62a2b7865a09a49a1fd2931a359fd394ecb9b5a5" origin="Google Maven SHA-256" reason="Reviewed T04 strict verification metadata"/>
          </artifact>
       </component>
+      <component group="com.android.tools.build" name="aapt2" version="8.11.1-12782657">
+         <artifact name="aapt2-8.11.1-12782657-windows.jar">
+            <sha256 value="3ac122c7fc5a6b8bd5fd4b65b94fd00afc7ec69f51a00245fa05803517a588a7" origin="Google Maven SHA-256" reason="Reviewed C0-T02 recovery against official Google Maven artifact"/>
+         </artifact>
+         <artifact name="aapt2-8.11.1-12782657.pom">
+            <sha256 value="43f1683656c6fcd2f24070bd781948427af61a67eb31a9a92fc0ffab9fc0953b" origin="Google Maven SHA-256" reason="Reviewed C0-T02 recovery against official Google Maven metadata"/>
+         </artifact>
+      </component>
       <component group="com.android.tools.build" name="transform-api" version="2.0.0-deprecated-use-gradle-api">
          <artifact name="transform-api-2.0.0-deprecated-use-gradle-api.jar">
             <sha256 value="4de4a3d05e1c534c2db9e4588bf34082bb2bd232d8abb9727c430290ce225740" origin="Google Maven SHA-256" reason="Reviewed T04 strict verification artifact"/>
