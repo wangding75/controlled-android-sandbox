@@ -135,17 +135,19 @@ def probe_classloader(serial: str) -> dict[str, Any]:
 def probe_ordinary_slots(serial: str) -> dict[str, Any]:
     rows = []
     for slot in ORDINARY_TARGETS:
+        command = [
+            "--es", "command", "slot-campaign",
+            "--es", "package", GUEST_PACKAGE,
+            "--ei", "user", "0",
+            "--ez", "trustNativeGuest", "true",
+            "--ei", "slotTarget", str(slot),
+            "--ez", "startService", "true",
+        ]
+        if slot > 0:
+            command.extend(["--es", "processName", f"{GUEST_PACKAGE}:remote"])
         payload = debug_command(
             serial,
-            [
-                "--es", "command", "slot-campaign",
-                "--es", "package", GUEST_PACKAGE,
-                "--ei", "user", "0",
-                "--ez", "trustNativeGuest", "true",
-                "--ei", "slotTarget", str(slot),
-                "--es", "processName", f"{GUEST_PACKAGE}:remote" if slot > 0 else "",
-                "--ez", "startService", "true",
-            ],
+            command,
             deadline_sec=120,
         )
         operation = ((payload.get("result") or {}).get("operation") or {})

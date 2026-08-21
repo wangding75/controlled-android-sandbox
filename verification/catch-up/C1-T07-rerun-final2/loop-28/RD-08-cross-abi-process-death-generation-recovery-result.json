@@ -1,0 +1,75 @@
+﻿{
+    "case":  "RD-08-cross-abi-process-death-generation-recovery",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "status":  "PASS",
+    "killedPid":  4841,
+    "recoveredPid":  4886,
+    "firstGeneration":  1,
+    "secondGeneration":  2,
+    "prepare":  {
+                    "command":  "import-prepare",
+                    "package":  "com.warden.controlledsandbox.fixture32",
+                    "virtualUserId":  0,
+                    "trustNativeGuest":  true,
+                    "requestId":  "",
+                    "startedAt":  1787334213460,
+                    "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                    "operation":  {
+                                      "status":  "PREPARED",
+                                      "errorType":  "",
+                                      "errorMessage":  "",
+                                      "sessionId":  "9fedde09-d5e8-487a-9614-428eec7ee859",
+                                      "generation":  1,
+                                      "processSlot":  22,
+                                      "platformPid":  4767,
+                                      "pid":  4767,
+                                      "isolatedProcess":  false,
+                                      "processName":  "com.warden.controlledsandbox.fixture32",
+                                      "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                  },
+                    "companion":  {
+                                      "successful":  true,
+                                      "operation":  "PROBE",
+                                      "requestedAbi":  "x86",
+                                      "processBitness":  32,
+                                      "acceptedGeneration":  1,
+                                      "nativeStatus":  "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+                                      "errorType":  "",
+                                      "errorMessage":  ""
+                                  },
+                    "status":  "PASS"
+                },
+    "second":  {
+                   "command":  "prepare",
+                   "package":  "com.warden.controlledsandbox.fixture32",
+                   "virtualUserId":  0,
+                   "trustNativeGuest":  true,
+                   "requestId":  "",
+                   "startedAt":  1787334218290,
+                   "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                   "operation":  {
+                                     "status":  "ALREADY_PREPARED",
+                                     "errorType":  "",
+                                     "errorMessage":  "",
+                                     "sessionId":  "1982c2ab-cd55-49c3-bbc5-1e4af219eaaf",
+                                     "generation":  2,
+                                     "processSlot":  22,
+                                     "platformPid":  0,
+                                     "processName":  "com.warden.controlledsandbox.fixture32",
+                                     "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                 },
+                   "companion":  {
+                                     "successful":  true,
+                                     "operation":  "PROBE",
+                                     "requestedAbi":  "x86",
+                                     "processBitness":  32,
+                                     "acceptedGeneration":  1,
+                                     "nativeStatus":  "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+                                     "errorType":  "",
+                                     "errorMessage":  ""
+                                 },
+                   "status":  "PASS"
+               },
+    "deathMarker":  "GUEST_PROCESS_DISCONNECTED"
+}

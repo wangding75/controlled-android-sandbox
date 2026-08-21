@@ -1,0 +1,10 @@
+﻿{
+    "case":  "RD-08-cross-abi-process-death-generation-recovery",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "status":  "BLOCKED",
+    "error":  "CROSS_ABI_RECOVERY_FATAL_MARKER_PRESENT: 08-22 01:11:19.716 13053 13053 E AndroidRuntime: FATAL EXCEPTION: main\r\n",
+    "markerLines":  [
+                        "08-22 01:11:19.716 13053 13053 E AndroidRuntime: FATAL EXCEPTION: main"
+                    ]
+}

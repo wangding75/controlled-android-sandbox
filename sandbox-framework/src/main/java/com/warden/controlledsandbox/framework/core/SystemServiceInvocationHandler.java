@@ -252,6 +252,18 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 interactionCall.onFailure();
                 virtualCall.onFailure();
                 if (capabilityInterceptor != null) capabilityInterceptor.afterFailure(capabilityCall, cause);
+                if (isRecoverableStaleInputClient(method, cause)) {
+                    // Android's InputMethodManager keeps a process-local client Binder. After a
+                    // Guest process death the new process has a new client, while the Host IME
+                    // service can still observe the old window transaction briefly. Treat only
+                    // this exact framework rejection as a failed input session so a transient
+                    // recovery race cannot crash the Guest; the next window-focus callback will
+                    // retry against the new generation.
+                    android.util.Log.w("CS_INTERACTION_PROXY",
+                            "INPUT_METHOD_STALE_CLIENT_RECOVERED method=" + method.getName()
+                                    + " message=" + String.valueOf(cause.getMessage()));
+                    return defaultValue(method.getReturnType());
+                }
                 throw cause;
             } catch (Throwable error) {
                 try {
@@ -268,6 +280,14 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             virtualCall.close();
             interactionCall.close();
         }
+    }
+
+    private boolean isRecoverableStaleInputClient(Method method, Throwable cause) {
+        if (!"inputmethod".equalsIgnoreCase(serviceName) || method == null
+                || !"startInputOrWindowGainedFocus".equals(method.getName())) return false;
+        if (!(cause instanceof IllegalArgumentException)) return false;
+        String message = cause.getMessage();
+        return message != null && message.startsWith("unknown client");
     }
 
     private Object activityManagerResult(Method method) {

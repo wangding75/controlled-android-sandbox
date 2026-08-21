@@ -1,0 +1,77 @@
+﻿{
+    "case":  "RD-08-cross-abi-process-death-generation-recovery",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "status":  "PASS",
+    "killedPid":  10087,
+    "recoveredPid":  10210,
+    "firstGeneration":  1,
+    "secondGeneration":  2,
+    "prepare":  {
+                    "command":  "import-prepare",
+                    "package":  "com.warden.controlledsandbox.fixture32",
+                    "virtualUserId":  0,
+                    "trustNativeGuest":  true,
+                    "requestId":  "",
+                    "startedAt":  1787334341571,
+                    "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                    "operation":  {
+                                      "status":  "PREPARED",
+                                      "errorType":  "",
+                                      "errorMessage":  "",
+                                      "sessionId":  "726fd14a-d92f-4690-8495-583c8fb17ea9",
+                                      "generation":  1,
+                                      "processSlot":  22,
+                                      "platformPid":  10013,
+                                      "pid":  10013,
+                                      "isolatedProcess":  false,
+                                      "processName":  "com.warden.controlledsandbox.fixture32",
+                                      "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                  },
+                    "companion":  {
+                                      "successful":  true,
+                                      "operation":  "PROBE",
+                                      "requestedAbi":  "x86",
+                                      "processBitness":  32,
+                                      "acceptedGeneration":  1,
+                                      "nativeStatus":  "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+                                      "errorType":  "",
+                                      "errorMessage":  ""
+                                  },
+                    "status":  "PASS"
+                },
+    "second":  {
+                   "command":  "prepare",
+                   "package":  "com.warden.controlledsandbox.fixture32",
+                   "virtualUserId":  0,
+                   "trustNativeGuest":  true,
+                   "requestId":  "",
+                   "startedAt":  1787334346813,
+                   "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                   "operation":  {
+                                     "status":  "PREPARED",
+                                     "errorType":  "",
+                                     "errorMessage":  "",
+                                     "sessionId":  "25bbf50a-99fb-4e92-8ec9-5e4a3658a054",
+                                     "generation":  2,
+                                     "processSlot":  22,
+                                     "platformPid":  10210,
+                                     "pid":  10210,
+                                     "isolatedProcess":  false,
+                                     "processName":  "com.warden.controlledsandbox.fixture32",
+                                     "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                 },
+                   "companion":  {
+                                     "successful":  true,
+                                     "operation":  "PROBE",
+                                     "requestedAbi":  "x86",
+                                     "processBitness":  32,
+                                     "acceptedGeneration":  1,
+                                     "nativeStatus":  "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+                                     "errorType":  "",
+                                     "errorMessage":  ""
+                                 },
+                   "status":  "PASS"
+               },
+    "deathMarker":  "GUEST_PROCESS_DISCONNECTED"
+}

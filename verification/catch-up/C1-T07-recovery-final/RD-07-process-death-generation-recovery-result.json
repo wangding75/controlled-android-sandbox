@@ -1,0 +1,41 @@
+﻿{
+    "case":  "RD-07-process-death-generation-recovery",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "status":  "PASS",
+    "pidKilled":  27644,
+    "firstGeneration":  1,
+    "secondGeneration":  2,
+    "first":  {
+                  "status":  "PASS",
+                  "operation":  {
+                                    "status":  "PREPARED",
+                                    "generation":  1,
+                                    "processSlot":  -1
+                                }
+              },
+    "second":  {
+                   "command":  "prepare",
+                   "package":  "com.warden.controlledsandbox.fixture",
+                   "virtualUserId":  0,
+                   "trustNativeGuest":  true,
+                   "requestId":  "",
+                   "startedAt":  1787336123911,
+                   "nativeGuestTrust":  "EXPLICITLY_TRUSTED",
+                   "operation":  {
+                                     "status":  "PREPARED",
+                                     "errorType":  "",
+                                     "errorMessage":  "",
+                                     "sessionId":  "f5e07ce3-2a17-456e-a9fb-517138a153c0",
+                                     "generation":  2,
+                                     "processSlot":  54,
+                                     "platformPid":  27725,
+                                     "pid":  27725,
+                                     "isolatedProcess":  false,
+                                     "processName":  "com.warden.controlledsandbox.fixture",
+                                     "componentClass":  "com.warden.controlledsandbox.fixture.MainActivity"
+                                 },
+                   "status":  "PASS"
+               },
+    "recoveredFrameworkService":  true
+}

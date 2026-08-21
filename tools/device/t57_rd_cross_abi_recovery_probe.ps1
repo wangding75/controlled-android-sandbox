@@ -10,11 +10,23 @@ $guestPackage = 'com.warden.controlledsandbox.fixture32'
 $activity = 'com.warden.controlledsandbox.fixture.MainActivity'
 $guestProcessPattern = "$( [regex]::Escape($guestPackage) )(?:\:\S+)?(?:\s|$)"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$finalLog = ''
+$fatalLines = @()
 
 function Invoke-AdbChecked([string[]]$Arguments) {
-    $output = & adb @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "ADB_COMMAND_FAILED:$($Arguments -join ' ')" }
-    return $output
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $output = & adb @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { return $output }
+        $text = ($output | Out-String)
+        if ($text -match '(?i)daemon.*not running|cannot connect|device offline') {
+            & adb start-server 2>$null | Out-Null
+            Start-Sleep -Seconds $attempt
+            continue
+        }
+        throw "ADB_COMMAND_FAILED:$($Arguments -join ' ') exit=$exitCode output=$text"
+    }
+    throw "ADB_COMMAND_FAILED_AFTER_RETRY:$($Arguments -join ' ')"
 }
 
 function Read-CommandResult([object]$Device, [datetime]$Deadline) {
@@ -53,7 +65,9 @@ function Invoke-DebugCommand([object]$Device, [string]$Command, [hashtable]$Extr
 }
 
 function Read-Log([object]$Device) {
-    return (Invoke-AdbChecked @('-s', $Device.Serial, 'logcat', '-d', '-v', 'threadtime') |
+    return (Invoke-AdbChecked @('-s', $Device.Serial, 'logcat', '-d', '-v', 'threadtime',
+        '-s', 'CS_RUNTIME:V', 'CS_FIXTURE:V', 'CS_COMMAND:V', 'CS_NATIVE_BIND:V',
+        'AndroidRuntime:E', 'ActivityManager:E', 'InputMethodManagerService:E', '*:S') |
         Out-String)
 }
 
@@ -157,13 +171,16 @@ try {
     if ($secondPrepared.log -notmatch "(?m)^.*\s$($secondPrepared.pid)\s+\S+\s+I\s+CS_FIXTURE:\s+NATIVE_LOAD JNI_LOADED") {
         throw "CROSS_ABI_NATIVE_LOAD_MARKER_MISSING:secondPid=$($secondPrepared.pid)"
     }
+    $null = Write-T57RdEvidence -Device $device -CaseName $caseName -OutputDirectory $OutputDirectory
     $finalLog = Read-Log $device
-    if ($finalLog -match 'FRAMEWORK_SERVICE_EVENT_REJECTED|STALE_GENERATION|LAUNCH_GATE_FAILED|FATAL EXCEPTION|ANR in') {
-        throw 'CROSS_ABI_RECOVERY_FATAL_MARKER_PRESENT'
+    $finalLog | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$caseName-full-logcat.txt")
+    $fatalLines = @($finalLog -split "`r?`n" | Where-Object {
+        $_ -match 'FRAMEWORK_SERVICE_EVENT_REJECTED|STALE_GENERATION|LAUNCH_GATE_FAILED|FATAL EXCEPTION|ANR in'
+    })
+    if ($fatalLines.Count -gt 0) {
+        throw "CROSS_ABI_RECOVERY_FATAL_MARKER_PRESENT: $($fatalLines | Select-Object -Last 5 | Out-String)"
     }
 
-    $null = Write-T57RdEvidence -Device $device -CaseName $caseName -OutputDirectory $OutputDirectory
-    $finalLog | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$caseName-full-logcat.txt")
     [pscustomobject]@{
         case = $caseName; serial = $device.Serial; api = $device.API; status = 'PASS'
         killedPid = $first.pid; recoveredPid = $secondPrepared.pid
@@ -173,6 +190,13 @@ try {
     Write-Output "RESULT: PASS case=$caseName serial=$($device.Serial) api=$($device.API)"
     exit 0
 } catch {
+    if ($finalLog) {
+        $finalLog | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$caseName-full-logcat.txt")
+    }
+    [pscustomobject]@{
+        case = $caseName; serial = if ($device) { $device.Serial } else { '' }; api = if ($device) { $device.API } else { '' }
+        status = 'BLOCKED'; error = $_.Exception.Message; markerLines = $fatalLines
+    } | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 (Join-Path $OutputDirectory "$caseName-result.json")
     Write-Error $_
     Write-Output "RESULT: BLOCKED case=$caseName reason=$($_.Exception.Message)"
     exit 1

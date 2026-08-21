@@ -1,0 +1,26 @@
+﻿{
+    "case":  "RD-08-cross-abi-process-death-generation-recovery",
+    "instanceName":  "RD测试",
+    "serial":  "127.0.0.1:16416",
+    "model":  "22041211A",
+    "device":  "rubens",
+    "api":  "32",
+    "android":  "12",
+    "bootId":  "7cac15ce-d76e-44ea-968b-959d91d03be7",
+    "capturedAt":  "2026-08-21T17:47:13.1203418Z",
+    "gitHead":  "f36775d458ba330b350cba74710e5fa858c68927",
+    "gitTree":  [
+                    " M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md",
+                    " M sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+                    " M tools/device/t57_rd_c1_t07_process_abi_recovery.ps1",
+                    " M tools/device/t57_rd_cross_abi_recovery_probe.ps1",
+                    "?? verification/catch-up/C1-T07-diagnostic/",
+                    "?? verification/catch-up/C1-T07-rerun-final/",
+                    "?? verification/catch-up/C1-T07-rerun-final2/",
+                    "?? verification/catch-up/C1-T07-rerun-fixed/",
+                    "?? verification/catch-up/C1-T07-rerun-fixed2/",
+                    "?? verification/catch-up/C1-T07-single-adb-retry/",
+                    "?? verification/catch-up/C1-T07-single-filtered/",
+                    "?? verification/catch-up/C1-T07-single-fixed/"
+                ]
+}

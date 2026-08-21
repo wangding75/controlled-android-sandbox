@@ -1,0 +1,263 @@
+﻿{
+    "task":  "C1-T07",
+    "status":  "PASS",
+    "loops":  50,
+    "instanceName":  "RD测试",
+    "serial":  "127.0.0.1:16416",
+    "api":  "32",
+    "abiList":  "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "startedUtc":  "2026-08-21T17:38:26.0612085Z",
+    "endedUtc":  "2026-08-21T17:48:00.4151192Z",
+    "results":  [
+                    {
+                        "loop":  1,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  2,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  3,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  4,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  5,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  6,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  7,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  8,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  9,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  10,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  11,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  12,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  13,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  14,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  15,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  16,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  17,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  18,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  19,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  20,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  21,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  22,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  23,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  24,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  25,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  26,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  27,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  28,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  29,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  30,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  31,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  32,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  33,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  34,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  35,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  36,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  37,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  38,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  39,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  40,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  41,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  42,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  43,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  44,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  45,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  46,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  47,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  48,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  49,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    },
+                    {
+                        "loop":  50,
+                        "status":  "PASS",
+                        "outputTail":  "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32"
+                    }
+                ]
+}
