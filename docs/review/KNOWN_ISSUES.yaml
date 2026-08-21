@@ -755,29 +755,35 @@ issues:
       closed; the recovery build exposed the separate fixture lint blocker below.
 
   - issue_id: KI-R03-BUILD-002
-    title: Device-test fixture check fails on unguarded API and permission probes
+    title: Device-test build check previously failed on unguarded API and permission probes
     capability: android_oem_compatibility
     classification: CURRENT_DEFECT
     severity: HIGH
-    status: RECORDED
+    status: FIXED
     discovered_by: C0-T02 recovery build
     evidence:
       - verification/catch-up/C0-T02/build-baseline-blocked.md
       - fixture-compat32/build/reports/lint-results-debug.txt
       - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/CapabilityProbeActivity.java
       - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FrameworkProbeActivity.java
+      - sandbox-framework/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+      - sandbox-runtime/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+      - app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt
+      - artifacts/m5-device-test-build/b35ca0feccf6/build-manifest.json
     match_patterns:
       - MissingPermission
       - NewApi
       - WrongConstant
       - SoonBlockedPrivateApi
-    blocks_current_campaign: true
-    fix_policy: FIXTURE_LINT_REMEDIATION_REVIEW_REQUIRED
+    blocks_current_campaign: false
+    fix_policy: TARGETED_LINT_REMEDIATION_WITH_EXPLICIT_API_GUARDS
     notes: >
-      The first recovery run reaches the Gradle check/lint stage but fails with
-      43 errors and 30 warnings. The report includes privileged telephony,
-      location, Wi-Fi and camera permission diagnostics, API 28-30 guards,
-      WrongConstant findings, and a SoonBlockedPrivateApi finding. Do not make
-      the build pass by hiding runtime defects with a blanket lint suppression;
-      review the package-neutral fixture probes, add explicit guards/annotations
-      where semantically correct, and rerun the locked build.
+      The first recovery run reached the Gradle check/lint stage but failed with
+      43 errors and 30 warnings. Targeted fixture permission annotations,
+      explicit API guards, SDK service constants, the optional camera feature,
+      and a private-API probe annotation closed the original findings. The
+      subsequent full-build lint pass also required explicit compatibility
+      handling in sandbox-framework, sandbox-runtime, and app. The exact locked
+      build now succeeds twice and produces byte-identical Host, fixture, and
+      Companion32 APKs. No blanket lint suppression or verification bypass was
+      used.

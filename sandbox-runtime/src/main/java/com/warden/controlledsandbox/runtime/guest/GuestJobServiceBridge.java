@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.PersistableBundle;
 import com.warden.controlledsandbox.framework.identity.VirtualSystemServiceAuthority;
 import com.warden.controlledsandbox.contract.VirtualJobWorkItemSnapshot;
@@ -178,7 +179,8 @@ final class GuestJobServiceBridge implements AutoCloseable {
                 // semantic exception to the normal component lifecycle.
                 Service instantiated = GuestComponentFactory.instantiateService(
                         GuestDefiningLoader.of(session),
-                        session.context.getApplicationInfo().appComponentFactory,
+                        GuestApplicationInfoFactory.readComponentFactory(
+                                session.context.getApplicationInfo()),
                         className, new Intent("android.app.job.JobService"));
                 if (!(instantiated instanceof JobService)) {
                     throw new IllegalArgumentException("Factory did not create a JobService: "
@@ -300,7 +302,8 @@ final class GuestJobServiceBridge implements AutoCloseable {
                 if (reply != null) {
                     reply.writeNoException();
                     if (item == null) reply.writeInt(0);
-                    else { reply.writeInt(1); item.writeToParcel(reply, 1); }
+                    else { reply.writeInt(1); item.writeToParcel(reply,
+                            Parcelable.PARCELABLE_WRITE_RETURN_VALUE); }
                 }
                 return true;
             }

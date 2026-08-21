@@ -10,7 +10,7 @@ import java.lang.reflect.InvocationTargetException;
  * return null from {@code getSystemService("telecom")}, which production apps treat as fatal.
  */
 public final class TelecomServiceHook {
-    private static final String SERVICE = "telecom";
+    private static final String SERVICE = Context.TELECOM_SERVICE;
     private static final String MANAGER = "android.telecom.TelecomManager";
 
     private TelecomServiceHook() { }

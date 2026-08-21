@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <permission
         android:name="com.warden.controlledsandbox.permission.BIND_NATIVE_COMPANION"
         android:protectionLevel="signature" />
@@ -23,7 +24,8 @@
     <!-- API 32 fixture media import still uses the legacy read gate. -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <!-- Product installed-app discovery requires visibility of user-installed packages. -->
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <queries>

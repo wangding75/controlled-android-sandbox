@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.fixture;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -90,8 +91,9 @@ public final class CapabilityProbeActivity extends Activity {
         Log.i(TAG, "PROBE " + result);
     }
 
+    @SuppressLint("MissingPermission")
     private void telephony(JSONObject result) throws Exception {
-        Object namedService = getSystemService("phone");
+        Object namedService = getSystemService(Context.TELEPHONY_SERVICE);
         result.put("phoneServiceClass", namedService == null ? "null"
                 : namedService.getClass().getName());
         TelephonyManager telephony = namedService instanceof TelephonyManager
@@ -119,8 +121,12 @@ public final class CapabilityProbeActivity extends Activity {
                 result.put("cellType", cell.getClass().getName());
                 if (cell instanceof android.telephony.CellInfoLte lte) {
                     android.telephony.CellIdentityLte id = lte.getCellIdentity();
-                    result.put("cellMcc", id.getMccString()).put("cellMnc", id.getMncString())
-                            .put("cellTac", id.getTac()).put("cellCid", id.getCi())
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        result.put("cellMcc", id.getMccString()).put("cellMnc", id.getMncString());
+                    } else {
+                        result.put("cellMcc", id.getMcc()).put("cellMnc", id.getMnc());
+                    }
+                    result.put("cellTac", id.getTac()).put("cellCid", id.getCi())
                             .put("cellPci", id.getPci()).put("cellEarfcn", id.getEarfcn())
                             .put("cellRegistered", lte.isRegistered());
                 }
@@ -128,6 +134,7 @@ public final class CapabilityProbeActivity extends Activity {
         } catch (Throwable error) { result.put("cellError", error.getClass().getSimpleName()); }
     }
 
+    @SuppressLint("MissingPermission")
     private void wifi(JSONObject result) throws Exception {
         WifiManager wifi = getSystemService(WifiManager.class);
         if (wifi == null) return;
@@ -140,6 +147,7 @@ public final class CapabilityProbeActivity extends Activity {
         catch (Throwable error) { result.put("scanError", error.getClass().getSimpleName()); }
     }
 
+    @SuppressLint("MissingPermission")
     private void location(JSONObject result) throws Exception {
         locationManager = getSystemService(LocationManager.class);
         if (locationManager == null) return;
@@ -159,6 +167,7 @@ public final class CapabilityProbeActivity extends Activity {
         catch (Throwable error) { result.put("callbackError", error.getClass().getSimpleName()); }
     }
 
+    @SuppressLint("MissingPermission")
     private void camera(JSONObject result) throws Exception {
         CameraManager camera = getSystemService(CameraManager.class);
         if (camera == null) return;
@@ -290,6 +299,7 @@ public final class CapabilityProbeActivity extends Activity {
                 .put(prefix + "Time", value.getTime()).put(prefix + "ElapsedRealtimeNanos", value.getElapsedRealtimeNanos());
     }
 
+    @SuppressLint("MissingPermission")
     private static String serial() {
         try { return Build.getSerial(); } catch (Throwable error) { return "ERROR:" + error.getClass().getSimpleName(); }
     }

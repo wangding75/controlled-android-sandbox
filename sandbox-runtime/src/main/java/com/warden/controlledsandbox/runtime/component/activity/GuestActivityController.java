@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.guest.GuestRuntimeEnvironment;
 import com.warden.controlledsandbox.runtime.guest.GuestActivityResultBridge;
 import com.warden.controlledsandbox.runtime.guest.GuestComponentFactory;
+import com.warden.controlledsandbox.runtime.guest.GuestApplicationInfoFactory;
 import com.warden.controlledsandbox.contract.ActivityResultSnapshot;
 import com.warden.controlledsandbox.contract.ActivityResultIntentSnapshot;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -52,7 +53,8 @@ public final class GuestActivityController {
             if (!Activity.class.isAssignableFrom(type)) throw new IllegalArgumentException("Component is not an Activity: " + componentClass);
             guest = GuestComponentFactory.instantiateActivity(
                     com.warden.controlledsandbox.runtime.guest.GuestDefiningLoader.of(session),
-                    session.context().getApplicationInfo().appComponentFactory,
+                    GuestApplicationInfoFactory.readComponentFactory(
+                            session.context().getApplicationInfo()),
                     instantiateComponent, launchIntent == null ? new Intent() : new Intent(launchIntent));
             attachFrameworkState(guest, componentClass);
             ActivityFieldBridge.BridgeReport bridge = ActivityFieldBridge.install(

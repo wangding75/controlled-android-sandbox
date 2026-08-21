@@ -183,7 +183,8 @@ final class GuestActivityThreadReceiverBridge implements AutoCloseable {
             Intent guestIntent = RuntimeIntentWireCodec.decode(envelope);
             receiver = GuestComponentFactory.instantiateReceiver(
                     GuestDefiningLoader.of(session),
-                    session.context.getApplicationInfo().appComponentFactory,
+                    GuestApplicationInfoFactory.readComponentFactory(
+                            session.context.getApplicationInfo()),
                     guestClass, guestIntent);
             if (receiver == null) {
                 throw new IllegalStateException("FRAMEWORK_RECEIVER_FACTORY_RETURNED_NULL");

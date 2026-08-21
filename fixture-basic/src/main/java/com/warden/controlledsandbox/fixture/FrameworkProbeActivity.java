@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.fixture;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ComponentName;
@@ -100,6 +101,10 @@ public final class FrameworkProbeActivity extends Activity {
         operations.add(ContentProviderOperation.newUpdate(uri)
                 .withValue("value", "batch-update")
                 .build());
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            Log.i(TAG, "FRAMEWORK_PROBE_PROVIDER_BATCH_SKIPPED_API=" + Build.VERSION.SDK_INT);
+            return;
+        }
         Bundle callExtras = new Bundle();
         callExtras.putString("source", "framework-batch");
         operations.add(ContentProviderOperation.newCall(uri, "batch-call", "batch-arg")
@@ -183,7 +188,7 @@ public final class FrameworkProbeActivity extends Activity {
 
     private void notificationReadbackProbe() {
         try {
-            Object manager = getSystemService("notification");
+            Object manager = getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager == null) throw new AssertionError("NOTIFICATION_MANAGER_NULL");
             String channelId = "framework-readback";
             if (Build.VERSION.SDK_INT >= 26) {
@@ -236,7 +241,7 @@ public final class FrameworkProbeActivity extends Activity {
 
     private void jobReadbackProbe() {
         try {
-            Object scheduler = getSystemService("jobscheduler");
+            Object scheduler = getSystemService(Context.JOB_SCHEDULER_SERVICE);
             if (scheduler == null) throw new AssertionError("JOB_SCHEDULER_NULL");
             Class<?> builderClass = Class.forName("android.app.job.JobInfo$Builder");
             Class<?> jobInfoClass = Class.forName("android.app.job.JobInfo");
@@ -266,7 +271,7 @@ public final class FrameworkProbeActivity extends Activity {
 
     private void alarmClockReadbackProbe() {
         try {
-            Object manager = getSystemService("alarm");
+            Object manager = getSystemService(Context.ALARM_SERVICE);
             if (manager == null) throw new AssertionError("ALARM_MANAGER_NULL");
             Class<?> infoClass = Class.forName("android.app.AlarmManager$AlarmClockInfo");
             long trigger = System.currentTimeMillis() + 10 * 60 * 1000L;
@@ -295,6 +300,7 @@ public final class FrameworkProbeActivity extends Activity {
         }
     }
 
+    @SuppressLint("SoonBlockedPrivateApi")
     private void rawPendingIntentBinderProbe(PendingIntent pending) {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
@@ -593,13 +599,11 @@ public final class FrameworkProbeActivity extends Activity {
     private void packageContextProbe(String peerPackage, int expectedUid) {
         try {
             Context resourcesOnly = createPackageContext(peerPackage, 0);
-            // API32's Context constant is 0x1; use the value so this shared fixture also builds
-            // against the reduced static API stubs used by the host-side contract gate.
-            Context withCode = createPackageContext(peerPackage, 0x00000001);
+            Context withCode = createPackageContext(peerPackage, Context.CONTEXT_INCLUDE_CODE);
             ApplicationInfo projected = withCode.getApplicationInfo();
             if (!peerPackage.equals(resourcesOnly.getPackageName())
                     || !peerPackage.equals(withCode.getPackageName())
-                    || !getPackageName().equals(withCode.getOpPackageName())
+                    || !getPackageName().equals(packageOpName(withCode))
                     || resourcesOnly.getResources() == null
                     || withCode.getResources() == null
                     || withCode.getClassLoader() == null
@@ -623,6 +627,13 @@ public final class FrameworkProbeActivity extends Activity {
         } catch (Throwable error) {
             throw new AssertionError("PACKAGE_CONTEXT_FAILED:" + error, error);
         }
+    }
+
+    private String packageOpName(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return context.getOpPackageName();
+        }
+        return getPackageName();
     }
 
     private void crossPackageComponentProbe() {

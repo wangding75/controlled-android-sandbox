@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcel;
@@ -39,7 +40,7 @@ public final class NativeEnforcementSeccompActivity extends Activity {
             JSONObject host = new JSONObject();
             host.put("uid", Process.myUid());
             host.put("pid", Process.myPid());
-            host.put("processName", android.app.Application.getProcessName());
+            host.put("processName", processName());
             host.put("packageName", getPackageName());
             result.put("host", host);
             BindState bind = new BindState();
@@ -100,6 +101,13 @@ public final class NativeEnforcementSeccompActivity extends Activity {
         } catch (Exception error) {
             Log.e(TAG, "cannot persist seccomp result", error);
         }
+    }
+
+    private static String processName() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return android.app.Application.getProcessName();
+        }
+        return "unknown";
     }
 
     private static final class BindState {

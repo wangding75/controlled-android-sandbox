@@ -1,11 +1,13 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.annotation.SuppressLint;
 import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
+import android.os.Build;
 import java.io.File;
 
 /** Builds Guest ApplicationInfo without copying Host-only identity or process metadata. */
-final class GuestApplicationInfoFactory {
+public final class GuestApplicationInfoFactory {
     private GuestApplicationInfoFactory() { }
 
     static ApplicationInfo create(GuestPackageSpec spec, String dataDir) {
@@ -49,13 +51,25 @@ final class GuestApplicationInfoFactory {
         info.dataDir = dataDir;
         info.uid = spec.virtualUid;
         info.enabled = spec.packageState.enabled();
-        info.appComponentFactory = emptyToNull(appComponentFactory);
+        setOptionalField(info, "appComponentFactory", emptyToNull(appComponentFactory));
         if (metaData != null && !metaData.isEmpty()) {
             Bundle merged = info.metaData == null ? new Bundle() : new Bundle(info.metaData);
             merged.putAll(metaData);
             info.metaData = merged;
         }
         return info;
+    }
+
+    /** Reads the API-28 factory field without linking it on older platform images. */
+    public static String readComponentFactory(ApplicationInfo info) {
+        if (info == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return "";
+        return readApi28ComponentFactory(info);
+    }
+
+    @SuppressLint("NewApi")
+    private static String readApi28ComponentFactory(ApplicationInfo info) {
+        String value = info.appComponentFactory;
+        return value == null ? "" : value.trim();
     }
 
     private static String emptyToNull(String value) {

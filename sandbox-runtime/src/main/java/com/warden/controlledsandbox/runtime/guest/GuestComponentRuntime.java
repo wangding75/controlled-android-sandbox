@@ -797,7 +797,8 @@ public final class GuestComponentRuntime {
     }
 
     private String factoryClass() {
-        return session.context.getApplicationInfo().appComponentFactory;
+        return GuestApplicationInfoFactory.readComponentFactory(
+                session.context.getApplicationInfo());
     }
 
     private Bundle prepareProvider(String className, String authority) throws Exception {

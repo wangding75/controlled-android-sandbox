@@ -1,8 +1,10 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.ServiceConnection;
 import android.os.IBinder;
+import android.os.Build;
 
 import java.util.ArrayDeque;
 import java.util.Objects;
@@ -151,7 +153,7 @@ final class GuestServiceConnectionRelay implements ServiceConnection {
                     case CONNECTED -> guest.onServiceConnected(guestComponent, event.binder);
                     case DISCONNECTED -> guest.onServiceDisconnected(guestComponent);
                     case BINDING_DIED -> guest.onBindingDied(guestComponent);
-                    case NULL_BINDING -> guest.onNullBinding(guestComponent);
+                    case NULL_BINDING -> notifyNullBinding();
                 }
             } catch (Throwable error) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
@@ -159,6 +161,13 @@ final class GuestServiceConnectionRelay implements ServiceConnection {
                 android.util.Log.e("CS_SERVICE_FRAMEWORK",
                         "Guest ServiceConnection callback failed kind=" + event.kind, error);
             }
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private void notifyNullBinding() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            guest.onNullBinding(guestComponent);
         }
     }
 

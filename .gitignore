@@ -24,6 +24,7 @@ verification/*-working.txt
 # Local M5 APK validation outputs; published evidence stays outside the repository.
 artifacts/m5-device-lab-build/
 artifacts/m5-device-lab-rd-*/
+artifacts/m5-device-test-build/
 
 # Capability campaign runtime evidence. Registries stay in Git; raw audit/RD output does not.
 artifacts/capability-audit/

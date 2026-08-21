@@ -587,7 +587,7 @@ final class VirtualPackageStateBuilder {
         if (set.applicationHardwareAccelerated) info.flags |= ApplicationInfo.FLAG_HARDWARE_ACCELERATED;
         if (set.applicationExtractNativeLibs) info.flags |= ApplicationInfo.FLAG_EXTRACT_NATIVE_LIBS;
         if (set.applicationUsesCleartextTraffic) info.flags |= ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC;
-        info.appComponentFactory = set.applicationComponentFactory;
+        setOptionalApplicationField(info, "appComponentFactory", set.applicationComponentFactory);
         info.metaData = set.applicationMetadata == null ? null : new Bundle(set.applicationMetadata);
         setOptionalApplicationField(info, "directBootAware", set.applicationDirectBootAware);
         info.enabled = true;

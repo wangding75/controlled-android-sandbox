@@ -700,7 +700,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 configuration);
         return new GuestContext(hostServiceContext, spec, classLoader, configuredResources, assets,
                 packageManager, deviceProtected, sharedState, applicationInfo.metaData,
-                applicationInfo.appComponentFactory, applicationInfo);
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
     }
 
     public Context createCredentialProtectedStorageContext() {
@@ -716,7 +716,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private GuestContext storageContext(boolean targetDeviceProtected) {
         return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
                 packageManager, targetDeviceProtected, sharedState, applicationInfo.metaData,
-                applicationInfo.appComponentFactory, applicationInfo);
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
     }
 
     private ApplicationInfo packageContextApplicationInfo(

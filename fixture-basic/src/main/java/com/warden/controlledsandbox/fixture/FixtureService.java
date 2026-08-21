@@ -57,7 +57,7 @@ public class FixtureService extends Service {
             Object notification = builderClass.getMethod("build").invoke(builder);
 
             if (Build.VERSION.SDK_INT >= 26) {
-                Object notificationManager = getSystemService("notification");
+                Object notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE);
                 Class<?> channelClass = Class.forName("android.app.NotificationChannel");
                 int importance = Class.forName("android.app.NotificationManager")
                         .getField("IMPORTANCE_LOW").getInt(null);

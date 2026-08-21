@@ -1,5 +1,7 @@
 package android.telephony;
 
+import android.annotation.SuppressLint;
+
 import com.warden.controlledsandbox.contract.VirtualTelephonyProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualTelephonySlotSnapshot;
 
@@ -33,15 +35,25 @@ public final class ControlledTelephonyManager extends TelephonyManager {
 
     @Override public int getPhoneCount() { return profile().slots().size(); }
     @Override public boolean isVoiceCapable() { return profile().voiceCapable(); }
+    @SuppressLint("MissingPermission")
     @Override public String getImei() { return delegate.getImei(); }
+    @SuppressLint("MissingPermission")
     @Override public String getImei(int slotIndex) { return delegate.getImei(slotIndex); }
+    @SuppressLint("MissingPermission")
     @Override public String getMeid() { return delegate.getMeid(); }
+    @SuppressLint("MissingPermission")
     @Override public String getMeid(int slotIndex) { return delegate.getMeid(slotIndex); }
+    @SuppressLint("MissingPermission")
     @Override public String getDeviceId() { return delegate.getDeviceId(); }
+    @SuppressLint("MissingPermission")
     @Override public String getDeviceId(int slotIndex) { return delegate.getDeviceId(slotIndex); }
+    @SuppressLint("MissingPermission")
     @Override public String getSubscriberId() { return delegate.getSubscriberId(); }
+    @SuppressLint("MissingPermission")
     @Override public String getSimSerialNumber() { return delegate.getSimSerialNumber(); }
+    @SuppressLint("MissingPermission")
     @Override public String getLine1Number() { return delegate.getLine1Number(); }
+    @SuppressLint("MissingPermission")
     @Override public List<CellInfo> getAllCellInfo() { return delegate.getAllCellInfo(); }
 
     @Override public String getNetworkOperatorName() {

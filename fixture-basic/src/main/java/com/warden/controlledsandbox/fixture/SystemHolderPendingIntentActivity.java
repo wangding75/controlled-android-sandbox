@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.fixture;
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -78,7 +79,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
     }
 
     private void postNotification(PendingIntent content) throws Exception {
-        Object manager = getSystemService("notification");
+        Object manager = getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return;
         if (Build.VERSION.SDK_INT >= 26) {
             Class<?> channelClass = Class.forName("android.app.NotificationChannel");
@@ -107,7 +108,7 @@ public final class SystemHolderPendingIntentActivity extends Activity {
     }
 
     private void scheduleAlarm(PendingIntent sender) throws Exception {
-        Object manager = getSystemService("alarm");
+        Object manager = getSystemService(Context.ALARM_SERVICE);
         if (manager == null) return;
         int type = Class.forName("android.app.AlarmManager")
                 .getField("ELAPSED_REALTIME_WAKEUP").getInt(null);

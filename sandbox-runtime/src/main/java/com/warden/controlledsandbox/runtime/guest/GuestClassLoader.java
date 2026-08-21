@@ -1,5 +1,7 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.annotation.SuppressLint;
+import android.os.Build;
 import com.warden.controlledsandbox.contract.VirtualDetectionPolicySnapshot;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.nativebridge.NativePolicy;
@@ -76,8 +78,7 @@ public final class GuestClassLoader extends ClassLoader {
     GuestClassLoader(List<ByteBuffer> dexBuffers, String librarySearchPath,
                      ClassLoader parent, String guestPackageName,
                      List<String> declaredGuestClasses) {
-        this(new InMemoryDexClassLoader(requireBuffers(dexBuffers).toArray(new ByteBuffer[0]),
-                        librarySearchPath == null ? "" : librarySearchPath, parent),
+        this(newInMemoryDexClassLoader(requireBuffers(dexBuffers), librarySearchPath, parent),
                 parent, guestPackageName, declaredGuestClasses, requireBuffers(dexBuffers));
     }
 
@@ -93,6 +94,17 @@ public final class GuestClassLoader extends ClassLoader {
         this.dexFindLibrary = requireClassLoaderMethod("findLibrary", String.class);
         this.dexFindResource = requireClassLoaderMethod("findResource", String.class);
         this.dexFindResources = requireClassLoaderMethod("findResources", String.class);
+    }
+
+    @SuppressLint("NewApi")
+    private static ClassLoader newInMemoryDexClassLoader(List<ByteBuffer> dexBuffers,
+                                                         String librarySearchPath,
+                                                         ClassLoader parent) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            throw new IllegalStateException("FD_BACKED_GUEST_DEX_REQUIRES_API_29");
+        }
+        return new InMemoryDexClassLoader(dexBuffers.toArray(new ByteBuffer[0]),
+                librarySearchPath == null ? "" : librarySearchPath, parent);
     }
 
     private static List<ByteBuffer> requireBuffers(List<ByteBuffer> values) {

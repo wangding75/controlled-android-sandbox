@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Process;
 import android.util.Log;
@@ -332,11 +333,10 @@ public final class NativeEnforcementCampaign {
     }
 
     private static String processName() {
-        try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             return android.app.Application.getProcessName();
-        } catch (Throwable ignored) {
-            return "unknown";
         }
+        return "unknown";
     }
 
     private static final class BindState {

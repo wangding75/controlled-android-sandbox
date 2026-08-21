@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AppComponentFactory;
 import android.app.Application;
@@ -45,6 +46,7 @@ public final class GuestComponentFactory {
      * or component is created. Skipping this leaves factory-installed loaders (MultiDex,
      * plugin, class-tracing) out of the process.
      */
+    @SuppressLint("NewApi")
     public static ClassLoader instantiateClassLoader(ClassLoader loader, String factoryClass,
                                                      ApplicationInfo applicationInfo)
             throws Exception {
@@ -59,6 +61,7 @@ public final class GuestComponentFactory {
         return result;
     }
 
+    @SuppressLint("NewApi")
     public static Application instantiateApplication(ClassLoader loader, String factoryClass,
                                                       String applicationClass) throws Exception {
         AppComponentFactory factory = load(loader, factoryClass);
@@ -70,6 +73,7 @@ public final class GuestComponentFactory {
         return newInstance(loader, applicationClass, Application.class);
     }
 
+    @SuppressLint("NewApi")
     public static Activity instantiateActivity(ClassLoader loader, String factoryClass,
                                                String activityClass, Intent intent) throws Exception {
         AppComponentFactory factory = load(loader, factoryClass);
@@ -80,6 +84,7 @@ public final class GuestComponentFactory {
         return newInstance(loader, activityClass, Activity.class);
     }
 
+    @SuppressLint("NewApi")
     public static Service instantiateService(ClassLoader loader, String factoryClass,
                                              String serviceClass, Intent intent) throws Exception {
         AppComponentFactory factory = load(loader, factoryClass);
@@ -90,6 +95,7 @@ public final class GuestComponentFactory {
         return newInstance(loader, serviceClass, Service.class);
     }
 
+    @SuppressLint("NewApi")
     public static BroadcastReceiver instantiateReceiver(ClassLoader loader, String factoryClass,
                                                         String receiverClass, Intent intent)
             throws Exception {
@@ -101,6 +107,7 @@ public final class GuestComponentFactory {
         return newInstance(loader, receiverClass, BroadcastReceiver.class);
     }
 
+    @SuppressLint("NewApi")
     public static ContentProvider instantiateProvider(ClassLoader loader, String factoryClass,
                                                       String providerClass) throws Exception {
         AppComponentFactory factory = load(loader, factoryClass);
@@ -128,6 +135,7 @@ public final class GuestComponentFactory {
         return factories.get(factoryClass.trim());
     }
 
+    @SuppressLint("NewApi")
     private static AppComponentFactory load(ClassLoader loader, String factoryClass) throws Exception {
         if (factoryClass == null || factoryClass.trim().isEmpty()) return null;
         String key = factoryClass.trim();

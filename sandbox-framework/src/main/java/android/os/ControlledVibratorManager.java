@@ -1,8 +1,10 @@
 package android.os;
 
+import android.annotation.SuppressLint;
 import com.warden.controlledsandbox.contract.VirtualPowerProfileSnapshot;
 
 /** Guest-owned VibratorManager projection for platform isolated processes. */
+@SuppressLint("NewApi")
 public final class ControlledVibratorManager extends VibratorManager {
     private final ControlledVibrator vibrator;
 
@@ -19,5 +21,6 @@ public final class ControlledVibratorManager extends VibratorManager {
     }
 
     @Override public Vibrator getDefaultVibrator() { return vibrator; }
+    @SuppressLint("MissingPermission")
     @Override public void cancel() { vibrator.cancel(); }
 }

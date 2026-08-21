@@ -1,6 +1,7 @@
 package com.warden.controlledsandbox;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.Intent;
 import android.net.Uri;
@@ -603,7 +604,7 @@ public final class DebugCommandActivity extends Activity {
     }
 
     private int cancelSystemHolderNotifications() throws Exception {
-        Object manager = getSystemService("notification");
+        Object manager = getSystemService(Context.NOTIFICATION_SERVICE);
         if (manager == null) return 0;
         Object raw = manager.getClass().getMethod("getActiveNotifications").invoke(manager);
         if (!(raw instanceof Object[] active)) return 0;

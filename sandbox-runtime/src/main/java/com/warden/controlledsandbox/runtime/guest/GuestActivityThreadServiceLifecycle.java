@@ -214,7 +214,8 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         ClassLoader definingLoader = GuestDefiningLoader.of(session);
         GuestDefiningLoader.loadComponent(session, guestClass);
         Service service = GuestComponentFactory.instantiateService(definingLoader,
-                session.context.getApplicationInfo().appComponentFactory, guestClass, guestIntent);
+                GuestApplicationInfoFactory.readComponentFactory(
+                        session.context.getApplicationInfo()), guestClass, guestIntent);
         if (service == null) throw new IllegalStateException("FRAMEWORK_SERVICE_FACTORY_RETURNED_NULL");
         if (!(service instanceof Service)) throw new IllegalArgumentException("NOT_A_GUEST_SERVICE:" + guestClass);
         ServiceInfo projected = projectServiceInfo(data, guestClass);

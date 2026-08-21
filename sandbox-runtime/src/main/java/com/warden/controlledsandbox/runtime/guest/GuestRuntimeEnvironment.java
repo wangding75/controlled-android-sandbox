@@ -274,7 +274,7 @@ public final class GuestRuntimeEnvironment {
             }
             String appComponentFactory = spec.isolatedProcess
                     ? (parsedApplicationInfo == null ? "" :
-                    String.valueOf(parsedApplicationInfo.appComponentFactory))
+                    GuestApplicationInfoFactory.readComponentFactory(parsedApplicationInfo))
                     : archiveAppComponentFactory(processPackageManager, spec.apkPath);
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager,
@@ -472,7 +472,8 @@ public final class GuestRuntimeEnvironment {
             session.loadedApkBridge = GuestLoadedApkBridge.install(session);
             Application application = guestContext.mainThread.call(
                     () -> instantiateApplication(spec, processLoader,
-                            guestContext.getApplicationInfo().appComponentFactory));
+                            GuestApplicationInfoFactory.readComponentFactory(
+                                    guestContext.getApplicationInfo())));
             guestContext.application(application);
             // LoadedApk.makeApplication() is still called by the real ActivityThread when the
             // first framework-owned Activity transaction arrives. Publish the already-created
@@ -840,8 +841,8 @@ public final class GuestRuntimeEnvironment {
             android.content.pm.PackageInfo info = packageManager.getPackageArchiveInfo(
                     apkPath, PackageManager.GET_META_DATA);
             String value = info == null || info.applicationInfo == null
-                    ? "" : info.applicationInfo.appComponentFactory;
-            return value == null ? "" : value.trim();
+                    ? "" : GuestApplicationInfoFactory.readComponentFactory(info.applicationInfo);
+            return value;
         } catch (Throwable error) {
             android.util.Log.w("CS_GUEST_FACTORY", "archive factory unavailable", error);
             return "";

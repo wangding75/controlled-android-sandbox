@@ -114,7 +114,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             guestIntent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, consumedActivityToken);
             Activity guest = GuestComponentFactory.instantiateActivity(
                     GuestDefiningLoader.of(session),
-                    session.context().getApplicationInfo().appComponentFactory,
+                    GuestApplicationInfoFactory.readComponentFactory(
+                            session.context().getApplicationInfo()),
                     instantiateComponent, guestIntent);
             if (guest == null) throw new IllegalStateException("GUEST_ACTIVITY_FACTORY_RETURNED_NULL");
             if (!GuestDefiningLoader.loadComponent(session, instantiateComponent).isInstance(guest)) {

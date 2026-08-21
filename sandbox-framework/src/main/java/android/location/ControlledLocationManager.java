@@ -1,8 +1,10 @@
 package android.location;
 
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
@@ -57,6 +59,7 @@ public final class ControlledLocationManager extends LocationManager {
         return location(current);
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void getCurrentLocation(String provider, CancellationSignal cancellationSignal,
             Executor executor, Consumer<Location> consumer) {
         Objects.requireNonNull(executor, "executor");
@@ -69,35 +72,41 @@ public final class ControlledLocationManager extends LocationManager {
         });
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void requestLocationUpdates(String provider, long minTimeMs,
             float minDistanceM, LocationListener listener) {
         requestLocationUpdates(provider, minTimeMs, minDistanceM, listener,
                 Looper.getMainLooper());
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void requestLocationUpdates(String provider, long minTimeMs,
             float minDistanceM, LocationListener listener, Looper looper) {
         Handler handler = new Handler(looper == null ? Looper.getMainLooper() : looper);
         register(provider, minTimeMs, listener, handler::post);
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void requestLocationUpdates(String provider, long minTimeMs,
             float minDistanceM, Executor executor, LocationListener listener) {
         register(provider, minTimeMs, listener, executor);
     }
 
+    @SuppressLint({"MissingPermission", "NewApi"})
     @Override public void requestLocationUpdates(String provider, LocationRequest request,
             Executor executor, LocationListener listener) {
-        long interval = request == null ? profile().minimumUpdateIntervalMs()
-                : request.getIntervalMillis();
+        long interval = request == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                ? profile().minimumUpdateIntervalMs() : request.getIntervalMillis();
         register(provider, interval, listener, executor);
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void requestLocationUpdates(long minTimeMs, float minDistanceM,
             Criteria criteria, LocationListener listener, Looper looper) {
         requestLocationUpdates(profile().provider(), minTimeMs, minDistanceM, listener, looper);
     }
 
+    @SuppressLint("MissingPermission")
     @Override public void requestLocationUpdates(long minTimeMs, float minDistanceM,
             Criteria criteria, Executor executor, LocationListener listener) {
         requestLocationUpdates(profile().provider(), minTimeMs, minDistanceM, executor, listener);
@@ -164,6 +173,7 @@ public final class ControlledLocationManager extends LocationManager {
 
     @Override public void removeUpdates(PendingIntent intent) { }
 
+    @SuppressLint("MissingPermission")
     private void register(String provider, long interval, LocationListener listener,
             Executor callbackExecutor) {
         Objects.requireNonNull(listener, "listener");
@@ -187,6 +197,7 @@ public final class ControlledLocationManager extends LocationManager {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private void send(String provider, PendingIntent intent) {
         Location value = getLastKnownLocation(provider);
         if (value == null) return;

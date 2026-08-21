@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.fixture;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Process;
@@ -72,10 +73,9 @@ public final class NativeEnforcementSeccompService extends Service {
     }
 
     private static String processName() {
-        try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             return android.app.Application.getProcessName();
-        } catch (Throwable ignored) {
-            return "unknown";
         }
+        return "unknown";
     }
 }

@@ -125,3 +125,52 @@ No Host, fixture, or Companion32 APK was produced, and no second build was
 attempted after this failure. This recovery attempt is therefore still
 `BLOCKED` as `KI-R03-BUILD-002`; the next recovery must review the fixture
 semantics and lint findings before another exact build run.
+
+## Final recovery — DONE
+
+- Recovery window: 2026-08-21 (Asia/Shanghai); the implementation baseline
+  for the final build was `b35ca0feccf6c2d150766d8b9a740680d6f30057`.
+- The original fixture lint findings were classified and fixed with explicit
+  runtime API guards, SDK service/flag constants, method-level permission
+  annotations for intentional probe calls, a targeted private-API annotation,
+  and the optional camera hardware feature declaration. The full build then
+  exposed and fixed equivalent compatibility findings in `sandbox-framework`,
+  `sandbox-runtime`, and `app` with guarded API access and official constants.
+- Targeted verification passed:
+
+  ```text
+  .\gradlew.bat --no-daemon --no-build-cache --no-parallel --stacktrace --offline :fixture-basic:lintDebug :fixture-compat32:lintDebug
+  BUILD SUCCESSFUL
+  .\gradlew.bat --no-daemon --no-build-cache --no-parallel --stacktrace --offline :sandbox-framework:lintDebug
+  BUILD SUCCESSFUL
+  .\gradlew.bat --no-daemon --no-build-cache --no-parallel --stacktrace --offline :sandbox-runtime:lintDebug
+  BUILD SUCCESSFUL
+  .\gradlew.bat --no-daemon --no-build-cache --no-parallel --stacktrace --offline :app:lintDebug
+  BUILD SUCCESSFUL
+  ```
+
+- The exact locked command was run twice and both runs passed:
+
+  ```text
+  powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-device-test-apks.ps1
+  PASS locked device-test APK set: host=3710513B, fixture=1766894B, companion32=42218435B
+  PASS M5 device-test APK build: artifacts/m5-device-test-build/b35ca0feccf6
+  ```
+
+- The artifact manifest and SHA-256 evidence are in
+  `artifacts/m5-device-test-build/b35ca0feccf6/build-manifest.json` and
+  `artifacts/m5-device-test-build/b35ca0feccf6/SHA256SUMS.txt`.
+  The first/second build comparison was:
+
+  ```text
+  host-debug.apk         e6c565f7f9349901f5ac91fc234a052e86c6409d1d7eeaa2e1695c33b8fdeb9d
+  fixture-debug.apk      af85225a53002ce43084b5a32db5a17193be75c7bec0d2477780eb44702fb169
+  companion32-debug.apk  cdb690449ee858954625a24f2683e15208dd7727bed9cb13a55bb82b61712483
+  PASS deterministic APK SHA256 comparison
+  ```
+
+- Build-manifest checks passed for applicationId, signature, ABI, and native
+  library inventories. No device runtime execution is claimed by C0-T02.
+- `KI-R03-BUILD-001` and `KI-R03-BUILD-002` are now `FIXED` and do not block
+  the campaign. The historical blocked sections above remain preserved for
+  auditability; this evidence file's final status is `DONE`.

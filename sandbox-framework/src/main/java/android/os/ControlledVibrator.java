@@ -1,5 +1,6 @@
 package android.os;
 
+import android.annotation.SuppressLint;
 import android.media.AudioAttributes;
 import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPowerProfileSnapshot;
@@ -20,20 +21,27 @@ public final class ControlledVibrator extends Vibrator {
 
     @Override public void cancel() { }
 
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(long milliseconds) { enforce(milliseconds); }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(long milliseconds, AudioAttributes attributes) {
         enforce(milliseconds);
     }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(long[] pattern, int repeat) {
         enforce(pattern == null || pattern.length == 0 ? 0L : max(pattern));
     }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(long[] pattern, int repeat, AudioAttributes attributes) {
         vibrate(pattern, repeat);
     }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(VibrationEffect effect) { enforce(profile.maximumVibrationDurationMs()); }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(VibrationEffect effect, AudioAttributes attributes) {
         vibrate(effect);
     }
+    @SuppressLint("MissingPermission")
     @Override public void vibrate(VibrationEffect effect, VibrationAttributes attributes) {
         vibrate(effect);
     }

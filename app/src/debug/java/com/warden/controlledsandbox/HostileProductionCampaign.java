@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
+import android.os.Build;
 import android.os.Parcel;
 import android.os.Process;
 import android.util.Log;
@@ -42,7 +43,7 @@ public final class HostileProductionCampaign {
         JSONObject host = new JSONObject();
         host.put("uid", Process.myUid());
         host.put("pid", Process.myPid());
-        host.put("processName", android.app.Application.getProcessName());
+        host.put("processName", processName());
         result.put("host", host);
 
         String session = "hsess-" + System.nanoTime();
@@ -289,6 +290,13 @@ public final class HostileProductionCampaign {
             for (File child : children) deleteRecursively(child);
         }
         file.delete();
+    }
+
+    private static String processName() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            return android.app.Application.getProcessName();
+        }
+        return "unknown";
     }
 
     private static final class BindState {
