@@ -125,7 +125,7 @@
       "gradleProjectPath": ":fixture-basic",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 65,
+      "fileCount": 66,
       "languages": [
         "C++",
         "Gradle",
@@ -134,7 +134,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "a124f66b123fa3c5a8ac0d0e83c239ff1a3b4e29b0d144586d53123ac9f7b697"
+      "sourceDigestSha256": "f7219b99f73f387975d03e0909f6f2e6f625c13909ee42d135ddefa0a98eef76"
     },
     {
       "type": "application",
