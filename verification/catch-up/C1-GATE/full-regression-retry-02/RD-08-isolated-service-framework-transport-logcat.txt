@@ -1,0 +1,30 @@
+﻿--------- beginning of main
+08-22 13:59:38.688  5958  5958 I CS_COMMAND: COMMAND_BEGIN command=import-prepare package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:38.689  5958  5991 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=import-prepare package=com.warden.controlledsandbox.fixture
+08-22 13:59:39.809  5958  5991 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=import-prepare package=com.warden.controlledsandbox.fixture
+08-22 13:59:40.199  5958  5991 I CS_COMMAND: INSTANCE_READY command=import-prepare package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:42.846  6069  6069 I CS_RUNTIME: GUEST_PROVIDERS_BOUND snapshot=0 manifestExtra=0 skippedOtherProcess=4 classes=0
+08-22 13:59:42.855  6069  6069 I CS_FIXTURE: APPLICATION_CREATE count=780 package=com.warden.controlledsandbox.fixture process=com.warden.controlledsandbox.fixture
+08-22 13:59:42.858  6069  6069 I CS_FIXTURE: NATIVE_LOAD JNI_LOADED
+08-22 13:59:42.871  6069  6069 I CS_RUNTIME: GUEST_PREPARED status=READY package=com.warden.controlledsandbox.fixture session=72b01d30-1ddb-4e19-b552-d72f003c96f0 traceDomain=GUEST processName=com.warden.controlledsandbox.fixture virtualUserId=0 physicalPid=6069 threadTid=6069 component=com.warden.controlledsandbox.fixture.MainActivity generation=1 slot=54
+08-22 13:59:42.897  5958  5991 I CS_COMMAND: PASS import-prepare com.warden.controlledsandbox.fixture user=0 PREPARED
+08-22 13:59:43.271  5958  5958 I CS_COMMAND: COMMAND_BEGIN command=isolated-service package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:43.271  5958  6126 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=isolated-service package=com.warden.controlledsandbox.fixture
+08-22 13:59:43.331  5958  6126 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=isolated-service package=com.warden.controlledsandbox.fixture
+08-22 13:59:43.357  5958  6126 I CS_COMMAND: INSTANCE_READY command=isolated-service package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:44.380  6140  6140 E CS_DIAGNOSTICS: Cannot create diagnostics directory /data/user/0/com.warden.controlledsandbox.debug/files/runtime-diagnostics
+08-22 13:59:44.584  6140  6140 E CS_DIAGNOSTICS: Cannot create diagnostics directory /data/user/0/com.warden.controlledsandbox.fixture/diagnostics
+08-22 13:59:45.001  6140  6140 I CS_RUNTIME: GUEST_PROVIDERS_BOUND snapshot=0 manifestExtra=0 skippedOtherProcess=4 classes=0
+08-22 13:59:45.001  6140  6140 I CS_FIXTURE: APPLICATION_CREATE isolated uid=99230 package=com.warden.controlledsandbox.fixture
+08-22 13:59:45.013  6140  6140 I CS_RUNTIME: GUEST_PREPARED status=DEGRADED package=com.warden.controlledsandbox.fixture session=78f4c011-ff54-4f1b-be57-b0559554b51e traceDomain=GUEST processName=com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService virtualUserId=0 physicalPid=6140 threadTid=6140 component=com.warden.controlledsandbox.fixture.IsolatedFixtureService generation=1 slot=11
+08-22 13:59:45.048  6140  6140 I CS_FIXTURE: SERVICE_CREATE com.warden.controlledsandbox.fixture.IsolatedFixtureService process=com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService
+08-22 13:59:45.055  6140  6140 I CS_FIXTURE: SERVICE_START id=1 action=null
+08-22 13:59:45.062  6140  6140 I CS_RUNTIME: GUEST_SERVICE_START status=SERVICE_STARTED package=com.warden.controlledsandbox.fixture session=78f4c011-ff54-4f1b-be57-b0559554b51e traceDomain=GUEST processName=com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService virtualUserId=0 physicalPid=6140 threadTid=6140 component=com.warden.controlledsandbox.fixture.IsolatedFixtureService generation=1 slot=11
+08-22 13:59:45.064  5958  6126 I CS_COMMAND: PASS isolated-service com.warden.controlledsandbox.fixture user=0 SERVICE_STARTED
+08-22 13:59:45.605  5958  5958 I CS_COMMAND: COMMAND_BEGIN command=isolated-service package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:45.605  5958  6199 I CS_COMMAND: PACKAGE_LOOKUP_BEGIN command=isolated-service package=com.warden.controlledsandbox.fixture
+08-22 13:59:45.657  5958  6199 I CS_COMMAND: PACKAGE_LOOKUP_RETURN command=isolated-service package=com.warden.controlledsandbox.fixture
+08-22 13:59:45.695  5958  6199 I CS_COMMAND: INSTANCE_READY command=isolated-service package=com.warden.controlledsandbox.fixture user=0
+08-22 13:59:45.810  6140  6140 I CS_FIXTURE: SERVICE_DESTROY com.warden.controlledsandbox.fixture.IsolatedFixtureService
+08-22 13:59:45.811  6140  6140 I CS_RUNTIME: GUEST_SERVICE_STOP status=SERVICE_STOPPED package=com.warden.controlledsandbox.fixture session=78f4c011-ff54-4f1b-be57-b0559554b51e traceDomain=GUEST processName=com.warden.controlledsandbox.fixture:isolated_com_warden_controlledsandbox_fixture_IsolatedFixtureService virtualUserId=0 physicalPid=6140 threadTid=6140 component=com.warden.controlledsandbox.fixture.IsolatedFixtureService generation=1 slot=11
+08-22 13:59:45.812  5958  6199 I CS_COMMAND: PASS isolated-service com.warden.controlledsandbox.fixture user=0 SERVICE_STOPPED

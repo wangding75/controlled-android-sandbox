@@ -812,6 +812,14 @@ public final class DebugCommandActivity extends Activity {
         if (extras.containsKey("c2t06Loops")) {
             result.putInt("c2t06Loops", Math.max(1, extras.getInt("c2t06Loops", 20)));
         }
+        String c2t07Mode = text(extras, "c2t07Mode", "");
+        if (!c2t07Mode.isEmpty()) result.putString("c2t07Mode", c2t07Mode);
+        if (extras.containsKey("c2t07Loops")) {
+            result.putInt("c2t07Loops", Math.max(1, extras.getInt("c2t07Loops", 10)));
+        }
+        if (extras.containsKey("c2t07User")) {
+            result.putInt("c2t07User", Math.max(0, extras.getInt("c2t07User", 0)));
+        }
         if (extras.containsKey("cameraLoops")) {
             result.putInt("c2t04Loops", Math.max(1, extras.getInt("cameraLoops", 100)));
         }

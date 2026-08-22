@@ -1,43 +1,42 @@
 {
   "schema_version": 1,
-  "task_id": "C2-T04",
+  "task_id": "C2-T07",
   "status": "PASS",
-  "captured_at": "2026-08-22T15:08:48.528838+00:00",
+  "captured_at": "2026-08-22T19:44:07.397319+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C2-T04",
-    "active_task": "C2-T04",
-    "last_completed": "C2-T03",
-    "first_ready_pending": "C2-T05",
-    "dependencies": "C2-T01,C2-T02"
+    "next_task": "C2-T07",
+    "active_task": "",
+    "last_completed": "C2-T06",
+    "first_ready_pending": "C2-T07",
+    "dependencies": "C2-T02..T06"
   },
   "last_receipt": {
-    "task_id": "C2-T03",
+    "task_id": "C2-T06",
     "status": "DONE",
     "implementation_commits": [
-      "e327d329dba2feb93665566fa2721f5a2b6ed378"
+      "048ca1b183f76de37c70c3b4868edfd40e91c562"
     ],
-    "receipt_commit": "1d109c59e2e6722863eaaa5452eb1bca0cc195cc",
-    "baseline_commit": "be8f23a181ae4ec292a0685289bd7e9298899ad2",
+    "receipt_commit": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
+    "baseline_commit": "a1a423c9bee79fb2b65270f70cb6c42e172a0529",
     "evidence_paths": [
       "docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md",
       "docs/COMMIT_IDENTITY_POLICY.md",
-      "docs/review/C2_T03_LOCATION_DESIGN.md",
+      "docs/review/C2_T06_DEVICE_NETWORK_MEDIA_DESIGN.md",
       "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C2-T03/c2-t03-rd-summary.json",
-      "verification/catch-up/C2-T03/c2-t03-local-verification.json"
+      "verification/catch-up/C2-T06/c2-t06-rd-summary.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "1d109c59e2e6722863eaaa5452eb1bca0cc195cc",
+    "head": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "1d109c59e2e6722863eaaa5452eb1bca0cc195cc",
+    "remote_head": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/AndroidManifest.xml\n M sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PeripheralCameraInvocationHandler.java\n M sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PeripheralInvocationState.java\n M scripts/verify-catch-up-continuation.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/m5-t16-source-closure-audit.json\n M verification/sbom.json\n?? docs/review/C2_T04_CAMERA_DESIGN.md\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/CameraCampaignActivity.java\n?? scripts/check-c2-t04-camera.py\n?? tools/capability/run_c2_t04_rd.py\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke-2.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke.json\n?? verification/catch-up/C1-GATE/full-regression-retry-02/\n?? verification/catch-up/C1-GATE/full-regression-retry-03/\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-10.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-prepare.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-recovery-retry.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-synchronized.json\n?? verification/catch-up/C2-T04/"
+    "status_short": "M verification/catch-up/C0-T01/continuation-preflight.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke-2.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke.json\n?? verification/catch-up/C1-GATE/full-regression-retry-02/\n?? verification/catch-up/C1-GATE/full-regression-retry-03/\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-10.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-prepare.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-recovery-retry.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-synchronized.json"
   },
   "device": {
     "instance_name": "RD测试",
@@ -88,5 +87,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C2-T04"
+  "evidence_directory": "verification/catch-up/C2-T07"
 }

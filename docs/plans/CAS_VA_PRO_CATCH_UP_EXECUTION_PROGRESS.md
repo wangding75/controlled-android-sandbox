@@ -52,7 +52,7 @@
 | C2-T04 | Camera1/Camera2 | DONE | C2-T01,C2-T02 | `91cb86b62e2c8dd64b5047aee7b93609093eac36` | §5 C2-T04 |
 | C2-T05 | 调度与交互服务 | DONE | C2-T01,C1 | `547ba7ae` | §5 C2-T05 |
 | C2-T06 | 设备/网络/媒体服务 | DONE | C2-T01,C2-T02 | `048ca1b1` | §5 C2-T06 |
-| C2-T07 | Biometric 与长尾收敛 | PENDING | C2-T02..T06 | - | - |
+| C2-T07 | Biometric 与长尾收敛 | IN_PROGRESS | C2-T02..T06 | - | - |
 | C3-T01 | Native 绕过与兼容 corpus | PENDING | C1,C2-T01 | - | - |
 | C3-T02 | 文件/proc/network/FD | PENDING | C3-T01 | - | - |
 | C3-T03 | 四 ABI/16KB/native media | PENDING | C3-T01,C2-T04 | - | - |

@@ -71,6 +71,8 @@
             android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.C2T06DeviceNetworkMediaActivity"
             android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.C2T07ApplicationEnvironmentActivity"
+            android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkProbeActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.PmsPermissionAttributionProbeActivity"
             android:exported="false" />

@@ -1047,3 +1047,39 @@ issues:
       The C2-T05 implementation added tracked fixture-basic sources without regenerating the
       repository SBOM. C2-T06 regenerated the SBOM after all scoped tracked source changes and
       verified it with the repository checker.
+
+  - issue_id: KI-R03-041
+    title: C2-T07 application-environment and long-tail method-level RD evidence was incomplete
+    capability: system_service_virtualization
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C2-T07 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
+      - docs/plans/M5_T11_APPLICATION_ENVIRONMENT.md
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ApplicationEnvironmentInvocationInterceptor.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PolicyServicesInvocationInterceptor.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PeripheralServicesInvocationInterceptor.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PrivilegedServicesInvocationInterceptor.java
+      - verification/catch-up/C2-T01/c2-t01-method-inventory.json
+      - docs/review/C2_T07_APPLICATION_ENVIRONMENT_LONG_TAIL_DESIGN.md
+      - tools/capability/run_c2_t07_rd.py
+      - verification/catch-up/C2-T07/c2-t07-rd-summary.json
+    match_patterns:
+      - C2-T01-F1-12
+      - C2-T01-F1-14
+      - C2-T01-P2
+      - VIRTUAL_BIOMETRIC_
+      - VIRTUAL_.*_OPERATION_UNSUPPORTED
+      - C2_T07_
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_C2_T07_ENVIRONMENT_AND_LONG_TAIL_RD_CAMPAIGN
+    notes: >
+      Application-environment stores, hooks and source-side long-tail policy/peripheral/privileged
+      boundaries already pass static checks and host self-tests, but the repository had no
+      package-neutral RD fixture correlating identity, request, return, callback/observer,
+      unregister/cleanup and process-death behavior for User/Launcher/Shortcut/AppWidget/Usage/
+      Settings/Content or the P2 long-tail negative matrix. C2-T07 is scoped to the dynamically
+      resolved API32 RD device; API33+, OEM/HAL, commercial-app and VA PRO equivalence remain
+      explicitly unproven.
