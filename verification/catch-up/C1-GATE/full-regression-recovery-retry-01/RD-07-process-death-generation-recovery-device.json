@@ -1,4 +1,4 @@
-﻿{
+{
     "case":  "RD-07-process-death-generation-recovery",
     "instanceName":  "RD测试",
     "serial":  "127.0.0.1:16416",
@@ -8,7 +8,7 @@
     "android":  "12",
     "bootId":  "7cac15ce-d76e-44ea-968b-959d91d03be7",
     "capturedAt":  "2026-08-22T05:56:40.2976516Z",
-    "gitHead":  "d1de49a463f41ecd068eab867be4e4efe59cc34e",
+    "gitHead":  "df60c2dfa3d81af805216225da51fa0bc4865670",
     "gitTree":  [
                     " M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java",
                     " M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md",

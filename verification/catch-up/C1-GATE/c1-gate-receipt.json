@@ -4,7 +4,7 @@
   "status": "PASS",
   "maturity_level": "RD_BASELINE",
   "va_pro_equivalent": "NOT_PROVEN",
-  "tested_git_head": "d1de49a463f41ecd068eab867be4e4efe59cc34e",
+  "tested_git_head": "df60c2dfa3d81af805216225da51fa0bc4865670",
   "environment": {
     "instance_name": "RD测试",
     "serial": "127.0.0.1:16416",

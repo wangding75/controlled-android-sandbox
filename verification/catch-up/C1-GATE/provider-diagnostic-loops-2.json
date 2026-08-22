@@ -4,7 +4,7 @@
   "host_os": "Windows 11 AMD64",
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "commit": "d1de49a463f41ecd068eab867be4e4efe59cc34e",
+    "commit": "df60c2dfa3d81af805216225da51fa0bc4865670",
     "tree": "3ea28a5b81f3b39cd35ec95dd883fcc3a32c2cc5",
     "parent": "5d7195cb475108d7c2e864913a18ce6b778a70c2",
     "status": "M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContextComponentRouter.java\n M tools/capability/run_c1_t04_rd.py\n M tools/capability/run_p1_00_rd.py\n M tools/device/t57_rd_framework_transport_probe.ps1\n?? docs/review/C1_STAGE_GATE_DESIGN.md\n?? tools/capability/validate_c1_stage_gate.py\n?? tools/device/t57_rd_c1_stage_gate.ps1\n?? verification/catch-up/C1-GATE/"

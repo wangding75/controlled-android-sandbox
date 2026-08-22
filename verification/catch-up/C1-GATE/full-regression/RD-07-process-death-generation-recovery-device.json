@@ -1,4 +1,4 @@
-﻿{
+{
     "case":  "RD-07-process-death-generation-recovery",
     "instanceName":  "RD测试",
     "serial":  "127.0.0.1:16416",
@@ -8,7 +8,7 @@
     "android":  "12",
     "bootId":  "773adc6f-e0aa-4997-a0ee-481a7773a10d",
     "capturedAt":  "2026-08-22T07:48:51.5932601Z",
-    "gitHead":  "d1de49a463f41ecd068eab867be4e4efe59cc34e",
+    "gitHead":  "df60c2dfa3d81af805216225da51fa0bc4865670",
     "gitTree":  [
                     " M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java",
                     " M app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",

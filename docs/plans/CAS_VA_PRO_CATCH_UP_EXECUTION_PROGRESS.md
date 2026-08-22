@@ -1,13 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 02:24（Asia/Shanghai）
+更新时间：2026-08-22 15:57（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C1`
-下一任务：`C1 阶段门禁（完成后进入 C2-T01）`
-最后完成任务：`C1-T07`
+当前阶段：`C2`
+当前任务：`C2-T01`
+下一任务：`C2-T01`
+最后完成任务：`C1-GATE`
 
 ## 1. 使用规则
 
@@ -22,7 +23,7 @@
 | 阶段 | 状态 | 阶段门禁 | 完成回执 |
 |---|---|---|---|
 | C0 事实源与 RD 基线 | DONE | 两轮 RD 一致、事实源无冲突、可跨环境续接 | §5 C0-T04 |
-| C1 组件/包/进程 | PENDING | 双用户、50 轮与任务书规定压力 | - |
+| C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | PENDING | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | - |
 | C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
 | C4 SX 迁移 | PENDING | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
@@ -773,3 +774,51 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C1 阶段门禁的双用户全 fixture、30 分钟并发压力和 clear/delete/restart/death
   全资源收敛仍需阶段收口时单独补齐；本任务不宣称 API33+、ARM/16KB、OEM、SX/XH 或商业等价性。
 - **下一任务**：`C1 阶段门禁（完成后进入 C2-T01）`；本轮不执行后续任务。
+
+### C1-GATE：C1 阶段门禁
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 15:05 / 2026-08-22 15:53（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；MuMu `RD测试` 动态解析；serial
+  `127.0.0.1:16416`；model `22041211A`；API 32；ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`；boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`；Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `d1de49a463f41ecd068eab867be4e4efe59cc34e`；C1-T07 恢复回执已完成；按协议先将本任务置为
+  `IN_PROGRESS`，未修改任务书验收标准。
+- **实现摘要**：补齐 C1 阶段门禁设计、动态 RD gate runner 和 fail-closed validator；修复
+  Provider 双用户代际同步/Host-stop 归属及 `GUEST_NOT_PREPARED` 一次恢复；为每个 Guest
+  增加框架 ordered broadcast FIFO dispatcher；修复设备时钟回退导致的非法安装时间戳；补齐
+  full regression 的精确 ADB daemon 恢复重试与前台 receiver 传输入口。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContextComponentRouter.java`、
+  `app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/ProviderCampaignActivity.java`、
+  `tools/capability/run_c1_t04_rd.py`、`tools/capability/run_p1_00_rd.py`、
+  `tools/capability/validate_c1_stage_gate.py`、`tools/device/t57_rd_c1_stage_gate.ps1`、
+  `tools/device/t57_rd_full_regression.ps1`、`docs/review/C1_STAGE_GATE_DESIGN.md`、
+  `verification/catch-up/C1-GATE/`。
+- **验收命令与结果**：`python tools/android_gradle_build_gate.py verify` PASS；
+  `python tools/static_android_compile.py` PASS；`python tools/capability/validate_c1_stage_gate.py`
+  PASS。Provider 双用户各完成 105 个代际循环（共 210 个循环/每类 marker 210），要求压力
+  `1800` 秒、实测 `1817.687` 秒；C1 full regression 9/9 PASS；clear/delete/reinstall 与
+  process-death/cross-ABI 四组资源收敛结果均 PASS。
+- **设备证据**：主回执为 `verification/catch-up/C1-GATE/c1-gate-receipt.json`；Provider
+  回执为 `verification/catch-up/C1-GATE/c1-gate-provider-rd-summary.json`；9-case transcript
+  为 `verification/catch-up/C1-GATE/c1-gate-run.txt`；最终设备快照和逐 case 证据位于
+  `verification/catch-up/C1-GATE/`，均记录同一 serial、API、boot ID 和实现提交。
+- **Known Issues**：无新增 runtime issue。初始冷启动、Provider 代际清理、ordered broadcast
+  FIFO、ADB daemon 短暂失败和设备墙钟回退均已分类并修复后重跑；原始失败材料保留在
+  `verification/catch-up/C1-GATE/` 的分类/诊断证据中。
+- **偏离任务书**：无。仅执行 C1 阶段门禁一个任务；失败优先修复并重跑，未记录 `BLOCKED`；
+  本回执只关闭 RD API 32/C1 范围，不外推 API33+、ARM/16KB、OEM、SX/XH 或商业等价性。
+- **实现提交 SHA**：`df60c2dfa3d81af805216225da51fa0bc4865670`
+  （`feat(c1): close phase gate with RD evidence`）。
+- **回执提交**：使用主题 `docs(progress): record [C1-GATE] receipt` 单独提交；本回执中
+  `C1-GATE` 状态由 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：实现提交先行提交；本回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads` 校验最终
+  远端 HEAD 与本地 HEAD 一致。
+- **遗留风险**：C1 仅证明当前 RD API 32 设备范围；C2 系统服务/F2-F5、API33+、ARM/16KB、
+  OEM、SX/XH 与商业等价性仍未验证。
+- **下一任务**：`C2-T01`；本轮不执行后续任务。
