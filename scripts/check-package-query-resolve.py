@@ -58,7 +58,9 @@ require(
     'firstInstallAt', 'lastUpdateAt', 'withInstallTimes(')
 require(
     'app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java',
-    'withPackageState(', 'withComponentState(', 'previous.firstInstallAt', 'withInstallTimes(firstInstallAt, nowMs)')
+    'withPackageState(', 'withComponentState(', 'previous.firstInstallAt',
+    'long lastUpdateAt = Math.max(firstInstallAt, nowMs)',
+    'withInstallTimes(firstInstallAt, lastUpdateAt)')
 require(
     'app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java',
     'VirtualIntentDataSnapshot', 'VirtualIntentFilterSnapshot',

@@ -43,21 +43,35 @@ require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/gues
         "getpackageforintentsender", "getuidforintentsender")
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPendingIntentDispatcher.java",
         "RouteBrokerClient.launchActivity", "RouteBrokerClient.invokeComponent",
-        "VIRTUAL_PENDING_INTENT_CROSS_PACKAGE_DENIED")
+        "resolver().resolveOne", "pendingIntentCreatorPackage")
+require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestIntentResolver.java",
+        "Target resolveOne(", "packageManager.resolveActivity", "queryBroadcastReceivers")
+require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
+        "CROSS_PACKAGE_TARGET_NOT_INSTALLED", "requireAccessibleCrossPackageComponent",
+        "CALLER_PACKAGE_NAME")
 require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestFrameworkCallRouter.java",
         "OrderedReceiverFinishInterceptor", "PendingIntentFrameworkInterceptor")
 coordinator = require("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeReceiverCoordinator.java",
         "class RuntimeReceiverCoordinator", "dispatchManifestBroadcast(",
         "dispatchImplicitManifestBroadcast(", "dispatchDynamicBroadcast(",
         "IOrderedReceiverCompletion.Stub", "ReceiverLifecycleCoordinator")
+component_coordinator = require(
+        "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeComponentOperationCoordinator.java",
+        "class RuntimeComponentOperationCoordinator", "RuntimeReceiverCoordinator receiverCoordinator",
+        "receiverCoordinator.dispatchManifestBroadcast(",
+        "receiverCoordinator.dispatchImplicitManifestBroadcast(",
+        "receiverCoordinator.dispatchDynamicBroadcast(")
 broker_path = ROOT / "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java"
 broker = text(str(broker_path.relative_to(ROOT)))
 for token in ["RuntimeReceiverCoordinator receiverCoordinator",
-              "receiverCoordinator.dispatchManifestBroadcast(",
+              "RuntimeComponentOperationCoordinator componentOperationCoordinator"]:
+    if token not in broker:
+        errors.append(f"RuntimeBrokerService missing component/receiver coordinator ownership: {token}")
+for token in ["receiverCoordinator.dispatchManifestBroadcast(",
               "receiverCoordinator.dispatchImplicitManifestBroadcast(",
               "receiverCoordinator.dispatchDynamicBroadcast("]:
-    if token not in broker:
-        errors.append(f"RuntimeBrokerService missing coordinator delegation: {token}")
+    if token in broker:
+        errors.append(f"RuntimeBrokerService must not own Receiver dispatch: {token}")
 for forbidden in ["BrokerManifestReceiverRuntime", "BrokerOrderedReceiverRuntime",
                   "ManifestBroadcastDispatcher", "IOrderedReceiverCompletion.Stub"]:
     if forbidden in broker:

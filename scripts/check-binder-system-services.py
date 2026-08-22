@@ -119,10 +119,14 @@ require(
 require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java",
     "virtualSystemServiceBinder", "RuntimeKeys.VIRTUAL_SYSTEM_SERVICE_BINDER")
+guest_lifecycle = require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java",
+    "owner.systemServiceCoordinator.attach(session, spec)",
+    "owner.systemServiceCoordinator.stop(session)")
 broker = require(
     "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
     "RuntimeSystemServiceCoordinator systemServiceCoordinator",
-    "systemServiceCoordinator.attach(session, spec)", "systemServiceCoordinator.stop")
+    "systemServiceCoordinator.stop")
 broker_lines = len(broker.splitlines())
 if broker_lines > 1450:
     errors.append(f"RuntimeBrokerService exceeds bounded M4-T11 limit: {broker_lines} lines")

@@ -79,11 +79,13 @@ require("app/src/main/java/com/warden/controlledsandbox/VirtualSystemServiceStor
 
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/CompatibilityInvocationInterceptor.java",
         'case "webviewupdate"', 'case "deviceidentifiers"', 'case "gms"', 'case "oemidentifier"',
-        "VIRTUAL_WEBVIEW_MUTATION_DENIED", "VIRTUAL_GOOGLE_SERVICE_UNAVAILABLE")
+        "VIRTUAL_WEBVIEW_MUTATION_DENIED", "DEFERRED_GMS_RUNTIME")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkCompatibilityObjectFactory.java",
         "webViewPackageInfo", "packageInfo", "applicationInfo", "status")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ServiceManagerBinderHook.java",
-        "queryLocalInterface", "installDiscovered", "getInterfaceDescriptor")
+        "installDiscovered", "getInterfaceDescriptor")
+require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",
+        "queryLocalInterface")
 require("sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java",
         'attempt("webViewUpdate"', 'attempt("deviceIdentifiers"',
         'attempt("googleServiceBroker"', 'attempt("oemIdentifiers"')
