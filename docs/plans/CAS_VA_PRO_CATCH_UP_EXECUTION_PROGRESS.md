@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 01:50（Asia/Shanghai）
+更新时间：2026-08-23 03:04（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C2`
-当前任务：`C2-T06`
-下一任务：`C2-T06`
-最后完成任务：`C2-T05`
+当前任务：`C2-T07`
+下一任务：`C2-T07`
+最后完成任务：`C2-T06`
 
 ## 1. 使用规则
 
@@ -51,7 +51,7 @@
 | C2-T03 | Location | DONE | C2-T01,C2-T02 | `e327d329dba2feb93665566fa2721f5a2b6ed378` | §5 C2-T03 |
 | C2-T04 | Camera1/Camera2 | DONE | C2-T01,C2-T02 | `91cb86b62e2c8dd64b5047aee7b93609093eac36` | §5 C2-T04 |
 | C2-T05 | 调度与交互服务 | DONE | C2-T01,C1 | `547ba7ae` | §5 C2-T05 |
-| C2-T06 | 设备/网络/媒体服务 | PENDING | C2-T01,C2-T02 | - | - |
+| C2-T06 | 设备/网络/媒体服务 | DONE | C2-T01,C2-T02 | `048ca1b1` | §5 C2-T06 |
 | C2-T07 | Biometric 与长尾收敛 | PENDING | C2-T02..T06 | - | - |
 | C3-T01 | Native 绕过与兼容 corpus | PENDING | C1,C2-T01 | - | - |
 | C3-T02 | 文件/proc/network/FD | PENDING | C3-T01 | - | - |
@@ -1131,3 +1131,75 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C2-T06 至 C2-T07 尚未补齐对应 RD/API/OEM/商业方法证据；本任务仍不声称
   API33+、ARM/16KB、OEM、SX/XH 或 VA PRO 等价性。
 - **下一任务**：`C2-T06`；本轮不执行后续任务。
+
+### C2-T06：设备/网络/媒体服务
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 02:04 / 2026-08-23 03:04（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `22041211A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`，Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `a1a423c9bee79fb2b65270f70cb6c42e172a0529`；开始前完整读取任务书、进度账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md`、`docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 C2-T05 最后回执、Git/远端 HEAD 和动态 RD 环境；首个依赖满足的 `PENDING` 任务为
+  C2-T06。工作区原有 C1-GATE 未跟踪诊断/重试证据保持原样，未纳入本任务。
+- **实现摘要**：新增 C2-T06 设备/网络/媒体设计矩阵，按 identity、Telephony、Wi-Fi、
+  Connectivity/DNS/VPN、Audio/Media、Bluetooth、Sensor 的 typed getter、callback、权限、
+  双用户和清理边界分类；补齐 Telephony 注册/注销、Sensor listener lease、API32 `SensorEvent`
+  构造和 callback；把受控 SensorManager 正确绑定到 Guest Context，提供 event/flush/unregister
+  生命周期；新增 package-neutral `C2T06DeviceNetworkMediaActivity`、静态门禁和动态 RD runner。
+  runner 动态解析设备、安装 APK、准备双用户、执行 20/10 loop、负权限和 guest death probe，
+  并保存结构化 profile/APK/cleanup 证据。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `fixture-basic/src/main/AndroidManifest.xml`、`fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C2T06DeviceNetworkMediaActivity.java`、
+  `sandbox-framework/src/main/java/android/hardware/ControlledSensorManager.java`、
+  `sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java`、
+  `sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java`、
+  相关 clean-room Android test stubs、`tools/static_android_compile.py`、
+  `scripts/check-c2-t06-device-network-media.py`、`tools/capability/run_c2_t06_rd.py`、
+  `docs/review/C2_T06_DEVICE_NETWORK_MEDIA_DESIGN.md`、`docs/review/KNOWN_ISSUES.yaml`、
+  `verification/catch-up/C2-T06/`、SBOM 和 M5-T16 source-closure 回执。
+- **验收命令与结果**：C2-T06 static gate、M5-T8/M5-T10/M5-T14/M5-T15 checks、clean-room
+  `python tools/static_android_compile.py`、Python compile、`git diff --check` 全部 PASS；
+  `python tools/android_gradle_build_gate.py verify --timeout-seconds 1800` PASS；
+  `python scripts/generate-sbom.py --check` PASS；`python scripts/check-m5-t16-source-closure.py`
+  PASS。全量本地审计 `artifacts/capability-audit/all/20260822T190035Z/` 分类为 42 gates 中
+  34 PASS、8 个既有 KNOWN_ISSUE、0 NEW_REGRESSION；其诊断命令因既有问题返回 1，未误判为
+  本任务阻断。
+- **设备证据**：`python tools/capability/run_c2_t06_rd.py --instance RD测试 --loops 20
+  --clone-loops 10` 最终 PASS；主回执为
+  `verification/catch-up/C2-T06/c2-t06-rd-summary.json`，最终 raw logcat、逐步证据和 APK
+  SHA-256 位于 `artifacts/capability-audit/catch-up-c2-t06/20260822T190315Z/`。user0 20 loop、
+  user1 clone 10 loop、permission-negative 1 loop 均 PASS；user0/user1 profile hash 分别为
+  `a77f464d2f843e2c0b686cbd01d076ddf0cf8dbe413b1d97339b534c4907fb1a`、
+  `042b5b39a1d5cbd3ff5625b7737c22a87f28ea053c56a9056583687276f37ce0`；网络 callback、sensor
+  event/flush、Telephony/Wi-Fi/audio getter、Bluetooth state、DNS/VPN boundary、permission
+  check `-1`、显式注销和最终 `networkRegistered=false/sensorRegistered=false/
+  telephonyRegistered=false/focusHeld=false` 均有 trace。death probe 记录
+  `old_process_dead=true`，user0/clone clear 均 PASS。Media public manager 在该 API32 image
+  记录为明确 `NOT_SUPPORTED` boundary，未伪造 Host media truth；Telephony callback 同样保留
+  unsupported 边界日志。
+- **设备 APK SHA-256**：host
+  `fd907711017f2e1b577385cd27e2e25c4fc31b1c2f29453ceabdd0f77c706447`；companion32
+  `8f89c4fb6603f4aaf29cc906695e0d385231a6645ee49a83fb27a008a619839b`；fixture64
+  `e611017b47e76881c728a6e7d403a2a9a67e1fffe8daf6888e4e53bdce0704e4`；fixture32
+  `629682b3f361fd7c0dfc61c74a14449b8c02d82c96b0db928581fca9e768029f`。
+- **Known Issues**：`KI-R03-039` 已 FIXED（C2-T06 设备/网络/媒体方法级 RD 证据缺口）；
+  `KI-R03-040` 已 FIXED（C2-T05 后 SBOM 漂移）；`KI-R03-020`、`KI-R03-023`、
+  `KI-R03-024`、`KI-R03-025`、`KI-R03-026`、`KI-M10-005`、`KI-M10-006` 为既有非阻断项；
+  本任务无 BLOCKED。
+- **偏离任务书**：无验收范围偏离；本轮只执行 C2-T06。设备证据限定 RD API32，不外推
+  API33+、ARM/16KB、OEM、商业应用、SX/XH 或 VA PRO 等价性，`va_pro_equivalent` 保持
+  `NOT_PROVEN`；Bluetooth discovery、Media public manager、Telephony callback 和 DNS/VPN
+  unavailable adapters 的边界均在设计矩阵与 raw trace 中显式记录；失败均优先修复并重跑。
+- **实现提交 SHA**：`048ca1b183f76de37c70c3b4868edfd40e91c562`
+  （`feat(c2): [C2-T06] close device network media evidence gates`）。
+- **回执提交**：使用主题 `docs(progress): record [C2-T06] receipt` 单独提交；本回执将 C2-T06
+  从 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 HEAD。
+- **下一任务**：`C2-T07`；本轮不执行后续任务。
