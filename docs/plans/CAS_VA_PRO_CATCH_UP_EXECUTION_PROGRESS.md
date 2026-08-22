@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 23:12（Asia/Shanghai）
+更新时间：2026-08-23 01:50（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C2`
-当前任务：`C2-T04`
-下一任务：`C2-T05`
-最后完成任务：`C2-T04`
+当前任务：`C2-T06`
+下一任务：`C2-T06`
+最后完成任务：`C2-T05`
 
 ## 1. 使用规则
 
@@ -50,7 +50,7 @@
 | C2-T02 | PMS/Permission/AppOps/Attribution | DONE | C2-T01 | `16a9aa38fdf7f9227de06cadf7304033f59a4fa3` | §5 C2-T02 |
 | C2-T03 | Location | DONE | C2-T01,C2-T02 | `e327d329dba2feb93665566fa2721f5a2b6ed378` | §5 C2-T03 |
 | C2-T04 | Camera1/Camera2 | DONE | C2-T01,C2-T02 | `91cb86b62e2c8dd64b5047aee7b93609093eac36` | §5 C2-T04 |
-| C2-T05 | 调度与交互服务 | PENDING | C2-T01,C1 | - | - |
+| C2-T05 | 调度与交互服务 | DONE | C2-T01,C1 | `547ba7ae` | §5 C2-T05 |
 | C2-T06 | 设备/网络/媒体服务 | PENDING | C2-T01,C2-T02 | - | - |
 | C2-T07 | Biometric 与长尾收敛 | PENDING | C2-T02..T06 | - | - |
 | C3-T01 | Native 绕过与兼容 corpus | PENDING | C1,C2-T01 | - | - |
@@ -1064,3 +1064,70 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   API33+、ARM/16KB、OEM、SX/XH 或 VA PRO 等价性；C2-T04 的 Camera2 source format 与
   `RD_BASELINE` 边界按回执保持显式记录。
 - **下一任务**：`C2-T05`；本轮不执行后续任务。
+
+### C2-T05：调度与交互服务
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 23:20 / 2026-08-23 01:50（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `22041211A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`，Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `b1655e74611d4f3006582cfe334bc7a0c8341ea9`；开始前完整读取任务书、进度账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md`、`docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 C2-T04 最后回执、Git/远端 HEAD 和动态 RD 环境；首个依赖满足的 `PENDING` 任务为
+  C2-T05。工作区原有 C1-GATE 未跟踪诊断/重试证据保持原样，未纳入本任务。
+- **实现摘要**：新增 package-neutral C2-T05 fixture、事件接收器、设计矩阵、静态门禁和动态
+  RD runner，闭合 Notification channel/post/click/delete、exact Alarm schedule/callback/
+  cancel、JobInfo constraints/schedule/callback/finish、FGS declared/runtime `dataSync` type/
+  promotion/stop，以及 Window token、Display context、Input/IME request/return 证据；增加
+  Guest Service stop acknowledgement、typed XML hex integer、Guest display context 和 Host
+  bridge metadata 投影修复。普通循环 PendingIntent 使用稳定 request identity +
+  `FLAG_UPDATE_CURRENT`，避免长循环产生无界等价远端记录。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java`、
+  `fixture-basic/src/main/AndroidManifest.xml`、`fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/`、
+  `sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java`、
+  `sandbox-domain/src/testHarness/java/com/warden/controlledsandbox/domain/`、
+  `sandbox-runtime/src/main/AndroidManifest.xml`、`sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/`、
+  `scripts/check-c2-t05-scheduling-interaction.py`、`tools/capability/run_c2_t05_rd.py`、
+  `tools/static_android_compile.py`、`docs/review/C2_T05_SCHEDULING_INTERACTION_DESIGN.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、`verification/catch-up/C2-T05/`。
+- **验收命令与结果**：`python scripts/check-c2-t05-scheduling-interaction.py` PASS；通知/Job、
+  Alarm/Notification、JobScheduler policy gates PASS；`python tools/static_android_compile.py`
+  PASS（module self-tests）；`build-device-test-apks.ps1` 清洁构建 PASS（766 tasks），
+  `:fixture-compat32:check :fixture-compat32:assembleDebug` PASS，
+  `verify-device-test-artifacts.py --android-tools --profile device-lab` PASS；Python compile 和
+  `git diff --check` PASS。首次 50-loop runner 因等待预算不足在 31 轮后提前判失败，设备日志显示
+  循环仍通过；修复 runner 每轮 18 秒预算后重跑，最终 `run_c2_t05_rd.py --instance RD测试
+  --loops 50` PASS，未记录 BLOCKED。
+- **设备证据**：主回执为 `verification/catch-up/C2-T05/c2-t05-rd-summary.json`；本地验收清单为
+  `verification/catch-up/C2-T05/c2-t05-local-verification.json`；设计矩阵为
+  `docs/review/C2_T05_SCHEDULING_INTERACTION_DESIGN.md`；最终 raw logcat 与设备证据位于
+  `artifacts/capability-audit/catch-up-c2-t05/20260822T173726Z/`。50/50 loop 的 notification
+  return/click/delete/pass、alarm return/callback/pass、job return/callback、FGS return/
+  promoted/stop 和 loop pass 均为 50；FGS type 全部为 `1`；window token、display context、
+  IME host catalog isolation 均 PASS。死亡探针使用 `run-as` 终止旧 Guest，旧 PID 已死、替代
+  进程 callback 到达，cleanup PASS，notification/alarm residue 均为 false。
+- **设备 APK SHA-256**：host
+  `5bc966f24861c9162f460a5b5bd69da131d0fdffe9aa160fdef3d727fec5dff5`；companion32
+  `399ac60dad484b5eeef0ae6fd4bd67f822140dc58b7a74d3a948a66b820730d4`；fixture64
+  `b42ae1a3266d76621c75fb9f2642d03fa01530908ccdbffd27839764da24ff13`；fixture32
+  `187803a00ea8174858c2ce0ea2f8cdd6f0860f044795ef128eadff7151e9ef6e`。
+- **Known Issues**：`KI-R03-038` 已 FIXED（C2-T05 调度与交互方法级 RD 证据缺口）；
+  `KI-R03-020`、`KI-R03-023`、`KI-R03-024`、`KI-R03-025`、`KI-R03-026`、`KI-M10-005`、
+  `KI-M10-006`、`KI-M10-007` 为既有非阻断项；本任务无 BLOCKED。
+- **偏离任务书**：无验收范围偏离；本轮只执行 C2-T05。设备证据限定 RD API32，不外推
+  API33+、ARM/16KB、OEM、商业应用、SX/XH 或 VA PRO 等价性，`va_pro_equivalent` 保持
+  `NOT_PROVEN`；失败优先修复并重跑。
+- **实现提交 SHA**：`547ba7ae`（`feat(c2): [C2-T05] close scheduling and interaction evidence gates`）。
+- **回执提交**：使用主题 `docs(progress): record [C2-T05] receipt` 单独提交；本回执将 C2-T05
+  从 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：实现提交先行提交；回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads` 对比最终
+  远端 HEAD 与本地 HEAD。
+- **遗留风险**：C2-T06 至 C2-T07 尚未补齐对应 RD/API/OEM/商业方法证据；本任务仍不声称
+  API33+、ARM/16KB、OEM、SX/XH 或 VA PRO 等价性。
+- **下一任务**：`C2-T06`；本轮不执行后续任务。
