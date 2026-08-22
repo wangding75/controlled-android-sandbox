@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 18:06（Asia/Shanghai）
+更新时间：2026-08-22 21:31（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C2`
-当前任务：`C2-T03`
-下一任务：`C2-T03`
-最后完成任务：`C2-T02`
+当前任务：`C2-T04`
+下一任务：`C2-T04`
+最后完成任务：`C2-T03`
 
 ## 1. 使用规则
 
@@ -48,7 +48,7 @@
 | C1-T07 | Process/ABI/Recovery | DONE | C1-T01..T06 | `5d7195cb475108d7c2e864913a18ce6b778a70c2` | §5 C1-T07 |
 | C2-T01 | SX/XH 系统服务方法清单 | DONE | C1 | `ebcc31841f805502a0791f245b1df505333dfa04` | §5 C2-T01 |
 | C2-T02 | PMS/Permission/AppOps/Attribution | DONE | C2-T01 | `16a9aa38fdf7f9227de06cadf7304033f59a4fa3` | §5 C2-T02 |
-| C2-T03 | Location | PENDING | C2-T01,C2-T02 | - | - |
+| C2-T03 | Location | DONE | C2-T01,C2-T02 | `e327d329dba2feb93665566fa2721f5a2b6ed378` | §5 C2-T03 |
 | C2-T04 | Camera1/Camera2 | PENDING | C2-T01,C2-T02 | - | - |
 | C2-T05 | 调度与交互服务 | PENDING | C2-T01,C1 | - | - |
 | C2-T06 | 设备/网络/媒体服务 | PENDING | C2-T01,C2-T02 | - | - |
@@ -931,3 +931,68 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C2-T03 至 C2-T07 尚未补齐 SX/XH F1-F5 的 RD_API32 L3 方法证据；API33+、
   ARM/16KB、OEM、商业应用和 VA PRO 等价性仍未验证；P2 长尾按本清单保持显式 `UNVERIFIED`。
 - **下一任务**：`C2-T03`；本轮不执行后续任务。
+
+### C2-T03：Location 通用能力闭环
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 18:06 / 21:31（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `22041211A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `be8f23a181ae4ec292a0685289bd7e9298899ad2`；开始前完整读取任务书、进度账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md` 与 `docs/COMMIT_IDENTITY_POLICY.md`，
+  核对最后回执为 `C2-T02`，执行 `git fetch origin` 后确认本地与远端同 HEAD；首个依赖满足的
+  `PENDING` 任务为 C2-T03。工作区原有 C1-GATE 未跟踪诊断/重试证据保持原样，未纳入本任务。
+- **实现摘要**：补齐 Location 的 profile-driven provider/status、last/current（含
+  `LocationRequest`）、listener 注册/注销、NMEA、GNSS、权限变化、前后台、进程关闭和双用户
+  隔离生命周期；回调在注销、clear、权限拒绝、profile 不可用和 manager close 后 fail-closed，
+  PendingIntent/test-provider 不支持路径显式返回负面结果。Guest Hook 使用动态 capability policy，
+  explicit release 释放 capability lease；新增 package-neutral Location campaign、动态 MuMu RD
+  runner、设计矩阵、静态门禁和结构化设备证据。构建所需的既有 API/lint 注解修复一并纳入实现。
+- **变更文件**：`sandbox-framework/src/main/java/android/location/ControlledLocationManager.java`、
+  `sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/LocationServiceHook.java`、
+  `sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java`、
+  `app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `fixture-basic/src/main/AndroidManifest.xml`、`fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/LocationCampaignActivity.java`、
+  `scripts/check-c2-t03-location.py`、`tools/capability/run_c2_t03_rd.py`、
+  `docs/review/C2_T03_LOCATION_DESIGN.md`、`docs/review/KNOWN_ISSUES.yaml`、
+  `verification/catch-up/C2-T03/` 及相关 static stub、lint、SBOM 文件。
+- **验收命令与结果**：`build-device-test-apks.ps1` PASS（locked host/fixture/companion32 APK set）；
+  `:fixture-compat32:assembleDebug` PASS；`verify-device-test-artifacts.py --android-tools --profile device-lab`
+  PASS（locked host/fixture64/fixture32/companion32 APK set）；`python tools/static_android_compile.py`
+  PASS，160/160 self-tests；C2-T03、pre-device hardening、M5-T8、Campaign validator、Campaign
+  infrastructure 12 tests、SBOM、Python compile 与 `git diff --check` 全部 PASS。全量本地审计为
+  42 gates 中 34 PASS、8 个既有 KNOWN_ISSUE、0 NEW_REGRESSION；该诊断命令因既有问题返回 1，
+  未把它们误判为本任务阻断。
+- **设备证据**：`python tools/capability/run_c2_t03_rd.py --instance RD测试` 最终 PASS；主回执为
+  `verification/catch-up/C2-T03/c2-t03-rd-summary.json`，本地验收清单为
+  `verification/catch-up/C2-T03/c2-t03-local-verification.json`，设计矩阵为
+  `docs/review/C2_T03_LOCATION_DESIGN.md`，raw logcat 与逐步证据位于
+  `artifacts/capability-audit/catch-up-c2-t03/20260822T122226Z/`。user0 permission-denied 5 秒
+  callbacks/NMEA/current/current-request 均为 0；user0 profile-update 1800 秒为 callbacks/NMEA
+  `1801/1801`、current/current-request `1/1`；user1 isolation 1800 秒为 `1800/1800`、`1/1`；
+  user1 clear 5 秒全部为 0。两个稳定阶段均记录 GNSS `started/firstFix/stopped`，每阶段注销 1 次，
+  force-stop 后 `post_stop_processes` 为空；user0/user1 坐标、provider、accuracy、时间和 callback
+  order 均通过隔离校验。
+- **设备 APK SHA-256**：host
+  `ABF6F8BB061F2A2634C83F95C1BD8ED947F6D51CCC0A0F5E971458C443A9904D`；companion32
+  `C1072E638210802492242D310893AF6CA06C9C6A917B3FC62904415FC5C5BAA5`；fixture64
+  `2DB21ECDB66BAB821A28803D2B5C3F32355DC1148CCC222FB754D9270C8ED748`；fixture32
+  `E783D04A7614332312B98B47E8CB3DD287E802DEFC46804747621011FE5C0D11`。
+- **Known Issues**：`KI-R03-034` 已 FIXED（Location manager 权限感知的生命周期清理）；
+  `KI-R03-035` 已 RECORDED（GNSS 为 profile-driven callback，非真实 HAL satellite object）；
+  `KI-R03-020`、`KI-R03-023`、`KI-R03-024`、`KI-R03-025`、`KI-R03-026`、`KI-M10-005`、
+  `KI-M10-006`、`KI-M10-007` 为既有非阻断项；本任务无 BLOCKED。
+- **偏离任务书**：无验收范围偏离；本轮只执行 C2-T03。设备证据限定 RD API32，不外推 API33+、
+  ARM/16KB、OEM、商业应用、SX/XH 或 VA PRO 等价性，均保持 `NOT_PROVEN`；失败均优先修复并重跑。
+- **实现提交 SHA**：`e327d329dba2feb93665566fa2721f5a2b6ed378`
+  （`feat(location): [C2-T03] close Guest location lifecycle gates`）。
+- **回执提交**：将使用主题 `docs(progress): record [C2-T03] receipt` 单独提交；本回执将 C2-T03
+  从 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 HEAD。
+- **下一任务**：`C2-T04`；本轮不执行后续任务。
