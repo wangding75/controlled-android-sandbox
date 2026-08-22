@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 16:41（Asia/Shanghai）
+更新时间：2026-08-22 18:06（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C2`
-当前任务：`C2-T02`
-下一任务：`C2-T02`
-最后完成任务：`C2-T01`
+当前任务：`C2-T03`
+下一任务：`C2-T03`
+最后完成任务：`C2-T02`
 
 ## 1. 使用规则
 
@@ -47,7 +47,7 @@
 | C1-T06 | Package 生命周期 | DONE | C1-T04,C1-T05 | `68f28f43b5d35bc4b85a03938b5d7009f9e6f277` | §5 C1-T06 |
 | C1-T07 | Process/ABI/Recovery | DONE | C1-T01..T06 | `5d7195cb475108d7c2e864913a18ce6b778a70c2` | §5 C1-T07 |
 | C2-T01 | SX/XH 系统服务方法清单 | DONE | C1 | `ebcc31841f805502a0791f245b1df505333dfa04` | §5 C2-T01 |
-| C2-T02 | PMS/Permission/AppOps/Attribution | PENDING | C2-T01 | - | - |
+| C2-T02 | PMS/Permission/AppOps/Attribution | DONE | C2-T01 | `16a9aa38fdf7f9227de06cadf7304033f59a4fa3` | §5 C2-T02 |
 | C2-T03 | Location | PENDING | C2-T01,C2-T02 | - | - |
 | C2-T04 | Camera1/Camera2 | PENDING | C2-T01,C2-T02 | - | - |
 | C2-T05 | 调度与交互服务 | PENDING | C2-T01,C1 | - | - |
@@ -870,3 +870,64 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C2-T02 至 C2-T07 尚未补齐 SX/XH F1-F5 的 RD_API32 L3 方法证据；API33+、ARM/16KB、
   OEM、商业应用和 VA PRO 等价性仍未验证；P2 长尾按本清单保持显式 `UNVERIFIED`。
 - **下一任务**：`C2-T02`；本轮不执行后续任务。
+
+### C2-T02：PMS/Permission/AppOps/Attribution
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 16:50 / 18:02（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `22041211A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`，Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `4d912297d91d86efa6181d72f4f7c7c8f60483bc`；开始前已完整读取任务书、进度账本和治理文件，
+  通过继续执行预检，确认上一任务 `C2-T01` 已 DONE、远端同 HEAD，首个依赖满足任务为 C2-T02。
+  工作区原有 C1-GATE 未跟踪诊断/重试证据保持原样，未纳入本任务。
+- **实现摘要**：统一 PMS、Permission、AppOps 的 Host/Guest package、UID 和 attribution
+  边界；Guest Context 生成 API31+ AttributionSource，AppOps note/start 使用真实
+  `SyncNotedAppOp` mode 构造；Broker 直接 Provider transaction 安装并恢复 Guest callback
+  identity；clear instance data 同步清除权限/AppOps policy。新增 package-neutral C2-T02
+  probe、Provider callback 证据、policy-state reset audit 和动态 RD runner。
+- **变更文件**：`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`；
+  `app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java`；
+  `app/src/testHarness/java/com/warden/controlledsandbox/RuntimePermissionWorkflowSelfTest.java`；
+  `fixture-basic/src/main/AndroidManifest.xml`、`fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/FixtureProvider.java`、
+  `PmsPermissionAttributionProbeActivity.java`；
+  `sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java`、
+  `FrameworkIdentityProxySelfTest.java`；
+  `sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestAttributionSourceBridge.java`、
+  `GuestComponentRuntime.java`、`GuestContext.java`、`GuestPackageContext.java`、
+  `GuestRuntimeBrokerBridge.java`、`RuntimeKeys.java`；
+  `scripts/check-runtime-permission-workflow.py`；`tools/capability/run_c2_t02_rd.py`；
+  `docs/review/C2_T02_PMS_PERMISSION_APPOPS_ATTRIBUTION_DESIGN.md`；
+  `verification/catch-up/C2-T02/`；`verification/catch-up/C0-T01/continuation-preflight.json`。
+- **验收命令与结果**：`python tools/static_android_compile.py` PASS，160/160 self-test PASS、
+  0 non-pass；pre-device hardening PASS（staticTests=160）；runtime permission、virtual
+  package state、PackageManager query/resolve、package-service boundary、Binder system-service
+  checks 全部 PASS；四模块最终 Gradle assemble PASS；`git diff --check` PASS。
+  `python tools/capability/run_c2_t02_rd.py --instance RD测试` 最终 PASS，17 步完成。
+  中间发现的 API31+ static stub/JVM 反射差异、effective AppOps 与 raw reset 口径差异及一次
+  probe 启动 gate 时序失败均已修复并重跑；未记录 `BLOCKED`。
+- **设备证据**：主回执为 `verification/catch-up/C2-T02/c2-t02-rd-summary.json`；本地验收清单为
+  `verification/catch-up/C2-T02/c2-t02-local-verification.json`；设计与方法矩阵为
+  `docs/review/C2_T02_PMS_PERMISSION_APPOPS_ATTRIBUTION_DESIGN.md`；最终 raw logcat 与逐步
+  设备证据位于 `artifacts/capability-audit/catch-up-c2-t02/20260822T100204Z/`。
+  user0 的 CAMERA `DENIED/IGNORED`、user1 的 `GRANTED/ALLOWED`、PMS/Permission 负面边界、
+  AppOps check/note/start/proxy/checkPackage、Guest/Provider Attribution callback、clear/delete
+  收敛及双用户隔离均在回执中记录。
+- **Known Issues**：`KI-R03-020`、`KI-R03-023`、`KI-R03-024`、`KI-R03-025`、`KI-R03-026`、
+  `KI-M10-005`、`KI-M10-006`、`KI-M10-007` 均为既有非阻断项；本任务未新增 runtime issue，
+  VA PRO 等价性保持 `NOT_PROVEN`。
+- **偏离任务书**：无验收范围偏离；本轮只执行 C2-T02，设备证据限定 RD API32，不外推 API33+、
+  ARM/16KB、OEM、SX/XH 或商业等价性；失败优先修复并重跑，未记录 `BLOCKED`。
+- **实现提交 SHA**：`16a9aa38fdf7f9227de06cadf7304033f59a4fa3`
+  （`feat(c2): [C2-T02] close PMS permission AppOps attribution boundary`）。
+- **回执提交**：使用主题 `docs(progress): record [C2-T02] receipt` 单独提交；本回执将 C2-T02
+  从 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 HEAD。
+- **遗留风险**：C2-T03 至 C2-T07 尚未补齐 SX/XH F1-F5 的 RD_API32 L3 方法证据；API33+、
+  ARM/16KB、OEM、商业应用和 VA PRO 等价性仍未验证；P2 长尾按本清单保持显式 `UNVERIFIED`。
+- **下一任务**：`C2-T03`；本轮不执行后续任务。
