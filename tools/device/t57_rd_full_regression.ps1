@@ -31,8 +31,32 @@ foreach ($case in $cases) {
         Start-Sleep -Milliseconds 750
     }
     Write-Output "CASE_BEGIN $case"
-    & (Join-Path $PSScriptRoot $case) -InstanceName $InstanceName -Serial $Serial -OutputDirectory $OutputDirectory
+    $caseOutput = @(& (Join-Path $PSScriptRoot $case) -InstanceName $InstanceName -Serial $Serial `
+        -OutputDirectory $OutputDirectory 2>&1)
     $caseExit = $LASTEXITCODE
+    $caseOutput | ForEach-Object { Write-Output $_ }
+    $caseText = ($caseOutput | Out-String)
+    if ($caseExit -ne 0 -and $Serial -and $caseText -match 'daemon still not running') {
+        # ADB can briefly lose its host daemon after a long device campaign. Retry only this
+        # transport-level symptom once after proving the resolved device is back in `device`
+        # state; runtime/probe assertions remain fail-closed and are never retried here.
+        Write-Output "CASE_RETRY $case reason=ADB_DAEMON_TRANSIENT"
+        & adb start-server 2>$null | Out-Null
+        $adbReady = $false
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {
+            $state = (& adb -s $Serial get-state 2>$null | Out-String).Trim()
+            if ($state -eq 'device') { $adbReady = $true; break }
+            Start-Sleep -Milliseconds 500
+        }
+        if ($adbReady) {
+            $caseOutput = @(& (Join-Path $PSScriptRoot $case) -InstanceName $InstanceName -Serial $Serial `
+                -OutputDirectory $OutputDirectory 2>&1)
+            $caseExit = $LASTEXITCODE
+            $caseOutput | ForEach-Object { Write-Output $_ }
+        } else {
+            Write-Output "CASE_RETRY_BLOCKED $case reason=ADB_DEVICE_NOT_READY"
+        }
+    }
     Write-Output "CASE_END $case exit=$caseExit"
     if ($caseExit -ne 0) { $failed = $true }
 }

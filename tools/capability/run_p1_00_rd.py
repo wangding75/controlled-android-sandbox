@@ -68,22 +68,11 @@ def debug_command(
         if probe.returncode != 0:
             break
         time.sleep(0.1)
-    started = run_adb(
-        serial,
-        [
-            "shell",
-            "am",
-            "start",
-            "-S",
-            "-W",
-            "-f",
-            "0x10008000",
-            "-n",
-            DEBUG_ACTIVITY,
-            *extras,
-        ],
-        check=False,
-    )
+    start_args = ["shell", "am", "start"]
+    if force_stop_host:
+        start_args.append("-S")
+    start_args.extend(["-W", "-f", "0x10008000", "-n", DEBUG_ACTIVITY, *extras])
+    started = run_adb(serial, start_args, check=False)
     try:
         result = read_debug_command_result(
             serial, deadline_sec=deadline_sec,

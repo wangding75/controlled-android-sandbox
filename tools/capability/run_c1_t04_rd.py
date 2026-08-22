@@ -63,6 +63,26 @@ def _command(serial: str, iterations: int, pressure_seconds: int) -> dict[str, A
             *TRUST,
         ],
         deadline_sec=max(240, pressure_seconds + 240),
+        force_stop_host=False,
+    )
+
+
+def _warm_host(serial: str) -> dict[str, Any]:
+    """Establish a visible Host/Guest window before the concurrent campaign.
+
+    MuMu API32 can reject a cold framework launch as a background activity start even though
+    the runtime path is healthy.  This warm-up is a harness precondition only; campaign
+    assertions still require every Provider marker and fail on any runtime failure marker.
+    """
+    return safe_debug_command(
+        serial,
+        [
+            "--es", "command", "launch",
+            "--es", "package", GUEST_PACKAGE,
+            "--ei", "user", "0",
+            *TRUST,
+        ],
+        deadline_sec=120,
         force_stop_host=True,
     )
 
@@ -150,6 +170,11 @@ def main() -> int:
     raw_dir = artifacts_dir("catch-up-c1-t04")
     install = install_rd_apks(serial)
     _reset(serial)
+    warm = _warm_host(serial)
+    write_json(raw_dir / "warm-command.json", warm)
+    if warm.get("status") != "PASS":
+        raise RuntimeError(f"provider-campaign-warmup-failed: {warm.get('detail', warm)}")
+    time.sleep(4.0)
     logcat_path = raw_dir / "provider-campaign-logcat.txt"
     process, handle = _stream_logcat(serial, logcat_path)
     started_at = time.monotonic()

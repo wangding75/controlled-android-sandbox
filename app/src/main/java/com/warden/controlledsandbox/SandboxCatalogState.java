@@ -112,7 +112,11 @@ final class SandboxCatalogState {
         if (imported == null) throw new IllegalArgumentException("imported record is required");
         SandboxRecord previous = findRecord(imported.packageName);
         long firstInstallAt = previous == null ? nowMs : previous.firstInstallAt;
-        SandboxRecord timedImport = imported.withInstallTimes(firstInstallAt, nowMs);
+        // Device wall clocks can move backwards across an emulator reboot or snapshot restore.
+        // Preserve the install-time invariant instead of rejecting an otherwise valid package
+        // update when the new wall-clock timestamp predates the historical first install.
+        long lastUpdateAt = Math.max(firstInstallAt, nowMs);
+        SandboxRecord timedImport = imported.withInstallTimes(firstInstallAt, lastUpdateAt);
         List<SandboxRecord> nextRecords = records();
         nextRecords.removeIf(record -> record.packageName.equals(imported.packageName));
         nextRecords.add(timedImport);

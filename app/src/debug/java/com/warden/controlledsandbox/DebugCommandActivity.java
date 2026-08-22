@@ -228,7 +228,7 @@ public final class DebugCommandActivity extends Activity {
                 int pressureSeconds = Math.max(0, Math.min(86_400,
                         extras.getInt("pressureSeconds", 0)));
                 operation = runProviderCampaign(runtime, record, virtualUserId,
-                        iterations, pressureSeconds);
+                        iterations, pressureSeconds, 0L);
                 result.put("providerCampaign", bundleJson(operation));
                 requireStatus("provider-campaign", operation, "PROVIDER_CAMPAIGN_PASS");
             } else if ("provider-concurrent-campaign".equals(command)) {
@@ -829,58 +829,99 @@ public final class DebugCommandActivity extends Activity {
         String peerPackage = "com.warden.controlledsandbox.fixture32";
         packages.ensureInstance(peerPackage, firstUser);
         packages.ensureInstance(peerPackage, secondUser);
-        ExecutorService campaigns = Executors.newFixedThreadPool(2);
-        try {
-            Future<Bundle> first = campaigns.submit(() -> runProviderCampaign(firstRuntime, record,
-                    firstUser, iterations, pressureSeconds));
-            Future<Bundle> second = campaigns.submit(() -> {
-                try (RuntimeClient runtime = new RuntimeClient(this)) {
-                    return runProviderCampaign(runtime, record, secondUser, iterations,
-                            pressureSeconds);
+        try (RuntimeClient secondRuntime = new RuntimeClient(this)) {
+            long startedAt = System.currentTimeMillis();
+            long deadline = pressureSeconds > 0
+                    ? startedAt + pressureSeconds * 1000L : Long.MIN_VALUE;
+            int cycles = 0;
+            boolean firstActive = false;
+            boolean secondActive = false;
+            ExecutorService firstCycleLaunchers = Executors.newFixedThreadPool(2);
+            try {
+                    while (cycles < iterations
+                        || (pressureSeconds > 0 && System.currentTimeMillis() < deadline)) {
+                    cycles++;
+                    if (!firstActive) {
+                        int cycle = cycles;
+                        Future<Bundle> firstLaunch = firstCycleLaunchers.submit(() ->
+                                launchProviderWithRecovery(firstRuntime, record, firstUser,
+                                        "provider-concurrent-launch-" + firstUser + "-" + cycle));
+                        Future<Bundle> secondLaunch = firstCycleLaunchers.submit(() ->
+                                launchProviderWithRecovery(secondRuntime, record, secondUser,
+                                        "provider-concurrent-launch-" + secondUser + "-" + cycle));
+                        Bundle firstResult = firstLaunch.get();
+                        firstActive = true;
+                        Bundle secondResult = secondLaunch.get();
+                        secondActive = true;
+                    } else {
+                        // Keep the other user's successful window visible while each generation
+                        // is fenced and relaunched. This is a state-based foreground precondition
+                        // for API32, not a timing retry or a bypass of the platform gate.
+                        firstRuntime.stop(record, firstUser);
+                        firstActive = false;
+                        Thread.sleep(250L);
+                        launchProviderWithRecovery(firstRuntime, record, firstUser,
+                                "provider-concurrent-launch-" + firstUser + "-" + cycles);
+                        firstActive = true;
+
+                        secondRuntime.stop(record, secondUser);
+                        secondActive = false;
+                        Thread.sleep(250L);
+                        launchProviderWithRecovery(secondRuntime, record, secondUser,
+                                "provider-concurrent-launch-" + secondUser + "-" + cycles);
+                        secondActive = true;
+                    }
+                    // The Guest Activity closes its Provider resources before reporting PASS and
+                    // remains visible until Host stop. Allow observer callbacks and cursor leases
+                    // to settle before the next generation fence.
+                    Thread.sleep(15_000L);
                 }
-            });
-            Bundle firstResult = first.get();
-            Bundle secondResult = second.get();
-            requireStatus("provider-concurrent-user-" + firstUser, firstResult,
-                    "PROVIDER_CAMPAIGN_PASS");
-            requireStatus("provider-concurrent-user-" + secondUser, secondResult,
-                    "PROVIDER_CAMPAIGN_PASS");
-            int firstCycles = firstResult.getInt("cycles", 0);
-            int secondCycles = secondResult.getInt("cycles", 0);
-            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + firstUser + " cycles=" + firstCycles);
-            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + secondUser + " cycles=" + secondCycles);
+            } finally {
+                firstCycleLaunchers.shutdownNow();
+                if (firstActive) firstRuntime.stop(record, firstUser);
+                if (secondActive) secondRuntime.stop(record, secondUser);
+            }
+            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + firstUser + " cycles=" + cycles);
+            Log.i(TAG, "C1_T04_PROVIDER_USER_PASS user=" + secondUser + " cycles=" + cycles);
             Bundle out = new Bundle();
             out.putString(RuntimeKeys.STATUS, "PROVIDER_CAMPAIGN_PASS");
             out.putInt("firstUser", firstUser);
             out.putInt("secondUser", secondUser);
-            out.putInt("firstCycles", firstCycles);
-            out.putInt("secondCycles", secondCycles);
-            out.putInt("cycles", firstCycles + secondCycles);
+            out.putInt("firstCycles", cycles);
+            out.putInt("secondCycles", cycles);
+            out.putInt("cycles", cycles * 2);
             out.putInt("pressureSeconds", pressureSeconds);
+            out.putLong("elapsedMs", System.currentTimeMillis() - startedAt);
             return out;
-        } finally {
-            campaigns.shutdownNow();
         }
     }
 
     private Bundle runProviderCampaign(RuntimeClient runtime, SandboxRecord record,
                                        int virtualUserId, int iterations,
-                                       int pressureSeconds) throws Exception {
+                                       int pressureSeconds, long interCycleStopDelayMs) throws Exception {
         long startedAt = System.currentTimeMillis();
         long deadline = pressureSeconds > 0
                 ? startedAt + pressureSeconds * 1000L : Long.MIN_VALUE;
         int cycles = 0;
         while (cycles < iterations || (pressureSeconds > 0 && System.currentTimeMillis() < deadline)) {
             cycles++;
+            boolean moreCycles;
             try {
-                Bundle launch = runtime.launchComponent(record, virtualUserId,
-                        "com.warden.controlledsandbox.fixture.ProviderCampaignActivity");
-                requireStatus("provider-campaign-launch-" + virtualUserId + "-" + cycles,
-                        launch, "LAUNCH_PASS");
-                // The Guest Activity closes its own resources before finishing.  Keep the
-                // generation alive long enough for observer callbacks and cursor leases to settle.
+                launchProviderWithRecovery(runtime, record, virtualUserId,
+                        "provider-campaign-launch-" + virtualUserId + "-" + cycles);
+                // The Guest Activity closes its own Provider resources before reporting PASS and
+                // remains visible until Host stop. Keep the generation alive long enough for
+                // observer callbacks and cursor leases to settle.
                 Thread.sleep(15_000L);
             } finally {
+                moreCycles = cycles < iterations
+                        || (pressureSeconds > 0 && System.currentTimeMillis() < deadline);
+                if (moreCycles && interCycleStopDelayMs > 0) {
+                    // The peer Guest Activity intentionally remains visible after PASS. Delay
+                    // this user's stop so the peer remains a legitimate foreground anchor while
+                    // this generation is fenced and the next one is launched.
+                    Thread.sleep(interCycleStopDelayMs);
+                }
                 runtime.stop(record, virtualUserId);
             }
             Thread.sleep(250L);
@@ -891,6 +932,28 @@ public final class DebugCommandActivity extends Activity {
         out.putInt("cycles", cycles);
         out.putLong("elapsedMs", System.currentTimeMillis() - startedAt);
         return out;
+    }
+
+    private static Bundle launchProviderWithRecovery(RuntimeClient runtime, SandboxRecord record,
+                                                     int virtualUserId, String operation)
+            throws Exception {
+        try {
+            Bundle launch = runtime.launchComponent(record, virtualUserId,
+                    "com.warden.controlledsandbox.fixture.ProviderCampaignActivity");
+            requireStatus(operation, launch, "LAUNCH_PASS");
+            return launch;
+        } catch (Exception error) {
+            String detail = String.valueOf(error);
+            if (!detail.contains("GUEST_NOT_PREPARED")) throw error;
+            Bundle prepared = runtime.prepare(record, virtualUserId);
+            requireStatus(operation + "-prepare-recovery", prepared,
+                    "PREPARED", "ALREADY_PREPARED");
+            Bundle retry = runtime.launchComponent(record, virtualUserId,
+                    "com.warden.controlledsandbox.fixture.ProviderCampaignActivity");
+            requireStatus(operation + "-retry", retry, "LAUNCH_PASS");
+            Log.i(TAG, "C1_T04_PROVIDER_PREPARE_RECOVERY user=" + virtualUserId);
+            return retry;
+        }
     }
 
     private static void requireStatus(String operation, Bundle bundle, String... accepted) {

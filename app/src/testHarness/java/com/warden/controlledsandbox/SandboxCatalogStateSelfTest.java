@@ -21,6 +21,10 @@ public final class SandboxCatalogStateSelfTest {
                 "first install timestamp survives upgrade");
         require(upgraded.records().get(0).lastUpdateAt == 200L,
                 "last update timestamp advances on upgrade");
+        SandboxCatalogState clockRollback = upgraded.withImported(alphaV2, 0L);
+        require(clockRollback.records().get(0).firstInstallAt == alphaV1.firstInstallAt
+                        && clockRollback.records().get(0).lastUpdateAt == alphaV1.firstInstallAt,
+                "clock rollback violated install timestamp ordering");
 
         SandboxCatalogState explicit = upgraded.withEnsuredInstance("com.example.alpha", 7, 250L);
         require(explicit.instances().size() == 2, "explicit test instance added");

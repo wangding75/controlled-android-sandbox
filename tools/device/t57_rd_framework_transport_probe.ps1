@@ -100,7 +100,7 @@ try {
     # and must still arrive with Guest Context identity.
     for ($attempt = 0; $attempt -lt 4; $attempt++) {
         Invoke-AdbChecked @('-s', $device.Serial, 'shell', 'am', 'broadcast',
-            '-a', 'com.warden.controlledsandbox.fixture.DYNAMIC_PING',
+            '--receiver-foreground', '-a', 'com.warden.controlledsandbox.fixture.DYNAMIC_PING',
             '--es', 'frameworkDynamicReceiverValue', 'dynamic-framework-probe') | Out-Null
         Start-Sleep -Milliseconds 500
     }

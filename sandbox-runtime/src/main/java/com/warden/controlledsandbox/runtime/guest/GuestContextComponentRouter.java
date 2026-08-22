@@ -16,6 +16,9 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.domain.component.provider.UriGrantRegistry;
 import java.util.IdentityHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /** Standard Context component APIs backed by the virtual runtime Broker. */
 final class GuestContextComponentRouter {
@@ -24,6 +27,14 @@ final class GuestContextComponentRouter {
     private final GuestRuntimeBrokerBridge bridge;
     private final GuestIntentResolver resolver;
     private final GuestDynamicReceiverRegistry receivers;
+    /**
+     * Android keeps ordered broadcasts in submission order.  A framework-routed explicit
+     * broadcast cannot use the normal synchronous component call from the Guest main thread,
+     * because the target ActivityThread receiver callback must be allowed to re-enter that same
+     * thread.  Keep the broker calls off the main thread, but serialize them per Guest Context so
+     * two back-to-back sendOrderedBroadcast calls cannot overtake one another.
+     */
+    private final ExecutorService frameworkOrderedBroadcasts;
     private final IdentityHashMap<ServiceConnection, ConnectionRecord> connections = new IdentityHashMap<>();
     private volatile boolean closed;
 
@@ -35,6 +46,12 @@ final class GuestContextComponentRouter {
         this.bridge = new GuestRuntimeBrokerBridge(spec, mainThread);
         this.resolver = new GuestIntentResolver(spec, packageManager);
         this.receivers = java.util.Objects.requireNonNull(receivers, "receivers");
+        this.frameworkOrderedBroadcasts = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable,
+                    "guest-framework-ordered-" + spec.virtualUserId + "-" + spec.packageName);
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     void startActivity(Intent intent, Bundle options) {
@@ -197,6 +214,7 @@ final class GuestContextComponentRouter {
     synchronized void beginTeardown() {
         if (closed) return;
         closed = true;
+        frameworkOrderedBroadcasts.shutdownNow();
         connections.clear();
         receivers.clear();
     }
@@ -357,6 +375,7 @@ final class GuestContextComponentRouter {
     void sendOrderedBroadcast(Intent intent, String receiverPermission, Bundle options,
             BroadcastReceiver resultReceiver, Handler scheduler, int initialCode,
             String initialData, Bundle initialExtras) {
+        if (closed) throw new IllegalStateException("GUEST_COMPONENT_ROUTER_CLOSED");
         if (intent == null) throw new IllegalArgumentException("intent is required");
         resolver.requireGuestScopeForBroadcast(intent);
         Bundle request = bridge.baseRequest();
@@ -384,19 +403,38 @@ final class GuestContextComponentRouter {
                 initialExtras == null ? new Bundle() : new Bundle(initialExtras));
         if (options != null) request.putBundle("broadcastOptions", new Bundle(options));
         if (frameworkRoute) {
-            bridge.invokeComponentAsync(request,
-                    result -> deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
-                            initialData, result),
-                    error -> {
-                        android.util.Log.e("CS_GUEST_BROADCAST",
-                                "framework ordered Receiver transport failed", error);
-                        deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
-                                initialData, null);
-                    });
+            dispatchFrameworkOrderedBroadcast(request, intent, resultReceiver, scheduler,
+                    initialCode, initialData);
             return;
         }
         deliverOrderedResult(intent, resultReceiver, scheduler, initialCode, initialData,
                 bridge.invokeComponent(request));
+    }
+
+    private void dispatchFrameworkOrderedBroadcast(Bundle request, Intent intent,
+                                                   BroadcastReceiver resultReceiver,
+                                                   Handler scheduler, int initialCode,
+                                                   String initialData) {
+        try {
+            frameworkOrderedBroadcasts.execute(() -> {
+                try {
+                    deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
+                            initialData, bridge.invokeComponent(request));
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(
+                            error);
+                    android.util.Log.e("CS_GUEST_BROADCAST",
+                            "framework ordered Receiver transport failed", error);
+                    deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
+                            initialData, null);
+                }
+            });
+        } catch (RejectedExecutionException error) {
+            android.util.Log.e("CS_GUEST_BROADCAST",
+                    "framework ordered Receiver transport queue is closed", error);
+            deliverOrderedResult(intent, resultReceiver, scheduler, initialCode,
+                    initialData, null);
+        }
     }
 
     private void deliverOrderedResult(Intent intent, BroadcastReceiver resultReceiver,

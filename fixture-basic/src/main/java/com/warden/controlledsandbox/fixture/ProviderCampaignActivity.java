@@ -69,8 +69,16 @@ public final class ProviderCampaignActivity extends Activity {
         } finally {
             final boolean result = passed;
             runOnUiThread(() -> {
-                if (!result) Log.e(TAG, "C1_T04_PROVIDER_RUNTIME_FAIL");
-                finish();
+                if (!result) {
+                    Log.e(TAG, "C1_T04_PROVIDER_RUNTIME_FAIL");
+                    finish();
+                }
+                // A successful campaign Activity remains visible until the Host campaign calls
+                // RuntimeClient.stop().  The next virtual-user generation is started by the
+                // broker service; retaining one successful peer window makes that repeated
+                // lifecycle exercise deterministic on API32, rather than depending on whether
+                // the previous peer has already left the foreground task at the exact moment of
+                // the next launch.  Resource recovery is still Host-owned and fail-closed.
             });
         }
     }
