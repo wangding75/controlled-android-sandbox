@@ -277,7 +277,7 @@ public final class FrameworkHooks implements AutoCloseable {
         attempt("bluetooth", installed, failures, hooks, bindingDetails,
                 () -> BluetoothServiceHook.install(hostServiceContext, identity));
         attempt("sensorCatalog", installed, failures, hooks, bindingDetails,
-                () -> SensorServiceHook.install(hostServiceContext, identity));
+                () -> SensorServiceHook.install(guestContext, identity));
         attempt("audioCapture", installed, failures, hooks, () -> AudioCaptureServiceHook.install(hostServiceContext, identity));
         return new FrameworkHooks(hooks,
                 new FrameworkHookReport(installed, failures, bindingDetails), identity);

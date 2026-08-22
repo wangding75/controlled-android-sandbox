@@ -2,6 +2,7 @@ package android.telephony;
 
 import android.content.Context;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /** Minimal API surface used by the static framework and SMS cache fixtures. */
 public class TelephonyManager {
@@ -28,6 +29,9 @@ public class TelephonyManager {
     public String getSimOperator() { return ""; }
     public String getSimOperatorName() { return ""; }
     public String getSimCountryIso() { return ""; }
+    public void registerTelephonyCallback(Executor executor, TelephonyCallback callback) { }
+    public void unregisterTelephonyCallback(TelephonyCallback callback) { }
+    public void listen(PhoneStateListener listener, int events) { }
 
     public static void resetSmsServiceForTest(Object service) { sISms = service; }
     public static Object smsServiceForTest() { return sISms; }

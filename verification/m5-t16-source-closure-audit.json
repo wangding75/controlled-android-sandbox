@@ -100,7 +100,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java",
-      "lines": 1586
+      "lines": 1594
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/activity/ActivityTaskLedger.java",
@@ -139,6 +139,10 @@
       "lines": 1131
     },
     {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java",
+      "lines": 1026
+    },
+    {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/ReflectiveServiceHook.java",
       "lines": 1019
     },
@@ -152,7 +156,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
-      "lines": 958
+      "lines": 969
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
@@ -163,16 +167,12 @@
       "lines": 839
     },
     {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java",
-      "lines": 801
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceLifecycle.java",
+      "lines": 832
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
       "lines": 797
-    },
-    {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceLifecycle.java",
-      "lines": 765
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
@@ -188,7 +188,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/VirtualPackageStateBuilder.java",
-      "lines": 678
+      "lines": 683
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
@@ -196,7 +196,7 @@
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
-      "lines": 654
+      "lines": 655
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/provider/ProviderBatchRuntime.java",

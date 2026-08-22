@@ -38,12 +38,21 @@ final class DeviceServiceInvocationInterceptor {
                     return thread;
                 }
             });
+    private static final ScheduledExecutorService SENSOR_CALLBACK_EXECUTOR =
+            Executors.newScheduledThreadPool(1, new ThreadFactory() {
+                @Override public Thread newThread(Runnable runnable) {
+                    Thread thread = new Thread(runnable, "controlled-sandbox-sensor");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
     private static volatile boolean LOCATION_REFLECTION_LOGGED;
     private static volatile boolean LOCATION_FIELDS_LOGGED;
     private static volatile boolean LOCATION_STATE_LOGGED;
     private final GuestIdentity identity;
     private final String service;
     private final Map<Object, ScheduledFuture<?>> locationCallbacks = new IdentityHashMap<>();
+    private final Map<Object, ScheduledFuture<?>> sensorCallbacks = new IdentityHashMap<>();
 
     DeviceServiceInvocationInterceptor(GuestIdentity identity, String service) {
         this.identity = java.util.Objects.requireNonNull(identity, "identity");
@@ -261,7 +270,18 @@ final class DeviceServiceInvocationInterceptor {
             }
             return Decision.handled(defaultValue(method.getReturnType()));
         }
-        if (startsAny(name, "listen", "registertelephony", "unregistertelephony")) {
+        if (startsAny(name, "unregistertelephony")) {
+            Object callback = callback(arguments);
+            if (callback != null) identity.capabilityLeases().release(
+                    callback, identity.capabilityAudit(), "EXPLICIT_TELEPHONY_RELEASE");
+            return Decision.handled(defaultValue(method.getReturnType()));
+        }
+        if (startsAny(name, "listen", "registertelephony")) {
+            Object callback = callback(arguments);
+            if (callback != null) {
+                invokeTelephonyCallback(callback, profile);
+                identity.capabilityLeases().register("telephony", callback, () -> { });
+            }
             return Decision.handled(defaultValue(method.getReturnType()));
         }
         if (startsAny(name, "set", "enable", "disable", "dial", "call", "send")) {
@@ -362,25 +382,208 @@ final class DeviceServiceInvocationInterceptor {
             return Decision.handled(sensor == null ? null
                     : FrameworkDeviceObjectFactory.sensor(method.getReturnType(), sensor));
         }
-        if (InvocationMethodMatcher.named(name, "unregisterListener", "disableSensor", "flush")
+        if (InvocationMethodMatcher.named(name, "flush")) {
+            Object listener = sensorListener(arguments);
+            if (listener != null) invokeSensorFlushCallback(listener, profile);
+            return Decision.handled(successValue(method.getReturnType()));
+        }
+        if (InvocationMethodMatcher.named(name, "unregisterListener", "disableSensor")
                 || InvocationMethodMatcher.startsWith(name, "unregisterListener", "disableSensor")) {
-            Object listener = callback(arguments);
+            Object listener = sensorListener(arguments);
             if (listener != null) identity.capabilityLeases().release(
                     listener, identity.capabilityAudit(), "EXPLICIT_SENSOR_RELEASE");
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (InvocationMethodMatcher.named(name, "registerListener", "registerSensor", "enableSensor")
                 || InvocationMethodMatcher.startsWith(name, "registerListener", "registerSensor", "enableSensor")) {
-            Object listener = callback(arguments);
+            Object listener = sensorListener(arguments);
             if (listener == null) return Decision.handled(falseValue(method.getReturnType()));
             VirtualSensorSnapshot sensor = profile.sensorForType(type);
             if (sensor == null && !profile.sensors().isEmpty()) sensor = profile.sensors().get(0);
             if (sensor == null) return Decision.handled(falseValue(method.getReturnType()));
-            invokeCallback(listener, new String[]{"onSensorChanged", "dispatchSensorEvent"}, sensor.values());
-            identity.capabilityLeases().register("sensor", listener, () -> { });
+            VirtualSensorSnapshot selected = sensor;
+            identity.capabilityLeases().register("sensor", listener, () -> cancelSensorCallback(listener));
+            try {
+                invokeSensorCallback(listener, selected);
+                ScheduledFuture<?> future = SENSOR_CALLBACK_EXECUTOR.scheduleAtFixedRate(
+                        () -> invokeSensorCallback(listener, selected), 250L, 250L,
+                        TimeUnit.MILLISECONDS);
+                synchronized (sensorCallbacks) {
+                    ScheduledFuture<?> previous = sensorCallbacks.put(listener, future);
+                    if (previous != null) previous.cancel(false);
+                }
+            } catch (RuntimeException error) {
+                identity.capabilityLeases().release(listener, identity.capabilityAudit(),
+                        "SENSOR_CALLBACK_SETUP_FAILED");
+                throw error;
+            }
             return Decision.handled(successValue(method.getReturnType()));
         }
         return failUnsupported("sensor", method);
+    }
+
+    private void cancelSensorCallback(Object listener) {
+        if (listener == null) return;
+        ScheduledFuture<?> future;
+        synchronized (sensorCallbacks) { future = sensorCallbacks.remove(listener); }
+        if (future != null) future.cancel(false);
+    }
+
+    private static void invokeTelephonyCallback(Object callback,
+            VirtualTelephonyProfileSnapshot profile) {
+        if (invokeTelephonyCallbackTarget(callback, profile, 0)) return;
+        android.util.Log.w("CS_TELEPHONY_CALLBACK", "no compatible callback target="
+                + callback.getClass().getName());
+    }
+
+    private static boolean invokeTelephonyCallbackTarget(Object target,
+            VirtualTelephonyProfileSnapshot profile, int depth) {
+        if (target == null || depth > 3) return false;
+        for (Method method : callbackMethods(target)) {
+            String name = normalize(method.getName());
+            if (!name.equals("oncellinfochanged") || method.getParameterCount() != 1) continue;
+            Class<?> parameter = method.getParameterTypes()[0];
+            Object value;
+            if (List.class.isAssignableFrom(parameter)) {
+                if (profile.cells().isEmpty()) value = List.of();
+                else value = List.of(FrameworkDeviceObjectFactory.cellInfo(
+                        android.telephony.CellInfo.class, profile.cells().get(0)));
+            } else if (parameter.isArray()) {
+                value = Array.newInstance(parameter.getComponentType(), 0);
+            } else {
+                continue;
+            }
+            try {
+                method.setAccessible(true);
+                method.invoke(target, value);
+                android.util.Log.i("CS_TELEPHONY_CALLBACK", "CELL_INFO_DELIVERED target="
+                        + target.getClass().getName());
+                return true;
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                android.util.Log.w("CS_TELEPHONY_CALLBACK", "invoke failed method="
+                        + method.getName() + " error=" + error.getClass().getName());
+            }
+        }
+        Class<?> type = target.getClass();
+        while (type != null) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                String fieldName = field.getName().toLowerCase(Locale.ROOT);
+                if (!fieldName.contains("callback") && !fieldName.contains("listener")) continue;
+                try {
+                    field.setAccessible(true);
+                    Object nested = field.get(target);
+                    if (nested != null && nested != target
+                            && invokeTelephonyCallbackTarget(nested, profile, depth + 1)) return true;
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                            .rethrowIfFatal(error);
+                }
+            }
+            type = type.getSuperclass();
+        }
+        return false;
+    }
+
+    private static void invokeSensorCallback(Object listener, VirtualSensorSnapshot sensor) {
+        boolean delivered = false;
+        for (Method method : callbackMethods(listener)) {
+            String name = normalize(method.getName());
+            if (!(name.equals("onsensorchanged") || name.equals("dispatchsensorevent")
+                    || name.equals("onaccuracychanged")) || method.getParameterCount() < 1) continue;
+            Object[] arguments = sensorCallbackArguments(method, sensor, name);
+            if (arguments == null) continue;
+            try {
+                method.setAccessible(true);
+                method.invoke(listener, arguments);
+                delivered = true;
+                if (name.equals("onsensorchanged") || name.equals("dispatchsensorevent")) return;
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                android.util.Log.w("CS_SENSOR_CALLBACK", "invoke failed method="
+                        + method.getName() + " error=" + error.getClass().getName());
+            }
+        }
+        if (!delivered) android.util.Log.w("CS_SENSOR_CALLBACK", "no compatible callback target="
+                + listener.getClass().getName());
+    }
+
+    private static void invokeSensorFlushCallback(Object listener,
+            VirtualSensorProfileSnapshot profile) {
+        VirtualSensorSnapshot sensor = profile.sensors().isEmpty() ? null : profile.sensors().get(0);
+        if (sensor == null) return;
+        for (Method method : callbackMethods(listener)) {
+            if (!normalize(method.getName()).equals("onflushcompleted")
+                    || method.getParameterCount() != 1) continue;
+            try {
+                method.setAccessible(true);
+                method.invoke(listener, FrameworkDeviceObjectFactory.sensor(
+                        method.getParameterTypes()[0], sensor));
+                android.util.Log.i("CS_SENSOR_CALLBACK", "FLUSH_COMPLETED");
+                return;
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+            }
+        }
+    }
+
+    private static Object[] sensorCallbackArguments(Method method,
+            VirtualSensorSnapshot sensor, String name) {
+        Class<?>[] types = method.getParameterTypes();
+        if (name.equals("onaccuracychanged")) {
+            if (types.length != 2) return null;
+            return new Object[]{FrameworkDeviceObjectFactory.sensor(types[0], sensor), 3};
+        }
+        if (types.length != 1) return null;
+        Class<?> type = types[0];
+        if (type == float[].class || type == Object.class || type.isAssignableFrom(float[].class)) {
+            return new Object[]{sensor.values().clone()};
+        }
+        if (!type.getName().equals("android.hardware.SensorEvent")) return null;
+        try {
+            java.lang.reflect.Constructor<?> constructor;
+            try {
+                constructor = type.getDeclaredConstructor(int.class);
+            } catch (NoSuchMethodException missingSizedConstructor) {
+                constructor = type.getDeclaredConstructor();
+            }
+            constructor.setAccessible(true);
+            Object event = constructor.getParameterCount() == 0
+                    ? constructor.newInstance()
+                    : constructor.newInstance(sensor.values().length);
+            writeField(event, "values", sensor.values().clone());
+            writeField(event, "sensor", FrameworkDeviceObjectFactory.sensor(
+                    android.hardware.Sensor.class, sensor));
+            writeField(event, "timestamp", System.nanoTime());
+            writeField(event, "accuracy", 3);
+            return new Object[]{event};
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                    .rethrowIfFatal(error);
+            return null;
+        }
+    }
+
+    private static void writeField(Object target, String name, Object value) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                java.lang.reflect.Field field = type.getDeclaredField(name);
+                field.setAccessible(true);
+                field.set(target, value);
+                return;
+            } catch (NoSuchFieldException missing) {
+                type = type.getSuperclass();
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
+                        .rethrowIfFatal(error);
+                return;
+            }
+        }
     }
 
     private static void requireMode(String mode, String service, String operation) {
@@ -431,6 +634,27 @@ final class DeviceServiceInvocationInterceptor {
             return value;
         }
         return null;
+    }
+
+    private static Object sensorListener(Object[] arguments) {
+        if (arguments != null) {
+            for (Object value : arguments) {
+                if (value == null || value instanceof String || value instanceof Number
+                        || value instanceof Boolean || value.getClass().isEnum()) continue;
+                String type = value.getClass().getName().toLowerCase(Locale.ROOT);
+                if (type.contains("pendingintent") || type.contains("executor")
+                        || type.contains("request") || type.contains("attribution")
+                        || (type.contains("sensor") && !type.contains("listener"))) continue;
+                for (Method method : callbackMethods(value)) {
+                    String name = normalize(method.getName());
+                    if ((name.equals("onsensorchanged") || name.equals("onaccuracychanged")
+                            || name.equals("onflushcompleted")) && method.getParameterCount() > 0) {
+                        return value;
+                    }
+                }
+            }
+        }
+        return callback(arguments);
     }
 
     /**
@@ -760,7 +984,8 @@ final class DeviceServiceInvocationInterceptor {
     private static boolean isTelephonyOperation(String name) {
         return containsAny(name, "deviceid", "imei", "meid", "subscriber", "sim", "network",
                 "phone", "cell", "line1", "msisdn", "telephony", "userdata", "roaming",
-                "subscription", "subinfo", "subid", "slotindex", "voicecapable",
+                "subscription", "subinfo", "subid", "slotindex", "voicecapable", "listen",
+                "registertelephony", "unregistertelephony",
                 "smscapable", "emergency", "dataenabled");
     }
     private static boolean isWifiOperation(String name) {

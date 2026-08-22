@@ -8,12 +8,21 @@
         </intent>
     </queries>
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -59,6 +68,8 @@
         <activity android:name="com.warden.controlledsandbox.fixture.LegacyCameraProbeActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.CameraCampaignActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.C2T05SchedulingInteractionActivity"
+            android:exported="false" />
+        <activity android:name="com.warden.controlledsandbox.fixture.C2T06DeviceNetworkMediaActivity"
             android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkProbeActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.PmsPermissionAttributionProbeActivity"

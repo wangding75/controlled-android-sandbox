@@ -37,7 +37,7 @@
         "pro",
         "txt"
       ],
-      "sourceDigestSha256": "da4d25d45ebe5a589a0ea55d96248bdadbf08ac3d692c31cd81faf53acb9f752"
+      "sourceDigestSha256": "099861db58d26a032c8963f8f06e5dd2037b187951d63af8a43b58a475f9df5a"
     },
     {
       "type": "library",
@@ -52,7 +52,7 @@
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "488860e6cb39d495e26ae245f1eac9bdbd500ea3c7aef8f9dbbafe5385e2a7d7"
+      "sourceDigestSha256": "6bba4c6d11602ae729006f8c139ca82b4df1abe04eaeff78d35e0d4447f6e29f"
     },
     {
       "type": "library",
@@ -100,7 +100,7 @@
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "771ce3e10bcdaa39922eab795a01f39eabcdf0a043fff7e935152655d6bff0b6"
+      "sourceDigestSha256": "806968bdc95afe46e798850e82dcf309b7d90799f28c8b6364bf89539358f640"
     },
     {
       "type": "library",
@@ -109,14 +109,14 @@
       "gradleProjectPath": ":sandbox-framework",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 300,
+      "fileCount": 308,
       "languages": [
         "Gradle",
         "Java",
         "XML",
         "lockfile"
       ],
-      "sourceDigestSha256": "9ae47b218bcfc11c2709d45f73794bafd7779b6e2af42788232f93a8f256240d"
+      "sourceDigestSha256": "8db29a488769f2f7476de127f4f337e7f0fa9249e03d3b246e4447d39cb8318a"
     },
     {
       "type": "application",
@@ -125,7 +125,7 @@
       "gradleProjectPath": ":fixture-basic",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 66,
+      "fileCount": 69,
       "languages": [
         "C++",
         "Gradle",
@@ -134,7 +134,7 @@
         "lockfile",
         "txt"
       ],
-      "sourceDigestSha256": "f7219b99f73f387975d03e0909f6f2e6f625c13909ee42d135ddefa0a98eef76"
+      "sourceDigestSha256": "841fcf592ab697279037d094eecf93d1d68207c90ba77815ff0940777d356063"
     },
     {
       "type": "application",

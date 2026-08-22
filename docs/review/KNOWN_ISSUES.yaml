@@ -989,3 +989,61 @@ issues:
       but no package-neutral RD fixture correlated request/return/callback/death/cleanup across
       Notification, Alarm, Job, FGS, Window, Input/IME and Display. C2-T05 closes the scoped RD
       API32 evidence gap; API33+, OEM, commercial-app and VA PRO equivalence remain unproven.
+
+  - issue_id: KI-R03-039
+    title: C2-T06 device, network and media method-level RD evidence was incomplete
+    capability: system_service_virtualization
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C2-T06 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
+      - docs/review/C2_T06_DEVICE_NETWORK_MEDIA_DESIGN.md
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/NetworkServiceInvocationInterceptor.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/MediaCommunicationInvocationInterceptor.java
+      - sandbox-framework/src/main/java/android/hardware/ControlledSensorManager.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/FrameworkHooks.java
+      - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C2T06DeviceNetworkMediaActivity.java
+      - tools/capability/run_c2_t06_rd.py
+      - verification/catch-up/C2-T06/c2-t06-rd-summary.json
+    match_patterns:
+      - C2-T01-F3-05
+      - C2-T01-F4
+      - C2-T01-F5
+      - registerTelephony
+      - registerListener
+      - registerNetworkCallback
+      - requestAudioFocus
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_C2_T06_RD_METHOD_CAMPAIGN
+    notes: >
+      The package-neutral RD API32 campaign now proves synchronized typed getter/callback values,
+      permission-negative behavior, cross-user separation, explicit unregister/cleanup and
+      process-death probe coverage across device, network, media and sensor domains. The fix
+      closes only the scoped RD API32 evidence boundary; API33+, OEM/HAL, commercial-app, SX/XH
+      and VA PRO equivalence remain unproven.
+
+  - issue_id: KI-R03-040
+    title: SBOM verification was stale after C2-T05 fixture additions
+    capability: governance_evidence
+    classification: TEST_EVIDENCE_GAP
+    severity: LOW
+    status: FIXED
+    discovered_by: C2-T06 DISCOVER/CLASSIFY collect-all 2026-08-23
+    evidence:
+      - artifacts/capability-audit/all/20260822T180556Z/sbom-check.json
+      - verification/sbom.json
+      - 547ba7ae
+      - scripts/generate-sbom.py
+    match_patterns:
+      - sbom-check
+      - sourceDigestSha256 mismatch
+      - fixture-basic fileCount mismatch
+    blocks_current_campaign: false
+    fix_policy: REGENERATE_VERIFICATION_SBOM_AFTER_TRACKED_SOURCE_CHANGES
+    notes: >
+      The C2-T05 implementation added tracked fixture-basic sources without regenerating the
+      repository SBOM. C2-T06 regenerated the SBOM after all scoped tracked source changes and
+      verified it with the repository checker.
