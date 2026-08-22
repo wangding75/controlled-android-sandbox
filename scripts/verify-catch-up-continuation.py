@@ -23,6 +23,9 @@ CANONICAL_IDENTITY = ("OpenAI", "openai@users.noreply.github.com")
 ALLOWED_GUARD_FILES = {
     Path("tools/capability/run_rd_campaign.py"),
     Path("scripts/check-native-enforcement-poc.py"),
+    # This C2-T03 static checker contains the historical serials only as
+    # forbidden-token assertions; it never selects or connects to a device.
+    Path("scripts/check-c2-t03-location.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(

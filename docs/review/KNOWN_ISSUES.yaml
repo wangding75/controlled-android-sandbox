@@ -908,3 +908,54 @@ issues:
       fabricate a real GnssStatus satellite object or claim RF/HAL measurements. A future task
       may add a typed satellite projection if a consumer requires it; this boundary is not a
       blocker for the current Location acceptance contract.
+
+  - issue_id: KI-R03-036
+    title: Camera1/Camera2 source-frame and resource-lifecycle evidence was incomplete
+    capability: android_oem_compatibility
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C2-T04 discovery 2026-08-22
+    evidence:
+      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PeripheralCameraInvocationHandler.java
+      - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/LegacyCameraProbeActivity.java
+      - docs/review/C2_T04_CAMERA_DESIGN.md
+      - fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/CameraCampaignActivity.java
+      - tools/capability/run_c2_t04_rd.py
+      - verification/catch-up/C2-T04/c2-t04-rd-summary.json
+    match_patterns:
+      - C2-T01-F3-01
+      - C2-T01-F3-02
+      - C2-T01-F3-03
+      - C2-T01-F3-04
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_CAMERA_SOURCE_FORMAT_AND_RESOURCE_CAMPAIGN
+    notes: >
+      Existing camera code had contract/self-test coverage and a legacy probe, but no complete
+      package-neutral RD fixture proving source-frame provenance, dimensions, formats, timestamps,
+      callback/result delivery, Surface/ImageReader ownership, 100 reopen/release cycles, and
+      death/cleanup convergence. C2-T04 closed this evidence gap for the scoped API32 RD campaign;
+      API33+/OEM/HAL/VA PRO equivalence remains explicitly unproven.
+
+  - issue_id: KI-R03-037
+    title: Continuation preflight misclassified a C2-T03 negative serial guard as executable device routing
+    capability: android_oem_compatibility
+    classification: CURRENT_DEFECT
+    severity: MEDIUM
+    status: FIXED
+    discovered_by: C2-T04 continuation preflight 2026-08-22
+    evidence:
+      - scripts/verify-catch-up-continuation.py
+      - scripts/check-c2-t03-location.py
+      - verification/catch-up/C0-T01/continuation-preflight.json
+    match_patterns:
+      - unexpected hard-coded executable serials
+      - check-c2-t03-location.py
+    blocks_current_campaign: false
+    fix_policy: ALLOWLIST_NEGATIVE_STATIC_GUARD_ONLY
+    notes: >
+      The continuation scanner treated three literals used only to assert that device scripts
+      reject historical endpoints as executable serial selection. The checker now allowlists this
+      negative static guard while continuing to reject hard-coded serials in executable device
+      runners; RD resolution remains instance-name based.

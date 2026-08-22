@@ -69,11 +69,18 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle launchComponent(SandboxRecord record, int virtualUserId, String component)
             throws Exception {
+        return launchComponent(record, virtualUserId, component, null);
+    }
+    Bundle launchComponent(SandboxRecord record, int virtualUserId, String component,
+                           Bundle intentExtras) throws Exception {
         if (component == null || component.trim().isEmpty()) {
             throw new IllegalArgumentException("activity component is required");
         }
         Bundle request = request(record, virtualUserId, record.launchProcess);
         request.putString(RuntimeKeys.COMPONENT_CLASS, component.trim());
+        if (intentExtras != null && !intentExtras.isEmpty()) {
+            request.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(intentExtras));
+        }
         return companionRoute(record)
                 ? nativeCompanion.launchActivity(record, virtualUserId, request)
                 : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);

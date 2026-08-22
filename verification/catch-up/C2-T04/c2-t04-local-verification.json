@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "task_id": "C2-T04",
+  "task": "Camera1/Camera2 source-frame and lifecycle",
+  "status": "PASS",
+  "verified_at": "2026-08-22T23:06:27+08:00",
+  "baseline_commit": "1d109c59e2e6722863eaaa5452eb1bca0cc195cc",
+  "checks": {
+    "static_android_compile": "PASS (160/160 self-tests)",
+    "c2_t04_static_gate": "PASS",
+    "continuation_preflight": "PASS",
+    "pre_device_runtime_hardening": "PASS",
+    "sbom_check": "PASS",
+    "device_test_apks": "PASS",
+    "device_lab_apks": "PASS",
+    "rd_campaign": "PASS",
+    "regression_audit": "DIAGNOSTIC PASS (34 PASS, 8 KNOWN_ISSUE, 0 NEW_REGRESSION; exit 1 by diagnostic policy)",
+    "diff_check": "PASS"
+  },
+  "device": {
+    "instance_name": "RD测试",
+    "serial": "127.0.0.1:16416",
+    "model": "22041211A",
+    "api_level": 32,
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "android_id": "398eea33120cd887",
+    "boot_id": "773adc6f-e0aa-4997-a0ee-481a7773a10d"
+  },
+  "formal_rd": {
+    "artifact": "artifacts/capability-audit/catch-up-c2-t04/20260822T142834Z",
+    "summary": "verification/catch-up/C2-T04/c2-t04-rd-summary.json",
+    "source_sha256": "c3e47c885142b911aa7ce38744af8eb79c735ae6be3f6de5958ee284976a16b3",
+    "requested_loops": 100,
+    "requested_preview_seconds": 1800,
+    "phases": {
+      "smoke": {
+        "status": "PASS",
+        "frame_markers": 19,
+        "cleanup_markers": 19,
+        "session_closed_markers": 19
+      },
+      "loops": {
+        "status": "PASS",
+        "cleanup_markers": 200,
+        "pass_markers": 2,
+        "failure_markers": 0,
+        "observation": "The raw log contains two successful 100-iteration campaign windows; no runtime failure was recorded."
+      },
+      "preview": {
+        "status": "PASS",
+        "duration_seconds": 1800,
+        "frame_markers": 1,
+        "progress_markers": 60,
+        "session_closed_markers": 1
+      },
+      "recovery_first": { "status": "PASS", "frame_markers": 1, "cleanup_markers": 1 },
+      "recovery_second": { "status": "PASS", "frame_markers": 1, "cleanup_markers": 1 },
+      "permission_revoked": {
+        "status": "PASS",
+        "expected_error": "GUEST_CAMERA_PERMISSION_DENIED",
+        "camera_open_markers": 0
+      },
+      "post_revoke_recovery": { "status": "PASS", "frame_markers": 1, "cleanup_markers": 1 }
+    },
+    "failures": []
+  },
+  "state_cleanup": {
+    "permission_restore": "PASS",
+    "clear_camera_user": "PASS",
+    "known_issue_fixes": ["KI-R03-036", "KI-R03-037"]
+  },
+  "scope": {
+    "maturity_level": "RD_BASELINE",
+    "rd_api32_only": true,
+    "va_pro_equivalent": "NOT_PROVEN",
+    "remaining_known_issues": [
+      "KI-R03-020",
+      "KI-R03-023",
+      "KI-R03-024",
+      "KI-R03-025",
+      "KI-R03-026",
+      "KI-M10-005",
+      "KI-M10-006",
+      "KI-M10-007",
+      "KI-R03-034",
+      "KI-R03-035"
+    ]
+  }
+}

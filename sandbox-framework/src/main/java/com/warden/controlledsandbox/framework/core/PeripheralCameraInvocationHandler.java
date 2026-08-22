@@ -45,8 +45,7 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
         }
         if (host(profile.mode())) return PeripheralServicesInvocationInterceptor.Decision.passThrough();
         if (containsAny(name, "disconnect", "close", "release", "remove")) {
-            removeIdentity(state.cameraSessions, arguments);
-            removeIdentity(state.cameraListeners, arguments);
+            releaseCameraToken(firstIdentity(arguments), "EXPLICIT_CAMERA_RELEASE");
             return handled(successValue(method.getReturnType()));
         }
         if (blocked(profile.mode())) return handled(emptyValue(method.getReturnType()));
@@ -73,7 +72,15 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
             if (token == null) token = state.syntheticToken();
             addBounded(state.cameraSessions, token, profile.maximumOpenCameras(),
                     "VIRTUAL_CAMERA_SESSION_LIMIT_EXCEEDED");
-            return cameraUserSession(method.getReturnType(), token, profile);
+            Object captured = token;
+            state.identity().capabilityLeases().register("camera", token,
+                    () -> state.removeCameraSession(captured));
+            try {
+                return cameraUserSession(method.getReturnType(), token, profile);
+            } catch (RuntimeException error) {
+                releaseCameraToken(token, "CAMERA_RESULT_ADAPTER_FAILURE");
+                throw error;
+            }
         }
         if (containsAny(name, "settorchmode", "turnontorch", "turnofftorch")) {
             String cameraId = firstString(arguments);
@@ -222,7 +229,7 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
                         if (name.equals("hashcode")) return System.identityHashCode(proxy);
                         if (name.equals("equals")) return proxy == (arguments == null ? null : arguments[0]);
                         if (name.equals("disconnect")) {
-                            state.cameraSessions.remove(token);
+                            releaseCameraToken(token, "CAMERA_DEVICE_DISCONNECT");
                             return null;
                         }
                         // Android 16 exposes the optional FMQ result-metadata descriptor during
@@ -258,9 +265,23 @@ final class PeripheralCameraInvocationHandler implements PeripheralServiceInvoca
                     });
             return handled(user);
         } catch (RuntimeException error) {
-            state.cameraSessions.remove(token);
+            releaseCameraToken(token, "CAMERA_DEVICE_USER_ADAPTER_FAILURE");
             throw new IllegalStateException("VIRTUAL_CAMERA_DEVICE_USER_ADAPTER_FAILED", error);
         }
+    }
+
+    private void releaseCameraToken(Object token, String reason) {
+        if (token == null) return;
+        boolean released = state.identity().capabilityLeases().release(
+                token, state.identity().capabilityAudit(), reason);
+        if (!released) {
+            state.removeCameraSession(token);
+            state.removeCameraListener(token);
+        }
+        android.util.Log.i("CS_CAMERA_CLEANUP", "reason=" + reason
+                + " released=" + released + " sessions=" + state.cameraSessions.size()
+                + " listeners=" + state.cameraListeners.size()
+                + " leases=" + state.identity().capabilityLeases().activeCount("camera"));
     }
 
     private static Object submitInfo(Class<?> returnType) {

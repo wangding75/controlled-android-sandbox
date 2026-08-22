@@ -112,7 +112,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestComponentRuntime.java",
-      "lines": 1377
+      "lines": 1424
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java",
@@ -152,7 +152,7 @@
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java",
-      "lines": 904
+      "lines": 958
     },
     {
       "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/VirtualSystemServiceState.java",
@@ -163,12 +163,12 @@
       "lines": 839
     },
     {
-      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
-      "lines": 797
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java",
+      "lines": 801
     },
     {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/DeviceServiceInvocationInterceptor.java",
-      "lines": 794
+      "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedProcessCoordinator.java",
+      "lines": 797
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestActivityThreadServiceLifecycle.java",
@@ -176,7 +176,7 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxPackageLifecycle.java",
-      "lines": 728
+      "lines": 739
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java",
@@ -191,6 +191,10 @@
       "lines": 678
     },
     {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
+      "lines": 665
+    },
+    {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/packageinfo/manifest/BinaryXmlManifestParser.java",
       "lines": 654
     },
@@ -200,7 +204,11 @@
     },
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/SandboxCatalogState.java",
-      "lines": 610
+      "lines": 614
+    },
+    {
+      "path": "sandbox-framework/src/main/java/android/location/ControlledLocationManager.java",
+      "lines": 611
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/PendingIntentFrameworkInterceptor.java",
@@ -217,10 +225,6 @@
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/systemservice/RemoteVirtualSystemServiceAuthority.java",
       "lines": 595
-    },
-    {
-      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java",
-      "lines": 587
     },
     {
       "path": "sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/component/receiver/ManifestReceiverRegistry.java",
@@ -253,6 +257,10 @@
     {
       "path": "app/src/main/java/com/warden/controlledsandbox/PackageManagementSession.java",
       "lines": 520
+    },
+    {
+      "path": "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/PeripheralCameraInvocationHandler.java",
+      "lines": 519
     },
     {
       "path": "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeIsolatedShareManager.java",

@@ -30,6 +30,8 @@ final class PeripheralInvocationState {
 
     Object syntheticToken() { return new SyntheticToken(++syntheticSequence); }
 
+    synchronized void removeCameraSession(Object session) { cameraSessions.remove(session); }
+
     synchronized void removeCameraListener(Object listener) { cameraListeners.remove(listener); }
 
     private static Set<Object> identitySet() {

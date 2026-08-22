@@ -22,6 +22,8 @@ import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSna
 import com.warden.controlledsandbox.compatibility.dingtalk.DingTalkCompatibilityManager;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +31,9 @@ import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.zip.CRC32;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
 import org.json.JSONObject;
 import org.json.JSONArray;
 
@@ -221,7 +226,8 @@ public final class DebugCommandActivity extends Activity {
                 if (component.isEmpty()) {
                     throw new IllegalArgumentException("component extra is required");
                 }
-                operation = runtime.launchComponent(record, virtualUserId, component);
+                operation = runtime.launchComponent(record, virtualUserId, component,
+                        componentIntentExtras(extras));
                 requireStatus("launch-component", operation, "LAUNCH_PASS");
             } else if ("broadcast-campaign".equals(command)) {
                 int iterations = Math.max(1, Math.min(100,
@@ -773,6 +779,9 @@ public final class DebugCommandActivity extends Activity {
             Bundle extras) throws Exception {
         VirtualCameraSourceSnapshot source = current.source();
         String sourceUri = extras.getString("sourceUri", "");
+        if (sourceUri.trim().isEmpty() && bool(extras, "generateCameraSource", false)) {
+            sourceUri = generateCameraSource().toURI().toString();
+        }
         if (!sourceUri.trim().isEmpty()) {
             source = VirtualCameraMediaStore.importSource(this, packageName, virtualUserId,
                     Uri.parse(sourceUri), extras.getString("sourceKind", ""));
@@ -787,6 +796,81 @@ public final class DebugCommandActivity extends Activity {
                 enabled ? java.util.List.of("0") : java.util.List.of(), java.util.List.of(),
                 source == null ? VirtualCameraSourceSnapshot.none() : source,
                 enabled && configured);
+    }
+
+    private static Bundle componentIntentExtras(Bundle extras) {
+        Bundle result = new Bundle();
+        String mode = text(extras, "componentMode", "");
+        if (!mode.isEmpty()) result.putString("c2t04Mode", mode);
+        if (extras.containsKey("cameraLoops")) {
+            result.putInt("c2t04Loops", Math.max(1, extras.getInt("cameraLoops", 100)));
+        }
+        if (extras.containsKey("cameraPressureSeconds")) {
+            result.putInt("c2t04PressureSeconds",
+                    Math.max(1, extras.getInt("cameraPressureSeconds", 1800)));
+        }
+        if (extras.containsKey("cameraRecoveryDelayMs")) {
+            result.putLong("c2t04RecoveryDelayMs",
+                    Math.max(0L, extras.getLong("cameraRecoveryDelayMs", 500L)));
+        }
+        return result;
+    }
+
+    private File generateCameraSource() throws Exception {
+        File output = new File(getFilesDir(), "c2-t04-camera-source.png");
+        final int width = 320;
+        final int height = 240;
+        byte[] raw = new byte[height * (1 + width * 4)];
+        int offset = 0;
+        for (int row = 0; row < height; row++) {
+            raw[offset++] = 0;
+            for (int column = 0; column < width; column++) {
+                int tileRow = row / 40;
+                int tileColumn = column / 40;
+                raw[offset++] = (byte) (20 + tileRow * 22);
+                raw[offset++] = (byte) (70 + tileColumn * 12);
+                raw[offset++] = (byte) (120 + ((tileRow + tileColumn) * 9) % 100);
+                raw[offset++] = (byte) 255;
+            }
+        }
+        ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+        try (DeflaterOutputStream stream = new DeflaterOutputStream(compressed,
+                new Deflater(6))) {
+            stream.write(raw);
+        }
+        ByteArrayOutputStream png = new ByteArrayOutputStream();
+        png.write(new byte[] {(byte) 137, 80, 78, 71, 13, 10, 26, 10});
+        ByteArrayOutputStream header = new ByteArrayOutputStream();
+        try (DataOutputStream stream = new DataOutputStream(header)) {
+            stream.writeInt(width);
+            stream.writeInt(height);
+            stream.writeByte(8);
+            stream.writeByte(6);
+            stream.writeByte(0);
+            stream.writeByte(0);
+            stream.writeByte(0);
+        }
+        pngChunk(png, "IHDR", header.toByteArray());
+        pngChunk(png, "IDAT", compressed.toByteArray());
+        pngChunk(png, "IEND", new byte[0]);
+        try (FileOutputStream stream = new FileOutputStream(output)) {
+            stream.write(png.toByteArray());
+        }
+        return output;
+    }
+
+    private static void pngChunk(ByteArrayOutputStream output, String type, byte[] data)
+            throws Exception {
+        byte[] name = type.getBytes(StandardCharsets.US_ASCII);
+        DataOutputStream stream = new DataOutputStream(output);
+        stream.writeInt(data.length);
+        stream.write(name);
+        stream.write(data);
+        CRC32 crc = new CRC32();
+        crc.update(name);
+        crc.update(data);
+        stream.writeInt((int) crc.getValue());
+        stream.flush();
     }
 
     /**
