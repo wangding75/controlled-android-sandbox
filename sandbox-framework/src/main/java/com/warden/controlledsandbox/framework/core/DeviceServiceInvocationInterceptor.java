@@ -77,7 +77,14 @@ final class DeviceServiceInvocationInterceptor {
         String name = normalize(method.getName());
         if (!isLocationOperation(name)) return Decision.passThrough();
         if (VirtualLocationProfileSnapshot.MODE_HOST.equals(profile.mode())) return Decision.passThrough();
-        if (isCleanup(name)) return Decision.handled(defaultValue(method.getReturnType()));
+        if (isCleanup(name)) {
+            Object listener = callback(arguments);
+            if (listener != null) {
+                identity.capabilityLeases().release(listener, identity.capabilityAudit(),
+                        "EXPLICIT_LOCATION_RELEASE");
+            }
+            return Decision.handled(defaultValue(method.getReturnType()));
+        }
         requireMode(profile.mode(), "location", name);
         if (containsAny(name, "geofence", "testprovider", "injectlocation")) {
             throw new UnsupportedOperationException("VIRTUAL_LOCATION_OPERATION_UNSUPPORTED:" + method.getName());

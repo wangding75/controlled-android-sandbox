@@ -860,3 +860,51 @@ issues:
       Host-owned relay component, raw AMS sender preservation, identity/revision fencing, and
       asynchronous recovery dispatch. The final RD receipt records relay delivery, stale-token
       rejection, and notification/alarm cleanup.
+
+  - issue_id: KI-R03-034
+    title: Guest Location public manager lacked permission-aware lifecycle cleanup
+    capability: system_service_virtualization
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C2-T03 source discovery 2026-08-22
+    evidence:
+      - docs/review/C2_T03_LOCATION_DESIGN.md
+      - sandbox-framework/src/main/java/android/location/ControlledLocationManager.java
+      - sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/LocationServiceHook.java
+      - verification/catch-up/C2-T03/c2-t03-rd-summary.json
+    match_patterns:
+      - ControlledLocationManager
+      - VIRTUAL_LOCATION_PENDING_INTENT_UNSUPPORTED
+      - EXPLICIT_LOCATION_RELEASE
+    blocks_current_campaign: false
+    fix_policy: TASK_SCOPED_LOCATION_LIFECYCLE_REPAIR
+    notes: >
+      The pre-C2-T03 public Guest manager could retain scheduled work, bypass dynamic location
+      permission state, and deliver one PendingIntent update despite the catalog's fail-closed
+      contract. C2-T03 repaired only this typed Guest Location boundary: registrations are fenced,
+      permission/AppOps-aware, explicitly cancellable and closed with the Guest generation;
+      PendingIntent and test-provider mutation remain explicit unsupported paths.
+
+  - issue_id: KI-R03-035
+    title: GNSS status is profile-driven and does not synthesize a platform satellite object
+    capability: android_oem_compatibility
+    classification: COMPATIBILITY_GAP
+    severity: MEDIUM
+    status: RECORDED
+    discovered_by: C2-T03 design review 2026-08-22
+    evidence:
+      - docs/review/C2_T03_LOCATION_DESIGN.md
+      - sandbox-framework/src/main/java/android/location/ControlledLocationManager.java
+      - verification/catch-up/C2-T03/c2-t03-rd-summary.json
+    match_patterns:
+      - GnssStatus.Callback
+      - satellitesInView
+      - nmeaSentence
+    blocks_current_campaign: false
+    fix_policy: RECORD_REAL_HAL_BOUNDARY_NO_FAKE_SATELLITE_OBJECT
+    notes: >
+      C2-T03 proves profile-driven GNSS started/first-fix and NMEA/time callbacks, but does not
+      fabricate a real GnssStatus satellite object or claim RF/HAL measurements. A future task
+      may add a typed satellite projection if a consumer requires it; this boundary is not a
+      blocker for the current Location acceptance contract.

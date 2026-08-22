@@ -1,0 +1,301 @@
+{
+  "campaign_id": "C2-T03",
+  "capability": "Location",
+  "timestamp": "2026-08-22T12:22:26.967167+00:00",
+  "host_os": "Windows 11 AMD64",
+  "maturity_level": "RD_BASELINE",
+  "rd_api32_only": true,
+  "va_pro_equivalent": "NOT_PROVEN",
+  "build_result": "PASS",
+  "static_result": "PASS",
+  "targeted_result": "PASS",
+  "rd_result": "PASS",
+  "regression_result": "PASS",
+  "failures": [],
+  "known_issues": [
+    "KI-R03-020",
+    "KI-R03-023",
+    "KI-R03-024",
+    "KI-R03-025",
+    "KI-R03-026",
+    "KI-M10-005",
+    "KI-M10-006",
+    "KI-M10-007",
+    "KI-R03-034",
+    "KI-R03-035"
+  ],
+  "evidence_files": [
+    "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user0-permission-denied-logcat.txt",
+    "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user0-user0-profile-update-logcat.txt",
+    "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user1-user1-clear-logcat.txt",
+    "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user1-user1-isolation-logcat.txt",
+    "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\evidence.json",
+    "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C2-T03\\c2-t03-rd-summary.json"
+  ],
+  "notes": "RD API32 evidence only; VA PRO equivalence and OEM/HAL matrix remain unproven.",
+  "branch": "feature/t57-r03-va-pro-capability-campaign",
+  "commit": "be8f23a181ae4ec292a0685289bd7e9298899ad2",
+  "tree": "1fed5346f8295b58d892fb71a746a4677967ec06",
+  "android_environment": "{\"abi\": \"x86_64,arm64-v8a,x86,armeabi-v7a,armeabi\", \"adb_devices\": \"List of devices attached\\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\\n\\n\", \"adb_serial\": \"127.0.0.1:16416\", \"android_id\": \"398eea33120cd887\", \"api_level\": \"32\", \"boot_id\": \"773adc6f-e0aa-4997-a0ee-481a7773a10d\", \"device_name\": \"22041211A\", \"instance_name\": \"RD测试\", \"manufacturer\": \"Redmi\", \"mumu\": {\"abiList\": \"x86_64,arm64-v8a,x86,armeabi-v7a,armeabi\", \"adb\": {\"connect\": {\"attempt\": 1, \"getState\": \"device\", \"returnCode\": 0, \"stderr\": \"\", \"stdout\": \"already connected to 127.0.0.1:16416\"}, \"devices\": \"List of devices attached\\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:10\\n\\n\", \"getState\": \"device\", \"path\": \"adb\"}, \"androidId\": \"398eea33120cd887\", \"api\": \"32\", \"bootId\": \"773adc6f-e0aa-4997-a0ee-481a7773a10d\", \"config\": {\"configuredHostPort\": 16416, \"configuredManufacturer\": \"Redmi\", \"configuredModel\": \"22041211A\", \"extraConfig\": \"C:\\\\Program Files\\\\Netease\\\\MuMu Player 12\\\\vms\\\\MuMuPlayer-12.0-1\\\\configs\\\\extra_config.json\", \"runtimeHost\": \"127.0.0.1\", \"runtimeHostPort\": 16416, \"vmConfig\": \"C:\\\\Program Files\\\\Netease\\\\MuMu Player 12\\\\vms\\\\MuMuPlayer-12.0-1\\\\configs\\\\vm_config.json\"}, \"configuredSerial\": \"127.0.0.1:16416\", \"instanceId\": \"ginstance1400650936961264501\", \"instanceIndex\": 1, \"instanceName\": \"RD测试\", \"manufacturer\": \"Redmi\", \"model\": \"22041211A\", \"mumuManager\": {\"adb_host_ip\": \"127.0.0.1\", \"adb_port\": 16416, \"created_timestamp\": 1785131843951152, \"disk_size_bytes\": 44578161242, \"error_code\": 0, \"headless_pid\": 24508, \"hyperv_enabled\": true, \"index\": \"1\", \"is_android_started\": true, \"is_main\": false, \"is_process_started\": true, \"launch_err_code\": 0, \"launch_err_msg\": \"\", \"launch_time\": 11977388, \"main_wnd\": \"00340D0A\", \"name\": \"RD测试\", \"pid\": 31176, \"player_state\": \"start_finished\", \"render_wnd\": \"00560D2A\", \"vt_enabled\": true}, \"mumuPlayerState\": \"start_finished\", \"mumuRoot\": \"C:\\\\Program Files\\\\Netease\\\\MuMu Player 12\", \"project\": \"Controlled Android Sandbox / 闪现2\", \"release\": \"12\", \"resolvedSerial\": \"127.0.0.1:16416\", \"runtimeStatus\": \"device\", \"timestamp\": \"2026-08-22T12:22:27.582948+00:00\", \"vmName\": \"MuMuPlayer-12.0-1\"}, \"release\": \"12\"}",
+  "device_name": "22041211A",
+  "adb_serial": "127.0.0.1:16416",
+  "api_level": "32",
+  "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+  "boot_id": "773adc6f-e0aa-4997-a0ee-481a7773a10d",
+  "android_id": "398eea33120cd887",
+  "instance_name": "RD测试",
+  "apk_install": {
+    "installs": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "returncode": 0,
+        "stdout": "Performing Streamed Install\nSuccess",
+        "stderr": ""
+      }
+    ]
+  },
+  "host_location_grants": [
+    {
+      "permission": "android.permission.ACCESS_FINE_LOCATION",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "permission": "android.permission.ACCESS_COARSE_LOCATION",
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "observations": [
+    {
+      "phase": "permission-denied",
+      "status": "PASS",
+      "expected_available": false,
+      "probe_count": 1,
+      "current_count": 0,
+      "current_request_count": 0,
+      "callback_count": 0,
+      "nmea_count": 0,
+      "gnss_events": [],
+      "negative_kinds": [
+        "pendingIntent",
+        "testProvider"
+      ],
+      "unregister_count": 1,
+      "session_ids": [
+        "f8d699aa-01dc-4255-8df7-62d4e5290621"
+      ],
+      "failures": [],
+      "errors": [],
+      "post_stop_processes": "",
+      "user": 0,
+      "launch": {
+        "command": "launch-component",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "304f404a067f459189bc4c518b1a9e1b",
+        "startedAt": 1787236217537,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "70d3778b-7e7f-4c82-8378-8779b2f033b6",
+          "generation": 1,
+          "processSlot": 54,
+          "platformPid": 3588,
+          "pid": 3588,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.LocationCampaignActivity"
+        },
+        "status": "PASS"
+      },
+      "stable_seconds": 5,
+      "recovery_seconds": 5,
+      "logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user0-permission-denied-logcat.txt"
+    },
+    {
+      "phase": "user0-profile-update",
+      "status": "PASS",
+      "expected_available": true,
+      "probe_count": 1,
+      "current_count": 1,
+      "current_request_count": 1,
+      "callback_count": 1801,
+      "nmea_count": 1801,
+      "gnss_events": [
+        "started",
+        "firstFix",
+        "stopped"
+      ],
+      "negative_kinds": [
+        "pendingIntent",
+        "testProvider"
+      ],
+      "unregister_count": 1,
+      "session_ids": [
+        "116a265f-397b-431b-82e2-6c74c4cd2b2f"
+      ],
+      "failures": [],
+      "errors": [],
+      "post_stop_processes": "",
+      "user": 0,
+      "launch": {
+        "command": "launch-component",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "457cc2c0fea6446a90b5059bfbf0f4f7",
+        "startedAt": 1787236235963,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "70169193-2531-4693-8c8f-225aace52a80",
+          "generation": 1,
+          "processSlot": 54,
+          "platformPid": 4023,
+          "pid": 4023,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.LocationCampaignActivity"
+        },
+        "status": "PASS"
+      },
+      "stable_seconds": 1800,
+      "recovery_seconds": 5,
+      "logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user0-user0-profile-update-logcat.txt"
+    },
+    {
+      "phase": "user1-isolation",
+      "status": "PASS",
+      "expected_available": true,
+      "probe_count": 1,
+      "current_count": 1,
+      "current_request_count": 1,
+      "callback_count": 1800,
+      "nmea_count": 1800,
+      "gnss_events": [
+        "started",
+        "firstFix",
+        "stopped"
+      ],
+      "negative_kinds": [
+        "pendingIntent",
+        "testProvider"
+      ],
+      "unregister_count": 1,
+      "session_ids": [
+        "5549dd5d-5d45-4fb9-88f7-e1001eeb2104"
+      ],
+      "failures": [],
+      "errors": [],
+      "post_stop_processes": "",
+      "user": 1,
+      "launch": {
+        "command": "launch-component",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 1,
+        "trustNativeGuest": true,
+        "requestId": "5f7d89353132489681d0de7a36dc7140",
+        "startedAt": 1787238045310,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "5db73061-6751-4a29-bc4a-6028ccbaa35c",
+          "generation": 1,
+          "processSlot": 55,
+          "platformPid": 4224,
+          "pid": 4224,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.LocationCampaignActivity"
+        },
+        "status": "PASS"
+      },
+      "stable_seconds": 1800,
+      "recovery_seconds": 5,
+      "logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user1-user1-isolation-logcat.txt"
+    },
+    {
+      "phase": "user1-clear",
+      "status": "PASS",
+      "expected_available": false,
+      "probe_count": 1,
+      "current_count": 0,
+      "current_request_count": 0,
+      "callback_count": 0,
+      "nmea_count": 0,
+      "gnss_events": [],
+      "negative_kinds": [
+        "pendingIntent",
+        "testProvider"
+      ],
+      "unregister_count": 1,
+      "session_ids": [
+        "50aa96d4-15de-4804-9c6f-e23c2065a24d"
+      ],
+      "failures": [],
+      "errors": [],
+      "post_stop_processes": "",
+      "user": 1,
+      "launch": {
+        "command": "launch-component",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 1,
+        "trustNativeGuest": true,
+        "requestId": "09f5d6b562b8432a9ff9f4c80be94ff1",
+        "startedAt": 1787239856195,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "8497fade-10ca-4763-9801-410fdca12a19",
+          "generation": 1,
+          "processSlot": 55,
+          "platformPid": 4560,
+          "pid": 4560,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.LocationCampaignActivity"
+        },
+        "status": "PASS"
+      },
+      "stable_seconds": 5,
+      "recovery_seconds": 5,
+      "logcat": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c2-t03\\20260822T122226Z\\c2-t03-user1-user1-clear-logcat.txt"
+    }
+  ],
+  "status": "PASS",
+  "finished_at": "2026-08-22T13:23:41.171400+00:00"
+}

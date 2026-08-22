@@ -14,8 +14,24 @@ public final class LocationServiceHook {
     public static AutoCloseable installGuestManager(Context guestContext, GuestIdentity identity) {
         android.location.ControlledLocationManager manager =
                 new android.location.ControlledLocationManager(
-                        () -> identity.virtualServices().deviceServiceProfile().location());
-        return GuestSystemServiceOverrideRegistry.install(
-                guestContext, Context.LOCATION_SERVICE, manager);
+                        () -> identity.virtualServices().deviceServiceProfile().location(),
+                        () -> identity.capabilityPolicy().allowed(
+                                com.warden.controlledsandbox.framework.capability
+                                        .CapabilityAccessPolicy.LOCATION));
+        AutoCloseable override;
+        try {
+            override = GuestSystemServiceOverrideRegistry.install(
+                    guestContext, Context.LOCATION_SERVICE, manager);
+        } catch (RuntimeException error) {
+            manager.close();
+            throw error;
+        }
+        return () -> {
+            try {
+                override.close();
+            } finally {
+                manager.close();
+            }
+        };
     }
 }

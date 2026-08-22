@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.runtime.guest;
 
+import android.annotation.SuppressLint;
 import android.content.AttributionSource;
 import android.content.ContentProvider;
 import android.os.Build;
@@ -14,6 +15,7 @@ import java.lang.reflect.Method;
  * ContentProvider, while the Guest/Broker transport invokes the Provider object directly and
  * therefore has to bracket the invocation explicitly.</p>
  */
+@SuppressLint("BlockedPrivateApi")
 final class GuestAttributionSourceBridge {
     private GuestAttributionSourceBridge() { }
 

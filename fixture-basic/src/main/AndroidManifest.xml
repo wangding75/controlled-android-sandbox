@@ -54,6 +54,7 @@
             android:isolatedProcess="true"
             android:process=":native_enf_iso" />
         <activity android:name="com.warden.controlledsandbox.fixture.CapabilityProbeActivity" android:exported="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.LocationCampaignActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.LegacyCameraProbeActivity" android:exported="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.FrameworkProbeActivity" android:exported="false" />
         <activity android:name="com.warden.controlledsandbox.fixture.PmsPermissionAttributionProbeActivity"

@@ -725,11 +725,21 @@ public final class DebugCommandActivity extends Activity {
         float accuracy = (float) number(extras, "accuracy", 5f);
         float speed = (float) number(extras, "speed", 0f);
         float bearing = (float) number(extras, "bearing", 0f);
-        long now = System.currentTimeMillis();
+        String mode = text(extras, "mode", VirtualLocationProfileSnapshot.MODE_STATIC);
+        String provider = text(extras, "provider", "gps");
+        boolean providerEnabled = bool(extras, "providerEnabled", true);
+        long minimumUpdateIntervalMs = whole(extras, "minimumUpdateIntervalMs", 1000L);
+        boolean gnssEnabled = bool(extras, "gnssEnabled", true);
+        int satellitesInView = (int) whole(extras, "satellitesInView", 8L);
+        int satellitesUsedInFix = (int) whole(extras, "satellitesUsedInFix", 5L);
+        String nmeaSentence = text(extras, "nmeaSentence",
+                "$GPGGA,000000.00,3113.824,N,12128.422,E,1,08,0.9,4.0,M,0.0,M,,*00");
+        long now = whole(extras, "timeMs", System.currentTimeMillis());
+        long elapsed = whole(extras, "elapsedRealtimeNanos", System.nanoTime());
         return new VirtualLocationProfileSnapshot(
-                VirtualLocationProfileSnapshot.MODE_STATIC, "gps", true, latitude, longitude,
-                altitude, accuracy, speed, bearing, now, System.nanoTime(), 1000L,
-                true, 8, 5, "$GPGGA,000000.00,3113.824,N,12128.422,E,1,08,0.9,4.0,M,0.0,M,,*00");
+                mode, provider, providerEnabled, latitude, longitude, altitude, accuracy, speed,
+                bearing, now, elapsed, minimumUpdateIntervalMs, gnssEnabled, satellitesInView,
+                satellitesUsedInFix, nmeaSentence);
     }
 
     private static double number(Bundle extras, String key, double fallback) {
@@ -739,6 +749,23 @@ public final class DebugCommandActivity extends Activity {
             try { return Double.parseDouble(text); } catch (NumberFormatException ignored) { }
         }
         return fallback;
+    }
+
+    private static long whole(Bundle extras, String key, long fallback) {
+        double value = number(extras, key, fallback);
+        return value < 0d || value > Long.MAX_VALUE ? fallback : (long) value;
+    }
+
+    private static boolean bool(Bundle extras, String key, boolean fallback) {
+        Object value = extras == null ? null : extras.get(key);
+        if (value instanceof Boolean flag) return flag;
+        if (value instanceof String text) return Boolean.parseBoolean(text);
+        return fallback;
+    }
+
+    private static String text(Bundle extras, String key, String fallback) {
+        String value = extras == null ? null : extras.getString(key, null);
+        return value == null || value.trim().isEmpty() ? fallback : value.trim();
     }
 
     private VirtualCameraProfileSnapshot cameraFromExtras(

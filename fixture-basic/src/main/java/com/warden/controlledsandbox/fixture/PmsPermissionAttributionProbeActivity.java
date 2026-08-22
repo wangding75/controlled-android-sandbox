@@ -1,5 +1,6 @@
 package com.warden.controlledsandbox.fixture;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -21,6 +22,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 /** Device probe for the C2-T02 PMS, permission, AppOps and attribution boundary. */
+@SuppressLint({"NewApi", "WrongConstant"})
 public final class PmsPermissionAttributionProbeActivity extends Activity {
     private static final String TAG = "CS_FIXTURE";
     private static final String HOST_PACKAGE = "com.warden.controlledsandbox.debug";
