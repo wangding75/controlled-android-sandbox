@@ -802,6 +802,11 @@ public final class DebugCommandActivity extends Activity {
         Bundle result = new Bundle();
         String mode = text(extras, "componentMode", "");
         if (!mode.isEmpty()) result.putString("c2t04Mode", mode);
+        String c2t05Mode = text(extras, "c2t05Mode", "");
+        if (!c2t05Mode.isEmpty()) result.putString("c2t05Mode", c2t05Mode);
+        if (extras.containsKey("c2t05Loops")) {
+            result.putInt("c2t05Loops", Math.max(1, extras.getInt("c2t05Loops", 20)));
+        }
         if (extras.containsKey("cameraLoops")) {
             result.putInt("c2t04Loops", Math.max(1, extras.getInt("cameraLoops", 100)));
         }

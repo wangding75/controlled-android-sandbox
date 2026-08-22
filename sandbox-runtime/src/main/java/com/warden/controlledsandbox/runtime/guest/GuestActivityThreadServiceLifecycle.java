@@ -53,6 +53,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     private final Map<IBinder, Record> records = new IdentityHashMap<>();
     private final GuestServiceForegroundTransport foregroundTransport;
     private final Map<String, RecoveryWaiter> recoveryWaiters = new HashMap<>();
+    private final Map<String, StopWaiter> stopWaiters = new HashMap<>();
     private volatile boolean closed;
 
     GuestActivityThreadServiceLifecycle(GuestRuntimeEnvironment.Session session,
@@ -124,6 +125,43 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         }
     }
 
+    /**
+     * Registers the framework stop acknowledgement before asking AMS to stop the StubService.
+     * Context.stopService() returns when the request is accepted, not when ActivityThread has
+     * completed Service.onDestroy() and serviceDoneExecuting().  A following start can otherwise
+     * reuse a still-destroying host ServiceRecord and never deliver CREATE_SERVICE/SERVICE_ARGS.
+     */
+    StopWaiter prepareStop(String guestClass) {
+        if (guestClass == null || guestClass.trim().isEmpty()) {
+            throw new IllegalArgumentException("FRAMEWORK_SERVICE_COMPONENT_MISSING");
+        }
+        synchronized (stopWaiters) {
+            if (stopWaiters.containsKey(guestClass)) {
+                throw new IllegalStateException("FRAMEWORK_SERVICE_STOP_ALREADY_PENDING:" + guestClass);
+            }
+            StopWaiter waiter = new StopWaiter();
+            stopWaiters.put(guestClass, waiter);
+            return waiter;
+        }
+    }
+
+    void cancelStop(String guestClass, StopWaiter waiter) {
+        synchronized (stopWaiters) {
+            if (stopWaiters.get(guestClass) == waiter) stopWaiters.remove(guestClass);
+        }
+        waiter.done.countDown();
+    }
+
+    void awaitStop(String guestClass, StopWaiter waiter) throws Exception {
+        if (!waiter.done.await(GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS,
+                TimeUnit.MILLISECONDS)) {
+            synchronized (stopWaiters) {
+                if (stopWaiters.get(guestClass) == waiter) stopWaiters.remove(guestClass);
+            }
+            throw new IllegalStateException("FRAMEWORK_SERVICE_STOP_TIMEOUT:" + guestClass);
+        }
+    }
+
     @Override public void close() {
         if (closed) return;
         closed = true;
@@ -152,6 +190,10 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
                 waiter.fail(new IllegalStateException("GUEST_SERVICE_FRAMEWORK_BRIDGE_CLOSED"));
             }
             recoveryWaiters.clear();
+        }
+        synchronized (stopWaiters) {
+            for (StopWaiter waiter : stopWaiters.values()) waiter.done.countDown();
+            stopWaiters.clear();
         }
     }
 
@@ -219,6 +261,11 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         if (service == null) throw new IllegalStateException("FRAMEWORK_SERVICE_FACTORY_RETURNED_NULL");
         if (!(service instanceof Service)) throw new IllegalArgumentException("NOT_A_GUEST_SERVICE:" + guestClass);
         ServiceInfo projected = projectServiceInfo(data, guestClass);
+        VirtualPackageMetadata.Component projectedComponent = session.packageMetadata.component(
+                guestClass, VirtualPackageMetadata.Type.SERVICE);
+        if (projectedComponent == null) {
+            throw new IllegalArgumentException("SERVICE_NOT_DECLARED:" + guestClass);
+        }
         setField(data, "info", projected);
         Object manager = foregroundTransport.serviceManagerProxy(projected, token,
                 hostIntent.getBooleanExtra(RuntimeKeys.SERVICE_RECOVERY, false));
@@ -232,8 +279,11 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         // The Guest manifest projection is authoritative for FGS type validation.  Carry it on
         // the framework record because Service.startForeground() can run before the final
         // onStartCommand result is known.
+        // ServiceInfo.foregroundServiceType is hidden on some API/OEM builds.  The immutable
+        // Guest manifest projection is authoritative even when that framework field cannot be
+        // written reflectively.
         storedRoute.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK,
-                optionalIntField(projected, "foregroundServiceType"));
+                projectedComponent.foregroundServiceType());
         synchronized (records) {
             records.put(token, new Record(token, service, guestClass, projected,
                     new ComponentName(session.context.hostServiceContext(),
@@ -443,22 +493,32 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     }
 
     private void stopService(IBinder token, Record record) throws Exception {
-        synchronized (records) { records.remove(token); }
-        foregroundTransport.clear(token);
-        record.bindings.clear();
-        mapRemove(servicesData, token);
-        mapRemove(services, token);
-        record.service.onDestroy();
-        detach(record.service);
-        // ActivityThread.handleStopService acknowledges STOP_SERVICE to AMS after
-        // Service.onDestroy(). The bridge owns that callback, so omitting the
-        // STOP acknowledgement leaves the StubService in AMS's executing set and
-        // produces a delayed ANR even though the guest Service has already been
-        // destroyed. VA/NBB preserve this framework completion edge as well.
-        serviceDone(token, SERVICE_DONE_EXECUTING_STOP, 0, 0);
-        recordFrameworkEvent(record, record.routeRequest,
-                ComponentOperations.FRAMEWORK_SERVICE_EVENT_STOP, 0, 0);
-        logLifecycle("GUEST_SERVICE_FRAMEWORK_DESTROYED", record, "STOP");
+        try {
+            synchronized (records) { records.remove(token); }
+            foregroundTransport.clear(token);
+            record.bindings.clear();
+            mapRemove(servicesData, token);
+            mapRemove(services, token);
+            record.service.onDestroy();
+            detach(record.service);
+            // ActivityThread.handleStopService acknowledges STOP_SERVICE to AMS after
+            // Service.onDestroy(). The bridge owns that callback, so omitting the
+            // STOP acknowledgement leaves the StubService in AMS's executing set and
+            // produces a delayed ANR even though the guest Service has already been
+            // destroyed. VA/NBB preserve this framework completion edge as well.
+            serviceDone(token, SERVICE_DONE_EXECUTING_STOP, 0, 0);
+            recordFrameworkEvent(record, record.routeRequest,
+                    ComponentOperations.FRAMEWORK_SERVICE_EVENT_STOP, 0, 0);
+            logLifecycle("GUEST_SERVICE_FRAMEWORK_DESTROYED", record, "STOP");
+        } finally {
+            signalStop(record.className);
+        }
+    }
+
+    private void signalStop(String guestClass) {
+        StopWaiter waiter;
+        synchronized (stopWaiters) { waiter = stopWaiters.remove(guestClass); }
+        if (waiter != null) waiter.done.countDown();
     }
     private Intent createIntent(Object data) {
         return (Intent) field(data, "intent");
@@ -512,6 +572,9 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             info.flags |= optionalStaticInt(ServiceInfo.class, "FLAG_STOP_WITH_TASK");
         }
         setOptional(info, "foregroundServiceType", component.foregroundServiceType());
+        android.util.Log.i("CS_FGS_PROJECTION", "SERVICE_INFO service=" + guestClass
+                + " declaredType=" + component.foregroundServiceType()
+                + " projectedType=" + optionalIntField(info, "foregroundServiceType"));
         setOptional(info, "directBootAware", component.directBootAware());
         info.applicationInfo = new ApplicationInfo(session.context.getApplicationInfo());
         return info;
@@ -760,6 +823,10 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
             this.stub = stub;
             this.routeRequest = routeRequest == null ? new Bundle() : new Bundle(routeRequest);
         }
+    }
+
+    static final class StopWaiter {
+        final CountDownLatch done = new CountDownLatch(1);
     }
 
 }

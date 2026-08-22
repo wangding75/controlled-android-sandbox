@@ -6,9 +6,14 @@ import android.content.Intent;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class FixtureService extends Service {
     private final FixtureBinder binder = new FixtureBinder();
+    private String c2t05Session = "";
+    private int c2t05Loop;
 
     @Override public void onCreate() {
         super.onCreate();
@@ -31,10 +36,21 @@ public class FixtureService extends Service {
         boolean recoveryIntent = !isolatedProcess
                 && (intent == null || intent.getAction() == null);
         if (recoveryIntent || "com.warden.controlledsandbox.fixture.FOREGROUND_SERVICE"
+                .equals(intent.getAction()) || "com.warden.controlledsandbox.fixture.C2_T05_FGS"
                 .equals(intent.getAction())) {
+            if (intent != null && "com.warden.controlledsandbox.fixture.C2_T05_FGS"
+                    .equals(intent.getAction())) {
+                c2t05Session = intent.getStringExtra("c2t05Session");
+                c2t05Loop = intent.getIntExtra("c2t05Loop", 0);
+            }
             int foregroundType = invokeForegroundTransport("fixture-foreground");
             Log.i("CS_FIXTURE", "FRAMEWORK_FGS_START_FOREGROUND_PASS type=" + foregroundType
                     + " recoveryIntent=" + recoveryIntent);
+            if (!c2t05Session.isEmpty()) {
+                String line = c2t05Session + " " + c2t05Loop + " type=" + foregroundType;
+                Log.i("CS_C2_T05_FGS", "C2_T05_FGS_PROMOTED " + line);
+                appendC2T05("c2-t05-fgs.log", line);
+            }
         }
         return START_STICKY;
     }
@@ -70,10 +86,27 @@ public class FixtureService extends Service {
                         .newInstance(channelId, "Controlled Sandbox Fixture", importance);
                 invokeNamed(notificationManager, "createNotificationChannel", channel);
             }
-            java.lang.reflect.Method start = Service.class.getDeclaredMethod(
-                    "startForeground", int.class, notificationClass);
+            java.lang.reflect.Method start;
+            boolean typedPromotion = Build.VERSION.SDK_INT >= 29;
+            try {
+                start = typedPromotion
+                        ? Service.class.getDeclaredMethod("startForeground", int.class,
+                                notificationClass, int.class)
+                        : Service.class.getDeclaredMethod("startForeground", int.class,
+                                notificationClass);
+            } catch (NoSuchMethodException unsupportedTypedPromotion) {
+                typedPromotion = false;
+                start = Service.class.getDeclaredMethod("startForeground", int.class,
+                        notificationClass);
+            }
             start.setAccessible(true);
-            start.invoke(this, 42, notification);
+            if (typedPromotion) {
+                // FOREGROUND_SERVICE_TYPE_DATA_SYNC is 0x1 on API29+; use the literal so the
+                // API-agnostic static Android stubs need not model ServiceInfo constants.
+                start.invoke(this, 42, notification, 0x1);
+            } else {
+                start.invoke(this, 42, notification);
+            }
             java.lang.reflect.Method type = Service.class.getDeclaredMethod("getForegroundServiceType");
             type.setAccessible(true);
             return ((Number) type.invoke(this)).intValue();
@@ -104,8 +137,23 @@ public class FixtureService extends Service {
         }
     }
     @Override public void onDestroy() {
+        if (!c2t05Session.isEmpty()) {
+            Log.i("CS_C2_T05_FGS", "C2_T05_FGS_STOPPED session=" + c2t05Session
+                    + " loop=" + c2t05Loop);
+            appendC2T05("c2-t05-fgs-stopped.log", c2t05Session + " " + c2t05Loop);
+        }
         Log.i("CS_FIXTURE", "SERVICE_DESTROY " + getClass().getName());
         super.onDestroy();
+    }
+
+    private void appendC2T05(String name, String line) {
+        try (FileOutputStream output = new FileOutputStream(new File(getFilesDir(), name), true)) {
+            output.write(line.getBytes(StandardCharsets.UTF_8));
+            output.write('\n');
+            output.getFD().sync();
+        } catch (Exception error) {
+            Log.e("CS_C2_T05_FGS", "C2_T05_FGS_EVIDENCE_WRITE_FAILED", error);
+        }
     }
     @Override public IBinder onBind(Intent intent) {
         Log.i("CS_FIXTURE", "SERVICE_BIND action=" + (intent == null ? "" : intent.getAction()));

@@ -107,7 +107,7 @@ public final class SelfTest {
                 .start("intent-filter")
                 .start("action", BinaryXmlFixtureBuilder.text("name", "com.example.ALIAS")).end("action")
                 .end("intent-filter").end("activity-alias")
-                .start("service", BinaryXmlFixtureBuilder.text("name", ".SyncService"), BinaryXmlFixtureBuilder.text("process", ":remote"), BinaryXmlFixtureBuilder.bool("isolatedProcess", true)).end("service")
+                .start("service", BinaryXmlFixtureBuilder.text("name", ".SyncService"), BinaryXmlFixtureBuilder.text("process", ":remote"), BinaryXmlFixtureBuilder.bool("isolatedProcess", true), BinaryXmlFixtureBuilder.hexInteger("foregroundServiceType", 1)).end("service")
                 .start("receiver", BinaryXmlFixtureBuilder.text("name", ".BootReceiver"), BinaryXmlFixtureBuilder.text("permission", "com.example.SEND_BOOT"))
                 .start("intent-filter", BinaryXmlFixtureBuilder.integer("priority", 250),
                         BinaryXmlFixtureBuilder.integer("order", 3),
@@ -158,6 +158,8 @@ public final class SelfTest {
                 "same-name activity alias is merged without losing filters");
         require(model.activities().get(0).themeResId() == 0x7f120002, "activity theme resource");
         require(model.isolatedProcessCount() == 1, "isolated process");
+        require(model.services().size() == 1 && model.services().get(0).foregroundServiceType() == 1,
+                "hex-typed foreground service type");
         require(model.permissions().contains("android.permission.INTERNET"), "permission");
         require(model.permissionGroups().size() == 1
                         && "com.example.PERM_GROUP".equals(model.permissionGroups().get(0).name())

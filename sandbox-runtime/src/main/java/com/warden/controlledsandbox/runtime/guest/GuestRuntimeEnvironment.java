@@ -335,6 +335,14 @@ public final class GuestRuntimeEnvironment {
                     guestContext.getApplicationInfo(), spec);
             VirtualPackageMetadata packageMetadata = GuestPackageMetadataMapper.fromSnapshot(
                     spec.packageState, guestContext.getApplicationInfo(), loadedResources.manifestMetadata);
+            for (VirtualPackageMetadata.Component component : packageMetadata.components()) {
+                if (component.type() == VirtualPackageMetadata.Type.SERVICE
+                        && component.foregroundServiceType() != 0) {
+                    android.util.Log.i("CS_FGS_PROJECTION", "GUEST_METADATA service="
+                            + component.className() + " declaredType="
+                            + component.foregroundServiceType());
+                }
+            }
             List<VirtualPackageMetadata> packageViews = new ArrayList<>();
             packageViews.add(packageMetadata);
             for (VirtualPackageProjectionSnapshot projection : spec.packageUniverse) {

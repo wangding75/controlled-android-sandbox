@@ -757,6 +757,17 @@ public final class GuestContext extends GuestHostOperationDenyContext {
                 GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
     }
 
+    @Override public Context createDisplayContext(android.view.Display display) {
+        if (display == null) throw new IllegalArgumentException("display is required");
+        // ContextWrapper's default implementation delegates to its host base context. That
+        // would manufacture a host-owned display context and leak the host package identity
+        // through a guest Activity. Keep the guest resources, package manager, and identity on
+        // the derived context just as createConfigurationContext does.
+        return new GuestContext(hostServiceContext, spec, classLoader, resources, assets,
+                packageManager, deviceProtected, sharedState, applicationInfo.metaData,
+                GuestApplicationInfoFactory.readComponentFactory(applicationInfo), applicationInfo);
+    }
+
     public Context createCredentialProtectedStorageContext() {
         return deviceProtected ? storageContext(false) : this;
     }

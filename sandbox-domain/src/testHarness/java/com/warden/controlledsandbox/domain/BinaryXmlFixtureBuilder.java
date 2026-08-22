@@ -86,6 +86,7 @@ final class BinaryXmlFixtureBuilder {
     static Attr text(String name, String value) { return new Attr(name, value, 0x03, 0); }
     static Attr bool(String name, boolean value) { return new Attr(name, null, 0x12, value ? 1 : 0); }
     static Attr integer(String name, int value) { return new Attr(name, null, 0x10, value); }
+    static Attr hexInteger(String name, int value) { return new Attr(name, null, 0x11, value); }
     static Attr reference(String name, int value) { return new Attr(name, null, 0x01, value); }
 
     static final class Attr {

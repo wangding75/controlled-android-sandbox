@@ -141,7 +141,29 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
 
     boolean stop(Bundle request, String guestClass) {
         Route route = route(request, guestClass);
-        return session.context.hostServiceContext().stopService(hostIntent(route));
+        GuestActivityThreadServiceLifecycle.StopWaiter waiter = serviceLifecycle.prepareStop(guestClass);
+        boolean accepted;
+        try {
+            accepted = session.context.hostServiceContext().stopService(hostIntent(route));
+        } catch (Throwable error) {
+            serviceLifecycle.cancelStop(guestClass, waiter);
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error : new IllegalStateException(error);
+        }
+        if (!accepted) {
+            serviceLifecycle.cancelStop(guestClass, waiter);
+            return false;
+        }
+        try {
+            serviceLifecycle.awaitStop(guestClass, waiter);
+            android.util.Log.i("CS_SERVICE_FRAMEWORK", "STOP_ACKED guest=" + guestClass);
+            return true;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error : new IllegalStateException(error);
+        }
     }
 
     boolean bind(Bundle request, String guestClass, ServiceConnection guestConnection,

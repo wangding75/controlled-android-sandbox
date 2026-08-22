@@ -959,3 +959,33 @@ issues:
       reject historical endpoints as executable serial selection. The checker now allowlists this
       negative static guard while continuing to reject hard-coded serials in executable device
       runners; RD resolution remains instance-name based.
+
+  - issue_id: KI-R03-038
+    title: C2-T05 scheduling and interaction method-level RD evidence was incomplete
+    capability: system_service_virtualization
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C2-T05 DISCOVER/CLASSIFY 2026-08-22
+    evidence:
+      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
+      - docs/plans/M5_T9_WINDOW_INPUT_DISPLAY.md
+      - docs/review/C2_T05_SCHEDULING_INTERACTION_DESIGN.md
+      - tools/capability/run_c2_t05_rd.py
+      - verification/catch-up/C2-T05/c2-t05-rd-summary.json
+      - artifacts/capability-audit/catch-up-c2-t05/20260822T173726Z
+    match_patterns:
+      - C2-T01-F1
+      - notification channel
+      - exact alarm
+      - JobInfo constraints
+      - window token
+      - InputMethodManager
+      - DisplayManager
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_C2_T05_RD_METHOD_CAMPAIGN
+    notes: >
+      Typed stores, framework hooks, process-local ownership ledgers and host self-tests existed,
+      but no package-neutral RD fixture correlated request/return/callback/death/cleanup across
+      Notification, Alarm, Job, FGS, Window, Input/IME and Display. C2-T05 closes the scoped RD
+      API32 evidence gap; API33+, OEM, commercial-app and VA PRO equivalence remain unproven.

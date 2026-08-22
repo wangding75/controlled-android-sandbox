@@ -24,6 +24,7 @@ public final class BinaryXmlManifestParser {
     private static final int TYPE_FLOAT = 0x04;
     private static final int TYPE_REFERENCE = 0x01;
     private static final int TYPE_INT_DEC = 0x10;
+    private static final int TYPE_INT_HEX = 0x11;
     private static final int TYPE_INT_BOOLEAN = 0x12;
     private static final int NO_INDEX = 0xFFFFFFFF;
     private static final int MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
@@ -534,7 +535,7 @@ public final class BinaryXmlManifestParser {
             return fallback;
         }
         int asInt(int fallback) {
-            if (dataType == TYPE_REFERENCE || dataType == TYPE_INT_DEC
+            if (dataType == TYPE_REFERENCE || dataType == TYPE_INT_DEC || dataType == TYPE_INT_HEX
                     || dataType == TYPE_INT_BOOLEAN) return data;
             try { return Integer.parseInt(text); } catch (NumberFormatException ignored) { return fallback; }
         }

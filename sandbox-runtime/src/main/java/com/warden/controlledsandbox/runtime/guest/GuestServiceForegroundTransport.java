@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 
 import com.warden.controlledsandbox.runtime.component.service.GuestServiceStubNames;
+import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.framework.identity.VirtualNotificationNamespace;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -122,8 +123,14 @@ final class GuestServiceForegroundTransport implements AutoCloseable {
         request.putString(RuntimeKeys.SERVICE_FOREGROUND_NOTIFICATION_TAG, "");
         request.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_REMOVE_NOTIFICATION, call.removeNotification);
         request.putBoolean(RuntimeKeys.SERVICE_RECOVERY, recovery);
-        request.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK,
-                infoForegroundType(info));
+        VirtualPackageMetadata.Component component = session.packageMetadata.component(
+                info.name, VirtualPackageMetadata.Type.SERVICE);
+        int declaredType = component == null
+                ? infoForegroundType(info) : component.foregroundServiceType();
+        android.util.Log.i("CS_FGS_PROJECTION", "SERVICE_FOREGROUND service=" + info.name
+                + " method=" + method.getName() + " requestedType=" + call.typeMask
+                + " declaredType=" + declaredType);
+        request.putInt(RuntimeKeys.SERVICE_FOREGROUND_DECLARED_TYPE_MASK, declaredType);
 
         // Promote in the virtual state first so invalid Guest metadata never causes the host
         // Stub to become foreground. A host rejection is rolled back through the same typed

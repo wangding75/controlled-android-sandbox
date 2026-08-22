@@ -469,6 +469,11 @@ final class VirtualPackageStateBuilder {
                     component.initOrder(), component.syncable(), component.persistableMode(),
                     component.targetActivity(), toMetadataSnapshots(componentMetadata == null ? null
                             : componentMetadata.get(component.className()))));
+            if ("SERVICE".equals(type) && component.foregroundServiceType() != 0) {
+                android.util.Log.i("CS_FGS_PROJECTION", "PACKAGE_STATE service="
+                        + component.className() + " declaredType="
+                        + component.foregroundServiceType());
+            }
         }
     }
 
