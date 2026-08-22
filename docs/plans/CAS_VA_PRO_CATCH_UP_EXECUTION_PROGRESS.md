@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-22 15:57（Asia/Shanghai）
+更新时间：2026-08-22 16:41（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C2`
-当前任务：`C2-T01`
-下一任务：`C2-T01`
-最后完成任务：`C1-GATE`
+当前任务：`C2-T02`
+下一任务：`C2-T02`
+最后完成任务：`C2-T01`
 
 ## 1. 使用规则
 
@@ -46,7 +46,7 @@
 | C1-T05 | PendingIntent/Alarm/Notification holder | DONE | C1-T02,C1-T03 | `d50d8d91cb98a1c96524efbe2bd00edbc40dddb5` | §5 C1-T05 |
 | C1-T06 | Package 生命周期 | DONE | C1-T04,C1-T05 | `68f28f43b5d35bc4b85a03938b5d7009f9e6f277` | §5 C1-T06 |
 | C1-T07 | Process/ABI/Recovery | DONE | C1-T01..T06 | `5d7195cb475108d7c2e864913a18ce6b778a70c2` | §5 C1-T07 |
-| C2-T01 | SX/XH 系统服务方法清单 | PENDING | C1 | - | - |
+| C2-T01 | SX/XH 系统服务方法清单 | DONE | C1 | `ebcc31841f805502a0791f245b1df505333dfa04` | §5 C2-T01 |
 | C2-T02 | PMS/Permission/AppOps/Attribution | PENDING | C2-T01 | - | - |
 | C2-T03 | Location | PENDING | C2-T01,C2-T02 | - | - |
 | C2-T04 | Camera1/Camera2 | PENDING | C2-T01,C2-T02 | - | - |
@@ -822,3 +822,51 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C1 仅证明当前 RD API 32 设备范围；C2 系统服务/F2-F5、API33+、ARM/16KB、
   OEM、SX/XH 与商业等价性仍未验证。
 - **下一任务**：`C2-T01`；本轮不执行后续任务。
+
+### C2-T01：SX/XH 系统服务方法清单
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-22 15:57 / 2026-08-22 16:41（Asia/Shanghai）
+- **执行环境**：Windows 11 amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，当前状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `22041211A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `773adc6f-e0aa-4997-a0ee-481a7773a10d`，Android ID `398eea33120cd887`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `d0da3743197b609756d0bd5ed309ad2bfa71de2f`；开始前已核对远端同 HEAD；上一任务
+  `C1-GATE` 已 DONE，主回执为 `verification/catch-up/C1-GATE/c1-gate-receipt.json`。
+  工作区原有的未跟踪 C1-GATE 诊断/重试证据未纳入本任务，保持原样。
+- **实现摘要**：将 59 个 service Hook 文件逐一分类为 F1-F5 产品面、C2 P1 支撑面或明确分离的
+  C2 P2 长尾；建立 40 条逻辑方法族 backlog（P0=20、P1=15、P2=5）。每条 P0/P1 都记录
+  request/identity、return/callback、cleanup/death、现有 owner、当前证据、测试计划和目标证据等级。
+  同时修复预检发现的静态检查器 owner/实现漂移，并重新生成 SBOM digest；未修改生产运行时行为。
+- **变更文件**：`docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md`、
+  `verification/catch-up/C2-T01/c2-t01-method-inventory.json`、
+  `scripts/check-binder-system-services.py`、`scripts/check-m5-t12-webview-gms-oem-detection.py`、
+  `scripts/check-package-query-resolve.py`、`scripts/check-system-services-broker-split.py`、
+  `verification/sbom.json`。
+- **验收命令与结果**：目录实际 Hook 文件与清单核对 `59/59`；JSON readback PASS；P0/P1 owner、
+  test plan、target evidence 完整性 PASS；`python scripts/test_mumu_instance.py` PASS；M5-T8 至
+  M5-T15、system-service split、Binder system-service、PackageManager query/resolve 与 SBOM
+  checks 全部 PASS；`git diff --check` PASS。`python tools/capability/run_local_capability_audit.py --all`
+  在实现提交上完成：42 gates 中 34 PASS、8 个已登记 KNOWN_ISSUE、0 NEW_REGRESSION，证据目录为
+  `artifacts/capability-audit/all/20260822T083903Z/`。
+- **设备证据**：本任务是方法清单与治理验收，不新增设备行为声明；仅按任务书动态解析并记录
+  `RD测试` 快照，完整字段保存在 `verification/catch-up/C2-T01/c2-t01-method-inventory.json`。
+  C1 行为基线仍只引用 `verification/catch-up/C1-GATE/c1-gate-receipt.json`，不外推为 C2 L3。
+- **Known Issues**：全量审计中的 `KI-R03-020`、`KI-M10-001/002`、`KI-R03-023`、`KI-R03-024`、
+  `KI-R03-025`、`KI-R03-026`、`KI-M10-005`、`KI-M10-006` 均为既有非阻断项；本任务未新增
+  runtime issue。预检发现的 SBOM digest 与 package-query 静态规则漂移已修复并复验通过；VA PRO
+  等价性仍为 `NOT_PROVEN`。
+- **偏离任务书**：无验收范围偏离。按任务书 C2-T01 交付文档/矩阵/证据；P2 未调用长尾明确分离，
+  隐藏 API32/OEM 具体 overload 留给后续 C2 任务；失败优先修复并重跑，未记录 BLOCKED。
+- **实现提交 SHA**：`ebcc31841f805502a0791f245b1df505333dfa04`
+  （`docs(c2): [C2-T01] inventory system-service method surface`）。
+- **回执提交**：使用主题 `docs(progress): record [C2-T01] receipt` 单独提交；本回执将 C2-T01
+  从 `IN_PROGRESS` 更新为 `DONE`。
+- **推送与远端验证**：回执提交完成后，两个提交一并推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 HEAD。
+- **遗留风险**：C2-T02 至 C2-T07 尚未补齐 SX/XH F1-F5 的 RD_API32 L3 方法证据；API33+、ARM/16KB、
+  OEM、商业应用和 VA PRO 等价性仍未验证；P2 长尾按本清单保持显式 `UNVERIFIED`。
+- **下一任务**：`C2-T02`；本轮不执行后续任务。
