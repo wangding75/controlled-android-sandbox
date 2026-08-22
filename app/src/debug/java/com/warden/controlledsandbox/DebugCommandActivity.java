@@ -11,6 +11,7 @@ import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
 import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import com.warden.controlledsandbox.contract.NativeCompanionResult;
 import com.warden.controlledsandbox.contract.PackageAppOpSnapshot;
+import com.warden.controlledsandbox.contract.PermissionAuditSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPermissionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualCameraProfileSnapshot;
@@ -201,6 +202,12 @@ public final class DebugCommandActivity extends Activity {
             } else if ("set-permissions".equals(command)) {
                 operation = setPermissions(packages, packageName, virtualUserId, extras);
                 requireStatus("permissions", operation, "PERMISSIONS_UPDATED");
+            } else if ("set-appops".equals(command)) {
+                operation = setAppOps(packages, packageName, virtualUserId, extras);
+                requireStatus("appops", operation, "APPOPS_UPDATED");
+            } else if ("policy-state".equals(command)) {
+                operation = policyState(packages, packageName, virtualUserId);
+                requireStatus("policy-state", operation, "POLICY_STATE");
             } else if ("configure-location".equals(command)
                     || "configure-camera".equals(command)
                     || "dingtalk-profile".equals(command)) {
@@ -650,6 +657,63 @@ public final class DebugCommandActivity extends Activity {
         result.putString(RuntimeKeys.STATUS, "PERMISSIONS_UPDATED");
         result.putString("decision", decision);
         result.putInt("permissionCount", count);
+        return result;
+    }
+
+    private static Bundle setAppOps(PackageServiceClient packages, String packageName,
+                                    int virtualUserId, Bundle extras) throws Exception {
+        String appOps = extras.getString("appOps", "");
+        String mode = extras.getString("mode", "").trim().toUpperCase(java.util.Locale.ROOT);
+        if (appOps.trim().isEmpty()) throw new IllegalArgumentException("appOps extra is required");
+        if (!java.util.Set.of("DEFAULT", "ALLOWED", "IGNORED", "ERRORED").contains(mode)) {
+            throw new IllegalArgumentException("mode must be DEFAULT, ALLOWED, IGNORED or ERRORED");
+        }
+        int count = 0;
+        for (String appOp : appOps.split(",")) {
+            String normalized = appOp.trim();
+            if (normalized.isEmpty()) continue;
+            packages.setAppOpMode(packageName, virtualUserId, normalized, mode);
+            count++;
+        }
+        if (count == 0) throw new IllegalArgumentException("appOps extra contains no values");
+        Bundle result = new Bundle();
+        result.putString(RuntimeKeys.STATUS, "APPOPS_UPDATED");
+        result.putString("mode", mode);
+        result.putInt("appOpCount", count);
+        return result;
+    }
+
+    private static Bundle policyState(PackageServiceClient packages, String packageName,
+                                      int virtualUserId) throws Exception {
+        VirtualPackageStateSnapshot state = packages.virtualPackageState(packageName, virtualUserId);
+        PermissionAuditSnapshot latestCameraAppOpReset = null;
+        for (PermissionAuditSnapshot audit : packages.permissionAudit(packageName, virtualUserId, 256)) {
+            if ("android:camera".equals(audit.permission())
+                    && "RESET_APP_OP".equals(audit.action())) {
+                latestCameraAppOpReset = audit;
+                break;
+            }
+        }
+        Bundle result = new Bundle();
+        result.putString(RuntimeKeys.STATUS, "POLICY_STATE");
+        result.putInt(RuntimeKeys.VIRTUAL_USER_ID, virtualUserId);
+        result.putString("cameraPermission", permissionDecision(state, "android.permission.CAMERA"));
+        result.putString("internetPermission", permissionDecision(state, "android.permission.INTERNET"));
+        result.putString("cameraAppOp", appOpMode(state, "android:camera"));
+        result.putString("recordAudioAppOp", appOpMode(state, "android:record_audio"));
+        result.putInt("permissionCount", state.permissions().size());
+        result.putInt("appOpCount", state.appOps().size());
+        result.putInt("splitCount", state.splitNames().size());
+        // cameraAppOp is the runtime-effective projection. When the virtual CAMERA permission
+        // is DEFAULT (and therefore not granted), the projection may be IGNORED even though the
+        // raw AppOps policy has been removed. Expose the reset audit separately so a data-clear
+        // check can prove raw policy convergence without changing the runtime semantics.
+        result.putString("cameraAppOpPolicy", latestCameraAppOpReset == null
+                ? "UNOBSERVED" : latestCameraAppOpReset.outcome());
+        result.putString("cameraAppOpResetReason", latestCameraAppOpReset == null
+                ? "" : latestCameraAppOpReset.reason());
+        result.putLong("cameraAppOpResetSequence", latestCameraAppOpReset == null
+                ? 0L : latestCameraAppOpReset.sequence());
         return result;
     }
 
@@ -1109,6 +1173,15 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "changedAppOp");
         copyIfPresent(bundle, out, "otherUserPermission");
         copyIfPresent(bundle, out, "otherUserAppOp");
+        copyIfPresent(bundle, out, "cameraPermission");
+        copyIfPresent(bundle, out, "internetPermission");
+        copyIfPresent(bundle, out, "cameraAppOp");
+        copyIfPresent(bundle, out, "recordAudioAppOp");
+        copyIfPresent(bundle, out, "permissionCount");
+        copyIfPresent(bundle, out, "appOpCount");
+        copyIfPresent(bundle, out, "cameraAppOpPolicy");
+        copyIfPresent(bundle, out, "cameraAppOpResetReason");
+        copyIfPresent(bundle, out, "cameraAppOpResetSequence");
         copyIfPresent(bundle, out, "isolatedVirtualUserId");
         copyIfPresent(bundle, out, "failedState");
         copyIfPresent(bundle, out, "failureCode");

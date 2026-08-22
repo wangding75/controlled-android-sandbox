@@ -1,48 +1,48 @@
 {
   "schema_version": 1,
-  "task_id": "C1-T06",
+  "task_id": "C2-T02",
   "status": "PASS",
-  "captured_at": "2026-08-21T15:56:44.285501+00:00",
+  "captured_at": "2026-08-22T08:49:37.564122+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C1-T06",
-    "active_task": "C1-T06",
-    "last_completed": "C1-T05",
-    "first_ready_pending": null,
-    "dependencies": "C1-T04,C1-T05"
+    "next_task": "C2-T02",
+    "active_task": "",
+    "last_completed": "C2-T01",
+    "first_ready_pending": "C2-T02",
+    "dependencies": "C2-T01"
   },
   "last_receipt": {
-    "task_id": "C1-T05",
+    "task_id": "C2-T01",
     "status": "DONE",
     "implementation_commits": [
-      "d50d8d91cb98a1c96524efbe2bd00edbc40dddb5"
+      "ebcc31841f805502a0791f245b1df505333dfa04"
     ],
-    "receipt_commit": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
-    "baseline_commit": "585e1ace6fedeb9d43784545327b691ce44f234b",
+    "receipt_commit": "4d912297d91d86efa6181d72f4f7c7c8f60483bc",
+    "baseline_commit": "d0da3743197b609756d0bd5ed309ad2bfa71de2f",
     "evidence_paths": [
-      "docs/review/C1_T05_PENDING_INTENT_ALARM_NOTIFICATION_DESIGN.md",
-      "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C1-T05/c1-t05-rd-summary.json",
-      "artifacts/capability-audit/catch-up-c1-t05/pre-fix-system-holder-logcat.txt"
+      "verification/catch-up/C1-GATE/c1-gate-receipt.json",
+      "docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md",
+      "verification/catch-up/C2-T01/c2-t01-method-inventory.json",
+      "verification/sbom.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
+    "head": "4d912297d91d86efa6181d72f4f7c7c8f60483bc",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "23ca42d45a1dab1f803248bb0c8f34efa2668fee",
+    "remote_head": "4d912297d91d86efa6181d72f4f7c7c8f60483bc",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M scripts/check-split-install-sessions.py\n M tools/capability/run_p1_00_rd.py\n M tools/capability/run_rd_campaign.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/m5-t16-source-closure-audit.json\n M verification/sbom.json\n?? docs/review/C1_T06_PACKAGE_LIFECYCLE_DESIGN.md\n?? tools/capability/run_c1_t06_rd.py\n?? verification/catch-up/C1-T06/"
+    "status_short": "?? verification/catch-up/C1-GATE/c1-gate-provider-smoke-2.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke.json\n?? verification/catch-up/C1-GATE/full-regression-retry-02/\n?? verification/catch-up/C1-GATE/full-regression-retry-03/\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-10.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-prepare.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-recovery-retry.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-synchronized.json"
   },
   "device": {
     "instance_name": "RD测试",
     "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "7cac15ce-d76e-44ea-968b-959d91d03be7",
+    "boot_id": "773adc6f-e0aa-4997-a0ee-481a7773a10d",
     "android_id": "398eea33120cd887",
     "model": "22041211A"
   },
@@ -74,5 +74,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C1-T06"
+  "evidence_directory": "verification/catch-up/C2-T02"
 }

@@ -162,7 +162,11 @@ require(
 require(
     'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java',
     'GuestCapabilityGate',
-    'capabilityGate.requireService(name)',
+    # Service lookup is intentionally discovery-only.  The concrete operation proxy
+    # (camera/location/etc.) performs the capability check; requiring the gate during
+    # getSystemService() would break APIs which obtain a manager before requesting the
+    # corresponding runtime permission.
+    'sharedState.systemServices.requireAvailable(name)',
     'updatePermissionState(',
 )
 require(

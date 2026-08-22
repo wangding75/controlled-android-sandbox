@@ -148,6 +148,8 @@ public final class FrameworkIdentityProxySelfTest {
                 "PermissionManager denial uses virtual policy");
         require(permission.checkPermission("android.permission.INTERNET", "guest.pkg", 12001) == 0,
                 "PermissionManager grant uses virtual policy");
+        require(permission.checkPermission("android.permission.CAMERA", "host.pkg", 10001) == -1,
+                "PermissionManager hides explicit Host package");
         boolean mutationBlocked = false;
         try { permission.grantRuntimePermission("guest.pkg", "android.permission.CAMERA", 0); }
         catch (SecurityException expected) {
@@ -169,6 +171,14 @@ public final class FrameworkIdentityProxySelfTest {
                 "integer Camera AppOps code maps to virtual camera mode");
         require(appOps.checkOperation(999, 12001, "guest.pkg") == 3,
                 "unknown integer AppOps code fails closed to MODE_DEFAULT");
+        require(appOps.checkOperation("android:camera", 10001, "guest.pkg") == 1,
+                "AppOps accepts the Guest process physical UID with Guest package");
+        boolean hostHidden = false;
+        try { appOps.checkOperation("android:camera", 10001, "host.pkg"); }
+        catch (SecurityException expected) {
+            hostHidden = expected.getMessage().contains("VIRTUAL_APPOPS_HOST_PACKAGE_HIDDEN");
+        }
+        require(hostHidden, "AppOps hides explicit Host package");
         FakeAttribution source = new FakeAttribution("guest.pkg", 12001, "proxy", null);
         require(appOps.noteProxyOperation("android:camera", source) == 1,
                 "proxy AppOps attribution chain targets Guest policy");

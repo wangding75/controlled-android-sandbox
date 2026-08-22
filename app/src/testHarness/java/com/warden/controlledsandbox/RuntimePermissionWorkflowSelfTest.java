@@ -84,10 +84,14 @@ public final class RuntimePermissionWorkflowSelfTest {
                 cloneDenied.state.withPermissionRequest(PACKAGE, 0, MICROPHONE,
                         "android:record_audio", false, 8, "session-b", 2L,
                         50L, "RUNTIME_BROKER");
-        SandboxCatalogState reset = pendingMicrophone.state.withPolicyReset(
+        SandboxCatalogState appOpConfigured = pendingMicrophone.state.withAppOpMode(
+                PACKAGE, 0, "android:camera", SandboxPolicyState.APP_OP_IGNORED);
+        SandboxCatalogState reset = appOpConfigured.withPolicyReset(
                 PACKAGE, 0, "administrator reset", "HOST_MAIN", 51L);
         require(reset.policy(PACKAGE, 0).permissionDecisions().isEmpty(),
                 "policy reset must clear decisions");
+        require(reset.policy(PACKAGE, 0).appOpModes().isEmpty(),
+                "policy reset must clear AppOps modes");
         require(RuntimePermissionRequestRecord.CANCELLED.equals(
                         reset.latestPermissionRequestState(PACKAGE, 0, MICROPHONE)),
                 "policy reset must cancel pending callbacks");
@@ -101,6 +105,11 @@ public final class RuntimePermissionWorkflowSelfTest {
                                 && item.permission.equals(CAMERA)
                                 && item.outcome.equals(SandboxPolicyState.PERMISSION_DEFAULT)),
                 "policy reset must audit cleared permission decisions without pending callbacks");
+        require(reset.permissionAudit(PACKAGE, 0, 20).stream()
+                        .anyMatch(item -> item.action.equals("RESET_APP_OP")
+                                && item.permission.equals("android:camera")
+                                && item.outcome.equals(SandboxPolicyState.APP_OP_DEFAULT)),
+                "policy reset must audit cleared AppOps policy");
 
         SandboxCatalogState.PermissionRequestResult pendingBeforeUpgrade =
                 cloneDenied.state.withPermissionRequest(PACKAGE, 0, MICROPHONE,

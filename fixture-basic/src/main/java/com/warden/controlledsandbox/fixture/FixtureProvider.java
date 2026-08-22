@@ -11,6 +11,8 @@ import android.net.Uri;
 import android.util.Log;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,6 +99,22 @@ public final class FixtureProvider extends ContentProvider {
     }
 
     @Override public Bundle call(String method, String arg, Bundle extras) {
+        if ("c2-t02-attribution".equals(method)) {
+            Bundle result = new Bundle();
+            String callingPackage = (String) invokeCalling("getCallingPackage");
+            result.putString("callingPackage", callingPackage);
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                Object source = invokeCalling("getCallingAttributionSource");
+                result.putString("callingAttributionPackage",
+                        source == null ? "" : (String) invokeValue(source, "getPackageName"));
+                result.putInt("callingAttributionUid", source == null ? -1
+                        : (Integer) invokeValue(source, "getUid"));
+            } else {
+                result.putString("callingAttributionPackage", callingPackage);
+                result.putInt("callingAttributionUid", -1);
+            }
+            return result;
+        }
         if ("batch-call".equals(method)) {
             Bundle result = new Bundle();
             result.putString("method", method);
@@ -108,6 +126,38 @@ public final class FixtureProvider extends ContentProvider {
             throw new IllegalStateException("fixture batch failure");
         }
         return super.call(method, arg, extras);
+    }
+
+    private Object invokeCalling(String methodName) {
+        try {
+            Method method = ContentProvider.class.getMethod(methodName);
+            method.setAccessible(true);
+            return method.invoke(this);
+        } catch (InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof RuntimeException) throw (RuntimeException) cause;
+            if (cause instanceof Error) throw (Error) cause;
+            throw new IllegalStateException("fixture calling identity invocation failed", cause);
+        } catch (Exception error) {
+            throw new IllegalStateException("fixture calling identity method unavailable: "
+                    + methodName, error);
+        }
+    }
+
+    private static Object invokeValue(Object receiver, String methodName) {
+        try {
+            Method method = receiver.getClass().getMethod(methodName);
+            method.setAccessible(true);
+            return method.invoke(receiver);
+        } catch (InvocationTargetException error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof RuntimeException) throw (RuntimeException) cause;
+            if (cause instanceof Error) throw (Error) cause;
+            throw new IllegalStateException("fixture attribution invocation failed", cause);
+        } catch (Exception error) {
+            throw new IllegalStateException("fixture attribution method unavailable: "
+                    + methodName, error);
+        }
     }
 
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {

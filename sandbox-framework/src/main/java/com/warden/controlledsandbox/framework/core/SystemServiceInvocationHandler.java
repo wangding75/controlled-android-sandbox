@@ -364,6 +364,19 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
 
     private Object permissionDecision(Method method, Object[] arguments) {
         String name = method.getName();
+        if (containsHostPackage(arguments)
+                || (containsHostUid(arguments) && !containsGuestPackage(arguments))) {
+            if (isPermissionMutation(name)) {
+                throw new SecurityException("VIRTUAL_PERMISSION_MUTATION_REQUIRES_PACKAGE_SERVICE");
+            }
+            if (isPermissionCheck(name)) {
+                Class<?> result = method.getReturnType();
+                if (result == int.class || result == Integer.class) return -1;
+                if (result == boolean.class || result == Boolean.class) return false;
+                throw new SecurityException("VIRTUAL_PERMISSION_SIGNATURE_UNSUPPORTED:" + name);
+            }
+            return defaultValue(method.getReturnType());
+        }
         if (!targetsGuest(arguments)) return NoResult.VALUE;
         if (isPermissionMutation(name)) {
             throw new SecurityException("VIRTUAL_PERMISSION_MUTATION_REQUIRES_PACKAGE_SERVICE");
@@ -394,11 +407,17 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
 
     private Object appOpsDecision(Method method, Object[] arguments) {
         String methodName = method.getName();
-        if (semanticAdapter.containsHostAttribution(arguments)) {
-            // A Guest must never be able to smuggle the Host opPackageName or an already-host
-            // AttributionSource into the framework service.  The normal outbound transform is
-            // Guest -> Host and therefore only runs after this validation point.
-            throw new SecurityException("VIRTUAL_APPOPS_HOST_ATTRIBUTION_HIDDEN");
+        if (semanticAdapter.containsHostAttribution(arguments) && !targetsGuest(arguments)) {
+            // AppOpsManager on API 31+ carries the process' transport AttributionSource in
+            // otherwise Guest-addressed calls. That source is Host-shaped because the manager
+            // came from the Host Context; the Guest package/UID arguments still establish the
+            // virtual target and the call is answered locally below. A Host-shaped attribution
+            // with no Guest target remains an explicit identity-smuggling attempt.
+            throw new SecurityException("VIRTUAL_APPOPS_HOST_PACKAGE_HIDDEN");
+        }
+        if (containsHostPackage(arguments)
+                || (containsHostUid(arguments) && !containsGuestPackage(arguments))) {
+            throw new SecurityException("VIRTUAL_APPOPS_HOST_PACKAGE_HIDDEN");
         }
         if ("checkPackage".equals(methodName)) {
             return appOpsCheckPackage(method, arguments);
@@ -439,9 +458,11 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if ("android.app.SyncNotedAppOp".equals(result.getName())) {
             try {
                 java.lang.reflect.Constructor<?> constructor =
-                        result.getDeclaredConstructor(int.class, String.class);
+                        result.getDeclaredConstructor(int.class, int.class, String.class,
+                                String.class);
                 constructor.setAccessible(true);
-                return constructor.newInstance(mode, firstAttributionTag(arguments));
+                return constructor.newInstance(mode, firstOperationCode(arguments),
+                        firstAttributionTag(arguments), identity.packageName());
             } catch (Throwable error) {
                 com.warden.controlledsandbox.framework.capability.FatalErrorPolicy
                         .rethrowIfFatal(error);
@@ -456,7 +477,8 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         Integer uid = firstInteger(arguments);
         boolean guestPackage = identity.packageName().equals(packageName);
         boolean guestUid = uid != null && uid == identity.virtualUid();
-        if (guestPackage && (uid == null || guestUid)) {
+        boolean hostUid = uid != null && uid == identity.hostUid();
+        if (guestPackage && (uid == null || guestUid || hostUid)) {
             // IAppOpsService.checkPackage() is void on Android; preserve a false/zero fallback
             // for reduced API stubs without manufacturing a Host PackageOps result.
             return defaultValue(method.getReturnType());
@@ -504,6 +526,30 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
         if (java.util.List.class.isAssignableFrom(returnType)) return Collections.emptyList();
         if (java.util.Set.class.isAssignableFrom(returnType)) return Collections.emptySet();
         return null;
+    }
+
+    private boolean containsHostPackage(Object[] arguments) {
+        if (arguments == null) return false;
+        for (Object argument : arguments) {
+            if (identity.hostPackageName().equals(argument)) return true;
+        }
+        return false;
+    }
+
+    private boolean containsHostUid(Object[] arguments) {
+        if (arguments == null) return false;
+        for (Object argument : arguments) {
+            if (argument instanceof Integer value && value == identity.hostUid()) return true;
+        }
+        return false;
+    }
+
+    private boolean containsGuestPackage(Object[] arguments) {
+        if (arguments == null) return false;
+        for (Object argument : arguments) {
+            if (identity.packageName().equals(argument)) return true;
+        }
+        return false;
     }
 
     private static String firstPackageName(Object[] arguments) {
@@ -601,6 +647,18 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
             if (value.startsWith("android:") || identity.appOpsPolicy().modes().containsKey(value)) return value;
         }
         return "android:unknown_op";
+    }
+
+    private int firstOperationCode(Object[] arguments) {
+        if (arguments == null) return 0;
+        for (Object argument : arguments) {
+            if (!(argument instanceof Integer value)) continue;
+            switch (value) {
+                case 0, 1, 26, 27 -> { return value; }
+                default -> { }
+            }
+        }
+        return 0;
     }
 
     private enum NoResult { VALUE }

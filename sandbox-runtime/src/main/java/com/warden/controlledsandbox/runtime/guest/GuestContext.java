@@ -44,6 +44,7 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private static final Object PREFERENCE_LOCK_TIE = new Object();
     private final Context hostServiceContext;
     private final PackageManager packageManager;
+    private final ContentResolver contentResolver;
     private final GuestPackageSpec spec;
     private ClassLoader classLoader;
     private final Resources resources;
@@ -142,6 +143,10 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         this.storageNames = new GuestStorageNameCodec(instanceRoot, capabilityBackedStorage);
         this.applicationInfo = GuestApplicationInfoFactory.create(spec, dataRoot.getAbsolutePath(),
                 applicationMetadata, appComponentFactory, parsedApplicationInfo);
+        // ContentResolver captures its Context attribution source at construction time. Reuse
+        // Android's concrete ApplicationContentResolver implementation with this Guest Context;
+        // an anonymous ContentResolver cannot implement API32's hidden provider lifecycle hooks.
+        this.contentResolver = createGuestContentResolver();
         this.dynamicReceivers = sharedState.dynamicReceivers;
         this.mainThread = sharedState.mainThread;
         this.capabilityGate = sharedState.capabilityGate;
@@ -215,6 +220,19 @@ public final class GuestContext extends GuestHostOperationDenyContext {
 
     @Override public String getPackageName() { return spec.packageName; }
     @Override public String getOpPackageName() { return spec.packageName; }
+    /**
+     * Project the API 31+ framework attribution source into the active Guest identity. The
+     * Android 12 device image exposes AttributionSource constructors as hidden APIs (and has no
+     * public Builder), so construction stays reflective and is guarded by the platform version.
+     * This source is also what AppOpsManager and ContentResolver use to create their outbound
+     * attribution chains.
+    */
+    // The static compile stubs intentionally omit this API31+ hidden Context method. Keep the
+    // source-compatible method without @Override so both the stub compiler and API32 runtime
+    // build use the same Guest attribution projection.
+    public android.content.AttributionSource getAttributionSource() {
+        return GuestAttributionSourceBridge.create(spec.virtualUid, spec.packageName);
+    }
     @Override public Context getApplicationContext() {
         return sharedState.application == null ? this : sharedState.application;
     }
@@ -307,7 +325,43 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         return hostServiceContext.getSystemService(name);
     }
     @Override public ContentResolver getContentResolver() {
-        return hostServiceContext.getContentResolver();
+        return contentResolver;
+    }
+
+    private ContentResolver createGuestContentResolver() {
+        if (Build.VERSION.SDK_INT < 31) return hostServiceContext.getContentResolver();
+        try {
+            Object hostResolver = hostServiceContext.getContentResolver();
+            Class<?> resolverType = Class.forName(
+                    "android.app.ContextImpl$ApplicationContentResolver");
+            Class<?> activityThreadType = Class.forName("android.app.ActivityThread");
+            java.lang.reflect.Field mainThreadField = findField(resolverType, "mMainThread");
+            mainThreadField.setAccessible(true);
+            Object mainThread = mainThreadField.get(hostResolver);
+            java.lang.reflect.Constructor<?> constructor = resolverType.getDeclaredConstructor(
+                    Context.class, activityThreadType);
+            constructor.setAccessible(true);
+            return (ContentResolver) constructor.newInstance(this, mainThread);
+        } catch (Throwable error) {
+            if (error instanceof ThreadDeath) throw (ThreadDeath) error;
+            // Host-side framework self-tests run without android.jar's concrete ContextImpl.
+            // Keep those tests on the existing resolver; API31+ device images contain the
+            // concrete class and therefore continue through the Guest-context constructor path.
+            if (error instanceof ClassNotFoundException) {
+                return hostServiceContext.getContentResolver();
+            }
+            throw new IllegalStateException("GUEST_CONTENT_RESOLVER_CONSTRUCTION_FAILED", error);
+        }
+    }
+
+    private static java.lang.reflect.Field findField(Class<?> type, String name)
+            throws NoSuchFieldException {
+        Class<?> cursor = type;
+        while (cursor != null && cursor != Object.class) {
+            try { return cursor.getDeclaredField(name); }
+            catch (NoSuchFieldException ignored) { cursor = cursor.getSuperclass(); }
+        }
+        throw new NoSuchFieldException(name);
     }
     @Override public Executor getMainExecutor() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

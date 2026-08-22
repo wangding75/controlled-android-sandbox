@@ -250,6 +250,8 @@ public final class RuntimeKeys {
     public static final String URI_PERMISSION_RESULT = "uriPermissionResult";
     public static final String CALLER_PACKAGE_NAME = "callerPackageName";
     public static final String CALLER_VIRTUAL_USER_ID = "callerVirtualUserId";
+    /** Virtual UID paired with CALLER_PACKAGE_NAME for framework AttributionSource projection. */
+    public static final String CALLER_VIRTUAL_UID = "callerVirtualUid";
     public static final String CALLER_SESSION_ID = "callerSessionId";
     public static final String CALLER_GENERATION = "callerGeneration";
     public static final String TARGET_PACKAGE_NAME = "targetPackageName";

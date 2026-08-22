@@ -55,6 +55,11 @@ final class GuestPackageContext extends GuestHostOperationDenyContext {
     @Override public String getPackageName() { return targetPackage; }
     /** Keep operation identity owned by the calling Guest, never by a resource-only view. */
     @Override public String getOpPackageName() { return owner.getOpPackageName(); }
+    /** Resource-only views must not reintroduce the Host attribution source. */
+    // See GuestContext: the static API stubs do not declare the hidden API31+ method.
+    public android.content.AttributionSource getAttributionSource() {
+        return owner.getAttributionSource();
+    }
     @Override public Context getApplicationContext() { return owner.getApplicationContext(); }
     @Override public ClassLoader getClassLoader() { return classLoader; }
     @Override public Resources getResources() { return resources; }

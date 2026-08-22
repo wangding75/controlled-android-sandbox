@@ -511,7 +511,10 @@ final class SandboxPackageLifecycle {
         if (java.nio.file.Files.isSymbolicLink(root.toPath())) {
             throw new SecurityException("INSTANCE_DATA_ROOT_SYMLINK");
         }
-        if (!root.exists()) return;
+        if (!root.exists()) {
+            resetPolicyAfterDataClear(current, packageName, virtualUserId);
+            return;
+        }
         if (!root.isDirectory()) throw new IllegalStateException("Instance data root is not a directory");
         File[] children = root.listFiles();
         if (children == null) throw new IllegalStateException("Cannot list instance data root");
@@ -521,6 +524,14 @@ final class SandboxPackageLifecycle {
             }
             ApkImportManager.deleteTreeOrThrow(child);
         }
+        resetPolicyAfterDataClear(current, packageName, virtualUserId);
+    }
+
+    private void resetPolicyAfterDataClear(SandboxCatalogState current, String packageName,
+                                           int virtualUserId) throws Exception {
+        SandboxCatalogState next = current.withPolicyReset(packageName, virtualUserId,
+                "clear instance data", "HOST_MAIN", System.currentTimeMillis());
+        catalogRepository.save(next);
     }
 
     synchronized String maintenanceWarning() {

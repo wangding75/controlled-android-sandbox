@@ -310,6 +310,13 @@ public final class GuestComponentRuntime {
 
     private Bundle invokeProviderTransaction(String componentClass, Bundle request, String operation)
             throws Exception {
+        ProviderRecord record = requireProvider(componentClass, request);
+        return withProviderCallingIdentity(record.provider, request,
+                () -> invokeProviderTransactionUnbound(componentClass, request, operation));
+    }
+
+    private Bundle invokeProviderTransactionUnbound(String componentClass, Bundle request,
+                                                    String operation) throws Exception {
         return switch (operation) {
             case ComponentOperations.PROVIDER_QUERY -> queryProvider(componentClass, request);
             case ComponentOperations.PROVIDER_CANONICALIZE -> canonicalizeProvider(
@@ -334,6 +341,46 @@ public final class GuestComponentRuntime {
                     openProviderTypedAssetFile(componentClass, request);
             default -> throw new IllegalArgumentException("Unknown Provider operation: " + operation);
         };
+    }
+
+    /**
+     * The framework ContentProvider.Transport normally installs this caller state around every
+     * provider method.  Guest/Broker provider calls are direct Java calls, so install the
+     * validated virtual caller for the complete transaction and restore any nested state.
+     */
+    private <T> T withProviderCallingIdentity(ContentProvider provider, Bundle request,
+                                              java.util.concurrent.Callable<T> action)
+            throws Exception {
+        if (android.os.Build.VERSION.SDK_INT < 31) return action.call();
+        String packageName = request.getString(RuntimeKeys.CALLER_PACKAGE_NAME,
+                session.spec.packageName);
+        int virtualUid = callerVirtualUid(request, packageName);
+        android.content.AttributionSource source = GuestAttributionSourceBridge.create(
+                virtualUid, packageName);
+        Object previous = GuestAttributionSourceBridge.install(provider, source);
+        try {
+            return action.call();
+        } finally {
+            GuestAttributionSourceBridge.restore(provider, previous);
+        }
+    }
+
+    private int callerVirtualUid(Bundle request, String packageName) {
+        int explicit = request.getInt(RuntimeKeys.CALLER_VIRTUAL_UID, -1);
+        if (explicit < 0) {
+            // Requests produced by older in-process callers did not carry this field.  The
+            // current Guest session is the only safe fallback; a foreign package must fail
+            // closed instead of being attributed to the target process.
+            if (!session.spec.packageName.equals(packageName)) {
+                throw new SecurityException("GUEST_PROVIDER_CALLER_UID_MISSING");
+            }
+            return session.spec.virtualUid;
+        }
+        if (session.spec.packageName.equals(packageName)
+                && explicit != session.spec.virtualUid) {
+            throw new SecurityException("GUEST_PROVIDER_CALLER_UID_MISMATCH");
+        }
+        return explicit;
     }
 
     private static boolean requiresMainThread(String operation) {
