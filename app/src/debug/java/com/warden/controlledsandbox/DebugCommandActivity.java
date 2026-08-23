@@ -134,6 +134,44 @@ public final class DebugCommandActivity extends Activity {
                         + campaign.optJSONObject("isolated"));
                 return;
             }
+            if ("c4-t05-sx-business".equals(command)) {
+                if (packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("package extra is required");
+                }
+                String trust = trustNativeGuest
+                        ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                        : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED;
+                int loops = Math.max(0, Math.min(100, extras.getInt("loops", 100)));
+                boolean skipSurfaces = extras.getBoolean("skipSurfaces", false);
+                boolean skipLoops = extras.getBoolean("skipLoops", false);
+                JSONObject campaign = runC4T05SxBusiness(
+                        this, packageName, trust, loops, skipSurfaces, skipLoops);
+                result.put("c4t05", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pass", false)
+                                ? "C4_T05_SX_BUSINESS_PASS" : "C4_T05_SX_BUSINESS_FAIL"));
+                if (!campaign.optBoolean("pass", false)) {
+                    throw new IllegalStateException("C4_T05_SX_BUSINESS_FAILED:"
+                            + campaign.optString("error", "sx business failed"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS c4-t05-sx-business package=" + packageName);
+                return;
+            }
+            if ("c4-t05-dingtalk".equals(command)) {
+                JSONObject campaign = runC4T05DingTalk(this, trustNativeGuest);
+                result.put("c4t05DingTalk", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pass", false)
+                                ? "C4_T05_DINGTALK_PASS" : "C4_T05_DINGTALK_FAIL"));
+                if (!campaign.optBoolean("pass", false)) {
+                    throw new IllegalStateException("C4_T05_DINGTALK_FAILED:"
+                            + campaign.optString("error", "dingtalk failed"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS c4-t05-dingtalk");
+                return;
+            }
             if ("c4-t03-migrate".equals(command)) {
                 if (packageName.trim().isEmpty()) {
                     throw new IllegalArgumentException("package extra is required");
@@ -1409,6 +1447,255 @@ public final class DebugCommandActivity extends Activity {
         return out;
     }
 
+    private JSONObject runC4T05SxBusiness(Context context, String packageName, String trust,
+                                          int loops, boolean skipSurfaces, boolean skipLoops)
+            throws Exception {
+        JSONObject campaign = new JSONObject();
+        try (SxSandboxAdapter adapter = new SxSandboxAdapter(context);
+             PackageServiceClient packages = new PackageServiceClient(context);
+             RuntimeClient runtime = new RuntimeClient(context)) {
+            CasSandboxEngine engine = new CasSandboxEngine(adapter);
+            engine.killAll();
+            SxMigrationHostStore store = new SxMigrationHostStore(context, packages);
+            Map<String, String> applied = Map.of();
+            if (!skipSurfaces) {
+                for (SandboxInstance existing : engine.listInstalled()) {
+                    if (packageName.equals(existing.packageName())) {
+                        engine.uninstall(existing.packageName(), existing.virtualUserId());
+                    }
+                }
+                requireEngine(new JSONArray(), "c4-t05-import",
+                        engine.installFromHost(packageName, trust));
+                SxInstanceProfileMigrator migrator = new SxInstanceProfileMigrator(store);
+                byte[] cameraPng = java.nio.file.Files.readAllBytes(generateCameraSource().toPath());
+                SxLegacyConfigDocument f1f5 = sxFixture(packageName, 0, "31.230400", "121.473700",
+                        "02:00:00:00:00:10", "0123456789abcdef", "SX-F1F5", cameraPng);
+                SxMigrationRecord previous = store.read(packageName, 0);
+                if (previous != null) {
+                    store.write(previous.withStatus(SxMigrationRecord.FAILED, Map.of(), "",
+                            previous.mediaPath, true));
+                }
+                SxMigrationRecord migrated = migrator.migrate(f1f5);
+                if (!SxMigrationRecord.COMMITTED.equals(migrated.status)) {
+                    throw new IllegalStateException("F1F5_MIGRATE_FAILED:" + migrated.status);
+                }
+                applied = store.readApplied(packageName, 0);
+                if (applied.getOrDefault("location.lat", "").isEmpty()
+                        || applied.getOrDefault("device.androidId", "").isEmpty()
+                        || applied.getOrDefault("network.ssid", "").isEmpty()
+                        || applied.getOrDefault("bluetooth.name", "").isEmpty()
+                        || applied.getOrDefault("camera.sha256", "").isEmpty()) {
+                    throw new IllegalStateException("F1F5_PROFILE_INCOMPLETE:" + applied);
+                }
+            } else if (adapter.findRecord(packageName) == null) {
+                requireEngine(new JSONArray(), "c4-t05-import",
+                        engine.installFromHost(packageName, trust));
+            }
+            SandboxRecord record = adapter.findRecord(packageName);
+            if (record == null) throw new IllegalStateException("FIXTURE_RECORD_MISSING");
+            packages.setPermissionDecision(packageName, 0, "android.permission.CAMERA", "GRANTED");
+            packages.setPermissionDecision(packageName, 0,
+                    "android.permission.ACCESS_FINE_LOCATION", "GRANTED");
+            packages.setPermissionDecision(packageName, 0,
+                    "android.permission.ACCESS_COARSE_LOCATION", "GRANTED");
+            packages.setAppOpMode(packageName, 0, "android:camera", "ALLOWED");
+            packages.setAppOpMode(packageName, 0, "android:fine_location", "ALLOWED");
+            packages.setAppOpMode(packageName, 0, "android:coarse_location", "ALLOWED");
+            JSONArray components = new JSONArray();
+            Bundle provider;
+            if (!skipSurfaces) {
+                requireEngine(new JSONArray(), "c4-t05-prepare", engine.launch(packageName, 0));
+                // Package-neutral fixture first, then F1 camera, F2 location, F4 network,
+                // F5 bluetooth, F3 device. ConfigProvider is the migrated instance store.
+                Bundle cameraExtras = new Bundle();
+                cameraExtras.putString("c2t04Mode", "smoke");
+                launchSurface(runtime, record, components,
+                        "com.warden.controlledsandbox.fixture.CameraCampaignActivity",
+                        cameraExtras, 30_000L);
+                launchSurface(runtime, record, components,
+                        "com.warden.controlledsandbox.fixture.LocationCampaignActivity",
+                        null, 8_000L);
+                Bundle networkExtras = new Bundle();
+                networkExtras.putString("c2t06Mode", "full");
+                networkExtras.putInt("c2t06Loops", 1);
+                launchSurface(runtime, record, components,
+                        "com.warden.controlledsandbox.fixture.C2T06DeviceNetworkMediaActivity",
+                        networkExtras, 12_000L);
+                launchSurface(runtime, record, components,
+                        "com.warden.controlledsandbox.fixture.RemoteActivity",
+                        null, 2_000L);
+                Bundle schedulingExtras = new Bundle();
+                schedulingExtras.putString("c2t05Mode", "full");
+                schedulingExtras.putInt("c2t05Loops", 1);
+                launchSurface(runtime, record, components,
+                        "com.warden.controlledsandbox.fixture.C2T05SchedulingInteractionActivity",
+                        schedulingExtras, 20_000L);
+            }
+            if (!skipSurfaces) {
+                provider = runtime.prepareProvider(record, 0);
+                if (!"PROVIDER_READY".equals(provider.getString(RuntimeKeys.STATUS, ""))
+                        && !"PROVIDER_ALREADY_READY".equals(provider.getString(RuntimeKeys.STATUS, ""))) {
+                    throw new IllegalStateException("FILEPROVIDER_FAILED:"
+                            + provider.getString(RuntimeKeys.STATUS, ""));
+                }
+                requireEngine(new JSONArray(), "c4-t05-preloop-stop",
+                        killSettled(engine, packageName, 0));
+            } else {
+                provider = new Bundle();
+                provider.putString(RuntimeKeys.STATUS, "SKIPPED_LOOPS_PHASE");
+            }
+            int passed = 0;
+            int plannedLoops = skipLoops ? 0 : loops;
+            for (int loop = 1; loop <= plannedLoops; loop++) {
+                Bundle launched = runtime.launchComponent(record, 0,
+                        "com.warden.controlledsandbox.fixture.MainActivity");
+                String launchStatus = launched.getString(RuntimeKeys.STATUS, "FAILED");
+                if (!"LAUNCH_PASS".equals(launchStatus)) {
+                    stopSoft(runtime, record);
+                    Thread.sleep(400L);
+                    launched = runtime.launchComponent(record, 0,
+                            "com.warden.controlledsandbox.fixture.MainActivity");
+                    launchStatus = launched.getString(RuntimeKeys.STATUS, "FAILED");
+                }
+                if (!"LAUNCH_PASS".equals(launchStatus)) {
+                    throw new IllegalStateException("LOOP_LAUNCH_FAILED:" + loop + ":"
+                            + launchStatus + ":"
+                            + launched.getString("failureMessage",
+                                    launched.getString("errorMessage", "")));
+                }
+                stopSoft(runtime, record);
+                Thread.sleep(200L);
+                passed++;
+            }
+            SandboxOperationResult shortcut = engine.createShortcut(packageName, 0);
+            if (!shortcut.successful()) {
+                throw new IllegalStateException("SHORTCUT_FAILED:" + shortcut.errorCode());
+            }
+            DingTalkCompatibilityManager manager = new DingTalkCompatibilityManager();
+            if (manager.enabled(context, packageName, 0)) {
+                throw new IllegalStateException("DINGTALK_SPECIALIZATION_LEAKED_ONTO_FIXTURE");
+            }
+            if (!skipSurfaces) {
+                Map<String, String> after = store.readApplied(packageName, 0);
+                if (!applied.get("location.lat").equals(after.get("location.lat"))
+                        || !applied.get("device.androidId").equals(after.get("device.androidId"))
+                        || !applied.get("network.ssid").equals(after.get("network.ssid"))
+                        || !applied.get("bluetooth.name").equals(after.get("bluetooth.name"))
+                        || !applied.get("camera.sha256").equals(after.get("camera.sha256"))) {
+                    throw new IllegalStateException("GENERIC_PROFILE_MUTATED_AFTER_SPECIALIZATION_OFF");
+                }
+            }
+            campaign.put("pass", true);
+            campaign.put("loops", passed);
+            campaign.put("configProvider", "sx-config-v1-instance-store");
+            campaign.put("f1Camera", applied.get("camera.sha256"));
+            campaign.put("f2Location", applied.get("location.lat"));
+            campaign.put("f3Device", applied.get("device.androidId"));
+            campaign.put("f4Network", applied.get("network.ssid"));
+            campaign.put("f5Bluetooth", applied.get("bluetooth.name"));
+            campaign.put("components", components);
+            campaign.put("provider", provider.getString(RuntimeKeys.STATUS, ""));
+            campaign.put("shortcut", shortcut.status());
+            campaign.put("dingTalkEnabledOnFixture", false);
+        } catch (Exception error) {
+            campaign.put("pass", false);
+            campaign.put("error", String.valueOf(error.getMessage()));
+        }
+        return campaign;
+    }
+
+    private JSONObject runC4T05DingTalk(Context context, boolean trustNativeGuest) throws Exception {
+        JSONObject campaign = new JSONObject();
+        String packageName = DingTalkCompatibilityManager.PACKAGE_NAME;
+        String trust = trustNativeGuest
+                ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED;
+        try (SxSandboxAdapter adapter = new SxSandboxAdapter(context)) {
+            CasSandboxEngine engine = new CasSandboxEngine(adapter);
+            SandboxOperationResult imported = engine.installFromHost(packageName, trust);
+            if (!imported.successful()) {
+                throw new IllegalStateException("DINGTALK_IMPORT_FAILED:" + imported.errorCode()
+                        + ":" + imported.errorMessage());
+            }
+            SandboxRecord record = adapter.findRecord(packageName);
+            if (record == null) throw new IllegalStateException("DINGTALK_RECORD_MISSING");
+            DingTalkCompatibilityManager manager = new DingTalkCompatibilityManager();
+            DingTalkCompatibilityManager.Target target = manager.identify(
+                    record.packageName, record.versionName, record.versionCode);
+            campaign.put("versionName", record.versionName);
+            campaign.put("versionCode", record.versionCode);
+            campaign.put("targetReason", target.reason());
+            campaign.put("supported", target.supported());
+            campaign.put("defaultEnabled", manager.enabled(context, packageName, 0));
+            if (!target.supported()) {
+                throw new IllegalStateException("DINGTALK_REVISION_UNSUPPORTED:" + target.reason());
+            }
+            if (manager.enabled(context, packageName, 0)) {
+                throw new IllegalStateException("DINGTALK_COMPATIBILITY_NOT_DEFAULT_OFF");
+            }
+            SandboxOperationResult cold = engine.launch(packageName, 0);
+            if (!cold.successful()) {
+                throw new IllegalStateException("DINGTALK_COLD_LAUNCH_FAILED:" + cold.errorCode()
+                        + ":" + cold.errorMessage());
+            }
+            campaign.put("cold", cold.status());
+            // LaunchHomeActivity historically System.exit()s into PrivacyPolicyActivity.
+            Thread.sleep(12_000L);
+            SandboxOperationResult hot = engine.launch(packageName, 0);
+            if (!hot.successful() || "LAUNCH_FAILED".equals(hot.status())) {
+                throw new IllegalStateException("DINGTALK_HOT_LAUNCH_FAILED:" + hot.status()
+                        + ":" + hot.errorCode() + ":" + hot.errorMessage());
+            }
+            campaign.put("hot", hot.status());
+            Thread.sleep(8_000L);
+            // HOME/fg-bg is driven by the RD runner via adb keyevent so the Host
+            // DebugCommandActivity is not itself backgrounded (Android 12+
+            // BackgroundServiceStartNotAllowedException).
+            campaign.put("background", "RUNNER_HOME");
+            campaign.put("foreground", "RUNNER_LAUNCH");
+            SandboxOperationResult upgrade = engine.installFromHost(packageName, trust);
+            campaign.put("upgrade", upgrade.status());
+            if (!upgrade.successful()) {
+                throw new IllegalStateException("DINGTALK_UPGRADE_REIMPORT_FAILED:"
+                        + upgrade.errorCode());
+            }
+            SandboxRecord afterUpgrade = adapter.findRecord(packageName);
+            if (afterUpgrade == null) throw new IllegalStateException("DINGTALK_MISSING_AFTER_UPGRADE");
+            campaign.put("upgradeVersionName", afterUpgrade.versionName);
+            campaign.put("upgradeVersionCode", afterUpgrade.versionCode);
+            if (!DingTalkCompatibilityManager.SUPPORTED_VERSION_NAME.equals(afterUpgrade.versionName)
+                    || afterUpgrade.versionCode != DingTalkCompatibilityManager.SUPPORTED_VERSION_CODE) {
+                throw new IllegalStateException("DINGTALK_UPGRADE_REVISION_DRIFT:"
+                        + afterUpgrade.versionName + "/" + afterUpgrade.versionCode);
+            }
+            SandboxOperationResult afterUpgradeLaunch = engine.launch(packageName, 0);
+            if (!afterUpgradeLaunch.successful()) {
+                throw new IllegalStateException("DINGTALK_POST_UPGRADE_LAUNCH_FAILED:"
+                        + afterUpgradeLaunch.errorCode());
+            }
+            campaign.put("postUpgradeLaunch", afterUpgradeLaunch.status());
+            Thread.sleep(8_000L);
+            campaign.put("pass", true);
+            campaign.put("loginSurface", "DUMPSYS_REQUIRED");
+        } catch (Exception error) {
+            campaign.put("pass", false);
+            campaign.put("error", String.valueOf(error.getMessage()));
+        }
+        return campaign;
+    }
+
+    private static void launchSurface(RuntimeClient runtime, SandboxRecord record,
+                                      JSONArray components, String component, Bundle extras,
+                                      long settleMs) throws Exception {
+        Bundle launched = runtime.launchComponent(record, 0, component, extras);
+        String status = launched.getString(RuntimeKeys.STATUS, "FAILED");
+        components.put(component + "=" + status);
+        if (!"LAUNCH_PASS".equals(status)) {
+            throw new IllegalStateException("COMPONENT_LAUNCH_FAILED:" + component + ":" + status);
+        }
+        if (settleMs > 0L) Thread.sleep(settleMs);
+    }
+
     private JSONObject runC4T03Migrate(Context context, String packageName, String trust)
             throws Exception {
         JSONObject campaign = new JSONObject();
@@ -1632,6 +1919,17 @@ public final class DebugCommandActivity extends Activity {
         campaign.put("observerOperations", observerOps.length());
         campaign.put("traceCount", traces.length());
         return campaign;
+    }
+
+    private static void stopSoft(RuntimeClient runtime, SandboxRecord record) throws Exception {
+        try {
+            runtime.stop(record, 0);
+        } catch (Exception error) {
+            String message = String.valueOf(error.getMessage());
+            if (!message.contains("GUEST_STOP_FAILED") && !message.contains("STOP_FAILED")) {
+                throw error;
+            }
+        }
     }
 
     private static SandboxOperationResult killSettled(CasSandboxEngine engine, String packageName,

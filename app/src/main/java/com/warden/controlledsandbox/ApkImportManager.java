@@ -370,18 +370,26 @@ final class ApkImportManager {
             default: throw new SecurityException("NATIVE_ABI_UNSUPPORTED:" + abi);
         }
         byte[] header = new byte[20];
+        int offset = 0;
         try (InputStream input = new FileInputStream(file)) {
-            int offset = 0;
             while (offset < header.length) {
                 int count = input.read(header, offset, header.length - offset);
-                if (count < 0) throw new SecurityException("NATIVE_ELF_HEADER_SHORT");
+                if (count < 0) break;
                 offset += count;
             }
         }
+        boolean elf = offset >= 4
+                && (header[0] & 0xff) == 0x7f && header[1] == 'E' && header[2] == 'L'
+                && header[3] == 'F';
+        if (!elf) {
+            // Android PackageManager extracts lib/<abi>/*.so even when the payload is a
+            // packed/encrypted blob (zip, 7z, version stamps) or shorter than an ELF header.
+            return;
+        }
+        if (offset < header.length) throw new SecurityException("NATIVE_ELF_HEADER_SHORT");
         int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
         int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
-        if ((header[0] & 0xff) != 0x7f || header[1] != 'E' || header[2] != 'L'
-                || header[3] != 'F' || (header[4] & 0xff) != expectedClass
+        if ((header[4] & 0xff) != expectedClass
                 || (header[5] & 0xff) != 1 || (header[6] & 0xff) != 1
                 || type != 3 || machine != expectedMachine) {
             throw new SecurityException("NATIVE_ELF_ABI_MISMATCH:" + abi);

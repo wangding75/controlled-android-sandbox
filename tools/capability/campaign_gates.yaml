@@ -186,6 +186,13 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-049]
+  - id: c4-t05-sx-business
+    group: package_visibility
+    command: [python, scripts/check-c4-t05-sx-business.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-050]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

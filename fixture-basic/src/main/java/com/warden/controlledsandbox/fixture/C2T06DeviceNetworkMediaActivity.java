@@ -66,6 +66,9 @@ public final class C2T06DeviceNetworkMediaActivity extends Activity {
 
     private void runCampaign() {
         Bundle extras = getIntent() == null ? null : getIntent().getExtras();
+        if (extras != null && extras.getBundle("intentExtras") != null) {
+            extras = extras.getBundle("intentExtras");
+        }
         String mode = extras == null ? "full" : extras.getString("c2t06Mode", "full");
         int loops = extras == null ? DEFAULT_LOOPS
                 : Math.max(1, Math.min(MAX_LOOPS, extras.getInt("c2t06Loops", DEFAULT_LOOPS)));

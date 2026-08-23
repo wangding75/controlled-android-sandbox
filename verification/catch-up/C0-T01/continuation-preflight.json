@@ -1,40 +1,39 @@
 {
   "schema_version": 1,
-  "task_id": "C4-T03",
+  "task_id": "C4-T05",
   "status": "PASS",
-  "captured_at": "2026-08-23T10:08:07.366168+00:00",
+  "captured_at": "2026-08-23T13:12:59.961390+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-T03",
-    "active_task": "",
-    "last_completed": "C4-T02",
-    "first_ready_pending": "C4-T03",
-    "dependencies": "C4-T01,C4-T02"
+    "next_task": "C4-T05",
+    "active_task": "C4-T05",
+    "last_completed": "C4-T04",
+    "first_ready_pending": "C5-T01",
+    "dependencies": "C4-T04"
   },
   "last_receipt": {
-    "task_id": "C4-T02",
+    "task_id": "C4-T04",
     "status": "DONE",
     "implementation_commits": [
-      "d6763e40f971fa60db015b17b294cea15fdcdc32"
+      "525f3aec84ae1ff09192f11a417adf51464f965e"
     ],
-    "receipt_commit": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
-    "baseline_commit": "3de95e15332aa09da1427d92a15d7eb9bd2f82db",
+    "receipt_commit": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
+    "baseline_commit": "b931724fbe2aef0854eac7bb65409a26b9c24b82",
     "evidence_paths": [
-      "docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md",
-      "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C4-T02/c4-t02-rd-summary.json"
+      "docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md",
+      "verification/catch-up/C4-T04/c4-t04-rd-summary.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
+    "head": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
+    "remote_head": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": ""
+    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java\n M docs/capability/CAPABILITY_REGISTRY.yaml\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C2T06DeviceNetworkMediaActivity.java\n M scripts/verify-catch-up-continuation.py\n M tools/capability/campaign_gates.yaml\n M verification/catch-up/C0-T01/continuation-preflight.json\n?? docs/review/C4_T05_SX_BUSINESS_DESIGN.md\n?? scripts/check-c4-t05-sx-business.py\n?? tools/capability/run_c4_t05_rd.py\n?? verification/catch-up/C4-T05/"
   },
   "device": {
     "instance_name": "RD测试",
@@ -152,6 +151,42 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t03-sx-migration.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t04-cas-only-runtime.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t05-sx-business.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "scripts/check-native-enforcement-poc.py",
         "serial": "127.0.0.1:16416"
       },
@@ -216,6 +251,42 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t03_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t04_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t05_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "tools/capability/run_rd_campaign.py",
         "serial": "127.0.0.1:16416"
       },
@@ -229,5 +300,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-T03"
+  "evidence_directory": "verification/catch-up/C4-T05"
 }

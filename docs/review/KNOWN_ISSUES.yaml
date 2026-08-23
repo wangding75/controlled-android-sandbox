@@ -1279,3 +1279,49 @@ issues:
       Closed by C4-T04: production Gradle/source/APK zip cannot contain BlackBox/NBB/Pine
       runtime. Reference trees under ref/ stay unpackaged. CAS-only engine smoke remains
       the dynamic evidence. Not VA Pro equivalence.
+
+  - issue_id: KI-R03-050
+    title: CAS-only Host lacked F1-F5 call-surface, DingTalk 7.8.10/1178, and 100-round SX business evidence
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C4-T05 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C4_T05_SX_BUSINESS_DESIGN.md
+      - scripts/check-c4-t05-sx-business.py
+      - tools/capability/run_c4_t05_rd.py
+      - verification/catch-up/C4-T05/c4-t05-rd-summary.json
+      - verification/catch-up/C4-T05/c4-t05-local-verification.json
+    match_patterns:
+      - c4-t05-sx-business
+      - c4-t05-dingtalk
+      - C2_T04_CAMERA_SMOKE_PASS
+      - PrivacyPolicyActivity
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_F1F5_THEN_REVISION_GATED_DINGTALK
+    notes: >
+      Closed by C4-T05: package-neutral fixture exercises F1 camera, F2 location, F4 network,
+      F5 bluetooth, F3 device, FileProvider, shortcut, FGS, Job, notification, WebView and
+      multi-process, then 100 launch/stop rounds. Specified DingTalk 7.8.10/1178 covers
+      cold/hot/upgrade/pre-login dumpsys and fg/bg. Specialization stays default-off and must
+      not mutate generic profiles. Not 8-hour soak and not VA Pro equivalence.
+
+  - issue_id: KI-R03-051
+    title: APK native extract rejected packed lib/<abi>/*.so that are not ELF
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: FIXED
+    discovered_by: C4-T05 DISCOVER 2026-08-23 DingTalk 7.8.10/1178 import
+    evidence:
+      - app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java
+      - verification/catch-up/C4-T05/c4-t05-rd-summary.json
+    match_patterns:
+      - NATIVE_ELF_ABI_MISMATCH
+      - requireCompatibleElf
+    blocks_current_campaign: false
+    fix_policy: ELF_ABI_CHECK_ONLY_WHEN_ELF_MAGIC
+    notes: >
+      Closed by C4-T05: PackageManager extracts packed/encrypted .so blobs as-is.
+      CAS now ABI-checks only files with ELF magic. Not VA Pro equivalence.

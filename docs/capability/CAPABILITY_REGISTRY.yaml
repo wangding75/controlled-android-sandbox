@@ -319,6 +319,8 @@ capabilities:
       - scripts/check-c4-t03-sx-migration.py
       - docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md
       - scripts/check-c4-t04-cas-only-runtime.py
+      - docs/review/C4_T05_SX_BUSINESS_DESIGN.md
+      - scripts/check-c4-t05-sx-business.py
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization

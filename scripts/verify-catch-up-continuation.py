@@ -45,6 +45,8 @@ ALLOWED_GUARD_FILES = {
     Path("tools/capability/run_c4_t03_rd.py"),
     Path("scripts/check-c4-t04-cas-only-runtime.py"),
     Path("tools/capability/run_c4_t04_rd.py"),
+    Path("scripts/check-c4-t05-sx-business.py"),
+    Path("tools/capability/run_c4_t05_rd.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(

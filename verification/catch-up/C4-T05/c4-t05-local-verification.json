@@ -1,0 +1,171 @@
+{
+  "task_id": "C4-T05",
+  "status": "PASS",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T12:49:50.352417+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "static_gates": [
+    {
+      "gate": "scripts/check-c4-t05-sx-business.py",
+      "returncode": 0
+    },
+    {
+      "gate": "assembleDebug device APKs",
+      "returncode": 0
+    },
+    {
+      "gate": "scripts/check-c4-t04-cas-only-runtime.py",
+      "returncode": 0
+    }
+  ],
+  "surfaces": {
+    "status": "PASS",
+    "campaign": {
+      "pass": true,
+      "loops": 0,
+      "configProvider": "sx-config-v1-instance-store",
+      "f1Camera": "c3e47c885142b911aa7ce38744af8eb79c735ae6be3f6de5958ee284976a16b3",
+      "f2Location": "31.2304",
+      "f3Device": "0123456789abcdef",
+      "f4Network": "Fixture-WiFi-0",
+      "f5Bluetooth": "FixtureBT-0",
+      "components": [
+        "com.warden.controlledsandbox.fixture.CameraCampaignActivity=LAUNCH_PASS",
+        "com.warden.controlledsandbox.fixture.LocationCampaignActivity=LAUNCH_PASS",
+        "com.warden.controlledsandbox.fixture.C2T06DeviceNetworkMediaActivity=LAUNCH_PASS",
+        "com.warden.controlledsandbox.fixture.RemoteActivity=LAUNCH_PASS",
+        "com.warden.controlledsandbox.fixture.C2T05SchedulingInteractionActivity=LAUNCH_PASS"
+      ],
+      "provider": "PROVIDER_ALREADY_READY",
+      "shortcut": "IDENTITY_READY",
+      "dingTalkEnabledOnFixture": false
+    }
+  },
+  "business": {
+    "status": "PASS",
+    "campaign": {
+      "pass": true,
+      "loops": 100,
+      "configProvider": "sx-config-v1-instance-store",
+      "components": [],
+      "provider": "SKIPPED_LOOPS_PHASE",
+      "shortcut": "IDENTITY_READY",
+      "dingTalkEnabledOnFixture": false
+    }
+  },
+  "dingtalk": {
+    "status": "PASS",
+    "campaign": {
+      "versionName": "7.8.10",
+      "versionCode": 1178,
+      "targetReason": "SUPPORTED_REVISION",
+      "supported": true,
+      "defaultEnabled": false,
+      "cold": "LAUNCH_PASS",
+      "hot": "LAUNCH_PASS",
+      "background": "RUNNER_HOME",
+      "foreground": "RUNNER_LAUNCH",
+      "upgrade": "IMPORTED",
+      "upgradeVersionName": "7.8.10",
+      "upgradeVersionCode": 1178,
+      "postUpgradeLaunch": "LAUNCH_PASS",
+      "pass": true,
+      "loginSurface": "DUMPSYS_REQUIRED"
+    },
+    "login_markers_present": [
+      "PrivacyPolicyActivity",
+      "HomeActivity",
+      "LaunchHomeActivity"
+    ],
+    "hosted_stub": true,
+    "background_retained": true,
+    "foreground_reentry_markers": [],
+    "guest_activity_create": true
+  },
+  "apk_metadata": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "8434e8dd7b02518022d7e80aa99166a5fbce0b4383a56d53e97f098c9e63275c"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "608b112fe269c1bda183e701c1ccbf5f91279f12e33a3df2d53c5d7986d5febd"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "d9405a756e487ec522280688185dadc6d45240f280f8d8f89d37b15e0f2c0dbc"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "a46d96f8a08ae86267ab04c45bf2a253ded21f5608a4c9c7c1a6e6dbeb4a7a5e"
+      }
+    ]
+  },
+  "errors": [],
+  "non_claims": [
+    "not 8-hour soak",
+    "not DingTalk account credentials",
+    "not VA Pro equivalence",
+    "not Android matrix / OEM PASS"
+  ]
+}
