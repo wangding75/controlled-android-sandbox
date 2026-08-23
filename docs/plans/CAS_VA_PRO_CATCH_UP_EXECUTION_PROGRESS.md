@@ -1130,6 +1130,15 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   远端 HEAD 与本地 HEAD。
 - **遗留风险**：C2-T06 至 C2-T07 尚未补齐对应 RD/API/OEM/商业方法证据；本任务仍不声称
   API33+、ARM/16KB、OEM、SX/XH 或 VA PRO 等价性。
+- **黑屏恢复（2026-08-23）**：对照 NewBlackBox `ContextCompat.fix` /
+  `IWindowSessionProxy` / `IAudioServiceProxy`。RD API32 上 `ViewRootImpl.<init>`
+  调用 `AudioManager.areNavigationRepeatSoundEffectsEnabled()`，CAS audio 拦截器抛
+  `VIRTUAL_AUDIO_ROUTING_OPERATION_UNSUPPORTED`，`WindowManagerGlobal.addView` 失败，
+  Stub `windows=[]` / `reportedDrawn=false`。已按 NBB 放行该只读查询，并补 Host
+  `LayoutParams.packageName` / ContextImpl op-package、保留 `IWindow` Binder。
+  夸克 `import-launch` 在 `RD测试` 上 `require_guest_window_drawn` PASS，
+  `dumpsys window` 可见 `com.quark.browser/com.ucpro.BrowserActivity` 挂在
+  `StubActivity60W1`。`GuestContext.getOpPackageName()` 仍为 Guest（C2-T02）。
 - **下一任务**：`C2-T06`；本轮不执行后续任务。
 
 ### C2-T06：设备/网络/媒体服务
