@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 18:32（Asia/Shanghai）
+更新时间：2026-08-23 21:14（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（执行中）
-当前任务：`C4-T05`（PENDING）
-下一任务：`C4-T05`
-最后完成任务：`C4-T04`
+当前阶段：`C4`（编号任务完成，阶段门禁待关）
+当前任务：`C5-T01`（PENDING）
+下一任务：`C5-T01`
+最后完成任务：`C4-T05`
 
 ## 1. 使用规则
 
@@ -63,7 +63,7 @@
 | C4-T02 | SX CAS SDK adapter | DONE | C4-T01 | `d6763e40f971fa60db015b17b294cea15fdcdc32` | §5 C4-T02 |
 | C4-T03 | SX 数据迁移 | DONE | C4-T01,C4-T02 | `e064e2174854c661248e0c2970b8fe621bc161ef` | §5 C4-T03 |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
-| C4-T05 | SX F1-F5/DingTalk/长稳 | PENDING | C4-T04 | - | - |
+| C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C5-T01 | 原始 XH 产品能力契约 | PENDING | C2,C3 | - | - |
 | C5-T02 | XH CAS Host/SDK 集成 | PENDING | C5-T01,C4-T02 | - | - |
 | C5-T03 | 原始 XH/DingTalk 验收 | PENDING | C5-T02,C4 | - | - |
@@ -1868,3 +1868,52 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   对比 HEAD。
 - **遗留风险**：C4-T05 F1-F5/DingTalk 长稳未做；C4 阶段门禁未关。
 - **下一任务**：`C4-T05`。
+
+### C4-T05：SX F1-F5、DingTalk 与长稳验收
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 19:10 / 2026-08-23 21:14（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。
+- **开始基线**：`6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6`；上一任务 `C4-T04` DONE。
+- **DISCOVER / CLASSIFY**：C4-T02..T04 已关闭引擎、迁移和 CAS-only 门，但缺少 F1-F5
+  实际调用面、DingTalk 7.8.10/1178 冷热/升级/登录表面/前后台、以及 100 轮关键业务的
+  fail-closed 战役。登记 `KI-R03-050`（`TEST_EVIDENCE_GAP`）。导入钉钉时
+  `requireCompatibleElf` 把 packed `lib/<abi>/*.so` 当 ELF 拒绝，登记
+  `KI-R03-051`（`CURRENT_DEFECT`）并在本任务修复。
+- **实现摘要**：通用 fixture 先按 F1 相机、F2 定位、F4 网络、F5 蓝牙、F3 设备调用
+  Location/Camera/C2T06/C2T05/WebView/RemoteActivity，FileProvider
+  `prepareProvider`，shortcut，DingTalk 特化保持关闭且不改 generic profile；再 100
+  轮 launch/stop。指定钉钉 7.8.10/1178 冷/热启动、同版本再导入升级、dumpsys 登录表面
+  （PrivacyPolicy/LaunchHome/Home + CAS Stub/guest）与 HOME 前后台。ELF 校验仅作用于
+  带 ELF magic 的文件。
+- **变更文件**：`docs/review/C4_T05_SX_BUSINESS_DESIGN.md`、
+  `scripts/check-c4-t05-sx-business.py`、`tools/capability/run_c4_t05_rd.py`、
+  `app/src/debug/.../DebugCommandActivity.java`、
+  `app/src/main/.../ApkImportManager.java`、
+  `verification/catch-up/C4-T05/`。
+- **验收命令与结果**：`python scripts/check-c4-t05-sx-business.py` PASS；
+  `python scripts/check-c4-t04-cas-only-runtime.py` PASS；assembleDebug PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c4_t05_rd.py --instance RD测试` PASS。F1-F5 log 标记、
+  100 轮、DingTalk 7.8.10/1178 cold/hot/upgrade/login-surface/fg-bg 均 PASS。
+- **设备证据**：`verification/catch-up/C4-T05/c4-t05-rd-summary.json`；
+  host SHA-256
+  `8434e8dd7b02518022d7e80aa99166a5fbce0b4383a56d53e97f098c9e63275c`。
+- **Known Issues**：`KI-R03-050`、`KI-R03-051` 已 `FIXED`。
+  `va_pro_equivalent` 保持 `NOT_PROVEN`。未宣称 8 小时 soak、账号密码登录或 OEM。
+- **偏离任务书**：无显式 8 小时 soak（任务书 1.1 已移除）。钉钉账号凭据登录不在本
+  Host 门禁内；登录表面以 Guest `PrivacyPolicyActivity`/`LaunchHomeActivity` 和
+  CAS Stub 为准。
+- **实现提交 SHA**：`0e34f37535aec5d3dd93cdf9bc2463c61639310b`
+  （`test(sx): [C4-T05] prove F1-F5 DingTalk and 100-round business`）。
+- **回执提交**：主题 `docs(progress): record [C4-T05] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C4 阶段门禁尚未单独落账；DingTalk 账号级登录需要凭据；100 轮
+  launch/stop 偏慢（guest bind）。C5 未开始。
+- **下一任务**：`C5-T01`。
