@@ -179,6 +179,13 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-048]
+  - id: c4-t04-cas-only-runtime
+    group: package_visibility
+    command: [python, scripts/check-c4-t04-cas-only-runtime.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-049]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

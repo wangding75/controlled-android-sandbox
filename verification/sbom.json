@@ -28,7 +28,7 @@
       "gradleProjectPath": ":app",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 177,
+      "fileCount": 178,
       "languages": [
         "Gradle",
         "Java",
@@ -37,7 +37,7 @@
         "pro",
         "txt"
       ],
-      "sourceDigestSha256": "82a90717a33f66f7e3f6393f39a9bcd2da10eabeb7b5f8a3be5dcf90b361380b"
+      "sourceDigestSha256": "ca4d1bd2396720e6c085d1e8d677ec950a76617654377f99d4c17a14c69c92c1"
     },
     {
       "type": "library",
@@ -46,13 +46,13 @@
       "gradleProjectPath": ":sandbox-domain",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 65,
+      "fileCount": 70,
       "languages": [
         "Gradle",
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "48b97b35c3551432645848b89513372cc9cbb69c61ad773fc6dd14ee6660809f"
+      "sourceDigestSha256": "abffcf0c9558bb7c1f770afefe7c996cf6333944c55ebdbe3b01d90a3f9703fb"
     },
     {
       "type": "library",

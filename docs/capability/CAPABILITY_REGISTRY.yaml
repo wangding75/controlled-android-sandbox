@@ -317,6 +317,8 @@ capabilities:
       - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
       - docs/review/C4_T03_SX_DATA_MIGRATION_DESIGN.md
       - scripts/check-c4-t03-sx-migration.py
+      - docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md
+      - scripts/check-c4-t04-cas-only-runtime.py
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization

@@ -1254,3 +1254,28 @@ issues:
       Closed by C4-T03: desensitized sx-config-v1 documents migrate onto CAS instance
       profiles with backup, idempotent replay, interrupt, rollback, and dual-user isolation.
       License/time-guard remain DROP. Not VA Pro equivalence.
+
+  - issue_id: KI-R03-049
+    title: CAS production lacked a fail-closed BlackBox/Pine APK content gate
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C4-T04 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md
+      - scripts/check-c4-t04-cas-only-runtime.py
+      - tools/capability/run_c4_t04_rd.py
+      - verification/catch-up/C4-T04/c4-t04-rd-summary.json
+      - verification/catch-up/C4-T04/c4-t04-local-verification.json
+    match_patterns:
+      - BlackBoxCore
+      - PineXposed
+      - xposed_init
+      - libpine
+    blocks_current_campaign: false
+    fix_policy: GRADLE_SOURCE_APK_CAS_ONLY_GATE
+    notes: >
+      Closed by C4-T04: production Gradle/source/APK zip cannot contain BlackBox/NBB/Pine
+      runtime. Reference trees under ref/ stay unpackaged. CAS-only engine smoke remains
+      the dynamic evidence. Not VA Pro equivalence.
