@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
@@ -15,12 +16,20 @@
 #include <string.h>
 #include <sys/ptrace.h>
 #include <sys/prctl.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#if __has_include(<sys/xattr.h>)
+#include <sys/xattr.h>
+#define FIXTURE_HAS_XATTR 1
+#else
+#define FIXTURE_HAS_XATTR 0
+#endif
 
 #include <string>
 
@@ -617,6 +626,182 @@ void case_010(int out) {
             detail));
 }
 
+struct OpenHowCompat {
+    uint64_t flags;
+    uint64_t mode;
+    uint64_t resolve;
+};
+
+bool is_expected_xattr_errno(int value) {
+    if (value == ENOSYS || value == ENOTSUP || value == EPERM || value == EACCES
+            || value == ENOTDIR || value == ENOENT) {
+        return true;
+    }
+#ifdef ENODATA
+    if (value == ENODATA) return true;
+#endif
+#ifdef ENOATTR
+    if (value == ENOATTR) return true;
+#endif
+    return false;
+}
+
+bool xattr_call_expected(int rc, int error) {
+    return rc == 0 || is_expected_xattr_errno(error);
+}
+
+std::string rc_with_errno(int rc, int value) {
+    return std::to_string(rc) + ",errno=" + std::to_string(value);
+}
+
+void case_011(int out) {
+    // This case is deliberately test-only. It records each native entry point
+    // separately; it must not turn an unhooked entry point into a compatibility
+    // or hostile-isolation claim.
+    const std::string path = probe_path();
+    const char* xattr_name = "user.cas.c3t01";
+    const char xattr_value[] = "c3-t01";
+
+    int open_fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    int open_errno = errno;
+    int openat_fd = openat(AT_FDCWD, path.c_str(), O_RDONLY | O_CLOEXEC, 0);
+    int openat_errno = errno;
+
+    int openat2_fd = -1;
+    int openat2_errno = ENOSYS;
+#if defined(SYS_openat2)
+    OpenHowCompat how {O_RDONLY | O_CLOEXEC, 0, 0};
+    long openat2_result = syscall(SYS_openat2, AT_FDCWD, path.c_str(), &how, sizeof(how));
+    openat2_fd = from_syscall(openat2_result);
+    openat2_errno = errno;
+#endif
+
+    int access_rc = faccessat(AT_FDCWD, path.c_str(), R_OK, 0);
+    int access_errno = errno;
+    int faccessat2_rc = -1;
+    int faccessat2_errno = ENOSYS;
+#if defined(SYS_faccessat2)
+    long faccessat2_result = syscall(SYS_faccessat2, AT_FDCWD, path.c_str(), R_OK, 0);
+    faccessat2_rc = from_syscall(faccessat2_result);
+    faccessat2_errno = errno;
+#endif
+
+    struct stat stat_info {};
+    int stat_rc = stat(path.c_str(), &stat_info);
+    int stat_errno = errno;
+    int fstatat_rc = fstatat(AT_FDCWD, path.c_str(), &stat_info, 0);
+    int fstatat_errno = errno;
+
+    int xattr_set_rc = -1;
+    int xattr_set_errno = ENOSYS;
+    int xattr_get_rc = -1;
+    int xattr_get_errno = ENOSYS;
+    int xattr_list_rc = -1;
+    int xattr_list_errno = ENOSYS;
+    int xattr_remove_rc = -1;
+    int xattr_remove_errno = ENOSYS;
+#if FIXTURE_HAS_XATTR
+    xattr_set_rc = setxattr(path.c_str(), xattr_name, xattr_value, sizeof(xattr_value) - 1, 0);
+    xattr_set_errno = errno;
+    char xattr_buffer[64] = {};
+    xattr_get_rc = static_cast<int>(getxattr(path.c_str(), xattr_name,
+            xattr_buffer, sizeof(xattr_buffer)));
+    xattr_get_errno = errno;
+    char xattr_list[128] = {};
+    xattr_list_rc = static_cast<int>(listxattr(path.c_str(), xattr_list, sizeof(xattr_list)));
+    xattr_list_errno = errno;
+    xattr_remove_rc = removexattr(path.c_str(), xattr_name);
+    xattr_remove_errno = errno;
+#endif
+
+    char saved_cwd[PATH_MAX] = {};
+    char cwd_after[PATH_MAX] = {};
+    char real_path[PATH_MAX] = {};
+    const bool saved_cwd_ok = getcwd(saved_cwd, sizeof(saved_cwd)) != nullptr;
+    const int chdir_rc = chdir(g_files_dir.c_str());
+    const int chdir_errno = errno;
+    const bool cwd_after_ok = getcwd(cwd_after, sizeof(cwd_after)) != nullptr;
+    const int realpath_ok = realpath(path.c_str(), real_path) != nullptr ? 1 : 0;
+    const int realpath_errno = errno;
+    if (saved_cwd_ok) {
+        (void) chdir(saved_cwd);
+    }
+
+    int pipe_fds[2] = {-1, -1};
+    int ioctl_rc = -1;
+    int ioctl_errno = ENOSYS;
+    int syscall_ioctl_rc = -1;
+    int syscall_ioctl_errno = ENOSYS;
+    int raw_ioctl_rc = -1;
+    int raw_ioctl_errno = ENOSYS;
+    int available = 0;
+    if (pipe(pipe_fds) == 0) {
+        ioctl_rc = ioctl(pipe_fds[0], FIONREAD, &available);
+        ioctl_errno = errno;
+#if defined(SYS_ioctl)
+        syscall_ioctl_rc = static_cast<int>(syscall(SYS_ioctl, pipe_fds[0], FIONREAD, &available));
+        syscall_ioctl_errno = errno;
+#if RAW_SYSCALL_AVAILABLE
+        raw_ioctl_rc = from_syscall(raw_syscall6(SYS_ioctl, pipe_fds[0], FIONREAD,
+                reinterpret_cast<long>(&available), 0, 0, 0));
+        raw_ioctl_errno = errno;
+#endif
+#endif
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+    }
+
+    const char* foreign_path =
+            "/data/data/com.warden.controlledsandbox.debug/files/instances/u0";
+    int foreign_fd = open(foreign_path, O_RDONLY | O_CLOEXEC);
+    int foreign_errno = errno;
+    if (foreign_fd >= 0) {
+        close(foreign_fd);
+    }
+    if (open_fd >= 0) close(open_fd);
+    if (openat_fd >= 0) close(openat_fd);
+    if (openat2_fd >= 0) close(openat2_fd);
+
+    const bool xattr_expected = xattr_call_expected(xattr_set_rc, xattr_set_errno)
+            && xattr_call_expected(xattr_get_rc, xattr_get_errno)
+            && xattr_call_expected(xattr_list_rc, xattr_list_errno)
+            && xattr_call_expected(xattr_remove_rc, xattr_remove_errno);
+    std::string detail = "path=" + path
+            + ";open=" + rc_with_errno(open_fd, open_errno)
+            + ";openat=" + rc_with_errno(openat_fd, openat_errno)
+            + ";openat2=" + rc_with_errno(openat2_fd, openat2_errno)
+            + ";faccessat=" + rc_with_errno(access_rc, access_errno)
+            + ";faccessat2=" + rc_with_errno(faccessat2_rc, faccessat2_errno)
+            + ";stat=" + rc_with_errno(stat_rc, stat_errno)
+            + ";fstatat=" + rc_with_errno(fstatat_rc, fstatat_errno)
+            + ";xattr_set=" + rc_with_errno(xattr_set_rc, xattr_set_errno)
+            + ";xattr_get=" + rc_with_errno(xattr_get_rc, xattr_get_errno)
+            + ";xattr_list=" + rc_with_errno(xattr_list_rc, xattr_list_errno)
+            + ";xattr_remove=" + rc_with_errno(xattr_remove_rc, xattr_remove_errno)
+            + ";xattr_class=" + (xattr_expected ? "EXPECTED_LIMITATION_OR_SUPPORTED" : "UNCLASSIFIED_ERROR")
+            + ";cwd_saved=" + (saved_cwd_ok ? saved_cwd : "getcwd_fail")
+            + ";chdir=" + rc_with_errno(chdir_rc, chdir_errno)
+            + ";cwd_after=" + (cwd_after_ok ? cwd_after : "getcwd_fail")
+            + ";realpath=" + std::to_string(realpath_ok)
+            + ";realpath_value=" + (realpath_ok ? real_path : "")
+            + ";realpath_errno=" + std::to_string(realpath_errno)
+            + ";ioctl=" + rc_with_errno(ioctl_rc, ioctl_errno)
+            + ";syscall_ioctl=" + rc_with_errno(syscall_ioctl_rc, syscall_ioctl_errno)
+            + ";raw_ioctl=" + rc_with_errno(raw_ioctl_rc, raw_ioctl_errno)
+            + ";foreign_open=" + rc_with_errno(foreign_fd, foreign_errno)
+            + ";negative_host_path=" + (foreign_fd < 0 ? "DENIED" : "OPENED")
+            + ";classification="
+            + (g_context == "IN_SANDBOX" ? "UNCONTROLLED_ENTRYPOINTS_RECORDED" : "DIRECT_COMPAT_BASELINE")
+            + ";raw_instruction_case=NATIVE-ADV-003";
+    const char* status = g_context == "IN_SANDBOX" ? "BYPASS_CONFIRMED" : "PASS_COMPAT";
+    if (foreign_fd >= 0 || !xattr_expected) {
+        detail += ";negative_or_xattr_check=REVIEW_REQUIRED";
+    } else {
+        detail += ";negative_or_xattr_check=CLASSIFIED";
+    }
+    write_all(out, case_json("NATIVE-ADV-011", status, detail));
+}
+
 struct CaseSpec {
     const char* id;
     void (*fn)(int);
@@ -633,6 +818,7 @@ const CaseSpec kCases[] = {
         {"NATIVE-ADV-008", case_008},
         {"NATIVE-ADV-009", case_009},
         {"NATIVE-ADV-010", case_010},
+        {"NATIVE-ADV-011", case_011},
 };
 
 std::string run_one(const CaseSpec& spec) {
@@ -704,7 +890,7 @@ std::string run_one(const CaseSpec& spec) {
 
 std::string run_campaign() {
     std::string out = "{";
-    out += json_kv("schema", "t57-r03-p0a-01-native-adv");
+    out += json_kv("schema", "t57-r03-p0a-01-native-adv-c3-t01");
     out += ",";
     out += json_kv("abi", kCompiledAbi);
     out += ",";

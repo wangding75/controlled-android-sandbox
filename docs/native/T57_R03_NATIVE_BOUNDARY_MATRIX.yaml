@@ -58,8 +58,8 @@ entries:
     current_interceptor: controlled_openat2 / SYS_openat2
     current_status: INTERCEPTED
     bypass_risk: HIGH
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: VA-648
     notes: RESOLVE_BENEATH/IN_ROOT stripped. Kernel availability varies.
@@ -73,8 +73,8 @@ entries:
     current_interceptor: controlled_access / controlled_faccessat / controlled_faccessat2
     current_status: INTERCEPTED
     bypass_risk: HIGH
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: VA-648
     notes: faccessat2 is a VA commercial signal; CAS has PLT only.
@@ -88,8 +88,8 @@ entries:
     current_interceptor: controlled_stat / lstat / fstatat / statx
     current_status: PARTIAL
     bypass_risk: HIGH
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: VA-616
     notes: fstat/fstat64 on an already-open FD are not targets.
@@ -193,8 +193,8 @@ entries:
     current_interceptor: none
     current_status: NOT_INTERCEPTED
     bypass_risk: MEDIUM
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: VA-616
     notes: VA commercial row mentions setxattr/lsetxattr. CAS has none.
@@ -208,8 +208,8 @@ entries:
     current_interceptor: none
     current_status: NOT_INTERCEPTED
     bypass_risk: HIGH
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: ""
     notes: getcwd returns host instance path. Used internally for AT_FDCWD.
@@ -223,8 +223,8 @@ entries:
     current_interceptor: none
     current_status: NOT_INTERCEPTED
     bypass_risk: MEDIUM
-    required_fixture: NATIVE-ADV-001
-    required_rd_test: NATIVE-ADV-001
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
     target_mode: TRUSTED_COMPAT
     va_pro_signal: ""
     notes: Internal confinement helper only.
@@ -738,6 +738,21 @@ entries:
     target_mode: TRUSTED_COMPAT
     va_pro_signal: VA-616
     notes: Guest-root ELF only. Host and foreign-ABI ELFs skipped.
+
+  - id: SYS-IOCTL
+    domain: syscall
+    operation: ioctl
+    libc_path: NOT_INTERCEPTED
+    syscall_path: NOT_INTERCEPTED
+    raw_instruction_path: NOT_INTERCEPTED
+    current_interceptor: none
+    current_status: NOT_INTERCEPTED
+    bypass_risk: HIGH
+    required_fixture: NATIVE-ADV-011
+    required_rd_test: NATIVE-ADV-011
+    target_mode: ISOLATED_HOSTILE
+    va_pro_signal: ""
+    notes: Pipe FIONREAD is a safe compatibility probe; binder/device ioctl isolation is not implemented.
 
   - id: SYS-SYSCALL
     domain: syscall

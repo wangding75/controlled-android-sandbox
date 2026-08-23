@@ -1,0 +1,547 @@
+{
+  "task_id": "C3-T01",
+  "status": "PASS",
+  "source_commit_before_implementation_commit": "d9d89ca19e86cf97542729e63f698c9edb4bfef6",
+  "source_worktree_status_before_implementation_commit": "M docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M fixture-basic/src/main/cpp/adversarial_native.cpp\n M scripts/check-native-boundary-matrix.py\n M tools/capability/run_native_adversarial_rd.py\n M verification/sbom.json\n?? docs/review/C3_T01_NATIVE_CORPUS_DESIGN.md\n?? scripts/check-c3-t01-native-corpus.py\n?? tools/capability/run_c3_t01_rd.py\n?? verification/catch-up/C3-T01/",
+  "started_at": "2026-08-23T03:23:25.044659+00:00",
+  "finished_at": "2026-08-23T03:23:25.126851+00:00",
+  "static_gates": [
+    {
+      "gate": "scripts/check-c3-t01-native-corpus.py",
+      "returncode": 0,
+      "stdout": "PASS C3-T01 native corpus static acceptance\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-boundary-matrix.py",
+      "returncode": 0,
+      "stdout": "PASS native boundary matrix and adversarial fixture inventory\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-files-loader.py",
+      "returncode": 0,
+      "stdout": "PASS M4-T17 B1 native filesystem/loader checks\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-file-hooks.py",
+      "returncode": 0,
+      "stdout": "PASS native file-system hook architecture checks\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-abi-companion.py",
+      "returncode": 0,
+      "stdout": "PASS native ABI companion runtime and architecture checks\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-hostile-profile.py",
+      "returncode": 0,
+      "stdout": "PASS native hostile profile inventory\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-enforcement-poc.py",
+      "returncode": 0,
+      "stdout": "PASS native enforcement POC inventory\n",
+      "stderr": ""
+    }
+  ],
+  "build": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "8e2c70d251ce13847b993d12c320148279a39fd79865978f0d70b0070c823406"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "5edaf1c0e083faafe5bbba0e7d30631f9bd40cd5194aa5a21dd4952c05b004e8"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "78dffc7797f396e672caefcc5000ba2434958914c12eb9a8cac719a94035d52b"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "726a5da7f7d7aa9668fb43ae874aca349a02830cccae4e0824a8e71cefc8d8bd"
+      }
+    ],
+    "native_libraries": [
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcas_native_enf.so",
+        "abi": "arm64-v8a",
+        "sha256": "97a68c4f217694b44d01080fd81f55e4210a9b4fb391bcf7ecd2ad589d5783fd"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_fixture.so",
+        "abi": "arm64-v8a",
+        "sha256": "b0af492dfaa86f648a09bae40d8b98cd9d432cb61e4fe7e5be7ab7d26e3d1f70"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libfixture_adv_payload.so",
+        "abi": "arm64-v8a",
+        "sha256": "771a310424e00703f835fdafc4b755963e6d7e2edce36e48ec7138adebaf01d3"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcas_native_enf.so",
+        "abi": "x86_64",
+        "sha256": "0f25faa62e82f37437bd5720c506c978b3c7dc22387d6a227a9e95f50087a447"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_fixture.so",
+        "abi": "x86_64",
+        "sha256": "2cf7edd827172840d7e80cf9265ce20b22c293ad3251534c0dac16cadda0efdb"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libfixture_adv_payload.so",
+        "abi": "x86_64",
+        "sha256": "b8644dd24a89b38658087823503c7722ec7cc9338e170ad36299bdd8098f6f8d"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcas_native_enf.so",
+        "abi": "armeabi-v7a",
+        "sha256": "2dedb5e02fd3f5652a57e5c7667bfd8c104f2bad6747eaf6d1014591a503020b"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_fixture.so",
+        "abi": "armeabi-v7a",
+        "sha256": "7d29766faaa2e39fb88a314ad46ddc1a529f9a70b0399e3a7ed15feda9462441"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libfixture_adv_payload.so",
+        "abi": "armeabi-v7a",
+        "sha256": "43e391b04d5cc4bafd31614538a0647cf962194a2617f2e84dedac7bbe00cd75"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcas_native_enf.so",
+        "abi": "x86",
+        "sha256": "bcbe224f51ed9af3a273cbc732b6baf92d4cde8d3386f560d124500e905d9055"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_fixture.so",
+        "abi": "x86",
+        "sha256": "c6bba998b16af53fc9c744651f83e2def7b884de3baf7a693f3eabc46cc10f53"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libfixture_adv_payload.so",
+        "abi": "x86",
+        "sha256": "ee45ff2147bd8d42ada64bb52049b5105f016b08db510a5a8ee9dd32bdc3ea87"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_native.so",
+        "abi": "arm64-v8a",
+        "sha256": "1f10ecce2e73b5ed96a799e037bb0db1540382d27810e0cdc6385d46bc818df5"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native.so",
+        "abi": "armeabi-v7a",
+        "sha256": "82c71fe3dc10c74c696629e9fbe1a5e24f6b0c3bb6c27bc3e685fe2200bf554b"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native.so",
+        "abi": "x86",
+        "sha256": "4b4445f313433f27043ca24db93c6464c37051bd597a8272e6b3fa71865b47c0"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_native.so",
+        "abi": "x86_64",
+        "sha256": "234def96757e2646505fdcfae32866038f3b83092f132dc55f3d46178eecfbff"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_native.so",
+        "abi": "arm64-v8a",
+        "sha256": "1f10ecce2e73b5ed96a799e037bb0db1540382d27810e0cdc6385d46bc818df5"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native.so",
+        "abi": "armeabi-v7a",
+        "sha256": "82c71fe3dc10c74c696629e9fbe1a5e24f6b0c3bb6c27bc3e685fe2200bf554b"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native32.so",
+        "abi": "armeabi-v7a",
+        "sha256": "2163a17d08d13cfbd8fa0da74ffe19aca67f15025ba2b1e5ad7008625a00be89"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native.so",
+        "abi": "x86",
+        "sha256": "4b4445f313433f27043ca24db93c6464c37051bd597a8272e6b3fa71865b47c0"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native32.so",
+        "abi": "x86",
+        "sha256": "e8e9a1277e0352b542bbe035d694c76c75ba52425a3ca9400135e1e5391703db"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_native.so",
+        "abi": "x86_64",
+        "sha256": "234def96757e2646505fdcfae32866038f3b83092f132dc55f3d46178eecfbff"
+      }
+    ]
+  },
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T03:22:48.374717+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "direct64": {
+    "label": "direct64-final",
+    "abi": "x86_64",
+    "context": "DIRECT_FIXTURE",
+    "schema": "t57-r03-p0a-01-native-adv-c3-t01",
+    "statuses": {
+      "NATIVE-ADV-001": "PASS_COMPAT",
+      "NATIVE-ADV-002": "PASS_COMPAT",
+      "NATIVE-ADV-003": "PASS_COMPAT",
+      "NATIVE-ADV-004": "PASS_COMPAT",
+      "NATIVE-ADV-005": "PASS_COMPAT",
+      "NATIVE-ADV-006": "PASS_COMPAT",
+      "NATIVE-ADV-007": "PASS_COMPAT",
+      "NATIVE-ADV-008": "PASS_COMPAT",
+      "NATIVE-ADV-009": "PASS_COMPAT",
+      "NATIVE-ADV-010": "PASS_COMPAT",
+      "NATIVE-ADV-011": "PASS_COMPAT"
+    },
+    "cases": [
+      {
+        "id": "NATIVE-ADV-001",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "open_path=/data/user/0/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;fstat_rc=0;size=14;readlink_rc=-1;readlink_errno=22"
+      },
+      {
+        "id": "NATIVE-ADV-002",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "libc_fd=56;syscall_fd=58;libc_target=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;syscall_target=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;context=DIRECT_FIXTURE"
+      },
+      {
+        "id": "NATIVE-ADV-003",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "raw_available=1;raw_rc=58;raw_fd=58;libc_target=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;raw_target=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;note=direct_fixture_raw_instruction_works"
+      },
+      {
+        "id": "NATIVE-ADV-004",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "target=127.0.0.1:9;libc_socket=52;syscall_socket=57;raw_socket=58;libc_connect=-1;syscall_connect=-1;raw_connect=-1"
+      },
+      {
+        "id": "NATIVE-ADV-005",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "/proc/self/status{libc=Name:\tsandbox.fixture\nUmask:\t0077\nState:;sys=Name:\tsandbox.fixture\nUmask:\t0077\nState:}|/proc/self/maps{libc=12c00000-2ac00000 rw-p 00000000 00:00 0 ;sys=12c00000-2ac00000 rw-p 00000000 00:00 0 }|/proc/self/fd{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/self/task{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/net{libc=READ_FAIL:21;sys=READ_FAIL:21};getpid=28070;getuid=10047;prctl_name_rc=0;prctl_name=sandbox.fixture;prctl_dumpable=1;prctl_seccomp=0;prctl_no_new_privs=-1"
+      },
+      {
+        "id": "NATIVE-ADV-006",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "child=28072;attach=0;attach_errno=2;traceme=0;traceme_errno=2"
+      },
+      {
+        "id": "NATIVE-ADV-007",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "target=/system/bin/true;exit=0;signaled=0;output="
+      },
+      {
+        "id": "NATIVE-ADV-008",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "self=ok;payload=ok;marker=FIXTURE_ADV_PAYLOAD_V1;custom_path=/data/user/0/com.warden.controlledsandbox.fixture/files/libfixture_adv_payload.so;custom=fail;custom_errno=2;dlopen_ext=ok;dlopen_ext_errno=2"
+      },
+      {
+        "id": "NATIVE-ADV-009",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "opened=/data/user/0/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;proc_fd=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;dup=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;inherited=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt"
+      },
+      {
+        "id": "NATIVE-ADV-010",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "/dev/binder=open,errno=0;/dev/vndbinder=open,errno=0;/dev/hwbinder=open,errno=0;note=observation_only_no_transaction"
+      },
+      {
+        "id": "NATIVE-ADV-011",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "DIRECT_FIXTURE",
+        "detail": "path=/data/user/0/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;open=52,errno=2;openat=57,errno=2;openat2=-1,errno=1;faccessat=0,errno=1;faccessat2=-1,errno=1;stat=0,errno=1;fstatat=0,errno=1;xattr_set=0,errno=1;xattr_get=6,errno=1;xattr_list=32,errno=1;xattr_remove=0,errno=1;xattr_class=EXPECTED_LIMITATION_OR_SUPPORTED;cwd_saved=/;chdir=0,errno=1;cwd_after=/data/data/com.warden.controlledsandbox.fixture/files;realpath=1;realpath_value=/data/data/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;realpath_errno=1;ioctl=0,errno=1;syscall_ioctl=0,errno=1;raw_ioctl=0,errno=1;foreign_open=-1,errno=2;negative_host_path=DENIED;classification=DIRECT_COMPAT_BASELINE;raw_instruction_case=NATIVE-ADV-003;negative_or_xattr_check=CLASSIFIED"
+      }
+    ]
+  },
+  "direct32": {
+    "label": "direct32-final",
+    "abi": "x86",
+    "context": "DIRECT_FIXTURE",
+    "schema": "t57-r03-p0a-01-native-adv-c3-t01",
+    "statuses": {
+      "NATIVE-ADV-001": "PASS_COMPAT",
+      "NATIVE-ADV-002": "PASS_COMPAT",
+      "NATIVE-ADV-003": "PASS_COMPAT",
+      "NATIVE-ADV-004": "PASS_COMPAT",
+      "NATIVE-ADV-005": "PASS_COMPAT",
+      "NATIVE-ADV-006": "PASS_COMPAT",
+      "NATIVE-ADV-007": "PASS_COMPAT",
+      "NATIVE-ADV-008": "PASS_COMPAT",
+      "NATIVE-ADV-009": "PASS_COMPAT",
+      "NATIVE-ADV-010": "PASS_COMPAT",
+      "NATIVE-ADV-011": "PASS_COMPAT"
+    },
+    "cases": [
+      {
+        "id": "NATIVE-ADV-001",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "open_path=/data/user/0/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;fstat_rc=0;size=14;readlink_rc=-1;readlink_errno=22"
+      },
+      {
+        "id": "NATIVE-ADV-002",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "libc_fd=56;syscall_fd=58;libc_target=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;syscall_target=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;context=DIRECT_FIXTURE"
+      },
+      {
+        "id": "NATIVE-ADV-003",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "raw_available=1;raw_rc=57;raw_fd=57;libc_target=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;raw_target=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;note=direct_fixture_raw_instruction_works"
+      },
+      {
+        "id": "NATIVE-ADV-004",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "target=127.0.0.1:9;libc_socket=52;syscall_socket=57;raw_socket=58;libc_connect=-1;syscall_connect=-1;raw_connect=-1"
+      },
+      {
+        "id": "NATIVE-ADV-005",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "/proc/self/status{libc=Name:\tndbox.fixture32\nUmask:\t0077\nState:;sys=Name:\tndbox.fixture32\nUmask:\t0077\nState:}|/proc/self/maps{libc=12c00000-2ac00000 rw-p 00000000 00:00 0 ;sys=12c00000-2ac00000 rw-p 00000000 00:00 0 }|/proc/self/fd{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/self/task{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/net{libc=READ_FAIL:21;sys=READ_FAIL:21};getpid=28147;getuid=10048;prctl_name_rc=0;prctl_name=ndbox.fixture32;prctl_dumpable=1;prctl_seccomp=0;prctl_no_new_privs=-1"
+      },
+      {
+        "id": "NATIVE-ADV-006",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "child=28149;attach=0;attach_errno=88;traceme=0;traceme_errno=88"
+      },
+      {
+        "id": "NATIVE-ADV-007",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "target=/system/bin/true;exit=0;signaled=0;output="
+      },
+      {
+        "id": "NATIVE-ADV-008",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "self=ok;payload=ok;marker=FIXTURE_ADV_PAYLOAD_V1;custom_path=/data/user/0/com.warden.controlledsandbox.fixture32/files/libfixture_adv_payload.so;custom=fail;custom_errno=2;dlopen_ext=ok;dlopen_ext_errno=2"
+      },
+      {
+        "id": "NATIVE-ADV-009",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "opened=/data/user/0/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;proc_fd=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;dup=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;inherited=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt"
+      },
+      {
+        "id": "NATIVE-ADV-010",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "/dev/binder=open,errno=0;/dev/vndbinder=open,errno=0;/dev/hwbinder=open,errno=0;note=observation_only_no_transaction"
+      },
+      {
+        "id": "NATIVE-ADV-011",
+        "status": "PASS_COMPAT",
+        "abi": "x86",
+        "context": "DIRECT_FIXTURE",
+        "detail": "path=/data/user/0/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;open=52,errno=88;openat=57,errno=88;openat2=-1,errno=1;faccessat=0,errno=1;faccessat2=-1,errno=1;stat=0,errno=1;fstatat=0,errno=1;xattr_set=0,errno=1;xattr_get=6,errno=1;xattr_list=32,errno=1;xattr_remove=0,errno=1;xattr_class=EXPECTED_LIMITATION_OR_SUPPORTED;cwd_saved=/;chdir=0,errno=1;cwd_after=/data/data/com.warden.controlledsandbox.fixture32/files;realpath=1;realpath_value=/data/data/com.warden.controlledsandbox.fixture32/files/native-adv-probe.txt;realpath_errno=1;ioctl=0,errno=1;syscall_ioctl=0,errno=1;raw_ioctl=0,errno=1;foreign_open=-1,errno=2;negative_host_path=DENIED;classification=DIRECT_COMPAT_BASELINE;raw_instruction_case=NATIVE-ADV-003;negative_or_xattr_check=CLASSIFIED"
+      }
+    ]
+  },
+  "sandbox": {
+    "label": "sandbox-final",
+    "abi": "x86_64",
+    "context": "IN_SANDBOX",
+    "schema": "t57-r03-p0a-01-native-adv-c3-t01",
+    "statuses": {
+      "NATIVE-ADV-001": "PASS_COMPAT",
+      "NATIVE-ADV-002": "PASS_COMPAT",
+      "NATIVE-ADV-003": "BYPASS_CONFIRMED",
+      "NATIVE-ADV-004": "PASS_COMPAT",
+      "NATIVE-ADV-005": "PASS_COMPAT",
+      "NATIVE-ADV-006": "BLOCKED_BY_POLICY",
+      "NATIVE-ADV-007": "BLOCKED_BY_POLICY",
+      "NATIVE-ADV-008": "PASS_COMPAT",
+      "NATIVE-ADV-009": "PASS_COMPAT",
+      "NATIVE-ADV-010": "PASS_COMPAT",
+      "NATIVE-ADV-011": "BYPASS_CONFIRMED"
+    },
+    "cases": [
+      {
+        "id": "NATIVE-ADV-001",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "open_path=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;fstat_rc=0;size=14;readlink_rc=-1;readlink_errno=22"
+      },
+      {
+        "id": "NATIVE-ADV-002",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "libc_fd=57;syscall_fd=58;libc_target=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;syscall_target=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;context=IN_SANDBOX"
+      },
+      {
+        "id": "NATIVE-ADV-003",
+        "status": "BYPASS_CONFIRMED",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "raw_available=1;raw_rc=58;raw_fd=58;libc_target=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;raw_target=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;note=raw_instruction_executed_outside_plt"
+      },
+      {
+        "id": "NATIVE-ADV-004",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "target=127.0.0.1:9;libc_socket=57;syscall_socket=58;raw_socket=59;libc_connect=-1;syscall_connect=-1;raw_connect=-1"
+      },
+      {
+        "id": "NATIVE-ADV-005",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "/proc/self/status{libc=Name:\tcom.warden.controlledsandbox.fixtu;sys=Name:\tcom.warden.controlledsandbox.fixtu}|/proc/self/maps{libc=12c00000-2ac00000 rw-p 00000000 00:00 0 ;sys=12c00000-2ac00000 rw-p 00000000 00:00 0 }|/proc/self/fd{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/self/task{libc=READ_FAIL:21;sys=READ_FAIL:21}|/proc/net{libc=OPEN_FAIL:13;sys=OPEN_FAIL:13};getpid=20054;getuid=10000;prctl_name_rc=0;prctl_name=com.warden.cont;prctl_dumpable=1;prctl_seccomp=0;prctl_no_new_privs=0"
+      },
+      {
+        "id": "NATIVE-ADV-006",
+        "status": "BLOCKED_BY_POLICY",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "fork denied errno=1"
+      },
+      {
+        "id": "NATIVE-ADV-007",
+        "status": "BLOCKED_BY_POLICY",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "fork denied before execve errno=1"
+      },
+      {
+        "id": "NATIVE-ADV-008",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "self=ok;payload=ok;marker=FIXTURE_ADV_PAYLOAD_V1;custom_path=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/libfixture_adv_payload.so;custom=fail;custom_errno=13;dlopen_ext=ok;dlopen_ext_errno=13"
+      },
+      {
+        "id": "NATIVE-ADV-009",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "opened=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;proc_fd=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;dup=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;inherited=fork_denied_by_policy"
+      },
+      {
+        "id": "NATIVE-ADV-010",
+        "status": "PASS_COMPAT",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "/dev/binder=open,errno=0;/dev/vndbinder=open,errno=0;/dev/hwbinder=open,errno=0;note=observation_only_no_transaction"
+      },
+      {
+        "id": "NATIVE-ADV-011",
+        "status": "BYPASS_CONFIRMED",
+        "abi": "x86_64",
+        "context": "IN_SANDBOX",
+        "detail": "path=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files/native-adv-probe.txt;open=57,errno=1;openat=58,errno=1;openat2=-1,errno=1;faccessat=0,errno=1;faccessat2=-1,errno=1;stat=0,errno=1;fstatat=0,errno=1;xattr_set=0,errno=1;xattr_get=6,errno=1;xattr_list=32,errno=1;xattr_remove=0,errno=1;xattr_class=EXPECTED_LIMITATION_OR_SUPPORTED;cwd_saved=/;chdir=0,errno=1;cwd_after=/data/data/com.warden.controlledsandbox.debug/files/instances/u0/com.warden.controlledsandbox.fixture/data/files;realpath=1;realpath_value=/data/user/0/com.warden.controlledsandbox.fixture/files/native-adv-probe.txt;realpath_errno=1;ioctl=0,errno=1;syscall_ioctl=0,errno=1;raw_ioctl=0,errno=1;foreign_open=-1,errno=13;negative_host_path=DENIED;classification=UNCONTROLLED_ENTRYPOINTS_RECORDED;raw_instruction_case=NATIVE-ADV-003;negative_or_xattr_check=CLASSIFIED"
+      }
+    ]
+  },
+  "sandbox_command_status": "PASS",
+  "errors": [],
+  "non_claims": [
+    "raw syscall/SVC is not mediated by PLT/GOT",
+    "four ABI build presence is not translated-ABI runtime proof",
+    "RD API32 is not API33+ / OEM / commercial / VA Pro equivalence"
+  ]
+}

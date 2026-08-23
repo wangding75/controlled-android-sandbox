@@ -46,7 +46,7 @@ CAMPAIGN_ID = "T57-R03-P0A-01"
 FIXTURE64 = "com.warden.controlledsandbox.fixture"
 FIXTURE32 = "com.warden.controlledsandbox.fixture32"
 ADV_ACTIVITY = "com.warden.controlledsandbox.fixture.NativeAdversarialProbeActivity"
-CASE_IDS = [f"NATIVE-ADV-{index:03d}" for index in range(1, 11)]
+CASE_IDS = [f"NATIVE-ADV-{index:03d}" for index in range(1, 12)]
 
 
 def collect_device_files(serial: str, output_dir: Path, environment: dict[str, Any]) -> None:

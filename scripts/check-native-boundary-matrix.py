@@ -95,11 +95,12 @@ REQUIRED_OPERATIONS = {
     "native library search path",
     "libc wrapper",
     "syscall()",
+    "ioctl",
     "__syscall",
     "architecture raw instruction",
     "inline asm",
 }
-REQUIRED_CASES = [f"NATIVE-ADV-{index:03d}" for index in range(1, 11)]
+REQUIRED_CASES = [f"NATIVE-ADV-{index:03d}" for index in range(1, 12)]
 LEGAL_STATUS = {
     "INTERCEPTED",
     "PARTIAL",
@@ -179,7 +180,19 @@ def main() -> int:
         for case in REQUIRED_CASES:
             if case not in text:
                 errors.append(f"adversarial fixture missing {case}")
-        for token in ("svc #0", "syscall", "PTRACE_ATTACH", "execve", "/dev/binder"):
+        for token in (
+            "svc #0",
+            "syscall",
+            "PTRACE_ATTACH",
+            "execve",
+            "/dev/binder",
+            "openat2",
+            "faccessat2",
+            "setxattr",
+            "getcwd",
+            "ioctl",
+            "NATIVE-ADV-011",
+        ):
             if token not in text:
                 errors.append(f"adversarial fixture missing token: {token}")
         if "sandbox-native" in text and "controlled_sandbox::" in text:
