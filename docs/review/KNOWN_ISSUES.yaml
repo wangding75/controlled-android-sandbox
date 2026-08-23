@@ -694,6 +694,9 @@ issues:
       P3 documents the owner and keeps HostileSeccompInstaller as an isolated
       process deny-only BPF policy. Guest seccomp install is mediated/denied to
       protect the substrate; user-notify/trap virtualization is not implemented.
+      C3-T05 decided production user-notify is NOT_APPLICABLE on ordinary APK:
+      the RD API32 kernel has CONFIG_SECCOMP_FILTER but not CONFIG_SECCOMP_USER_NOTIF,
+      and listener ownership remains REQUIRES_PRIVILEGE (Option D/E).
 
   - issue_id: KI-R03-NATIVE-009
     title: FD escape via /proc/self/fd, dup, and inherited FDs

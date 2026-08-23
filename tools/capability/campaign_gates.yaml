@@ -145,6 +145,13 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-044]
+  - id: c3-t05-seccomp-decision
+    group: native_self_test
+    command: [python, scripts/check-c3-t05-seccomp-decision.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-NATIVE-008]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]
