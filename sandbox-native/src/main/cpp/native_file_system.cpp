@@ -206,6 +206,14 @@ NativeResolvedPath NativeFileSystemResolver::resolve_fd(int file_descriptor) {
                 && !global_policy().revision_current(record->policy_revision)) {
             throw PathPolicyError(EAGAIN, "NATIVE_FD_REVISION_STALE");
         }
+    } else if (file_descriptor > STDERR_FILENO) {
+        // Do not infer Guest ownership from a readable /proc/self/fd entry.
+        // Intercepted producers and SCM_RIGHTS registration are authoritative;
+        // an otherwise unknown inherited descriptor is a fail-closed boundary.
+        throw PathPolicyError(EACCES, "UNKNOWN_INHERITED_FD_DENIED");
+    } else {
+        NativeFdLedger::observe_inherited(file_descriptor,
+                global_policy().snapshot().revision);
     }
     if (global_policy().is_capability_fd(file_descriptor)) {
         const NativePolicySnapshot policy = global_policy().snapshot();

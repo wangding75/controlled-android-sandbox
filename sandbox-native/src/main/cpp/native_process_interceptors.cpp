@@ -189,7 +189,15 @@ bool resolve_fd_checked(int descriptor, NativeResolvedPath& resolved) {
 
 bool fd_operation_current(int descriptor) noexcept {
     const auto record = NativeFdLedger::lookup(descriptor);
-    if (!record) return true;
+    if (!record) {
+        if (descriptor > STDERR_FILENO) {
+            errno = EACCES;
+            return false;
+        }
+        NativeFdLedger::observe_inherited(descriptor,
+                global_policy().snapshot().revision);
+        return true;
+    }
     if (record->ownership == NativeFdOwnership::HostInternal
             || record->ownership == NativeFdOwnership::BrokerTransport) {
         errno = EACCES;
@@ -610,7 +618,6 @@ extern "C" int controlled_fstat(int descriptor, struct stat* value) {
     if (value == nullptr) { errno = EFAULT; return -1; }
     if (configured()) {
         if (!fd_operation_current(descriptor)) return -1;
-        NativeFdLedger::observe_inherited(descriptor, global_policy().snapshot().revision);
         if (!NativeFdLedger::guest_visible(descriptor)) { errno = EACCES; return -1; }
     }
     return function(descriptor, value);

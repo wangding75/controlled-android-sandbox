@@ -1,51 +1,54 @@
 {
   "schema_version": 1,
-  "task_id": "C2-T07",
+  "task_id": "C3-T02",
   "status": "PASS",
-  "captured_at": "2026-08-22T19:44:07.397319+00:00",
+  "captured_at": "2026-08-23T04:53:20.383450+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C2-T07",
-    "active_task": "",
-    "last_completed": "C2-T06",
-    "first_ready_pending": "C2-T07",
-    "dependencies": "C2-T02..T06"
+    "next_task": "C3-T02",
+    "active_task": "C3-T02",
+    "last_completed": "C3-T01",
+    "first_ready_pending": "C3-T03",
+    "dependencies": "C3-T01"
   },
   "last_receipt": {
-    "task_id": "C2-T06",
+    "task_id": "C3-T01",
     "status": "DONE",
     "implementation_commits": [
-      "048ca1b183f76de37c70c3b4868edfd40e91c562"
+      "8b4233623a0e09028969a88370a68f3ae0137c54"
     ],
-    "receipt_commit": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
-    "baseline_commit": "a1a423c9bee79fb2b65270f70cb6c42e172a0529",
+    "receipt_commit": "ffb69277a5efa253a929beeb458f5bb78bdb3517",
+    "baseline_commit": "d9d89ca19e86cf97542729e63f698c9edb4bfef6",
     "evidence_paths": [
       "docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md",
       "docs/COMMIT_IDENTITY_POLICY.md",
-      "docs/review/C2_T06_DEVICE_NETWORK_MEDIA_DESIGN.md",
-      "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C2-T06/c2-t06-rd-summary.json"
+      "docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml",
+      "docs/review/C3_T01_NATIVE_CORPUS_DESIGN.md",
+      "verification/sbom.json",
+      "docs/capability/CAPABILITY_REGISTRY.yaml",
+      "verification/catch-up/C3-T01/c3-t01-rd-summary.json",
+      "verification/catch-up/C3-T01/c3-t01-local-verification.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
+    "head": "ffb69277a5efa253a929beeb458f5bb78bdb3517",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "9bb551cd4ba13062ae36fc9744c55229e7e88870",
+    "remote_head": "ffb69277a5efa253a929beeb458f5bb78bdb3517",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M verification/catch-up/C0-T01/continuation-preflight.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke-2.json\n?? verification/catch-up/C1-GATE/c1-gate-provider-smoke.json\n?? verification/catch-up/C1-GATE/full-regression-retry-02/\n?? verification/catch-up/C1-GATE/full-regression-retry-03/\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-10.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-prepare.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-recovery-retry.json\n?? verification/catch-up/C1-GATE/provider-diagnostic-loops-6-synchronized.json"
+    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M fixture-basic/src/main/AndroidManifest.xml\n M fixture-basic/src/main/cpp/CMakeLists.txt\n M fixture-compat32/src/main/AndroidManifest.xml\n M sandbox-native/src/main/cpp/native_file_system.cpp\n M sandbox-native/src/main/cpp/native_network_interceptors.cpp\n M sandbox-native/src/main/cpp/native_process_interceptors.cpp\n M sandbox-native/src/main/cpp/native_procfs.cpp\n M scripts/verify-catch-up-continuation.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n?? docs/review/C3_T02_FILE_PROC_NETWORK_FD_DESIGN.md\n?? fixture-basic/src/main/cpp/c3_t02_native.cpp\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T02FileProcNetworkFdActivity.java\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T02FileProcNetworkFdProbe.java\n?? scripts/check-c3-t02-file-proc-network-fd.py\n?? tools/capability/run_c3_t02_rd.py\n?? verification/catch-up/C3-T02/"
   },
   "device": {
     "instance_name": "RD测试",
     "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "773adc6f-e0aa-4997-a0ee-481a7773a10d",
-    "android_id": "398eea33120cd887",
-    "model": "22041211A"
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "model": "V2241A"
   },
   "static_checks": {
     "required_files": [
@@ -70,6 +73,30 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t02-file-proc-network-fd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "scripts/check-native-enforcement-poc.py",
         "serial": "127.0.0.1:16416"
       },
@@ -87,5 +114,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C2-T07"
+  "evidence_directory": "verification/catch-up/C3-T02"
 }

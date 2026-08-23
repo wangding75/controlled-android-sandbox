@@ -4,6 +4,7 @@ project(controlled_sandbox_fixture LANGUAGES CXX)
 add_library(controlled_sandbox_fixture SHARED
     fixture_native.cpp
     adversarial_native.cpp
+    c3_t02_native.cpp
 )
 target_compile_features(controlled_sandbox_fixture PRIVATE cxx_std_20)
 target_compile_options(controlled_sandbox_fixture PRIVATE -Wall -Wextra -Werror)

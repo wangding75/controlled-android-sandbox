@@ -125,6 +125,34 @@ bool message_oriented_socket(int socket_fd) noexcept {
     return type == SOCK_DGRAM || type == SOCK_SEQPACKET || type == SOCK_RAW;
 }
 
+bool anonymous_unix_socket(int socket_fd) noexcept {
+    GetSockNameFn function = require_real(real_getsockname, "getsockname");
+    GetPeerNameFn peer_function = require_real(real_getpeername, "getpeername");
+    GetSockOptFn get_socket_option = require_real(real_getsockopt, "getsockopt");
+#ifdef SO_DOMAIN
+    if (get_socket_option != nullptr) {
+        int domain = 0;
+        socklen_t domain_length = sizeof(domain);
+        if (get_socket_option(socket_fd, SOL_SOCKET, SO_DOMAIN, &domain, &domain_length) == 0) {
+            if (domain == AF_UNIX) return true;
+        }
+    }
+#endif
+    if (peer_function != nullptr) {
+        sockaddr_storage peer{};
+        socklen_t peer_length = sizeof(peer);
+        if (peer_function(socket_fd, reinterpret_cast<sockaddr*>(&peer), &peer_length) == 0
+                && peer.ss_family == AF_UNIX) {
+            return true;
+        }
+    }
+    if (function == nullptr) return false;
+    sockaddr_storage local{};
+    socklen_t length = sizeof(local);
+    return function(socket_fd, reinterpret_cast<sockaddr*>(&local), &length) == 0
+            && local.ss_family == AF_UNIX;
+}
+
 bool socket_address_present(const sockaddr_storage& address, socklen_t length) noexcept {
     if (std::cmp_less(length, sizeof(sa_family_t))) return false;
     return address.ss_family == AF_INET || address.ss_family == AF_INET6
@@ -197,8 +225,12 @@ ssize_t checked_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
         const ssize_t probe_status = function(socket_fd, &probe_byte, sizeof(probe_byte),
                 flags | MSG_PEEK, reinterpret_cast<sockaddr*>(&probed_source), &probed_source_length);
         if (probe_status < 0) return probe_status;
-        if (!native_socket_address_allowed(reinterpret_cast<const sockaddr*>(&probed_source),
-                                            probed_source_length)) {
+        const bool source_allowed = probed_source_length == 0
+                ? anonymous_unix_socket(socket_fd)
+                : native_socket_address_allowed(
+                        reinterpret_cast<const sockaddr*>(&probed_source),
+                        probed_source_length);
+        if (!source_allowed) {
             errno = EACCES;
             return -1;
         }
@@ -215,7 +247,7 @@ ssize_t checked_recvfrom(int socket_fd, void* buffer, size_t length, int flags,
         const ssize_t received = function(socket_fd, temporary_buffer, length, flags,
                 reinterpret_cast<sockaddr*>(&temporary_source), &temporary_source_length);
         if (received < 0) return received;
-        if (message_oriented && !socket_addresses_equal(
+        if (message_oriented && probed_source_length != 0 && !socket_addresses_equal(
                 probed_source, probed_source_length, temporary_source, temporary_source_length)) {
             errno = EAGAIN;
             return -1;
@@ -579,8 +611,12 @@ extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags)
         const ssize_t probe_status = function(socket_fd, &probe, flags | MSG_PEEK);
         if (probe_status < 0) return probe_status;
         probed_source_length = probe.msg_namelen;
-        if (!native_socket_address_allowed(reinterpret_cast<const sockaddr*>(&probed_source),
-                                            probe.msg_namelen)) {
+        const bool source_allowed = probed_source_length == 0
+                ? anonymous_unix_socket(socket_fd)
+                : native_socket_address_allowed(
+                        reinterpret_cast<const sockaddr*>(&probed_source),
+                        probed_source_length);
+        if (!source_allowed) {
             errno = EACCES;
             return -1;
         }
@@ -604,7 +640,7 @@ extern "C" ssize_t controlled_recvmsg(int socket_fd, msghdr* message, int flags)
 
         const ssize_t received = function(socket_fd, &temporary, flags);
         if (received < 0) return received;
-        if (message_oriented && !socket_addresses_equal(
+        if (message_oriented && probed_source_length != 0 && !socket_addresses_equal(
                 probed_source, probed_source_length, temporary_source, temporary.msg_namelen)) {
             close_received_file_descriptors(temporary);
             errno = EAGAIN;

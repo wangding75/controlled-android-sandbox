@@ -357,12 +357,52 @@ std::vector<int> visible_fd_candidates() {
     return descriptors;
 }
 
-std::string fdinfo_content(int descriptor) {
-    NativeFdLedger::observe_inherited(descriptor, global_policy().snapshot().revision);
-    if (!NativeFdLedger::guest_visible(descriptor)) {
-        throw PathPolicyError(EACCES, "HOST_INTERNAL_FD_DENIED");
+bool allow_guest_descriptor(int descriptor) {
+    const auto record = NativeFdLedger::lookup(descriptor);
+    if (!record && descriptor > STDERR_FILENO) {
+        // An unknown descriptor is not evidence of Guest ownership.  Only the
+        // process stdio descriptors may be adopted as inherited compatibility
+        // state; every other inherited/foreign FD must fail closed until a
+        // brokered or intercepted producer registers it in the ledger.
+        errno = EACCES;
+        return false;
     }
-    return read_raw_file("/proc/self/fdinfo/" + std::to_string(descriptor));
+    if (!record) {
+        NativeFdLedger::observe_inherited(descriptor,
+                global_policy().snapshot().revision);
+    }
+    if (!NativeFdLedger::guest_visible(descriptor)) {
+        errno = EACCES;
+        return false;
+    }
+    return true;
+}
+
+std::string fdinfo_content(int descriptor) {
+    if (!allow_guest_descriptor(descriptor)) {
+        throw PathPolicyError(errno == EACCES ? EACCES : EPERM, "UNKNOWN_OR_INTERNAL_FD_DENIED");
+    }
+    try {
+        return read_raw_file("/proc/self/fdinfo/" + std::to_string(descriptor));
+    } catch (const PathPolicyError&) {
+        // Some runtime layers expose a Guest FD whose kernel fdinfo leaf is not
+        // readable through the host proc mount.  Re-render only the
+        // authoritative, already-validated Guest descriptor metadata instead of
+        // falling back to an unfiltered host procfs read.
+        const long status_flags = trusted_syscall6(SYS_fcntl, descriptor, F_GETFL);
+        const long descriptor_flags = trusted_syscall6(SYS_fcntl, descriptor, F_GETFD);
+        struct stat value{};
+        if (status_flags < 0 || descriptor_flags < 0
+                || trusted_syscall6(SYS_fstat, descriptor,
+                        reinterpret_cast<long>(&value)) != 0) {
+            throw;
+        }
+        std::ostringstream rendered;
+        rendered << "pos:\t0\nflags:\t" << std::oct
+                 << (status_flags | ((descriptor_flags & FD_CLOEXEC) != 0 ? O_CLOEXEC : 0))
+                 << "\nmnt_id:\t0\nino:\t" << std::dec << value.st_ino << "\n";
+        return rendered.str();
+    }
 }
 
 }  // namespace
@@ -437,8 +477,12 @@ NativePathDecision NativeProcFileSystem::materialize(std::string_view guest_path
     } else {
         throw PathPolicyError(ENOENT, "PROC_VIRTUAL_PATH_UNKNOWN");
     }
+    std::string snapshot_suffix = classified->leaf;
+    if (classified->kind == ProcKind::FdInfo) {
+        snapshot_suffix = "fdinfo/" + std::to_string(classified->descriptor);
+    }
     NativePathDecision decision = snapshot_decision(policy,
-            ".runtime/proc/" + std::to_string(policy.revision) + "/" + classified->leaf,
+            ".runtime/proc/" + std::to_string(policy.revision) + "/" + snapshot_suffix,
             false);
     write_snapshot(decision, content);
     return decision;
@@ -507,9 +551,7 @@ NativePathDecision NativeProcFileSystem::materialize_directory(std::string_view 
 int NativeProcFileSystem::open_fd_path(std::string_view guest_path, int flags) {
     const auto classified = classify(guest_path);
     if (!classified || classified->kind != ProcKind::Fd) { errno = ENOENT; return -1; }
-    NativeFdLedger::observe_inherited(classified->descriptor,
-            global_policy().snapshot().revision);
-    if (!NativeFdLedger::guest_visible(classified->descriptor)) { errno = EACCES; return -1; }
+    if (!allow_guest_descriptor(classified->descriptor)) return -1;
     if ((flags & O_DIRECTORY) != 0) {
         struct stat value{};
         if (trusted_syscall6(SYS_fstat, classified->descriptor,
@@ -541,12 +583,8 @@ int NativeProcFileSystem::stat_fd_path(std::string_view guest_path, struct stat*
                                        bool follow) {
     if (value == nullptr) { errno = EFAULT; return -1; }
     const auto classified = classify(guest_path);
-    if (classified && classified->kind == ProcKind::Fd) {
-        NativeFdLedger::observe_inherited(classified->descriptor,
-                global_policy().snapshot().revision);
-    }
     if (!classified || classified->kind != ProcKind::Fd
-            || !NativeFdLedger::guest_visible(classified->descriptor)) {
+            || !allow_guest_descriptor(classified->descriptor)) {
         errno = EACCES;
         return -1;
     }
@@ -571,12 +609,8 @@ ssize_t NativeProcFileSystem::readlink_virtual(std::string_view guest_path, char
             && classified->kind != ProcKind::MapFile)) { errno = EINVAL; return -1; }
     std::string value;
     if (classified->kind == ProcKind::Fd) {
-        NativeFdLedger::observe_inherited(classified->descriptor,
-                global_policy().snapshot().revision);
-        if (!NativeFdLedger::guest_visible(classified->descriptor)) { errno = EACCES; return -1; }
+        if (!allow_guest_descriptor(classified->descriptor)) return -1;
         const std::string raw = raw_readlink("/proc/self/fd/" + std::to_string(classified->descriptor));
-        NativeFdLedger::observe_inherited(classified->descriptor,
-                global_policy().snapshot().revision);
         value = NativeFdLedger::project_readlink(classified->descriptor, raw);
     } else {
         value = sanitize_map_path(raw_readlink("/proc/self/map_files/" + classified->map_file),
