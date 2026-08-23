@@ -1,0 +1,653 @@
+{
+  "task_id": "C3-T03",
+  "status": "PASS",
+  "source_commit_before_implementation_commit": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
+  "source_worktree_status_before_implementation_commit": "M app/src/debug/cpp/CMakeLists.txt\n M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M docs/capability/CAPABILITY_REGISTRY.yaml\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/AndroidManifest.xml\n M fixture-basic/src/main/cpp/CMakeLists.txt\n M fixture-compat32/src/main/AndroidManifest.xml\n M sandbox-companion32/src/main/cpp/CMakeLists.txt\n M sandbox-native/src/main/cpp/CMakeLists.txt\n M tools/static_android_compile.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/sbom.json\n?? docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md\n?? fixture-basic/src/main/cpp/c3_t03_native.cpp\n?? fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T03NativeMediaActivity.java\n?? scripts/check-c3-t03-abi-elf.py\n?? tools/capability/run_c3_t03_rd.py\n?? verification/catch-up/C3-T03/",
+  "started_at": "2026-08-23T06:06:57.277510+00:00",
+  "finished_at": "2026-08-23T06:06:57.360569+00:00",
+  "static_gates": [
+    {
+      "gate": "scripts/check-c3-t03-abi-elf.py",
+      "returncode": 0,
+      "stdout": "PASS C3-T03 ELF/16KB static gate: host=4 ELF, fixture64=6 ELF, fixture32=6 ELF, companion32=4 ELF\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-abi-companion.py",
+      "returncode": 0,
+      "stdout": "PASS native ABI companion runtime and architecture checks\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-m5-t2-cross-width-runtime.py",
+      "returncode": 0,
+      "stdout": "PASS M5-T2 cross-width runtime checks: 32-bit production route wired; build/device evidence remains blocked/not-tested\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-c2-t04-camera.py",
+      "returncode": 0,
+      "stdout": "PASS C2-T04 camera static checks\n",
+      "stderr": ""
+    }
+  ],
+  "build": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "812f3f625faf5b7178eae9803179f252cdb4357e9ade5bf80ade7ed5c5697470"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "57b1dbdb765e233376d35f1bf2aae74f325520a82ff12c7554ba8ef1c281ef1d"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "204df526209b4f3cc6490b8a5cbef1990c17925190cc1316c14c741016067d5a"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "5564918e1af297ecbdba85548e36f1b7fb655423f4cb17358ec8622f3fda9e10"
+      }
+    ]
+  },
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T06:06:32.708175+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+    "page_size": 4096,
+    "page_size_command": "getconf PAGE_SIZE"
+  },
+  "direct": {
+    "direct64": {
+      "label": "direct64",
+      "package": "com.warden.controlledsandbox.fixture",
+      "start_returncode": 0,
+      "start_stdout": "Starting: Intent { cmp=com.warden.controlledsandbox.fixture/.C3T03NativeMediaActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.fixture/.C3T03NativeMediaActivity\nTotalTime: 912\nWaitTime: 914\nComplete\n",
+      "start_stderr": "",
+      "result": {
+        "taskId": "C3-T03",
+        "context": "DIRECT_FIXTURE",
+        "compiledAbi": "x86_64",
+        "nativePageSize": 4096,
+        "lateDlopen": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+        },
+        "surface": {
+          "nativeStatus": "PASS",
+          "native": {
+            "status": "PASS",
+            "abi": "x86_64",
+            "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+          },
+          "imageStatus": "PASS",
+          "image": {
+            "status": "PASS",
+            "width": 64,
+            "height": 48,
+            "format": 1,
+            "bytes": 12288,
+            "rowStride": 256,
+            "pixelStride": 4,
+            "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+          },
+          "surfaceFormat": 1
+        },
+        "codec": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+        },
+        "status": "PASS",
+        "cleanup": "PASS"
+      },
+      "log_marker": true
+    },
+    "direct32": {
+      "label": "direct32",
+      "package": "com.warden.controlledsandbox.fixture32",
+      "start_returncode": 0,
+      "start_stdout": "Starting: Intent { cmp=com.warden.controlledsandbox.fixture32/com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.fixture32/com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity\nTotalTime: 957\nWaitTime: 958\nComplete\n",
+      "start_stderr": "",
+      "result": {
+        "taskId": "C3-T03",
+        "context": "DIRECT_FIXTURE",
+        "compiledAbi": "x86",
+        "nativePageSize": 4096,
+        "lateDlopen": {
+          "status": "PASS",
+          "abi": "x86",
+          "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+        },
+        "surface": {
+          "nativeStatus": "PASS",
+          "native": {
+            "status": "PASS",
+            "abi": "x86",
+            "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+          },
+          "imageStatus": "PASS",
+          "image": {
+            "status": "PASS",
+            "width": 64,
+            "height": 48,
+            "format": 1,
+            "bytes": 12288,
+            "rowStride": 256,
+            "pixelStride": 4,
+            "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+          },
+          "surfaceFormat": 1
+        },
+        "codec": {
+          "status": "PASS",
+          "abi": "x86",
+          "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+        },
+        "status": "PASS",
+        "cleanup": "PASS"
+      },
+      "log_marker": true
+    }
+  },
+  "probes": {
+    "direct64": {
+      "label": "direct64",
+      "status": "PASS",
+      "context": "DIRECT_FIXTURE",
+      "compiledAbi": "x86_64",
+      "nativePageSize": 4096,
+      "checks": {
+        "lateDlopen": "PASS",
+        "nativeSurface": "PASS",
+        "imageCallback": "PASS",
+        "codec": "PASS",
+        "cleanup": "PASS"
+      },
+      "result": {
+        "taskId": "C3-T03",
+        "context": "DIRECT_FIXTURE",
+        "compiledAbi": "x86_64",
+        "nativePageSize": 4096,
+        "lateDlopen": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+        },
+        "surface": {
+          "nativeStatus": "PASS",
+          "native": {
+            "status": "PASS",
+            "abi": "x86_64",
+            "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+          },
+          "imageStatus": "PASS",
+          "image": {
+            "status": "PASS",
+            "width": 64,
+            "height": 48,
+            "format": 1,
+            "bytes": 12288,
+            "rowStride": 256,
+            "pixelStride": 4,
+            "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+          },
+          "surfaceFormat": 1
+        },
+        "codec": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+        },
+        "status": "PASS",
+        "cleanup": "PASS"
+      }
+    },
+    "direct32": {
+      "label": "direct32",
+      "status": "PASS",
+      "context": "DIRECT_FIXTURE",
+      "compiledAbi": "x86",
+      "nativePageSize": 4096,
+      "checks": {
+        "lateDlopen": "PASS",
+        "nativeSurface": "PASS",
+        "imageCallback": "PASS",
+        "codec": "PASS",
+        "cleanup": "PASS"
+      },
+      "result": {
+        "taskId": "C3-T03",
+        "context": "DIRECT_FIXTURE",
+        "compiledAbi": "x86",
+        "nativePageSize": 4096,
+        "lateDlopen": {
+          "status": "PASS",
+          "abi": "x86",
+          "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+        },
+        "surface": {
+          "nativeStatus": "PASS",
+          "native": {
+            "status": "PASS",
+            "abi": "x86",
+            "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+          },
+          "imageStatus": "PASS",
+          "image": {
+            "status": "PASS",
+            "width": 64,
+            "height": 48,
+            "format": 1,
+            "bytes": 12288,
+            "rowStride": 256,
+            "pixelStride": 4,
+            "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+          },
+          "surfaceFormat": 1
+        },
+        "codec": {
+          "status": "PASS",
+          "abi": "x86",
+          "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+        },
+        "status": "PASS",
+        "cleanup": "PASS"
+      }
+    },
+    "sandbox": {
+      "label": "sandbox",
+      "status": "PASS",
+      "context": "IN_SANDBOX",
+      "compiledAbi": "x86_64",
+      "nativePageSize": 4096,
+      "checks": {
+        "lateDlopen": "PASS",
+        "nativeSurface": "PASS",
+        "imageCallback": "PASS",
+        "codec": "PASS",
+        "cleanup": "PASS"
+      },
+      "result": {
+        "taskId": "C3-T03",
+        "context": "IN_SANDBOX",
+        "compiledAbi": "x86_64",
+        "nativePageSize": 4096,
+        "lateDlopen": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+        },
+        "surface": {
+          "nativeStatus": "PASS",
+          "native": {
+            "status": "PASS",
+            "abi": "x86_64",
+            "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+          },
+          "imageStatus": "PASS",
+          "image": {
+            "status": "PASS",
+            "width": 64,
+            "height": 48,
+            "format": 1,
+            "bytes": 12288,
+            "rowStride": 256,
+            "pixelStride": 4,
+            "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+          },
+          "surfaceFormat": 1
+        },
+        "codec": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+        },
+        "status": "PASS",
+        "cleanup": "PASS"
+      }
+    }
+  },
+  "sandbox": {
+    "launch": {
+      "status": "PASS",
+      "returncode": 0,
+      "result": {
+        "command": "c3-t03-native-media",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "",
+        "startedAt": 1787465195712,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "c3T03": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "85d9e695-5534-408a-b30e-662e87d9a323",
+          "generation": 1,
+          "processSlot": 54,
+          "platformPid": 14294,
+          "pid": 14294,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity"
+        },
+        "operation": {
+          "status": "LAUNCH_PASS",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "85d9e695-5534-408a-b30e-662e87d9a323",
+          "generation": 1,
+          "processSlot": 54,
+          "platformPid": 14294,
+          "pid": 14294,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture",
+          "componentClass": "com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity"
+        },
+        "status": "PASS"
+      },
+      "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 830\nWaitTime: 831\nComplete\n",
+      "start_stderr": ""
+    },
+    "result": {
+      "taskId": "C3-T03",
+      "context": "IN_SANDBOX",
+      "compiledAbi": "x86_64",
+      "nativePageSize": 4096,
+      "lateDlopen": {
+        "status": "PASS",
+        "abi": "x86_64",
+        "detail": "symbol=FIXTURE_ADV_PAYLOAD_V1;dlclose=0"
+      },
+      "surface": {
+        "nativeStatus": "PASS",
+        "native": {
+          "status": "PASS",
+          "abi": "x86_64",
+          "detail": "unlockAndPost=0;width=64;height=48;stride=64"
+        },
+        "imageStatus": "PASS",
+        "image": {
+          "status": "PASS",
+          "width": 64,
+          "height": 48,
+          "format": 1,
+          "bytes": 12288,
+          "rowStride": 256,
+          "pixelStride": 4,
+          "sha256": "8381a260eada8d8d03d4abb8e3e250a8ce3b32127bdc5fdb9b99057ddb47bd1e"
+        },
+        "surfaceFormat": 1
+      },
+      "codec": {
+        "status": "PASS",
+        "abi": "x86_64",
+        "detail": "inputBytes=384;outputBytes=29;outputCapacity=1048576;formatChanged=1"
+      },
+      "status": "PASS",
+      "cleanup": "PASS"
+    },
+    "log_marker": true
+  },
+  "companion": {
+    "attempt": 1,
+    "status": "PASS",
+    "returncode": 0,
+    "stdout": "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32\n",
+    "stderr": "",
+    "result": {
+      "case": "RD-08-cross-abi-process-death-generation-recovery",
+      "serial": "127.0.0.1:16416",
+      "api": "32",
+      "status": "PASS",
+      "killedPid": 14636,
+      "recoveredPid": 14689,
+      "firstGeneration": 1,
+      "secondGeneration": 2,
+      "prepare": {
+        "command": "import-prepare",
+        "package": "com.warden.controlledsandbox.fixture32",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "",
+        "startedAt": 1787465204612,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "PREPARED",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "1748a6c9-8a8a-4979-beb8-d8c77904a7b9",
+          "generation": 1,
+          "processSlot": 22,
+          "platformPid": 14560,
+          "pid": 14560,
+          "isolatedProcess": false,
+          "processName": "com.warden.controlledsandbox.fixture32",
+          "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+        },
+        "companion": {
+          "successful": true,
+          "operation": "PROBE",
+          "requestedAbi": "x86",
+          "processBitness": 32,
+          "acceptedGeneration": 1,
+          "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+          "errorType": "",
+          "errorMessage": ""
+        },
+        "status": "PASS"
+      },
+      "second": {
+        "command": "prepare",
+        "package": "com.warden.controlledsandbox.fixture32",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "",
+        "startedAt": 1787465212137,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "ALREADY_PREPARED",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "9ba41023-3501-4756-b268-346868b2899e",
+          "generation": 2,
+          "processSlot": 22,
+          "platformPid": 0,
+          "processName": "com.warden.controlledsandbox.fixture32",
+          "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+        },
+        "companion": {
+          "successful": true,
+          "operation": "PROBE",
+          "requestedAbi": "x86",
+          "processBitness": 32,
+          "acceptedGeneration": 1,
+          "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+          "errorType": "",
+          "errorMessage": ""
+        },
+        "status": "PASS"
+      },
+      "deathMarker": "GUEST_PROCESS_DISCONNECTED"
+    },
+    "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+    "resultPath": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c3-t03\\20260823T060630Z\\companion-cross-abi\\RD-08-cross-abi-process-death-generation-recovery-result.json",
+    "identity": {
+      "product": "controlled-android-sandbox",
+      "releaseTrain": "m5-t19-1",
+      "versionCode": 19,
+      "versionName": "0.5.19.1-source",
+      "protocol": 1,
+      "verification": "static NativeCompanionIdentity contract plus Host requireCompatible during prepare"
+    },
+    "attempts": [
+      {
+        "attempt": 1,
+        "status": "PASS",
+        "returncode": 0,
+        "stdout": "RESULT: PASS case=RD-08-cross-abi-process-death-generation-recovery serial=127.0.0.1:16416 api=32\n",
+        "stderr": "",
+        "result": {
+          "case": "RD-08-cross-abi-process-death-generation-recovery",
+          "serial": "127.0.0.1:16416",
+          "api": "32",
+          "status": "PASS",
+          "killedPid": 14636,
+          "recoveredPid": 14689,
+          "firstGeneration": 1,
+          "secondGeneration": 2,
+          "prepare": {
+            "command": "import-prepare",
+            "package": "com.warden.controlledsandbox.fixture32",
+            "virtualUserId": 0,
+            "trustNativeGuest": true,
+            "requestId": "",
+            "startedAt": 1787465204612,
+            "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+            "operation": {
+              "status": "PREPARED",
+              "errorType": "",
+              "errorMessage": "",
+              "sessionId": "1748a6c9-8a8a-4979-beb8-d8c77904a7b9",
+              "generation": 1,
+              "processSlot": 22,
+              "platformPid": 14560,
+              "pid": 14560,
+              "isolatedProcess": false,
+              "processName": "com.warden.controlledsandbox.fixture32",
+              "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+            },
+            "companion": {
+              "successful": true,
+              "operation": "PROBE",
+              "requestedAbi": "x86",
+              "processBitness": 32,
+              "acceptedGeneration": 1,
+              "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+              "errorType": "",
+              "errorMessage": ""
+            },
+            "status": "PASS"
+          },
+          "second": {
+            "command": "prepare",
+            "package": "com.warden.controlledsandbox.fixture32",
+            "virtualUserId": 0,
+            "trustNativeGuest": true,
+            "requestId": "",
+            "startedAt": 1787465212137,
+            "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+            "operation": {
+              "status": "ALREADY_PREPARED",
+              "errorType": "",
+              "errorMessage": "",
+              "sessionId": "9ba41023-3501-4756-b268-346868b2899e",
+              "generation": 2,
+              "processSlot": 22,
+              "platformPid": 0,
+              "processName": "com.warden.controlledsandbox.fixture32",
+              "componentClass": "com.warden.controlledsandbox.fixture.MainActivity"
+            },
+            "companion": {
+              "successful": true,
+              "operation": "PROBE",
+              "requestedAbi": "x86",
+              "processBitness": 32,
+              "acceptedGeneration": 1,
+              "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+              "errorType": "",
+              "errorMessage": ""
+            },
+            "status": "PASS"
+          },
+          "deathMarker": "GUEST_PROCESS_DISCONNECTED"
+        },
+        "nativeStatus": "bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32",
+        "resultPath": "D:\\github\\controlled-android-sandbox\\artifacts\\capability-audit\\catch-up-c3-t03\\20260823T060630Z\\companion-cross-abi\\RD-08-cross-abi-process-death-generation-recovery-result.json"
+      }
+    ],
+    "retryCount": 0
+  },
+  "environment_block": {
+    "task_id": "C3-T03",
+    "status": "PASS",
+    "device_page_size": 4096,
+    "page_16kb_dynamic_status": "ENVIRONMENT_NOT_AVAILABLE",
+    "arm32_dynamic_status": "UNVERIFIED_RUNTIME",
+    "arm64_dynamic_status": "UNVERIFIED_RUNTIME",
+    "static_16kb_alignment_status": "PASS",
+    "reason": "RD测试 reports a non-16KB page size; no approved ARM32/ARM64 or 16KB runtime is available in this environment. Static alignment is not promoted to dynamic PASS.",
+    "non_claims": [
+      "ARM32 dynamic PASS",
+      "ARM64 dynamic PASS",
+      "16KB runtime dynamic PASS"
+    ]
+  },
+  "errors": [],
+  "non_claims": [
+    "ARM32 dynamic PASS",
+    "ARM64 dynamic PASS",
+    "16KB runtime dynamic PASS"
+  ]
+}

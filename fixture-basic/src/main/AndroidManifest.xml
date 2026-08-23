@@ -46,6 +46,9 @@
         <activity android:name="com.warden.controlledsandbox.fixture.C3T02FileProcNetworkFdActivity"
             android:exported="true"
             android:noHistory="true" />
+        <activity android:name="com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity"
+            android:exported="true"
+            android:noHistory="true" />
         <activity android:name="com.warden.controlledsandbox.fixture.NativeEnforcementSeccompActivity"
             android:exported="true"
             android:noHistory="true" />

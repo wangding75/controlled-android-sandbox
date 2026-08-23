@@ -24,4 +24,5 @@ add_library(controlled_sandbox_native32 SHARED
 target_include_directories(controlled_sandbox_native32 PRIVATE ${SHARED_NATIVE_ROOT}/include)
 target_compile_features(controlled_sandbox_native32 PRIVATE cxx_std_20)
 target_compile_options(controlled_sandbox_native32 PRIVATE -Wall -Wextra -Werror)
+target_link_options(controlled_sandbox_native32 PRIVATE "-Wl,-z,max-page-size=16384")
 target_link_libraries(controlled_sandbox_native32 PRIVATE android log dl)

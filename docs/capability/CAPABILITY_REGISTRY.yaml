@@ -245,6 +245,14 @@ capabilities:
       - scripts/check-c3-t01-native-corpus.py
       - verification/catch-up/C3-T01/c3-t01-rd-summary.json
       - verification/catch-up/C3-T01/c3-t01-local-verification.json
+      - docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md
+      - scripts/check-c3-t03-abi-elf.py
+      - tools/static_android_compile.py
+      - tools/capability/run_c3_t03_rd.py
+      - verification/catch-up/C3-T03/c3-t03-abi-report.json
+      - verification/catch-up/C3-T03/c3-t03-rd-summary.json
+      - verification/catch-up/C3-T03/c3-t03-local-verification.json
+      - verification/catch-up/C3-T03/c3-t03-environment-block.json
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS

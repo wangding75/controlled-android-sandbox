@@ -1085,3 +1085,63 @@ issues:
       followed by the nine-case C1 full regression. This closes only the dynamically resolved
       API32 RD evidence gap; API33+, OEM/HAL, commercial-app and VA PRO equivalence remain
       explicitly unproven.
+
+  - issue_id: KI-R03-042
+    title: C3-T03 four-ABI ELF, page-alignment and native-media evidence was missing
+    capability: native_loader_jni_io
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C3-T03 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - scripts/check-native-abi-companion.py
+      - scripts/verify-device-test-artifacts.py
+      - docs/review/T57_R03_P3_16KB_RESULT.md
+      - docs/review/C2_T04_CAMERA_DESIGN.md
+      - sandbox-native/src/main/cpp/native_policy_jni.cpp
+      - docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md
+      - scripts/check-c3-t03-abi-elf.py
+      - tools/capability/run_c3_t03_rd.py
+      - verification/catch-up/C3-T03/c3-t03-abi-report.json
+      - verification/catch-up/C3-T03/c3-t03-rd-summary.json
+      - verification/catch-up/C3-T03/c3-t03-local-verification.json
+      - verification/catch-up/C3-T03/c3-t03-environment-block.json
+    match_patterns:
+      - four ABI
+      - PT_LOAD
+      - 16KB page
+      - native buffer
+      - native codec
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_C3_T03_ABI_ELF_PAGE_NATIVE_MEDIA_CAMPAIGN
+    notes: >
+      Closed by C3-T03: the tracked ELF gate correlates every device-lab APK's ABI/class/machine/
+      DT_NEEDED/PT_LOAD alignment and the RD campaign correlates direct x86_64/x86, in-sandbox
+      x86_64, Companion32 cross-width recovery, late-dlopen, native Surface/ImageReader buffer,
+      codec and cleanup results. Static 16KB alignment and the 4KB RD run remain separate claims.
+
+  - issue_id: KI-R03-043
+    title: C3-T03 ARM and 16KB dynamic environments are unavailable
+    capability: android_oem_compatibility
+    classification: ENVIRONMENT_BLOCKED
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C3-T03 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/T57_R03_P3_16KB_RESULT.md
+      - docs/review/T57_R03_P3_FINAL_ACCEPTANCE.md
+      - docs/compat/T57_R03_ANDROID_OEM_MATRIX.yaml
+      - verification/catch-up/C3-T03/c3-t03-environment-block.json
+      - verification/catch-up/C3-T03/c3-t03-rd-summary.json
+    match_patterns:
+      - PAGE_16KB
+      - ARM64_NATIVE
+      - ARM32
+      - ENVIRONMENT_NOT_AVAILABLE
+    blocks_current_campaign: false
+    fix_policy: RECORD_ENVIRONMENT_BLOCK_AND_DO_NOT_PROMOTE_DYNAMIC_PASS
+    notes: >
+      The dynamically resolved RD测试 API32 device reports 4096-byte pages and x86_64 runtime
+      execution. No approved ARM device or 16KB-page runtime is available in this environment;
+      C3-T03 must produce explicit environment-block evidence and must not promote static ELF
+      readiness or x86 execution into ARM/16KB dynamic PASS.

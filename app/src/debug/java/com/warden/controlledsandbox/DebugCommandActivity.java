@@ -237,6 +237,14 @@ public final class DebugCommandActivity extends Activity {
                         probeExtras);
                 result.put("c3T02", bundleJson(operation));
                 requireStatus("c3-t02-file-proc-network-fd", operation, "LAUNCH_PASS");
+            } else if ("c3-t03-native-media".equals(command)) {
+                Bundle probeExtras = new Bundle();
+                probeExtras.putString("cas.native.context", "IN_SANDBOX");
+                operation = runtime.launchComponent(record, virtualUserId,
+                        "com.warden.controlledsandbox.fixture.C3T03NativeMediaActivity",
+                        probeExtras);
+                result.put("c3T03", bundleJson(operation));
+                requireStatus("c3-t03-native-media", operation, "LAUNCH_PASS");
             } else if ("broadcast-campaign".equals(command)) {
                 int iterations = Math.max(1, Math.min(100,
                         extras.getInt("iterations", 1)));
