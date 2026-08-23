@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 17:20（Asia/Shanghai）
+更新时间：2026-08-23 17:55（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（执行中）
-当前任务：`C4-T02`（PENDING）
-下一任务：`C4-T02`
-最后完成任务：`C4-T01`
+当前任务：`C4-T03`（PENDING）
+下一任务：`C4-T03`
+最后完成任务：`C4-T02`
 
 ## 1. 使用规则
 
@@ -60,7 +60,7 @@
 | C3-T05 | seccomp/user-notify 决策 | NOT_APPLICABLE | C3-T04 | `537c20211300c93ae42dda4365bcb0cdb0ee0b70` | §5 C3-T05 |
 | C3-T06 | ART/Xposed Extension 决策 | NOT_APPLICABLE | C2,C3-T04 | `1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3` | §5 C3-T06 |
 | C4-T01 | SX 依赖与功能冻结 | DONE | C1,C2,C3-T01..T04 | `4dcce11e08bdc6edafbf867032a0790f0ef8ee57` | §5 C4-T01 |
-| C4-T02 | SX CAS SDK adapter | PENDING | C4-T01 | - | - |
+| C4-T02 | SX CAS SDK adapter | DONE | C4-T01 | `d6763e40f971fa60db015b17b294cea15fdcdc32` | §5 C4-T02 |
 | C4-T03 | SX 数据迁移 | PENDING | C4-T01,C4-T02 | - | - |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | PENDING | C4-T02,C4-T03 | - | - |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | PENDING | C4-T04 | - | - |
@@ -1728,3 +1728,65 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   ConfigProvider/`sx_config`；C4-T04 删除 engine-bb/Bcore/Pine。C3 阶段门禁的
   C1/C2 回归仍待单独确认。
 - **下一任务**：`C4-T02`。
+
+### C4-T02：实现 SX 到 CAS SDK 的唯一引擎适配
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 17:30 / 2026-08-23 17:55（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。runner 使用
+  `MUMU_ROOT=D:\install\Netease\MuMu`，未固化 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `3de95e15332aa09da1427d92a15d7eb9bd2f82db`；远端同 HEAD；上一任务 `C4-T01`
+  DONE，实现提交 `4dcce11e08bdc6edafbf867032a0790f0ef8ee57`，回执提交
+  `3de95e15332aa09da1427d92a15d7eb9bd2f82db`。
+- **DISCOVER / CLASSIFY**：Host UI 仍走 `SxSandboxAdapter` extras 而非公开
+  `SandboxSdk`；SDK 缺少 `importInstalledApplication`/`stopAll`；失败常抛异常
+  而非可诊断结果；clone 无回滚；无 observer 与 package-neutral RD engine smoke。
+  登记为 `KI-R03-047`（`TEST_EVIDENCE_GAP`）。
+- **实现摘要**：新增 `CasSandboxEngine` 将 17 个 SX `SandboxEngine` 方法映射到
+  `SandboxSdk`；catalog/status 每次从 SDK 重读，不复制权威状态；
+  `onAttachBaseContext` 为 `NO_OP_CAS_HOST`；失败返回 `PACKAGE_NOT_INSTALLED` 等
+  errorCode；clone 失败删除新 virtual user。Host `SandboxApplicationLayer` 的
+  install/launch/stop/clone/clear/delete 改走 engine。Debug `c4-t02-engine`
+  只用 adapter/engine。未修改 live SX 树，未删除 engine-bb。
+- **变更文件**：`CasSandboxEngine.java`、`SandboxEngineObserver.java`、
+  `SandboxSdk.java`、`SxSandboxAdapter.java`、`SandboxApplicationLayer.java`、
+  `DebugCommandActivity.java`、`docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md`、
+  `scripts/check-c4-t02-sx-adapter.py`、`tools/capability/run_c4_t02_rd.py`、
+  `verification/catch-up/C4-T02/`、`docs/review/KNOWN_ISSUES.yaml`。
+- **验收命令与结果**：`python scripts/check-c4-t02-sx-adapter.py` PASS；
+  `python scripts/check-c4-t01-sx-freeze.py` PASS；
+  `python tools/capability/validate_campaign_infra.py` PASS；
+  `:sandbox-sdk:selfTest` PASS；`:app:assembleDebug` 与 fixture/companion32
+  assemble PASS；`$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c4_t02_rd.py --instance RD测试` PASS。首次 stop 因 Guest
+  尚未完成 death-barrier 注册失败，已分类为 harness 时序并在 launch 后 settle/retry
+  后重跑通过，未记录 BLOCKED。
+- **设备证据**：主回执 `verification/catch-up/C4-T02/c4-t02-rd-summary.json`，
+  本地 `c4-t02-local-verification.json`，映射
+  `c4-t02-engine-mapping.json`。smoke：`cloneUser=1`，observerOperations=22，
+  traceCount=21。APK SHA-256：host
+  `17b232be212895d502b1cf71824af58dd8ec735472627f2e20a3addb885e3a91`；
+  companion32 `57b1dbdb765e233376d35f1bf2aae74f325520a82ff12c7554ba8ef1c281ef1d`；
+  fixture `18cb010cbe42159aff720beb716a2d25f5c0eaf248b9c37e93098de13caed53e`；
+  fixture32 `82f3d33ab2bd83203c2f3e86be603afffcb1d15641e8d769f865016d32895616`。
+- **Known Issues**：`KI-R03-047` 已 `FIXED`。无新增 runtime issue。
+  `va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无验收范围偏离。live SX 仍含 `BlackBoxSandboxEngine`，删除
+  归属 C4-T04；`setDisplayName` 持久化与 `sx_config` 归属 C4-T03。本轮只执行
+  C4-T02。证据限定 RD API32。
+- **实现提交 SHA**：`d6763e40f971fa60db015b17b294cea15fdcdc32`
+  （`feat(sx): [C4-T02] route SX engine through CAS SDK adapter`）。
+- **回执提交**：主题 `docs(progress): record [C4-T02] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C4-T03 迁移 ConfigProvider/`sx_config`；C4-T04 删除
+  engine-bb/Bcore/Pine；C3 阶段门禁的 C1/C2 回归仍待单独确认。API33+、ARM/16KB、
+  OEM、DingTalk 业务和 VA PRO 等价性仍未证明。
+- **下一任务**：`C4-T03`。
