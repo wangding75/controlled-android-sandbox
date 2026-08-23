@@ -158,6 +158,13 @@ gates:
     capabilities: [native_loader_jni_io]
     required: true
     timeout_sec: 180
+  - id: c4-t01-sx-freeze
+    group: package_visibility
+    command: [python, scripts/check-c4-t01-sx-freeze.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-046]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

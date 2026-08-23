@@ -1,0 +1,93 @@
+{
+  "task_id": "C4-T01",
+  "status": "PASS",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T09:08:47.214581+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "static_gates": [
+    {
+      "gate": "scripts/check-c4-t01-sx-freeze.py",
+      "returncode": 0,
+      "stdout": "PASS C4-T01 SX dependency freeze\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-c3-t06-art-xposed-decision.py",
+      "returncode": 0,
+      "stdout": "PASS C3-T06 ART/Xposed decision inventory\n",
+      "stderr": ""
+    }
+  ],
+  "freeze_counts": {
+    "gradle_modules": 11,
+    "engine_methods": 17,
+    "ui_entries": 17,
+    "f1_f5_hooks": 8,
+    "data_stores": 7,
+    "dynamic_loads": 5
+  },
+  "migration_order": [
+    "C4-T02",
+    "C4-T03",
+    "C4-T04",
+    "C4-T05"
+  ],
+  "errors": [],
+  "non_claims": [
+    "not SX business PASS",
+    "not DingTalk PASS",
+    "not BlackBox removed from the live SX tree",
+    "not VA Pro equivalence"
+  ]
+}

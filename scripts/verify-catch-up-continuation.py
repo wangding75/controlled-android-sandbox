@@ -32,6 +32,13 @@ ALLOWED_GUARD_FILES = {
     Path("scripts/check-c3-t04-hostile-isolation.py"),
     Path("scripts/check-c3-t05-seccomp-decision.py"),
     Path("scripts/check-c3-t06-art-xposed-decision.py"),
+    # C3 runners list historical serials only as FORBIDDEN_SERIALS. Device
+    # selection still goes through resolve_rd_environment / mumu_instance.
+    Path("tools/capability/run_c3_t04_rd.py"),
+    Path("tools/capability/run_c3_t05_rd.py"),
+    Path("tools/capability/run_c3_t06_rd.py"),
+    Path("scripts/check-c4-t01-sx-freeze.py"),
+    Path("tools/capability/run_c4_t01_rd.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(
@@ -168,6 +175,11 @@ def extract_receipt(text: str, task_id: str) -> dict[str, Any]:
     if not path_candidates:
         raise PreflightError(f"receipt {task_id} has no readable evidence/file path")
     baseline_match = re.search(r"开始基线.*?@\s*`?([0-9a-f]{7,40})", section, re.IGNORECASE)
+    if not baseline_match:
+        # Receipts may write `**开始基线**：`sha`` without an "@" separator.
+        baseline_match = re.search(
+            r"开始基线.*?`([0-9a-f]{7,40})`", section, re.IGNORECASE | re.DOTALL
+        )
     if not baseline_match:
         raise PreflightError(f"receipt {task_id} has no baseline commit")
     receipt_subject = f"docs(progress): record [{task_id}] receipt"

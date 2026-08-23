@@ -1,48 +1,40 @@
 {
   "schema_version": 1,
-  "task_id": "C3-T04",
+  "task_id": "C4-T01",
   "status": "PASS",
-  "captured_at": "2026-08-23T07:30:34.468618+00:00",
+  "captured_at": "2026-08-23T09:03:39.912763+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C3-T04",
+    "next_task": "C4-T01",
     "active_task": "",
-    "last_completed": "C3-T03",
-    "first_ready_pending": "C3-T04",
-    "dependencies": "C3-T01,C3-T02"
+    "last_completed": "C3-T06",
+    "first_ready_pending": "C4-T01",
+    "dependencies": "C1,C2,C3-T01..T04"
   },
   "last_receipt": {
-    "task_id": "C3-T03",
-    "status": "DONE",
+    "task_id": "C3-T06",
+    "status": "NOT_APPLICABLE",
     "implementation_commits": [
-      "372fc11a9548184e568de213c4c8264f7bf39771"
+      "1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3"
     ],
-    "receipt_commit": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
-    "baseline_commit": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
+    "receipt_commit": "65c5c5691327b0b7b6cc81885370e55117e60b4f",
+    "baseline_commit": "4a8faa64db8b6843c3ed209a97a50b3cc4ac9df5",
     "evidence_paths": [
-      "docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md",
-      "docs/COMMIT_IDENTITY_POLICY.md",
-      "docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md",
-      "docs/review/KNOWN_ISSUES.yaml",
+      "docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md",
       "docs/capability/CAPABILITY_REGISTRY.yaml",
-      "verification/sbom.json",
-      "verification/catch-up/C0-T01/continuation-preflight.json",
-      "verification/catch-up/C3-T03/c3-t03-rd-summary.json",
-      "verification/catch-up/C3-T03/c3-t03-local-verification.json",
-      "verification/catch-up/C3-T03/c3-t03-abi-report.json",
-      "verification/catch-up/C3-T03/c3-t03-environment-block.json"
+      "verification/catch-up/C3-T06/c3-t06-local-verification.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
+    "head": "65c5c5691327b0b7b6cc81885370e55117e60b4f",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
+    "remote_head": "65c5c5691327b0b7b6cc81885370e55117e60b4f",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": ""
+    "status_short": "M scripts/verify-catch-up-continuation.py"
   },
   "device": {
     "instance_name": "RD测试",
@@ -100,8 +92,80 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t04-hostile-isolation.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t05-seccomp-decision.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c3-t06-art-xposed-decision.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "scripts/check-native-enforcement-poc.py",
         "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t04_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t05_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c3_t06_rd.py",
+        "serial": "127.0.0.1:7555"
       },
       {
         "file": "tools/capability/run_rd_campaign.py",
@@ -117,5 +181,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C3-T04"
+  "evidence_directory": "verification/catch-up/C4-T01"
 }

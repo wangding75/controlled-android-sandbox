@@ -1176,3 +1176,30 @@ issues:
       and execve seccomp deny, and death revocation. Residual kernel limits remain explicit:
       /dev/binder KERNEL_LIMIT_EXPOSED, clone KERNEL_LIMIT_EXPOSED_SAME_UID. Not VA Pro,
       API33+, ARM/16KB, or OEM.
+
+  - issue_id: KI-R03-046
+    title: C4-T01 SX freeze was not machine-checked against live SX and CAS SDK
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C4-T01 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/sx-migration/SX_LEGACY_FEATURE_INVENTORY.md
+      - docs/review/C4_T01_SX_DEPENDENCY_FREEZE_DESIGN.md
+      - scripts/check-c4-t01-sx-freeze.py
+      - verification/catch-up/C4-T01/c4-t01-freeze.json
+      - verification/catch-up/C4-T01/c4-t01-rd-summary.json
+      - verification/catch-up/C4-T01/c4-t01-local-verification.json
+    match_patterns:
+      - SandboxEngine
+      - BlackBoxCore
+      - engine-bb
+      - sx_config
+    blocks_current_campaign: false
+    fix_policy: FREEZE_LIVE_SX_GRAPH_THEN_CAS_ONLY_MIGRATION
+    notes: >
+      Closed by C4-T01: live SX Gradle graph, SandboxEngine methods, UI, F1-F5 hooks, sx_config
+      keys, ConfigProvider and BlackBoxCore reflection are frozen with REPLACE/DELETE/DROP
+      dispositions and CAS targets. C4-T02/T03/T04 remain the migration owners. Not SX business
+      PASS and not VA Pro equivalence.
