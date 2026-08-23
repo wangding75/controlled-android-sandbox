@@ -229,7 +229,7 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 8b4233623a0e09028969a88370a68f3ae0137c54
+    last_verified_commit: 372fc11a9548184e568de213c4c8264f7bf39771
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md

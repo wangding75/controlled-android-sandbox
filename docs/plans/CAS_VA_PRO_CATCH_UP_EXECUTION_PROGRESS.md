@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 12:53（Asia/Shanghai）
+更新时间：2026-08-23 14:12（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C3`（执行中）
-当前任务：`C3-T03`（PENDING）
-下一任务：`C3-T03`
-最后完成任务：`C3-T02`
+当前任务：`C3-T04`（PENDING）
+下一任务：`C3-T04`
+最后完成任务：`C3-T03`
 
 ## 1. 使用规则
 
@@ -55,7 +55,7 @@
 | C2-T07 | Biometric 与长尾收敛 | DONE | C2-T02..T06 | `b6d9dafa` | §5 C2-T07 |
 | C3-T01 | Native 绕过与兼容 corpus | DONE | C1,C2-T01 | `8b4233623a0e09028969a88370a68f3ae0137c54` | §5 C3-T01 |
 | C3-T02 | 文件/proc/network/FD | DONE | C3-T01 | `566fadc60437a22c36fc985bbf54dce77c177173` | §5 C3-T02 |
-| C3-T03 | 四 ABI/16KB/native media | PENDING | C3-T01,C2-T04 | - | - |
+| C3-T03 | 四 ABI/16KB/native media | DONE | C3-T01,C2-T04 | `372fc11a9548184e568de213c4c8264f7bf39771` | §5 C3-T03 |
 | C3-T04 | Hostile native 隔离 | PENDING | C3-T01,C3-T02 | - | - |
 | C3-T05 | seccomp/user-notify 决策 | PENDING | C3-T04 | - | - |
 | C3-T06 | ART/Xposed Extension 决策 | PENDING | C2,C3-T04 | - | - |
@@ -1429,3 +1429,102 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C3-T03/T04/T05/T06 尚未执行；API33+、ARM/16KB、OEM/HAL、商业应用、
   SX/XH 和 VA PRO equivalence 仍未证明；hostile native 隔离后续由 C3-T04/T05 决策与验收。
 - **下一任务**：`C3-T03`；本轮只执行 C3-T02，不执行后续任务。
+
+### C3-T03：四 ABI、16 KB page 与 native Camera/Media
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 13:10 / 2026-08-23 14:12（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；Android SDK 36；NDK
+  `27.2.12479018`；CMake 3.22.1；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。开始前完整读取任务书、本账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md` 和 `docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 Git/远端/最后 C3-T02 回执；MuMu 通过实例名 `RD测试` 动态解析，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，manufacturer `vivo`，Android release `12`，
+  boot ID `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`，Android ID `8acae00bece8090b`；本轮
+  使用 `MUMU_ROOT=D:\install\Netease\MuMu`，执行器未固化 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `ffcd3d1c142a30c7920aaf77b605ce9ff3386502`；远端 HEAD 同步；最后完成回执为 C3-T02，
+  实现提交 `566fadc60437a22c36fc985bbf54dce77c177173`，其回执提交为
+  `ffcd3d1c142a30c7920aaf77b605ce9ff3386502`；依赖满足的首个 PENDING 任务为 C3-T03，
+  本轮只执行 C3-T03。
+- **DISCOVER / CLASSIFY**：登记 `KI-R03-042`（`TEST_EVIDENCE_GAP`，四 ABI ELF/
+  page/native media/Companion32 关联证据缺口）和 `KI-R03-043`
+  （`ENVIRONMENT_BLOCKED`，ARM/16 KB 动态环境缺失）。设计文档明确静态 ELF 16 KB
+  对齐、RD 动态结果和 ARM/16 KB 环境缺口分开计量，不把 x86/4 KB PASS 外推为 ARM、
+  16 KB、API33+、OEM 或 VA PRO 等价性。
+- **实现摘要**：为 fixture、Host native-enforcement、sandbox-native 和 Companion32
+  的 native targets 加入 `-Wl,-z,max-page-size=16384`；新增纯 Python ELF/class/machine/
+  `DT_NEEDED`/`PT_LOAD` 静态报告；新增 package-neutral `C3T03NativeMediaActivity` 和
+  JNI fixture，覆盖编译 ABI、page size、late `dlopen`、真实 `ANativeWindow` buffer/
+  ImageReader callback、NDK `AMediaCodec` AVC encode/dequeue/release 和 cleanup；Host
+  debug command 增加 in-sandbox 路径；RD runner 动态解析 `RD测试`，关联 direct64、
+  direct32、sandbox、Companion32 identity/load/death-recovery 及原始日志。同步补齐
+  static Android compiler 的 PixelFormat/Image/Plane API stubs、SBOM 和 capability registry。
+- **变更文件**：`app/src/debug/cpp/CMakeLists.txt`、
+  `app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `fixture-basic/src/main/AndroidManifest.xml`、`fixture-basic/src/main/cpp/CMakeLists.txt`、
+  `fixture-basic/src/main/cpp/c3_t03_native.cpp`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T03NativeMediaActivity.java`、
+  `fixture-compat32/src/main/AndroidManifest.xml`、`sandbox-native/src/main/cpp/CMakeLists.txt`、
+  `sandbox-companion32/src/main/cpp/CMakeLists.txt`、`tools/static_android_compile.py`、
+  `scripts/check-c3-t03-abi-elf.py`、`tools/capability/run_c3_t03_rd.py`、
+  `docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、`docs/capability/CAPABILITY_REGISTRY.yaml`、
+  `verification/sbom.json`、`verification/catch-up/C0-T01/continuation-preflight.json` 和
+  `verification/catch-up/C3-T03/`。
+- **验收命令与结果**：`python scripts/check-c3-t03-abi-elf.py` PASS（host 4、fixture64
+  6、fixture32 6、companion32 4 个 ELF）；`python scripts/check-native-abi-companion.py`、
+  `python scripts/check-m5-t2-cross-width-runtime.py`、`python scripts/check-c2-t04-camera.py`
+  均 PASS；`python scripts/verify-device-test-artifacts.py --android-tools --profile device-lab`
+  PASS（locked APK set：host 4487692B、fixture64 2331726B、fixture32 884796B、
+  companion32 5026291B）；最终无缓存 Gradle 四 APK 构建 PASS（238 actionable tasks，
+  32 executed）；`python tools/static_android_compile.py` PASS，receipt 为 160/160
+  self-tests PASS；`python scripts/generate-sbom.py --check` PASS（14 components）；Python
+  compile 和 `git diff --check` PASS（仅既有 compiler warnings/CRLF 提示）。
+- **设备证据**：最终 runner 命令为
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python tools/capability/run_c3_t03_rd.py --instance RD测试`，
+  返回 PASS，raw 目录为 ignored
+  `artifacts/capability-audit/catch-up-c3-t03/20260823T060630Z/`；主回执为
+  `verification/catch-up/C3-T03/c3-t03-rd-summary.json`，本地验收清单为
+  `verification/catch-up/C3-T03/c3-t03-local-verification.json`，ELF 报告为
+  `verification/catch-up/C3-T03/c3-t03-abi-report.json`，环境回执为
+  `verification/catch-up/C3-T03/c3-t03-environment-block.json`。direct64 `x86_64`、
+  direct32 `x86`、sandbox `x86_64` 均 PASS：late-dlopen marker 为
+  `FIXTURE_ADV_PAYLOAD_V1`，native Surface 为 `64x48/stride=64`，ImageReader 为
+  `64x48/12288 bytes/rowStride=256/pixelStride=4`，codec 为 `inputBytes=384`、
+  `outputBytes=29`、`formatChanged=1`，cleanup 均 PASS。Companion32 为
+  `bitness=32;abi=x86;hookLibrary=controlled_sandbox_native32`，cross-width 进程死亡
+  恢复 PASS，generation `1 -> 2`，`GUEST_PROCESS_DISCONNECTED` marker 存在。
+- **APK SHA-256**：最终设备 campaign 对应产物为 host
+  `812F3F625FAF5B7178EAE9803179F252CDB4357E9ADE5BF80ADE7ED5C5697470`；fixture64
+  `204DF526209B4F3CC6490B8A5CBEF1990C17925190CC1316C14C741016067D5A`；fixture32
+  `5564918E1AF297ECBDBA85548E36F1B7FB655423F4CB17358EC8622F3FDA9E10`；companion32
+  `57B1DBDB765E233376D35F1BF2AAE74F325520A82FF12C7554BA8EF1C281EF1D`。
+- **失败修复记录**：首轮包装器读取 PowerShell UTF-8 BOM 回执失败，改为 `utf-8-sig`
+  并按结果文件动态发现；MuMu 曾出现一次 `GUEST_PREPARED_MARKER_TIMEOUT` 瞬态，单独
+  重跑通过，runner 增加仅针对该 marker timeout 的一次独立目录重试并保留两次原始证据；
+  static Android compiler 首次因 stub 缺少 PixelFormat/Image/Plane API 失败，补齐 stubs
+  后 160 项全部通过。每项均修复后重编译、重跑；最终 campaign 首次尝试 PASS，未记录
+  BLOCKED。
+- **Known Issues**：`KI-R03-042` 已关闭为 `FIXED`，证据包含设计、静态 gate、RD
+  summary/local verification；`KI-R03-043` 保持 `RECORDED`，设备 `getconf PAGE_SIZE=4096`，
+  `page_16kb_dynamic_status=ENVIRONMENT_NOT_AVAILABLE`、ARM32/ARM64 为
+  `UNVERIFIED_RUNTIME`。既有 `KI-R03-NATIVE-001` 等 raw syscall/SVC、procfs/FD、
+  custom loader、Binder device、seccomp/user-notify 和 hostile native 边界不因本任务关闭。
+- **偏离任务书**：无验收范围偏离。静态四 ABI 16 KB PT_LOAD 对齐通过，但当前 RD 仅为
+  API32 x86/x86_64、4 KB page；不宣称 ARM32/ARM64 动态 PASS、16 KB 动态 PASS、API33+、
+  OEM/HAL、商业应用、SX/XH 或 VA PRO equivalence，`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **实现提交 SHA**：`372fc11a9548184e568de213c4c8264f7bf39771`
+  （`test(native): [C3-T03] close ABI 16KB native media gates`）。
+- **回执提交**：使用主题 `docs(progress): record [C3-T03] receipt` 单独提交；本回执将
+  C3-T03 从 `IN_PROGRESS` 更新为 `DONE`，C3 保持 `IN_PROGRESS`，下一任务为 C3-T04；
+  capability registry 的 `last_verified_commit` 同步更新为实现提交 SHA。
+- **推送与远端验证**：实现提交已先行非强制推送，推送后
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 等于
+  `372fc11a9548184e568de213c4c8264f7bf39771`；回执提交完成后将再次非强制推送两个提交，
+  并以最终 `git ls-remote --heads` 对比本地 HEAD。
+- **遗留风险**：C3-T04/T05/T06 尚未执行；API33+、ARM/16KB、OEM/HAL、商业应用、SX/XH
+  和 VA PRO equivalence 仍未证明；hostile native 隔离、raw syscall/SVC 和完整 kernel
+  boundary 仍按既有 Known Issues 及后续 C3-T04/C3-T05 处理。
+- **下一任务**：`C3-T04`；本轮只执行 C3-T03，不执行后续任务。
