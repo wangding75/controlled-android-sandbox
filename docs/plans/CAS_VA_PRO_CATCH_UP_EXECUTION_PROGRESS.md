@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 11:31（Asia/Shanghai）
+更新时间：2026-08-23 12:53（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C3`（执行中）
-当前任务：`C3-T02`（PENDING，等待 C3-T01 完成）
-下一任务：`C3-T02`
-最后完成任务：`C3-T01`
+当前任务：`C3-T03`（PENDING）
+下一任务：`C3-T03`
+最后完成任务：`C3-T02`
 
 ## 1. 使用规则
 
@@ -54,7 +54,7 @@
 | C2-T06 | 设备/网络/媒体服务 | DONE | C2-T01,C2-T02 | `048ca1b1` | §5 C2-T06 |
 | C2-T07 | Biometric 与长尾收敛 | DONE | C2-T02..T06 | `b6d9dafa` | §5 C2-T07 |
 | C3-T01 | Native 绕过与兼容 corpus | DONE | C1,C2-T01 | `8b4233623a0e09028969a88370a68f3ae0137c54` | §5 C3-T01 |
-| C3-T02 | 文件/proc/network/FD | PENDING | C3-T01 | - | - |
+| C3-T02 | 文件/proc/network/FD | DONE | C3-T01 | `566fadc60437a22c36fc985bbf54dce77c177173` | §5 C3-T02 |
 | C3-T03 | 四 ABI/16KB/native media | PENDING | C3-T01,C2-T04 | - | - |
 | C3-T04 | Hostile native 隔离 | PENDING | C3-T01,C3-T02 | - | - |
 | C3-T05 | seccomp/user-notify 决策 | PENDING | C3-T04 | - | - |
@@ -1347,3 +1347,85 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   应用、SX/XH 和 VA PRO equivalence 仍未证明；hostile native 隔离仍由后续 C3-T04/T05
   决策与验收负责。
 - **下一任务**：`C3-T02`；本轮按用户指令停止，不执行后续任务。
+
+### C3-T02：文件/procfs/网络/FD 生命周期
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 11:40 / 2026-08-23 12:53（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；Android SDK 36；NDK
+  `27.2.12479018`；CMake 3.22.1；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。开始前完整读取任务书、本账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md` 和 `docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 Git/远端/最后 C3-T01 回执；MuMu 通过实例名 `RD测试` 动态解析，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`，Android ID `8acae00bece8090b`；本轮 runner
+  使用 `MUMU_ROOT=D:\install\Netease\MuMu`，代码和 runner 未固化历史 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `ffb69277a5efa253a929beeb458f5bb78bdb3517`；远端 HEAD 同步；最后完成回执为 C3-T01，
+  实现提交 `8b4233623a0e09028969a88370a68f3ae0137c54`，回执主题为
+  `docs(progress): record [C3-T01] receipt`；依赖满足的首个 PENDING 任务为 C3-T02，
+  本轮只执行 C3-T02。
+- **实现摘要**：新增 package-neutral test-only 文件、procfs、网络和 FD 生命周期 corpus，
+  覆盖 dfd/relative path/symlink escape、maps/smaps/fd/task/cgroup/fdinfo、`/proc/net`、
+  DNS/socket trace、dup/dup2/dup3/F_DUPFD_CLOEXEC、SCM_RIGHTS、close-on-exec、clear/death
+  和 raw syscall 边界；生产 native procfs/file/process 访问对未知或 HostInternal FD
+  fail-closed，补齐 fdinfo 快照路径和 Guest fdinfo 权威元数据兜底；网络接收对匿名 Unix
+  socket 使用 `getpeername/getsockname` 识别并在无地址时保持安全一致性；sandbox 夹具建立
+  真实窗口后异步运行，避免生命周期门控竞态；新增静态 gate、RD runner、设计文档和证据。
+- **变更文件**：`sandbox-native/src/main/cpp/native_procfs.cpp`、
+  `sandbox-native/src/main/cpp/native_file_system.cpp`、
+  `sandbox-native/src/main/cpp/native_process_interceptors.cpp`、
+  `sandbox-native/src/main/cpp/native_network_interceptors.cpp`、
+  `fixture-basic/src/main/cpp/c3_t02_native.cpp`、
+  `fixture-basic/src/main/cpp/CMakeLists.txt`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T02FileProcNetworkFdActivity.java`、
+  `fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C3T02FileProcNetworkFdProbe.java`、
+  两个 fixture manifest、`app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java`、
+  `docs/review/C3_T02_FILE_PROC_NETWORK_FD_DESIGN.md`、
+  `scripts/check-c3-t02-file-proc-network-fd.py`、`tools/capability/run_c3_t02_rd.py`、
+  `scripts/verify-catch-up-continuation.py`、`verification/catch-up/C0-T01/continuation-preflight.json`、
+  `verification/catch-up/C3-T02/`。
+- **验收命令与结果**：`python scripts/check-c3-t02-file-proc-network-fd.py`、既有
+  native files-loader/file-hooks/network-audio/M5 network correctness gates、
+  `python -m py_compile tools/capability/run_c3_t02_rd.py`、
+  `python tools/static_android_compile.py`、最终
+  `:fixture-basic:assembleDebug :fixture-compat32:assembleDebug :sandbox-native:assembleDebug
+  :app:assembleDebug :sandbox-companion32:assembleDebug --no-daemon`、`git diff --check`
+  均 PASS；静态 Android 编译的 declared Host source/self-test receipt 为 PASS，仅有既有
+  unchecked/deprecation/try-resource warnings。
+- **设备证据**：`$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c3_t02_rd.py` PASS，证据目录为 ignored
+  `artifacts/capability-audit/catch-up-c3-t02/20260823T044723Z/`；主回执为
+  `verification/catch-up/C3-T02/c3-t02-rd-summary.json`，本地验收清单为
+  `verification/catch-up/C3-T02/c3-t02-local-verification.json`，续接预检为
+  `verification/catch-up/C0-T01/continuation-preflight.json`。direct64/direct32 所有
+  7/7 案例为 `PASS_COMPAT`；sandbox 所有 7/7 案例均有预期结果，其中 FD exec 为
+  `BLOCKED_BY_POLICY`，raw syscall 为显式 `BYPASS_CONFIRMED` 且带
+  `UNMEDIATED_DIRECT_SYSCALL_EXPOSED`；procfs 未知项拒绝、`host_leak=0`，SCM_RIGHTS
+  收发和 close convergence 通过；clear/death 的 Guest 结果清除和残留扫描通过。
+  APK SHA-256：host `31e7e54e0fca3daff85cc355a69648be4ed3abba7236801b36ebd2ed248acf74`；
+  companion32 `485f90191c77acd03ed09a2a91872d4850ce6739302a2a6ad593a063f550842d`；
+  fixture64 `42cb2f03127ebcf50a44ac5985619e5f3f3c2ede9fdddf1c250951e47f1a8923`；
+  fixture32 `9e949587f6ed039597620a6e65e1477b42255418c5f6359a03e1d4faf559c833`。
+- **失败修复记录**：早期 SCM_RIGHTS 的匿名 socket 接收路径出现 EAGAIN，补齐匿名 Unix
+  peer/local 识别与无地址 equality 处理；路径型 Unix socket 在 sandbox 映射中出现 ENOENT，
+  恢复为匿名 `socketpair`；procfs fdinfo 快照落入错误目录导致 EIO，修正为
+  `fdinfo/<descriptor>`；Activity launch gate 竞态通过真实 content view 和异步夹具执行修复。
+  每项均修复后重编译、重跑；未记录 BLOCKED。
+- **Known Issues / 偏离任务书**：raw direct syscall 仍明确暴露为未调解边界，不把它计为
+  hostile isolation PASS；unknown proc leaves 继续 fail-closed 而非完整虚拟化；Provider/Binder
+  FD producer、kernel inheritance 和 hostile network 仍受 `KI-R03-NATIVE-009`、
+  `KI-R03-NATIVE-ENF-001` 等既有边界约束。证据严格限定 RD API32、当前 MuMu image 和
+  四 ABI build，不外推 API33+、ARM 真机/16 KB、OEM/HAL、商业应用、SX/XH 或 VA PRO
+  等价性，`va_pro_equivalent` 保持 `NOT_PROVEN`；无验收范围偏离。
+- **实现提交 SHA**：`566fadc60437a22c36fc985bbf54dce77c177173`
+  （`test(native): [C3-T02] close file/proc/network/FD lifecycle gaps`）。
+- **回执提交**：使用主题 `docs(progress): record [C3-T02] receipt` 单独提交；本回执将
+  C3-T02 从 `IN_PROGRESS` 更新为 `DONE`，C3 保持 `IN_PROGRESS`，下一任务为 C3-T03。
+- **推送与远端验证**：实现提交先行非强制推送；回执提交随后以独立提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads`
+  验证最终远端 HEAD 与本地 HEAD 一致。
+- **遗留风险**：C3-T03/T04/T05/T06 尚未执行；API33+、ARM/16KB、OEM/HAL、商业应用、
+  SX/XH 和 VA PRO equivalence 仍未证明；hostile native 隔离后续由 C3-T04/T05 决策与验收。
+- **下一任务**：`C3-T03`；本轮只执行 C3-T02，不执行后续任务。
