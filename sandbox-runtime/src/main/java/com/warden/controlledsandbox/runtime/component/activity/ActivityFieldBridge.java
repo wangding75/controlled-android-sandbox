@@ -708,6 +708,18 @@ public final class ActivityFieldBridge {
      * that the framework still believes a window exists.  A visible or registered Guest window
      * remains entirely under ActivityThread/WindowManager ownership.</p>
      */
+    /**
+     * True when ActivityThread has not yet published this Activity's window. {@code mDecor} is
+     * not a publication signal: {@code setContentView} in onCreate creates it while
+     * {@code mWindowAdded} and {@code ActivityClientRecord.window} stay unset until
+     * {@code handleResumeActivity()} calls addView. Treating that DecorView as a stale root
+     * caused a premature addView and a black screen ({@code windows=[]}, {@code reportedDrawn=false}).
+     */
+    static boolean firstResumeWithoutFrameworkWindow(boolean windowAdded, Object activityDecor,
+                                                     Object recordWindow) {
+        return !windowAdded && recordWindow == null;
+    }
+
     public static Bundle repairFrameworkWindowBeforeResume(Activity activity) {
         Bundle evidence = new Bundle();
         if (activity == null) return evidence;
@@ -715,20 +727,37 @@ public final class ActivityFieldBridge {
         try {
             record = findActivityClientRecord(activity);
             android.view.Window window = activity.getWindow();
-            android.view.View decor = window == null ? null : window.getDecorView();
             ensureFrameworkRecordIntent(record, activity);
-            boolean attached = decor != null && decor.isAttachedToWindow();
-            WindowRegistration registration = windowRegistration(decor);
-            boolean registered = registration == WindowRegistration.REGISTERED;
             boolean windowAdded = optionalBoolean(activity, "mWindowAdded", false);
             Object activityDecor = optionalObject(activity, "mDecor");
             Object recordWindow = optionalObject(record, "window");
-            boolean frameworkWindowPresent = windowAdded || activityDecor != null
-                    || recordWindow != null;
-            evidence.putBoolean("resumeWindowAttached", attached);
-            evidence.putBoolean("resumeWindowRegistered", registered);
+            boolean frameworkWindowPresent = !firstResumeWithoutFrameworkWindow(
+                    windowAdded, activityDecor, recordWindow);
             evidence.putBoolean("resumeWindowAddedMarker", windowAdded);
             evidence.putBoolean("resumeFrameworkWindowPresent", frameworkWindowPresent);
+            if (firstResumeWithoutFrameworkWindow(windowAdded, activityDecor, recordWindow)) {
+                // First frame belongs to ActivityThread.handleResumeActivity() addView.
+                setOptionalBoolean(record, "hideForNow", false);
+                evidence.putBoolean("resumeFirstWindowDeferredToActivityThread", true);
+                evidence.putString("resumeWindowRegistration", "FIRST_RESUME");
+                android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                        "WINDOW_FIRST_RESUME_DEFER"
+                                + " windowAdded=" + windowAdded
+                                + " recordWindow=" + (recordWindow != null)
+                                + " startedActivity=" + optionalBoolean(activity, "mStartedActivity", false)
+                                + " visibleFromClient=" + optionalBoolean(activity, "mVisibleFromClient", true)
+                                + " finished=" + activity.isFinishing()
+                                + " activityClass=" + activity.getClass().getName());
+                return evidence;
+            }
+            android.view.View decor = activityDecor instanceof android.view.View view
+                    ? view
+                    : (window == null ? null : window.getDecorView());
+            boolean attached = decor != null && decor.isAttachedToWindow();
+            WindowRegistration registration = windowRegistration(decor);
+            boolean registered = registration == WindowRegistration.REGISTERED;
+            evidence.putBoolean("resumeWindowAttached", attached);
+            evidence.putBoolean("resumeWindowRegistered", registered);
             evidence.putString("resumeWindowRegistration", registration.name());
             if (attached || registration == WindowRegistration.REGISTERED) {
                 // A previous recovery may have hidden this record while WMS was detaching the
@@ -773,13 +802,15 @@ public final class ActivityFieldBridge {
             evidence.putBoolean("resumeWindowReattached", true);
             WindowRegistration afterRegistration = windowRegistration(decor);
             if (afterRegistration != WindowRegistration.REGISTERED) {
-                // The system-server task may still be detached while this client transaction
-                // is completing. Do not alter Activity.mVisibleFromClient: Android rejects an
-                // Activity that returns from onResume() while it is still marked unfinished but
-                // invisible. ActivityThread's own hideForNow record bit is the framework-owned
-                // way to suppress this one stale window update until the next transaction.
-                setOptionalBoolean(record, "hideForNow", true);
-                evidence.putBoolean("resumeWindowUpdateDeferred", true);
+                // Reattach did not land in WindowManagerGlobal. Do not set hideForNow: that
+                // suppresses handleResumeActivity's visible-frame path and leaves a black
+                // screen. Clear stale markers so ActivityThread can take addView() itself.
+                setOptionalBoolean(activity, "mWindowAdded", false);
+                setOptionalObject(record, "window", null);
+                setOptionalBoolean(record, "hideForNow", false);
+                evidence.putBoolean("resumeWindowClearedForFrameworkAdd", true);
+            } else {
+                setOptionalBoolean(record, "hideForNow", false);
             }
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
                     "WINDOW_REPAIR stage=RESUME attached=" + attached
@@ -793,11 +824,13 @@ public final class ActivityFieldBridge {
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             try {
-                // A failed reattach must still be fail-closed at the ActivityThread boundary.
-                // Keep Activity.mVisibleFromClient untouched and ask ActivityThread to defer
-                // the record's stale window update. This preserves the public lifecycle
-                // invariant that an unfinished Activity is visible after onResume().
-                if (record != null) setOptionalBoolean(record, "hideForNow", true);
+                // A failed reattach must not hide the Activity. Clear stale window markers so
+                // ActivityThread can still addView on this resume.
+                if (record != null) {
+                    setOptionalBoolean(record, "hideForNow", false);
+                    setOptionalBoolean(activity, "mWindowAdded", false);
+                    setOptionalObject(record, "window", null);
+                }
             } catch (Throwable ignored) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
             }
@@ -805,6 +838,193 @@ public final class ActivityFieldBridge {
             android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "window resume repair skipped", error);
             return evidence;
         }
+    }
+
+    /**
+     * NewBlackBox {@code ContextCompat.fix} + {@code IWindowSessionProxy.addToDisplay} contract
+     * for the framework objects WMS actually reads. Guest-visible
+     * {@code GuestContext.getOpPackageName()} stays the Guest package (C2-T02); only the
+     * WindowManagerImpl {@code ContextImpl} and {@code LayoutParams.packageName} present the
+     * Host identity that matches {@code Binder.getCallingUid()}.
+     */
+    public static void fixFrameworkWindowIdentity(Activity activity) {
+        if (activity == null) return;
+        try {
+            HostWindowIdentity host = hostWindowIdentity(activity);
+            if (host == null) return;
+            patchWindowManagerContext(activity.getWindowManager(), host);
+            android.view.Window window = activity.getWindow();
+            if (window != null) {
+                patchWindowManagerContext(window.getWindowManager(), host);
+                applyHostPackageToLayoutParams(window.getAttributes(), host.packageName);
+            }
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_IDENTITY_FIXED hostPkg=" + host.packageName
+                            + " hostUid=" + host.uid
+                            + " activityClass=" + activity.getClass().getName());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "window identity fix skipped", error);
+        }
+    }
+
+    /**
+     * After {@code callActivityOnResume} returns, ActivityThread continues into
+     * {@code handleResumeActivity}'s addView. If that path still leaves the DecorView
+     * unregistered, publish it on the next main-loop turn so WMS attaches a real window
+     * instead of a black, {@code windows=[]} ActivityRecord.
+     */
+    public static void ensureWindowPublishedAfterResume(Activity activity) {
+        if (activity == null) return;
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        handler.post(() -> publishWindowIfMissing(activity, 0));
+    }
+
+    private static void publishWindowIfMissing(Activity activity, int attempt) {
+        try {
+            fixFrameworkWindowIdentity(activity);
+            android.view.Window window = activity.getWindow();
+            if (window == null) return;
+            android.view.View decor = window.getDecorView();
+            if (decor.isAttachedToWindow()
+                    || windowRegistration(decor) == WindowRegistration.REGISTERED) {
+                Object record = findActivityClientRecord(activity);
+                if (record != null) setOptionalBoolean(record, "hideForNow", false);
+                return;
+            }
+            Object record = findActivityClientRecord(activity);
+            if (record != null) setOptionalBoolean(record, "hideForNow", false);
+            // NewBlackBox uses the Activity/PhoneWindow WindowManagerImpl (mParentWindow set).
+            // The Host application WindowManager has no parent PhoneWindow and cannot attach
+            // TYPE_BASE_APPLICATION to the Stub ActivityRecord.
+            android.view.WindowManager windowManager = activity.getWindowManager();
+            if (windowManager == null) return;
+            android.view.WindowManager.LayoutParams layout = window.getAttributes();
+            layout.type = android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
+            Field tokenField = findField(activity.getClass(), "mToken");
+            if (tokenField != null) {
+                tokenField.setAccessible(true);
+                Object token = tokenField.get(activity);
+                if (token instanceof android.os.IBinder binder) layout.token = binder;
+            }
+            HostWindowIdentity host = hostWindowIdentity(activity);
+            if (host != null) applyHostPackageToLayoutParams(layout, host.packageName);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_PUBLISH_ADDVIEW attempt=" + attempt
+                            + " wm=" + windowManager.getClass().getName()
+                            + " pkg=" + layout.packageName
+                            + " token=" + (layout.token != null)
+                            + " type=" + layout.type
+                            + " activityClass=" + activity.getClass().getName());
+            windowManager.addView(decor, layout);
+            if (windowRegistration(decor) != WindowRegistration.REGISTERED) {
+                // Device evidence: WindowManagerImpl.addView can return without mutating
+                // WindowManagerGlobal.mViews (wmgViews=0). Add through the process singleton
+                // the same way ActivityThread/ViewRootImpl would.
+                addViewThroughWindowManagerGlobal(decor, layout, activity, window);
+            }
+            setOptionalBoolean(activity, "mWindowAdded", true);
+            if (record != null) setOptionalObject(record, "window", window);
+            boolean attached = decor.isAttachedToWindow();
+            int viewCount = windowManagerViewCount();
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_PUBLISH_AFTER_RESUME attempt=" + attempt
+                            + " attached=" + attached
+                            + " registered=" + windowRegistration(decor).name()
+                            + " parent=" + (decor.getParent() == null ? "null" : decor.getParent().getClass().getName())
+                            + " wmgViews=" + viewCount
+                            + " activityClass=" + activity.getClass().getName());
+            if (!attached && attempt < 5) {
+                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+                handler.postDelayed(() -> publishWindowIfMissing(activity, attempt + 1), 80L);
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "WINDOW_PUBLISH_AFTER_RESUME failed attempt=" + attempt, error);
+            if (attempt < 5) {
+                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+                handler.postDelayed(() -> publishWindowIfMissing(activity, attempt + 1), 80L);
+            }
+        }
+    }
+
+    private record HostWindowIdentity(String packageName, int uid) { }
+
+    private static HostWindowIdentity hostWindowIdentity(Activity activity) {
+        android.content.Context base = activity.getBaseContext();
+        if (!(base instanceof com.warden.controlledsandbox.runtime.guest.GuestContext guest)) {
+            return null;
+        }
+        android.content.Context host = guest.hostServiceContext();
+        if (host == null) return null;
+        String packageName = host.getPackageName();
+        if (packageName == null || packageName.isEmpty()) return null;
+        return new HostWindowIdentity(packageName, host.getApplicationInfo().uid);
+    }
+
+    private static void applyHostPackageToLayoutParams(android.view.WindowManager.LayoutParams layout,
+                                                       String hostPackage) {
+        if (layout == null || hostPackage == null || hostPackage.isEmpty()) return;
+        layout.packageName = hostPackage;
+    }
+
+    private static void patchWindowManagerContext(android.view.WindowManager windowManager,
+                                                  HostWindowIdentity host) throws Exception {
+        if (windowManager == null || host == null) return;
+        Field contextField = findField(windowManager.getClass(), "mContext");
+        if (contextField == null) return;
+        contextField.setAccessible(true);
+        patchContextImplIdentity(contextField.get(windowManager), host);
+    }
+
+    /**
+     * NewBlackBox {@code ContextCompat.fix}: rewrite ContextImpl {@code mBasePackageName},
+     * {@code mOpPackageName} and AttributionSource uid/package to the Host. Never rewrite
+     * {@code GuestContext} itself — Guest code must still observe Guest {@code getOpPackageName()}.
+     */
+    private static void patchContextImplIdentity(Object context, HostWindowIdentity host)
+            throws Exception {
+        if (context == null || host == null) return;
+        Object cursor = context;
+        int depth = 0;
+        while (cursor instanceof android.content.ContextWrapper wrapper && depth < 10) {
+            if (cursor instanceof com.warden.controlledsandbox.runtime.guest.GuestContext) return;
+            android.content.Context next = wrapper.getBaseContext();
+            if (next == null || next == cursor) break;
+            cursor = next;
+            depth++;
+        }
+        if (cursor == null
+                || cursor instanceof com.warden.controlledsandbox.runtime.guest.GuestContext) {
+            return;
+        }
+        if (!cursor.getClass().getName().contains("ContextImpl")) return;
+        setOptionalObject(cursor, "mBasePackageName", host.packageName);
+        setOptionalObject(cursor, "mOpPackageName", host.packageName);
+        Method attribution = findMethod(cursor.getClass(), "getAttributionSource");
+        if (attribution != null) {
+            attribution.setAccessible(true);
+            patchAttributionSource(attribution.invoke(cursor), host, 0);
+        }
+    }
+
+    private static void patchAttributionSource(Object source, HostWindowIdentity host, int depth)
+            throws Exception {
+        if (source == null || host == null || depth > 5) return;
+        Object state = optionalObject(source, "mAttributionSourceState");
+        if (state != null) {
+            setOptionalObject(state, "packageName", host.packageName);
+            Field uidField = findField(state.getClass(), "uid");
+            if (uidField != null) {
+                uidField.setAccessible(true);
+                uidField.setInt(state, host.uid);
+            }
+        }
+        Method getNext = findMethod(source.getClass(), "getNext");
+        if (getNext == null) return;
+        getNext.setAccessible(true);
+        patchAttributionSource(getNext.invoke(source), host, depth + 1);
     }
 
     private static void ensureFrameworkRecordIntent(Object record, Activity activity)
@@ -882,6 +1102,61 @@ public final class ActivityFieldBridge {
         REGISTERED,
         NOT_REGISTERED,
         UNKNOWN
+    }
+
+    private static void addViewThroughWindowManagerGlobal(android.view.View decor,
+                                                          android.view.WindowManager.LayoutParams layout,
+                                                          Activity activity,
+                                                          android.view.Window parentWindow)
+            throws Exception {
+        Object global = Class.forName("android.view.WindowManagerGlobal")
+                .getDeclaredMethod("getInstance").invoke(null);
+        Method getDisplay = findMethod(activity.getClass(), "getDisplay");
+        android.view.Display display = getDisplay == null ? null
+                : (android.view.Display) getDisplay.invoke(activity);
+        int userId = 0;
+        Method getUserId = findMethod(activity.getClass(), "getUserId");
+        if (getUserId != null) {
+            Object value = getUserId.invoke(activity);
+            if (value instanceof Integer integer) userId = integer;
+        }
+        Method selected = null;
+        for (Method method : global.getClass().getDeclaredMethods()) {
+            if (!"addView".equals(method.getName())) continue;
+            Class<?>[] parameters = method.getParameterTypes();
+            if (parameters.length == 5 || parameters.length == 4) {
+                selected = method;
+                if (parameters.length == 5) break;
+            }
+        }
+        if (selected == null) {
+            throw new NoSuchMethodException("WindowManagerGlobal.addView");
+        }
+        selected.setAccessible(true);
+        if (selected.getParameterCount() == 5) {
+            selected.invoke(global, decor, layout, display, parentWindow, userId);
+        } else {
+            selected.invoke(global, decor, layout, display, parentWindow);
+        }
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                "WINDOW_PUBLISH_GLOBAL_ADDVIEW arity=" + selected.getParameterCount()
+                        + " display=" + (display == null ? "null" : display.getDisplayId())
+                        + " userId=" + userId
+                        + " activityClass=" + activity.getClass().getName());
+    }
+
+    private static int windowManagerViewCount() {
+        try {
+            Object global = Class.forName("android.view.WindowManagerGlobal")
+                    .getDeclaredMethod("getInstance").invoke(null);
+            Field views = requireField(global.getClass(), "mViews");
+            views.setAccessible(true);
+            Object value = views.get(global);
+            return value instanceof java.util.List<?> list ? list.size() : -1;
+        } catch (Throwable ignored) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+            return -2;
+        }
     }
 
     private static WindowRegistration windowRegistration(android.view.View decor) {

@@ -74,3 +74,48 @@ in-scope repair cannot proceed without manual intervention.
 
 The receipt records the exact RD API32 scope and keeps `va_pro_equivalent` as
 `NOT_PROVEN`.
+
+## Black-screen repair and Quark launch (C2-T05 recovery)
+
+DISCOVER: a Guest `RESUMED` Stub could show `windows=[]` / `reportedDrawn=false`
+because `repairFrameworkWindowBeforeResume` called `getDecorView()` on first
+resume, treated the newly created `mDecor` as a stale root, then set
+`hideForNow=true` when the premature `addView` was not yet in
+WindowManagerGlobal. ActivityThread then skipped the visible-frame path.
+
+CLASSIFY: `KI-R03-052` (`CURRENT_DEFECT`). First resume must leave window
+publication to `handleResumeActivity()`. A failed reattach must clear stale
+markers instead of hiding the Activity.
+
+NewBlackBox (`ref/upstream/NewBlackbox`) window contract used for the
+recovery, not guessed:
+
+1. `AppInstrumentation.checkActivity()` → `ContextCompat.fix()` rewrites
+   `ContextImpl.mBasePackageName` / `mOpPackageName` and AttributionSource
+   uid/package to the Host package/uid before `onCreate`.
+2. `IWindowSessionProxy.addToDisplay` / `addToDisplayAsUser` sets
+   `LayoutParams.packageName` to the Host package and invokes the real
+   session with the process-local `IWindow` Binder. It does not wrap
+   `IWindow`.
+3. `IWindowManagerProxy.openSession` wraps the session; a cached
+   `WindowManagerGlobal` session from before the hook is dropped.
+
+CAS keeps `GuestContext.getOpPackageName()` as the Guest package (C2-T02).
+Only the WindowManagerImpl `ContextImpl` and the Binder `LayoutParams`
+present Host identity to WMS.
+
+RD evidence: `ViewRootImpl.<init>` on this API32 image calls
+`AudioManager.areNavigationRepeatSoundEffectsEnabled()`. The CAS audio
+interceptor previously threw `VIRTUAL_AUDIO_ROUTING_OPERATION_UNSUPPORTED`,
+so `WindowManagerGlobal.addView` never completed (`wmgViews=0`,
+`windows=[]`). NewBlackBox `IAudioServiceProxy` passes unhooked audio
+methods through; CAS now returns a Guest-owned `false` for that query.
+
+Additional RD acceptance, still on `RD测试` API32:
+
+1. `com.quark.browser` must be installed on the Host.
+2. Import/launch through the existing debug `import-launch` path (no Quark
+   package branch in production runtime).
+3. A RESUMED Guest stub must not be a black screen: fail if the Guest
+   `:guest` Hist block is `windows=[]` and `reportedDrawn=false`.
+4. Logcat must show `GUEST_ACTIVITY_CREATE` for the Quark package.

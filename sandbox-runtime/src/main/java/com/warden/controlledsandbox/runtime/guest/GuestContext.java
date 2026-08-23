@@ -210,13 +210,12 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     /**
      * Returns the host-only context used by internal RuntimeBroker transport.
      *
-     * <p>This is intentionally package-private. Guest code must continue to observe this
-     * object as its Context and therefore must not be able to bind host components through the
-     * normal {@link #bindService(Intent, ServiceConnection, int)} path. Runtime-owned routing
-     * calls, such as PendingIntent delivery, need the host context only to reach the broker
-     * Service; guest identity is carried in the request bundle.</p>
+     * <p>Guest application code still observes this object as its Context and cannot bind host
+     * components through {@link #bindService(Intent, ServiceConnection, int)}. Runtime-owned
+     * routing, window identity repair and PendingIntent delivery may read the host transport
+     * context; guest identity remains in the request bundle.</p>
      */
-    Context hostServiceContext() { return hostServiceContext; }
+    public Context hostServiceContext() { return hostServiceContext; }
 
     @Override public String getPackageName() { return spec.packageName; }
     @Override public String getOpPackageName() { return spec.packageName; }

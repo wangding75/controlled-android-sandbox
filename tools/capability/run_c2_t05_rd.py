@@ -34,14 +34,16 @@ FGS_TAG = "CS_C2_T05_FGS"
 JOB_TAG = "CS_FIXTURE_JOB"
 ARM_TAG = "c2t05-arm"
 ARM_ALARM_ACTION = "C2_T05_EXACT_ALARM"
+QUARK_PACKAGE = "com.quark.browser"
 TRUST = ["--ez", "trustNativeGuest", "true"]
 
 
 def command(serial: str, name: str, *, user: int = 0, component: str = "",
             mode: str = "", loops: int = 0, force_stop_host: bool = True,
-            deadline_sec: int = 180, extra: list[str] | None = None) -> dict[str, Any]:
+            deadline_sec: int = 180, extra: list[str] | None = None,
+            package: str = GUEST_PACKAGE) -> dict[str, Any]:
     request_id = uuid.uuid4().hex
-    args = ["--es", "command", name, "--es", "package", GUEST_PACKAGE,
+    args = ["--es", "command", name, "--es", "package", package,
             "--ei", "user", str(user), "--es", "requestId", request_id, *TRUST]
     if extra:
         args.extend(extra)
@@ -99,6 +101,95 @@ def require_markers(text: str, markers: tuple[str, ...], *, name: str) -> None:
 
 def count(text: str, marker: str) -> int:
     return sum(marker in line for line in text.splitlines())
+
+
+def dumpsys_activities(serial: str) -> str:
+    return run_adb(serial, ["shell", "dumpsys", "activity", "activities"],
+                   check=False).stdout
+
+
+def guest_resumed_blocks(dump: str) -> list[str]:
+    blocks: list[str] = []
+    current: list[str] = []
+    in_hist = False
+    for line in dump.splitlines():
+        if "* Hist" in line:
+            if current:
+                blocks.append("\n".join(current))
+            current = [line]
+            in_hist = True
+        elif in_hist:
+            if line.startswith("    * Hist") or line.startswith("  * Task"):
+                blocks.append("\n".join(current))
+                current = [line] if line.startswith("    * Hist") else []
+                in_hist = line.startswith("    * Hist")
+            else:
+                current.append(line)
+    if current:
+        blocks.append("\n".join(current))
+    return [block for block in blocks if ":guest" in block and "state=RESUMED" in block]
+
+
+def require_guest_window_drawn(dump: str, label: str) -> dict[str, Any]:
+    blocks = guest_resumed_blocks(dump)
+    if not blocks:
+        raise RuntimeError(f"{label}: no RESUMED Guest stub in dumpsys activity")
+    drawn = False
+    black = False
+    for block in blocks:
+        empty = "windows=[]" in block
+        reported = "reportedDrawn=true" in block
+        visible = "hasVisible=true" in block
+        if reported or (visible and not empty):
+            drawn = True
+        if empty and "reportedDrawn=false" in block:
+            black = True
+    if black and not drawn:
+        raise RuntimeError(
+            f"{label}: black screen (Guest RESUMED windows=[] reportedDrawn=false)")
+    if not drawn:
+        raise RuntimeError(f"{label}: Guest stub is RESUMED but not drawn")
+    return {"status": "PASS", "resumed_guest_stubs": len(blocks), "drawn": True}
+
+
+def run_quark_launch(serial: str, output: Path) -> dict[str, Any]:
+    packages = run_adb(serial, ["shell", "pm", "list", "packages", QUARK_PACKAGE],
+                       check=False).stdout
+    if QUARK_PACKAGE not in packages:
+        raise RuntimeError(
+            f"{QUARK_PACKAGE} is not installed on RD测试; C2-T05 requires a successful Quark launch")
+    run_adb(serial, ["logcat", "-c"], check=False)
+    launched = require_pass(
+        "quark import-launch",
+        command(serial, "import-launch", package=QUARK_PACKAGE, force_stop_host=True,
+                deadline_sec=180),
+    )
+    time.sleep(8.0)
+    dump = dumpsys_activities(serial)
+    dump_path = output / "quark-dumpsys-activities.txt"
+    dump_path.write_text(dump, encoding="utf-8", errors="replace")
+    window = require_guest_window_drawn(dump, "quark")
+    runtime_log = run_adb(
+        serial,
+        ["logcat", "-d", "-v", "threadtime", "CS_RUNTIME:I", "CS_COMMAND:I", "*:S"],
+        check=False,
+    ).stdout
+    log_path = output / "quark-runtime-logcat.txt"
+    log_path.write_text(runtime_log, encoding="utf-8", errors="replace")
+    if "GUEST_ACTIVITY_CREATE" not in runtime_log:
+        raise RuntimeError("quark launch missing GUEST_ACTIVITY_CREATE")
+    if QUARK_PACKAGE not in runtime_log and "quark" not in runtime_log.lower():
+        raise RuntimeError("quark launch logcat does not name com.quark.browser")
+    if launched.get("result", {}).get("status", "").upper() != "PASS":
+        raise RuntimeError(f"quark import-launch status not PASS: {launched}")
+    return {
+        "status": "PASS",
+        "package": QUARK_PACKAGE,
+        "launch": launched,
+        "window": window,
+        "dumpsys": str(dump_path),
+        "logcat": str(log_path),
+    }
 
 
 def validate_full(text: str, loops: int) -> dict[str, Any]:
@@ -293,9 +384,9 @@ def main() -> int:
         "failures": [],
         "known_issues": ["KI-T57-010", "KI-T57-011", "KI-R03-020", "KI-R03-023",
                          "KI-R03-024", "KI-R03-025", "KI-R03-026", "KI-M10-005",
-                         "KI-M10-006", "KI-M10-007", "KI-R03-038"],
+                         "KI-M10-006", "KI-M10-007", "KI-R03-038", "KI-R03-052"],
         "evidence_files": [],
-        "notes": "RD API32 method evidence only; C1 token/death evidence is inherited and the fresh exact-alarm death probe is recorded here. Android Matrix/OEM/commercial/VA PRO equivalence remains unproven.",
+        "notes": "RD API32 method evidence plus Quark import-launch window-drawn gate. C1 token/death evidence is inherited. Android Matrix/OEM/VA PRO equivalence remains unproven.",
     }
     details: dict[str, Any] = {
         "task_id": TASK_ID,
@@ -351,6 +442,8 @@ def main() -> int:
 
         death = run_death_probe(serial, output)
         details["phases"].append(death)
+        quark = run_quark_launch(serial, output)
+        details["phases"].append({"name": "quark-launch", **quark})
         evidence["rd_result"] = "PASS"
         evidence["regression_result"] = "PASS"
         details["status"] = "PASS"

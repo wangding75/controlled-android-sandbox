@@ -182,6 +182,13 @@ final class MediaCommunicationInvocationInterceptor {
             // isolation boundary without exposing host audio state or rejecting startup.
             return Decision.handled(stringValue(method.getReturnType(), ""));
         }
+        if (containsAny(name, "arenavigationrepeatsoundeffectsenabled",
+                "isnavigationrepeatsoundeffectsenabled")) {
+            // API32 ViewRootImpl.<init> queries this while WindowManagerGlobal.addView
+            // constructs the root. NewBlackBox IAudioServiceProxy passes unknown audio
+            // methods through; throwing here leaves Guest Stub windows=[] / reportedDrawn=false.
+            return Decision.handled(booleanValue(method.getReturnType(), false));
+        }
         if (containsAny(name, "requestaudiofocus", "registeraudiofocusclient")) {
             if (!profile.allowAudioFocus()) throw new SecurityException("VIRTUAL_AUDIO_FOCUS_DENIED");
             Object owner = firstIdentity(arguments);

@@ -312,6 +312,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     route.intent, route.taskId);
             Bundle frameworkEvidence = ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
+            // NewBlackBox AppInstrumentation.checkActivity() → ContextCompat.fix() before onCreate.
+            ActivityFieldBridge.fixFrameworkWindowIdentity(activity);
             emitActivityRecordMapping(activity, route, route.token, route.activityToken,
                     frameworkEvidence);
             Bundle effectiveState = effectiveState(route, state);
@@ -345,6 +347,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     route.intent, route.taskId);
             ActivityFieldBridge.promoteFrameworkRecord(activity, session,
                     route.component, route.intent);
+            ActivityFieldBridge.fixFrameworkWindowIdentity(activity);
             // Do not downgrade a persistable launch to the two-argument callback. Android
             // selects this overload from ActivityInfo.persistableMode and applications use the
             // PersistableBundle to restore task state across process/reboot recreation.
@@ -401,6 +404,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         // an unregistered trampoline root before the framework reaches its updateViewLayout()
         // branch; otherwise a task transition can kill the Guest process even though onResume
         // itself completed successfully.
+        ActivityFieldBridge.fixFrameworkWindowIdentity(activity);
         ActivityFieldBridge.repairFrameworkWindowBeforeResume(activity);
         delegate.callActivityOnResume(activity);
         // Guest onResume() is allowed to synchronously change task/window state (for example a
@@ -409,6 +413,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         // control back. Reconcile once more at this transaction boundary so the framework sees
         // a null ActivityClientRecord.window and follows its normal addView path.
         ActivityFieldBridge.repairFrameworkWindowBeforeResume(activity);
+        ActivityFieldBridge.ensureWindowPublishedAfterResume(activity);
         emit(activity, route, "RESUMED", new Bundle());
         }
     }

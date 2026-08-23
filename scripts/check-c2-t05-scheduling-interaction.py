@@ -57,12 +57,29 @@ require(
     "tools/capability/run_c2_t05_rd.py",
     "resolve_rd_environment", "install_rd_apks", "C2_T05_CAMPAIGN_PASS",
     "C2_T05_ALARM_CALLBACK", "C2_T05_FGS_PROMOTED", "old_pid_dead",
-    "dumpsys", "--loops",
+    "dumpsys", "--loops", "com.quark.browser", "reportedDrawn",
+    "GUEST_ACTIVITY_CREATE", "black screen",
 )
 require(
     "docs/review/C2_T05_SCHEDULING_INTERACTION_DESIGN.md",
     "request/return/callback/death", "exact alarm", "JobInfo", "Window", "IME",
-    "Display", "RD_BASELINE", "NOT_PROVEN",
+    "Display", "RD_BASELINE", "NOT_PROVEN", "com.quark.browser",
+    "hideForNow", "KI-R03-052",
+)
+require(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java",
+    "firstResumeWithoutFrameworkWindow",
+    "resumeFirstWindowDeferredToActivityThread",
+    "resumeWindowClearedForFrameworkAdd",
+    "ensureWindowPublishedAfterResume",
+    "WINDOW_PUBLISH_AFTER_RESUME",
+    "fixFrameworkWindowIdentity",
+    "WINDOW_IDENTITY_FIXED",
+)
+require(
+    "sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridgeSelfTest.java",
+    "testFirstResumeDoesNotLookLikeStaleWindow",
+    "firstResumeWithoutFrameworkWindow",
 )
 for relative, tokens in {
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/VirtualSystemServiceInterceptor.java": (
@@ -73,6 +90,15 @@ for relative, tokens in {
         'case "window"', 'case "inputmethod"', 'case "display"',
         "VIRTUAL_WINDOW_TOKEN_NOT_OWNED",
         "VIRTUAL_DISPLAY_MUTATION_DENIED",
+    ),
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/SystemServiceInvocationHandler.java": (
+        "android.view.IWindow",
+    ),
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/core/MediaCommunicationInvocationInterceptor.java": (
+        "arenavigationrepeatsoundeffectsenabled",
+    ),
+    "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/service/WindowManagerHook.java": (
+        "sWindowSession",
     ),
     "sandbox-framework/src/main/java/com/warden/controlledsandbox/framework/identity/GuestInteractionState.java": (
         "closeSession", "inputMethods", "displays", "windowCount",

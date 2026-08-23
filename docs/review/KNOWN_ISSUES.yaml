@@ -1325,3 +1325,31 @@ issues:
     notes: >
       Closed by C4-T05: PackageManager extracts packed/encrypted .so blobs as-is.
       CAS now ABI-checks only files with ELF magic. Not VA Pro equivalence.
+
+  - issue_id: KI-R03-052
+    title: First Guest resume set hideForNow and left a black screen
+    capability: activity_framework
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: FIXED
+    discovered_by: C2-T05 recovery 2026-08-23 black-screen / Quark launch
+    evidence:
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/ActivityFieldBridge.java
+      - tools/capability/run_c2_t05_rd.py
+      - docs/review/C2_T05_SCHEDULING_INTERACTION_DESIGN.md
+      - verification/catch-up/C2-T05/c2-t05-rd-summary.json
+    match_patterns:
+      - hideForNow
+      - reportedDrawn=false
+      - windows=[]
+      - firstResumeWithoutFrameworkWindow
+    blocks_current_campaign: false
+    fix_policy: FIRST_RESUME_DEFERS_ADDVIEW_TO_ACTIVITYTHREAD
+    notes: >
+      Closed by C2-T05 recovery. First resume must not create mDecor via getDecorView
+      or set hideForNow. Failed reattach clears stale markers so handleResumeActivity
+      can addView. Window identity follows NewBlackBox ContextCompat.fix /
+      IWindowSessionProxy: Host packageName on LayoutParams and ContextImpl op-package,
+      original IWindow Binder, no GuestContext.getOpPackageName leak (C2-T02).
+      Quark import-launch on RD测试 must show a drawn Guest stub. Not VA Pro
+      equivalence.

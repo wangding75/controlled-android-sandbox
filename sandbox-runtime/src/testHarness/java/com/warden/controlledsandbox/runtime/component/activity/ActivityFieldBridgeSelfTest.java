@@ -27,6 +27,8 @@ public final class ActivityFieldBridgeSelfTest {
 
     public static void main(String[] args) throws Exception {
         testFieldCopyAndContract();
+        testFirstResumeDoesNotLookLikeStaleWindow();
+        testFixFrameworkWindowIdentityNullSafe();
         testLegacyPreLaunchRecordSuccess();
         testLegacyPreLaunchRecordMissingFailsClosed();
         testAndroid15DirectLaunchActivityItemAuthoritative();
@@ -55,6 +57,21 @@ public final class ActivityFieldBridgeSelfTest {
                 List.of("required"), List.of(), Map.of(), 37), "unknown API must fail closed");
         expectFailure(() -> ActivityFieldBridge.installFields(new WrongTypeHost(), new WrongTypeTarget(),
                 List.of("required"), List.of(), Map.of(), 36), "type mismatch must fail closed");
+    }
+
+    private static void testFirstResumeDoesNotLookLikeStaleWindow() {
+        check(ActivityFieldBridge.firstResumeWithoutFrameworkWindow(false, null, null),
+                "first resume with no mWindowAdded/r.window must defer to ActivityThread");
+        check(ActivityFieldBridge.firstResumeWithoutFrameworkWindow(false, new Object(), null),
+                "setContentView mDecor must still be treated as first resume");
+        check(!ActivityFieldBridge.firstResumeWithoutFrameworkWindow(true, null, null),
+                "mWindowAdded means the framework already published a window");
+        check(!ActivityFieldBridge.firstResumeWithoutFrameworkWindow(false, null, new Object()),
+                "existing ActivityClientRecord.window is not a first resume");
+    }
+
+    private static void testFixFrameworkWindowIdentityNullSafe() {
+        ActivityFieldBridge.fixFrameworkWindowIdentity(null);
     }
 
     private static void testLegacyPreLaunchRecordSuccess() throws Exception {

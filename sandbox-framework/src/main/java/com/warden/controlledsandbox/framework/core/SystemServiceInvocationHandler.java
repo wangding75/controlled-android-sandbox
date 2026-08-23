@@ -108,6 +108,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                 .localInterface(localInterface)
                 .sessionFence(identity.binderSessionFence())
                 .preserveBinderType("android.app.IApplicationThread")
+                // NewBlackBox IWindowSessionProxy invokes addToDisplay with the process-local
+                // ViewRootImpl.W Binder. Wrapping IWindow replaces that identity and WMS cannot
+                // attach the window to the Stub ActivityRecord (windows=[], reportedDrawn=false).
+                .preserveBinderType("android.view.IWindow")
                 .build();
     }
 

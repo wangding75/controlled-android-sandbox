@@ -269,7 +269,10 @@ final class ActivityRuntimeRouteCoordinator {
         if (action == LaunchAction.DELIVERED_NEW_INTENT
                 || action == LaunchAction.CLEARED_TOP
                 || action == LaunchAction.REORDERED_TO_FRONT) {
-            throw new IllegalStateException("PHYSICAL_ACTIVITY_WINDOW_MISSING:" + activityToken);
+            // After Host/Guest process death the virtual task can still name this
+            // activity while the in-process physical-window map is empty. Allocate a
+            // fresh Stub window instead of failing the relaunch.
+            return physicalIdentities.allocate(processSlot, activityToken);
         }
         int flags = request == null ? 0 : request.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0);
         if (action == LaunchAction.CREATED_ACTIVITY
