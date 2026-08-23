@@ -152,6 +152,12 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-NATIVE-008]
+  - id: c3-t06-art-xposed-decision
+    group: native_self_test
+    command: [python, scripts/check-c3-t06-art-xposed-decision.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

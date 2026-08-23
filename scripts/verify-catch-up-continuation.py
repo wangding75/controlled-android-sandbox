@@ -31,6 +31,7 @@ ALLOWED_GUARD_FILES = {
     Path("scripts/check-c3-t02-file-proc-network-fd.py"),
     Path("scripts/check-c3-t04-hostile-isolation.py"),
     Path("scripts/check-c3-t05-seccomp-decision.py"),
+    Path("scripts/check-c3-t06-art-xposed-decision.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(

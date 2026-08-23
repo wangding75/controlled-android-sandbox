@@ -259,6 +259,7 @@ capabilities:
       - verification/catch-up/C3-T04/c3-t04-rd-summary.json
       - verification/catch-up/C3-T04/c3-t04-local-verification.json
       - docs/review/C3_T05_SECCOMP_USER_NOTIFY_ADR.md
+      - docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS
