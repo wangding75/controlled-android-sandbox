@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 18:27（Asia/Shanghai）
+更新时间：2026-08-23 18:32（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（执行中）
-当前任务：`C4-T04`（PENDING）
-下一任务：`C4-T04`
-最后完成任务：`C4-T03`
+当前任务：`C4-T05`（PENDING）
+下一任务：`C4-T05`
+最后完成任务：`C4-T04`
 
 ## 1. 使用规则
 
@@ -62,7 +62,7 @@
 | C4-T01 | SX 依赖与功能冻结 | DONE | C1,C2,C3-T01..T04 | `4dcce11e08bdc6edafbf867032a0790f0ef8ee57` | §5 C4-T01 |
 | C4-T02 | SX CAS SDK adapter | DONE | C4-T01 | `d6763e40f971fa60db015b17b294cea15fdcdc32` | §5 C4-T02 |
 | C4-T03 | SX 数据迁移 | DONE | C4-T01,C4-T02 | `e064e2174854c661248e0c2970b8fe621bc161ef` | §5 C4-T03 |
-| C4-T04 | 移除 BlackBox/Pine/Xposed runtime | PENDING | C4-T02,C4-T03 | - | - |
+| C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | PENDING | C4-T04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | PENDING | C2,C3 | - | - |
 | C5-T02 | XH CAS Host/SDK 集成 | PENDING | C5-T01,C4-T02 | - | - |
@@ -1832,3 +1832,39 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   对比 HEAD。
 - **遗留风险**：C4-T04 仍需生产 APK 无 BlackBox/Pine 门禁；C4-T05 业务长稳未做。
 - **下一任务**：`C4-T04`。
+
+### C4-T04：移除 SX 生产 BlackBox/Pine/Xposed 运行时
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 18:27 / 2026-08-23 18:32（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。
+- **开始基线**：`b931724fbe2aef0854eac7bb65409a26b9c24b82`；上一任务 `C4-T03` DONE。
+- **DISCOVER / CLASSIFY**：CAS Gradle 本无 `:Bcore`/`:engine-bb`，但缺少 fail-closed
+  的源码/APK 内容门。登记 `KI-R03-049`（`TEST_EVIDENCE_GAP`）。
+- **实现摘要**：新增生产 Gradle/src/main/APK zip 扫描，禁止 BlackBoxCore、PineXposed、
+  `xposed_init`、libpine/libblackbox、`top.niunaijun.blackbox`。`ref/` 参考树不打包。
+  CAS-only smoke 复用 `c4-t02-engine`。未改 live SX 工程。C4-T03 迁移代码保留。
+- **变更文件**：`docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md`、
+  `scripts/check-c4-t04-cas-only-runtime.py`、`tools/capability/run_c4_t04_rd.py`、
+  `verification/catch-up/C4-T04/`。
+- **验收命令与结果**：`python scripts/check-c4-t04-cas-only-runtime.py` PASS；
+  `python scripts/check-c4-t03-sx-migration.py` PASS；assembleDebug PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c4_t04_rd.py --instance RD测试` PASS。
+- **设备证据**：`verification/catch-up/C4-T04/c4-t04-rd-summary.json`；
+  CAS-only smoke PASS。host SHA-256
+  `f9405a13b2a448b7182c02d6259d74e9296313476b7cc6a9cf67d68d6905fc65`。
+- **Known Issues**：`KI-R03-049` 已 `FIXED`。`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无。本轮只关闭 C4-T04，不执行 C4-T05。
+- **实现提交 SHA**：`525f3aec84ae1ff09192f11a417adf51464f965e`
+  （`test(runtime): [C4-T04] gate CAS-only production against BlackBox`）。
+- **回执提交**：主题 `docs(progress): record [C4-T04] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C4-T05 F1-F5/DingTalk 长稳未做；C4 阶段门禁未关。
+- **下一任务**：`C4-T05`。
