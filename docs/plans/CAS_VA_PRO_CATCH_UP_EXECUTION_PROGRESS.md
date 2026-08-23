@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 14:12（Asia/Shanghai）
+更新时间：2026-08-23 15:55（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C3`（执行中）
-当前任务：`C3-T04`（PENDING）
-下一任务：`C3-T04`
-最后完成任务：`C3-T03`
+当前任务：`C3-T05`（PENDING）
+下一任务：`C3-T05`
+最后完成任务：`C3-T04`
 
 ## 1. 使用规则
 
@@ -56,7 +56,7 @@
 | C3-T01 | Native 绕过与兼容 corpus | DONE | C1,C2-T01 | `8b4233623a0e09028969a88370a68f3ae0137c54` | §5 C3-T01 |
 | C3-T02 | 文件/proc/network/FD | DONE | C3-T01 | `566fadc60437a22c36fc985bbf54dce77c177173` | §5 C3-T02 |
 | C3-T03 | 四 ABI/16KB/native media | DONE | C3-T01,C2-T04 | `372fc11a9548184e568de213c4c8264f7bf39771` | §5 C3-T03 |
-| C3-T04 | Hostile native 隔离 | PENDING | C3-T01,C3-T02 | - | - |
+| C3-T04 | Hostile native 隔离 | DONE | C3-T01,C3-T02 | `22716fbfec845b288ea119c6ec6be678fc23915f` | §5 C3-T04 |
 | C3-T05 | seccomp/user-notify 决策 | PENDING | C3-T04 | - | - |
 | C3-T06 | ART/Xposed Extension 决策 | PENDING | C2,C3-T04 | - | - |
 | C4-T01 | SX 依赖与功能冻结 | PENDING | C1,C2,C3-T01..T04 | - | - |
@@ -1528,3 +1528,78 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   和 VA PRO equivalence 仍未证明；hostile native 隔离、raw syscall/SVC 和完整 kernel
   boundary 仍按既有 Known Issues 及后续 C3-T04/C3-T05 处理。
 - **下一任务**：`C3-T04`；本轮只执行 C3-T03，不执行后续任务。
+
+### C3-T04：Hostile native 隔离与 Broker-only 能力
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 15:30 / 2026-08-23 15:55（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；Android SDK 36；NDK
+  `27.2.12479018`；CMake 3.22.1；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。开始前完整读取任务书、本账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md` 和 `docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 Git/远端/最后 C3-T03 回执；MuMu 通过实例名 `RD测试` 动态解析，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`，Android ID `8acae00bece8090b`；本轮
+  使用 `MUMU_ROOT=D:\install\Netease\MuMu`，执行器未固化 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `6e98c0e143fc32fc1d4774483843b948df68b7e3`；远端 HEAD 同步；最后完成回执为 C3-T03，
+  实现提交 `372fc11a9548184e568de213c4c8264f7bf39771`，回执提交
+  `6e98c0e143fc32fc1d4774483843b948df68b7e3`；依赖满足的首个 PENDING 任务为 C3-T04。
+- **DISCOVER / CLASSIFY**：登记 `KI-R03-044`（`TEST_EVIDENCE_GAP`，hostile 攻击矩阵
+  缺少 other-Guest/core storage、inherited FD、`/dev/binder`、ptrace/clone/execve、
+  capability expiry/replay 与 death 撤销的 RD 证据）。既有 `KI-R03-NATIVE-001/006/008`
+  与 `KI-R03-NATIVE-ENF-001` 保持架构边界，不把 PLT 命中或残余内核限制改名为 PASS。
+- **实现摘要**：扩展 isolated UID + production Broker + deny-only seccomp 的
+  package-neutral 攻击矩阵；JNI 记录 libc/syscall/raw 与 ptrace/execve/fork/
+  binder/inherited-FD/core/other-Guest 探针；Broker ledger 在设备上证明
+  grant/scope/generation/expiry/replay；unbind 后校验 isolated PID 消失和 token
+  撤销。修复 `KI-R03-040` 非法 capability 标签使治理 validator 通过。
+- **变更文件**：`HostileProductionCampaign.java`、`NativeEnforcementChild.java`、
+  `NativeEnforcementNative.java`、`NativeEnforcementIsolatedService.java`、
+  `DebugCommandActivity.java`、`enforcement_native.cpp`、
+  `HostileCapabilityRegistrySelfTest.java`、
+  `docs/review/C3_T04_HOSTILE_NATIVE_ISOLATION_DESIGN.md`、
+  `scripts/check-c3-t04-hostile-isolation.py`、`tools/capability/run_c3_t04_rd.py`、
+  `docs/review/KNOWN_ISSUES.yaml`、`docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md`、
+  `docs/capability/CAPABILITY_REGISTRY.yaml`、`verification/catch-up/C3-T04/`。
+- **验收命令与结果**：`python scripts/check-c3-t04-hostile-isolation.py`、
+  `python scripts/check-native-hostile-profile.py`、
+  `python scripts/check-native-enforcement-poc.py`、
+  `python scripts/check-native-boundary-matrix.py`、
+  `python tools/static_android_compile.py`（含 hostile capability self-test）、
+  `python tools/capability/validate_campaign_infra.py`、
+  `scripts/build-device-test-apks.ps1 -Online -NoClean`、
+  `python scripts/generate-sbom.py --check` 全部 PASS。
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python tools/capability/run_c3_t04_rd.py --instance RD测试`
+  最终 PASS。首次 runner 因 evidence schema 拒绝额外字段失败，已把 case 状态写入
+  notes/local verification 后重跑通过；未记录 BLOCKED。
+- **设备证据**：主回执 `verification/catch-up/C3-T04/c3-t04-rd-summary.json`，本地
+  验收 `verification/catch-up/C3-T04/c3-t04-local-verification.json`，raw 目录
+  `artifacts/capability-audit/catch-up-c3-t04/20260823T075418Z/`。
+  `C3-T04-ISO-001=PASS_ISOLATED`；core/other-Guest=`DENIED_BY_KERNEL_POLICY`；
+  ungranted=`DENIED`；inherited FD=`PASS_NO_LEAK`；ptrace/execve/socket=
+  `DENIED_BY_SECCOMP`；Broker grant/scope/rev/expiry/replay 与 death=`PASS`；
+  residual binder=`KERNEL_LIMIT_EXPOSED`，clone=`KERNEL_LIMIT_EXPOSED_SAME_UID`。
+- **APK SHA-256**：host
+  `17875705e6f95c5dc9ffdfe8b705e4989a6965c2da5f6d9ef6011e5328ba6efa`；companion32
+  `57b1dbdb765e233376d35f1bf2aae74f325520a82ff12c7554ba8ef1c281ef1d`；fixture
+  `18cb010cbe42159aff720beb716a2d25f5c0eaf248b9c37e93098de13caed53e`；fixture32
+  `5564918e1af297ecbdba85548e36f1b7fb655423f4cb17358ec8622f3fda9e10`。
+- **Known Issues**：`KI-R03-044` 已 `FIXED`；`KI-R03-NATIVE-001/006/008` 与
+  `KI-R03-NATIVE-ENF-001` 保持既有非阻断架构边界；`KI-R03-040` 仅修正非法
+  capability 标签。`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无验收范围偏离。本轮按用户指令将执行 3 个任务，本回执只关闭
+  C3-T04；证据限定 RD API32，不外推 API33+、ARM/16KB、OEM、SX/XH 或 VA PRO。
+- **实现提交 SHA**：`22716fbfec845b288ea119c6ec6be678fc23915f`
+  （`test(native): [C3-T04] close hostile isolation attack matrix`）。
+- **回执提交**：使用主题 `docs(progress): record [C3-T04] receipt` 单独提交；
+  本回执将 C3-T04 从 `PENDING` 更新为 `DONE`，C3 保持 `IN_PROGRESS`，下一任务为
+  `C3-T05`。
+- **推送与远端验证**：实现提交先行提交；回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads`
+  对比最终远端 HEAD 与本地 HEAD。
+- **遗留风险**：C3-T05/T06 尚未执行；`/dev/binder` 观察与 same-UID clone 仍是
+  内核残余限制；user-notify 与 ART/Xposed 由后续条件任务决策；API33+、ARM/16KB、
+  OEM/HAL、商业应用、SX/XH 和 VA PRO equivalence 仍未证明。
+- **下一任务**：`C3-T05`。
