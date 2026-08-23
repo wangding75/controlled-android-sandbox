@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 15:55（Asia/Shanghai）
+更新时间：2026-08-23 16:05（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C3`（执行中）
-当前任务：`C3-T05`（PENDING）
-下一任务：`C3-T05`
-最后完成任务：`C3-T04`
+当前任务：`C3-T06`（PENDING）
+下一任务：`C3-T06`
+最后完成任务：`C3-T05`
 
 ## 1. 使用规则
 
@@ -57,7 +57,7 @@
 | C3-T02 | 文件/proc/network/FD | DONE | C3-T01 | `566fadc60437a22c36fc985bbf54dce77c177173` | §5 C3-T02 |
 | C3-T03 | 四 ABI/16KB/native media | DONE | C3-T01,C2-T04 | `372fc11a9548184e568de213c4c8264f7bf39771` | §5 C3-T03 |
 | C3-T04 | Hostile native 隔离 | DONE | C3-T01,C3-T02 | `22716fbfec845b288ea119c6ec6be678fc23915f` | §5 C3-T04 |
-| C3-T05 | seccomp/user-notify 决策 | PENDING | C3-T04 | - | - |
+| C3-T05 | seccomp/user-notify 决策 | NOT_APPLICABLE | C3-T04 | `537c20211300c93ae42dda4365bcb0cdb0ee0b70` | §5 C3-T05 |
 | C3-T06 | ART/Xposed Extension 决策 | PENDING | C2,C3-T04 | - | - |
 | C4-T01 | SX 依赖与功能冻结 | PENDING | C1,C2,C3-T01..T04 | - | - |
 | C4-T02 | SX CAS SDK adapter | PENDING | C4-T01 | - | - |
@@ -1603,3 +1603,43 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   内核残余限制；user-notify 与 ART/Xposed 由后续条件任务决策；API33+、ARM/16KB、
   OEM/HAL、商业应用、SX/XH 和 VA PRO equivalence 仍未证明。
 - **下一任务**：`C3-T05`。
+
+### C3-T05：seccomp/user-notify 可行性决策
+
+- **状态**：NOT_APPLICABLE
+- **开始/结束时间**：2026-08-23 15:56 / 2026-08-23 16:05（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；
+  分支 `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，kernel `5.4.32-perf-gda349bfae95e`，
+  boot ID `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。
+- **开始基线**：`3fd633479880c8745d70ed1cd7ff1a83ba8a5146`；远端同 HEAD；上一任务
+  `C3-T04` DONE，实现提交 `22716fbfec845b288ea119c6ec6be678fc23915f`。
+- **实现摘要**：对 RD 内核做 `/proc/config.gz` 与 uname 探测；确认
+  `CONFIG_SECCOMP_FILTER=y` 且 `CONFIG_SECCOMP_USER_NOTIF` 未编译。ADR 决定普通
+  APK 不实现 user-notify 监督器；产品 hostile 边界保持 C3-T04 isolated UID +
+  Broker + deny-only BPF。Option D/E 保留为 `REQUIRES_PRIVILEGE` / OEM SKU。
+- **变更文件**：`docs/review/C3_T05_SECCOMP_USER_NOTIFY_ADR.md`、
+  `scripts/check-c3-t05-seccomp-decision.py`、`tools/capability/run_c3_t05_rd.py`、
+  `verification/catch-up/C3-T05/`、`docs/review/KNOWN_ISSUES.yaml`、
+  `docs/capability/CAPABILITY_REGISTRY.yaml`。
+- **验收命令与结果**：`python scripts/check-c3-t05-seccomp-decision.py` PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python tools/capability/run_c3_t05_rd.py --instance RD测试`
+  PASS，`decision=NOT_APPLICABLE`。未修改生产运行时。
+- **设备证据**：`verification/catch-up/C3-T05/c3-t05-rd-summary.json` 与
+  `c3-t05-local-verification.json`；raw
+  `artifacts/capability-audit/catch-up-c3-t05/`。config 仅
+  `CONFIG_SECCOMP=y` / `HAVE_ARCH_SECCOMP_FILTER=y` / `SECCOMP_FILTER=y`；
+  getenforce=`Permissive`（不外推 Enforcing OEM）。
+- **Known Issues**：`KI-R03-NATIVE-008` 保持记录并引用本 ADR；无新增 runtime
+  issue。`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无。条件任务按验收标准以正式决策关闭为 `NOT_APPLICABLE`，
+  并写明 C3-T04 替代边界与特权部署路径。
+- **实现提交 SHA**：`537c20211300c93ae42dda4365bcb0cdb0ee0b70`
+  （`docs(native): [C3-T05] record seccomp user-notify not applicable`）。
+- **回执提交**：主题 `docs(progress): record [C3-T05] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：特权 companion / OEM user-notify 仍未建设；C3-T06 ART/Xposed
+  决策未执行；API33+ / ARM / Enforcing SELinux 未验证。
+- **下一任务**：`C3-T06`。
