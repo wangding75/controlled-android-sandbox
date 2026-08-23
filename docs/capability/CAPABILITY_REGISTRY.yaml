@@ -229,7 +229,7 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: 9e5d3e73628d80872c21776897898493925c7a97
+    last_verified_commit: 8b4233623a0e09028969a88370a68f3ae0137c54
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - docs/T57_R02_VA_PRO_OPTIMIZATION_EVIDENCE.md
@@ -241,6 +241,10 @@ capabilities:
       - scripts/check-m5-t19-1-a-native-trust-boundary.py
       - scripts/check-native-boundary-matrix.py
       - scripts/check-native-enforcement-poc.py
+      - docs/review/C3_T01_NATIVE_CORPUS_DESIGN.md
+      - scripts/check-c3-t01-native-corpus.py
+      - verification/catch-up/C3-T01/c3-t01-rd-summary.json
+      - verification/catch-up/C3-T01/c3-t01-local-verification.json
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS

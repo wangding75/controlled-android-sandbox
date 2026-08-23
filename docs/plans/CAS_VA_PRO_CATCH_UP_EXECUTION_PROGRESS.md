@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 10:40（Asia/Shanghai）
+更新时间：2026-08-23 11:31（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C2`（已完成；本轮停止）
-当前任务：`C3-T01`（本轮停止，未执行）
-下一任务：`C3-T01`
-最后完成任务：`C2-T07`
+当前阶段：`C3`（执行中）
+当前任务：`C3-T02`（PENDING，等待 C3-T01 完成）
+下一任务：`C3-T02`
+最后完成任务：`C3-T01`
 
 ## 1. 使用规则
 
@@ -25,7 +25,7 @@
 | C0 事实源与 RD 基线 | DONE | 两轮 RD 一致、事实源无冲突、可跨环境续接 | §5 C0-T04 |
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
-| C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
+| C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
 | C4 SX 迁移 | PENDING | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
 | C5 XH 支持 | PENDING | 原始 XH 通过，可选模块有决策 | - |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
@@ -53,7 +53,7 @@
 | C2-T05 | 调度与交互服务 | DONE | C2-T01,C1 | `547ba7ae` | §5 C2-T05 |
 | C2-T06 | 设备/网络/媒体服务 | DONE | C2-T01,C2-T02 | `048ca1b1` | §5 C2-T06 |
 | C2-T07 | Biometric 与长尾收敛 | DONE | C2-T02..T06 | `b6d9dafa` | §5 C2-T07 |
-| C3-T01 | Native 绕过与兼容 corpus | PENDING | C1,C2-T01 | - | - |
+| C3-T01 | Native 绕过与兼容 corpus | DONE | C1,C2-T01 | `8b4233623a0e09028969a88370a68f3ae0137c54` | §5 C3-T01 |
 | C3-T02 | 文件/proc/network/FD | PENDING | C3-T01 | - | - |
 | C3-T03 | 四 ABI/16KB/native media | PENDING | C3-T01,C2-T04 | - | - |
 | C3-T04 | Hostile native 隔离 | PENDING | C3-T01,C3-T02 | - | - |
@@ -1267,3 +1267,83 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：API33-36、OEM/HAL、ARM/16KB、商业应用、SX/XH 和 VA PRO equivalence
   仍未证明；这些是后续阶段范围，不影响本次 C2-T07 DONE 判定。
 - **下一任务**：`C3-T01`；本轮按用户指令停止，不执行 C3。
+
+### C3-T01：Native 绕过与兼容 corpus
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 10:40 / 2026-08-23 11:31（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；Android SDK 36；NDK
+  `27.2.12479018`；CMake 3.22.1；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 通过实例名 `RD测试` 动态解析，状态为
+  `device`，本次 resolved serial `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`，Android ID `8acae00bece8090b`；runner 使用
+  `MUMU_ROOT=D:\install\Netease\MuMu` 发现安装根目录，未在代码中固化历史 ADB endpoint。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `d9d89ca19e86cf97542729e63f698c9edb4bfef6`；远端 HEAD 同步；开始前完整读取任务书、
+  本账本、`docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md`、
+  `docs/COMMIT_IDENTITY_POLICY.md`，核对 C2-T07 最后回执、Git/远端和动态 RD 环境；首个
+  依赖满足的 PENDING 任务为 C3-T01。本轮只执行 C3-T01。
+- **实现摘要**：新增 test-only `NATIVE-ADV-011`，覆盖 `open/openat/openat2`、
+  `faccessat/faccessat2`、`stat/fstatat`、xattr、`getcwd/chdir`、`realpath`、安全的
+  pipe `ioctl(FIONREAD)`、libc/`syscall()` 变体和 foreign Host path 负向检查；保留既有
+  execve、socket、loader、procfs/FD、Binder、raw SVC/int 案例。边界矩阵扩展为 55 条并
+  新增 `SYS-IOCTL`，每一条均有字段、风险和 `TRUSTED_COMPAT`/`ISOLATED_HOSTILE` 分类；
+  新增静态 C3-T01 gate、动态 RD runner、设计文档和四 ABI build/evidence 校验。未修改
+  production native interceptor；`BYPASS_CONFIRMED` 仅表示发现，不升级为 hostile isolation
+  或 VA PRO 等价性。
+- **变更文件**：`fixture-basic/src/main/cpp/adversarial_native.cpp`、
+  `docs/native/T57_R03_NATIVE_BOUNDARY_MATRIX.yaml`、
+  `docs/review/C3_T01_NATIVE_CORPUS_DESIGN.md`、
+  `scripts/check-c3-t01-native-corpus.py`、`scripts/check-native-boundary-matrix.py`、
+  `tools/capability/run_c3_t01_rd.py`、`tools/capability/run_native_adversarial_rd.py`、
+  `verification/catch-up/C3-T01/`、`verification/sbom.json`；本回执同步更新
+  `docs/capability/CAPABILITY_REGISTRY.yaml` 的证据路径和 `last_verified_commit`。
+- **验收命令与结果**：`python scripts/check-c3-t01-native-corpus.py`、既有 native
+  boundary/files-loader/file-hooks/ABI-companion/hostile-profile/enforcement-P0C gates、
+  Python compile、YAML/JSON 解析、`git diff --check`、
+  `python scripts/generate-sbom.py --check`、`python scripts/check-m5-t16-source-closure.py`
+  全部 PASS；`scripts/build-device-test-apks.ps1 -Online -NoClean` PASS（740 actionable
+  tasks，36 executed），因共享 C++ 源的 32-bit Gradle 增量输入需显式刷新，随后
+  `:fixture-compat32:assembleDebug --rerun-tasks` PASS（38/38 tasks）。
+- **设备证据**：`$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c3_t01_rd.py --instance-name 'RD测试'` PASS。主回执为
+  `verification/catch-up/C3-T01/c3-t01-rd-summary.json`，本地验收清单为
+  `verification/catch-up/C3-T01/c3-t01-local-verification.json`，raw logcat、动态环境、
+  APK/SO hashes 位于 ignored `artifacts/capability-audit/catch-up-c3-t01/20260823T032245Z/`。
+  direct 64-bit `x86_64` 的 11/11 案例均 `PASS_COMPAT`；direct 32-bit `x86` 的 11/11
+  案例均 `PASS_COMPAT`；in-sandbox `x86_64` 的 11/11 案例均有结果，其中
+  `NATIVE-ADV-003`、`NATIVE-ADV-011` 为预期 `BYPASS_CONFIRMED`，fork/exec 相关案例按策略
+  `BLOCKED_BY_POLICY`，`NATIVE-ADV-011` 的 `negative_host_path=DENIED`。四个 ABI
+  `arm64-v8a/x86_64/armeabi-v7a/x86` 的 fixture/payload native libraries 均存在并记录
+  SHA-256。设备 APK SHA-256：host
+  `8e2c70d251ce13847b993d12c320148279a39fd79865978f0d70b0070c823406`；companion32
+  `5edaf1c0e083faafe5bbba0e7d30631f9bd40cd5194aa5a21dd4952c05b004e8`；fixture64
+  `78dffc7797f396e672caefcc5000ba2434958914c12eb9a8cac719a94035d52b`；fixture32
+  `726a5da7f7d7aa9668fb43ae874aca349a02830cccae4e0824a8e71cefc8d8bd`。
+- **附加 host 自测说明**：`scripts/test-native.sh` 在 PowerShell 的 WSL launcher 下因无可用
+  host `g++` 立即退出；改用 Git Bash 后确认同样缺少 `g++`；WSL Ubuntu 的前置 native
+  self-tests 通过，但将 Windows NDK headers 作为 host include 会与 glibc/JNI 产生既有
+  harness 冲突。因此该附加 host harness 未作为本任务 PASS 依据；本任务的 Android NDK
+  四 ABI Gradle 编译和 RD 动态验收均 PASS，未发现 C3-T01 新 runtime regression，也未
+  记录 BLOCKED。
+- **Known Issues**：继续显式保留 `KI-T57-009`、`KI-R03-023`、
+  `KI-R03-NATIVE-001` 至 `KI-R03-NATIVE-009`、`KI-R03-NATIVE-ENF-001` 等既有非阻断
+  架构/证据边界；raw syscall/SVC、identity/process、procfs/FD、metadata/cwd、custom
+  loader、Binder device 和 seccomp/user-notify 不因本任务而关闭；无新增 Known Issue。
+- **偏离任务书**：无验收范围偏离；仅因共享源的 32-bit 增量构建显式重跑一次兼容 fixture，
+  不改变任务范围。证据严格限定 RD API32、当前 MuMu image 和静态四 ABI build，不外推
+  API33+、ARM 真机/16 KB、OEM/HAL、商业应用、SX/XH 或 VA PRO 等价性，
+  `va_pro_equivalent` 保持 `NOT_PROVEN`；失败均先修复并重跑。
+- **实现提交 SHA**：`8b4233623a0e09028969a88370a68f3ae0137c54`
+  （`test(native): [C3-T01] establish native compatibility corpus`）。
+- **回执提交**：使用主题 `docs(progress): record [C3-T01] receipt` 单独提交；本回执将
+  C3-T01 从 `IN_PROGRESS` 更新为 `DONE`，并将 C3 保持为 `IN_PROGRESS`，下一任务为
+  `C3-T02`。
+- **推送与远端验证**：实现提交已先行非强制推送；回执提交完成后，两个提交均非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并用 `git ls-remote --heads` 对比
+  最终远端 HEAD 与本地 HEAD。
+- **遗留风险**：C3-T02/T03/T04/T05/T06 尚未执行；API33+、ARM/16KB、OEM/HAL、商业
+  应用、SX/XH 和 VA PRO equivalence 仍未证明；hostile native 隔离仍由后续 C3-T04/T05
+  决策与验收负责。
+- **下一任务**：`C3-T02`；本轮按用户指令停止，不执行后续任务。
