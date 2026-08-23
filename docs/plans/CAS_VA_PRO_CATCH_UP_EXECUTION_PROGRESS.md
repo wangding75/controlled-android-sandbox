@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 17:55（Asia/Shanghai）
+更新时间：2026-08-23 18:27（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（执行中）
-当前任务：`C4-T03`（PENDING）
-下一任务：`C4-T03`
-最后完成任务：`C4-T02`
+当前任务：`C4-T04`（PENDING）
+下一任务：`C4-T04`
+最后完成任务：`C4-T03`
 
 ## 1. 使用规则
 
@@ -61,7 +61,7 @@
 | C3-T06 | ART/Xposed Extension 决策 | NOT_APPLICABLE | C2,C3-T04 | `1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3` | §5 C3-T06 |
 | C4-T01 | SX 依赖与功能冻结 | DONE | C1,C2,C3-T01..T04 | `4dcce11e08bdc6edafbf867032a0790f0ef8ee57` | §5 C4-T01 |
 | C4-T02 | SX CAS SDK adapter | DONE | C4-T01 | `d6763e40f971fa60db015b17b294cea15fdcdc32` | §5 C4-T02 |
-| C4-T03 | SX 数据迁移 | PENDING | C4-T01,C4-T02 | - | - |
+| C4-T03 | SX 数据迁移 | DONE | C4-T01,C4-T02 | `e064e2174854c661248e0c2970b8fe621bc161ef` | §5 C4-T03 |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | PENDING | C4-T02,C4-T03 | - | - |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | PENDING | C4-T04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | PENDING | C2,C3 | - | - |
@@ -1790,3 +1790,45 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   engine-bb/Bcore/Pine；C3 阶段门禁的 C1/C2 回归仍待单独确认。API33+、ARM/16KB、
   OEM、DingTalk 业务和 VA PRO 等价性仍未证明。
 - **下一任务**：`C4-T03`。
+
+### C4-T03：迁移 SX 用户、包、Profile、媒体与配置数据
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 18:10 / 2026-08-23 18:27（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `e7ac819bedf09b3e02d3f038c23e3e1f25e20b44`；远端同 HEAD；上一任务 `C4-T02`
+  DONE，实现提交 `d6763e40f971fa60db015b17b294cea15fdcdc32`。
+- **DISCOVER / CLASSIFY**：SX `sx_config`/ConfigProvider 仍按 BlackBox 同 UID 共享；
+  CAS 已有实例级 profile/media store，但没有版本化、幂等、可回滚的桥。登记
+  `KI-R03-048`（`TEST_EVIDENCE_GAP`）。
+- **实现摘要**：新增 `sx-config-v1` → `cas-instance-profile-v1` 迁移器；提交前备份
+  CAS profile；同 hash 重放为 IDEMPOTENT；中断不改 live；回滚恢复备份并保留旧源；
+  双用户坐标/androidId/媒体 hash 隔离。license/time-guard DROP。
+- **变更文件**：`sandbox-domain/.../migration/*`、`SxMigrationHostStore.java`、
+  `DebugCommandActivity.java`、`docs/review/C4_T03_SX_DATA_MIGRATION_DESIGN.md`、
+  `scripts/check-c4-t03-sx-migration.py`、`tools/capability/run_c4_t03_rd.py`、
+  `verification/catch-up/C4-T03/`。
+- **验收命令与结果**：`python scripts/check-c4-t03-sx-migration.py` PASS；
+  `:sandbox-domain:selfTest` PASS；`:app:assembleDebug` PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python
+  tools/capability/run_c4_t03_rd.py --instance RD测试` PASS。
+- **设备证据**：`verification/catch-up/C4-T03/c4-t03-rd-summary.json`；
+  cloneUser=1；replay=IDEMPOTENT；interrupt=INTERRUPTED；rollback=ROLLED_BACK；
+  user0Lat=31.2304 / user1Lat=22.543099；sourceKept=true。APK SHA-256：host
+  `f9405a13b2a448b7182c02d6259d74e9296313476b7cc6a9cf67d68d6905fc65`。
+- **Known Issues**：`KI-R03-048` 已 `FIXED`。`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无。本轮只关闭 C4-T03。
+- **实现提交 SHA**：`e064e2174854c661248e0c2970b8fe621bc161ef`
+  （`feat(sx): [C4-T03] migrate SX config onto instance profiles`）。
+- **回执提交**：主题 `docs(progress): record [C4-T03] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C4-T04 仍需生产 APK 无 BlackBox/Pine 门禁；C4-T05 业务长稳未做。
+- **下一任务**：`C4-T04`。
