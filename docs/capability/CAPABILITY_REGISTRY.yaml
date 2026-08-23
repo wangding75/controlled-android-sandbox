@@ -262,6 +262,8 @@ capabilities:
       - docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md
       - docs/review/C4_T01_SX_DEPENDENCY_FREEZE_DESIGN.md
       - verification/catch-up/C4-T01/c4-t01-freeze.json
+      - docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md
+      - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS
@@ -310,6 +312,9 @@ capabilities:
       - tools/device/t57_rd_lifecycle_probe.ps1
       - scripts/check-package-lifecycle-transaction.py
       - verification/catch-up/C0-T03/README.md
+      - docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md
+      - scripts/check-c4-t02-sx-adapter.py
+      - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization

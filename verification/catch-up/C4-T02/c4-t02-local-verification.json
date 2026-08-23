@@ -1,0 +1,130 @@
+{
+  "task_id": "C4-T02",
+  "status": "PASS",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T09:50:23.309171+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "static_gates": [
+    {
+      "gate": "scripts/check-c4-t02-sx-adapter.py",
+      "returncode": 0,
+      "stdout": "PASS C4-T02 SX CAS SDK adapter\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-c4-t01-sx-freeze.py",
+      "returncode": 0,
+      "stdout": "PASS C4-T01 SX dependency freeze\n",
+      "stderr": ""
+    },
+    {
+      "gate": ":sandbox-sdk:selfTest",
+      "returncode": 0,
+      "stdout": "it https://g.co/64-bit-requirement\n\n> Task :sandbox-sdk:compileJava UP-TO-DATE\n> Task :sandbox-sdk:processResources NO-SOURCE\n> Task :sandbox-sdk:classes UP-TO-DATE\n> Task :sandbox-sdk:compileTestHarnessJava UP-TO-DATE\n> Task :sandbox-sdk:processTestHarnessResources NO-SOURCE\n> Task :sandbox-sdk:testHarnessClasses UP-TO-DATE\n\n> Task :sandbox-sdk:selfTest\nPASS sandbox-sdk identity, compatibility, and CasSandboxEngine self-test\n\nBUILD SUCCESSFUL in 28s\n3 actionable tasks: 1 executed, 2 up-to-date\n",
+      "stderr": ""
+    },
+    {
+      "gate": "assembleDebug device APKs",
+      "returncode": 0,
+      "stdout": "DATE\n> Task :app:mergeProjectDexDebug\n\n> Task :app:packageDebug\nPackagingOptions.jniLibs.useLegacyPackaging should be set to true because android:extractNativeLibs is set to \"true\" in AndroidManifest.xml.\n\n> Task :app:createDebugApkListingFileRedirect UP-TO-DATE\n> Task :app:assembleDebug\n\n[Incubating] Problems report is available at: file:///D:/github/controlled-android-sandbox/build/reports/problems/problems-report.html\n\nBUILD SUCCESSFUL in 46s\n238 actionable tasks: 28 executed, 210 up-to-date\n",
+      "stderr": " versions of Android Studio and the command-line tools that were released at different times.\nNote: D:\\github\\controlled-android-sandbox\\app\\src\\debug\\java\\com\\warden\\controlledsandbox\\DebugCommandActivity.java uses or overrides a deprecated API.\nNote: Recompile with -Xlint:deprecation for details.\n"
+    }
+  ],
+  "smoke": {
+    "status": "PASS",
+    "pass": true,
+    "cloneUser": 1,
+    "observerOperations": 22,
+    "traceCount": 21
+  },
+  "mapping_counts": {
+    "engine_methods": 17,
+    "unfinished_entries": 4
+  },
+  "apk_metadata": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "17b232be212895d502b1cf71824af58dd8ec735472627f2e20a3addb885e3a91"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "57b1dbdb765e233376d35f1bf2aae74f325520a82ff12c7554ba8ef1c281ef1d"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "18cb010cbe42159aff720beb716a2d25f5c0eaf248b9c37e93098de13caed53e"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "82f3d33ab2bd83203c2f3e86be603afffcb1d15641e8d769f865016d32895616"
+      }
+    ]
+  },
+  "errors": [],
+  "non_claims": [
+    "not SX live-tree BlackBox removed",
+    "not DingTalk PASS",
+    "not profile/config data migration",
+    "not VA Pro equivalence"
+  ]
+}

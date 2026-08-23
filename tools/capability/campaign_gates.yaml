@@ -165,6 +165,13 @@ gates:
     required: true
     timeout_sec: 180
     known_issue_ids: [KI-R03-046]
+  - id: c4-t02-sx-adapter
+    group: package_visibility
+    command: [python, scripts/check-c4-t02-sx-adapter.py]
+    capabilities: [package_lifecycle_clear_delete_reinstall]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-047]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]

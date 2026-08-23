@@ -9,32 +9,56 @@ import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.VirtualDeviceServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualNetworkServiceProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.sdk.CasSandboxEngine;
+import com.warden.controlledsandbox.sdk.SandboxOperationResult;
 import java.util.List;
+import java.util.Map;
 
 /** Application-facing use cases. Screens never cross this boundary into Binder or runtime code. */
 final class SandboxApplicationLayer implements AutoCloseable {
     private final Context context;
     private final SxSandboxAdapter adapter;
+    private final CasSandboxEngine engine;
 
     SandboxApplicationLayer(Context context) {
         this.context = context.getApplicationContext();
         this.adapter = new SxSandboxAdapter(this.context);
+        this.engine = new CasSandboxEngine(this.adapter);
     }
 
     SandboxCatalogState load() throws Exception { return adapter.load(); }
     SandboxRecord findRecord(String packageName) throws Exception { return adapter.findRecord(packageName); }
-    SandboxRecord importApk(Uri uri) throws Exception { return adapter.importApk(uri); }
+    SandboxRecord importApk(Uri uri) throws Exception {
+        return importApk(uri, "");
+    }
     SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
-        return adapter.importApk(uri, nativeGuestTrust);
+        if (nativeGuestTrust != null && !nativeGuestTrust.isBlank()) {
+            return adapter.importApk(uri, nativeGuestTrust);
+        }
+        SandboxOperationResult result = engine.installFromApk(uri == null ? "" : uri.toString());
+        requireSuccess(result);
+        String packageName = result.identity() == null ? "" : result.identity().packageName();
+        return requireRecord(packageName);
     }
     List<InstalledApplication> installedApplications() throws Exception {
         return adapter.installedApplications();
     }
     SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
             throws Exception {
-        return adapter.importInstalledApplication(packageName, nativeGuestTrust);
+        SandboxOperationResult result = engine.installFromHost(packageName, nativeGuestTrust);
+        requireSuccess(result);
+        return requireRecord(packageName);
     }
-    int createClone(String packageName) throws Exception { return adapter.createClone(packageName); }
+    int createClone(String packageName) throws Exception {
+        SandboxOperationResult result = engine.clone(packageName);
+        requireSuccess(result);
+        String user = result.diagnostics().get("virtualUserId");
+        if (user == null || user.isBlank()) {
+            throw new IllegalStateException("CLONE_FAILED:missing virtualUserId");
+        }
+        return Integer.parseInt(user);
+    }
     void updateInstanceStatus(String packageName, int userId, String status) throws Exception {
         adapter.updateInstanceStatus(packageName, userId, status);
     }
@@ -42,21 +66,25 @@ final class SandboxApplicationLayer implements AutoCloseable {
         // PackageManagementSession owns the destructive transaction, including the runtime
         // stop/death barrier.  Keeping the stop here would create a second, non-transactional
         // lifecycle edge before the authoritative package-service operation.
-        adapter.clearInstanceData(packageName, userId);
+        requireSuccess(engine.clearData(packageName, userId));
     }
     void deleteInstance(String packageName, int userId) throws Exception {
         // Deletion is serialized by PackageManagementSession.  It must stop the generation and
         // clear all virtual-service state before mutating the catalog or instance directory.
-        adapter.deleteInstance(packageName, userId);
+        requireSuccess(engine.uninstall(packageName, userId));
         SandboxShortcutManager.disable(context, packageName, userId);
     }
-    Bundle launch(SandboxRecord record, int userId) throws Exception { return adapter.launchBundle(record, userId); }
+    Bundle launch(SandboxRecord record, int userId) throws Exception {
+        return toBundle(requireSuccess(engine.launch(record.packageName, userId)));
+    }
     Bundle prepare(SandboxRecord record, int userId) throws Exception { return adapter.prepare(record, userId); }
     Bundle startService(SandboxRecord record, int userId) throws Exception { return adapter.startService(record, userId); }
     Bundle sendBroadcast(SandboxRecord record, int userId) throws Exception { return adapter.sendBroadcast(record, userId); }
     Bundle prepareProvider(SandboxRecord record, int userId) throws Exception { return adapter.prepareProvider(record, userId); }
     Bundle stopService(SandboxRecord record, int userId) throws Exception { return adapter.stopService(record, userId); }
-    void stop(SandboxRecord record, int userId) throws Exception { adapter.stopRuntime(record, userId); }
+    void stop(SandboxRecord record, int userId) throws Exception {
+        requireSuccess(engine.kill(record.packageName, userId));
+    }
     RuntimeStatusResult runtimeStatus() throws Exception { return adapter.runtimeStatus(); }
     String maintenanceWarning() throws Exception { return adapter.maintenanceWarning(); }
 
@@ -130,6 +158,31 @@ final class SandboxApplicationLayer implements AutoCloseable {
         SandboxRecord record = findRecord(packageName);
         if (record == null) throw new IllegalArgumentException("Package is not installed: " + packageName);
         return record;
+    }
+
+    private static SandboxOperationResult requireSuccess(SandboxOperationResult result) throws Exception {
+        if (result == null || !result.successful()) {
+            String code = result == null ? "NO_RESULT" : result.errorCode();
+            String message = result == null ? "engine returned no result" : result.errorMessage();
+            throw new IllegalStateException(code + ":" + message);
+        }
+        return result;
+    }
+
+    private static Bundle toBundle(SandboxOperationResult result) {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, result.status());
+        if (result.identity() != null) {
+            out.putString("packageName", result.identity().packageName());
+            out.putInt("virtualUserId", result.identity().virtualUserId());
+            out.putString("instanceId", result.identity().instanceId());
+        }
+        for (Map.Entry<String, String> entry : result.diagnostics().entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                out.putString(entry.getKey(), entry.getValue());
+            }
+        }
+        return out;
     }
 
     @Override public void close() { adapter.close(); }

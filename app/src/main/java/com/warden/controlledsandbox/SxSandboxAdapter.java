@@ -42,10 +42,6 @@ final class SxSandboxAdapter implements SandboxSdk {
     SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
         return packageService.importApk(uri, nativeGuestTrust);
     }
-    SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
-            throws Exception {
-        return packageService.importInstalledApplication(packageName, nativeGuestTrust);
-    }
     List<InstalledApplication> installedApplications() throws Exception {
         PackageManager packageManager = context.getPackageManager();
         SandboxCatalogState state = packageService.load();
@@ -177,77 +173,222 @@ final class SxSandboxAdapter implements SandboxSdk {
     }
 
     @Override public SandboxOperationResult importPackage(String source) throws Exception {
-        if (source == null || source.trim().isEmpty()) {
-            return SandboxOperationResult.failure("importPackage", "SOURCE_REQUIRED",
-                    "APK source is required", null, Map.of());
+        try {
+            if (source == null || source.trim().isEmpty()) {
+                return SandboxOperationResult.failure("importPackage", "SOURCE_REQUIRED",
+                        "APK source is required", null, Map.of());
+            }
+            SandboxRecord record = source.startsWith("content://")
+                    ? packageService.importApk(Uri.parse(source))
+                    : packageService.importApkFile(new File(source));
+            return SandboxOperationResult.success("importPackage", "IMPORTED",
+                    identityFor(record, 0), diagnostics(record));
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("importPackage", code("IMPORT_FAILED", error),
+                    String.valueOf(error.getMessage()), null, Map.of());
         }
-        SandboxRecord record = source.startsWith("content://")
-                ? packageService.importApk(Uri.parse(source))
-                : packageService.importApkFile(new File(source));
-        return SandboxOperationResult.success("importPackage", "IMPORTED",
-                identityFor(record, 0), diagnostics(record));
+    }
+
+    @Override public SandboxOperationResult importInstalledApplication(String packageName,
+            String nativeGuestTrust) throws Exception {
+        try {
+            if (packageName == null || packageName.trim().isEmpty()) {
+                return SandboxOperationResult.failure("importInstalledApplication",
+                        "PACKAGE_REQUIRED", "packageName is required", null, Map.of());
+            }
+            SandboxRecord record = packageService.importInstalledApplication(packageName,
+                    nativeGuestTrust == null ? "" : nativeGuestTrust);
+            packageService.ensureInstance(packageName, 0);
+            return SandboxOperationResult.success("importInstalledApplication", "IMPORTED",
+                    identityFor(record, 0), diagnostics(record));
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("importInstalledApplication",
+                    code("IMPORT_FAILED", error), String.valueOf(error.getMessage()), null, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult ensureInstance(String packageName, int virtualUserId)
             throws Exception {
-        packageService.ensureInstance(packageName, virtualUserId);
-        SandboxRecord record = packageService.findRecord(packageName);
-        return SandboxOperationResult.success("ensureInstance", "READY",
-                identityFor(record, virtualUserId), Map.of());
+        try {
+            if (packageName == null || packageName.trim().isEmpty()) {
+                return SandboxOperationResult.failure("ensureInstance", "PACKAGE_REQUIRED",
+                        "packageName is required", null, Map.of());
+            }
+            packageService.ensureInstance(packageName, virtualUserId);
+            SandboxRecord record = packageService.findRecord(packageName);
+            if (record == null) {
+                return SandboxOperationResult.failure("ensureInstance", "PACKAGE_NOT_INSTALLED",
+                        "Package is not installed: " + packageName, null, Map.of());
+            }
+            return SandboxOperationResult.success("ensureInstance", "READY",
+                    identityFor(record, virtualUserId), Map.of());
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("ensureInstance", code("ENSURE_FAILED", error),
+                    String.valueOf(error.getMessage()), null, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult cloneInstance(String packageName) throws Exception {
-        int userId = packageService.createClone(packageName);
-        SandboxRecord record = packageService.findRecord(packageName);
-        return SandboxOperationResult.success("cloneInstance", "CREATED",
-                identityFor(record, userId), Map.of("virtualUserId", Integer.toString(userId)));
+        int userId = -1;
+        try {
+            if (packageName == null || packageName.trim().isEmpty()) {
+                return SandboxOperationResult.failure("cloneInstance", "PACKAGE_REQUIRED",
+                        "packageName is required", null, Map.of());
+            }
+            userId = packageService.createClone(packageName);
+            SandboxRecord record = packageService.findRecord(packageName);
+            if (record == null) {
+                rollbackClone(packageName, userId);
+                return SandboxOperationResult.failure("cloneInstance", "CLONE_FAILED",
+                        "clone succeeded without a package record", null,
+                        Map.of("virtualUserId", Integer.toString(userId)));
+            }
+            return SandboxOperationResult.success("cloneInstance", "CREATED",
+                    identityFor(record, userId), Map.of("virtualUserId", Integer.toString(userId)));
+        } catch (Exception error) {
+            rollbackClone(packageName, userId);
+            return SandboxOperationResult.failure("cloneInstance", code("CLONE_FAILED", error),
+                    String.valueOf(error.getMessage()), null, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult launch(SandboxIdentity identity) throws Exception {
-        SandboxRecord record = requireRecord(identity);
-        return bundleResult("launch", identity, runtime.launch(record, identity.virtualUserId()));
+        try {
+            SandboxRecord record = requireRecord(identity);
+            if (record == null) {
+                return SandboxOperationResult.failure("launch", identity == null
+                                ? "IDENTITY_REQUIRED" : "PACKAGE_NOT_INSTALLED",
+                        identity == null ? "identity is required"
+                                : "Package is not installed: " + identity.packageName(),
+                        identity, Map.of());
+            }
+            return bundleResult("launch", identity, runtime.launch(record, identity.virtualUserId()));
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("launch", code("LAUNCH_FAILED", error),
+                    String.valueOf(error.getMessage()), identity, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult stop(SandboxIdentity identity) throws Exception {
-        SandboxRecord record = requireRecord(identity);
-        runtime.stop(record, identity.virtualUserId());
-        return SandboxOperationResult.success("stop", "STOPPED", identity, Map.of());
+        try {
+            SandboxRecord record = requireRecord(identity);
+            if (record == null) {
+                return SandboxOperationResult.failure("stop", identity == null
+                                ? "IDENTITY_REQUIRED" : "PACKAGE_NOT_INSTALLED",
+                        identity == null ? "identity is required"
+                                : "Package is not installed: " + identity.packageName(),
+                        identity, Map.of());
+            }
+            runtime.stop(record, identity.virtualUserId());
+            return SandboxOperationResult.success("stop", "STOPPED", identity, Map.of());
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("stop", code("STOP_FAILED", error),
+                    String.valueOf(error.getMessage()), identity, Map.of());
+        }
+    }
+
+    @Override public SandboxOperationResult stopAll() throws Exception {
+        try {
+            SandboxCatalogState state = packageService.load();
+            int stopped = 0;
+            int failed = 0;
+            for (com.warden.controlledsandbox.SandboxInstance instance : state.instances()) {
+                SandboxRecord record = packageService.findRecord(instance.packageName);
+                if (record == null) {
+                    failed++;
+                    continue;
+                }
+                try {
+                    runtime.stop(record, instance.virtualUserId);
+                    stopped++;
+                } catch (Exception ignored) {
+                    failed++;
+                }
+            }
+            Map<String, String> diagnostics = new LinkedHashMap<>();
+            diagnostics.put("stopped", Integer.toString(stopped));
+            diagnostics.put("failed", Integer.toString(failed));
+            if (failed > 0) {
+                return SandboxOperationResult.failure("stopAll", "STOP_FAILED",
+                        "one or more instances failed to stop", null, diagnostics);
+            }
+            return SandboxOperationResult.success("stopAll", "STOPPED", null, diagnostics);
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("stopAll", code("STOP_FAILED", error),
+                    String.valueOf(error.getMessage()), null, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult clearData(SandboxIdentity identity) throws Exception {
-        packageService.clearInstanceData(identity.packageName(), identity.virtualUserId());
-        return SandboxOperationResult.success("clearData", "CLEARED", identity, Map.of());
+        try {
+            if (identity == null) {
+                return SandboxOperationResult.failure("clearData", "IDENTITY_REQUIRED",
+                        "identity is required", null, Map.of());
+            }
+            packageService.clearInstanceData(identity.packageName(), identity.virtualUserId());
+            return SandboxOperationResult.success("clearData", "CLEARED", identity, Map.of());
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("clearData", code("CLEAR_FAILED", error),
+                    String.valueOf(error.getMessage()), identity, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult deleteInstance(SandboxIdentity identity) throws Exception {
-        // PackageManagementSession is the single lifecycle authority.  It performs the stop
-        // barrier and data/catalog transaction atomically for every caller, including SDK calls.
-        packageService.deleteInstance(identity.packageName(), identity.virtualUserId());
-        return SandboxOperationResult.success("deleteInstance", "DELETED", identity, Map.of());
+        try {
+            if (identity == null) {
+                return SandboxOperationResult.failure("deleteInstance", "IDENTITY_REQUIRED",
+                        "identity is required", null, Map.of());
+            }
+            // PackageManagementSession is the single lifecycle authority.  It performs the stop
+            // barrier and data/catalog transaction atomically for every caller, including SDK calls.
+            packageService.deleteInstance(identity.packageName(), identity.virtualUserId());
+            return SandboxOperationResult.success("deleteInstance", "DELETED", identity, Map.of());
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("deleteInstance", code("DELETE_FAILED", error),
+                    String.valueOf(error.getMessage()), identity, Map.of());
+        }
     }
 
     @Override public SandboxOperationResult status() throws Exception {
-        RuntimeStatusResult result = runtime.status();
-        if (!result.successful()) {
-            return SandboxOperationResult.failure("status", result.error().code(),
-                    result.error().message(), null, Map.of());
+        try {
+            RuntimeStatusResult result = runtime.status();
+            if (!result.successful()) {
+                return SandboxOperationResult.failure("status", result.error().code(),
+                        result.error().message(), null, Map.of());
+            }
+            Map<String, String> diagnostics = new LinkedHashMap<>();
+            diagnostics.put("runtimeStatus", result.status());
+            diagnostics.put("capability", result.capability());
+            if (result.snapshot() != null) {
+                diagnostics.put("slotCapacity", Integer.toString(result.snapshot().slotCapacity()));
+                diagnostics.put("slotUsed", Integer.toString(result.snapshot().slotUsed()));
+                diagnostics.put("sessionCount", Integer.toString(result.snapshot().sessionCount()));
+            }
+            return SandboxOperationResult.success("status", result.status(), null, diagnostics);
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("status", code("STATUS_FAILED", error),
+                    String.valueOf(error.getMessage()), null, Map.of());
         }
-        Map<String, String> diagnostics = new LinkedHashMap<>();
-        diagnostics.put("runtimeStatus", result.status());
-        diagnostics.put("capability", result.capability());
-        if (result.snapshot() != null) {
-            diagnostics.put("slotCapacity", Integer.toString(result.snapshot().slotCapacity()));
-            diagnostics.put("slotUsed", Integer.toString(result.snapshot().slotUsed()));
-            diagnostics.put("sessionCount", Integer.toString(result.snapshot().sessionCount()));
-        }
-        return SandboxOperationResult.success("status", result.status(), null, diagnostics);
     }
 
     private SandboxRecord requireRecord(SandboxIdentity identity) throws Exception {
-        if (identity == null) throw new IllegalArgumentException("identity is required");
-        SandboxRecord record = packageService.findRecord(identity.packageName());
-        if (record == null) throw new IllegalArgumentException("Package is not installed: " + identity.packageName());
-        return record;
+        if (identity == null) return null;
+        return packageService.findRecord(identity.packageName());
+    }
+
+    private void rollbackClone(String packageName, int userId) {
+        if (packageName == null || packageName.isBlank() || userId < 0) return;
+        try {
+            packageService.deleteInstance(packageName, userId);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String code(String fallback, Exception error) {
+        String message = error == null ? "" : String.valueOf(error.getMessage());
+        if (message.contains("not installed")) return "PACKAGE_NOT_INSTALLED";
+        if (message.contains("required")) return "SOURCE_REQUIRED";
+        return fallback;
     }
 
     private SandboxOperationResult bundleResult(String operation, SandboxIdentity identity, Bundle result) {

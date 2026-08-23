@@ -21,6 +21,11 @@ import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPeripheralServicesProfileSnapshot;
 import com.warden.controlledsandbox.compatibility.dingtalk.DingTalkCompatibilityManager;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.sdk.CasSandboxEngine;
+import com.warden.controlledsandbox.sdk.SandboxCatalog;
+import com.warden.controlledsandbox.sdk.SandboxEngineObserver;
+import com.warden.controlledsandbox.sdk.SandboxInstance;
+import com.warden.controlledsandbox.sdk.SandboxOperationResult;
 import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -122,6 +127,26 @@ public final class DebugCommandActivity extends Activity {
                 result.put("status", "PASS");
                 Log.i(TAG, "PASS native-enforcement isolatedUid="
                         + campaign.optJSONObject("isolated"));
+                return;
+            }
+            if ("c4-t02-engine".equals(command)) {
+                if (packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("package extra is required");
+                }
+                String trust = trustNativeGuest
+                        ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                        : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED;
+                JSONObject campaign = runC4T02Engine(this, packageName, trust);
+                result.put("c4t02", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pass", false)
+                                ? "C4_T02_ENGINE_PASS" : "C4_T02_ENGINE_FAIL"));
+                if (!campaign.optBoolean("pass", false)) {
+                    throw new IllegalStateException("C4_T02_ENGINE_FAILED:"
+                            + campaign.optString("error", "engine smoke failed"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS c4-t02-engine package=" + packageName);
                 return;
             }
             if ("lifecycle-clone".equals(command)
@@ -1356,6 +1381,170 @@ public final class DebugCommandActivity extends Activity {
         out.put("nativeStatus", value.nativeStatus());
         out.put("errorType", value.errorType());
         out.put("errorMessage", value.errorMessage());
+        return out;
+    }
+
+    private JSONObject runC4T02Engine(Context context, String packageName, String trust)
+            throws Exception {
+        JSONObject campaign = new JSONObject();
+        JSONArray traces = new JSONArray();
+        JSONArray observerOps = new JSONArray();
+        try (SxSandboxAdapter adapter = new SxSandboxAdapter(context)) {
+            CasSandboxEngine engine = new CasSandboxEngine(adapter);
+            engine.addObserver(new SandboxEngineObserver() {
+                @Override public void onOperation(SandboxOperationResult result) {
+                    try {
+                        observerOps.put(operationJson(result));
+                        Log.i("CS_C4_T02", "ENGINE_OP operation=" + result.operation()
+                                + " successful=" + result.successful()
+                                + " status=" + result.status()
+                                + " error=" + result.errorCode());
+                    } catch (Exception ignored) {
+                    }
+                }
+
+                @Override public void onCatalogChanged(SandboxCatalog catalog) {
+                    Log.i("CS_C4_T02", "ENGINE_CATALOG packages=" + catalog.packages().size()
+                            + " instances=" + catalog.instances().size());
+                }
+
+                @Override public void onStatusChanged(SandboxOperationResult status) {
+                    Log.i("CS_C4_T02", "ENGINE_STATUS successful=" + status.successful()
+                            + " status=" + status.status());
+                }
+            });
+            requireEngine(traces, "initialize", engine.initialize());
+            if (!engine.isReady()) throw new IllegalStateException("ENGINE_NOT_READY");
+            SandboxOperationResult attach = engine.onAttachBaseContext();
+            requireEngine(traces, "onAttachBaseContext", attach);
+            if (!"NO_OP_CAS_HOST".equals(attach.status())) {
+                throw new IllegalStateException("ATTACH_MUST_BE_NO_OP");
+            }
+            requireEngine(traces, "onAppCreate", engine.onAppCreate());
+            traces.put(namedOperation("reset-killAll", engine.killAll()));
+            for (SandboxInstance existing : engine.listInstalled()) {
+                if (!packageName.equals(existing.packageName())) continue;
+                traces.put(namedOperation("reset-uninstall-u" + existing.virtualUserId(),
+                        engine.uninstall(existing.packageName(), existing.virtualUserId())));
+            }
+            requireEngine(traces, "installFromHost",
+                    engine.installFromHost(packageName, trust));
+            if (!engine.isInstalled(packageName, 0) || engine.get(packageName, 0) == null) {
+                throw new IllegalStateException("PRIMARY_INSTANCE_MISSING");
+            }
+            if (engine.listInstalled().isEmpty()) {
+                throw new IllegalStateException("CATALOG_EMPTY_AFTER_IMPORT");
+            }
+            requireEngine(traces, "launch-user0", engine.launch(packageName, 0));
+            requireEngine(traces, "kill-user0", killSettled(engine, packageName, 0));
+            requireEngine(traces, "recovery-launch", engine.launch(packageName, 0));
+            requireEngine(traces, "recovery-kill", killSettled(engine, packageName, 0));
+            SandboxOperationResult cloned = requireEngine(traces, "clone", engine.clone(packageName));
+            int cloneUser = Integer.parseInt(cloned.diagnostics().getOrDefault("virtualUserId", "-1"));
+            if (cloneUser < 1) throw new IllegalStateException("CLONE_USER_INVALID:" + cloneUser);
+            campaign.put("cloneUser", cloneUser);
+            requireEngine(traces, "launch-clone", engine.launch(packageName, cloneUser));
+            requireEngine(traces, "kill-clone", killSettled(engine, packageName, cloneUser));
+            requireEngine(traces, "clear-user0", engine.clearData(packageName, 0));
+            SandboxOperationResult shortcut = requireEngine(traces, "createShortcut",
+                    engine.createShortcut(packageName, 0));
+            if (!shortcut.diagnostics().getOrDefault("instanceId", "").contains(packageName)) {
+                throw new IllegalStateException("SHORTCUT_IDENTITY_MISSING");
+            }
+            requireEngine(traces, "setDisplayName",
+                    engine.setDisplayName(packageName, 0, "c4-t02"));
+            SandboxOperationResult missing = engine.launch(
+                    "com.warden.controlledsandbox.missing", 0);
+            traces.put(namedOperation("launch-missing", missing));
+            if (missing.successful()
+                    || !CasSandboxEngine.PACKAGE_NOT_INSTALLED.equals(missing.errorCode())) {
+                throw new IllegalStateException("MISSING_PACKAGE_NOT_FAIL_CLOSED:"
+                        + missing.errorCode());
+            }
+            SandboxOperationResult badClone = engine.clone("com.warden.controlledsandbox.missing");
+            traces.put(namedOperation("clone-missing", badClone));
+            if (badClone.successful()) {
+                throw new IllegalStateException("MISSING_CLONE_NOT_FAIL_CLOSED");
+            }
+            requireEngine(traces, "killAll", engine.killAll());
+            requireEngine(traces, "uninstall-clone", engine.uninstall(packageName, cloneUser));
+            requireEngine(traces, "uninstall-user0", engine.uninstall(packageName, 0));
+            if (engine.isInstalled(packageName, 0) || engine.isInstalled(packageName, cloneUser)) {
+                throw new IllegalStateException("INSTANCE_RESIDUE_AFTER_DELETE");
+            }
+            boolean blackBox = traces.toString().contains("BlackBoxCore")
+                    || traces.toString().contains("top.niunaijun.blackbox");
+            if (blackBox) throw new IllegalStateException("BLACKBOX_TOKEN_IN_ENGINE_TRACE");
+            campaign.put("pass", true);
+            campaign.put("observerOperations", observerOps.length());
+            campaign.put("traceCount", traces.length());
+            campaign.put("authority", "SandboxSdk");
+            campaign.put("adapterOwnsCatalog", false);
+        } catch (Exception error) {
+            campaign.put("pass", false);
+            campaign.put("error", String.valueOf(error.getMessage()));
+        }
+        campaign.put("traces", traces);
+        campaign.put("observerOps", observerOps);
+        campaign.put("observerOperations", observerOps.length());
+        campaign.put("traceCount", traces.length());
+        return campaign;
+    }
+
+    private static SandboxOperationResult killSettled(CasSandboxEngine engine, String packageName,
+                                                      int userId) throws Exception {
+        SandboxOperationResult result = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            Thread.sleep(attempt == 0 ? 1500L : 500L);
+            result = engine.kill(packageName, userId);
+            if (result != null && result.successful()) return result;
+            String code = result == null ? "" : result.errorCode();
+            String message = result == null ? "" : String.valueOf(result.errorMessage());
+            if (!"STOP_FAILED".equals(code) && !message.contains("GUEST_STOP_FAILED")) {
+                return result;
+            }
+        }
+        return result;
+    }
+
+    private static SandboxOperationResult requireEngine(JSONArray traces, String name,
+                                                        SandboxOperationResult result)
+            throws Exception {
+        traces.put(namedOperation(name, result));
+        if (result == null || !result.successful()) {
+            throw new IllegalStateException("C4_T02_" + name + "_FAILED:"
+                    + (result == null ? "null" : result.errorCode() + ":" + result.errorMessage()));
+        }
+        return result;
+    }
+
+    private static JSONObject namedOperation(String name, SandboxOperationResult result)
+            throws Exception {
+        JSONObject row = operationJson(result);
+        row.put("step", name);
+        return row;
+    }
+
+    private static JSONObject operationJson(SandboxOperationResult result) throws Exception {
+        JSONObject out = new JSONObject();
+        if (result == null) {
+            return out.put("successful", false).put("errorCode", "NO_RESULT");
+        }
+        out.put("successful", result.successful());
+        out.put("operation", result.operation());
+        out.put("status", result.status());
+        out.put("errorCode", result.errorCode());
+        out.put("errorMessage", result.errorMessage());
+        if (result.identity() != null) {
+            out.put("packageName", result.identity().packageName());
+            out.put("virtualUserId", result.identity().virtualUserId());
+            out.put("instanceId", result.identity().instanceId());
+        }
+        JSONObject diagnostics = new JSONObject();
+        for (var entry : result.diagnostics().entrySet()) {
+            diagnostics.put(entry.getKey(), entry.getValue());
+        }
+        out.put("diagnostics", diagnostics);
         return out;
     }
 

@@ -39,6 +39,8 @@ ALLOWED_GUARD_FILES = {
     Path("tools/capability/run_c3_t06_rd.py"),
     Path("scripts/check-c4-t01-sx-freeze.py"),
     Path("tools/capability/run_c4_t01_rd.py"),
+    Path("scripts/check-c4-t02-sx-adapter.py"),
+    Path("tools/capability/run_c4_t02_rd.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(
