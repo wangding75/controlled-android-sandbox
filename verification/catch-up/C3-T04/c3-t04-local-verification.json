@@ -1,0 +1,2146 @@
+{
+  "task_id": "C3-T04",
+  "status": "PASS",
+  "source_commit_before_implementation_commit": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
+  "source_worktree_status_before_implementation_commit": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M app/src/debug/java/com/warden/controlledsandbox/HostileProductionCampaign.java\n M app/src/debug/java/com/warden/controlledsandbox/NativeEnforcementChild.java\n M app/src/debug/java/com/warden/controlledsandbox/NativeEnforcementIsolatedService.java\n M app/src/debug/java/com/warden/controlledsandbox/NativeEnforcementNative.java\n M docs/capability/CAPABILITY_REGISTRY.yaml\n M docs/review/KNOWN_ISSUES.yaml\n M sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/hostile/HostileCapabilityRegistrySelfTest.java\n M scripts/verify-catch-up-continuation.py\n M tools/capability/campaign_gates.yaml\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/native-enforcement/enforcement_native.cpp\n?? docs/review/C3_T04_HOSTILE_NATIVE_ISOLATION_DESIGN.md\n?? scripts/check-c3-t04-hostile-isolation.py\n?? tools/capability/run_c3_t04_rd.py\n?? verification/catch-up/C3-T04/",
+  "started_at": "2026-08-23T07:54:24.310684+00:00",
+  "finished_at": "2026-08-23T07:54:24.393157+00:00",
+  "static_gates": [
+    {
+      "gate": "scripts/check-c3-t04-hostile-isolation.py",
+      "returncode": 0,
+      "stdout": "PASS C3-T04 hostile isolation inventory\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-hostile-profile.py",
+      "returncode": 0,
+      "stdout": "PASS native hostile profile inventory\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-enforcement-poc.py",
+      "returncode": 0,
+      "stdout": "PASS native enforcement POC inventory\n",
+      "stderr": ""
+    },
+    {
+      "gate": "scripts/check-native-boundary-matrix.py",
+      "returncode": 0,
+      "stdout": "PASS native boundary matrix and adversarial fixture inventory\n",
+      "stderr": ""
+    }
+  ],
+  "build": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "17875705e6f95c5dc9ffdfe8b705e4989a6965c2da5f6d9ef6011e5328ba6efa"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "57b1dbdb765e233376d35f1bf2aae74f325520a82ff12c7554ba8ef1c281ef1d"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "18cb010cbe42159aff720beb716a2d25f5c0eaf248b9c37e93098de13caed53e"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "5564918e1af297ecbdba85548e36f1b7fb655423f4cb17358ec8622f3fda9e10"
+      }
+    ],
+    "native_libraries": [
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcas_native_enf.so",
+        "abi": "arm64-v8a",
+        "sha256": "7780ac25907baa1fe736a298358f421ad89660b45e8d6c36a3bfb920405fb747"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_fixture.so",
+        "abi": "arm64-v8a",
+        "sha256": "f8dda8ed7bd78ea6b500f7494dd596edcea8d562494bd96a503c76f8bb918aea"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libfixture_adv_payload.so",
+        "abi": "arm64-v8a",
+        "sha256": "36fa195c854bcafb322c663b3ffe1e23c3bfd1846f0fe77fb543fa2a62862b45"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcas_native_enf.so",
+        "abi": "x86_64",
+        "sha256": "47141a314cf172fe33e4bb1c05bd0eb6ded97b263abac4bbe8949e1d75ae7d38"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_fixture.so",
+        "abi": "x86_64",
+        "sha256": "5f5b5ca1c8dd21b1d9c9b95c90e6d76d39bb61c5b5e66b2a7d15be581f6b5cdc"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libfixture_adv_payload.so",
+        "abi": "x86_64",
+        "sha256": "3a05aef98b011f06029b7bdfbab6dbe9cc49bb851c5b8ae7b086cee8d373d8a4"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcas_native_enf.so",
+        "abi": "armeabi-v7a",
+        "sha256": "72963cb0f4086ad19249a44a1a9cb04d3e519a6a9de353b3e676414ba5052490"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_fixture.so",
+        "abi": "armeabi-v7a",
+        "sha256": "8755feed03b5285e6d4c59d9a79e05df9d8b5db2331e8efa6e303f5cee8f5a30"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libfixture_adv_payload.so",
+        "abi": "armeabi-v7a",
+        "sha256": "3dc5dd7c573156a1046da48c52f6684209395842c202305211de316df1262980"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcas_native_enf.so",
+        "abi": "x86",
+        "sha256": "8ec626b5a9386e945a7e4699fe4565277c98ffc1556da9b450c54e7f990f7824"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_fixture.so",
+        "abi": "x86",
+        "sha256": "0761f716b7ce3bde30d6292a12ec4de3dcefaab6888b662af8d682915297bb51"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libfixture_adv_payload.so",
+        "abi": "x86",
+        "sha256": "7639e58e3a310be3a7b0121f5f4f33b3f4d177680ce83e8c21060ad8872af77f"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_native.so",
+        "abi": "arm64-v8a",
+        "sha256": "a265d00ce8b6f582010a800b7e6d8bb7791efde292dfcc1b7cb200841c60a187"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native.so",
+        "abi": "armeabi-v7a",
+        "sha256": "0e2aebeae745ba70c910ac55ff9070d6bf439d3a52733a6212ebbe199abdf96e"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native.so",
+        "abi": "x86",
+        "sha256": "a6edd2f0297f52d3c0a7ba3f774a607c82c12273439979482de353ed8c0d1495"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-native\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_native.so",
+        "abi": "x86_64",
+        "sha256": "0ffee54ccf6c3bb6116678dc547dc0750458b292f7eedb8724c01e9412a87680"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\arm64-v8a\\libcontrolled_sandbox_native.so",
+        "abi": "arm64-v8a",
+        "sha256": "a265d00ce8b6f582010a800b7e6d8bb7791efde292dfcc1b7cb200841c60a187"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native.so",
+        "abi": "armeabi-v7a",
+        "sha256": "0e2aebeae745ba70c910ac55ff9070d6bf439d3a52733a6212ebbe199abdf96e"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\armeabi-v7a\\libcontrolled_sandbox_native32.so",
+        "abi": "armeabi-v7a",
+        "sha256": "bd61d885ca14b7c05bdd54736acd00de0c2cffa89f0c1e437da8c5f309d425b6"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native.so",
+        "abi": "x86",
+        "sha256": "a6edd2f0297f52d3c0a7ba3f774a607c82c12273439979482de353ed8c0d1495"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86\\libcontrolled_sandbox_native32.so",
+        "abi": "x86",
+        "sha256": "614186be3ce28fb90eabd1760bea50fbff0698f94c140155a3517243a856615d"
+      },
+      {
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\intermediates\\merged_native_libs\\debug\\mergeDebugNativeLibs\\out\\lib\\x86_64\\libcontrolled_sandbox_native.so",
+        "abi": "x86_64",
+        "sha256": "0ffee54ccf6c3bb6116678dc547dc0750458b292f7eedb8724c01e9412a87680"
+      }
+    ]
+  },
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T07:54:20.135843+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "debug_command": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "c3-t04-hostile",
+      "package": "",
+      "virtualUserId": 0,
+      "trustNativeGuest": false,
+      "requestId": "",
+      "startedAt": 1787471659535,
+      "nativeHostile": {
+        "schema": "t57-r03-p0a-03-hostile",
+        "profile": "ISOLATED_HOSTILE",
+        "host": {
+          "uid": 10045,
+          "pid": 15226,
+          "processName": "com.warden.controlledsandbox.debug"
+        },
+        "isolated": {
+          "uid": 99020,
+          "pid": 15262,
+          "appUid": 99020,
+          "isolated": true,
+          "processName": "com.warden.controlledsandbox.debug:native_enf_iso:com.warden.controlledsandbox.NativeEnforcementIsolatedService",
+          "abi": "x86_64",
+          "jniAvailable": true
+        },
+        "isolatedUidDistinct": true,
+        "pocValid": true,
+        "child": {
+          "identity": {
+            "uid": 99020,
+            "pid": 15262,
+            "appUid": 99020,
+            "isolated": true,
+            "processName": "com.warden.controlledsandbox.debug:native_enf_iso:com.warden.controlledsandbox.NativeEnforcementIsolatedService",
+            "abi": "x86_64",
+            "jniAvailable": true
+          },
+          "uid": 99020,
+          "pid": 15262,
+          "seccompStatus": "SECCOMP_FILTER_INSTALLED",
+          "attack": {
+            "abi": "x86_64",
+            "raw_available": true,
+            "ptrace": {
+              "kind": "ptrace",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "denied": true
+            },
+            "execve": {
+              "kind": "execve",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "denied": true
+            },
+            "clone": {
+              "path": "fork",
+              "rc": 15290,
+              "errno": 0,
+              "errname": "ok",
+              "note": "KERNEL_LIMIT_EXPOSED_SAME_UID"
+            },
+            "binder": {
+              "path": "/dev/binder",
+              "rc": 49,
+              "errno": 0,
+              "errname": "ok",
+              "note": "open"
+            },
+            "binderfs": {
+              "path": "/dev/binderfs/binder",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "open"
+            },
+            "inherited_fd": {
+              "count": 46,
+              "host_private_leaks": 0,
+              "fds": [
+                {
+                  "fd": 0,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 1,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 2,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 3,
+                  "target": "socket:[443848]",
+                  "host_private": false
+                },
+                {
+                  "fd": 4,
+                  "target": "/sys/kernel/tracing/trace_marker",
+                  "host_private": false
+                },
+                {
+                  "fd": 5,
+                  "target": "/system/framework/framework-res.apk",
+                  "host_private": false
+                },
+                {
+                  "fd": 6,
+                  "target": "/apex/com.android.art/javalib/core-oj.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 7,
+                  "target": "/apex/com.android.art/javalib/core-libart.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 8,
+                  "target": "/apex/com.android.art/javalib/okhttp.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 9,
+                  "target": "/apex/com.android.art/javalib/bouncycastle.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 10,
+                  "target": "/apex/com.android.art/javalib/apache-xml.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 11,
+                  "target": "/system/framework/framework.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 12,
+                  "target": "/system/framework/framework-graphics.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 13,
+                  "target": "/system/framework/ext.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 14,
+                  "target": "/system/framework/telephony-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 15,
+                  "target": "/system/framework/voip-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 16,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 17,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 18,
+                  "target": "/system/framework/ims-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 19,
+                  "target": "/apex/com.android.i18n/javalib/core-icu4j.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 20,
+                  "target": "/apex/com.android.appsearch/javalib/framework-appsearch.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 21,
+                  "target": "/apex/com.android.conscrypt/javalib/conscrypt.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 22,
+                  "target": "/apex/com.android.ipsec/javalib/android.net.ipsec.ike.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 23,
+                  "target": "/apex/com.android.media/javalib/updatable-media.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 24,
+                  "target": "/apex/com.android.mediaprovider/javalib/framework-mediaprovider.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 25,
+                  "target": "/apex/com.android.os.statsd/javalib/framework-statsd.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 26,
+                  "target": "/apex/com.android.permission/javalib/framework-permission.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 27,
+                  "target": "/apex/com.android.permission/javalib/framework-permission-s.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 28,
+                  "target": "/apex/com.android.scheduling/javalib/framework-scheduling.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 29,
+                  "target": "/apex/com.android.sdkext/javalib/framework-sdkextensions.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 30,
+                  "target": "/apex/com.android.tethering/javalib/framework-connectivity.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 31,
+                  "target": "/apex/com.android.tethering/javalib/framework-tethering.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 32,
+                  "target": "/apex/com.android.wifi/javalib/framework-wifi.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 33,
+                  "target": "/system/framework/org.apache.http.legacy.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 34,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 35,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 36,
+                  "target": "pipe:[443851]",
+                  "host_private": false
+                },
+                {
+                  "fd": 37,
+                  "target": "pipe:[443851]",
+                  "host_private": false
+                },
+                {
+                  "fd": 38,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 39,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 40,
+                  "target": "socket:[443852]",
+                  "host_private": false
+                },
+                {
+                  "fd": 41,
+                  "target": "socket:[443853]",
+                  "host_private": false
+                },
+                {
+                  "fd": 42,
+                  "target": "socket:[442264]",
+                  "host_private": false
+                },
+                {
+                  "fd": 43,
+                  "target": "/dev/binder",
+                  "host_private": false
+                },
+                {
+                  "fd": 44,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 45,
+                  "target": "anon_inode:[eventpoll]",
+                  "host_private": false
+                }
+              ]
+            },
+            "core_storage": {
+              "abi": "x86_64",
+              "path": "/data/user/0/com.warden.controlledsandbox.debug/files/cas-core/ledger.bin",
+              "raw_available": true,
+              "libc": {
+                "path": "libc_open",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              },
+              "syscall": {
+                "path": "syscall_openat",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "note": "SYS_openat"
+              },
+              "raw": {
+                "path": "raw_openat",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "raw_syscall"
+              }
+            },
+            "other_guest": {
+              "abi": "x86_64",
+              "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/other-guest/secret.txt",
+              "raw_available": true,
+              "libc": {
+                "path": "libc_open",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              },
+              "syscall": {
+                "path": "syscall_openat",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "note": "SYS_openat"
+              },
+              "raw": {
+                "path": "raw_openat",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "raw_syscall"
+              }
+            }
+          },
+          "cases": [
+            {
+              "id": "NATIVE-ENF-FS-001",
+              "domain": "filesystem",
+              "pathKind": "libc",
+              "status": "DENIED_BY_KERNEL_POLICY",
+              "detail": {
+                "path": "libc_open",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-FS-002",
+              "domain": "filesystem",
+              "pathKind": "syscall",
+              "status": "DENIED_BY_KERNEL_POLICY",
+              "detail": {
+                "path": "syscall_openat",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "note": "SYS_openat"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-FS-003",
+              "domain": "filesystem",
+              "pathKind": "raw",
+              "status": "DENIED_BY_KERNEL_POLICY",
+              "detail": {
+                "path": "raw_openat",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "raw_syscall"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-FS-004",
+              "domain": "filesystem",
+              "status": "PASS_CAPABILITY",
+              "detail": {
+                "ok": 1,
+                "body": "htok-24c081c13e19"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-FS-005",
+              "domain": "filesystem",
+              "status": "DENIED",
+              "guesses": [
+                {
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../sentinel.txt",
+                  "allowed": false,
+                  "probe": {
+                    "abi": "x86_64",
+                    "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../sentinel.txt",
+                    "raw_available": true,
+                    "libc": {
+                      "path": "libc_open",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "open"
+                    },
+                    "syscall": {
+                      "path": "syscall_openat",
+                      "rc": -1,
+                      "errno": 1,
+                      "errname": "Operation not permitted",
+                      "note": "SYS_openat"
+                    },
+                    "raw": {
+                      "path": "raw_openat",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "raw_syscall"
+                    }
+                  }
+                },
+                {
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../../files/sentinel.txt",
+                  "allowed": false,
+                  "probe": {
+                    "abi": "x86_64",
+                    "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../../files/sentinel.txt",
+                    "raw_available": true,
+                    "libc": {
+                      "path": "libc_open",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "open"
+                    },
+                    "syscall": {
+                      "path": "syscall_openat",
+                      "rc": -1,
+                      "errno": 1,
+                      "errname": "Operation not permitted",
+                      "note": "SYS_openat"
+                    },
+                    "raw": {
+                      "path": "raw_openat",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "raw_syscall"
+                    }
+                  }
+                },
+                {
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/native-enf-should-not-exist",
+                  "allowed": false,
+                  "probe": {
+                    "abi": "x86_64",
+                    "path": "/data/user/0/com.warden.controlledsandbox.debug/files/native-enf-should-not-exist",
+                    "raw_available": true,
+                    "libc": {
+                      "path": "libc_open",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "open"
+                    },
+                    "syscall": {
+                      "path": "syscall_openat",
+                      "rc": -1,
+                      "errno": 1,
+                      "errname": "Operation not permitted",
+                      "note": "SYS_openat"
+                    },
+                    "raw": {
+                      "path": "raw_openat",
+                      "rc": -1,
+                      "errno": 2,
+                      "errname": "No such file or directory",
+                      "note": "raw_syscall"
+                    }
+                  }
+                },
+                {
+                  "ok": 0,
+                  "body": "",
+                  "reason": "CAPABILITY_UNKNOWN"
+                },
+                {
+                  "ok": 0,
+                  "reason": "java.lang.SecurityException: CAPABILITY_TOKEN_LOOKS_LIKE_PATH"
+                },
+                {
+                  "ok": 0,
+                  "body": "",
+                  "reason": "SESSION_MISMATCH"
+                }
+              ]
+            },
+            {
+              "id": "NATIVE-ENF-NET-001",
+              "domain": "network",
+              "status": "DIRECT_DENIED_BY_SECCOMP",
+              "detail": {
+                "kind": "libc",
+                "socket_fd": -1,
+                "socket_errno": 1,
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "outcome": "DIRECT_DENIED"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-NET-002",
+              "domain": "network",
+              "status": "DIRECT_DENIED_BY_SECCOMP",
+              "detail": {
+                "kind": "syscall",
+                "socket_fd": -1,
+                "socket_errno": 1,
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "outcome": "DIRECT_DENIED"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-NET-003",
+              "domain": "network",
+              "status": "DIRECT_DENIED_BY_SECCOMP",
+              "detail": {
+                "kind": "raw",
+                "socket_fd": -1,
+                "socket_errno": 1,
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "outcome": "DIRECT_DENIED"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-NET-004",
+              "domain": "network",
+              "status": "PASS_CAPABILITY",
+              "detail": {
+                "ok": 1,
+                "body": "hnet-24c081c4848b"
+              }
+            },
+            {
+              "id": "NATIVE-ENF-FD-001",
+              "domain": "fd",
+              "status": "PASS_FD",
+              "procPath": "/proc/15262/fd/50",
+              "errorType": ""
+            },
+            {
+              "id": "C3-T04-FS-CORE-001",
+              "domain": "filesystem",
+              "status": "DENIED_BY_KERNEL_POLICY",
+              "detail": {
+                "abi": "x86_64",
+                "path": "/data/user/0/com.warden.controlledsandbox.debug/files/cas-core/ledger.bin",
+                "raw_available": true,
+                "libc": {
+                  "path": "libc_open",
+                  "rc": -1,
+                  "errno": 2,
+                  "errname": "No such file or directory",
+                  "note": "open"
+                },
+                "syscall": {
+                  "path": "syscall_openat",
+                  "rc": -1,
+                  "errno": 1,
+                  "errname": "Operation not permitted",
+                  "note": "SYS_openat"
+                },
+                "raw": {
+                  "path": "raw_openat",
+                  "rc": -1,
+                  "errno": 2,
+                  "errname": "No such file or directory",
+                  "note": "raw_syscall"
+                }
+              }
+            },
+            {
+              "id": "C3-T04-FS-GUEST-001",
+              "domain": "filesystem",
+              "status": "DENIED_BY_KERNEL_POLICY",
+              "detail": {
+                "abi": "x86_64",
+                "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/other-guest/secret.txt",
+                "raw_available": true,
+                "libc": {
+                  "path": "libc_open",
+                  "rc": -1,
+                  "errno": 2,
+                  "errname": "No such file or directory",
+                  "note": "open"
+                },
+                "syscall": {
+                  "path": "syscall_openat",
+                  "rc": -1,
+                  "errno": 1,
+                  "errname": "Operation not permitted",
+                  "note": "SYS_openat"
+                },
+                "raw": {
+                  "path": "raw_openat",
+                  "rc": -1,
+                  "errno": 2,
+                  "errname": "No such file or directory",
+                  "note": "raw_syscall"
+                }
+              }
+            },
+            {
+              "id": "C3-T04-PTRACE-001",
+              "domain": "ptrace",
+              "status": "DENIED_BY_SECCOMP",
+              "detail": {
+                "kind": "ptrace",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "denied": true
+              }
+            },
+            {
+              "id": "C3-T04-EXEC-001",
+              "domain": "execve",
+              "status": "DENIED_BY_SECCOMP",
+              "detail": {
+                "kind": "execve",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "denied": true
+              }
+            },
+            {
+              "id": "C3-T04-CLONE-001",
+              "domain": "clone",
+              "status": "KERNEL_LIMIT_EXPOSED_SAME_UID",
+              "detail": {
+                "path": "fork",
+                "rc": 15290,
+                "errno": 0,
+                "errname": "ok",
+                "note": "KERNEL_LIMIT_EXPOSED_SAME_UID"
+              }
+            },
+            {
+              "id": "C3-T04-BINDER-001",
+              "domain": "binder",
+              "status": "KERNEL_LIMIT_EXPOSED",
+              "binder": {
+                "path": "/dev/binder",
+                "rc": 49,
+                "errno": 0,
+                "errname": "ok",
+                "note": "open"
+              },
+              "binderfs": {
+                "path": "/dev/binderfs/binder",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              }
+            },
+            {
+              "id": "C3-T04-FD-INHERIT-001",
+              "domain": "fd",
+              "status": "PASS_NO_LEAK",
+              "detail": {
+                "count": 46,
+                "host_private_leaks": 0,
+                "fds": [
+                  {
+                    "fd": 0,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 1,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 2,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 3,
+                    "target": "socket:[443848]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 4,
+                    "target": "/sys/kernel/tracing/trace_marker",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 5,
+                    "target": "/system/framework/framework-res.apk",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 6,
+                    "target": "/apex/com.android.art/javalib/core-oj.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 7,
+                    "target": "/apex/com.android.art/javalib/core-libart.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 8,
+                    "target": "/apex/com.android.art/javalib/okhttp.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 9,
+                    "target": "/apex/com.android.art/javalib/bouncycastle.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 10,
+                    "target": "/apex/com.android.art/javalib/apache-xml.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 11,
+                    "target": "/system/framework/framework.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 12,
+                    "target": "/system/framework/framework-graphics.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 13,
+                    "target": "/system/framework/ext.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 14,
+                    "target": "/system/framework/telephony-common.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 15,
+                    "target": "/system/framework/voip-common.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 16,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 17,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 18,
+                    "target": "/system/framework/ims-common.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 19,
+                    "target": "/apex/com.android.i18n/javalib/core-icu4j.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 20,
+                    "target": "/apex/com.android.appsearch/javalib/framework-appsearch.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 21,
+                    "target": "/apex/com.android.conscrypt/javalib/conscrypt.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 22,
+                    "target": "/apex/com.android.ipsec/javalib/android.net.ipsec.ike.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 23,
+                    "target": "/apex/com.android.media/javalib/updatable-media.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 24,
+                    "target": "/apex/com.android.mediaprovider/javalib/framework-mediaprovider.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 25,
+                    "target": "/apex/com.android.os.statsd/javalib/framework-statsd.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 26,
+                    "target": "/apex/com.android.permission/javalib/framework-permission.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 27,
+                    "target": "/apex/com.android.permission/javalib/framework-permission-s.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 28,
+                    "target": "/apex/com.android.scheduling/javalib/framework-scheduling.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 29,
+                    "target": "/apex/com.android.sdkext/javalib/framework-sdkextensions.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 30,
+                    "target": "/apex/com.android.tethering/javalib/framework-connectivity.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 31,
+                    "target": "/apex/com.android.tethering/javalib/framework-tethering.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 32,
+                    "target": "/apex/com.android.wifi/javalib/framework-wifi.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 33,
+                    "target": "/system/framework/org.apache.http.legacy.jar",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 34,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 35,
+                    "target": "/dev/null",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 36,
+                    "target": "pipe:[443851]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 37,
+                    "target": "pipe:[443851]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 38,
+                    "target": "anon_inode:[eventfd]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 39,
+                    "target": "anon_inode:[eventfd]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 40,
+                    "target": "socket:[443852]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 41,
+                    "target": "socket:[443853]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 42,
+                    "target": "socket:[442264]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 43,
+                    "target": "/dev/binder",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 44,
+                    "target": "anon_inode:[eventfd]",
+                    "host_private": false
+                  },
+                  {
+                    "fd": 45,
+                    "target": "anon_inode:[eventpoll]",
+                    "host_private": false
+                  }
+                ]
+              }
+            },
+            {
+              "id": "NATIVE-ENF-SECCOMP-64",
+              "domain": "seccomp",
+              "classification": "SECCOMP_FILTER_FEASIBLE",
+              "detail": {
+                "fork_used": true,
+                "child_exit": 0,
+                "child_signal": 0,
+                "result": {
+                  "abi": "x86_64",
+                  "prctl_no_new_privs": 0,
+                  "prctl_errno": 0,
+                  "filter_rc": 0,
+                  "filter_errno": 0,
+                  "baseline_getppid": 15262,
+                  "filtered_getppid": -1,
+                  "filtered_getppid_errno": 1,
+                  "live_getpid": 15291,
+                  "signal": 0,
+                  "classification": "SECCOMP_FILTER_FEASIBLE",
+                  "raw_available": true
+                }
+              },
+              "abi": "x86_64"
+            },
+            {
+              "id": "NATIVE-ENF-STALE-001",
+              "status": "DENIED",
+              "errorType": "GENERATION_MISMATCH"
+            },
+            {
+              "id": "C3-T04-CAP-GRANT-001",
+              "domain": "capability",
+              "status": "PASS_CAPABILITY",
+              "detail": {
+                "broker": "NATIVE-ENF-FS-004"
+              }
+            },
+            {
+              "id": "C3-T04-CAP-SCOPE-001",
+              "domain": "capability",
+              "status": "DENIED_BY_BROKER",
+              "detail": {
+                "source": "NATIVE-ENF-FS-005"
+              }
+            },
+            {
+              "id": "C3-T04-CAP-REV-001",
+              "domain": "capability",
+              "status": "DENIED_BY_BROKER",
+              "detail": {
+                "errorType": "GENERATION_MISMATCH"
+              }
+            },
+            {
+              "id": "C3-T04-FS-UNGRANTED-001",
+              "domain": "filesystem",
+              "status": "DENIED",
+              "detail": {}
+            },
+            {
+              "id": "C3-T04-SOCKET-001",
+              "domain": "network",
+              "status": "DENIED_BY_SECCOMP",
+              "detail": {
+                "source": "NATIVE-ENF-NET-001"
+              }
+            },
+            {
+              "id": "C3-T04-NET-BROKER-001",
+              "domain": "network",
+              "status": "PASS_CAPABILITY",
+              "detail": {
+                "source": "NATIVE-ENF-NET-004"
+              }
+            },
+            {
+              "id": "C3-T04-CAP-EXPIRY-001",
+              "domain": "capability",
+              "status": "DENIED_BY_BROKER",
+              "detail": {
+                "denied": true,
+                "errorType": "CAPABILITY_EXPIRED",
+                "expected": "CAPABILITY_EXPIRED",
+                "matched": true
+              }
+            },
+            {
+              "id": "C3-T04-CAP-REPLAY-001",
+              "domain": "capability",
+              "status": "DENIED_BY_BROKER",
+              "detail": {
+                "denied": true,
+                "errorType": "CAPABILITY_REVOKED",
+                "expected": "CAPABILITY_REVOKED",
+                "matched": true
+              }
+            },
+            {
+              "id": "C3-T04-DEATH-001",
+              "domain": "death",
+              "status": "PASS_REVOKED",
+              "detail": {
+                "isolatedPid": 15262,
+                "processGone": true,
+                "replayDenied": true
+              }
+            },
+            {
+              "id": "C3-T04-ISO-001",
+              "domain": "process",
+              "status": "PASS_ISOLATED",
+              "detail": {
+                "uid": 99020,
+                "pid": 15262,
+                "appUid": 99020,
+                "isolated": true,
+                "processName": "com.warden.controlledsandbox.debug:native_enf_iso:com.warden.controlledsandbox.NativeEnforcementIsolatedService",
+                "abi": "x86_64",
+                "jniAvailable": true
+              }
+            }
+          ],
+          "production": true,
+          "openProbe": {
+            "abi": "x86_64",
+            "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt",
+            "raw_available": true,
+            "libc": {
+              "path": "libc_open",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "open"
+            },
+            "syscall": {
+              "path": "syscall_openat",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "note": "SYS_openat"
+            },
+            "raw": {
+              "path": "raw_openat",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "raw_syscall"
+            }
+          },
+          "netProbe": {
+            "abi": "x86_64",
+            "host": "127.0.0.1",
+            "port": 45205,
+            "raw_available": true,
+            "libc": {
+              "kind": "libc",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            },
+            "syscall": {
+              "kind": "syscall",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            },
+            "raw": {
+              "kind": "raw",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            }
+          },
+          "brokerFs": {
+            "ok": 1,
+            "body": "htok-24c081c13e19"
+          },
+          "brokerNet": {
+            "ok": 1,
+            "body": "hnet-24c081c4848b"
+          },
+          "seccomp": {
+            "fork_used": true,
+            "child_exit": 0,
+            "child_signal": 0,
+            "result": {
+              "abi": "x86_64",
+              "prctl_no_new_privs": 0,
+              "prctl_errno": 0,
+              "filter_rc": 0,
+              "filter_errno": 0,
+              "baseline_getppid": 15262,
+              "filtered_getppid": -1,
+              "filtered_getppid_errno": 1,
+              "live_getpid": 15291,
+              "signal": 0,
+              "classification": "SECCOMP_FILTER_FEASIBLE",
+              "raw_available": true
+            }
+          },
+          "fs_conclusion": "PROVEN",
+          "BROKER_FS_CAPABILITY": "PROVEN_ON_RD",
+          "net_conclusion": "PROVEN",
+          "BROKER_NET_CAPABILITY": "PROVEN_ON_RD",
+          "seccomp_conclusion": "FEASIBLE",
+          "sentinelToken": "htok-24c081c13e19",
+          "networkNonce": "hnet-24c081c4848b"
+        },
+        "cases": [
+          {
+            "id": "NATIVE-ENF-FS-001",
+            "domain": "filesystem",
+            "pathKind": "libc",
+            "status": "DENIED_BY_KERNEL_POLICY",
+            "detail": {
+              "path": "libc_open",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "open"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-FS-002",
+            "domain": "filesystem",
+            "pathKind": "syscall",
+            "status": "DENIED_BY_KERNEL_POLICY",
+            "detail": {
+              "path": "syscall_openat",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "note": "SYS_openat"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-FS-003",
+            "domain": "filesystem",
+            "pathKind": "raw",
+            "status": "DENIED_BY_KERNEL_POLICY",
+            "detail": {
+              "path": "raw_openat",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "raw_syscall"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-FS-004",
+            "domain": "filesystem",
+            "status": "PASS_CAPABILITY",
+            "detail": {
+              "ok": 1,
+              "body": "htok-24c081c13e19"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-FS-005",
+            "domain": "filesystem",
+            "status": "DENIED",
+            "guesses": [
+              {
+                "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../sentinel.txt",
+                "allowed": false,
+                "probe": {
+                  "abi": "x86_64",
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../sentinel.txt",
+                  "raw_available": true,
+                  "libc": {
+                    "path": "libc_open",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "open"
+                  },
+                  "syscall": {
+                    "path": "syscall_openat",
+                    "rc": -1,
+                    "errno": 1,
+                    "errname": "Operation not permitted",
+                    "note": "SYS_openat"
+                  },
+                  "raw": {
+                    "path": "raw_openat",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "raw_syscall"
+                  }
+                }
+              },
+              {
+                "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../../files/sentinel.txt",
+                "allowed": false,
+                "probe": {
+                  "abi": "x86_64",
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/hsess-40409223631189/sentinel.txt/../../files/sentinel.txt",
+                  "raw_available": true,
+                  "libc": {
+                    "path": "libc_open",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "open"
+                  },
+                  "syscall": {
+                    "path": "syscall_openat",
+                    "rc": -1,
+                    "errno": 1,
+                    "errname": "Operation not permitted",
+                    "note": "SYS_openat"
+                  },
+                  "raw": {
+                    "path": "raw_openat",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "raw_syscall"
+                  }
+                }
+              },
+              {
+                "path": "/data/user/0/com.warden.controlledsandbox.debug/files/native-enf-should-not-exist",
+                "allowed": false,
+                "probe": {
+                  "abi": "x86_64",
+                  "path": "/data/user/0/com.warden.controlledsandbox.debug/files/native-enf-should-not-exist",
+                  "raw_available": true,
+                  "libc": {
+                    "path": "libc_open",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "open"
+                  },
+                  "syscall": {
+                    "path": "syscall_openat",
+                    "rc": -1,
+                    "errno": 1,
+                    "errname": "Operation not permitted",
+                    "note": "SYS_openat"
+                  },
+                  "raw": {
+                    "path": "raw_openat",
+                    "rc": -1,
+                    "errno": 2,
+                    "errname": "No such file or directory",
+                    "note": "raw_syscall"
+                  }
+                }
+              },
+              {
+                "ok": 0,
+                "body": "",
+                "reason": "CAPABILITY_UNKNOWN"
+              },
+              {
+                "ok": 0,
+                "reason": "java.lang.SecurityException: CAPABILITY_TOKEN_LOOKS_LIKE_PATH"
+              },
+              {
+                "ok": 0,
+                "body": "",
+                "reason": "SESSION_MISMATCH"
+              }
+            ]
+          },
+          {
+            "id": "NATIVE-ENF-NET-001",
+            "domain": "network",
+            "status": "DIRECT_DENIED_BY_SECCOMP",
+            "detail": {
+              "kind": "libc",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-NET-002",
+            "domain": "network",
+            "status": "DIRECT_DENIED_BY_SECCOMP",
+            "detail": {
+              "kind": "syscall",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-NET-003",
+            "domain": "network",
+            "status": "DIRECT_DENIED_BY_SECCOMP",
+            "detail": {
+              "kind": "raw",
+              "socket_fd": -1,
+              "socket_errno": 1,
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "outcome": "DIRECT_DENIED"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-NET-004",
+            "domain": "network",
+            "status": "PASS_CAPABILITY",
+            "detail": {
+              "ok": 1,
+              "body": "hnet-24c081c4848b"
+            }
+          },
+          {
+            "id": "NATIVE-ENF-FD-001",
+            "domain": "fd",
+            "status": "PASS_FD",
+            "procPath": "/proc/15262/fd/50",
+            "errorType": ""
+          },
+          {
+            "id": "C3-T04-FS-CORE-001",
+            "domain": "filesystem",
+            "status": "DENIED_BY_KERNEL_POLICY",
+            "detail": {
+              "abi": "x86_64",
+              "path": "/data/user/0/com.warden.controlledsandbox.debug/files/cas-core/ledger.bin",
+              "raw_available": true,
+              "libc": {
+                "path": "libc_open",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              },
+              "syscall": {
+                "path": "syscall_openat",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "note": "SYS_openat"
+              },
+              "raw": {
+                "path": "raw_openat",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "raw_syscall"
+              }
+            }
+          },
+          {
+            "id": "C3-T04-FS-GUEST-001",
+            "domain": "filesystem",
+            "status": "DENIED_BY_KERNEL_POLICY",
+            "detail": {
+              "abi": "x86_64",
+              "path": "/data/user/0/com.warden.controlledsandbox.debug/files/hostile/other-guest/secret.txt",
+              "raw_available": true,
+              "libc": {
+                "path": "libc_open",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "open"
+              },
+              "syscall": {
+                "path": "syscall_openat",
+                "rc": -1,
+                "errno": 1,
+                "errname": "Operation not permitted",
+                "note": "SYS_openat"
+              },
+              "raw": {
+                "path": "raw_openat",
+                "rc": -1,
+                "errno": 2,
+                "errname": "No such file or directory",
+                "note": "raw_syscall"
+              }
+            }
+          },
+          {
+            "id": "C3-T04-PTRACE-001",
+            "domain": "ptrace",
+            "status": "DENIED_BY_SECCOMP",
+            "detail": {
+              "kind": "ptrace",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "denied": true
+            }
+          },
+          {
+            "id": "C3-T04-EXEC-001",
+            "domain": "execve",
+            "status": "DENIED_BY_SECCOMP",
+            "detail": {
+              "kind": "execve",
+              "rc": -1,
+              "errno": 1,
+              "errname": "Operation not permitted",
+              "denied": true
+            }
+          },
+          {
+            "id": "C3-T04-CLONE-001",
+            "domain": "clone",
+            "status": "KERNEL_LIMIT_EXPOSED_SAME_UID",
+            "detail": {
+              "path": "fork",
+              "rc": 15290,
+              "errno": 0,
+              "errname": "ok",
+              "note": "KERNEL_LIMIT_EXPOSED_SAME_UID"
+            }
+          },
+          {
+            "id": "C3-T04-BINDER-001",
+            "domain": "binder",
+            "status": "KERNEL_LIMIT_EXPOSED",
+            "binder": {
+              "path": "/dev/binder",
+              "rc": 49,
+              "errno": 0,
+              "errname": "ok",
+              "note": "open"
+            },
+            "binderfs": {
+              "path": "/dev/binderfs/binder",
+              "rc": -1,
+              "errno": 2,
+              "errname": "No such file or directory",
+              "note": "open"
+            }
+          },
+          {
+            "id": "C3-T04-FD-INHERIT-001",
+            "domain": "fd",
+            "status": "PASS_NO_LEAK",
+            "detail": {
+              "count": 46,
+              "host_private_leaks": 0,
+              "fds": [
+                {
+                  "fd": 0,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 1,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 2,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 3,
+                  "target": "socket:[443848]",
+                  "host_private": false
+                },
+                {
+                  "fd": 4,
+                  "target": "/sys/kernel/tracing/trace_marker",
+                  "host_private": false
+                },
+                {
+                  "fd": 5,
+                  "target": "/system/framework/framework-res.apk",
+                  "host_private": false
+                },
+                {
+                  "fd": 6,
+                  "target": "/apex/com.android.art/javalib/core-oj.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 7,
+                  "target": "/apex/com.android.art/javalib/core-libart.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 8,
+                  "target": "/apex/com.android.art/javalib/okhttp.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 9,
+                  "target": "/apex/com.android.art/javalib/bouncycastle.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 10,
+                  "target": "/apex/com.android.art/javalib/apache-xml.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 11,
+                  "target": "/system/framework/framework.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 12,
+                  "target": "/system/framework/framework-graphics.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 13,
+                  "target": "/system/framework/ext.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 14,
+                  "target": "/system/framework/telephony-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 15,
+                  "target": "/system/framework/voip-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 16,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 17,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 18,
+                  "target": "/system/framework/ims-common.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 19,
+                  "target": "/apex/com.android.i18n/javalib/core-icu4j.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 20,
+                  "target": "/apex/com.android.appsearch/javalib/framework-appsearch.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 21,
+                  "target": "/apex/com.android.conscrypt/javalib/conscrypt.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 22,
+                  "target": "/apex/com.android.ipsec/javalib/android.net.ipsec.ike.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 23,
+                  "target": "/apex/com.android.media/javalib/updatable-media.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 24,
+                  "target": "/apex/com.android.mediaprovider/javalib/framework-mediaprovider.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 25,
+                  "target": "/apex/com.android.os.statsd/javalib/framework-statsd.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 26,
+                  "target": "/apex/com.android.permission/javalib/framework-permission.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 27,
+                  "target": "/apex/com.android.permission/javalib/framework-permission-s.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 28,
+                  "target": "/apex/com.android.scheduling/javalib/framework-scheduling.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 29,
+                  "target": "/apex/com.android.sdkext/javalib/framework-sdkextensions.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 30,
+                  "target": "/apex/com.android.tethering/javalib/framework-connectivity.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 31,
+                  "target": "/apex/com.android.tethering/javalib/framework-tethering.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 32,
+                  "target": "/apex/com.android.wifi/javalib/framework-wifi.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 33,
+                  "target": "/system/framework/org.apache.http.legacy.jar",
+                  "host_private": false
+                },
+                {
+                  "fd": 34,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 35,
+                  "target": "/dev/null",
+                  "host_private": false
+                },
+                {
+                  "fd": 36,
+                  "target": "pipe:[443851]",
+                  "host_private": false
+                },
+                {
+                  "fd": 37,
+                  "target": "pipe:[443851]",
+                  "host_private": false
+                },
+                {
+                  "fd": 38,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 39,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 40,
+                  "target": "socket:[443852]",
+                  "host_private": false
+                },
+                {
+                  "fd": 41,
+                  "target": "socket:[443853]",
+                  "host_private": false
+                },
+                {
+                  "fd": 42,
+                  "target": "socket:[442264]",
+                  "host_private": false
+                },
+                {
+                  "fd": 43,
+                  "target": "/dev/binder",
+                  "host_private": false
+                },
+                {
+                  "fd": 44,
+                  "target": "anon_inode:[eventfd]",
+                  "host_private": false
+                },
+                {
+                  "fd": 45,
+                  "target": "anon_inode:[eventpoll]",
+                  "host_private": false
+                }
+              ]
+            }
+          },
+          {
+            "id": "NATIVE-ENF-SECCOMP-64",
+            "domain": "seccomp",
+            "classification": "SECCOMP_FILTER_FEASIBLE",
+            "detail": {
+              "fork_used": true,
+              "child_exit": 0,
+              "child_signal": 0,
+              "result": {
+                "abi": "x86_64",
+                "prctl_no_new_privs": 0,
+                "prctl_errno": 0,
+                "filter_rc": 0,
+                "filter_errno": 0,
+                "baseline_getppid": 15262,
+                "filtered_getppid": -1,
+                "filtered_getppid_errno": 1,
+                "live_getpid": 15291,
+                "signal": 0,
+                "classification": "SECCOMP_FILTER_FEASIBLE",
+                "raw_available": true
+              }
+            },
+            "abi": "x86_64"
+          },
+          {
+            "id": "NATIVE-ENF-STALE-001",
+            "status": "DENIED",
+            "errorType": "GENERATION_MISMATCH"
+          },
+          {
+            "id": "C3-T04-CAP-GRANT-001",
+            "domain": "capability",
+            "status": "PASS_CAPABILITY",
+            "detail": {
+              "broker": "NATIVE-ENF-FS-004"
+            }
+          },
+          {
+            "id": "C3-T04-CAP-SCOPE-001",
+            "domain": "capability",
+            "status": "DENIED_BY_BROKER",
+            "detail": {
+              "source": "NATIVE-ENF-FS-005"
+            }
+          },
+          {
+            "id": "C3-T04-CAP-REV-001",
+            "domain": "capability",
+            "status": "DENIED_BY_BROKER",
+            "detail": {
+              "errorType": "GENERATION_MISMATCH"
+            }
+          },
+          {
+            "id": "C3-T04-FS-UNGRANTED-001",
+            "domain": "filesystem",
+            "status": "DENIED",
+            "detail": {}
+          },
+          {
+            "id": "C3-T04-SOCKET-001",
+            "domain": "network",
+            "status": "DENIED_BY_SECCOMP",
+            "detail": {
+              "source": "NATIVE-ENF-NET-001"
+            }
+          },
+          {
+            "id": "C3-T04-NET-BROKER-001",
+            "domain": "network",
+            "status": "PASS_CAPABILITY",
+            "detail": {
+              "source": "NATIVE-ENF-NET-004"
+            }
+          },
+          {
+            "id": "C3-T04-CAP-EXPIRY-001",
+            "domain": "capability",
+            "status": "DENIED_BY_BROKER",
+            "detail": {
+              "denied": true,
+              "errorType": "CAPABILITY_EXPIRED",
+              "expected": "CAPABILITY_EXPIRED",
+              "matched": true
+            }
+          },
+          {
+            "id": "C3-T04-CAP-REPLAY-001",
+            "domain": "capability",
+            "status": "DENIED_BY_BROKER",
+            "detail": {
+              "denied": true,
+              "errorType": "CAPABILITY_REVOKED",
+              "expected": "CAPABILITY_REVOKED",
+              "matched": true
+            }
+          },
+          {
+            "id": "C3-T04-DEATH-001",
+            "domain": "death",
+            "status": "PASS_REVOKED",
+            "detail": {
+              "isolatedPid": 15262,
+              "processGone": true,
+              "replayDenied": true
+            }
+          },
+          {
+            "id": "C3-T04-ISO-001",
+            "domain": "process",
+            "status": "PASS_ISOLATED",
+            "detail": {
+              "uid": 99020,
+              "pid": 15262,
+              "appUid": 99020,
+              "isolated": true,
+              "processName": "com.warden.controlledsandbox.debug:native_enf_iso:com.warden.controlledsandbox.NativeEnforcementIsolatedService",
+              "abi": "x86_64",
+              "jniAvailable": true
+            }
+          }
+        ],
+        "fs_conclusion": "PROVEN",
+        "net_conclusion": "PROVEN",
+        "seccomp_conclusion": "FEASIBLE",
+        "BROKER_FS_CAPABILITY": "PROVEN_ON_RD",
+        "BROKER_NET_CAPABILITY": "PROVEN_ON_RD",
+        "death": {
+          "isolatedPid": 15262,
+          "processGone": true,
+          "replayDenied": true
+        },
+        "c3t04Pass": true,
+        "residual": {
+          "binder": "KERNEL_LIMIT_EXPOSED",
+          "clone": "KERNEL_LIMIT_EXPOSED_SAME_UID",
+          "socket": "DENIED_BY_SECCOMP"
+        }
+      },
+      "operation": {
+        "status": "NATIVE_HOSTILE_RAN"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 934\nWaitTime: 936\nComplete\n",
+    "start_stderr": ""
+  },
+  "case_statuses": {
+    "C3-T04-FS-CORE-001": "DENIED_BY_KERNEL_POLICY",
+    "C3-T04-FS-GUEST-001": "DENIED_BY_KERNEL_POLICY",
+    "C3-T04-PTRACE-001": "DENIED_BY_SECCOMP",
+    "C3-T04-EXEC-001": "DENIED_BY_SECCOMP",
+    "C3-T04-CLONE-001": "KERNEL_LIMIT_EXPOSED_SAME_UID",
+    "C3-T04-BINDER-001": "KERNEL_LIMIT_EXPOSED",
+    "C3-T04-FD-INHERIT-001": "PASS_NO_LEAK",
+    "C3-T04-CAP-GRANT-001": "PASS_CAPABILITY",
+    "C3-T04-CAP-SCOPE-001": "DENIED_BY_BROKER",
+    "C3-T04-CAP-REV-001": "DENIED_BY_BROKER",
+    "C3-T04-FS-UNGRANTED-001": "DENIED",
+    "C3-T04-SOCKET-001": "DENIED_BY_SECCOMP",
+    "C3-T04-NET-BROKER-001": "PASS_CAPABILITY",
+    "C3-T04-CAP-EXPIRY-001": "DENIED_BY_BROKER",
+    "C3-T04-CAP-REPLAY-001": "DENIED_BY_BROKER",
+    "C3-T04-DEATH-001": "PASS_REVOKED",
+    "C3-T04-ISO-001": "PASS_ISOLATED"
+  },
+  "residual": {
+    "binder": "KERNEL_LIMIT_EXPOSED",
+    "clone": "KERNEL_LIMIT_EXPOSED_SAME_UID",
+    "socket": "DENIED_BY_SECCOMP"
+  },
+  "errors": [],
+  "non_claims": [
+    "PLT/GOT is not a hostile native security boundary",
+    "classic BPF deny-only is not seccomp user-notify",
+    "binder/clone residuals are kernel limits, not isolation PASS",
+    "RD API32 is not API33+ / ARM / 16KB / OEM / VA Pro equivalence"
+  ]
+}

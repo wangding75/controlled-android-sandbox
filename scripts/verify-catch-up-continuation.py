@@ -29,6 +29,7 @@ ALLOWED_GUARD_FILES = {
     # This C3-T02 static checker likewise asserts that historical serials are
     # forbidden; the RD runner resolves the device dynamically.
     Path("scripts/check-c3-t02-file-proc-network-fd.py"),
+    Path("scripts/check-c3-t04-hostile-isolation.py"),
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(

@@ -57,6 +57,22 @@ public final class HostileProductionCampaign {
         HostileCapabilityRegistry registry = new HostileCapabilityRegistry();
         registry.admit(admission);
 
+        File coreDir = new File(context.getFilesDir(), "cas-core");
+        if (!coreDir.isDirectory() && !coreDir.mkdirs()) {
+            throw new IllegalStateException("cannot create core storage dir");
+        }
+        File coreStorage = new File(coreDir, "ledger.bin");
+        try (FileOutputStream output = new FileOutputStream(coreStorage)) {
+            output.write(("core-" + session).getBytes(StandardCharsets.UTF_8));
+        }
+        File otherGuest = new File(context.getFilesDir(), "hostile/other-guest/secret.txt");
+        File otherParent = otherGuest.getParentFile();
+        if (otherParent != null && !otherParent.isDirectory() && !otherParent.mkdirs()) {
+            throw new IllegalStateException("cannot create other-guest dir");
+        }
+        try (FileOutputStream output = new FileOutputStream(otherGuest)) {
+            output.write(("other-guest-" + session).getBytes(StandardCharsets.UTF_8));
+        }
         File root = new File(context.getFilesDir(), "hostile/" + session);
         if (!root.isDirectory() && !root.mkdirs()) {
             throw new IllegalStateException("cannot create hostile sentinel dir");
@@ -105,7 +121,9 @@ public final class HostileProductionCampaign {
                 }
                 JSONObject child = runChild(bind.binder, broker, session, generation, pkg,
                         fs.tokenId(), net.tokenId(), fd.tokenId(),
-                        sentinel.getAbsolutePath(), "127.0.0.1", port, token, nonce, registry);
+                        sentinel.getAbsolutePath(), "127.0.0.1", port, token, nonce, registry,
+                        coreStorage.getAbsolutePath(), otherGuest.getAbsolutePath(),
+                        Process.myPid());
                 result.put("child", child);
                 result.put("cases", child.optJSONArray("cases"));
                 result.put("fs_conclusion", child.optString("fs_conclusion"));
@@ -113,8 +131,43 @@ public final class HostileProductionCampaign {
                 result.put("seccomp_conclusion", child.optString("seccomp_conclusion"));
                 result.put("BROKER_FS_CAPABILITY", child.optString("BROKER_FS_CAPABILITY"));
                 result.put("BROKER_NET_CAPABILITY", child.optString("BROKER_NET_CAPABILITY"));
-            } finally {
+                JSONObject expiry = brokerDenied(registry, new HostileCapabilityRequest(
+                        registry.issueReadResource(admission, "expired", sentinel, token, 1L)
+                                .tokenId(),
+                        session, generation, pkg, 0, HostileCapabilityRequest.OP_READ_RESOURCE),
+                        "CAPABILITY_EXPIRED");
+                appendCase(child, "C3-T04-CAP-EXPIRY-001", "capability",
+                        expiry.optBoolean("denied", false) ? "DENIED_BY_BROKER" : "UNEXPECTED_ALLOW",
+                        expiry);
+                boolean unbound = false;
+                int isolatedPid = isolated.optInt("pid", 0);
                 context.unbindService(bind.connection);
+                unbound = true;
+                boolean dead = waitPidGone(isolatedPid, 8_000L);
+                registry.revokeSession(session, generation);
+                JSONObject replay = brokerDenied(registry, new HostileCapabilityRequest(
+                        fs.tokenId(), session, generation, pkg, 0,
+                        HostileCapabilityRequest.OP_READ_RESOURCE), "CAPABILITY_REVOKED");
+                JSONObject death = new JSONObject();
+                death.put("isolatedPid", isolatedPid);
+                death.put("processGone", dead);
+                death.put("replayDenied", replay.optBoolean("denied", false));
+                appendCase(child, "C3-T04-CAP-REPLAY-001", "capability",
+                        replay.optBoolean("denied", false) ? "DENIED_BY_BROKER" : "UNEXPECTED_ALLOW",
+                        replay);
+                appendCase(child, "C3-T04-DEATH-001", "death",
+                        dead && replay.optBoolean("denied", false) ? "PASS_REVOKED" : "FAIL_RESIDUE",
+                        death);
+                result.put("death", death);
+                result.put("cases", child.optJSONArray("cases"));
+                classifyC3T04(result, child, isolated);
+                if (!unbound) {
+                    context.unbindService(bind.connection);
+                }
+            } finally {
+                try {
+                    context.unbindService(bind.connection);
+                } catch (Exception ignored) { }
                 registry.revokeSession(session, generation);
             }
         } finally {
@@ -124,13 +177,15 @@ public final class HostileProductionCampaign {
         }
         persist(context, result);
         persistSplit(context, result);
+        writeFile(new File(context.getFilesDir(), "c3-t04-hostile-results.json"), result.toString());
         return result;
     }
 
     private static JSONObject runChild(IBinder child, IBinder broker, String session,
             long generation, String pkg, String fsCap, String netCap, String fdCap,
             String realPath, String host, int port, String sentinelToken, String nonce,
-            HostileCapabilityRegistry registry) throws Exception {
+            HostileCapabilityRegistry registry, String coreStoragePath, String otherGuestPath,
+            int hostPid) throws Exception {
         Parcel data = Parcel.obtain();
         Parcel reply = Parcel.obtain();
         try {
@@ -146,6 +201,10 @@ public final class HostileProductionCampaign {
             data.writeString(pkg);
             data.writeString(fdCap);
             data.writeInt(1); // production broker
+            data.writeString(coreStoragePath);
+            data.writeString(otherGuestPath);
+            data.writeString(pkg);
+            data.writeInt(hostPid);
             child.transact(NativeEnforcementIsolatedService.TX_RUN, data, reply, 0);
             reply.readException();
             JSONObject out = new JSONObject(reply.readString());
@@ -186,6 +245,132 @@ public final class HostileProductionCampaign {
                 .contains("INSTALLED") ? "FEASIBLE" : "ENVIRONMENT_LIMITED");
         out.put("sentinelToken", sentinelToken);
         out.put("networkNonce", nonce);
+        appendCase(out, "C3-T04-CAP-GRANT-001", "capability",
+                fsBroker ? "PASS_CAPABILITY" : "BROKER_DENIED",
+                new JSONObject().put("broker", "NATIVE-ENF-FS-004"));
+        appendCase(out, "C3-T04-CAP-SCOPE-001", "capability",
+                statusIs(cases, "NATIVE-ENF-FS-005", "DENIED") ? "DENIED_BY_BROKER" : "UNEXPECTED_ALLOW",
+                new JSONObject().put("source", "NATIVE-ENF-FS-005"));
+        appendCase(out, "C3-T04-CAP-REV-001", "capability",
+                stale.successful() ? "UNEXPECTED_ALLOW" : "DENIED_BY_BROKER",
+                new JSONObject().put("errorType", stale.errorType()));
+        appendCase(out, "C3-T04-FS-UNGRANTED-001", "filesystem",
+                fsDenied && statusIs(cases, "NATIVE-ENF-FS-005", "DENIED")
+                        ? "DENIED" : "UNEXPECTED_ALLOW",
+                new JSONObject());
+        boolean socketDenied = netDenied;
+        appendCase(out, "C3-T04-SOCKET-001", "network",
+                socketDenied ? "DENIED_BY_SECCOMP" : "KERNEL_LIMIT_EXPOSED",
+                new JSONObject().put("source", "NATIVE-ENF-NET-001"));
+        appendCase(out, "C3-T04-NET-BROKER-001", "network",
+                netBroker ? "PASS_CAPABILITY" : "BROKER_DENIED",
+                new JSONObject().put("source", "NATIVE-ENF-NET-004"));
+    }
+
+    private static void classifyC3T04(JSONObject result, JSONObject child, JSONObject isolated)
+            throws Exception {
+        appendCase(child, "C3-T04-ISO-001", "process",
+                result.optBoolean("isolatedUidDistinct", false) ? "PASS_ISOLATED" : "FAIL_UID",
+                isolated);
+        result.put("cases", child.optJSONArray("cases"));
+        JSONArray cases = child.optJSONArray("cases");
+        boolean requiredDenied = statusIs(cases, "C3-T04-FS-CORE-001", "DENIED_BY_KERNEL_POLICY")
+                && statusIs(cases, "C3-T04-FS-GUEST-001", "DENIED_BY_KERNEL_POLICY")
+                && statusIs(cases, "C3-T04-FS-UNGRANTED-001", "DENIED")
+                && statusIs(cases, "C3-T04-FD-INHERIT-001", "PASS_NO_LEAK")
+                && statusIs(cases, "C3-T04-PTRACE-001", "DENIED_BY_SECCOMP")
+                && statusIs(cases, "C3-T04-EXEC-001", "DENIED_BY_SECCOMP")
+                && statusIs(cases, "C3-T04-CAP-GRANT-001", "PASS_CAPABILITY")
+                && statusIs(cases, "C3-T04-CAP-SCOPE-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-REV-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-EXPIRY-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-REPLAY-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-DEATH-001", "PASS_REVOKED")
+                && statusIs(cases, "C3-T04-ISO-001", "PASS_ISOLATED")
+                && statusIs(cases, "C3-T04-NET-BROKER-001", "PASS_CAPABILITY");
+        boolean ptraceDenied = statusIs(cases, "C3-T04-PTRACE-001", "DENIED_BY_SECCOMP")
+                || statusIs(cases, "C3-T04-PTRACE-001", "DENIED_BY_KERNEL_POLICY");
+        boolean execDenied = statusIs(cases, "C3-T04-EXEC-001", "DENIED_BY_SECCOMP")
+                || statusIs(cases, "C3-T04-EXEC-001", "DENIED_BY_KERNEL_POLICY");
+        requiredDenied = statusIs(cases, "C3-T04-FS-CORE-001", "DENIED_BY_KERNEL_POLICY")
+                && statusIs(cases, "C3-T04-FS-GUEST-001", "DENIED_BY_KERNEL_POLICY")
+                && statusIs(cases, "C3-T04-FS-UNGRANTED-001", "DENIED")
+                && statusIs(cases, "C3-T04-FD-INHERIT-001", "PASS_NO_LEAK")
+                && ptraceDenied && execDenied
+                && statusIs(cases, "C3-T04-CAP-GRANT-001", "PASS_CAPABILITY")
+                && statusIs(cases, "C3-T04-CAP-SCOPE-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-REV-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-EXPIRY-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-CAP-REPLAY-001", "DENIED_BY_BROKER")
+                && statusIs(cases, "C3-T04-DEATH-001", "PASS_REVOKED")
+                && statusIs(cases, "C3-T04-ISO-001", "PASS_ISOLATED")
+                && statusIs(cases, "C3-T04-NET-BROKER-001", "PASS_CAPABILITY");
+        result.put("c3t04Pass", requiredDenied);
+        result.put("residual", new JSONObject()
+                .put("binder", caseStatus(cases, "C3-T04-BINDER-001"))
+                .put("clone", caseStatus(cases, "C3-T04-CLONE-001"))
+                .put("socket", caseStatus(cases, "C3-T04-SOCKET-001")));
+    }
+
+    private static String caseStatus(JSONArray cases, String id) {
+        for (int i = 0; i < cases.length(); i++) {
+            JSONObject item = cases.optJSONObject(i);
+            if (item != null && id.equals(item.optString("id"))) {
+                return item.optString("status");
+            }
+        }
+        return "MISSING";
+    }
+
+    private static void appendCase(JSONObject out, String id, String domain, String status,
+            JSONObject detail) throws Exception {
+        JSONArray cases = out.optJSONArray("cases");
+        if (cases == null) {
+            cases = new JSONArray();
+            out.put("cases", cases);
+        }
+        JSONObject item = new JSONObject();
+        item.put("id", id);
+        item.put("domain", domain);
+        item.put("status", status);
+        item.put("detail", detail == null ? JSONObject.NULL : detail);
+        cases.put(item);
+    }
+
+    private static JSONObject brokerDenied(HostileCapabilityRegistry registry,
+            HostileCapabilityRequest request, String expected) throws Exception {
+        JSONObject out = new JSONObject();
+        try {
+            HostileCapabilityBrokerStub stub = new HostileCapabilityBrokerStub(registry);
+            HostileCapabilityResult result = stub.readResource(request);
+            boolean denied = !result.successful();
+            out.put("denied", denied);
+            out.put("errorType", result.errorType());
+            out.put("expected", expected);
+            out.put("matched", expected.equals(result.errorType()));
+            return out;
+        } catch (Exception error) {
+            out.put("denied", true);
+            out.put("errorType", error.getMessage());
+            out.put("expected", expected);
+            return out;
+        }
+    }
+
+    private static boolean waitPidGone(int pid, long timeoutMs) {
+        if (pid <= 0) return false;
+        File proc = new File("/proc/" + pid);
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (!proc.exists()) return true;
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        return !proc.exists();
     }
 
     private static boolean statusIs(JSONArray cases, String id, String status) {

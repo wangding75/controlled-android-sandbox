@@ -1,6 +1,7 @@
 #include <jni.h>
 
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/audit.h>
@@ -15,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/ptrace.h>
 #include <sys/socket.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -532,6 +534,149 @@ static std::string probe_seccomp() {
     return out;
 }
 
+static std::string syscall_attempt(const char* kind, long rc) {
+    int err = 0;
+    int normalized = static_cast<int>(rc);
+    if (syscall_failed(rc)) {
+        err = static_cast<int>(-rc);
+        normalized = -1;
+    } else if (rc < 0) {
+        err = errno;
+        normalized = -1;
+    }
+    std::string out = "{";
+    out += "\"kind\":\"";
+    out += json_escape(kind);
+    out += "\",\"rc\":";
+    out += std::to_string(normalized);
+    out += ",\"errno\":";
+    out += std::to_string(err);
+    out += ",\"errname\":\"";
+    out += json_escape(err == 0 ? "ok" : strerror(err));
+    out += "\",\"denied\":";
+    out += (normalized < 0 ? "true" : "false");
+    out += "}";
+    return out;
+}
+
+static bool path_is_host_private(const char* target, const char* host_package) {
+    if (target == nullptr || host_package == nullptr || host_package[0] == 0) return false;
+    std::string path(target);
+    std::string pkg(host_package);
+    return path.find("/data/data/" + pkg) != std::string::npos
+            || (path.find("/data/user/") != std::string::npos && path.find(pkg) != std::string::npos);
+}
+
+static std::string probe_inherited_fds(const char* host_package) {
+    DIR* dir = opendir("/proc/self/fd");
+    int leaks = 0;
+    int count = 0;
+    std::string items = "[";
+    if (dir == nullptr) {
+        return "{\"error\":\"opendir\",\"errno\":" + std::to_string(errno) + ",\"count\":0,\"host_private_leaks\":0}";
+    }
+    int dir_fd = dirfd(dir);
+    while (dirent* entry = readdir(dir)) {
+        if (entry->d_name[0] == '.') continue;
+        int fd = atoi(entry->d_name);
+        if (fd == dir_fd) continue;
+        char linkpath[64];
+        snprintf(linkpath, sizeof(linkpath), "/proc/self/fd/%d", fd);
+        char target[512];
+        ssize_t n = readlink(linkpath, target, sizeof(target) - 1);
+        if (n < 0) continue;
+        target[n] = 0;
+        count++;
+        bool leak = path_is_host_private(target, host_package);
+        if (leak) leaks++;
+        if (items.size() > 1) items += ",";
+        items += "{\"fd\":";
+        items += std::to_string(fd);
+        items += ",\"target\":\"";
+        items += json_escape(target);
+        items += "\",\"host_private\":";
+        items += leak ? "true" : "false";
+        items += "}";
+        if (items.size() > 3500) break;
+    }
+    closedir(dir);
+    items += "]";
+    std::string out = "{";
+    out += "\"count\":";
+    out += std::to_string(count);
+    out += ",\"host_private_leaks\":";
+    out += std::to_string(leaks);
+    out += ",\"fds\":";
+    out += items;
+    out += "}";
+    return out;
+}
+
+static std::string probe_attack(const char* core_path, const char* other_guest,
+        const char* host_package, int host_pid) {
+    long ptrace_rc = -ENOSYS;
+#ifdef SYS_ptrace
+    errno = 0;
+    if (host_pid > 0) {
+        long attach = syscall(SYS_ptrace, PTRACE_ATTACH, host_pid, 0, 0);
+        ptrace_rc = attach < 0 ? -errno : attach;
+    } else {
+        long trace = syscall(SYS_ptrace, PTRACE_TRACEME, 0, 0, 0);
+        ptrace_rc = trace < 0 ? -errno : trace;
+    }
+#endif
+    long exec_rc = -ENOSYS;
+#ifdef SYS_execve
+    const char* path = "/system/bin/true";
+    char* argv[] = {const_cast<char*>(path), nullptr};
+    errno = 0;
+    exec_rc = syscall(SYS_execve, path, argv, environ);
+    if (exec_rc < 0) exec_rc = -errno;
+#endif
+    errno = 0;
+    pid_t child = fork();
+    int fork_err = child < 0 ? errno : 0;
+    int fork_rc = child < 0 ? -1 : static_cast<int>(child);
+    if (child == 0) {
+        _exit(0);
+    }
+    if (child > 0) {
+        int status = 0;
+        waitpid(child, &status, 0);
+    }
+    int binder_fd = open("/dev/binder", O_RDWR | O_CLOEXEC);
+    int binder_err = binder_fd < 0 ? errno : 0;
+    close_if(binder_fd);
+    int binderfs_fd = open("/dev/binderfs/binder", O_RDWR | O_CLOEXEC);
+    int binderfs_err = binderfs_fd < 0 ? errno : 0;
+    close_if(binderfs_fd);
+
+    std::string out = "{";
+    out += "\"abi\":\"";
+    out += kCompiledAbi;
+    out += "\",\"raw_available\":";
+    out += RAW_SYSCALL_AVAILABLE ? "true" : "false";
+    out += ",\"ptrace\":";
+    out += syscall_attempt("ptrace", ptrace_rc);
+    out += ",\"execve\":";
+    out += syscall_attempt("execve", exec_rc);
+    out += ",\"clone\":";
+    out += attempt_json("fork", fork_rc, fork_err, fork_rc >= 0
+            ? "KERNEL_LIMIT_EXPOSED_SAME_UID" : "DENIED");
+    out += ",\"binder\":";
+    out += attempt_json("/dev/binder", binder_fd, binder_err, "open");
+    out += ",\"binderfs\":";
+    out += attempt_json("/dev/binderfs/binder", binderfs_fd, binderfs_err, "open");
+    out += ",\"inherited_fd\":";
+    out += probe_inherited_fds(host_package);
+    out += ",\"core_storage\":";
+    out += probe_open(core_path ? core_path : "");
+    out += ",\"other_guest\":";
+    out += probe_open(other_guest ? other_guest : "");
+    out += "}";
+    return out;
+}
+
 static jstring jni_probe_open(JNIEnv* env, jclass, jstring path) {
     const char* utf = path == nullptr ? "" : env->GetStringUTFChars(path, nullptr);
     std::string result = probe_open(utf == nullptr ? "" : utf);
@@ -550,6 +695,19 @@ static jstring jni_probe_seccomp(JNIEnv* env, jclass) {
     return to_jstring(env, probe_seccomp());
 }
 
+static jstring jni_probe_attack(JNIEnv* env, jclass, jstring core_path, jstring other_guest,
+        jstring host_package, jint host_pid) {
+    const char* core = core_path == nullptr ? "" : env->GetStringUTFChars(core_path, nullptr);
+    const char* other = other_guest == nullptr ? "" : env->GetStringUTFChars(other_guest, nullptr);
+    const char* pkg = host_package == nullptr ? "" : env->GetStringUTFChars(host_package, nullptr);
+    std::string result = probe_attack(core == nullptr ? "" : core, other == nullptr ? "" : other,
+            pkg == nullptr ? "" : pkg, static_cast<int>(host_pid));
+    if (core_path != nullptr && core != nullptr) env->ReleaseStringUTFChars(core_path, core);
+    if (other_guest != nullptr && other != nullptr) env->ReleaseStringUTFChars(other_guest, other);
+    if (host_package != nullptr && pkg != nullptr) env->ReleaseStringUTFChars(host_package, pkg);
+    return to_jstring(env, result);
+}
+
 static jstring jni_abi(JNIEnv* env, jclass) {
     return to_jstring(env, std::string(kCompiledAbi));
 }
@@ -565,14 +723,20 @@ static const JNINativeMethod kMethods[] = {
                 reinterpret_cast<void*>(jni_abi)},
 };
 
-static void register_if_present(JNIEnv* env, const char* class_name) {
+static const JNINativeMethod kHostMethods[] = {
+        {"nativeProbeAttack",
+                "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;",
+                reinterpret_cast<void*>(jni_probe_attack)},
+};
+
+static void register_if_present(JNIEnv* env, const char* class_name, const JNINativeMethod* methods,
+        jint count) {
     jclass cls = env->FindClass(class_name);
     if (cls == nullptr) {
         env->ExceptionClear();
         return;
     }
-    env->RegisterNatives(cls, kMethods,
-            static_cast<jint>(sizeof(kMethods) / sizeof(kMethods[0])));
+    env->RegisterNatives(cls, methods, count);
     env->DeleteLocalRef(cls);
 }
 
@@ -581,7 +745,11 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || env == nullptr) {
         return JNI_ERR;
     }
-    register_if_present(env, "com/warden/controlledsandbox/NativeEnforcementNative");
-    register_if_present(env, "com/warden/controlledsandbox/fixture/NativeEnforcementNative");
+    register_if_present(env, "com/warden/controlledsandbox/NativeEnforcementNative", kMethods,
+            static_cast<jint>(sizeof(kMethods) / sizeof(kMethods[0])));
+    register_if_present(env, "com/warden/controlledsandbox/NativeEnforcementNative", kHostMethods,
+            static_cast<jint>(sizeof(kHostMethods) / sizeof(kHostMethods[0])));
+    register_if_present(env, "com/warden/controlledsandbox/fixture/NativeEnforcementNative",
+            kMethods, static_cast<jint>(sizeof(kMethods) / sizeof(kMethods[0])));
     return JNI_VERSION_1_6;
 }

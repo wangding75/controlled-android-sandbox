@@ -1,38 +1,43 @@
 {
   "schema_version": 1,
-  "task_id": "C3-T03",
+  "task_id": "C3-T04",
   "status": "PASS",
-  "captured_at": "2026-08-23T05:10:15.964078+00:00",
+  "captured_at": "2026-08-23T07:30:34.468618+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C3-T03",
+    "next_task": "C3-T04",
     "active_task": "",
-    "last_completed": "C3-T02",
-    "first_ready_pending": "C3-T03",
-    "dependencies": "C3-T01,C2-T04"
+    "last_completed": "C3-T03",
+    "first_ready_pending": "C3-T04",
+    "dependencies": "C3-T01,C3-T02"
   },
   "last_receipt": {
-    "task_id": "C3-T02",
+    "task_id": "C3-T03",
     "status": "DONE",
     "implementation_commits": [
-      "566fadc60437a22c36fc985bbf54dce77c177173"
+      "372fc11a9548184e568de213c4c8264f7bf39771"
     ],
-    "receipt_commit": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
-    "baseline_commit": "ffb69277a5efa253a929beeb458f5bb78bdb3517",
+    "receipt_commit": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
+    "baseline_commit": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
     "evidence_paths": [
       "docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md",
       "docs/COMMIT_IDENTITY_POLICY.md",
-      "docs/review/C3_T02_FILE_PROC_NETWORK_FD_DESIGN.md",
+      "docs/review/C3_T03_ABI_16KB_NATIVE_MEDIA_DESIGN.md",
+      "docs/review/KNOWN_ISSUES.yaml",
+      "docs/capability/CAPABILITY_REGISTRY.yaml",
+      "verification/sbom.json",
       "verification/catch-up/C0-T01/continuation-preflight.json",
-      "verification/catch-up/C3-T02/c3-t02-rd-summary.json",
-      "verification/catch-up/C3-T02/c3-t02-local-verification.json"
+      "verification/catch-up/C3-T03/c3-t03-rd-summary.json",
+      "verification/catch-up/C3-T03/c3-t03-local-verification.json",
+      "verification/catch-up/C3-T03/c3-t03-abi-report.json",
+      "verification/catch-up/C3-T03/c3-t03-environment-block.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
+    "head": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "ffcd3d1c142a30c7920aaf77b605ce9ff3386502",
+    "remote_head": "6e98c0e143fc32fc1d4774483843b948df68b7e3",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
@@ -112,5 +117,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C3-T03"
+  "evidence_directory": "verification/catch-up/C3-T04"
 }

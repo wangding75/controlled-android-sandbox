@@ -30,6 +30,14 @@ public final class NativeEnforcementChild {
     static String run(Context context, IBinder broker, String session, String fsCap, String netCap,
             String realPath, String loopbackHost, int loopbackPort, long generation,
             String guestPackage, String fdCap, boolean production) {
+        return run(context, broker, session, fsCap, netCap, realPath, loopbackHost, loopbackPort,
+                generation, guestPackage, fdCap, production, "", "", context.getPackageName(), 0);
+    }
+
+    static String run(Context context, IBinder broker, String session, String fsCap, String netCap,
+            String realPath, String loopbackHost, int loopbackPort, long generation,
+            String guestPackage, String fdCap, boolean production, String coreStoragePath,
+            String otherGuestPath, String hostPackage, int hostPid) {
         JSONObject out = new JSONObject();
         JSONArray cases = new JSONArray();
         try {
@@ -117,6 +125,21 @@ public final class NativeEnforcementChild {
             cases.put(brokerCase("NATIVE-ENF-NET-004", brokerNet, false));
             if (production && fdCap != null && !fdCap.isEmpty()) {
                 cases.put(fdCase(broker, session, generation, guestPackage, fdCap));
+            }
+            if (production) {
+                JSONObject attack = parse(NativeEnforcementNative.probeAttack(coreStoragePath,
+                        otherGuestPath, hostPackage, hostPid));
+                out.put("attack", attack);
+                cases.put(deniedPathCase("C3-T04-FS-CORE-001", attack.optJSONObject("core_storage")));
+                cases.put(deniedPathCase("C3-T04-FS-GUEST-001", attack.optJSONObject("other_guest")));
+                cases.put(attackStatus("C3-T04-PTRACE-001", "ptrace",
+                        attack.optJSONObject("ptrace"), true));
+                cases.put(attackStatus("C3-T04-EXEC-001", "execve",
+                        attack.optJSONObject("execve"), true));
+                cases.put(cloneCase(attack.optJSONObject("clone")));
+                cases.put(binderCase(attack.optJSONObject("binder"),
+                        attack.optJSONObject("binderfs")));
+                cases.put(inheritedFdCase(attack.optJSONObject("inherited_fd")));
             }
 
             JSONObject seccomp = parse(NativeEnforcementNative.probeSeccomp());
@@ -249,6 +272,68 @@ public final class NativeEnforcementChild {
         boolean ok = reply.optInt("ok", 0) == 1 && reply.optString("body", "").length() > 0;
         item.put("status", ok ? "PASS_CAPABILITY" : "BROKER_DENIED");
         item.put("detail", reply);
+        return item;
+    }
+
+    private static JSONObject deniedPathCase(String id, JSONObject probe) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", id);
+        item.put("domain", "filesystem");
+        boolean libcDenied = expectedDenied(probe == null ? null : probe.optJSONObject("libc"));
+        boolean sysDenied = expectedDenied(probe == null ? null : probe.optJSONObject("syscall"));
+        boolean rawAvailable = probe != null && probe.optBoolean("raw_available", false);
+        boolean rawDenied = !rawAvailable
+                || expectedDenied(probe.optJSONObject("raw"));
+        boolean denied = libcDenied && sysDenied && rawDenied;
+        item.put("status", denied ? "DENIED_BY_KERNEL_POLICY" : "DIRECT_ALLOWED");
+        item.put("detail", probe == null ? JSONObject.NULL : probe);
+        return item;
+    }
+
+    private static JSONObject attackStatus(String id, String domain, JSONObject attempt,
+            boolean mustDeny) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", id);
+        item.put("domain", domain);
+        boolean denied = attempt != null && attempt.optBoolean("denied", attempt.optInt("rc", 0) < 0);
+        if (mustDeny) {
+            item.put("status", denied ? "DENIED_BY_SECCOMP" : "KERNEL_LIMIT_EXPOSED");
+        } else {
+            item.put("status", denied ? "DENIED" : "KERNEL_LIMIT_EXPOSED");
+        }
+        item.put("detail", attempt == null ? JSONObject.NULL : attempt);
+        return item;
+    }
+
+    private static JSONObject cloneCase(JSONObject attempt) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", "C3-T04-CLONE-001");
+        item.put("domain", "clone");
+        boolean denied = attempt != null && attempt.optInt("rc", 0) < 0;
+        item.put("status", denied ? "DENIED_BY_KERNEL_POLICY" : "KERNEL_LIMIT_EXPOSED_SAME_UID");
+        item.put("detail", attempt == null ? JSONObject.NULL : attempt);
+        return item;
+    }
+
+    private static JSONObject binderCase(JSONObject binder, JSONObject binderfs) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", "C3-T04-BINDER-001");
+        item.put("domain", "binder");
+        boolean opened = (binder != null && binder.optInt("rc", -1) >= 0)
+                || (binderfs != null && binderfs.optInt("rc", -1) >= 0);
+        item.put("status", opened ? "KERNEL_LIMIT_EXPOSED" : "DENIED_BY_KERNEL_POLICY");
+        item.put("binder", binder == null ? JSONObject.NULL : binder);
+        item.put("binderfs", binderfs == null ? JSONObject.NULL : binderfs);
+        return item;
+    }
+
+    private static JSONObject inheritedFdCase(JSONObject scan) throws Exception {
+        JSONObject item = new JSONObject();
+        item.put("id", "C3-T04-FD-INHERIT-001");
+        item.put("domain", "fd");
+        int leaks = scan == null ? -1 : scan.optInt("host_private_leaks", -1);
+        item.put("status", leaks == 0 ? "PASS_NO_LEAK" : "HOST_PRIVATE_FD_LEAK");
+        item.put("detail", scan == null ? JSONObject.NULL : scan);
         return item;
     }
 

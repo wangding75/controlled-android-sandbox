@@ -143,3 +143,24 @@ Evidence already in-tree:
 Adding more libc symbols does not convert this statement into a hostile-code
 proof. Kernel, supervisor, or privileged mediation is required for
 `ISOLATED_HOSTILE`.
+
+## C3-T04 RD_BASELINE residual kernel limits
+
+The C3-T04 isolated-UID + Broker + deny-only seccomp campaign on MuMu `RD测试`
+API32 proved: isolated UID assignment; kernel denial of CAS core storage,
+other-Guest secrets, and ungranted Host paths; Broker grant/scope/revision/
+expiry/replay; inherited FD Host-private leak count 0; ptrace/execve/socket
+denied by the hostile worker filter; isolated PID gone and tokens revoked
+after unbind.
+
+Residual kernel limits that remain explicit, not isolation PASS:
+
+| Surface | C3-T04 status | Why it remains |
+|---|---|---|
+| `/dev/binder` open | `KERNEL_LIMIT_EXPOSED` | no Native driver mediation (`KI-R03-NATIVE-006`) |
+| `fork`/`clone` | `KERNEL_LIMIT_EXPOSED_SAME_UID` | ART/threads need `clone`; UID does not change |
+| seccomp user-notify | not implemented | ordinary APK (`KI-R03-NATIVE-008`, C3-T05) |
+| isolated UID without hostile filter | network not a boundary | `KI-R03-NATIVE-ENF-001` |
+| raw SVC in TRUSTED_COMPAT | unmediated | `KI-R03-NATIVE-001`; hostile path does not use PLT |
+
+This section is RD_BASELINE only. It is not VA Pro equivalence.

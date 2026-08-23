@@ -1027,7 +1027,7 @@ issues:
 
   - issue_id: KI-R03-040
     title: SBOM verification was stale after C2-T05 fixture additions
-    capability: governance_evidence
+    capability: android_oem_compatibility
     classification: TEST_EVIDENCE_GAP
     severity: LOW
     status: FIXED
@@ -1145,3 +1145,31 @@ issues:
       execution. No approved ARM device or 16KB-page runtime is available in this environment;
       C3-T03 must produce explicit environment-block evidence and must not promote static ELF
       readiness or x86 execution into ARM/16KB dynamic PASS.
+
+  - issue_id: KI-R03-044
+    title: C3-T04 hostile native attack matrix lacked RD evidence
+    capability: native_loader_jni_io
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C3-T04 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C3_T04_HOSTILE_NATIVE_ISOLATION_DESIGN.md
+      - docs/native/T57_R03_NATIVE_BOUNDARY_THREAT_MODEL.md
+      - scripts/check-c3-t04-hostile-isolation.py
+      - tools/capability/run_c3_t04_rd.py
+      - verification/catch-up/C3-T04/c3-t04-rd-summary.json
+      - verification/catch-up/C3-T04/c3-t04-local-verification.json
+    match_patterns:
+      - C3-T04
+      - ISOLATED_HOSTILE
+      - DENIED_BY_KERNEL_POLICY
+      - KERNEL_LIMIT_EXPOSED
+    blocks_current_campaign: false
+    fix_policy: PACKAGE_NEUTRAL_C3_T04_ISOLATED_HOSTILE_ATTACK_MATRIX
+    notes: >
+      Closed on dynamically resolved RD测试 API32: isolated UID, core/other-Guest/ungranted
+      kernel denies, Broker grant/scope/revision/expiry/replay, inherited FD no-leak, ptrace
+      and execve seccomp deny, and death revocation. Residual kernel limits remain explicit:
+      /dev/binder KERNEL_LIMIT_EXPOSED, clone KERNEL_LIMIT_EXPOSED_SAME_UID. Not VA Pro,
+      API33+, ARM/16KB, or OEM.

@@ -78,7 +78,7 @@ public final class DebugCommandActivity extends Activity {
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("requestId", requestId)
                     .put("startedAt", System.currentTimeMillis());
-            if ("native-hostile".equals(command)) {
+            if ("native-hostile".equals(command) || "c3-t04-hostile".equals(command)) {
                 JSONObject campaign = HostileProductionCampaign.run(this);
                 result.put("nativeHostile", campaign);
                 result.put("operation", new JSONObject().put("status",
@@ -87,6 +87,11 @@ public final class DebugCommandActivity extends Activity {
                 if (!campaign.optBoolean("pocValid", false)) {
                     throw new IllegalStateException("ISOLATED_UID_POC_INVALID:"
                             + campaign.optString("error", "uid not distinct"));
+                }
+                if ("c3-t04-hostile".equals(command)
+                        && !campaign.optBoolean("c3t04Pass", false)) {
+                    throw new IllegalStateException("C3_T04_ATTACK_MATRIX_FAILED:"
+                            + campaign.optJSONObject("residual"));
                 }
                 result.put("status", "PASS");
                 Log.i(TAG, "PASS native-hostile isolatedUid="

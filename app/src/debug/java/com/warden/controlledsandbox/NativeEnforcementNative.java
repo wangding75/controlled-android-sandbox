@@ -48,8 +48,18 @@ public final class NativeEnforcementNative {
         return nativeProbeSeccomp();
     }
 
+    public static String probeAttack(String corePath, String otherGuestPath, String hostPackage,
+            int hostPid) {
+        if (!AVAILABLE) return "{\"error\":\"JNI_UNAVAILABLE\",\"detail\":\"" + ERROR + "\"}";
+        return nativeProbeAttack(corePath == null ? "" : corePath,
+                otherGuestPath == null ? "" : otherGuestPath,
+                hostPackage == null ? "" : hostPackage, hostPid);
+    }
+
     private static native String nativeProbeOpen(String path);
     private static native String nativeProbeConnect(String host, int port);
     private static native String nativeProbeSeccomp();
+    private static native String nativeProbeAttack(String corePath, String otherGuestPath,
+            String hostPackage, int hostPid);
     private static native String nativeCompiledAbi();
 }

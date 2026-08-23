@@ -51,15 +51,26 @@ public final class NativeEnforcementIsolatedService extends Service {
                 String guestPackage = getPackageName();
                 String fdCap = "";
                 boolean production = false;
+                String coreStoragePath = "";
+                String otherGuestPath = "";
+                String hostPackage = guestPackage;
+                int hostPid = 0;
                 if (data.dataAvail() > 0) {
                     generation = data.readLong();
                     guestPackage = data.readString();
                     fdCap = data.readString();
                     production = data.readInt() == 1;
                 }
+                if (production && data.dataAvail() > 0) {
+                    coreStoragePath = data.readString();
+                    otherGuestPath = data.readString();
+                    hostPackage = data.readString();
+                    hostPid = data.readInt();
+                }
                 String result = NativeEnforcementChild.run(NativeEnforcementIsolatedService.this,
                         broker, session, fsCap, netCap, realPath, loopbackHost, loopbackPort,
-                        generation, guestPackage, fdCap, production);
+                        generation, guestPackage, fdCap, production, coreStoragePath,
+                        otherGuestPath, hostPackage, hostPid);
                 reply.writeNoException();
                 reply.writeString(result);
                 return true;

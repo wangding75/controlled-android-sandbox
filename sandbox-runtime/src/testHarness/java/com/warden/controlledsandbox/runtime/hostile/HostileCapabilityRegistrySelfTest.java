@@ -45,6 +45,13 @@ public final class HostileCapabilityRegistrySelfTest {
                 3L, "com.example.guest", 0, HostileCapabilityRequest.OP_READ_RESOURCE),
                 HostileCapabilityRequest.OP_READ_RESOURCE), "CAPABILITY_UNKNOWN");
 
+        HostileCapabilitySnapshot expired = registry.issueReadResource(admission, "expired", file,
+                "SENTINEL", 1L);
+        expectDenied(() -> registry.require(new HostileCapabilityRequest(expired.tokenId(),
+                "sess-1", 3L, "com.example.guest", 0,
+                HostileCapabilityRequest.OP_READ_RESOURCE),
+                HostileCapabilityRequest.OP_READ_RESOURCE), "CAPABILITY_EXPIRED");
+
         registry.revokeToken(fs.tokenId());
         expectDenied(() -> registry.require(good, HostileCapabilityRequest.OP_READ_RESOURCE),
                 "CAPABILITY_REVOKED");

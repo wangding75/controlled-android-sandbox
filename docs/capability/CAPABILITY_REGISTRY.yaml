@@ -253,6 +253,11 @@ capabilities:
       - verification/catch-up/C3-T03/c3-t03-rd-summary.json
       - verification/catch-up/C3-T03/c3-t03-local-verification.json
       - verification/catch-up/C3-T03/c3-t03-environment-block.json
+      - docs/review/C3_T04_HOSTILE_NATIVE_ISOLATION_DESIGN.md
+      - scripts/check-c3-t04-hostile-isolation.py
+      - tools/capability/run_c3_t04_rd.py
+      - verification/catch-up/C3-T04/c3-t04-rd-summary.json
+      - verification/catch-up/C3-T04/c3-t04-local-verification.json
     hostile_fs_boundary_rd: PASS
     hostile_network_boundary_rd: PASS
     seccomp_filter_feasibility_rd: PASS

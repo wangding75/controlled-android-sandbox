@@ -138,6 +138,13 @@ gates:
     capabilities: [native_loader_jni_io]
     required: true
     timeout_sec: 180
+  - id: c3-t04-hostile-isolation
+    group: native_self_test
+    command: [python, scripts/check-c3-t04-hostile-isolation.py]
+    capabilities: [native_loader_jni_io]
+    required: true
+    timeout_sec: 180
+    known_issue_ids: [KI-R03-044]
   - id: native-file-hooks
     group: native_self_test
     command: [python, scripts/check-native-file-hooks.py]
