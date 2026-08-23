@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 16:05（Asia/Shanghai）
+更新时间：2026-08-23 16:15（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C3`（执行中）
-当前任务：`C3-T06`（PENDING）
-下一任务：`C3-T06`
-最后完成任务：`C3-T05`
+当前任务：`C4-T01`（PENDING）
+下一任务：`C4-T01`
+最后完成任务：`C3-T06`
 
 ## 1. 使用规则
 
@@ -58,7 +58,7 @@
 | C3-T03 | 四 ABI/16KB/native media | DONE | C3-T01,C2-T04 | `372fc11a9548184e568de213c4c8264f7bf39771` | §5 C3-T03 |
 | C3-T04 | Hostile native 隔离 | DONE | C3-T01,C3-T02 | `22716fbfec845b288ea119c6ec6be678fc23915f` | §5 C3-T04 |
 | C3-T05 | seccomp/user-notify 决策 | NOT_APPLICABLE | C3-T04 | `537c20211300c93ae42dda4365bcb0cdb0ee0b70` | §5 C3-T05 |
-| C3-T06 | ART/Xposed Extension 决策 | PENDING | C2,C3-T04 | - | - |
+| C3-T06 | ART/Xposed Extension 决策 | NOT_APPLICABLE | C2,C3-T04 | `1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3` | §5 C3-T06 |
 | C4-T01 | SX 依赖与功能冻结 | PENDING | C1,C2,C3-T01..T04 | - | - |
 | C4-T02 | SX CAS SDK adapter | PENDING | C4-T01 | - | - |
 | C4-T03 | SX 数据迁移 | PENDING | C4-T01,C4-T02 | - | - |
@@ -1643,3 +1643,41 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：特权 companion / OEM user-notify 仍未建设；C3-T06 ART/Xposed
   决策未执行；API33+ / ARM / Enforcing SELinux 未验证。
 - **下一任务**：`C3-T06`。
+
+### C3-T06：ART/Xposed Compatibility Extension 决策
+
+- **状态**：NOT_APPLICABLE
+- **开始/结束时间**：2026-08-23 16:06 / 2026-08-23 16:15（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；
+  分支 `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。本任务不宣称新的 runtime 行为 PASS。
+- **开始基线**：`4a8faa64db8b6843c3ed209a97a50b3cc4ac9df5`；远端同 HEAD；上一任务
+  `C3-T05` 为 `NOT_APPLICABLE`，实现提交 `537c20211300c93ae42dda4365bcb0cdb0ee0b70`。
+- **实现摘要**：产品问题判定为“只需 F2-F5/已知兼容，不加载任意第三方 Xposed 模块”。
+  ADR 排除 CAS 核心中的 ART/Xposed/Pine 模块宿主；原始 XH 是 VA Host 产品，
+  `spoofer_project` 仍是独立可选 SKU。生产源码扫描确认无 `XposedBridge` /
+  `PineXposed` / `xposed_init` 运行时依赖。许可证审查禁止复制 SX Pine 树。
+- **变更文件**：`docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md`、
+  `scripts/check-c3-t06-art-xposed-decision.py`、`tools/capability/run_c3_t06_rd.py`、
+  `verification/catch-up/C3-T06/`、`docs/capability/CAPABILITY_REGISTRY.yaml`。
+- **验收命令与结果**：`python scripts/check-c3-t06-art-xposed-decision.py` PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python tools/capability/run_c3_t06_rd.py --instance RD测试`
+  PASS，`decision=NOT_APPLICABLE`。未修改生产运行时。
+- **设备证据**：设备快照写入
+  `verification/catch-up/C3-T06/c3-t06-local-verification.json`；决策正文为
+  `docs/review/C3_T06_ART_XPOSED_EXTENSION_ADR.md`。不新增 Xposed callback 设备
+  PASS，因为模块宿主不在产品范围。
+- **Known Issues**：无新增 runtime issue。`va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无。条件任务按“仅需 F2-F5 则 NOT_APPLICABLE”关闭；C5-T04 仍可
+  在未来显式 SKU 下重新立项，不得把本 ADR 当成模块拦截证据。
+- **实现提交 SHA**：`1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3`
+  （`docs(compat): [C3-T06] exclude ART Xposed module host`）。
+- **回执提交**：主题 `docs(progress): record [C3-T06] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C3 阶段门禁仍要求单独确认 C1/C2 回归无退化后才能关闭阶段；
+  C4-T01 SX 冻结清单可开始，因其依赖仅为 C1/C2/C3-T01..T04。可选
+  `spoofer_project` 模块宿主、API33+、ARM/16KB、OEM 和 VA PRO 仍未证明。
+- **下一任务**：`C4-T01`。
