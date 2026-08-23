@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 03:04（Asia/Shanghai）
+更新时间：2026-08-23 10:40（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C2`
-当前任务：`C2-T07`
-下一任务：`C2-T07`
-最后完成任务：`C2-T06`
+当前阶段：`C2`（已完成；本轮停止）
+当前任务：`C3-T01`（本轮停止，未执行）
+下一任务：`C3-T01`
+最后完成任务：`C2-T07`
 
 ## 1. 使用规则
 
@@ -24,7 +24,7 @@
 |---|---|---|---|
 | C0 事实源与 RD 基线 | DONE | 两轮 RD 一致、事实源无冲突、可跨环境续接 | §5 C0-T04 |
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
-| C2 系统服务/F2-F5 | PENDING | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | - |
+| C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | PENDING | trusted/hostile 闭环，条件项有决策 | - |
 | C4 SX 迁移 | PENDING | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
 | C5 XH 支持 | PENDING | 原始 XH 通过，可选模块有决策 | - |
@@ -52,7 +52,7 @@
 | C2-T04 | Camera1/Camera2 | DONE | C2-T01,C2-T02 | `91cb86b62e2c8dd64b5047aee7b93609093eac36` | §5 C2-T04 |
 | C2-T05 | 调度与交互服务 | DONE | C2-T01,C1 | `547ba7ae` | §5 C2-T05 |
 | C2-T06 | 设备/网络/媒体服务 | DONE | C2-T01,C2-T02 | `048ca1b1` | §5 C2-T06 |
-| C2-T07 | Biometric 与长尾收敛 | IN_PROGRESS | C2-T02..T06 | - | - |
+| C2-T07 | Biometric 与长尾收敛 | DONE | C2-T02..T06 | `b6d9dafa` | §5 C2-T07 |
 | C3-T01 | Native 绕过与兼容 corpus | PENDING | C1,C2-T01 | - | - |
 | C3-T02 | 文件/proc/network/FD | PENDING | C3-T01 | - | - |
 | C3-T03 | 四 ABI/16KB/native media | PENDING | C3-T01,C2-T04 | - | - |
@@ -1203,3 +1203,67 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   `origin/feature/t57-r03-va-pro-capability-campaign`，并用
   `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 对比最终本地 HEAD。
 - **下一任务**：`C2-T07`；本轮不执行后续任务。
+
+### C2-T07：Biometric 与长尾服务收敛
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 03:05 / 2026-08-23 10:40（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；仓库 `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析成功，状态为
+  `device`，resolved serial `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`，Android ID `8acae00bece8090b`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `2f31db3089d53a0136ea76a2d6191e0ec216dae0`；开始前完整读取任务书、进度账本、
+  `docs/capability/CAPABILITY_CAMPAIGN_WORKFLOW.md`、`docs/COMMIT_IDENTITY_POLICY.md`，
+  核对 C2-T06 最后回执、Git/远端 HEAD、交接文档和动态 RD 环境；首个依赖满足的任务为
+  C2-T07。本任务未启动 C3。
+- **实现摘要**：补齐 User/Launcher/Shortcut/AppWidget/UsageStats 的 process-level
+  ServiceManager descriptor-validated hooks；实现 API31/32 `LauncherActivityInfoInternal`、
+  `AndroidFuture`/`ParceledListSlice` 和 shortcut rank projection；修复 callback identity、
+  list carrier flattening、Binder callback method 名称和 `notifyChange`；加入 package-neutral
+  application-environment/long-tail fixture、跨用户与死亡替换循环；修复同一 looper 的
+  `stopService` 等待死锁、旧 generation shutdown 覆盖新 native hook，以及 Windows
+  `MappedByteBuffer` 锁定 `core.jar` 的静态自测清理问题。P2 host-only/unavailable 路径保持
+  显式 `NOT_SUPPORTED`/`NOT_APPLICABLE`，不回退 Host 真值。
+- **变更文件**：`sandbox-framework` 应用环境工厂、拦截器、值投影和五个 ServiceManager
+  hook；`sandbox-runtime` service bridge、generation recovery、native projection；
+  `sandbox-native/src/main/cpp/native_policy_jni.cpp`；C2-T07 fixture、任务语义串行化；
+  `scripts/check-c2-t07-application-environment.py`、`tools/capability/run_c2_t07_rd.py`、
+  `tools/device/t57_rd_common.ps1`；registry/corpus/KNOWN_ISSUES；
+  `verification/catch-up/C2-T07/`、SBOM 和 M5-T16 source-closure 回执。
+- **验收命令与结果**：`python tools/static_android_compile.py` PASS（全量模块自测）；
+  `scripts/build-device-test-apks.ps1 -Online -NoClean` PASS（740 actionable tasks，70 executed）；
+  `python scripts/check-c2-t07-application-environment.py` PASS；Python compile、YAML/JSON
+  解析、`git diff --check`、`python scripts/generate-sbom.py --check`、
+  `python scripts/check-m5-t16-source-closure.py` PASS；`run_c2_t07_rd.py --instance RD测试
+  --loops 5 --clone-loops 3` PASS；`t57_rd_full_regression.ps1` 九个案例全部 PASS；无
+  FATAL/ANR、stale-session 或 cleanup residue。失败项均先修复并重跑，未记录 BLOCKED。
+- **设备证据**：主回执为
+  `verification/catch-up/C2-T07/c2-t07-rd-summary.json`，设备 raw evidence 位于
+  `artifacts/capability-audit/catch-up-c2-t07/20260823T023548Z/`；本地验收清单为
+  `verification/catch-up/C2-T07/c2-t07-local-verification.json`；C1 九案例证据位于
+  `verification/catch-up/C2-T07/c1-full-regression/`。C2-T07 user0 5 loop、clone user1
+  3 loop、death replacement 2 loop、19 项 long-tail matrix 全部 PASS；C1 full regression
+  覆盖 activity-result、framework transport、Job、FGS、recovery、isolated service、
+  lifecycle clear/delete/reinstall、cross-ABI recovery 和 cross-ABI lifecycle。
+- **设备 APK SHA-256**：host
+  `8e2c70d251ce13847b993d12c320148279a39fd79865978f0d70b0070c823406`；companion32
+  `5edaf1c0e083faafe5bbba0e7d30631f9bd40cd5194aa5a21dd4952c05b004e8`；fixture
+  `c52d4302e8d29ba9c6bdb58f1aa25b94b870895c2516b76bd1f6077f5577083e`。
+- **Known Issues**：`KI-R03-041` 已 FIXED（应用环境/长尾 API32 RD 证据缺口）；
+  `KI-R03-020`、`KI-R03-023`、`KI-R03-024`、`KI-R03-025`、`KI-R03-026`、`KI-M10-005`、
+  `KI-M10-006` 继续作为既有非阻断项；本任务无 BLOCKED。
+- **偏离任务书**：无验收范围偏离；证据严格限定动态 RD API32，不外推 API33-36、OEM/HAL、
+  ARM/16KB、商业应用、SX/XH 或 VA PRO 等价性；`va_pro_equivalent` 保持 `NOT_PROVEN`。
+  C2 阶段门禁以 C2-T01..T07 的 RD_API32 L3 证据、P2 显式边界和 C1 九案例回归通过关闭。
+- **实现提交 SHA**：`b6d9dafadf63ebdbd01bfc15dd297766ca71d91e`
+  （`feat(c2): [C2-T07] close application environment evidence gates`）。
+- **回执提交**：使用主题 `docs(progress): record [C2-T07] receipt` 单独提交；本回执将 C2-T07
+  从 `IN_PROGRESS` 更新为 `DONE`，并将 C2 阶段更新为 `DONE`。
+- **推送与远端验证**：实现提交已先行非强制推送；本回执提交完成后，两个提交均将再次核验
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign`，确保远端 HEAD
+  与本地 HEAD 一致。
+- **遗留风险**：API33-36、OEM/HAL、ARM/16KB、商业应用、SX/XH 和 VA PRO equivalence
+  仍未证明；这些是后续阶段范围，不影响本次 C2-T07 DONE 判定。
+- **下一任务**：`C3-T01`；本轮按用户指令停止，不执行 C3。
