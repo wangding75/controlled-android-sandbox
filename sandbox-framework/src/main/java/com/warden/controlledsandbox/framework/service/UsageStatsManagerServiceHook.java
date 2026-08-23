@@ -8,7 +8,8 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 public final class UsageStatsManagerServiceHook {
     private UsageStatsManagerServiceHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerFieldCandidates(context, "usagestats", "usageStats", identity,
-                "mService", "sService");
+        return ReflectiveServiceHook.managerFieldCandidatesOrServiceManagerBinding(
+                context, "usagestats", "usageStats", "android.app.usage.IUsageStatsManager",
+                identity, "mService", "sService");
     }
 }

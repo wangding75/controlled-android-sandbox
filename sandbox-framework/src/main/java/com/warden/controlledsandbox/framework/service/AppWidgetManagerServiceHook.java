@@ -8,7 +8,8 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 public final class AppWidgetManagerServiceHook {
     private AppWidgetManagerServiceHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerFieldCandidates(context, "appwidget", "appWidget", identity,
-                "mService", "sService");
+        return ReflectiveServiceHook.managerFieldCandidatesOrServiceManagerBinding(
+                context, "appwidget", "appWidget", "com.android.internal.appwidget.IAppWidgetService",
+                identity, "mService", "sService");
     }
 }

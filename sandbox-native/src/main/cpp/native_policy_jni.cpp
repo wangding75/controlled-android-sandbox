@@ -255,7 +255,10 @@ bool install_hidden_api_bridge(JNIEnv* env) {
             "Landroid/service/",
             "Landroid/telephony/",
             "Landroid/view/",
-            "Landroid/webkit/"
+            "Landroid/webkit/",
+            // Android 12's IShortcutService exposes AndroidFuture directly in its Binder
+            // contract. Keep this exemption class-exact; never open com/android/internal/.
+            "Lcom/android/internal/infra/AndroidFuture;"
     };
     constexpr jsize prefix_count = static_cast<jsize>(sizeof(prefixes) / sizeof(prefixes[0]));
     jobjectArray values = env->NewObjectArray(prefix_count, string_class, nullptr);

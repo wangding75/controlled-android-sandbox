@@ -801,14 +801,14 @@ entries:
   summary: 新增对StorageStatsManager的适配
   source_reference: ref/upstream/VirtualApp/README.md
   commercial_release_signal: VA commercial changelog recorded this compatibility domain
-  cas_evidence: CAS evidence is independent of this commercial signal. See capability registry for rd_api32_status.
+  cas_evidence: C2-T07 independently proves the profile-backed StorageStatsManager query boundary on the dynamically resolved RD API32 device; this is not VA implementation evidence.
   cas_mapping: system_service_virtualization
-  cas_status: GAP
-  required_test: StorageStatsManager probe
-  rd_status: UNVERIFIED
+  cas_status: IMPLEMENTED
+  required_test: C2-T07 StorageStatsManager profile query and long-tail negative matrix
+  rd_status: PASS
   android_matrix_status: UNVERIFIED
   oem_status: UNVERIFIED
-  va_pro_equivalence_effect: StorageStatsManager is a VA commercial SystemService domain.
+  va_pro_equivalence_effect: StorageStatsManager is a VA commercial SystemService domain; CAS only proves its independent RD API32 boundary and keeps VA PRO equivalence NOT_PROVEN.
 - id: VA-610
   category: SystemService
   source: ref/upstream/VirtualApp/README.md commercial changelog (locked public snapshot; not CAS implementation

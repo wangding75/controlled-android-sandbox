@@ -32,7 +32,11 @@ function Get-T57MuMuWindowTitle([string]$Index) {
             return [string]$process.MainWindowTitle
         }
     }
-    $configPath = "C:\Program Files\Netease\MuMu Player 12\vms\MuMuPlayer-12.0-$Index\configs\extra_config.json"
+    $mumuRoot = $env:MUMU_ROOT
+    if ([string]::IsNullOrWhiteSpace($mumuRoot)) {
+        $mumuRoot = "C:\Program Files\Netease\MuMu Player 12"
+    }
+    $configPath = Join-Path $mumuRoot "vms\MuMuPlayer-12.0-$Index\configs\extra_config.json"
     if (Test-Path $configPath) {
         try {
             $json = Get-Content $configPath -Raw -Encoding UTF8 | ConvertFrom-Json

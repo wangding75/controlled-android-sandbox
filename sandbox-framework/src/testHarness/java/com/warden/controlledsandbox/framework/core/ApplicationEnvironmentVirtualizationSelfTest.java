@@ -55,6 +55,8 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         Object listener = new Object();
         launcher.registerCallback("guest.pkg", listener);
         launcher.unregisterCallback("guest.pkg", listener);
+        launcher.addOnAppsChangedListener("guest.pkg", listener);
+        launcher.removeOnAppsChangedListener(listener);
         launcher.registerCallback("guest.pkg", new Object());
         launcher.registerCallback("guest.pkg", new Object());
 
@@ -170,6 +172,8 @@ public final class ApplicationEnvironmentVirtualizationSelfTest {
         List<Object> getLauncherActivities(String packageName, Object user);
         void registerCallback(String packageName, Object callback);
         void unregisterCallback(String packageName, Object callback);
+        void addOnAppsChangedListener(String packageName, Object callback);
+        void removeOnAppsChangedListener(Object callback);
     }
     interface ShortcutApi {
         boolean setDynamicShortcuts(String packageName, List<FakeShortcut> shortcuts, int userId);

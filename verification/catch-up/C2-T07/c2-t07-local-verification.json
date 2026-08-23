@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "campaign_id": "C2-T07",
+  "status": "PASS",
+  "scope": "RD_API32 only",
+  "run_start_commit": "2f31db3089d53a0136ea76a2d6191e0ec216dae0",
+  "run_start_tree": "6e6c67cff79ad1718e3b1cb0dd5f7c81f7c449a5",
+  "device": {
+    "instance": "RD测试",
+    "serial": "127.0.0.1:16416",
+    "api_level": 32,
+    "model": "V2241A",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b"
+  },
+  "build": {
+    "command": "scripts/build-device-test-apks.ps1 -Online -NoClean",
+    "status": "PASS",
+    "artifact_directory": "artifacts/m5-device-test-build/2f31db3089d5",
+    "apks": {
+      "host-debug.apk": {
+        "bytes": 4744334,
+        "sha256": "8e2c70d251ce13847b993d12c320148279a39fd79865978f0d70b0070c823406"
+      },
+      "companion32-debug.apk": {
+        "bytes": 5025202,
+        "sha256": "5edaf1c0e083faafe5bbba0e7d30631f9bd40cd5194aa5a21dd4952c05b004e8"
+      },
+      "fixture-debug.apk": {
+        "bytes": 1952531,
+        "sha256": "c52d4302e8d29ba9c6bdb58f1aa25b94b870895c2516b76bd1f6077f5577083e"
+      }
+    }
+  },
+  "static": {
+    "application_environment_checker": "PASS",
+    "static_android_compile": "PASS",
+    "python_compile": "PASS",
+    "yaml_parse": "PASS",
+    "git_diff_check": "PASS",
+    "sbom_check": "PASS",
+    "source_closure": "PASS"
+  },
+  "rd": {
+    "command": "run_c2_t07_rd.py --instance RD测试 --loops 5 --clone-loops 3",
+    "summary": "verification/catch-up/C2-T07/c2-t07-rd-summary.json",
+    "artifact": "artifacts/capability-audit/catch-up-c2-t07/20260823T023548Z",
+    "status": "PASS",
+    "user0_loops": 5,
+    "clone_user": 1,
+    "clone_loops": 3,
+    "death_replacement_loops": 2,
+    "long_tail_services": 19,
+    "cleanup_proven": true,
+    "fatal_or_anr": false
+  },
+  "c1_full_regression": {
+    "command": "t57_rd_full_regression.ps1 -InstanceName RD测试 -Serial 127.0.0.1:16416",
+    "status": "PASS",
+    "cases": 9,
+    "evidence_directory": "verification/catch-up/C2-T07/c1-full-regression"
+  },
+  "governance": {
+    "registry": "system_service_virtualization static_status/rd_api32_status PASS",
+    "corpus": "VA-584 rd_status PASS; VA PRO equivalence NOT_PROVEN",
+    "known_issue": "KI-R03-041 FIXED"
+  },
+  "limitations": [
+    "API33-36, OEM/HAL, commercial-app, SX/XH and VA PRO equivalence remain unproven.",
+    "P2 host-only or unavailable services remain explicit NOT_SUPPORTED or NOT_APPLICABLE boundaries."
+  ]
+}

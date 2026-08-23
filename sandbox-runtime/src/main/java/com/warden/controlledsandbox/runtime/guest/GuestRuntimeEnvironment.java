@@ -147,6 +147,23 @@ public final class GuestRuntimeEnvironment {
         ParcelFileDescriptor loaderApkDescriptor = null;
         ParcelFileDescriptor loaderNativeArchiveDescriptor = null;
         try {
+            if (current != null) {
+                if (current.spec.sessionId.equals(spec.sessionId)
+                        && current.spec.generation == spec.generation
+                        && current.spec.packageRevision.equals(spec.packageRevision)) {
+                    Bundle alreadyReady = current.status("ALREADY_READY", started);
+                    synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
+                    return alreadyReady;
+                }
+                if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
+                // Revoke the old generation before configuring process-wide native state for
+                // the new one. Session.shutdown() resets hooks and policy; doing it after
+                // prepareNativeBootstrap() silently erased the new generation's configuration
+                // during an in-process Binder-death recovery.
+                Session previous = current;
+                current = null;
+                previous.shutdown();
+            }
             IVirtualSystemServiceSession systemServiceSession = requireSystemServiceSession(spec);
             NativeBootstrap nativeBootstrap = prepareNativeBootstrap(host, spec, systemServiceSession);
             String nativeAbi = nativeBootstrap.nativeAbi;
@@ -160,17 +177,6 @@ public final class GuestRuntimeEnvironment {
             boolean nativePolicyConfigured = nativeBootstrap.nativePolicyConfigured;
             boolean systemIoHooksInstalled = nativeBootstrap.systemIoHooksInstalled;
             boolean nativeCrashRecorderInstalled = nativeBootstrap.nativeCrashRecorderInstalled;
-            if (current != null) {
-                if (current.spec.sessionId.equals(spec.sessionId)
-                        && current.spec.generation == spec.generation
-                        && current.spec.packageRevision.equals(spec.packageRevision)) {
-                    Bundle alreadyReady = current.status("ALREADY_READY", started);
-                    synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
-                    return alreadyReady;
-                }
-                if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
-                current.shutdown();
-            }
             File optimized = host.getCodeCacheDir();
             if (!spec.isolatedProcess) {
                 File optimizedBase = host.getCodeCacheDir();

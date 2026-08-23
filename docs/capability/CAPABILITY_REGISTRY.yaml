@@ -294,8 +294,8 @@ capabilities:
   - id: system_service_virtualization
     title: System service virtualization
     implementation_status: PARTIAL
-    static_status: PARTIAL
-    rd_api32_status: PARTIAL
+    static_status: PASS
+    rd_api32_status: PASS
     api33_status: UNVERIFIED
     api34_status: UNVERIFIED
     api35_status: UNVERIFIED
@@ -303,15 +303,24 @@ capabilities:
     oem_status: UNVERIFIED
     commercial_app_status: UNVERIFIED
     va_pro_equivalent: NOT_PROVEN
-    last_verified_commit: b6876cd7d3aa2a3530e8a703cdaa07417db52797
+    last_verified_commit: 2f31db3089d53a0136ea76a2d6191e0ec216dae0
     evidence:
       - docs/runtime/T57_R02_ARCHITECTURE_HANDOFF.md
       - scripts/check-binder-system-services.py
       - scripts/check-system-services-broker-split.py
       - docs/review/T57_R03_P4_FIX01_E_SYSTEM_SERVICE_SURFACE.md
+      - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
+      - docs/review/C2_T07_APPLICATION_ENVIRONMENT_LONG_TAIL_DESIGN.md
+      - scripts/check-c2-t07-application-environment.py
+      - tools/capability/run_c2_t07_rd.py
+      - verification/catch-up/C2-T07/c2-t07-rd-summary.json
+      - verification/catch-up/C2-T07/c2-t07-local-verification.json
+      - verification/catch-up/C2-T07/c1-full-regression
     known_gaps:
       - OEM manager transaction and callback variants are untested.
       - Account listeners are virtual-only, not host AccountManager callbacks.
+      - API33-36, OEM/HAL, commercial-app and VA PRO equivalence remain unproven.
+      - P2 host-only services without a safe Android object projection remain explicit NOT_SUPPORTED or NOT_APPLICABLE; they never fall back to Host truth.
   - id: android_oem_compatibility
     title: Android version and OEM compatibility
     implementation_status: GAP

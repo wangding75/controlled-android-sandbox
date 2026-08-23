@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.fixture;
 
 import android.app.Activity;
 import android.content.ComponentName;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import java.lang.reflect.Field;
@@ -41,6 +42,11 @@ public final class PersistableProbeActivity extends Activity {
             Log.i(TAG, "FRAMEWORK_PROBE_ACTIVITY_CONTRACT_PASS launch=" + launchMode
                     + " document=" + documentLaunchMode + " persist=" + persistableMode
                     + " affinity=" + taskAffinity);
+            // Serialize this probe with the task-semantics probe. Starting both from the parent
+            // in the same main-thread turn lets the second physical stub launch supersede the
+            // first before ActivityThread instantiates it on slower/device-busy runs.
+            startActivity(new Intent(this, TaskSemanticsProbeActivity.class)
+                    .setAction(getPackageName() + ".TASK_SEMANTICS_PROBE"));
         } catch (RuntimeException error) {
             throw error;
         } catch (Exception error) {

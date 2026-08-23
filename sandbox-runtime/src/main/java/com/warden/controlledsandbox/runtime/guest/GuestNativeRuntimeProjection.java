@@ -100,8 +100,21 @@ final class GuestNativeRuntimeProjection {
             if (candidate == null || samePath(candidate.libraryDirectory, packagedNative)
                     || !candidate.rawDex) return null;
             try (FileChannel channel = FileChannel.open(candidate.coreDex.toPath(), StandardOpenOption.READ)) {
-                if (channel.size() <= 0L || channel.size() > Integer.MAX_VALUE) return null;
-                return channel.map(FileChannel.MapMode.READ_ONLY, 0L, channel.size());
+                long size = channel.size();
+                if (size <= 0L || size > Integer.MAX_VALUE) return null;
+                // InMemoryDexClassLoader requires a direct buffer, but it does not require a
+                // memory-mapped file. A MappedByteBuffer pins core.jar on Windows and prevents
+                // an atomic runtime revision cleanup/replacement until GC eventually unmaps it.
+                // Copy once into process-owned direct memory so the source descriptor is closed
+                // deterministically while preserving the same direct-buffer contract.
+                ByteBuffer buffer = ByteBuffer.allocateDirect((int) size);
+                while (buffer.hasRemaining()) {
+                    int read = channel.read(buffer);
+                    if (read < 0) return null;
+                    if (read == 0) Thread.yield();
+                }
+                buffer.flip();
+                return buffer.asReadOnlyBuffer();
             }
         } catch (IOException | RuntimeException ignored) {
             return null;

@@ -47,9 +47,21 @@ final class ApplicationEnvironmentInvocationValues {
             if (value instanceof Iterable<?> iterable) iterable.forEach(out::add);
             else if (value != null && value.getClass().isArray()) {
                 for (int index = 0; index < Array.getLength(value); index++) out.add(Array.get(value, index));
-            } else out.add(value);
+            } else if (!appendListCarrier(out, value)) out.add(value);
         }
         return out;
+    }
+    private static boolean appendListCarrier(List<Object> out, Object value) {
+        if (value == null) return false;
+        try {
+            Method getList = value.getClass().getMethod("getList");
+            Object nested = getList.invoke(value);
+            if (nested instanceof Iterable<?> iterable) {
+                iterable.forEach(out::add);
+                return true;
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
+        return false;
     }
     static List<String> stringList(Object[] arguments) {
         List<String> out = new ArrayList<>();
@@ -130,6 +142,7 @@ final class ApplicationEnvironmentInvocationValues {
         return null;
     }
     static Object booleanResult(Class<?> type, boolean value) {
+        if (FrameworkApplicationEnvironmentObjectFactory.isAndroidFuture(type)) return value;
         if (type == void.class || type == Void.class) return null;
         if (type == boolean.class || type == Boolean.class) return value;
         if (type == int.class || type == Integer.class) return value ? 1 : 0;

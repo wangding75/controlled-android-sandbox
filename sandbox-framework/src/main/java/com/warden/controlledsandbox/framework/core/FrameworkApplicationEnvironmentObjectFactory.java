@@ -1,5 +1,9 @@
 package com.warden.controlledsandbox.framework.core;
 
+import android.content.ComponentName;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ComponentInfo;
+import android.content.pm.ResolveInfo;
 import com.warden.controlledsandbox.contract.VirtualWidgetSnapshot;
 import com.warden.controlledsandbox.contract.VirtualShortcutSnapshot;
 import com.warden.controlledsandbox.contract.VirtualUsageEventSnapshot;
@@ -59,6 +63,45 @@ final class FrameworkApplicationEnvironmentObjectFactory {
         return value;
     }
 
+    /**
+     * Projects the element contract returned by ILauncherApps rather than the public
+     * LauncherApps manager contract. Android 12's manager converts a
+     * LauncherActivityInfoInternal supplied by the Binder service into LauncherActivityInfo;
+     * returning a manager-layer DTO here fails that conversion before Guest code sees it.
+     */
+    private static Object launcherServiceActivity(GuestIdentity identity) {
+        ActivityInfo activity = launcherActivityInfo(identity);
+        try {
+            Class<?> incrementalType = Class.forName("android.content.pm.IncrementalStatesInfo");
+            Object incremental = construct(incrementalType,
+                    new Class<?>[]{boolean.class, float.class}, new Object[]{false, 1.0f});
+            Class<?> internalType = Class.forName("android.content.pm.LauncherActivityInfoInternal");
+            Object internal = construct(internalType,
+                    new Class<?>[]{ActivityInfo.class, incrementalType},
+                    new Object[]{activity, incremental});
+            if (incremental != null && internal != null) return internal;
+            throw unsupported("LAUNCHER_ACTIVITY_INTERNAL", internalType);
+        } catch (ClassNotFoundException legacyPlatform) {
+            ResolveInfo resolved = new ResolveInfo();
+            resolved.activityInfo = activity;
+            return resolved;
+        }
+    }
+
+    private static ActivityInfo launcherActivityInfo(GuestIdentity identity) {
+        String launcher = identity.packageMetadata().launcherActivity();
+        ComponentInfo component = identity.packageMetadata().componentInfo(
+                new ComponentName(identity.packageName(), launcher),
+                VirtualPackageMetadata.Type.ACTIVITY);
+        if (component instanceof ActivityInfo activity) return new ActivityInfo(activity);
+        ActivityInfo activity = new ActivityInfo();
+        activity.packageName = identity.packageName();
+        activity.name = launcher;
+        activity.applicationInfo = identity.applicationInfo();
+        activity.enabled = true;
+        return activity;
+    }
+
     static Object shortcut(Class<?> type, VirtualShortcutSnapshot snapshot, GuestIdentity identity) {
         if (type == Object.class) return new ProjectedShortcut(snapshot.id(), identity.packageName(),
                 snapshot.activityClass(), snapshot.shortLabel(), snapshot.longLabel(), snapshot.rank(),
@@ -89,6 +132,9 @@ final class FrameworkApplicationEnvironmentObjectFactory {
         String longLabel = text(read(source, "mLongLabel", "mText", "longLabel", "getLongLabel"));
         String disabledMessage = text(read(source, "mDisabledMessage", "disabledMessage", "getDisabledMessage"));
         int rank = integer(read(source, "mRank", "rank", "getRank"), 0);
+        // ShortcutInfo.Builder uses the framework sentinel RANK_NOT_SET until the service
+        // assigns a rank. The virtual contract persists only concrete bounded ranks.
+        if (rank < 0 || rank > 10_000) rank = 0;
         boolean enabled = bool(read(source, "isEnabled", "enabled"), true);
         boolean pinned = bool(read(source, "isPinned", "pinned"), false);
         boolean manifest = bool(read(source, "isDeclaredInManifest", "manifest"), false);
@@ -152,8 +198,45 @@ final class FrameworkApplicationEnvironmentObjectFactory {
         throw unsupported("COLLECTION", returnType);
     }
 
+    static Object shortcutCollectionResult(Class<?> returnType, List<?> source,
+            ElementFactory factory) {
+        if (!isAndroidFuture(returnType)) return collectionResult(returnType, source, factory);
+        try {
+            Class<?> sliceType = Class.forName("android.content.pm.ParceledListSlice");
+            return collectionResult(sliceType, source, factory);
+        } catch (ClassNotFoundException unavailable) {
+            throw new IllegalStateException("VIRTUAL_SHORTCUT_SLICE_UNAVAILABLE", unavailable);
+        }
+    }
+
+    static boolean isAndroidFuture(Class<?> type) {
+        return type != null && "com.android.internal.infra.AndroidFuture".equals(type.getName());
+    }
+
+    static Object completedFuture(Class<?> futureType, Object result) {
+        HiddenApiAccess.ensureExemptions();
+        try {
+            for (Method factory : futureType.getDeclaredMethods()) {
+                if (!"completedFuture".equals(factory.getName()) || factory.getParameterCount() != 1) continue;
+                factory.setAccessible(true);
+                Object completed = factory.invoke(null, result);
+                if (futureType.isInstance(completed)) return completed;
+            }
+        } catch (ReflectiveOperationException | RuntimeException unavailable) { }
+        Object future = construct(futureType, new Class<?>[0], new Object[0]);
+        if (future == null) throw unsupported("ANDROID_FUTURE", futureType);
+        try {
+            Method complete = futureType.getMethod("complete", Object.class);
+            complete.invoke(future, result);
+            return future;
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("VIRTUAL_ANDROID_FUTURE_COMPLETION_FAILED", failure);
+        }
+    }
+
     static Object launcherActivities(Class<?> returnType, GuestIdentity identity) {
-        Object activity = launcherActivity(Object.class, identity);
+        Object activity = "android.content.pm.ParceledListSlice".equals(returnType.getName())
+                ? launcherServiceActivity(identity) : launcherActivity(Object.class, identity);
         List<?> values = activity == null ? List.of() : List.of(activity);
         return collectionResult(returnType, values, (type, value) -> type == Object.class
                 ? value : launcherActivity(type, identity));

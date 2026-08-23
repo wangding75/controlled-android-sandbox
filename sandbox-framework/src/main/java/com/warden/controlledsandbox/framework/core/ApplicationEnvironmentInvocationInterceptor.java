@@ -51,7 +51,7 @@ final class ApplicationEnvironmentInvocationInterceptor {
             }
             throw unavailable;
         }
-        return switch (service) {
+        Decision decision = switch (service) {
             case "usermanager" -> user(method, arguments, profile.user());
             case "restrictions" -> restrictions(method, arguments, profile.user());
             case "launcherapps" -> launcher(method, arguments, profile.launcher());
@@ -61,6 +61,12 @@ final class ApplicationEnvironmentInvocationInterceptor {
             case "content" -> content(method, arguments, profile.settings());
             default -> Decision.passThrough();
         };
+        if (decision.handled() && FrameworkApplicationEnvironmentObjectFactory.isAndroidFuture(
+                method.getReturnType())) {
+            return Decision.handled(FrameworkApplicationEnvironmentObjectFactory.completedFuture(
+                    method.getReturnType(), decision.result()));
+        }
+        return decision;
     }
 
     private Decision user(Method method, Object[] arguments, VirtualUserProfileSnapshot profile) {
@@ -162,16 +168,16 @@ final class ApplicationEnvironmentInvocationInterceptor {
             return Decision.handled(activity);
         }
         if (InvocationMethodMatcher.named(name, "unregisterCallback", "removeCallback",
-                "unregisterPackageListener")
+                "unregisterPackageListener", "removeOnAppsChangedListener")
                 || InvocationMethodMatcher.startsWith(name, "unregisterCallback",
-                        "removeCallback", "unregisterPackageListener")) {
+                        "removeCallback", "unregisterPackageListener", "removeOnAppsChangedListener")) {
             removeListener(arguments);
             return Decision.handled(successValue(method.getReturnType()));
         }
         if (InvocationMethodMatcher.named(name, "registerCallback", "addCallback",
-                "registerPackageListener")
+                "registerPackageListener", "addOnAppsChangedListener")
                 || InvocationMethodMatcher.startsWith(name, "registerCallback",
-                        "addCallback", "registerPackageListener")) {
+                        "addCallback", "registerPackageListener", "addOnAppsChangedListener")) {
             if (!profile.allowPackageCallbacks()) return Decision.handled(falseValue(method.getReturnType()));
             Object callback = callback(arguments);
             if (callback == null) throw new IllegalArgumentException("VIRTUAL_LAUNCHER_CALLBACK_REQUIRED");
@@ -209,7 +215,7 @@ final class ApplicationEnvironmentInvocationInterceptor {
                 if (name.contains("pinned") && !value.pinned()) continue;
                 selected.add(value);
             }
-            return Decision.handled(FrameworkApplicationEnvironmentObjectFactory.collectionResult(
+            return Decision.handled(FrameworkApplicationEnvironmentObjectFactory.shortcutCollectionResult(
                     method.getReturnType(), selected, (type, value) ->
                             FrameworkApplicationEnvironmentObjectFactory.shortcut(type,
                                     (VirtualShortcutSnapshot) value, identity)));

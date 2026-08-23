@@ -68,8 +68,6 @@ public final class FrameworkProbeActivity extends Activity {
         packageUniverseProbe();
         startActivity(new Intent(this, PersistableProbeActivity.class)
                 .setAction(getPackageName() + ".PERSISTABLE_ACTIVITY_PROBE"));
-        startActivity(new Intent(this, TaskSemanticsProbeActivity.class)
-                .setAction(getPackageName() + ".TASK_SEMANTICS_PROBE"));
         crossPackageComponentProbe();
         multiProcessProbe();
         new Handler(Looper.getMainLooper()).postDelayed(this::finishProbe, 5000L);

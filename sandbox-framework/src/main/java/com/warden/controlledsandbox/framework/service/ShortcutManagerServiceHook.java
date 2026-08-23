@@ -8,7 +8,8 @@ import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 public final class ShortcutManagerServiceHook {
     private ShortcutManagerServiceHook() { }
     public static AutoCloseable install(Context context, GuestIdentity identity) throws Exception {
-        return ReflectiveServiceHook.managerFieldCandidates(context, "shortcut", "shortcut", identity,
-                "mService", "sService");
+        return ReflectiveServiceHook.managerFieldCandidatesOrServiceManagerBinding(
+                context, "shortcut", "shortcut", "android.content.pm.IShortcutService",
+                identity, "mService", "sService");
     }
 }

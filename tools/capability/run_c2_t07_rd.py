@@ -263,11 +263,11 @@ def main() -> int:
             "android_id": environment["android_id"],
             "instance_name": environment["instance_name"],
         })
+        details["steps"].append({"name": "install_rd_apks", "result": install_rd_apks(serial)})
         reset = run_adb(serial, ["shell", "pm", "clear", HOST_PACKAGE], check=False)
         if reset.returncode != 0 or reset.stdout.strip().lower() != "success":
             raise RuntimeError(f"host data reset failed: {reset.stdout} {reset.stderr}")
         details["steps"].append({"name": "reset_host_data", "status": "PASS"})
-        details["steps"].append({"name": "install_rd_apks", "result": install_rd_apks(serial)})
         details["apk_metadata"] = apk_metadata()
         details["steps"].append({"name": "import_prepare", "result": require_pass(
             "import prepare", command(serial, "import-prepare", force_stop_host=True))})

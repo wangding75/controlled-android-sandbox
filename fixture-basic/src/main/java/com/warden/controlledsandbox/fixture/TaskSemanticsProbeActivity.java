@@ -64,6 +64,9 @@ public final class TaskSemanticsProbeActivity extends Activity {
             return;
         }
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_COUNTS create=" + onCreateCount
+                    + " newIntent=" + onNewIntentCount + " start=" + onStartCount
+                    + " resume=" + onResumeCount);
             Log.i(TAG, "FRAMEWORK_PROBE_TASK_REUSE_LIFECYCLE create=" + onCreateCount
                     + " newIntent=" + onNewIntentCount + " start=" + onStartCount
                     + " resume=" + onResumeCount);

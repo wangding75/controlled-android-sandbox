@@ -1053,7 +1053,7 @@ issues:
     capability: system_service_virtualization
     classification: TEST_EVIDENCE_GAP
     severity: HIGH
-    status: RECORDED
+    status: FIXED
     discovered_by: C2-T07 DISCOVER/CLASSIFY 2026-08-23
     evidence:
       - docs/review/C2_T01_SYSTEM_SERVICE_METHOD_CATALOG.md
@@ -1066,6 +1066,8 @@ issues:
       - docs/review/C2_T07_APPLICATION_ENVIRONMENT_LONG_TAIL_DESIGN.md
       - tools/capability/run_c2_t07_rd.py
       - verification/catch-up/C2-T07/c2-t07-rd-summary.json
+      - verification/catch-up/C2-T07/c2-t07-local-verification.json
+      - verification/catch-up/C2-T07/c1-full-regression
     match_patterns:
       - C2-T01-F1-12
       - C2-T01-F1-14
@@ -1076,10 +1078,10 @@ issues:
     blocks_current_campaign: false
     fix_policy: PACKAGE_NEUTRAL_C2_T07_ENVIRONMENT_AND_LONG_TAIL_RD_CAMPAIGN
     notes: >
-      Application-environment stores, hooks and source-side long-tail policy/peripheral/privileged
-      boundaries already pass static checks and host self-tests, but the repository had no
-      package-neutral RD fixture correlating identity, request, return, callback/observer,
-      unregister/cleanup and process-death behavior for User/Launcher/Shortcut/AppWidget/Usage/
-      Settings/Content or the P2 long-tail negative matrix. C2-T07 is scoped to the dynamically
-      resolved API32 RD device; API33+, OEM/HAL, commercial-app and VA PRO equivalence remain
+      C2-T07 added and executed a package-neutral RD fixture correlating identity, request,
+      return, callback/observer, unregister/cleanup, cross-user separation and process-death
+      behavior for User/Launcher/Shortcut/AppWidget/Usage/Settings/Content plus the P2 long-tail
+      negative matrix. The final 5-loop user0, 3-loop clone and death-replacement campaign passed,
+      followed by the nine-case C1 full regression. This closes only the dynamically resolved
+      API32 RD evidence gap; API33+, OEM/HAL, commercial-app and VA PRO equivalence remain
       explicitly unproven.

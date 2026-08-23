@@ -14,6 +14,7 @@ import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 
@@ -154,6 +155,19 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         if (!accepted) {
             serviceLifecycle.cancelStop(guestClass, waiter);
             return false;
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // AMS delivers STOP_SERVICE back through this same ActivityThread main queue.
+            // Waiting for that acknowledgement here would block the queue that must produce
+            // it. Preserve Context.stopService()'s accepted-request semantics on the main
+            // thread, retain the waiter for the eventual lifecycle callback, and bound stale
+            // waiter retention if an OEM drops the callback.
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    () -> serviceLifecycle.cancelStop(guestClass, waiter),
+                    GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS);
+            android.util.Log.i("CS_SERVICE_FRAMEWORK",
+                    "STOP_ACCEPTED_ASYNC guest=" + guestClass);
+            return true;
         }
         try {
             serviceLifecycle.awaitStop(guestClass, waiter);

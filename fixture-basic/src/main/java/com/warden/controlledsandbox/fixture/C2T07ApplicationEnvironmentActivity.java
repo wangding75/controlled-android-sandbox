@@ -295,7 +295,10 @@ public final class C2T07ApplicationEnvironmentActivity extends Activity {
         String secureRead = Settings.Secure.getString(resolver, key);
         boolean systemPut = Settings.System.putString(resolver, key, value);
         String systemRead = Settings.System.getString(resolver, key);
-        resolver.notifyChange(uri, contentObserver);
+        // A non-null observer denotes the mutation origin and is excluded unless it opts into
+        // self notifications. Use a null origin so this probe actually validates delivery to
+        // the registered observer under the platform ContentResolver contract.
+        resolver.notifyChange(uri, null);
         mainHandler.postDelayed(() -> { }, 10L);
         if (!securePut || !value.equals(secureRead) || !systemPut || !value.equals(systemRead)) {
             throw new IllegalStateException("VIRTUAL_SETTINGS_ROUND_TRIP_FAILED:" + loop);
