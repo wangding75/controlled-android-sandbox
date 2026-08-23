@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.1
-更新时间：2026-08-23 16:15（Asia/Shanghai）
+更新时间：2026-08-23 17:20（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C3`（执行中）
-当前任务：`C4-T01`（PENDING）
-下一任务：`C4-T01`
-最后完成任务：`C3-T06`
+当前阶段：`C4`（执行中）
+当前任务：`C4-T02`（PENDING）
+下一任务：`C4-T02`
+最后完成任务：`C4-T01`
 
 ## 1. 使用规则
 
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | PENDING | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
+| C4 SX 迁移 | IN_PROGRESS | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
 | C5 XH 支持 | PENDING | 原始 XH 通过，可选模块有决策 | - |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -59,7 +59,7 @@
 | C3-T04 | Hostile native 隔离 | DONE | C3-T01,C3-T02 | `22716fbfec845b288ea119c6ec6be678fc23915f` | §5 C3-T04 |
 | C3-T05 | seccomp/user-notify 决策 | NOT_APPLICABLE | C3-T04 | `537c20211300c93ae42dda4365bcb0cdb0ee0b70` | §5 C3-T05 |
 | C3-T06 | ART/Xposed Extension 决策 | NOT_APPLICABLE | C2,C3-T04 | `1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3` | §5 C3-T06 |
-| C4-T01 | SX 依赖与功能冻结 | PENDING | C1,C2,C3-T01..T04 | - | - |
+| C4-T01 | SX 依赖与功能冻结 | DONE | C1,C2,C3-T01..T04 | `4dcce11e08bdc6edafbf867032a0790f0ef8ee57` | §5 C4-T01 |
 | C4-T02 | SX CAS SDK adapter | PENDING | C4-T01 | - | - |
 | C4-T03 | SX 数据迁移 | PENDING | C4-T01,C4-T02 | - | - |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | PENDING | C4-T02,C4-T03 | - | - |
@@ -1681,3 +1681,50 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
   C4-T01 SX 冻结清单可开始，因其依赖仅为 C1/C2/C3-T01..T04。可选
   `spoofer_project` 模块宿主、API33+、ARM/16KB、OEM 和 VA PRO 仍未证明。
 - **下一任务**：`C4-T01`。
+
+### C4-T01：冻结 SX 依赖、功能与运行时清单
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-23 17:03 / 2026-08-23 17:20（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；仓库 `D:\github\controlled-android-sandbox`；
+  分支 `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 动态解析，serial
+  `127.0.0.1:16416`，model `V2241A`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，boot ID
+  `4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31`。SX 源码树 `D:\github\all_project\sx`。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `65c5c5691327b0b7b6cc81885370e55117e60b4f`；远端同 HEAD；上一任务 `C3-T06`
+  `NOT_APPLICABLE`，实现提交 `1931baa5ebf5fb3470b9881230cb4fbdcb0ca3b3`。
+- **DISCOVER / CLASSIFY**：续接解析器原先要求 `开始基线 @ SHA`，C3-T05/T06 回执没有
+  `@`；C3 runners 的 `FORBIDDEN_SERIALS` 也未进 allowlist。已归为续接 harness 缺口并
+  修复。SX 冻结缺口登记为 `KI-R03-046`（T52 清单未对 live Gradle/`SandboxEngine`/
+  `BlackBoxCore` 反射做 fail-closed）。
+- **实现摘要**：对照 live SX 冻结 Gradle 图、启动链、17 个 `SandboxEngine` 方法、
+  UI、F1-F5 Hook、`sx_config`/ConfigProvider 数据键和动态加载；每条有
+  REPLACE/DELETE/DROP/GENERIC_ALREADY 与 CAS 目标。生产 CAS 再次确认无
+  `BlackBoxCore`/`PineXposed`。未改生产运行时。
+- **变更文件**：`docs/review/C4_T01_SX_DEPENDENCY_FREEZE_DESIGN.md`、
+  `verification/catch-up/C4-T01/c4-t01-freeze.json`、
+  `scripts/check-c4-t01-sx-freeze.py`、`tools/capability/run_c4_t01_rd.py`、
+  `scripts/verify-catch-up-continuation.py`、`docs/review/KNOWN_ISSUES.yaml`。
+- **验收命令与结果**：`python scripts/check-c4-t01-sx-freeze.py` PASS；
+  `python tools/capability/validate_campaign_infra.py` PASS；
+  `python scripts/generate-sbom.py --check` PASS；
+  `$env:MUMU_ROOT='D:\install\Netease\MuMu'; python tools/capability/run_c4_t01_rd.py --instance RD测试`
+  PASS。
+- **设备证据**：主回执 `verification/catch-up/C4-T01/c4-t01-rd-summary.json`，
+  本地 `c4-t01-local-verification.json`，冻结矩阵 `c4-t01-freeze.json`。本任务不构建
+  APK，不宣称 SX/DingTalk 业务 PASS。
+- **Known Issues**：`KI-R03-046` 已 `FIXED`。无新增 runtime issue。
+  `va_pro_equivalent` 保持 `NOT_PROVEN`。
+- **偏离任务书**：无。C3 阶段门禁仍未单独重跑 C1/C2 回归；C4-T01 依赖仅为
+  C1/C2/C3-T01..T04，已满足。本轮只执行 C4-T01。
+- **实现提交 SHA**：`4dcce11e08bdc6edafbf867032a0790f0ef8ee57`
+  （`docs(sx): [C4-T01] freeze SX dependency and runtime inventory`）。
+- **回执提交**：主题 `docs(progress): record [C4-T01] receipt`。
+- **推送与远端验证**：两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads`
+  对比 HEAD。
+- **遗留风险**：C4-T02 必须让 SX 生产入口只走 CAS SDK；C4-T03 迁移
+  ConfigProvider/`sx_config`；C4-T04 删除 engine-bb/Bcore/Pine。C3 阶段门禁的
+  C1/C2 回归仍待单独确认。
+- **下一任务**：`C4-T02`。
