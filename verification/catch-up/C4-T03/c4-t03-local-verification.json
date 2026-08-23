@@ -1,0 +1,121 @@
+{
+  "task_id": "C4-T03",
+  "status": "PASS",
+  "environment": {
+    "instance_name": "RD测试",
+    "adb_serial": "127.0.0.1:16416",
+    "device_name": "V2241A",
+    "api_level": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+    "android_id": "8acae00bece8090b",
+    "manufacturer": "vivo",
+    "release": "12",
+    "mumu": {
+      "project": "Controlled Android Sandbox / 闪现2",
+      "instanceName": "RD测试",
+      "instanceIndex": 1,
+      "instanceId": "ginstance1400672403315892101",
+      "vmName": "MuMuPlayer-12.0-1",
+      "runtimeStatus": "device",
+      "mumuPlayerState": "",
+      "mumuManager": {},
+      "resolvedSerial": "127.0.0.1:16416",
+      "configuredSerial": "127.0.0.1:16416",
+      "manufacturer": "vivo",
+      "model": "V2241A",
+      "release": "12",
+      "api": "32",
+      "androidId": "8acae00bece8090b",
+      "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
+      "timestamp": "2026-08-23T10:25:26.755405+00:00",
+      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "config": {
+        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "configuredHostPort": 16416,
+        "runtimeHost": "127.0.0.1",
+        "runtimeHostPort": 16416,
+        "configuredManufacturer": "vivo",
+        "configuredModel": "V2241A"
+      },
+      "adb": {
+        "path": "adb",
+        "connect": {
+          "attempt": 1,
+          "returnCode": 0,
+          "stdout": "already connected to 127.0.0.1:16416",
+          "stderr": "",
+          "getState": "device"
+        },
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "getState": "device"
+      }
+    },
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+  },
+  "static_gates": [
+    {
+      "gate": "scripts/check-c4-t03-sx-migration.py",
+      "returncode": 0
+    },
+    {
+      "gate": ":sandbox-domain:selfTest",
+      "returncode": 0
+    },
+    {
+      "gate": "assembleDebug device APKs",
+      "returncode": 0
+    }
+  ],
+  "smoke": {
+    "status": "PASS",
+    "campaign": {
+      "pass": true,
+      "cloneUser": 1,
+      "user0Hash": "614716c66394296909366dca52936d9206c382a18d6c4911824d97be6e8c6725",
+      "user1Hash": "11d63d197cb7da67afafe2de3095627d01e72ee15b83e3899cc070ae3a221b2a",
+      "replay": "IDEMPOTENT",
+      "interrupt": "INTERRUPTED",
+      "rollback": "ROLLED_BACK",
+      "user0Lat": "31.2304",
+      "user1Lat": "22.543099",
+      "sourceKept": true
+    }
+  },
+  "apk_metadata": {
+    "apks": [
+      {
+        "name": "host",
+        "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+        "exists": true,
+        "sha256": "f9405a13b2a448b7182c02d6259d74e9296313476b7cc6a9cf67d68d6905fc65"
+      },
+      {
+        "name": "companion32",
+        "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
+        "exists": true,
+        "sha256": "608b112fe269c1bda183e701c1ccbf5f91279f12e33a3df2d53c5d7986d5febd"
+      },
+      {
+        "name": "fixture",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
+        "exists": true,
+        "sha256": "18cb010cbe42159aff720beb716a2d25f5c0eaf248b9c37e93098de13caed53e"
+      },
+      {
+        "name": "fixture32",
+        "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
+        "exists": true,
+        "sha256": "82f3d33ab2bd83203c2f3e86be603afffcb1d15641e8d769f865016d32895616"
+      }
+    ]
+  },
+  "errors": [],
+  "non_claims": [
+    "not DingTalk PASS",
+    "not BlackBox removed from production APK",
+    "not VA Pro equivalence"
+  ]
+}

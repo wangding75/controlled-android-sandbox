@@ -37,7 +37,7 @@
         "pro",
         "txt"
       ],
-      "sourceDigestSha256": "601e9f2bd1e6bbf96cd17b54d51a55cef9fc05a51d69c9ca4f91b1bfd28d0cb5"
+      "sourceDigestSha256": "82a90717a33f66f7e3f6393f39a9bcd2da10eabeb7b5f8a3be5dcf90b361380b"
     },
     {
       "type": "library",
@@ -52,7 +52,7 @@
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "5c041f6f52fbcf5a99220e9a2af0292f1ab98a9934fd0d324fe7dcbbd1e465ad"
+      "sourceDigestSha256": "48b97b35c3551432645848b89513372cc9cbb69c61ad773fc6dd14ee6660809f"
     },
     {
       "type": "library",
@@ -78,13 +78,13 @@
       "gradleProjectPath": ":sandbox-sdk",
       "version": "0.5.19.1-source",
       "license": "Apache-2.0",
-      "fileCount": 13,
+      "fileCount": 15,
       "languages": [
         "Gradle",
         "Java",
         "lockfile"
       ],
-      "sourceDigestSha256": "da23b307ee747dba7c441d231b2b68bef09417739235556105d5f1c6e053ff70"
+      "sourceDigestSha256": "037fbb918b195daa307207c99161285bc3be87a8811019d8469b30804cc2b836"
     },
     {
       "type": "library",

@@ -315,6 +315,8 @@ capabilities:
       - docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md
       - scripts/check-c4-t02-sx-adapter.py
       - verification/catch-up/C4-T02/c4-t02-engine-mapping.json
+      - docs/review/C4_T03_SX_DATA_MIGRATION_DESIGN.md
+      - scripts/check-c4-t03-sx-migration.py
     known_gaps:
       - Upgrade, rollback, clone, reset-identity, and in-flight Provider/Service/Job/Alarm transactions remain open.
   - id: system_service_virtualization

@@ -1,36 +1,35 @@
 {
   "schema_version": 1,
-  "task_id": "C4-T02",
+  "task_id": "C4-T03",
   "status": "PASS",
-  "captured_at": "2026-08-23T09:25:16.286086+00:00",
+  "captured_at": "2026-08-23T10:08:07.366168+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-T02",
+    "next_task": "C4-T03",
     "active_task": "",
-    "last_completed": "C4-T01",
-    "first_ready_pending": "C4-T02",
-    "dependencies": "C4-T01"
+    "last_completed": "C4-T02",
+    "first_ready_pending": "C4-T03",
+    "dependencies": "C4-T01,C4-T02"
   },
   "last_receipt": {
-    "task_id": "C4-T01",
+    "task_id": "C4-T02",
     "status": "DONE",
     "implementation_commits": [
-      "4dcce11e08bdc6edafbf867032a0790f0ef8ee57"
+      "d6763e40f971fa60db015b17b294cea15fdcdc32"
     ],
-    "receipt_commit": "3de95e15332aa09da1427d92a15d7eb9bd2f82db",
-    "baseline_commit": "65c5c5691327b0b7b6cc81885370e55117e60b4f",
+    "receipt_commit": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
+    "baseline_commit": "3de95e15332aa09da1427d92a15d7eb9bd2f82db",
     "evidence_paths": [
-      "docs/review/C4_T01_SX_DEPENDENCY_FREEZE_DESIGN.md",
-      "verification/catch-up/C4-T01/c4-t01-freeze.json",
+      "docs/review/C4_T02_SX_CAS_SDK_ADAPTER_DESIGN.md",
       "docs/review/KNOWN_ISSUES.yaml",
-      "verification/catch-up/C4-T01/c4-t01-rd-summary.json"
+      "verification/catch-up/C4-T02/c4-t02-rd-summary.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "3de95e15332aa09da1427d92a15d7eb9bd2f82db",
+    "head": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "3de95e15332aa09da1427d92a15d7eb9bd2f82db",
+    "remote_head": "e7ac819bedf09b3e02d3f038c23e3e1f25e20b44",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
@@ -141,6 +140,18 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "scripts/check-c4-t02-sx-adapter.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "scripts/check-native-enforcement-poc.py",
         "serial": "127.0.0.1:16416"
       },
@@ -193,6 +204,18 @@
         "serial": "127.0.0.1:7555"
       },
       {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:16416"
+      },
+      {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:16384"
+      },
+      {
+        "file": "tools/capability/run_c4_t02_rd.py",
+        "serial": "127.0.0.1:7555"
+      },
+      {
         "file": "tools/capability/run_rd_campaign.py",
         "serial": "127.0.0.1:16416"
       },
@@ -206,5 +229,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-T02"
+  "evidence_directory": "verification/catch-up/C4-T03"
 }

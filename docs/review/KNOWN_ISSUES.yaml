@@ -1230,3 +1230,27 @@ issues:
       SandboxSdk. Adapter re-reads catalog/status, returns diagnosable failures, rolls back a
       failed clone, and RD fixture smoke uses the engine path only. setDisplayName persistence,
       sx_config, and live SX BlackBox deletion remain C4-T03/T04. Not VA Pro equivalence.
+
+  - issue_id: KI-R03-048
+    title: SX sx_config/ConfigProvider had no versioned CAS instance-profile migration
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: FIXED
+    discovered_by: C4-T03 DISCOVER/CLASSIFY 2026-08-23
+    evidence:
+      - docs/review/C4_T03_SX_DATA_MIGRATION_DESIGN.md
+      - scripts/check-c4-t03-sx-migration.py
+      - tools/capability/run_c4_t03_rd.py
+      - verification/catch-up/C4-T03/c4-t03-rd-summary.json
+      - verification/catch-up/C4-T03/c4-t03-local-verification.json
+    match_patterns:
+      - sx_config
+      - ConfigProvider
+      - SxInstanceProfileMigrator
+    blocks_current_campaign: false
+    fix_policy: VERSIONED_IDEMPOTENT_INSTANCE_SCOPED_MIGRATION
+    notes: >
+      Closed by C4-T03: desensitized sx-config-v1 documents migrate onto CAS instance
+      profiles with backup, idempotent replay, interrupt, rollback, and dual-user isolation.
+      License/time-guard remain DROP. Not VA Pro equivalence.

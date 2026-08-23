@@ -62,6 +62,7 @@ public final class SelfTest {
         testUriGrantRegistry();
         testCursorLeaseRegistry();
         testComponentProcessPlanner();
+        com.warden.controlledsandbox.domain.migration.SxMigrationSelfTest.run();
         System.out.println("PASS sandbox-domain self-test");
     }
 

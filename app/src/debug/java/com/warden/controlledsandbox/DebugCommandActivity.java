@@ -26,6 +26,11 @@ import com.warden.controlledsandbox.sdk.SandboxCatalog;
 import com.warden.controlledsandbox.sdk.SandboxEngineObserver;
 import com.warden.controlledsandbox.sdk.SandboxInstance;
 import com.warden.controlledsandbox.sdk.SandboxOperationResult;
+import com.warden.controlledsandbox.domain.migration.SxInstanceProfileMigrator;
+import com.warden.controlledsandbox.domain.migration.SxLegacyConfigDocument;
+import com.warden.controlledsandbox.domain.migration.SxMigrationRecord;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.io.File;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -127,6 +132,26 @@ public final class DebugCommandActivity extends Activity {
                 result.put("status", "PASS");
                 Log.i(TAG, "PASS native-enforcement isolatedUid="
                         + campaign.optJSONObject("isolated"));
+                return;
+            }
+            if ("c4-t03-migrate".equals(command)) {
+                if (packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("package extra is required");
+                }
+                String trust = trustNativeGuest
+                        ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                        : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED;
+                JSONObject campaign = runC4T03Migrate(this, packageName, trust);
+                result.put("c4t03", campaign);
+                result.put("operation", new JSONObject().put("status",
+                        campaign.optBoolean("pass", false)
+                                ? "C4_T03_MIGRATE_PASS" : "C4_T03_MIGRATE_FAIL"));
+                if (!campaign.optBoolean("pass", false)) {
+                    throw new IllegalStateException("C4_T03_MIGRATE_FAILED:"
+                            + campaign.optString("error", "migration smoke failed"));
+                }
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS c4-t03-migrate package=" + packageName);
                 return;
             }
             if ("c4-t02-engine".equals(command)) {
@@ -1382,6 +1407,124 @@ public final class DebugCommandActivity extends Activity {
         out.put("errorType", value.errorType());
         out.put("errorMessage", value.errorMessage());
         return out;
+    }
+
+    private JSONObject runC4T03Migrate(Context context, String packageName, String trust)
+            throws Exception {
+        JSONObject campaign = new JSONObject();
+        try (SxSandboxAdapter adapter = new SxSandboxAdapter(context);
+             PackageServiceClient packages = new PackageServiceClient(context)) {
+            CasSandboxEngine engine = new CasSandboxEngine(adapter);
+            engine.killAll();
+            for (SandboxInstance existing : engine.listInstalled()) {
+                if (packageName.equals(existing.packageName())) {
+                    engine.uninstall(existing.packageName(), existing.virtualUserId());
+                }
+            }
+            requireEngine(new JSONArray(), "c4-t03-import",
+                    engine.installFromHost(packageName, trust));
+            SandboxOperationResult cloned = requireEngine(new JSONArray(), "c4-t03-clone",
+                    engine.clone(packageName));
+            int cloneUser = Integer.parseInt(cloned.diagnostics().getOrDefault("virtualUserId", "-1"));
+            if (cloneUser < 1) throw new IllegalStateException("CLONE_USER_INVALID");
+            SxMigrationHostStore store = new SxMigrationHostStore(context, packages);
+            SxInstanceProfileMigrator migrator = new SxInstanceProfileMigrator(store);
+            SxLegacyConfigDocument user0 = sxFixture(packageName, 0, "31.230400", "121.473700",
+                    "02:00:00:00:00:10", "0123456789abcdef", "Fixture-0", new byte[]{1, 0});
+            SxLegacyConfigDocument user1 = sxFixture(packageName, cloneUser, "22.543099", "113.929884",
+                    "02:00:00:00:00:20", "fedcba9876543210", "Fixture-1", new byte[]{2, 0});
+            SxMigrationRecord first = migrator.migrate(user0);
+            SxMigrationRecord second = migrator.migrate(user1);
+            SxMigrationRecord replay = migrator.migrate(user0);
+            if (!SxMigrationRecord.COMMITTED.equals(first.status)
+                    || !SxMigrationRecord.COMMITTED.equals(second.status)
+                    || !SxMigrationRecord.IDEMPOTENT.equals(replay.status)
+                    || !first.sourceKept) {
+                throw new IllegalStateException("MIGRATION_STATUS_UNEXPECTED:"
+                        + first.status + "/" + second.status + "/" + replay.status);
+            }
+            Map<String, String> applied0 = store.readApplied(packageName, 0);
+            Map<String, String> applied1 = store.readApplied(packageName, cloneUser);
+            if (applied0.getOrDefault("location.lat", "").equals(applied1.get("location.lat"))
+                    || applied0.getOrDefault("device.androidId", "").equals(applied1.get("device.androidId"))
+                    || applied0.getOrDefault("camera.sha256", "").equals(applied1.get("camera.sha256"))) {
+                throw new IllegalStateException("CROSS_USER_PROFILE_LEAK");
+            }
+            SxLegacyConfigDocument changed = sxFixture(packageName, 0, "39.904200", "116.407400",
+                    "02:00:00:00:00:10", "0123456789abcdef", "Fixture-0", new byte[]{1, 0});
+            SxMigrationRecord interrupted = migrator.migrate(changed, true);
+            if (!SxMigrationRecord.INTERRUPTED.equals(interrupted.status)) {
+                throw new IllegalStateException("INTERRUPT_NOT_RECORDED:" + interrupted.status);
+            }
+            if (!applied0.get("location.lat").startsWith("31.2304")) {
+                throw new IllegalStateException("INTERRUPT_MUTATED_LIVE:" + applied0.get("location.lat"));
+            }
+            SxMigrationRecord rolled = migrator.rollback(packageName, 0);
+            Map<String, String> restored = store.readApplied(packageName, 0);
+            if (!SxMigrationRecord.ROLLED_BACK.equals(rolled.status)
+                    || !restored.getOrDefault("location.lat", "").startsWith("31.2304")) {
+                throw new IllegalStateException("ROLLBACK_DID_NOT_RESTORE:" + restored);
+            }
+            if (!store.read(packageName, 0).sourceKept) {
+                throw new IllegalStateException("OLD_SOURCE_DROPPED");
+            }
+            campaign.put("pass", true);
+            campaign.put("cloneUser", cloneUser);
+            campaign.put("user0Hash", first.sourceHash);
+            campaign.put("user1Hash", second.sourceHash);
+            campaign.put("replay", replay.status);
+            campaign.put("interrupt", interrupted.status);
+            campaign.put("rollback", rolled.status);
+            campaign.put("user0Lat", restored.get("location.lat"));
+            campaign.put("user1Lat", applied1.get("location.lat"));
+            campaign.put("sourceKept", true);
+        } catch (Exception error) {
+            campaign.put("pass", false);
+            campaign.put("error", String.valueOf(error.getMessage()));
+        }
+        return campaign;
+    }
+
+    private static SxLegacyConfigDocument sxFixture(String packageName, int userId, String lat,
+            String lng, String mac, String androidId, String label, byte[] media) {
+        Map<String, String> location = new LinkedHashMap<>();
+        location.put("enabled", "true");
+        location.put("lat", lat);
+        location.put("lng", lng);
+        location.put("accuracy", "5");
+        location.put("altitude", "10");
+        location.put("intervalMs", "1000");
+        Map<String, String> device = new LinkedHashMap<>();
+        device.put("enabled", "true");
+        device.put("brand", "FixtureBrand");
+        device.put("model", "FixtureModel");
+        device.put("manufacturer", "FixtureMfr");
+        device.put("board", "fixture");
+        device.put("serial", "FXSERIAL000" + userId);
+        device.put("imei", "353322101234567");
+        device.put("androidId", androidId);
+        device.put("imsi", "460001234567890");
+        device.put("iccid", "89860012345678901234");
+        device.put("operatorName", "FixtureNet");
+        Map<String, String> network = new LinkedHashMap<>();
+        network.put("enabled", "true");
+        network.put("ssid", "Fixture-WiFi-" + userId);
+        network.put("bssid", mac);
+        network.put("mac", mac);
+        network.put("mcc", "460");
+        network.put("mnc", "1");
+        network.put("lac", "1234");
+        network.put("cid", "5678");
+        Map<String, String> camera = new LinkedHashMap<>();
+        camera.put("enabled", "true");
+        camera.put("type", "image");
+        camera.put("path", "fixture.png");
+        Map<String, String> bluetooth = new LinkedHashMap<>();
+        bluetooth.put("enabled", "true");
+        bluetooth.put("name", "FixtureBT-" + userId);
+        bluetooth.put("address", mac);
+        return new SxLegacyConfigDocument(packageName, userId, label, location, device, network,
+                camera, bluetooth, media, "image");
     }
 
     private JSONObject runC4T02Engine(Context context, String packageName, String trust)
