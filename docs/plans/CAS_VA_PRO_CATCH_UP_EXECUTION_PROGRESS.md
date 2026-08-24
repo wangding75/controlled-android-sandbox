@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.1
-更新时间：2026-08-23 21:14（Asia/Shanghai）
+账本版本：1.2
+更新时间：2026-08-24 10:29（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（编号任务完成，阶段门禁待关）
-当前任务：`C5-T01`（PENDING）
-下一任务：`C5-T01`
+当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
+当前任务：`C4-R01`（PENDING）
+下一任务：`C4-R01`
 最后完成任务：`C4-T05`
 
 ## 1. 使用规则
@@ -26,8 +26,8 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | CAS-only，100 轮和任务书规定压力（不含显式 8 小时门槛） | - |
-| C5 XH 支持 | PENDING | 原始 XH 通过，可选模块有决策 | - |
+| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
+| C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
 
@@ -64,23 +64,29 @@
 | C4-T03 | SX 数据迁移 | DONE | C4-T01,C4-T02 | `e064e2174854c661248e0c2970b8fe621bc161ef` | §5 C4-T03 |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
-| C5-T01 | 原始 XH 产品能力契约 | PENDING | C2,C3 | - | - |
-| C5-T02 | XH CAS Host/SDK 集成 | PENDING | C5-T01,C4-T02 | - | - |
-| C5-T03 | 原始 XH/DingTalk 验收 | PENDING | C5-T02,C4 | - | - |
-| C5-T04 | 可选 Xposed 模块验收 | PENDING | C3-T06,C5-T01 | - | - |
-| C6-T01 | API33-37 回归 | PENDING | C4,C5 | - | - |
+| C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | PENDING | C4-T05 | - | - |
+| C4-R02 | 添加事务、超时与 UI 状态机 | PENDING | C4-R01 | - | - |
+| C4-R03 | 启动 readiness 与窗口合同 | PENDING | C4-R01 | - | - |
+| C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
+| C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
+| C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
+| C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
+| C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
+| C5-T04 | 可选 Xposed 模块验收 | NOT_APPLICABLE | C3-T06,C5-T01 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
+| C6-T01 | API33-37 回归 | PENDING | C4-R05 | - | - |
 | C6-T02 | ARM/跨宽度/16KB | PENDING | C3-T03,C6-T01 | - | - |
 | C6-T03 | Android Matrix 发布门禁 | PENDING | C6-T01,C6-T02 | - | - |
 | C7-T01 | OEM 优先级与代表设备 | PENDING | C6 | - | - |
-| C7-T02 | 逐厂商通用/SX/XH 适配 | PENDING | C7-T01 | - | - |
+| C7-T02 | 逐厂商通用/SX 适配 | PENDING | C7-T01 | - | - |
 | C7-T03 | VA PRO scope 与商业发布总验收 | PENDING | C7-T02 | - | - |
 
 ## 4. 阻断项
 
-当前阻断：无。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-056`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
-外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认，不得提前据此跳过 C0-C5 主线。
+外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
+C5 已由用户明确排除，完成 C4-R05 后直接进入 C6-T01。
 
 ## 5. 任务回执
 
@@ -1926,3 +1932,49 @@ M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均
 - **遗留风险**：C4 阶段门禁尚未单独落账；DingTalk 账号级登录需要凭据；100 轮
   launch/stop 偏慢（guest bind）。C5 未开始。
 - **下一任务**：`C5-T01`。
+
+### PLAN-20260824-C4-REOPEN：重开 C4、跳过 C5 并制定 RD 返修计划
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-24 10:20 / 2026-08-24 10:29（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu `RD测试` 仅做动态可用性解析，未复现、定位或修复
+  红果/番茄小说异常，也未执行新的 Android runtime 验收。
+- **开始基线**：`feature/t57-r03-va-pro-capability-campaign` @
+  `1bef0951218ec8356f94c869ae9131ad5859864e`；开始时本地、上游一致且工作区干净；最后完成任务
+  `C4-T05`，但其阶段关闭证据随后被本次审查判定不足。
+- **审查结论**：原 C4 runner 将 `LAUNCH_PASS`、Stub/Guest marker 作为成功，未验证 Window/Surface/
+  `reportedDrawn` 或首帧，故黑屏仍可 PASS；启动流程缺少 request-scoped readiness 和阶段 deadline；添加只做
+  少量样本，不能证明事务可靠性；静默 launch retry、固定 sleep 与宽泛窗口重试会隐藏首次失败。指定提交
+  `6e1044b0` 修复了部分 Window/Audio/Context 合同但未在同一 commit 闭合 C4 证据；`1bef0951` 只是说明性
+  进度补记，不是完整 C4 重验回执。
+- **计划变更**：任务书升至 1.2，保留 C4-T01..T05 历史，新增 C4-R01..R05；C4 必须依次完成证据纠偏与
+  VA/NBB mapping、添加状态机、启动/窗口合同、fail-closed runner 和 RD 正式重验。C5-T01..T04 全部
+  `NOT_APPLICABLE`，C6-T01 直接依赖 C4-R05。
+- **商业样本门槛**：夸克为正向对照，红果和番茄小说为必须关闭的异常样本；连同 DingTalk 分别执行 10 次
+  add/delete/re-add，单项成功率 100%。任一样本异常直接 FAIL，夸克成功不能替代红果或番茄小说。实际
+  package/version/base/split/ABI 在 C4-R01/R02 执行时动态记录，本轮不猜测包名或具体异常。
+- **变更文件**：
+  `docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`、
+  `docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、`scripts/verify-catch-up-continuation.py`、
+  `scripts/test_catch_up_continuation.py`、本进度账本。
+- **Known Issues**：新增 `KI-R03-053`（黑屏误判）、`KI-R03-054`（启动超时不可诊断）、
+  `KI-R03-055`（红果/番茄小说添加兼容性样本）和 `KI-R03-056`（隐藏重试与猜测式修复流程），均
+  `RECORDED` 且阻断 C4 关门。
+- **验收命令与结果**：`python scripts/test_catch_up_continuation.py` PASS（6 tests）；
+  `python tools/capability/validate_campaign_infra.py` PASS；`git diff --check` PASS。续接器已支持 `C4-R*`
+  任务 ID，确保新环境能够从账本选择 C4-R01。
+- **设备证据**：动态解析 MuMu `RD测试` 为 API 32、model `22041211A`、boot ID
+  `d09f0f79-058d-42af-924c-3a99f1429ea4`；仅证明计划首要设备可解析，不声明红果、番茄小说、夸克或
+  任何 runtime 能力通过。
+- **偏离任务书**：按用户最新指示，本轮只制定计划，不定位实际添加异常或提交生产修复；运行中的只读设备
+  解析在收到该指示后停止于环境确认，没有执行应用操作。
+- **实现提交 SHA**：`a8f24e40`（任务书、分析和 Known Issues）；`22387799`（续接器支持 C4-R 任务）。
+- **回执提交**：主题 `docs(progress): record [PLAN-20260824-C4-REOPEN] receipt`。
+- **推送目标与远端验证**：本回执提交后将实现提交与回执提交非强制推送至
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并以 `git ls-remote --heads` 对比本地 HEAD。
+- **遗留风险**：四个问题的实际首次失败签名和最终 owner 仍待 C4-R01；C4-R02..R05 尚未执行；历史
+  C4-T05 summary 仅保留审计，不得用于关闭重新打开的 C4。
+- **下一任务**：`C4-R01`；执行前必须先读取任务书 1.2、本账本最后回执、Known Issues 和 Git/远端状态。
