@@ -1,6 +1,11 @@
 {
   "schema_version": 1,
   "campaign_id": "C4-T05",
+  "evidence_status": "SUPERSEDED",
+  "historical_only": true,
+  "usable_for_c4_closure": false,
+  "superseded_by": "C4-R01",
+  "supersession_reason": "LAUNCH_PASS and Activity markers did not prove a visible first frame; this evidence predates the corrected C4 gate.",
   "capability": "package_lifecycle_clear_delete_reinstall",
   "branch": "feature/t57-r03-va-pro-capability-campaign",
   "commit": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",

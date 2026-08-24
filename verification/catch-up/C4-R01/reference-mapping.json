@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R01",
+  "purpose": "Immutable input manifest for the pre-design NewBlackBox and VirtualApp install/start/process/window mapping",
+  "new_blackbox": [
+    {"contract": "install", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/BPackageManagerService.java", "sha256": "9b3ba72be34e1d90621ce22bcf7865c05b4fbdd3a70fdf50db93a6eab071cad9"},
+    {"contract": "install", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/pm/BPackageInstallerService.java", "sha256": "6c3b175adfd854490eef13c1116563107b753d0666924169d739b5508ed5cae0"},
+    {"contract": "start", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/BlackBoxCore.java", "sha256": "41566905bfe2d87b0bee8d10f022d141367e7f730473e6d4210f7fc23dca0875"},
+    {"contract": "start", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/am/BActivityManagerService.java", "sha256": "70c338775e4da6c83012b8105361eb55b7ec4eaa0db79840e60411e4094dc0fd"},
+    {"contract": "start", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/am/ActivityStack.java", "sha256": "bad3643c1ec9d2c5303f270ae94f5d61d271f4dd89814565dd625a148da6b41f"},
+    {"contract": "process", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/core/system/BProcessManagerService.java", "sha256": "7cfb3c53afa1281e9a75779a397abf3db1e67e4e0680dd060c9948281bc66f98"},
+    {"contract": "process_context", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/app/BActivityThread.java", "sha256": "12cf3899198fc8e19cc97d9793fdf78eeb929177124769f272d4b274d67b40f5"},
+    {"contract": "context_identity", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/utils/compat/ContextCompat.java", "sha256": "48bb63609fe19e4521a7f3dbef1fafe67f72d7ae860bf7066be26d28bce96298"},
+    {"contract": "window_identity", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IWindowManagerProxy.java", "sha256": "3d85a74e0d17ebc4fb9019e6bbd4ed5789ba6f8d938c330dcb6b4b758c164a1c"},
+    {"contract": "window_identity", "path": "ref/upstream/NewBlackbox/Bcore/src/main/java/top/niunaijun/blackbox/fake/service/IWindowSessionProxy.java", "sha256": "d4763935fba903793c296becce6ba074afe6f4dac5e7adf2a6a24e16cc7578b8"}
+  ],
+  "virtual_app": [
+    {"contract": "install", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/pm/VAppManagerService.java", "sha256": "442ec66620150b7c489f5db5e52ef4ea2f7d9b38f08f2aba3c1135a8280ae319"},
+    {"contract": "start_client", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/ipc/VActivityManager.java", "sha256": "db04a477091ce6adae8f67405a9f95c16599434d0dce56a20bea91238ed62746"},
+    {"contract": "start_process", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/am/VActivityManagerService.java", "sha256": "5c8539cbfe406e4766fcfb471e15145c68a4f4a683882ae04a4cdfbd61749204"},
+    {"contract": "activity_stack", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/server/am/ActivityStack.java", "sha256": "93dba3e74faea34eb271d874ddd0494075416cfe28a6a576cba1d0d0a8224e73"},
+    {"contract": "stub", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/stub/StubActivity.java", "sha256": "dd88cc4f8d36bfd7cb92ba6cd34ed5626f9a99f650a23e05cde26863013b6f5c"},
+    {"contract": "transaction_restore", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/proxies/am/HCallbackStub.java", "sha256": "f72d1757528956eb3c9bf0f43eb0430ca3f5ea2b8b0f2f90eefeec6fecb23fab"},
+    {"contract": "instrumentation", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/delegate/AppInstrumentation.java", "sha256": "e91a4e30bb9cc8a87afab8f7a46671c295fb7138770842d3311b5ada4c4d5a82"},
+    {"contract": "window_identity", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/proxies/window/WindowManagerStub.java", "sha256": "d6b3bbb735fb7e24916f6fb83ad998bcb2eb698fcf167862568ad68f0f7ee14c"},
+    {"contract": "window_session", "path": "ref/upstream/VirtualApp/VirtualApp/lib/src/main/java/com/lody/virtual/client/hook/proxies/window/session/WindowSessionPatch.java", "sha256": "4e7e4da4cceb82b32c61812c9088d043f37897093b6bc765d28f322dde6745e5"}
+  ],
+  "adopt": [
+    "synchronized or single-flight install state with atomic publish and rollback",
+    "explicit stub route plus process attach/death lifecycle",
+    "minimal host context/window identity at the Binder boundary",
+    "normal ActivityThread lifecycle remains responsible for final addView and draw",
+    "phase-specific terminal states and deadlines"
+  ],
+  "reject": [
+    "direct source copying or legacy private-API assumptions",
+    "unclassified repeated launch or fixed-sleep readiness",
+    "broad Throwable catch followed by repeated addView",
+    "raw Host Context exposure to Guest code",
+    "LAUNCH_PASS or Activity markers as a first-frame proxy"
+  ]
+}

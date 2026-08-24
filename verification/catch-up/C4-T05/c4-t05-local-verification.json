@@ -1,5 +1,10 @@
 {
   "task_id": "C4-T05",
+  "evidence_status": "SUPERSEDED",
+  "historical_only": true,
+  "usable_for_c4_closure": false,
+  "superseded_by": "C4-R01",
+  "supersession_reason": "Historical local verification did not require Window/Surface/reportedDrawn/first-frame evidence.",
   "status": "PASS",
   "environment": {
     "instance_name": "RD测试",
