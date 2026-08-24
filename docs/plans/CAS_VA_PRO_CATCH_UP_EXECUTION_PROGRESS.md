@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-24 11:08（Asia/Shanghai）
+更新时间：2026-08-24 14:39（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R02`（IN_PROGRESS）
-下一任务：`C4-R02`
-最后完成任务：`C4-R01`
+当前任务：`C4-R03`（PENDING）
+下一任务：`C4-R03`
+最后完成任务：`C4-R02`
 
 ## 1. 使用规则
 
@@ -65,7 +65,7 @@
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
-| C4-R02 | 添加事务、超时与 UI 状态机 | IN_PROGRESS | C4-R01 | - | - |
+| C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | PENDING | C4-R01 | - | - |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
@@ -2043,3 +2043,47 @@ C5 已由用户明确排除，完成 C4-R05 后直接进入 C6-T01。
 - **推送与远端验证**：本回执提交后将两个提交非强制推送到
   `origin/feature/t57-r03-va-pro-capability-campaign`，再以 `git ls-remote --heads` 比较本地/远端 HEAD。
 - **下一任务**：`C4-R02`（PENDING）；下一环境必须从本回执和续接预检无损继续，禁止跳到 C4-R03、C6 或 OEM。
+
+### C4-R02：添加事务、超时与 UI 操作状态机
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-24 12:58 / 2026-08-24 14:39（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析，最终观测
+  endpoint `127.0.0.1:16416`，设备 model `22041211A`、API 32、boot ID
+  `d09f0f79-058d-42af-924c-3a99f1429ea4`；runner 未硬编码 ADB 地址。
+- **开始基线与预检**：`577d0e6a79a14b269058a01affebf1e482b20237`；开始时账本下一任务为
+  `C4-R02`，工作区、本地 HEAD、远端 HEAD 和 Git 身份符合规范；先将 C4-R02 标记为
+  `IN_PROGRESS`。规范身份为 `OpenAI <openai@users.noreply.github.com>`。
+- **实现摘要**：新增 package/user 单飞 coordinator、统一 request/operation trace、COPY/HASH/
+  PARSE/NATIVE_EXTRACT/PUBLISH/CATALOG/ENSURE_INSTANCE 分段 deadline、导入+首实例原子 catalog
+  提交、失败 staging 清理、单次 connector 获取、UI request/stage/elapsed 与终态恢复、并发
+  `MUTATION_BUSY`、Host/PackageService 死亡恢复。混合 ELF 目标机器作为可审计 anomaly 接受，未知
+  格式/目标仍 fail-closed。设计前已查阅并记录 NBB/VA 安装、启动、进程和窗口实现。
+- **动态商业样本**：夸克 `com.quark.browser` 10.10.5.1080/1080，base 1/split 0，arm64-v8a，
+  仅作正向对照；红果 `com.phoenix.read` 7.0.5.33/70533，base 1/split 0，arm64-v8a；番茄小说
+  `com.dragon.read` 7.1.9.32/71932，base 1/split 0，arm64-v8a；钉钉动态识别为
+  `com.alibaba.android.rimet` 7.8.10/1178，base 1/split 0，arm64-v8a。红果/番茄均记录
+  `MIXED_ELF_MACHINE`，未以夸克成功外推运行时兼容。
+- **验收结果**：fixture 50 次 add/delete/re-add（150/150）；钉钉、夸克、红果、番茄各 10 次
+  （30/30、30/30、31/31、31/31，红果/番茄含首次导入证据），共 272 条产品操作，失败 0；
+  latency min/median/p95/max 为 5513/7595/16416/23565 ms；每条 attempt=1、retryBudget=0。
+  并发添加为 1 success + 1 `MUTATION_BUSY` 且同 operation ID；未授权 native 负测稳定返回
+  `UNTRUSTED_NATIVE_GUEST_DENIED`，不重试且无 residue；Host 与 PackageService 死亡恢复均 PASS，
+  revision SHA 保持不变。
+- **证据与回执**：完整回执为 `docs/review/C4_R02_TASK_RECEIPT.md`，机器汇总为
+  `verification/catch-up/C4-R02/acceptance-summary.json`，设备原始证据在
+  `verification/catch-up/C4-R02/rd-acceptance/`；`python scripts/check-c4-r02-package-mutation.py`
+  PASS；`python scripts/test_catch_up_continuation.py` PASS（6 tests）；
+  `python tools/capability/validate_campaign_infra.py` PASS；Gradle APK 构建、完整静态 Android
+  self-test、证据 JSON/YAML parse 和 `git diff --check` PASS。最终 APK SHA-256 为
+  `17138281206690EA5B3C10AD0E0D21FC2C33C8DD7051A2386E0B9464CCB72CC6`。
+- **Known Issues**：`KI-R03-055` 已更新为 `FIXED`（仅 CAS 导入兼容性）；`KI-R03-053`、
+  `KI-R03-054`、`KI-R03-056` 保持 `RECORDED` 且阻断，分别由 C4-R03/R04/R05 继续处理；C4
+  尚未关闭。
+- **实现提交 SHA**：`46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1`
+  （`feat(c4): implement R02 package mutation transactions`）。
+- **回执提交**：本段为独立的 `docs(progress): record [C4-R02] receipt` 提交。
+- **下一任务**：`C4-R03`（PENDING）；下一环境必须从本回执和最终续接预检无损继续，禁止跳到
+  C4-R04、C4-R05、C6 或 OEM。
