@@ -1353,3 +1353,97 @@ issues:
       original IWindow Binder, no GuestContext.getOpPackageName leak (C2-T02).
       Quark import-launch on RD测试 must show a drawn Guest stub. Not VA Pro
       equivalence.
+
+  - issue_id: KI-R03-053
+    title: C4 accepted resumed Guest activities whose windows never drew
+    capability: activity_framework
+    classification: TEST_EVIDENCE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4 post-acceptance review 2026-08-24
+    evidence:
+      - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
+      - tools/capability/run_c4_t05_rd.py
+      - verification/catch-up/C4-T05/c4-t05-rd-summary.json
+    match_patterns:
+      - LAUNCH_PASS
+      - GUEST_ACTIVITY_CREATE
+      - reportedDrawn=false
+      - windows=[]
+    blocks_current_campaign: true
+    fix_policy: C4_R03_FIRST_FRAME_DRAWN_AND_C4_R04_FAIL_CLOSED_GATE
+    notes: >
+      The historical C4-T05 receipt remains auditable but cannot close C4 because its
+      runner proved request routing and Activity markers, not a visible Guest frame.
+      C4-R03/R04/R05 own the runtime contract, gate rewrite, and RD revalidation.
+
+  - issue_id: KI-R03-054
+    title: C4 add-to-launch timeout has no request-scoped phase diagnosis
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4 post-acceptance review 2026-08-24
+    evidence:
+      - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/RebindableServiceConnector.java
+      - app/src/main/java/com/warden/controlledsandbox/SandboxViewModel.java
+    match_patterns:
+      - timed out
+      - service unavailable
+      - FIRST_FRAME_DRAWN
+    blocks_current_campaign: true
+    fix_policy: C4_R01_REQUEST_TIMELINE_THEN_C4_R03_READINESS_DEADLINES
+    notes: >
+      The current API and UI cannot distinguish queue, bind, prepare, attach, Activity,
+      window, or draw timeout. C4-R01 must preserve the first failure and classify the
+      phase before C4-R03 changes production behavior.
+
+  - issue_id: KI-R03-055
+    title: Hongguo and Fanqie Novel throw while Quark can be added
+    capability: package_lifecycle_clear_delete_reinstall
+    classification: COMPATIBILITY_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: RD测试 C4 post-acceptance feedback 2026-08-24
+    evidence:
+      - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
+      - docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md
+    match_patterns:
+      - Hongguo
+      - Fanqie Novel
+      - Quark
+      - add installed application
+    blocks_current_campaign: true
+    fix_policy: C4_R01_BOUNDARY_CLASSIFICATION_AND_C4_R02_COMMERCIAL_SAMPLE_MATRIX
+    notes: >
+      This planning revision intentionally does not reproduce or guess the exception.
+      Until boundary evidence proves otherwise, the failure is owned as a CAS generic
+      import compatibility gap. Quark is a positive control only. C4-R02 requires the
+      package-neutral fixture plus DingTalk, Quark, Hongguo, and Fanqie Novel to meet
+      their independent add/delete/re-add gates; actual package IDs and versions are
+      resolved and recorded at execution time. Transfer to SX is allowed only when CAS
+      has verifiably committed the add and SX adapter or UI subsequently fails or misreports.
+
+  - issue_id: KI-R03-056
+    title: C4 retries and fixed sleeps can hide the first failure and encourage guess-driven fixes
+    capability: activity_framework
+    classification: NEEDS_GATE_AND_CODE_REVIEW
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4 post-acceptance review 2026-08-24
+    evidence:
+      - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
+      - app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java
+      - tools/capability/run_c4_t05_rd.py
+    match_patterns:
+      - stopSoft
+      - killSettled
+      - ensureWindowPublishedAfterResume
+      - Thread.sleep
+    blocks_current_campaign: true
+    fix_policy: FIRST_FAILURE_EVIDENCE_REFERENCE_MAPPING_AND_BOUNDED_TYPED_RETRY
+    notes: >
+      C4-R01 requires VA/NBB mapping before design. C4-R04 removes silent launch retry
+      and fixed-sleep readiness, records every attempt and retry decision, and proves
+      through failure injection that the first failure cannot be converted into PASS.

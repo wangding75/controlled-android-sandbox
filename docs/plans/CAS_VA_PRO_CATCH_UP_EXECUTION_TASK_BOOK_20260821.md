@@ -1,6 +1,6 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.1
+版本：1.2
 制定日期：2026-08-21
 基准分支：`feature/t57-r03-va-pro-capability-campaign`
 首要验收环境：MuMu 模拟器实例 `RD测试`
@@ -10,6 +10,10 @@
 已有的轮次、30 分钟压力和资源收敛要求，并在 `docs/review/KNOWN_ISSUES.yaml` 登记后续稳定性
 计划债务。此修订不宣称 8 小时稳定性已验证。
 
+修订记录：2026-08-24 按用户明确指示跳过 C5 XH 路线；C4-T05 原验收被黑屏、启动超时、偶发
+添加失败和隐藏重试证明不充分，C4 阶段重新打开并新增 C4-R01 至 C4-R05。根因与验收方案见
+`docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`。C6/C7 不再依赖或宣称 XH。
+
 ## 1. 任务书目标
 
 本任务书用于把 CAS 追平 VA PRO 的目标转化为可以逐项执行、验收、提交、推送和跨环境续接的工程任务。
@@ -18,8 +22,8 @@
 1. 先在 MuMu `RD测试` 上关闭 Android 沙箱通用能力，包括组件、生命周期、事件、Hook、系统服务、
    native/ABI、故障恢复与隔离边界；
 2. 通用能力稳定后，以 CAS 作为唯一沙箱宿主完成 SX 业务迁移和验收；
-3. 复用同一底座支持原始 XH 产品能力，并把可选 Xposed 模块宿主作为独立条件路线；
-4. 最后扩展 Android API/ABI 和厂商适配；
+3. 原 C5 XH 产品与可选 Xposed 模块路线按 2026-08-24 用户决定跳过，不作为后续阶段依赖；
+4. C4 修复重验通过后扩展 Android API/ABI 和厂商适配；
 5. 对产品范围内的 VA PRO 更新日志能力逐条建立实现、测试、证据或不适用说明。
 
 本任务书的事实依据为：
@@ -397,12 +401,14 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 ### 8.1 阶段目标
 
 在 C1、C2 P0、C3 trusted native 门禁通过后，将 SX 从 BlackBox/Pine 混合架构迁移为 CAS 唯一宿主，
-并在 `RD测试` 完成真实业务长稳。
+并在 `RD测试` 完成真实业务验收。原 C4-T05 的 PASS 只证明启动请求/marker，不足以证明窗口绘制；
+2026-08-24 起阶段重新打开，必须完成 C4-R01 至 C4-R05 才能关闭。
 
 ### 8.2 任务列表
 
 `C4-T01` 冻结清单；`C4-T02` CAS adapter；`C4-T03` 数据迁移；`C4-T04` 移除旧 runtime；
-`C4-T05` F1-F5 与业务长稳。
+`C4-T05` F1-F5 与业务验收；`C4-R01` 证据纠偏；`C4-R02` 添加可靠性；`C4-R03` 启动与窗口；
+`C4-R04` 验收编排；`C4-R05` RD 正式重验。
 
 ### C4-T01：冻结 SX 依赖、功能与运行时清单
 
@@ -446,19 +452,84 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
   达标；特化关闭后通用 fixture 不变。
 - **任务回执**：记录 SX/DingTalk 版本、业务脚本、F1-F5 证据、循环/soak 指标、崩溃/ANR 和阶段门禁。
 
+历史状态说明：该任务的实现和旧回执保留为 DONE，但其阶段关闭证据已被 2026-08-24 发现的问题取代。
+后续不得引用修复前的 C4-T05 summary 关闭 C4，必须执行以下重验任务。
+
+### C4-R01：证据纠偏、确定性复现与 VA/NBB 映射
+
+- **任务目标**：作废错误的阶段完成推断，分别复现黑屏、启动超时、偶发添加失败并建立可验证根因。
+- **执行方案**：在当前 HEAD 和动态解析的 MuMu `RD测试` 上执行首次失败即停的 collect-all；为 UI enqueue、
+  import、catalog commit、broker bind、Guest prepare/attach、Activity create/resume、window add/first draw 建立同一
+  request ID 时间线；设计前必须阅读 NBB/VA 对应 install/start/window/process 实现并提交 mapping。
+- **验收标准**：旧 C4 evidence 标记 `SUPERSEDED` 且保留历史；四个问题都有独立 Known Issue、原始失败证据、
+  最小复现和参考合同；没有通过重试覆盖第一次失败；未得到证据的推断明确标为待验证。
+- **任务回执**：记录当前 commit/APK/device、每个复现步骤和首次失败签名、时间线、NBB/VA 文件与采纳/不采纳结论。
+
+### C4-R02：添加事务、超时与 UI 操作状态机修复
+
+- **任务目标**：消除偶发添加失败和不可诊断等待，保证重复/并发操作幂等、可回滚且有明确 deadline。
+- **执行方案**：为 package/user mutating operation 增加 operation ID 和单飞控制；UI 操作期间禁用重复按钮并展示
+  stage/elapsed；分段记录 copy/hash/parse/extract/publish/catalog/ensureInstance；只对明确 retryable 的 bind/
+  unavailable 错误允许至多一次重试，其他错误禁止重试；失败清理 staging/in-flight/orphan state。
+- **验收标准**：package-neutral fixture 50 次，DingTalk、夸克、红果、番茄小说各 10 次真实
+  add/delete/re-add，成功率均为 100%；执行时动态记录四个商业样本的实际 package/version/base/split/ABI，
+  不在任务书硬编码包名；重复点击与并发请求不产生双提交；Host/PackageService 死亡后旧 revision/catalog
+  可恢复；失败后无 `.install-*`、半发布 revision、in-flight transaction 或孤儿实例；每次操作都有阶段耗时和
+  稳定 error code。任一样本无法添加均直接 FAIL，不得以夸克成功替代红果或番茄小说。
+- **任务回执**：记录 NBB/VA 安装状态机对照、fixture 50 轮及四个商业样本各 10 轮结果、样本清单、首发失败、
+  retry decision、事务残留扫描和耗时分位。
+
+### C4-R03：启动 readiness、窗口合同与超时修复
+
+- **任务目标**：把“启动请求接受”提升为“目标 Guest 首帧真实绘制”，关闭黑屏和启动超时。
+- **执行方案**：定义 `REQUEST_ACCEPTED -> GUEST_READY -> ACTIVITY_RESUMED -> FIRST_FRAME_DRAWN` 状态机；对照
+  NBB/VA 收敛 `6e1044b0` 的 Context/WindowSession/IWindow/Audio/ActivityThread 合同；优先让 framework 正常
+  addView；必要 fallback 只能针对一个明确错误尝试一次；以最小 Host window identity capability 替换 public raw
+  Host Context；记录各阶段 deadline 和错误。
+- **验收标准**：fixture、DingTalk、夸克、红果、番茄小说均先完成 C4-R02 添加门槛；user0/user1 各 50 次
+  冷/热启动首次尝试成功率 100%；每轮目标 revision 达到
+  `FIRST_FRAME_DRAWN`，Window/Surface 非空且截图非全黑/全透明/Host 占位；cold first-frame 不超过 30 秒、hot
+  不超过 10 秒；无重复 Stub/ViewRoot、BadToken、`View not attached`、FATAL、ANR 或 Host identity 泄漏。
+- **任务回执**：记录 NBB/VA 窗口合同、每阶段耗时、dumpsys/window/Surface/截图/帧 hash、首发失败和安全负测。
+
+### C4-R04：重写 C4 fail-closed 验收编排
+
+- **任务目标**：使黑屏、首发失败、隐藏重试、超时和添加事务残留不可能被 runner 误判为 PASS。
+- **执行方案**：删除 C4 主门禁中的静默 launch retry和固定 8/12 秒 sleep；使用 request-scoped readiness 等待；
+  每轮验证目标 Guest Activity、revision、`reportedDrawn/hasVisible`、Window/Surface 和非黑截图；将恢复重试放到
+  独立用例；输出 attempt、stage timing、error classification、retry decision 和 artifact 索引。
+- **验收标准**：注入 `windows=[]`、draw timeout、首发 bind failure、重复 add、staging 残留时 runner 必须 FAIL；
+  静态检查不得以 marker 存在代替动态结果；测试自身 failure 能保留第一次和最终状态；无未分类自动重试。
+- **任务回执**：记录 runner 单元/故障注入结果、删除的弱判据、每个 fail-closed 样本和 artifact schema。
+
+### C4-R05：MuMu RD 正式重验与 C4 关门
+
+- **任务目标**：在修复后的同一 clean commit 上重新证明 CAS-only SX 添加、启动、F1-F5 和 DingTalk 业务。
+- **执行方案**：动态解析 `RD测试`，同一 commit 执行两轮完整 suite；第一轮 clean install/cold，第二轮 retained
+  state/hot/recovery；将夸克作为当前可添加的对照样本，将红果、番茄小说作为必须关闭的兼容性样本，并连同
+  DingTalk 记录实际 package/version/APK 形态；运行 C1 Activity、C2 Window/Audio、C4 CAS-only/F1-F5 回归；
+  执行 user0 15 分钟且至少 50 周期、user1 15 分钟且至少 50 周期的 30 分钟压力。
+- **验收标准**：两轮均通过；fixture、DingTalk、夸克、红果、番茄小说的规定添加轮次全部通过；添加失败、
+  启动超时、黑屏、隐藏重试、FATAL、ANR 为 0；所有启动达到
+  `FIRST_FRAME_DRAWN`；资源与 staging/transaction/Window/ViewRoot/process slot 收敛；新的机器可读 evidence
+  记录修复 commit、APK hash、设备快照、截图/帧 hash和原始日志。P0/P1 未关闭不得关门。
+- **任务回执**：记录两轮矩阵、30 分钟双用户统计、所有问题状态、完整证据索引、C4 阶段结论和下一任务 C6-T01。
+
 ### 8.3 阶段门禁
 
-SX 生产路径只有 CAS 沙箱；目标业务在 `RD测试` 100 轮通过；无未解释 P0/P1 业务阻断。
+SX 生产路径只有 CAS 沙箱；C4-R01 至 C4-R05 全部 DONE；目标业务在 `RD测试` 达到真实
+`FIRST_FRAME_DRAWN`，完成规定添加/启动轮次和双用户 30 分钟压力；无未解释 P0/P1 业务阻断。
 
-## 9. 阶段 C5：XH 产品支持与可选模块路线
+## 9. 阶段 C5：XH 产品支持与可选模块路线（已跳过）
 
 ### 9.1 阶段目标
 
-复用 CAS/SX 已关闭能力支持原始 XH 沙箱产品；只有明确要求时才交付 `spoofer_project` 模块宿主能力。
+本阶段按用户 2026-08-24 明确决定整体标记 `NOT_APPLICABLE`。XH 不在当前追赶计划交付范围，
+也不再阻塞 C6/C7。若未来恢复，必须重新确认产品范围、基线和依赖，不能直接沿用本次排除结论。
 
 ### 9.2 任务列表
 
-`C5-T01` XH 契约；`C5-T02` CAS Host 集成；`C5-T03` XH 业务验收；`C5-T04` 可选 Xposed 模块验收。
+`C5-T01` 至 `C5-T04` 全部 `NOT_APPLICABLE`，仅保留原任务定义作为审计历史，不执行。
 
 ### C5-T01：冻结原始 XH 产品能力契约
 
@@ -497,14 +568,13 @@ SX 生产路径只有 CAS 沙箱；目标业务在 `RD测试` 100 轮通过；�
 
 ### 9.3 阶段门禁
 
-原始 XH 产品在 `RD测试` 达到与 SX 同级的通用能力和业务稳定性；可选模块路线有 DONE 或
-NOT_APPLICABLE 回执。
+C5-T01 至 C5-T04 均有基于用户范围决定的 `NOT_APPLICABLE` 回执；C6 依赖已改为 C4-R05，不等待 C5。
 
 ## 10. 阶段 C6：Android API 与 ABI 扩展
 
 ### 10.1 阶段目标
 
-在不引入 OEM 变量的前提下，把同一套 C1-C5 验收扩展到 API33-37 和目标 ABI。
+在不引入 OEM 变量的前提下，把同一套 C1-C4 验收扩展到 API33-37 和目标 ABI。C5 已跳过。
 
 ### 10.2 任务列表
 
@@ -513,7 +583,7 @@ NOT_APPLICABLE 回执。
 ### C6-T01：API33-37 统一回归
 
 - **任务目标**：识别并关闭 framework/AIDL/Parcel/权限/后台策略随 API 的变化。
-- **执行方案**：按 33、34、35、36、37 顺序，在 AOSP 环境运行同一 C1-C5 suite；修复应基于 API/signature，
+- **执行方案**：按 33、34、35、36、37 顺序，在 AOSP 环境运行同一 C1-C4 suite；修复应基于 API/signature，
   禁止业务包名分支；更新 API capability matrix。
 - **验收标准**：每个声明支持的 API 均有完整设备快照和回归结果；targetSdk、AttributionSource、FGS/Job/
   notification、WebView 等关键漂移有证据；P0/P1 无未分类失败。
@@ -522,7 +592,7 @@ NOT_APPLICABLE 回执。
 ### C6-T02：ARM32/ARM64、跨宽度和 16KB 动态验收
 
 - **任务目标**：补齐 ARM 真机/模拟环境和 16KB page 的动态证据。
-- **执行方案**：选择可审计环境运行 native、Companion32、Camera/Media、process death 和 SX/XH smoke；
+- **执行方案**：选择可审计环境运行 native、Companion32、Camera/Media、process death 和 SX smoke；
   对照 C3 静态结果，记录指令集和 linker 差异。
 - **验收标准**：目标 ARM32/ARM64 组合通过；16KB 环境可加载并运行关键路径；跨宽度身份/revision 正确；
   不以 x86 结果替代 ARM。
@@ -533,7 +603,7 @@ NOT_APPLICABLE 回执。
 - **任务目标**：形成精确到 API/ABI/业务的支持声明和回归入口。
 - **执行方案**：汇总 C6-T01/T02，更新 registry、compat matrix、release gate 和自动化；对未支持组合写风险接受或
   发布阻断，不做泛化宣传。
-- **验收标准**：支持矩阵每个格子有 evidence ID；发布 gate 能阻止缺证据组合；SX/XH 在目标组合完成 smoke/关键业务。
+- **验收标准**：支持矩阵每个格子有 evidence ID；发布 gate 能阻止缺证据组合；SX 在目标组合完成 smoke/关键业务。
 - **任务回执**：记录最终矩阵、gate 输出、排除组合、风险接受和进入 OEM 阶段的基线。
 
 ### 10.3 阶段门禁
@@ -558,27 +628,27 @@ NOT_APPLICABLE 回执。
 - **验收标准**：设备选择和顺序有数据依据；每台设备可复现、可恢复；通用/SX/XH 三层测试边界明确。
 - **任务回执**：记录优先级依据、设备/ROM 清单、实验控制变量、访问条件和计划顺序。
 
-### C7-T02：逐厂商执行通用、SX、XH 适配
+### C7-T02：逐厂商执行通用与 SX 适配
 
 - **任务目标**：关闭目标 OEM 的 framework、权限、后台、WebView、Camera/Location 和进程差异。
-- **执行方案**：每个 OEM 先跑通用 suite，再跑 SX，最后 XH；patch 必须带 manufacturer/API/framework signature/
+- **执行方案**：每个 OEM 先跑通用 suite，再跑 SX；patch 必须带 manufacturer/API/framework signature/
   reproduction，默认不影响 AOSP；每家独立提交和回执。
 - **验收标准**：目标 OEM P0/P1 全部通过或有批准限制；厂商 patch 不破坏 RD/API matrix；关键业务长稳达标；
   OTA/ROM 升级有回归触发条件。
-- **任务回执**：每个 OEM 单独记录设备/ROM、失败签名、patch guard、全量回归、SX/XH 结果和风险。
+- **任务回执**：每个 OEM 单独记录设备/ROM、失败签名、patch guard、全量回归、SX 结果和风险。
 
 ### C7-T03：VA PRO 范围等价与商业发布总验收
 
 - **任务目标**：对限定版本、API、ABI、OEM 和业务范围给出最终能力声明。
 - **执行方案**：汇总全部阶段证据；逐条关闭产品 scope 内 VA PRO corpus；执行供应链、安全、架构、发布、
-  SX/XH 业务和长稳 gate；生成最终报告与回滚方案。
+  SX 业务和长稳 gate；生成最终报告与回滚方案。C5/XH 明确列为 OUT_OF_SCOPE。
 - **验收标准**：scope 内 VA PRO corpus 均有 PROVEN、NOT_APPLICABLE 或批准的风险接受；P0/P1 无 NOT_PROVEN；
   支持矩阵达到 L5；最终声明明确限定范围，不使用无边界“完全兼容”。
 - **任务回执**：记录 corpus 统计、所有 gate、产物/SBOM/hash、支持范围、已知限制、回滚和发布批准。
 
 ### 11.3 阶段门禁
 
-声明支持的 OEM/API/ABI/SX/XH 组合全部有商业设备证据；最终报告、产物、SBOM、风险和回滚方案完整并已推送。
+声明支持的 OEM/API/ABI/SX 组合全部有商业设备证据；最终报告、产物、SBOM、风险和回滚方案完整并已推送。
 
 ## 12. 跨环境无损续接判定
 
