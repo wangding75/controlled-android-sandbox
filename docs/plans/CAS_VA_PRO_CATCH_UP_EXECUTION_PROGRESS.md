@@ -2147,3 +2147,50 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
 - **推送与远端验证**：本回执提交后将实现提交和回执提交非强制推送至
   `origin/feature/t57-r03-va-pro-capability-campaign`，再比较本地/远端 HEAD；由于任务 BLOCKED，
   最终续接预检确认仍停留在 C4-R03，不能伪造下一任务 C4-R04。
+
+### C4-R03：8 小时上限续接回执（2026-08-25）
+
+- **最终状态**：`BLOCKED`。本次按用户最新指示，将当前执行窗口上限覆盖为 8 小时；这只是本次运行
+  的时间限制，不改写任务书已移除显式 8 小时 soak 的全局修订，也不等同于 8 小时稳定性声明。
+  有效窗口为 2026-08-24 23:00:28 至 2026-08-25 07:00:28（Asia/Shanghai），到点停止正在执行的
+  fixture case；未伪造 `DONE`，下一任务仍为 `C4-R03`，不得进入 R04/R05、C6 或 OEM。
+- **执行环境与动态设备**：Windows amd64、PowerShell、JDK 17、Gradle 8.13；MuMu 实例通过名称
+  `RD测试` 动态解析。当前证据中的 `127.0.0.1:16416` 仅为解析快照字段，runner 没有硬编码 ADB
+  地址。设备快照见
+  `artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825/environment.json`；
+  本轮 boot ID 为 `60d44ff7-2d1b-44a3-8cec-7b1f0608b633`。
+- **矩阵定义与实际结果**：按用户此前将每个 50 轮改为 25 轮的指示，矩阵为 fixture、DingTalk、夸克、
+  红果、番茄小说 × user0/user1 × cold/hot 各 25，共 500 rows。最终修复代码实际完成 260 rows，
+  260/260 PASS、0 non-PASS：fixture user0 50/50，fixture user1 10/50（在 cold-006 证据采集阶段
+  截止）；DingTalk user0/user1 各 50/50；夸克 user0/user1 各 50/50；红果和番茄小说本轮最终矩阵
+  各 0/50。机器可读统计和每个 case 的 request/operation ID 见
+  `verification/catch-up/C4-R03/rd-acceptance/summary.json` 的 `continuation8h`，原始证据目录为：
+  `artifacts/capability-audit/catch-up-c4-r03/post-prelookup-owner-clean-reboot-quark-u0-25-20260825`、
+  `artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-quark-u1-25-20260825`、
+  `artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-dingtalk-u0-u1-25-20260825` 和
+  `artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825`。
+- **首次失败/截止证据**：历史首次失败仍保留并区分为 CAS 通用边界：DingTalk/夸克/红果的 oversized
+  Intent/Binder 事务，以及后续 Quark `lowmemorykiller` + Guest/Broker 进程断开。后者在
+  `.../post-client-broker-owner-clean-reboot-quark-u0-25-20260825/.../hot-018/first-failure-full` 和
+  `.../post-clean-reboot-quark-u0-25-20260825/.../hot-020/first-failure-full` 保存了 logcat、dumpsys、
+  window、Surface、进程、事务、截图和设备快照。8 小时截止时的 fixture user1 `cold-006` 没有
+  `case.json`，但已保存 `logcat.txt`、`activity-activities.txt`、`window-windows.txt`、
+  `surface-list.txt`、`screenshot.png` 和 cold-stop 证据；该中断 case 不计入通过。
+- **修复与 owner**：查阅 NBB/VA 的 ProcessRecord/ActivityStack、启动前进程归属、绑定与死亡回收实现
+  后，确认该问题 owner 是 CAS 通用 Broker/Guest 进程生命周期，而不是 SX/UI，也不是夸克专属兼容性。
+  修复在 `RebindableServiceConnector`、Broker/Guest connection pool、`BaseGuestProcessService`、
+  `RuntimeClient` 和 `DebugCommandActivity` 建立 `BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT`
+  owner edge，并在 package lookup 前 prime RuntimeClient owner；没有新增重试、sleep 或 deadline 延长。
+  修复后夸克双用户和 DingTalk 双用户完成 200/200 PASS；红果/番茄小说的兼容性结论仍为待验证，
+  夸克仅为正向对照。Known Issue 新增 `KI-R03-058`，因矩阵未完成保持 `RECORDED` 且阻断。
+- **重试审计**：260 个已完成 rows 全部为 `attempt=1`、`retryBudget=0`、
+  `automaticRetryPerformed=false`、`retryable=false`。没有把失败通过重复运行、延长 deadline 或固定
+  sleep 隐藏；8 小时截止停止产生的 KeyboardInterrupt 是时间门限结果，不是产品 PASS/FAIL。
+- **验证命令**：`.\gradlew.bat --no-daemon --no-build-cache --no-parallel --offline :app:assembleDebug
+  :sandbox-runtime:compileDebugJavaWithJavac` PASS；`python tools/static_android_compile.py` PASS；
+  `git diff --check` PASS。当前 APK SHA-256 为
+  `3F8D3CB58B29E2FE9A39566DDBA7A8D277DB9318F0A120326DA9BE7683AB5E7E`。
+- **阻断结论与恢复条件**：C4-R03 不能标记 `DONE`，因为红果/番茄小说最终启动矩阵未执行、fixture
+  user1 未完成，且 C4-R04 fail-closed 与 C4-R05 两轮正式重验尚未执行。恢复时从当前 `C4-R03`
+  继续，先完成剩余 240 rows（含红果/番茄小说完整双用户矩阵），再按任务书验证 C4-R04/R05；不得
+  复制旧 PASS 或把本回执推进为 C4-R04。
