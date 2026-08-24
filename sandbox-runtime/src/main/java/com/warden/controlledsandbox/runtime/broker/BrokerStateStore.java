@@ -11,12 +11,16 @@ import java.util.concurrent.ConcurrentMap;
 /** Concurrent, defensive-copy storage for bounded Binder-visible broker state. */
 public final class BrokerStateStore {
     static final int MAX_PREPARED_SPECS = 64;
+    static final int MAX_VALIDATED_ARTIFACTS = 128;
     static final int MAX_ROUTE_PAYLOADS = 1024;
     static final int MAX_PREPARED_BYTES = 1024 * 1024;
+    static final int MAX_VALIDATED_ARTIFACT_BYTES = 1024 * 1024;
     static final int MAX_ROUTE_BYTES = 512 * 1024;
     private static final int MAX_STATE_KEY_CHARS = 256;
 
     private final ConcurrentMap<String, Bundle> preparedSpecs = new ConcurrentHashMap<>();
+    /** Immutable validation results retained across process/session stops. */
+    private final ConcurrentMap<String, Bundle> validatedArtifacts = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Bundle> routePayloads = new ConcurrentHashMap<>();
 
     synchronized void putPrepared(String key, Bundle spec) {
@@ -34,6 +38,29 @@ public final class BrokerStateStore {
     }
 
     synchronized void removePrepared(String key) { preparedSpecs.remove(key); }
+
+    /**
+     * Stores a broker-produced package validation artifact.  This cache is deliberately separate
+     * from live prepared specs: stopping a Guest process must release the process lease while
+     * retaining the immutable package/process validation boundary for the next ProcessRecord.
+     * Cache pressure is non-fatal; a missed cache only takes the full validation path again.
+     */
+    synchronized void putValidatedArtifact(String key, Bundle artifact) {
+        requireKey(key);
+        Bundle bounded = boundedCopy(artifact, MAX_VALIDATED_ARTIFACT_BYTES,
+                "VALIDATED_ARTIFACT");
+        if (!validatedArtifacts.containsKey(key)
+                && validatedArtifacts.size() >= MAX_VALIDATED_ARTIFACTS) {
+            java.util.Iterator<String> iterator = validatedArtifacts.keySet().iterator();
+            if (iterator.hasNext()) validatedArtifacts.remove(iterator.next());
+        }
+        validatedArtifacts.put(key, bounded);
+    }
+
+    synchronized Bundle validatedArtifact(String key) {
+        Bundle value = validatedArtifacts.get(key);
+        return value == null ? null : new Bundle(value);
+    }
 
     public synchronized void putRoute(String token, Bundle payload) {
         requireKey(token);

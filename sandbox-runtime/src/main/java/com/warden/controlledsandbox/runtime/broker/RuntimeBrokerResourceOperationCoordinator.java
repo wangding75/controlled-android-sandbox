@@ -277,8 +277,7 @@ final class RuntimeBrokerResourceOperationCoordinator {
             String activityToken = request.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
             for (GuestLaunchObservation observation : new java.util.LinkedHashSet<>(
                     launchObservations.values())) {
-                if (!activityToken.isEmpty()
-                        && !activityToken.equals(observation.activityToken())) continue;
+                if (!activityToken.isEmpty() && !observation.acceptsActivityToken(activityToken)) continue;
                 observation.onActivityEvent(request);
             }
             if ("FAILED".equals(request.getString(RuntimeKeys.ACTIVITY_EVENT, ""))) {

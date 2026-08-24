@@ -73,17 +73,25 @@ final class GuestIntentResolver {
     }
 
     Bundle request(Intent intent, Target target) {
+        Bundle request = requestWithoutIntent(target);
+        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encodeComponent(
+                request, intent);
+        return request;
+    }
+
+    private Bundle requestWithoutIntent(Target target) {
         Bundle request = new Bundle();
         request.putString(RuntimeKeys.TARGET_PACKAGE_NAME, target.packageName());
         request.putString(RuntimeKeys.COMPONENT_CLASS, target.className());
         request.putString(RuntimeKeys.PROCESS_NAME,
                 target.processName().isEmpty() ? target.packageName() : target.processName());
-        applyIntent(request, intent);
         return request;
     }
 
     Bundle activityRequest(Intent intent, Target target) {
-        Bundle request = request(intent, target);
+        Bundle request = requestWithoutIntent(target);
+        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encodeActivity(
+                request, intent);
         projectActivityLaunchContract(request, intent, target);
         return request;
     }
@@ -213,7 +221,8 @@ final class GuestIntentResolver {
     }
 
     static void applyIntent(Bundle request, Intent intent) {
-        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encode(request, intent);
+        com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec.encodeComponent(
+                request, intent);
     }
 
     void requireGuestScopeForBroadcast(Intent intent) {

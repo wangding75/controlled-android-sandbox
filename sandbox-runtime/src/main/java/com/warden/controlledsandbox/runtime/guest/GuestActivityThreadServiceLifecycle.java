@@ -419,7 +419,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     /** Commits an ActivityThread lifecycle edge without constructing a second Guest Service. */
     private void recordFrameworkEvent(Record record, Bundle route, String event,
                                       int startId, int startResult) {
-        Bundle request = session.spec.toBundle();
+        Bundle request = session.spec.toRuntimeRequestBundle();
         if (route != null) request.putAll(route);
         request.putString(ComponentOperations.OPERATION,
                 ComponentOperations.FRAMEWORK_SERVICE_EVENT);
@@ -433,6 +433,14 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
         if (ComponentOperations.FRAMEWORK_SERVICE_EVENT_START.equals(event)) {
             request.putInt(RuntimeKeys.SERVICE_START_ID, startId);
             request.putInt(RuntimeKeys.SERVICE_START_RESULT, startResult);
+        }
+        // The full Intent is retained in this process only long enough to reconstruct the Guest
+        // callback.  The lifecycle commit is another Guest -> Broker Binder edge, so reproduce
+        // the VA/NBB boundary: send a fresh bounded descriptor, never the byte[] or a duplicate
+        // extras Bundle.  The Broker consumes it into its own service record before state update.
+        byte[] intentPayload = RuntimeIntentWireCodec.routePayload(request);
+        if (intentPayload != null) {
+            RuntimeIntentWireCodec.attachRoutePayloadDescriptor(request, intentPayload);
         }
         try {
             Bundle result = routeBroker.invokeComponent(request);
@@ -534,6 +542,7 @@ final class GuestActivityThreadServiceLifecycle implements AutoCloseable {
     }
 
     private Intent decodeGuestIntent(Intent host) {
+        if (host != null) RuntimeIntentWireCodec.materializePayloadForBroker(host.getExtras());
         return RuntimeIntentWireCodec.decode(host == null ? null : host.getExtras());
     }
 

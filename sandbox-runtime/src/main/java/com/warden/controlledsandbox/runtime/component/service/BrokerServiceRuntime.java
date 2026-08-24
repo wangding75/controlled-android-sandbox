@@ -237,8 +237,13 @@ public final class BrokerServiceRuntime {
                 envelope.putStringArrayList(RuntimeKeys.BROADCAST_CATEGORIES,
                         new ArrayList<>(categories));
             }
-            Bundle extras = request.getBundle(RuntimeKeys.INTENT_EXTRAS);
-            if (extras != null) envelope.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+            byte[] wirePayload = request.getByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD);
+            if (wirePayload != null && wirePayload.length != 0) {
+                envelope.putByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD, wirePayload.clone());
+            } else {
+                Bundle extras = request.getBundle(RuntimeKeys.INTENT_EXTRAS);
+                if (extras != null) envelope.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
+            }
         }
         lastStartIntents.put(serviceKey(instance, component), envelope);
         while (lastStartIntents.size() > ServiceRuntimeRegistry.MAX_SERVICE_RECORDS) {

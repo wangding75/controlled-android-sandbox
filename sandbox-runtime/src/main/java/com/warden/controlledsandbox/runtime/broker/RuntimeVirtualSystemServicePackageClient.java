@@ -22,7 +22,8 @@ final class RuntimeVirtualSystemServicePackageClient implements AutoCloseable {
                 RuntimePeerPolicy.hostPackageFor(this.context), PACKAGE_SERVICE_CLASS));
         this.rootConnection = new RebindableServiceConnector<>(this.context, service,
                 IPackageService.Stub::asInterface, ignored -> { },
-                "Virtual system-service package authority");
+                "Virtual system-service package authority",
+                Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT | Context.BIND_ABOVE_CLIENT);
     }
 
     IVirtualSystemServiceSession open(IBinder clientToken, String packageName,

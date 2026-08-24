@@ -11,6 +11,7 @@ import com.warden.controlledsandbox.runtime.guest.GuestLaunchGate;
 import com.warden.controlledsandbox.runtime.guest.GuestLaunchObservation;
 import com.warden.controlledsandbox.runtime.guest.GuestPackageMetadataMapper;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import java.util.ArrayList;
@@ -49,6 +50,12 @@ final class RuntimeActivityLaunchCoordinator {
         long acceptedAtElapsedMs = android.os.SystemClock.elapsedRealtime();
         routedRequest.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS, acceptedAtElapsedMs);
         launchStage(requestId, operationId, "REQUEST_ACCEPTED", 0L, routedRequest);
+        // The Guest sends oversized Intents through a bounded FD capability. Materialize only
+        // inside the Broker, before the broker-owned Activity route is created; never echo the
+        // large byte array through RuntimeOperationResult.
+        RuntimeIntentWireCodec.materializePayloadForBroker(routedRequest);
+        launchStage(requestId, operationId, "PREPARE_BEGIN",
+                elapsedSince(acceptedAtElapsedMs), routedRequest);
         String callerPackage = routedRequest.getString(RuntimeKeys.PACKAGE_NAME, "");
             String targetPackage = RuntimeBrokerService.targetPackageForRequest(
                     routedRequest, callerPackage);
@@ -65,8 +72,10 @@ final class RuntimeActivityLaunchCoordinator {
                     }
                     routedRequest = owner.prepareForeignTargetRequest(routedRequest, caller,
                             targetPackage, VirtualPackageMetadata.Type.ACTIVITY, true);
-                }
+            }
             Bundle prepared = owner.prepareGuestInternal(routedRequest);
+            launchStage(requestId, operationId, "PREPARE_RETURN",
+                    elapsedSince(acceptedAtElapsedMs), prepared);
             if (!RuntimeBrokerService.isPrepared(prepared)) return prepared;
             String packageName = prepared.getString(RuntimeKeys.PACKAGE_NAME, "");
             int userId = prepared.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
@@ -89,9 +98,20 @@ final class RuntimeActivityLaunchCoordinator {
                     "No Guest Activity class supplied");
 
             BrokerActivityRuntime activityRuntime = owner.activityRuntime;
+            launchStage(requestId, operationId, "LEDGER_LAUNCH_BEGIN",
+                    elapsedSince(acceptedAtElapsedMs), routedRequest);
             Bundle transaction = activityRuntime.launch(session, component, prepared, routedRequest);
+            launchStage(requestId, operationId, "LEDGER_LAUNCH_RETURN",
+                    elapsedSince(acceptedAtElapsedMs), transaction);
             transaction.putString(RuntimeKeys.REQUEST_ID, requestId);
             transaction.putString(RuntimeKeys.OPERATION_ID, operationId);
+            String activityToken = transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+            String sessionId = session.sessionId();
+            int taskId = transaction.getInt(RuntimeKeys.TASK_ID, 0);
+            int callerTaskId = routedRequest.getInt(RuntimeKeys.CALLER_TASK_ID, 0);
+            boolean nestedLaunch = callerTaskId > 0;
+            String taskKey = taskObservationKey(session, taskId);
+            String callerTaskKey = taskObservationKey(session, callerTaskId);
             issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
             boolean frameworkHost = routedRequest.getBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, false);
             Intent launch = new Intent();
@@ -132,6 +152,21 @@ final class RuntimeActivityLaunchCoordinator {
             physicalEvidence.putBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, frameworkHost);
             RuntimeEventLog.event("ATMS_ACTIVITY_LAUNCH_REQUEST", physicalEvidence);
             if (frameworkHost) {
+                // ActivityThread Instrumentation launches (for example an app's synchronous
+                // MainActivity -> BrowserActivity handoff) return LAUNCH_PENDING by design.
+                // They still belong to the same virtual task launch observation.  Link the
+                // child token before returning, otherwise the Guest can report a complete
+                // lifecycle while the Broker waits only on the entry token.
+                GuestLaunchObservation parent = sessionId.isEmpty()
+                        ? null : owner.launchObservations.get(sessionId);
+                if (parent == null && !callerTaskKey.isEmpty()) {
+                    parent = owner.launchObservations.get(callerTaskKey);
+                }
+                if (parent != null) {
+                    parent.linkActivity(activityToken, requestId, operationId, component);
+                    if (!activityToken.isEmpty()) owner.launchObservations.put(activityToken, parent);
+                    if (!taskKey.isEmpty()) owner.launchObservations.put(taskKey, parent);
+                }
                 Bundle out = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
                 out.putAll(transaction);
                 out.putBoolean("launcherResolved", true);
@@ -140,21 +175,63 @@ final class RuntimeActivityLaunchCoordinator {
                 out.putInt(RuntimeKeys.HOST_ACTIVITY_FLAGS, hostFlags);
                 return out;
             }
+            GuestLaunchObservation existing = null;
+            GuestLaunchObservation observation = null;
+            // Register before the real ActivityStarter call.  The Host trampoline can reach
+            // Guest onCreate/onResume before startActivity() returns, especially on MuMu when
+            // the Guest process is already warm; registering afterwards loses the first event.
+            existing = sessionId.isEmpty() ? null : owner.launchObservations.get(sessionId);
+            if (existing == null && nestedLaunch && !callerTaskKey.isEmpty()) {
+                // The Guest-side ActivityThread can create a new process/session for a child
+                // Activity while retaining the virtual task.  NBB/VA resolve that child through
+                // TaskRecord ownership; sessionId alone therefore cannot correlate lifecycle
+                // evidence for a same-task handoff.
+                existing = owner.launchObservations.get(callerTaskKey);
+            }
+            if (!nestedLaunch) {
+                if (existing == null) {
+                    observation = new GuestLaunchObservation(activityToken, component,
+                            requestId, operationId,
+                                    routedRequest.getLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
+                                    acceptedAtElapsedMs));
+                    if (!sessionId.isEmpty()) owner.launchObservations.put(sessionId, observation);
+                    owner.launchObservations.put(activityToken, observation);
+                    if (!taskKey.isEmpty()) owner.launchObservations.put(taskKey, observation);
+                } else {
+                    existing.linkActivity(activityToken, requestId, operationId, component);
+                    owner.launchObservations.put(activityToken, existing);
+                    if (!taskKey.isEmpty()) owner.launchObservations.put(taskKey, existing);
+                }
+            } else if (existing != null) {
+                // A Guest launcher such as Quark's MainActivity can synchronously start the
+                // real BrowserActivity in the same virtual task.  Keep that child token on the
+                // root observation so its CREATED/RESUMED/FIRST_FRAME evidence closes the same
+                // logical launch gate.
+                existing.linkActivity(activityToken, requestId, operationId, component);
+                owner.launchObservations.put(activityToken, existing);
+                if (!taskKey.isEmpty()) owner.launchObservations.put(taskKey, existing);
+            }
             // Every launch, including virtual reuse, must cross the real Host ActivityStarter.
             // The virtual ledger supplies only the selected physical component and the desired
             // operation flags; it never finishes or retargets a live Activity itself.
-            owner.startActivity(launch);
-            if (routedRequest.getInt(RuntimeKeys.CALLER_TASK_ID, 0) > 0) {
+            try {
+                launchStage(requestId, operationId, "HOST_START_BEGIN",
+                        elapsedSince(acceptedAtElapsedMs), transaction);
+                owner.startActivity(launch);
+                launchStage(requestId, operationId, "HOST_START_RETURN",
+                        elapsedSince(acceptedAtElapsedMs), transaction);
+            } catch (Throwable error) {
+                if (observation != null) removeObservationMappings(observation);
+                else if (existing != null) owner.launchObservations.remove(activityToken, existing);
+                throw error;
+            }
+            if (nestedLaunch) {
                 Bundle nested = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
                 nested.putAll(transaction);
                 nested.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
                 nested.putBoolean("launcherResolved", true);
                 return nested;
             }
-            String activityToken = transaction.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
-            String sessionId = session.sessionId();
-            GuestLaunchObservation existing = sessionId.isEmpty()
-                    ? null : owner.launchObservations.get(sessionId);
             if (existing != null) {
                 owner.launchObservations.put(activityToken, existing);
                 Bundle nested = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
@@ -162,20 +239,16 @@ final class RuntimeActivityLaunchCoordinator {
                 nested.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
                 return nested;
             }
-            GuestLaunchObservation observation = new GuestLaunchObservation(activityToken, component,
-                    requestId, operationId,
-                    routedRequest.getLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
-                            acceptedAtElapsedMs));
-            if (!sessionId.isEmpty()) owner.launchObservations.put(sessionId, observation);
-            owner.launchObservations.put(activityToken, observation);
+            if (observation == null) {
+                return owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
+            }
             try {
                 observation.await(LAUNCH_OBSERVATION_MS);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
             GuestLaunchEvidence evidence = observation.close();
-            owner.launchObservations.remove(activityToken, observation);
-            if (!sessionId.isEmpty()) owner.launchObservations.remove(sessionId, observation);
+            removeObservationMappings(observation);
             String gate = GuestLaunchGate.evaluate(evidence);
             Bundle out = owner.sessionBundle(session, gate);
             out.putAll(transaction);
@@ -214,6 +287,21 @@ final class RuntimeActivityLaunchCoordinator {
         }
     }
 
+    private void removeObservationMappings(GuestLaunchObservation observation) {
+        if (observation == null) return;
+        owner.launchObservations.forEach((key, value) -> {
+            if (value == observation) owner.launchObservations.remove(key, value);
+        });
+    }
+
+    private static String taskObservationKey(GuestSession session, int taskId) {
+        if (session == null || taskId <= 0) return "";
+        // The task id is only unique inside the virtual package/user namespace.  Do not include
+        // processName: NBB/VA allow a same-task launcher and child Activity to cross Guest
+        // process/session boundaries.
+        return "task:" + session.virtualUserId() + ":" + session.packageName() + ":" + taskId;
+    }
+
     private static void launchStage(String requestId, String operationId, String stage,
                                     long stageElapsedMs, Bundle source) {
         Bundle details = source == null ? new Bundle() : new Bundle(source);
@@ -222,6 +310,10 @@ final class RuntimeActivityLaunchCoordinator {
         details.putString(RuntimeKeys.LAUNCH_STAGE, stage);
         details.putLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, stageElapsedMs);
         RuntimeEventLog.event("GUEST_LAUNCH_STAGE", details);
+    }
+
+    private static long elapsedSince(long acceptedAtElapsedMs) {
+        return Math.max(0L, android.os.SystemClock.elapsedRealtime() - acceptedAtElapsedMs);
     }
 
     private static void copyActivityFrameworkField(Intent target, Bundle source, String key) {

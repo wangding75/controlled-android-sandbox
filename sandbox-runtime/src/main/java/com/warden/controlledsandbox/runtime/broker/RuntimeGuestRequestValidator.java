@@ -118,8 +118,8 @@ final class RuntimeGuestRequestValidator {
         input.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, nativeMode);
     }
 
-    void validateDeclaredProcess(String packageName, int virtualUserId,
-                                 String requestedProcess) throws Exception {
+    Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
+                                        String requestedProcess) throws Exception {
         if (owner.packageAuthority == null) {
             throw new IllegalStateException("RUNTIME_PACKAGE_AUTHORITY_NOT_INITIALIZED");
         }
@@ -143,6 +143,7 @@ final class RuntimeGuestRequestValidator {
         if (!declared.contains(requestedProcess)) {
             throw new SecurityException("PROCESS_NAME_NOT_DECLARED:" + requestedProcess);
         }
+        return declared;
     }
 
     private static ArrayList<String> optionalStringList(Bundle input, String key) {

@@ -129,7 +129,44 @@ CAS task/route → Host Stub → framework。
 因此 R03 当前 owner 保持 CAS 通用启动/Intent transport；没有证据时不转交 SX adapter/UI，也不把
 番茄单次 PASS 外推为商业兼容。
 
-## 7. 证据索引
+## 7. 2026-08-25 续接：进程 owner lease 修复与 8 小时窗口结果
+
+本节记录 2026-08-25 的续接执行结果；前文的 oversized Intent 首次失败仍是历史首次失败证据，
+不得被后续部分矩阵 PASS 覆盖。
+
+### 7.1 NBB/VA 进程 owner 合同与 CAS 修复
+
+- NBB 的 `BProcessManagerService.startProcessLocked(packageName, processName, userId, ...)` 以
+  `(virtual user, processName)` 维护 `ProcessRecord`，启动/attach 后由 Activity/Service owner 持有，
+  death 时移除代际；`ActiveServices` 在 start/bind/stop 前通过同一 process manager 取得 owner。
+- VA 的 `VActivityManagerService`/`ActivityStack` 以虚拟 `ProcessRecord`、task/activity history、
+  attach/death 和 rebind 关系作为运行时权威；StubActivityRecord 只承载小的 Host route，窗口仍由
+  正常 framework ActivityThread/WindowSession 绘制。
+- CAS 原先在 `PACKAGE_LOOKUP_BEGIN` 之后才建立 RuntimeClient，长时间运行的 Guest 在 lookup/launch
+  窗口内缺少前台 owner edge；MuMu `lowmemorykiller` 曾在设备仍有可用内存时杀死 Guest/Broker，形成
+  `GUEST_PROCESS_DISCONNECTED`、DeadObject 和 `LAUNCH_GATE_FAILED`。这已确认为 CAS 通用进程生命周期
+  owner，不是 SX/UI 或夸克专属问题。
+- 本轮实现了 `BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT` 的 Broker/Guest/authority owner
+  edges，并在 package lookup 前执行 RuntimeClient owner prime；该边界只改变 Android process importance，
+  不重试、不 sleep、不延长生产 deadline。对应实现见
+  `RebindableServiceConnector`、`BaseGuestProcessService`、`RuntimeGuestConnectionPool`、
+  `RuntimeClient` 和 `DebugCommandActivity`。
+
+### 7.2 续接矩阵与结论
+
+按用户此前把每个 50 轮改为 25 轮的指示，目标矩阵为 5 targets × 2 users × (25 cold + 25 hot) =
+500 rows。修复后的最终代码在 8 小时窗口内完成 260 rows，260/260 PASS：夸克双用户 100/100、
+DingTalk 双用户 100/100、fixture user0 50/50 和 fixture user1 10/50；红果和番茄小说最终矩阵未开始。
+每个已完成 row 均为 `attempt=1/retryBudget=0/automaticRetryPerformed=false/retryable=false`。
+
+fixture user1 的 `cold-006` 在时间上限到达时处于截图质量采集阶段；其 logcat、activity/window、Surface、
+截图和 cold-stop 文件已保留，但没有 `case.json`，不计入 PASS。机器可读统计见
+`verification/catch-up/C4-R03/rd-acceptance/summary.json` 的 `continuation8h`。
+
+夸克只继续作为正向对照，不能推导红果或番茄兼容；红果/番茄的 owner 与启动结论保持待验证。由于矩阵
+未完成、C4-R04/R05 尚未执行，C4-R03 保持 `BLOCKED`，不得更新为 `DONE` 或推进下一任务。
+
+## 8. 证据索引
 
 - R03 start preflight：`verification/catch-up/C4-R03/start-state.json`。
 - 机器汇总：`verification/catch-up/C4-R03/rd-acceptance/summary.json`。
@@ -137,4 +174,3 @@ CAS task/route → Host Stub → framework。
 - 番茄单次 cold/hot：`artifacts/capability-audit/catch-up-c4-r03/fanqie-after-event-fix-20260824T1730`。
 - DingTalk/夸克/红果首次失败：见第 4 节 raw paths；每个目录含 logcat、dumpsys、Surface、进程、
   事务文件、截图和设备快照。
-

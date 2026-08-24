@@ -9,6 +9,7 @@ import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.port.Clock;
 import com.warden.controlledsandbox.runtime.component.service.BrokerServiceRuntime;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.status.ServiceMetricsSource;
 
@@ -103,6 +104,10 @@ public final class RuntimeServiceCoordinator implements ServiceMetricsSource {
             Bundle redeliveryIntent = redeliver ? runtime.recoveryIntent(service) : null;
             if (redeliveryIntent != null) call.putAll(redeliveryIntent);
             else if (redeliver) call.putString(ComponentOperations.ACTION, service.lastStartAction());
+            byte[] redeliveryPayload = RuntimeIntentWireCodec.routePayload(call);
+            if (redeliveryPayload != null) {
+                RuntimeIntentWireCodec.attachRoutePayloadDescriptor(call, redeliveryPayload);
+            }
             if (service.recoverForeground()) {
                 call.putBoolean(RuntimeKeys.SERVICE_FOREGROUND_BACKGROUND_ALLOWED, true);
                 call.putString(RuntimeKeys.SERVICE_FOREGROUND_EXEMPTION_REASON, "PROCESS_RECOVERY");

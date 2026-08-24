@@ -327,6 +327,11 @@ public final class RuntimeDiagnostics {
             field(out, "package", data.getString(RuntimeKeys.PACKAGE_NAME, ""), true);
             field(out, "session", data.getString(RuntimeKeys.SESSION_ID, ""), true);
             field(out, "traceDomain", data.getString("traceDomain", ""), true);
+            field(out, "requestId", data.getString(RuntimeKeys.REQUEST_ID, ""), true);
+            field(out, "operationId", data.getString(RuntimeKeys.OPERATION_ID, ""), true);
+            field(out, "launchStage", data.getString(RuntimeKeys.LAUNCH_STAGE, ""), true);
+            field(out, "launchStageAtElapsedMs",
+                    String.valueOf(data.getLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, 0L)), false);
             field(out, "launchId", data.getString("launchId", ""), true);
             field(out, "binderToken", data.getString("binderToken", ""), true);
             field(out, "processName", data.getString(RuntimeKeys.PROCESS_NAME, ""), true);

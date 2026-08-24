@@ -85,5 +85,64 @@
   },
   "blocker": "R03 commercial launch acceptance cannot pass while first cold launches for DingTalk, Quark and Hongguo fail at the CAS Binder Intent transport boundary; no retry or deadline extension was used.",
   "nextTask": "C4-R03",
-  "nextTaskAdvanceAllowed": false
+  "nextTaskAdvanceAllowed": false,
+  "continuation8h": {
+    "requestedByUser": true,
+    "effectiveWindowStart": "2026-08-24T23:00:28+08:00",
+    "cutoff": "2026-08-25T07:00:28+08:00",
+    "stoppedAtCutoff": true,
+    "stopReason": "time_limit_reached",
+    "matrixDefinition": {
+      "targets": ["fixture", "dingtalk", "quark", "hongguo", "fanqie"],
+      "users": [0, 1],
+      "loopsPerUser": 25,
+      "rowsPerTargetUser": 50,
+      "requiredRows": 500,
+      "coldRowsPerTargetUser": 25,
+      "hotRowsPerTargetUser": 25
+    },
+    "completedRows": 260,
+    "completedPassRows": 260,
+    "completedNonPassRows": 0,
+    "rowsByTargetUser": {
+      "fixture/user0": 50,
+      "fixture/user1": 10,
+      "dingtalk/user0": 50,
+      "dingtalk/user1": 50,
+      "quark/user0": 50,
+      "quark/user1": 50,
+      "hongguo/user0": 0,
+      "hongguo/user1": 0,
+      "fanqie/user0": 0,
+      "fanqie/user1": 0
+    },
+    "retryAudit": {
+      "attempt1Rows": 260,
+      "retryBudget0Rows": 260,
+      "automaticRetryFalseRows": 260,
+      "retryableFalseRows": 260
+    },
+    "finalCodeEvidence": {
+      "quarkUser0": "artifacts/capability-audit/catch-up-c4-r03/post-prelookup-owner-clean-reboot-quark-u0-25-20260825",
+      "quarkUser1": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-quark-u1-25-20260825",
+      "dingtalkUsers01": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-dingtalk-u0-u1-25-20260825",
+      "fixtureUsers01Partial": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825",
+      "fixtureUser1InterruptedCase": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825/attempts/fixture/user-1/cold-006",
+      "dynamicEnvironment": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825/environment.json",
+      "dynamicCommercialDiscovery": "artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-fixture-u0-u1-25-20260825/commercial-sample-discovery.json"
+    },
+    "ownerLifetimeFix": {
+      "confirmedBeforeFix": "MuMu lowmemorykiller killed the sandbox Guest or Broker during package lookup/launch while the device still had available memory; the CAS process-owner edge was not held before lookup.",
+      "implementedBoundary": "NBB/VA-style live virtual ProcessRecord ownership is represented by explicit BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT edges and by priming the RuntimeClient owner before package lookup; no retry, sleep, or deadline extension was added.",
+      "scope": "CAS generic Broker/Guest process lifetime; not SX/UI and not a package-specific compatibility judgment",
+      "verification": "Quark user0/user1 and DingTalk user0/user1 final lanes passed 200/200 after the pre-lookup owner fix; the required Hongguo/Fanqie lanes remain unrun in this cutoff window."
+    },
+    "buildVerification": {
+      "gradle": "BUILD SUCCESSFUL: :app:assembleDebug :sandbox-runtime:compileDebugJavaWithJavac",
+      "staticAndroidCompile": "PASS",
+      "gitDiffCheck": "PASS",
+      "apkSha256": "3F8D3CB58B29E2FE9A39566DDBA7A8D277DB9318F0A120326DA9BE7683AB5E7E"
+    },
+    "conclusion": "BLOCKED: the eight-hour window ended before the required 500-row matrix completed; the current evidence does not prove Hongguo/Fanqie launch or full C4-R03 acceptance."
+  }
 }

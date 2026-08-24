@@ -34,7 +34,25 @@ final class RuntimeClient implements AutoCloseable {
         this.nativeCompanion = new NativeCompanionClient(this.context);
         this.brokerConnection = new RebindableServiceConnector<>(this.context,
                 new Intent(this.context, RuntimeBrokerService.class),
-                IRuntimeBroker.Stub::asInterface, ignored -> { }, "Runtime broker");
+                IRuntimeBroker.Stub::asInterface, ignored -> { }, "Runtime broker",
+                Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT | Context.BIND_ABOVE_CLIENT);
+    }
+
+    /**
+     * Publishes the foreground command owner's Binder edge before package lookup starts.
+     *
+     * <p>NBB/VA keep the virtual ProcessRecord owner edge alive while a command is resolving or
+     * starting a component.  CAS previously created this client only after package lookup, so a
+     * large already-running Guest could become background-cached during that lookup.  This method
+     * only acquires the existing Broker capability; it does not retry, sleep, or extend any
+     * operation deadline.</p>
+     */
+    void primeOperationOwner(String requestId, String operationId) throws Exception {
+        requireBroker();
+        android.util.Log.i("CS_PROCESS_OWNER", "RUNTIME_CLIENT_OWNER_READY request="
+                + (requestId == null ? "" : requestId)
+                + " operation=" + (operationId == null ? "" : operationId)
+                + " retry=false");
     }
 
     RuntimeStatusResult status() throws Exception {

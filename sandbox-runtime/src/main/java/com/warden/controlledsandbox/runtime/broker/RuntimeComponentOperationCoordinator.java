@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.domain.session.SessionState;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.runtime.component.receiver.BrokerReceiverRuntime;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntime;
 import com.warden.controlledsandbox.runtime.provider.BrokerFileRuntime;
@@ -57,6 +58,13 @@ final class RuntimeComponentOperationCoordinator {
         CallerGuard.requireRuntimePeer(owner);
         ComponentInvocation invocation = null;
         try {
+            if (request != null && ComponentOperations.FRAMEWORK_SERVICE_EVENT.equals(
+                    request.getString(ComponentOperations.OPERATION, ""))) {
+                // Lifecycle events are Broker-owned state commits, not Guest callbacks.  Consume
+                // the one-shot descriptor after the Binder boundary so the Broker can retain the
+                // complete Intent for START_REDELIVER_INTENT without echoing it back over Binder.
+                RuntimeIntentWireCodec.materializePayloadForBroker(request);
+            }
             invocation = prepareInvocation(request);
             if (invocation.immediate != null) return invocation.immediate;
             return invokePrepared(invocation);
@@ -173,6 +181,10 @@ final class RuntimeComponentOperationCoordinator {
         }
         Bundle call = new Bundle(base);
         call.putAll(invocation.request);
+        // Guest already owns the immutable package universe from PREPARE_GUEST. Keep the
+        // operation edge compact; re-sending the Broker's cached projections recreates the
+        // same Binder transaction overflow that the NBB/VA route avoids.
+        call.remove(RuntimeKeys.PACKAGE_UNIVERSE);
         call.putString(RuntimeKeys.PACKAGE_NAME, packageName);
         call.putInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
         call.putString(RuntimeKeys.PROCESS_NAME, processName);

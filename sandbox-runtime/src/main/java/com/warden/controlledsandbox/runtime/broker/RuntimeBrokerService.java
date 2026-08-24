@@ -397,13 +397,24 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         }
     }
     synchronized Bundle prepareGuestInternal(Bundle request) {
-        return guestLifecycleCoordinator.prepareGuest(request);
+        Bundle preparedRequest = request == null ? new Bundle() : new Bundle(request);
+        if (!preparedRequest.containsKey(RuntimeKeys.PACKAGE_UNIVERSE)) {
+            hydratePackageUniverse(preparedRequest);
+        }
+        return guestLifecycleCoordinator.prepareGuest(preparedRequest);
     }
 
     static Bundle guestOperation(IGuestProcess guest, String operation, Bundle payload)
             throws Exception {
+        Bundle compact = payload == null ? new Bundle() : new Bundle(payload);
+        // PREPARE_GUEST is the one edge that establishes the Guest's immutable package universe.
+        // Every later Broker -> Guest operation uses the already prepared in-process snapshot;
+        // forwarding the cached projection list here would recreate a >280 KB Binder envelope.
+        if (!RuntimeOperationRequest.PREPARE_GUEST.equals(operation)) {
+            compact.remove(RuntimeKeys.PACKAGE_UNIVERSE);
+        }
         return RuntimeOperationTransport.toLegacyBundle(
-                RuntimeOperationTransport.execute(guest, operation, payload));
+                RuntimeOperationTransport.execute(guest, operation, compact));
     }
 
     /**
@@ -769,9 +780,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         views.add(GuestPackageMetadataMapper.fromSnapshot(callerState,
                 metadataApplicationInfo(callerState, caller.packageName(),
                         uidRegistry().uidFor(caller.packageName(), caller.virtualUserId()))));
-        request.setClassLoader(VirtualPackageProjectionSnapshot.class.getClassLoader());
-        ArrayList<VirtualPackageProjectionSnapshot> projections = request.getParcelableArrayList(
-                RuntimeKeys.PACKAGE_UNIVERSE);
+        ArrayList<VirtualPackageProjectionSnapshot> projections = packageUniverse(request, caller);
         if (projections != null) {
             for (VirtualPackageProjectionSnapshot projection : projections) {
                 if (projection == null) continue;
@@ -792,9 +801,8 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             Bundle callerRequest, GuestSession caller, String targetPackage,
             VirtualPackageStateSnapshot targetState, PackageRecordSnapshot targetRecord) {
         ArrayList<VirtualPackageProjectionSnapshot> result = new ArrayList<>();
-        callerRequest.setClassLoader(VirtualPackageProjectionSnapshot.class.getClassLoader());
-        ArrayList<VirtualPackageProjectionSnapshot> projections = callerRequest
-                .getParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE);
+        ArrayList<VirtualPackageProjectionSnapshot> projections = packageUniverse(callerRequest,
+                caller);
         if (projections != null) {
             for (VirtualPackageProjectionSnapshot projection : projections) {
                 if (projection == null) continue;
@@ -819,6 +827,26 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         if (targetState == null || targetRecord == null) throw new IllegalStateException(
                 "CROSS_PACKAGE_TARGET_PROJECTION_MISSING");
         return result;
+    }
+
+    private ArrayList<VirtualPackageProjectionSnapshot> packageUniverse(Bundle request,
+                                                                          GuestSession caller) {
+        if (request != null) {
+            request.setClassLoader(VirtualPackageProjectionSnapshot.class.getClassLoader());
+            ArrayList<VirtualPackageProjectionSnapshot> declared = request.getParcelableArrayList(
+                    RuntimeKeys.PACKAGE_UNIVERSE);
+            if (declared != null) return declared;
+        }
+        if (caller == null) return new ArrayList<>();
+        Bundle prepared = brokerState.prepared(processKey(caller.packageName(),
+                caller.virtualUserId(), caller.processName()));
+        if (prepared == null || !prepared.containsKey(RuntimeKeys.PACKAGE_UNIVERSE)) {
+            return new ArrayList<>();
+        }
+        prepared.setClassLoader(VirtualPackageProjectionSnapshot.class.getClassLoader());
+        ArrayList<VirtualPackageProjectionSnapshot> cached = prepared.getParcelableArrayList(
+                RuntimeKeys.PACKAGE_UNIVERSE);
+        return cached == null ? new ArrayList<>() : new ArrayList<>(cached);
     }
 
     private void requireAccessibleCrossPackageComponent(VirtualPackageUniverse universe,
@@ -873,9 +901,10 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         guestRequestValidator.validate(input);
     }
 
-    void validateDeclaredProcess(String packageName, int virtualUserId,
-                                 String requestedProcess) throws Exception {
-        guestRequestValidator.validateDeclaredProcess(packageName, virtualUserId, requestedProcess);
+    Set<String> validateDeclaredProcess(String packageName, int virtualUserId,
+                                        String requestedProcess) throws Exception {
+        return guestRequestValidator.validateDeclaredProcess(packageName, virtualUserId,
+                requestedProcess);
     }
 
     Bundle unregisterProviderObserver(Bundle request, String requestedPackage, int requestedUser) {
@@ -1310,6 +1339,25 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         if (value == null || value.trim().isEmpty()) return packageName;
         value = value.trim();
         return value.startsWith(":") ? packageName + value : value;
+    }
+
+    void hydratePackageUniverse(Bundle request) {
+        if (request == null || request.containsKey(RuntimeKeys.PACKAGE_UNIVERSE)) return;
+        String packageName = request.getString(RuntimeKeys.CALLER_PACKAGE_NAME,
+                request.getString(RuntimeKeys.PACKAGE_NAME, ""));
+        int userId = request.getInt(RuntimeKeys.CALLER_VIRTUAL_USER_ID,
+                request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1));
+        if (packageName == null || packageName.trim().isEmpty() || userId < 0) return;
+        String processName = processName(request, packageName);
+        Bundle prepared = brokerState.prepared(processKey(packageName, userId, processName));
+        if (prepared == null || !prepared.containsKey(RuntimeKeys.PACKAGE_UNIVERSE)) return;
+        prepared.setClassLoader(VirtualPackageProjectionSnapshot.class.getClassLoader());
+        ArrayList<VirtualPackageProjectionSnapshot> universe = prepared.getParcelableArrayList(
+                RuntimeKeys.PACKAGE_UNIVERSE);
+        if (universe != null) {
+            request.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                    new ArrayList<>(universe));
+        }
     }
 
     static Bundle failure(Throwable error) {

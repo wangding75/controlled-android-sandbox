@@ -39,7 +39,8 @@ final class RuntimePermissionPackageClient implements RuntimePermissionGateway {
                         RuntimePackageAuthorityCapability.token(),
                         RuntimePackageAuthorityCapability.epochMarker());
             }
-        }, IRuntimePermissionSession::close, "Runtime permission package service");
+        }, IRuntimePermissionSession::close, "Runtime permission package service",
+                Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT | Context.BIND_ABOVE_CLIENT);
     }
 
     @Override public PackageServiceResult request(String packageName, int virtualUserId, String permission,

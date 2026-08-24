@@ -268,7 +268,15 @@ final class RuntimeGuestConnectionPool implements AutoCloseable {
         Intent intent = new Intent(owner, RuntimeStubComponents.serviceClassFor(connection.slot));
         final boolean accepted;
         try {
-            accepted = owner.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+            // The Broker owns the Guest process record for the lifetime of a live virtual
+            // session.  AUTO_CREATE alone models only a Binder capability and leaves a large
+            // Guest (for example Quark's Chromium process) eligible for LMK while its physical
+            // Activity is being handed through the Stub.  NBB/VA keep the ProcessRecord owner
+            // edge important across start/bind/stop; project that edge into Android's binding
+            // semantics without adding retries or changing any launch deadline.
+            accepted = owner.bindService(intent, connection,
+                    Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT
+                            | Context.BIND_ABOVE_CLIENT);
         } catch (RuntimeException error) {
             connection.markFailure("BIND_REJECTED");
             disconnect(connection, "BIND_REJECTED");

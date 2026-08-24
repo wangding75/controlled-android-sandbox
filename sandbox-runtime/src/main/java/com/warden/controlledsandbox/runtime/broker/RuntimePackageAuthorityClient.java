@@ -53,7 +53,8 @@ final class RuntimePackageAuthorityClient implements AutoCloseable {
             if (session == null) throw new IllegalStateException(
                     "Package service returned no runtime query session");
             return session;
-        }, IPackageRuntimeQuerySession::close, "Runtime package authority");
+        }, IPackageRuntimeQuerySession::close, "Runtime package authority",
+                Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT | Context.BIND_ABOVE_CLIENT);
     }
 
     PackageRecordSnapshot findRecord(String packageName) throws Exception {

@@ -1,16 +1,21 @@
 package com.warden.controlledsandbox.runtime.broker;
 
 import android.os.Bundle;
+import android.os.Parcel;
 
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.SessionRevisionPolicy;
 import com.warden.controlledsandbox.domain.session.SessionState;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 
 import java.io.File;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Set;
 
 /**
  * Owns the Guest process lease transaction.
@@ -22,6 +27,32 @@ import java.util.ArrayList;
  */
 final class RuntimeGuestLifecycleCoordinator {
     private static final long STOP_TIMEOUT_MILLIS = 10_000L;
+    private static final String VALIDATED_STATE_FINGERPRINT =
+            "validatedPackageStateFingerprint";
+    private static final String VALIDATED_PROCESS_NAMES = "validatedProcessNames";
+
+    private static final String[] VALIDATED_STRING_KEYS = {
+            RuntimeKeys.PACKAGE_NAME,
+            RuntimeKeys.APK_PATH,
+            RuntimeKeys.APK_SHA256,
+            RuntimeKeys.BASE_APK_SHA256,
+            RuntimeKeys.PACKAGE_REVISION,
+            RuntimeKeys.NATIVE_LIBRARY_DIR,
+            RuntimeKeys.NATIVE_ABI,
+            RuntimeKeys.NATIVE_GUEST_TRUST,
+            RuntimeKeys.NATIVE_EXECUTION_MODE,
+            RuntimeKeys.APPLICATION_CLASS,
+            RuntimeKeys.SHARED_LIBRARIES
+    };
+    private static final String[] VALIDATED_LIST_KEYS = {
+            RuntimeKeys.SPLIT_NAMES,
+            RuntimeKeys.SPLIT_TYPES,
+            RuntimeKeys.SPLIT_CONFIG_FOR,
+            RuntimeKeys.SPLIT_USES,
+            RuntimeKeys.SPLIT_PATHS,
+            RuntimeKeys.SPLIT_SHA256S,
+            RuntimeKeys.PERMISSIONS
+    };
 
     private final RuntimeBrokerService owner;
 
@@ -32,21 +63,151 @@ final class RuntimeGuestLifecycleCoordinator {
     Bundle prepareGuest(Bundle request) {
         try {
             Bundle input = request == null ? new Bundle() : new Bundle(request);
-            owner.validateInput(input);
+            long lifecycleStarted = android.os.SystemClock.elapsedRealtime();
+            lifecycleStage(input, null, "BEGIN", lifecycleStarted);
             String packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
             int userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
             String processName = RuntimeBrokerService.processName(input, packageName);
-            owner.validateDeclaredProcess(packageName, userId, processName);
+            GuestSession existing = null;
+            Bundle cachedPrepared = null;
+            Bundle cachedValidation = null;
+            boolean fastReusePath = false;
+            boolean recoveryArtifactReusePath = false;
+            boolean validationArtifactReusePath = false;
+            String validationCacheKey = "";
+            if (syntacticallyReusableInput(input, packageName, userId, processName)) {
+                existing = owner.sessions.get(packageName, userId, processName);
+                cachedPrepared = existing == null ? null : owner.brokerState.prepared(
+                        RuntimeBrokerService.processKey(packageName, userId, processName));
+                boolean cachedArtifactMatches = canReusePreparedArtifact(
+                        input, existing, cachedPrepared);
+                fastReusePath = cachedArtifactMatches && existing != null
+                        && (existing.state() == SessionState.READY
+                        || existing.state() == SessionState.ACTIVE);
+                recoveryArtifactReusePath = cachedArtifactMatches && existing != null
+                        && existing.state() == SessionState.RECOVERING;
+                if (!input.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false)) {
+                    validationCacheKey = validationCacheKey(input, packageName, userId);
+                    cachedValidation = validationCacheKey.isEmpty() ? null
+                            : owner.brokerState.validatedArtifact(validationCacheKey);
+                    validationArtifactReusePath = !fastReusePath && !recoveryArtifactReusePath
+                            && canReuseValidatedArtifact(input, packageName, userId, processName,
+                            cachedValidation);
+                }
+            }
+            if (fastReusePath) {
+                input.putString(RuntimeKeys.PROCESS_NAME, processName);
+                input.putString(RuntimeKeys.PACKAGE_REVISION, existing.packageRevision());
+                // NBB/VA reuse the already bound process record and LoadedApk on a hot Activity
+                // launch.  The immutable revision, cached prepared spec and native policy have
+                // already crossed the full validation boundary during the first prepare.
+                lifecycleStage(input, existing, "INPUT_VALIDATE_SKIPPED_REUSE", lifecycleStarted);
+                lifecycleStage(input, existing, "PROCESS_VALIDATE_SKIPPED_REUSE", lifecycleStarted);
+                lifecycleStage(input, existing, "REVISION_READ_RETURN", lifecycleStarted);
+            } else if (recoveryArtifactReusePath) {
+                // A process may intentionally exit after handing the virtual task to a child
+                // process (DingTalk's LaunchHomeActivity does this).  NBB/VA keep the validated
+                // PackageSetting/LoadedApk artifact and rebuild only the dead process record;
+                // they do not hash/index the same installed revision again.  Keep the declared
+                // process identity is already bound to the exact RECOVERING registry key and
+                // broker-owned immutable spec; NBB/VA do not re-query the package process table
+                // while rebuilding a dead process record.  A changed package/user/process or
+                // APK hash/version/trust/native mode cannot enter this branch because the
+                // existing-session and canReusePreparedArtifact() checks reject it.
+                Bundle recoveryInput = new Bundle(cachedPrepared);
+                for (String key : new String[] {
+                        RuntimeKeys.SLOT_PAD_COUNT, RuntimeKeys.SLOT_TARGET}) {
+                    if (input.containsKey(key)) recoveryInput.putInt(key, input.getInt(key));
+                }
+                input = recoveryInput;
+                packageName = input.getString(RuntimeKeys.PACKAGE_NAME, packageName);
+                userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
+                processName = RuntimeBrokerService.processName(input, packageName);
+                input.putString(RuntimeKeys.PROCESS_NAME, processName);
+                input.putString(RuntimeKeys.PACKAGE_REVISION, existing.packageRevision());
+                lifecycleStage(input, existing, "INPUT_VALIDATE_SKIPPED_RECOVERY_ARTIFACT",
+                        lifecycleStarted);
+                lifecycleStage(input, existing, "PROCESS_VALIDATE_SKIPPED_RECOVERY_ARTIFACT",
+                        lifecycleStarted);
+                lifecycleStage(input, existing, "REVISION_READ_RETURN", lifecycleStarted);
+            } else if (validationArtifactReusePath) {
+                applyValidatedArtifact(input, cachedValidation);
+                packageName = input.getString(RuntimeKeys.PACKAGE_NAME, packageName);
+                userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, userId);
+                processName = RuntimeBrokerService.processName(input, packageName);
+                input.putString(RuntimeKeys.PROCESS_NAME, processName);
+                lifecycleStage(input, null, "INPUT_VALIDATE_SKIPPED_CACHED_ARTIFACT",
+                        lifecycleStarted);
+                lifecycleStage(input, null, "PROCESS_VALIDATE_SKIPPED_CACHED_ARTIFACT",
+                        lifecycleStarted);
+                lifecycleStage(input, null, "REVISION_READ_RETURN", lifecycleStarted);
+            } else {
+                owner.validateInput(input);
+                lifecycleStage(input, null, "INPUT_VALIDATE_RETURN", lifecycleStarted);
+                packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
+                userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+                processName = RuntimeBrokerService.processName(input, packageName);
+                Set<String> declaredProcesses = owner.validateDeclaredProcess(
+                        packageName, userId, processName);
+                lifecycleStage(input, null, "PROCESS_VALIDATE_RETURN", lifecycleStarted);
+                validationCacheKey = validationCacheKey(input, packageName, userId);
+                if (!validationCacheKey.isEmpty()
+                        && !input.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false)) {
+                    owner.brokerState.putValidatedArtifact(validationCacheKey,
+                            validatedArtifact(input, declaredProcesses));
+                    lifecycleStage(input, null, "VALIDATION_ARTIFACT_CACHE_PUT",
+                            lifecycleStarted);
+                }
+                lifecycleStage(input, null, "REVISION_READ_RETURN", lifecycleStarted);
+                existing = owner.sessions.get(packageName, userId, processName);
+            }
             String packageRevision = RuntimeBrokerService.required(input,
                     RuntimeKeys.PACKAGE_REVISION);
             input.putString(RuntimeKeys.PROCESS_NAME, processName);
-            stopMismatchedRevisionSessions(packageName, userId, packageRevision);
-            owner.receiverCoordinator.indexPackage(input);
+            boolean reusePreparedSession = existing != null
+                    && existing.packageRevision().equals(packageRevision)
+                    && (existing.state() == SessionState.READY
+                            || existing.state() == SessionState.ACTIVE);
+            boolean reusePreparedArtifact = reusePreparedSession || recoveryArtifactReusePath;
+            // A same-revision READY/ACTIVE process has already crossed the package-install,
+            // process-bind and Activity-ledger boundaries.  NBB/VA reuse that process record on
+            // each ActivityThread launch; they do not rescan or stop package sessions on the hot
+            // path.  A revision change cannot take this branch because the session revision is
+            // part of the reuse predicate, so cold/recovery/upgrade still performs the complete
+            // stale-session and ledger cleanup below.
+            if (reusePreparedArtifact) {
+                lifecycleStage(input, existing,
+                        recoveryArtifactReusePath
+                                ? "REVISION_CLEANUP_SKIPPED_RECOVERY_ARTIFACT"
+                                : "REVISION_CLEANUP_SKIPPED_REUSE",
+                        lifecycleStarted);
+            } else {
+                stopMismatchedRevisionSessions(packageName, userId, packageRevision);
+                lifecycleStage(input, existing, "REVISION_CLEANUP_RETURN", lifecycleStarted);
+            }
+            // VA/NBB build the package/receiver view while the virtual process is prepared and
+            // reuse that view for subsequent Activity launches.  Re-reading the APK manifest on
+            // every hot launch is both redundant and observable on MuMu: the large commercial
+            // APK parse can consume several seconds before the actual ActivityStarter call.
+            // Keep indexing on first prepare, recovery, and any non-ready lease; only a live
+            // same-revision session with a broker-owned prepared spec may take the fast path.
+            if (!reusePreparedArtifact) {
+                lifecycleStage(input, null, "INDEX_BEGIN", lifecycleStarted);
+                owner.receiverCoordinator.indexPackage(input);
+                lifecycleStage(input, null, "INDEX_RETURN", lifecycleStarted);
+            } else {
+                lifecycleStage(input, existing,
+                        recoveryArtifactReusePath
+                                ? "INDEX_SKIPPED_RECOVERY_ARTIFACT" : "INDEX_SKIPPED_REUSE",
+                        lifecycleStarted);
+            }
             padOrdinarySlots(packageName, userId, packageRevision, processName,
                     input.getInt(RuntimeKeys.SLOT_PAD_COUNT, 0),
                     input.getInt(RuntimeKeys.SLOT_TARGET, -1));
+            lifecycleStage(input, null, "SLOT_PAD_RETURN", lifecycleStarted);
             GuestSession session = owner.sessions.allocate(
                     packageName, userId, processName, packageRevision, owner.now());
+            lifecycleStage(input, session, "SESSION_ALLOCATE_RETURN", lifecycleStarted);
             GuestSession staleRecovery = null;
             String key = RuntimeBrokerService.processKey(packageName, userId, processName);
             if (session.state() == SessionState.READY || session.state() == SessionState.ACTIVE) {
@@ -64,20 +225,44 @@ final class RuntimeGuestLifecycleCoordinator {
                 Bundle runtimeStatus = null;
                 Throwable statusFailure = null;
                 try {
+                    lifecycleStage(input, session, "STATUS_CALL_BEGIN", lifecycleStarted);
                     runtimeStatus = owner.callGuest(session.processSlot(), guest ->
                             RuntimeBrokerService.guestOperation(guest,
                                     RuntimeOperationRequest.GUEST_RUNTIME_STATUS, new Bundle()));
+                    lifecycleStage(input, session, "STATUS_CALL_RETURN", lifecycleStarted);
                 } catch (Throwable error) {
+                    lifecycleStage(input, session, "STATUS_CALL_FAILED", lifecycleStarted);
                     com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
                     statusFailure = error;
                 }
+                boolean frameworkActivityReady = runtimeStatus != null
+                        && runtimeStatus.getBoolean("frameworkActivityTransportInstalled", false)
+                        && runtimeStatus.getBoolean("frameworkComponentLifecycleReady", false);
                 if (runtimeStatus != null
-                        && "READY".equals(runtimeStatus.getString(RuntimeKeys.STATUS, ""))) {
+                        && "READY".equals(runtimeStatus.getString(RuntimeKeys.STATUS, ""))
+                        && frameworkActivityReady) {
+                    lifecycleStage(input, session, "SESSION_BIND_BEGIN", lifecycleStarted);
                     owner.receiverCoordinator.bindSession(session);
+                    lifecycleStage(input, session, "SESSION_BIND_RETURN", lifecycleStarted);
                     Bundle out = new Bundle(cached);
                     out.putString(RuntimeKeys.STATUS, cached.getBoolean("frameworkDegraded", false)
                             ? "ALREADY_PREPARED_DEGRADED" : "ALREADY_PREPARED");
                     return out;
+                }
+                if (fastReusePath) {
+                    // A READY registry entry is only a lease hint.  If the Guest Binder no longer
+                    // proves the compact runtime contract, recover through the full immutable
+                    // artifact and declared-process validation before making a new generation.
+                    owner.validateInput(input);
+                    lifecycleStage(input, session, "INPUT_VALIDATE_RECOVERY_RETURN", lifecycleStarted);
+                    packageName = input.getString(RuntimeKeys.PACKAGE_NAME, "");
+                    userId = input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+                    processName = RuntimeBrokerService.processName(input, packageName);
+                    owner.validateDeclaredProcess(packageName, userId, processName);
+                    lifecycleStage(input, session, "PROCESS_VALIDATE_RECOVERY_RETURN", lifecycleStarted);
+                    packageRevision = RuntimeBrokerService.required(input,
+                            RuntimeKeys.PACKAGE_REVISION);
+                    fastReusePath = false;
                 }
                 GuestSession observed = owner.sessions.get(packageName, userId, processName);
                 if (observed != null && (observed.state() == SessionState.READY
@@ -86,6 +271,11 @@ final class RuntimeGuestLifecycleCoordinator {
                             ? "GUEST_RUNTIME_STATUS_" + (runtimeStatus == null
                                     ? "MISSING" : runtimeStatus.getString(RuntimeKeys.STATUS, "UNKNOWN"))
                             : "GUEST_RUNTIME_STATUS_FAILED:" + statusFailure.getClass().getSimpleName();
+                    if (runtimeStatus != null && "READY".equals(
+                            runtimeStatus.getString(RuntimeKeys.STATUS, ""))
+                            && !frameworkActivityReady) {
+                        reason = "GUEST_FRAMEWORK_ACTIVITY_TRANSPORT_NOT_READY";
+                    }
                     GuestSession died = owner.sessions.markProcessDied(packageName, userId,
                             processName, observed.generation(), owner.now(), reason);
                     // A stale Binder can remain technically reachable while the process has
@@ -214,6 +404,206 @@ final class RuntimeGuestLifecycleCoordinator {
         return spec;
     }
 
+    private static boolean syntacticallyReusableInput(Bundle input, String packageName,
+                                                      int userId, String processName) {
+        if (input == null || !RuntimeProtocol.isCompatible(
+                input.getInt(RuntimeKeys.PROTOCOL, RuntimeProtocol.CURRENT))) return false;
+        if (packageName == null || !packageName.matches(
+                "[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+") || userId < 0) return false;
+        return processName != null && processName.matches(
+                "[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+(\\:[A-Za-z0-9_.]+)?");
+    }
+
+    private static boolean canReusePreparedArtifact(Bundle input, GuestSession existing,
+                                                     Bundle cached) {
+        if (existing == null || cached == null
+                || !existing.packageName().equals(cached.getString(RuntimeKeys.PACKAGE_NAME, ""))
+                || existing.virtualUserId() != cached.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1)
+                || !existing.processName().equals(RuntimeBrokerService.processName(cached,
+                        cached.getString(RuntimeKeys.PACKAGE_NAME, "")))) return false;
+        String sha256 = input.getString(RuntimeKeys.APK_SHA256, "");
+        if (sha256 == null) return false;
+        sha256 = sha256.trim().toLowerCase(java.util.Locale.ROOT);
+        long versionCode = input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
+        if (versionCode < 0 || !sha256.matches("[0-9a-f]{64}")) return false;
+        String revision = "v" + versionCode + ":sha256:" + sha256;
+        if (!revision.equals(existing.packageRevision())
+                || !revision.equals(cached.getString(RuntimeKeys.PACKAGE_REVISION, ""))) {
+            return false;
+        }
+        String cachedSha256 = cached.getString(RuntimeKeys.APK_SHA256, "");
+        if (cachedSha256 == null || !sha256.equals(
+                cachedSha256.trim().toLowerCase(java.util.Locale.ROOT))) return false;
+        if (cached.getLong(RuntimeKeys.APK_VERSION_CODE, -1L) != versionCode) return false;
+        return sameText(input, cached, RuntimeKeys.NATIVE_GUEST_TRUST)
+                && sameText(input, cached, RuntimeKeys.NATIVE_EXECUTION_MODE)
+                && input.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false)
+                    == cached.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false);
+    }
+
+    /**
+     * NBB/VA retain the validated package/process record beyond a process death.  The CAS
+     * equivalent is a broker-owned immutable artifact, keyed by the complete revision and the
+     * exact virtual package-state projection.  It is not a deadline relaxation and is never
+     * populated until both APK and declared-process validation have succeeded.
+     */
+    private static boolean canReuseValidatedArtifact(Bundle input, String packageName, int userId,
+                                                     String processName, Bundle cached) {
+        if (input == null || cached == null || packageName == null || packageName.isEmpty()
+                || userId < 0 || input.getBoolean(RuntimeKeys.ISOLATED_PROCESS, false)) {
+            return false;
+        }
+        if (!packageName.equals(cached.getString(RuntimeKeys.PACKAGE_NAME, ""))
+                || userId != cached.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1)) return false;
+        String requestedProcess = RuntimeBrokerService.processName(input, packageName);
+        if (requestedProcess == null || !requestedProcess.equals(processName)) return false;
+        ArrayList<String> declared = cached.getStringArrayList(VALIDATED_PROCESS_NAMES);
+        if (declared == null || !declared.contains(requestedProcess)) return false;
+        String requestedState = packageStateFingerprint(input);
+        if (requestedState.isEmpty() || !requestedState.equals(
+                cached.getString(VALIDATED_STATE_FINGERPRINT, ""))) return false;
+        if (!sameText(input, cached, RuntimeKeys.APK_SHA256)
+                || input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
+                != cached.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
+                || !sameText(input, cached, RuntimeKeys.BASE_APK_SHA256)
+                || !sameText(input, cached, RuntimeKeys.NATIVE_ABI)
+                || !sameText(input, cached, RuntimeKeys.NATIVE_GUEST_TRUST)
+                || !sameText(input, cached, RuntimeKeys.NATIVE_EXECUTION_MODE)
+                || !sameText(input, cached, RuntimeKeys.APPLICATION_CLASS)
+                || !sameText(input, cached, RuntimeKeys.SHARED_LIBRARIES)
+                || input.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false)
+                != cached.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false)) return false;
+        if (!sameCanonicalPath(input, cached, RuntimeKeys.APK_PATH)
+                || !sameCanonicalPath(input, cached, RuntimeKeys.NATIVE_LIBRARY_DIR)) return false;
+        for (String key : VALIDATED_LIST_KEYS) {
+            if (!sameStringList(input, cached, key)) return false;
+        }
+        String requestedRevision = input.getString(RuntimeKeys.PACKAGE_REVISION, "").trim();
+        if (requestedRevision.isEmpty()) {
+            requestedRevision = "v" + input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
+                    + ":sha256:" + input.getString(RuntimeKeys.APK_SHA256, "").trim()
+                    .toLowerCase(java.util.Locale.ROOT);
+        }
+        return requestedRevision.equals(cached.getString(RuntimeKeys.PACKAGE_REVISION, ""));
+    }
+
+    private static Bundle validatedArtifact(Bundle input, Set<String> declaredProcesses) {
+        Bundle out = new Bundle();
+        if (input.containsKey(RuntimeKeys.PROTOCOL)) {
+            out.putInt(RuntimeKeys.PROTOCOL, input.getInt(RuntimeKeys.PROTOCOL));
+        }
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1));
+        out.putLong(RuntimeKeys.APK_VERSION_CODE,
+                input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L));
+        for (String key : VALIDATED_STRING_KEYS) copyString(input, out, key);
+        for (String key : VALIDATED_LIST_KEYS) copyStringList(input, out, key);
+        if (input.containsKey(RuntimeKeys.NATIVE_CODE_PRESENT)) {
+            out.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT,
+                    input.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT));
+        }
+        if (input.containsKey(RuntimeKeys.PACKAGE_STATE)) {
+            out.putParcelable(RuntimeKeys.PACKAGE_STATE,
+                    input.getParcelable(RuntimeKeys.PACKAGE_STATE));
+        }
+        out.putString(VALIDATED_STATE_FINGERPRINT, packageStateFingerprint(input));
+        ArrayList<String> processNames = new ArrayList<>();
+        if (declaredProcesses != null) processNames.addAll(declaredProcesses);
+        out.putStringArrayList(VALIDATED_PROCESS_NAMES, processNames);
+        return out;
+    }
+
+    private static void applyValidatedArtifact(Bundle input, Bundle cached) {
+        for (String key : VALIDATED_STRING_KEYS) copyString(cached, input, key);
+        for (String key : VALIDATED_LIST_KEYS) copyStringList(cached, input, key);
+        input.putInt(RuntimeKeys.VIRTUAL_USER_ID,
+                cached.getInt(RuntimeKeys.VIRTUAL_USER_ID, input.getInt(RuntimeKeys.VIRTUAL_USER_ID)));
+        input.putLong(RuntimeKeys.APK_VERSION_CODE,
+                cached.getLong(RuntimeKeys.APK_VERSION_CODE, -1L));
+        input.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT,
+                cached.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false));
+        if (cached.containsKey(RuntimeKeys.PACKAGE_STATE)) {
+            input.putParcelable(RuntimeKeys.PACKAGE_STATE,
+                    cached.getParcelable(RuntimeKeys.PACKAGE_STATE));
+        }
+    }
+
+    private static void copyString(Bundle source, Bundle target, String key) {
+        if (source.containsKey(key)) target.putString(key, source.getString(key, ""));
+    }
+
+    private static void copyStringList(Bundle source, Bundle target, String key) {
+        ArrayList<String> values = source.getStringArrayList(key);
+        if (values != null) target.putStringArrayList(key, new ArrayList<>(values));
+    }
+
+    private static boolean sameStringList(Bundle left, Bundle right, String key) {
+        ArrayList<String> a = left.getStringArrayList(key);
+        ArrayList<String> b = right.getStringArrayList(key);
+        if (a == null) a = new ArrayList<>();
+        if (b == null) b = new ArrayList<>();
+        return a.equals(b);
+    }
+
+    private static boolean sameCanonicalPath(Bundle left, Bundle right, String key) {
+        String a = left.getString(key, "").trim();
+        String b = right.getString(key, "").trim();
+        if (a.isEmpty() || b.isEmpty()) return a.isEmpty() && b.isEmpty();
+        try {
+            return new File(a).getCanonicalPath().equals(new File(b).getCanonicalPath());
+        } catch (Exception error) {
+            return false;
+        }
+    }
+
+    private static String validationCacheKey(Bundle input, String packageName, int userId) {
+        if (input == null || packageName == null || packageName.isEmpty() || userId < 0) return "";
+        String sha256 = input.getString(RuntimeKeys.APK_SHA256, "").trim()
+                .toLowerCase(java.util.Locale.ROOT);
+        long versionCode = input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
+        String state = packageStateFingerprint(input);
+        if (versionCode < 0 || !sha256.matches("[0-9a-f]{64}") || state.isEmpty()) return "";
+        String revision = input.getString(RuntimeKeys.PACKAGE_REVISION, "").trim();
+        if (revision.isEmpty()) revision = "v" + versionCode + ":sha256:" + sha256;
+        String material = packageName + "\n" + userId + "\n" + revision + "\n"
+                + state + "\n" + input.getString(RuntimeKeys.NATIVE_GUEST_TRUST, "") + "\n"
+                + input.getString(RuntimeKeys.NATIVE_EXECUTION_MODE, "") + "\n"
+                + input.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false);
+        return "validated:" + sha256Hex(material.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private static String packageStateFingerprint(Bundle input) {
+        if (input == null || !input.containsKey(RuntimeKeys.PACKAGE_STATE)) return "";
+        Object value = input.getParcelable(RuntimeKeys.PACKAGE_STATE);
+        if (!(value instanceof VirtualPackageStateSnapshot state)) return "";
+        Parcel parcel = Parcel.obtain();
+        try {
+            state.writeToParcel(parcel, 0);
+            return sha256Hex(parcel.marshall());
+        } catch (RuntimeException error) {
+            return "";
+        } finally {
+            parcel.recycle();
+        }
+    }
+
+    private static String sha256Hex(byte[] value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value);
+            StringBuilder out = new StringBuilder(digest.length * 2);
+            for (byte item : digest) out.append(String.format(java.util.Locale.ROOT,
+                    "%02x", item & 0xff));
+            return out.toString();
+        } catch (Exception error) {
+            throw new IllegalStateException("SHA256_UNAVAILABLE", error);
+        }
+    }
+
+    private static boolean sameText(Bundle left, Bundle right, String key) {
+        String a = left.getString(key, "");
+        String b = right.getString(key, "");
+        return a != null && b != null && !a.trim().isEmpty() && a.trim().equals(b.trim());
+    }
+
     private void stopMismatchedRevisionSessions(String packageName, int userId,
                                                 String requestedRevision) {
         java.util.List<GuestSession> existing = owner.sessions.getAll(packageName, userId);
@@ -222,6 +612,21 @@ final class RuntimeGuestLifecycleCoordinator {
             stopSession(session);
         }
         owner.activityRuntime.clearMismatchedRevision(userId, packageName, requestedRevision);
+    }
+
+    private static void lifecycleStage(Bundle input, GuestSession session, String stage,
+                                       long started) {
+        Bundle evidence = input == null ? new Bundle() : new Bundle(input);
+        if (session != null) {
+            evidence.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+            evidence.putLong(RuntimeKeys.GENERATION, session.generation());
+            evidence.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        }
+        evidence.putString("traceDomain", "BROKER");
+        evidence.putString(RuntimeKeys.LAUNCH_STAGE, stage);
+        evidence.putLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS,
+                Math.max(0L, android.os.SystemClock.elapsedRealtime() - started));
+        RuntimeEventLog.event("GUEST_LIFECYCLE_STAGE", evidence);
     }
 
     // Do not hold the Broker monitor while waiting for Guest ActivityThread teardown.  Activity

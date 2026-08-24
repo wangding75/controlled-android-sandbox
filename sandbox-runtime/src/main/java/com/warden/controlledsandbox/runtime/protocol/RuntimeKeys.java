@@ -270,6 +270,10 @@ public final class RuntimeKeys {
     public static final String INTENT_EXTRAS = "intentExtras";
     /** Opaque Guest Intent Parcel preserving fields not represented by the bounded projection. */
     public static final String INTENT_WIRE_PAYLOAD = "intentWirePayload";
+    /** File-descriptor handle for an Intent payload too large for an inline Binder Bundle. */
+    public static final String INTENT_PAYLOAD_FD = "intentPayloadFd";
+    /** Byte count for INTENT_PAYLOAD_FD; bounds the read before Intent unmarshalling. */
+    public static final String INTENT_PAYLOAD_BYTES = "intentPayloadBytes";
     public static final String TARGET_VIRTUAL_USER_ID = "targetVirtualUserId";
 
     /** Internal, signature-protected Host -> native Companion Provider relay marker. */

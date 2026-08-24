@@ -774,6 +774,22 @@ public final class GuestRuntimeEnvironment {
             out.putInt("pid", Process.myPid());
             return out;
         }
+        // VA/NBB keep the process-reuse decision on the bindApplication/process record state
+        // boundary.  The Broker only needs this compact readiness projection to distinguish a
+        // live bound process from a stale lease; it must not synchronously rebuild diagnostics,
+        // query every isolated service declaration, or marshal the package projection on every
+        // hot Activity launch.
+        return current.readinessStatus(preparing ? "PREPARING" : "READY",
+                android.os.SystemClock.elapsedRealtime());
+    }
+
+    static synchronized Bundle diagnosticStatus() {
+        if (current == null) {
+            Bundle out = new Bundle();
+            out.putString(RuntimeKeys.STATUS, "IDLE");
+            out.putInt("pid", Process.myPid());
+            return out;
+        }
         return current.status(preparing ? "PREPARING" : "READY",
                 android.os.SystemClock.elapsedRealtime());
     }
@@ -1382,6 +1398,38 @@ public final class GuestRuntimeEnvironment {
             return loadedApkBridge == null ? null : loadedApkBridge.loadedApk();
         }
 
+        Bundle readinessStatus(String status, long started) {
+            Bundle out = new Bundle();
+            String effectiveStatus = status;
+            if (frameworkHooks.report().readiness()
+                    == com.warden.controlledsandbox.framework.core.FrameworkHookReport.Readiness.DEGRADED) {
+                if ("READY".equals(status)) effectiveStatus = "DEGRADED";
+                else if ("ALREADY_READY".equals(status)) effectiveStatus = "ALREADY_DEGRADED";
+            }
+            out.putString(RuntimeKeys.STATUS, effectiveStatus);
+            out.putString(RuntimeKeys.SESSION_ID, spec.sessionId);
+            out.putLong(RuntimeKeys.GENERATION, spec.generation);
+            out.putInt(RuntimeKeys.PROCESS_SLOT, spec.processSlot);
+            out.putString(RuntimeKeys.PACKAGE_NAME, spec.packageName);
+            out.putInt(RuntimeKeys.VIRTUAL_USER_ID, spec.virtualUserId);
+            out.putInt(RuntimeKeys.VIRTUAL_UID, spec.virtualUid);
+            out.putString(RuntimeKeys.PROCESS_NAME, spec.processName);
+            out.putString("frameworkReadiness", frameworkHooks.report().readiness().name());
+            out.putInt("pid", Process.myPid());
+            out.putBoolean("frameworkActivityTransportInstalled", activityThreadInstrumentation != null);
+            out.putBoolean("frameworkServiceTransportInstalled", serviceFrameworkBridge != null);
+            out.putBoolean("frameworkLoadedApkInstalled", loadedApkBridge != null
+                    && loadedApkBridge.loadedApk() != null);
+            out.putBoolean("frameworkGuestApplicationBound", application != null
+                    && context.getApplicationInfo() != null
+                    && spec.packageName.equals(context.getApplicationInfo().packageName));
+            out.putBoolean("frameworkComponentLifecycleReady", activityThreadInstrumentation != null
+                    && serviceFrameworkBridge != null && loadedApkBridge != null);
+            out.putLong("durationMs", Math.max(0,
+                    android.os.SystemClock.elapsedRealtime() - started));
+            return out;
+        }
+
         public void bindActivityTaskHost(IBinder frameworkToken, String activityToken, int taskId,
                                          Runnable moveToFront, BooleanSupplier moveToBack,
                                          Runnable finishAffinity,
@@ -1438,7 +1486,11 @@ public final class GuestRuntimeEnvironment {
         }
 
         Bundle status(String status, long started) {
-            Bundle out = spec.toBundle();
+            // VA/NBB readiness checks return process/application state, not the complete package
+            // projection.  The package universe is immutable preparation state and is already
+            // retained by the Broker; echoing it through this status Binder call turns every hot
+            // Activity launch into a large synchronous transaction before ActivityStarter.
+            Bundle out = spec.toRuntimeRequestBundle();
             String effectiveStatus = status;
             if (frameworkHooks.report().readiness() == com.warden.controlledsandbox.framework.core.FrameworkHookReport.Readiness.DEGRADED) {
                 if ("READY".equals(status)) effectiveStatus = "DEGRADED";

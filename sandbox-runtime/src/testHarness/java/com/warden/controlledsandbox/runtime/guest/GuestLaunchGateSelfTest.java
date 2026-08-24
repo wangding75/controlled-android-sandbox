@@ -23,7 +23,7 @@ public final class GuestLaunchGateSelfTest {
                         evidence(true, true, true, true, true, true, true, true, true, true, 1, 0, true, true, "fatal"))),
                 "FATAL rejects LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
-                        evidence(true, true, true, true, true, true, true, true, true, 0, 1, true, true, ""))),
+                        evidence(true, true, true, true, true, true, true, true, true, true, 0, 1, true, true, ""))),
                 "ANR rejects LAUNCH_PASS");
 
         Bundle created = new Bundle();
@@ -42,6 +42,32 @@ public final class GuestLaunchGateSelfTest {
         GuestLaunchEvidence pass = live.close();
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(pass)),
                 "CREATED+RESUMED+window is LAUNCH_PASS");
+
+        GuestLaunchObservation taskHandoff = new GuestLaunchObservation(
+                "root-token", "guest.Launch", "root-request", "root-operation");
+        Bundle rootReady = new Bundle();
+        rootReady.putString(RuntimeKeys.ACTIVITY_EVENT, "GUEST_READY");
+        rootReady.putString(RuntimeKeys.ACTIVITY_TOKEN, "root-token");
+        rootReady.putString(RuntimeKeys.REQUEST_ID, "root-request");
+        rootReady.putString(RuntimeKeys.OPERATION_ID, "root-operation");
+        taskHandoff.onActivityEvent(rootReady);
+        taskHandoff.linkActivity("child-token", "child-request", "child-operation",
+                "guest.RealActivity");
+        Bundle childCreated = new Bundle();
+        childCreated.putString(RuntimeKeys.ACTIVITY_EVENT, "CREATED");
+        childCreated.putString(RuntimeKeys.ACTIVITY_TOKEN, "child-token");
+        childCreated.putString(RuntimeKeys.REQUEST_ID, "child-request");
+        childCreated.putString(RuntimeKeys.OPERATION_ID, "child-operation");
+        childCreated.putBoolean("windowAttached", true);
+        taskHandoff.onActivityEvent(childCreated);
+        Bundle childResumed = new Bundle(childCreated);
+        childResumed.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        taskHandoff.onActivityEvent(childResumed);
+        Bundle childFrame = new Bundle(childCreated);
+        childFrame.putString(RuntimeKeys.ACTIVITY_EVENT, "FIRST_FRAME_DRAWN");
+        taskHandoff.onActivityEvent(childFrame);
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(taskHandoff.close())),
+                "same-task child lifecycle correlation is LAUNCH_PASS");
 
         GuestLaunchObservation delayedWindow = new GuestLaunchObservation("tok", "guest.Main");
         Bundle createdOnly = new Bundle();

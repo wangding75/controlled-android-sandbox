@@ -237,6 +237,17 @@ public final class GuestPackageSpec {
         return out;
     }
 
+    /**
+     * Builds the compact form used on ordinary Guest -> Broker operation calls.
+     * The package universe is immutable session state retained by the Broker after preparation;
+     * re-sending every projection on each Binder call can exceed the platform transaction budget.
+     */
+    Bundle toRuntimeRequestBundle() {
+        Bundle out = toBundle();
+        out.remove(RuntimeKeys.PACKAGE_UNIVERSE);
+        return out;
+    }
+
     private static void validateNativeAbi(String nativeLibraryDir, String nativeAbi) {
         String dir = nativeLibraryDir == null ? "" : nativeLibraryDir.trim();
         String abi = nativeAbi == null ? "" : nativeAbi.trim();

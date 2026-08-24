@@ -3,6 +3,8 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.os.Bundle;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -30,6 +32,8 @@ public final class GuestLaunchObservation {
     private final String operationId;
     private final long acceptedAtElapsedMs;
     private final ArrayList<String> timeline = new ArrayList<>();
+    /** ActivityThread may replace the launcher Activity with the app's real top Activity. */
+    private final Map<String, Correlation> activityCorrelations = new HashMap<>();
 
     public GuestLaunchObservation(String activityToken, String componentClass) {
         this(activityToken, componentClass, "", "");
@@ -52,15 +56,49 @@ public final class GuestLaunchObservation {
         this.acceptedAtElapsedMs = acceptedAtElapsedMs > 0L
                 ? acceptedAtElapsedMs : android.os.SystemClock.elapsedRealtime();
         timeline.add("REQUEST_ACCEPTED@" + this.acceptedAtElapsedMs);
+        if (!this.activityToken.isEmpty()) {
+            activityCorrelations.put(this.activityToken,
+                    new Correlation(this.requestId, this.operationId));
+        }
+    }
+
+    /**
+     * Associates a child Activity route with this logical launch.  VA/NBB-style task ownership
+     * allows an app launcher to synchronously replace its entry Activity; the launch gate must
+     * observe the resulting top record rather than only the host trampoline's first token.
+     */
+    public synchronized void linkActivity(String token, String childRequestId,
+                                           String childOperationId, String component) {
+        String normalizedToken = token == null ? "" : token.trim();
+        if (normalizedToken.isEmpty()) return;
+        activityCorrelations.put(normalizedToken, new Correlation(
+                childRequestId == null ? "" : childRequestId.trim(),
+                childOperationId == null ? "" : childOperationId.trim()));
+        String normalizedComponent = component == null ? "" : component.trim();
+        timeline.add("ACTIVITY_LINK:" + (normalizedComponent.isEmpty()
+                ? normalizedToken : normalizedComponent) + "@"
+                + android.os.SystemClock.elapsedRealtime());
+    }
+
+    public synchronized boolean acceptsActivityToken(String token) {
+        String normalizedToken = token == null ? "" : token.trim();
+        return normalizedToken.isEmpty() || activityCorrelations.containsKey(normalizedToken);
     }
 
     public synchronized void onActivityEvent(Bundle request) {
         if (request == null) return;
         String event = request.getString(RuntimeKeys.ACTIVITY_EVENT, "");
+        String eventActivityToken = request.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
         String eventRequestId = request.getString(RuntimeKeys.REQUEST_ID, "");
         String eventOperationId = request.getString(RuntimeKeys.OPERATION_ID, "");
-        if ((!requestId.isEmpty() && !requestId.equals(eventRequestId))
-                || (!operationId.isEmpty() && !operationId.equals(eventOperationId))) {
+        Correlation expected = activityCorrelations.get(eventActivityToken);
+        if (expected == null && !eventActivityToken.isEmpty()) {
+            failure = "LAUNCH_ACTIVITY_TOKEN_UNEXPECTED";
+        } else if (expected == null) {
+            expected = new Correlation(requestId, operationId);
+        }
+        if ((!expected.requestId.isEmpty() && !expected.requestId.equals(eventRequestId))
+                || (!expected.operationId.isEmpty() && !expected.operationId.equals(eventOperationId))) {
             failure = "LAUNCH_CORRELATION_MISMATCH";
         }
         String stage = "GUEST_READY".equals(event) ? "GUEST_READY"
@@ -138,4 +176,14 @@ public final class GuestLaunchObservation {
     }
 
     public long acceptedAtElapsedMs() { return acceptedAtElapsedMs; }
+
+    private static final class Correlation {
+        final String requestId;
+        final String operationId;
+
+        Correlation(String requestId, String operationId) {
+            this.requestId = requestId == null ? "" : requestId;
+            this.operationId = operationId == null ? "" : operationId;
+        }
+    }
 }

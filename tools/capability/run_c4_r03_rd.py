@@ -55,6 +55,10 @@ FATAL_MARKERS = (
     "FATAL EXCEPTION", "Fatal signal", "ANR in", "BadTokenException",
     "View not attached to window manager", "WINDOW_PUBLISH_AFTER_RESUME failed",
 )
+LOGCAT_THREADTIME = re.compile(
+    r"^(?P<month>\d{2})-(?P<day>\d{2}) (?P<hour>\d{2}):"
+    r"(?P<minute>\d{2}):(?P<second>\d{2})\.(?P<millis>\d{3})\s"
+)
 
 
 def now_iso() -> str:
@@ -223,6 +227,47 @@ def screenshot_quality(path: Path) -> dict[str, Any]:
                 "nonTransparent": False, "nonBlack": False, "uniform": True}
 
 
+def classify_logcat_markers(logcat: str, operation_started_at_ms: Any) -> tuple[list[str], list[str]]:
+    """Separate current-operation failures from historical device log residue.
+
+    The RD emulator intentionally retains logcat across app generations.  A marker is current
+    only when its threadtime timestamp is at or after the production operation's wall-clock
+    start.  Unknown/unparseable timestamps remain fail-closed and are classified as current.
+    """
+    try:
+        started = dt.datetime.fromtimestamp(float(operation_started_at_ms) / 1000.0)
+    except (TypeError, ValueError, OSError, OverflowError):
+        started = None
+    current: set[str] = set()
+    historical: set[str] = set()
+    for line in (logcat or "").splitlines():
+        markers = [marker for marker in FATAL_MARKERS if marker in line]
+        if not markers:
+            continue
+        match = LOGCAT_THREADTIME.match(line)
+        if started is None or match is None:
+            current.update(markers)
+            continue
+        try:
+            observed = dt.datetime(
+                started.year,
+                int(match.group("month")),
+                int(match.group("day")),
+                int(match.group("hour")),
+                int(match.group("minute")),
+                int(match.group("second")),
+                int(match.group("millis")) * 1000,
+            )
+        except ValueError:
+            current.update(markers)
+            continue
+        if observed.timestamp() * 1000 >= started.timestamp() * 1000:
+            current.update(markers)
+        else:
+            historical.update(markers)
+    return sorted(current), sorted(historical)
+
+
 def light_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str, Any]:
     screenshot = adb_binary(serial, ["exec-out", "screencap", "-p"], timeout=30)
     screenshot_path = case_dir / "screenshot.png"
@@ -336,7 +381,8 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
         failure_reason = failure_reason or "SURFACE_EMPTY"
     if not quality.get("nonTransparent") or not quality.get("nonBlack"):
         failure_reason = failure_reason or "SCREENSHOT_BLACK_OR_TRANSPARENT"
-    fatal = [marker for marker in FATAL_MARKERS if marker in device["logcat"]]
+    fatal, historical_fatal = classify_logcat_markers(
+        device["logcat"], result_json.get("startedAt"))
     if fatal:
         failure_reason = failure_reason or "FATAL_OR_WINDOW_ERROR:" + ",".join(fatal)
     row = {
@@ -365,6 +411,7 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
             "surfaceNonEmpty": device["surfaceNonEmpty"],
             "screenshot": quality,
             "fatalMarkers": fatal,
+            "historicalFatalMarkers": historical_fatal,
         },
         "errorClassification": failure_reason or "NONE",
         "firstAttemptFailure": bool(failure_reason),

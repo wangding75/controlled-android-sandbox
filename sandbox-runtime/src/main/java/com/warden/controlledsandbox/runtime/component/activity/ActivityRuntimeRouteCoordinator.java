@@ -20,6 +20,7 @@ import com.warden.controlledsandbox.framework.routing.RoutePayload;
 import com.warden.controlledsandbox.framework.routing.RouteToken;
 import com.warden.controlledsandbox.runtime.broker.BrokerStateStore;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -74,9 +75,12 @@ final class ActivityRuntimeRouteCoordinator {
             metadata.put(RuntimeKeys.SESSION_ID, session.sessionId());
             metadata.put(RuntimeKeys.COMPONENT_CLASS, component);
             metadata.put(RuntimeKeys.PROCESS_NAME, session.processName());
+            byte[] intentPayload = RuntimeIntentWireCodec.routePayload(request);
+            if (intentPayload != null) metadata.put("payloadType", "intent-wire");
             java.util.List<TaskSnapshot> virtualTasksBeforeLaunch = ledger.snapshot();
             ActivityLaunchTransaction transaction = coordinator.launch(
-                    spec, component.getBytes(StandardCharsets.UTF_8), metadata, ROUTE_TTL);
+                    spec, intentPayload == null ? component.getBytes(StandardCharsets.UTF_8)
+                            : intentPayload, metadata, ROUTE_TTL);
             token = transaction.routeToken().value();
             Bundle envelope = new Bundle(prepared);
             if (request != null) envelope.putAll(request);
@@ -98,6 +102,7 @@ final class ActivityRuntimeRouteCoordinator {
             envelope.putString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT,
                     physicalComponent(session.processSlot(), component, prepared, physicalWindow));
             attachSavedState(envelope, transaction.decision().activityToken());
+            if (intentPayload != null) RuntimeIntentWireCodec.stripRoutePayload(envelope);
             transport.putRoute(token, envelope);
             if (pending.putIfAbsent(token, transaction) != null) {
                 throw new IllegalStateException("DUPLICATE_ACTIVITY_TRANSACTION");
@@ -140,6 +145,9 @@ final class ActivityRuntimeRouteCoordinator {
         envelope.putString(RuntimeKeys.STATUS, "ROUTE_GRANTED");
         addDecision(envelope, transaction);
         envelope.putLong(RuntimeKeys.ROUTE_EXPIRES_AT, payload.get().expiresAtMillis());
+        if ("intent-wire".equals(payload.get().metadata().get("payloadType"))) {
+            RuntimeIntentWireCodec.attachRoutePayloadDescriptor(envelope, payload.get().bytes());
+        }
         // A restored virtual task is not the same thing as a surviving Android Host task.  Only
         // the real route consumer can acknowledge that the new Stub/ActivityThread task exists.
         transactions.mutate(() -> ledger.attachHostTask(transaction.decision().taskId()));

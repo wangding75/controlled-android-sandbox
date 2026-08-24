@@ -91,7 +91,7 @@ final class GuestActivityThreadReceiverBridge implements AutoCloseable {
                 // Internal capability/session state must not cross the host ActivityThread
                 // parcel boundary. Re-encode only the guest Intent wire contract.
                 Bundle intentEnvelope = new Bundle();
-                RuntimeIntentWireCodec.encode(intentEnvelope, guestIntent);
+                RuntimeIntentWireCodec.encodeComponent(intentEnvelope, guestIntent);
                 hostIntent.setComponent(new ComponentName(
                         session.context.hostServiceContext(),
                         GuestReceiverStubNames.classNameFor(session.spec.processSlot)));

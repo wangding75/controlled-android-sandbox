@@ -1531,3 +1531,46 @@ issues:
       assigns this to SX/UI. Fanqie user0 cold/hot passed once and remains insufficient for
       the required matrix. A bounded generation/session-bound payload handle or equivalent
       broker-owned record is required; do not retry, sleep, or silently truncate payloads.
+
+  - issue_id: KI-R03-058
+    title: CAS did not hold the NBB/VA-style process owner edge before Guest lookup and launch
+    capability: multi_process_process_name_slot
+    classification: CURRENT_DEFECT
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R03 extended RD matrix 2026-08-25
+    evidence:
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RebindableServiceConnector.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/BaseGuestProcessService.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestConnectionPool.java
+      - app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java
+      - app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java
+      - artifacts/capability-audit/catch-up-c4-r03/post-client-broker-owner-clean-reboot-quark-u0-25-20260825/attempts/quark/user-0/hot-018/first-failure-full
+      - artifacts/capability-audit/catch-up-c4-r03/post-clean-reboot-quark-u0-25-20260825/attempts/quark/user-0/hot-020/first-failure-full
+      - artifacts/capability-audit/catch-up-c4-r03/post-prelookup-owner-clean-reboot-quark-u0-25-20260825
+      - artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-quark-u1-25-20260825
+      - artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-dingtalk-u0-u1-25-20260825
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
+    match_patterns:
+      - lowmemorykiller: Kill 'com.quark.browser'
+      - reason: device is not responding
+      - GUEST_PROCESS_DISCONNECTED
+      - BROKER_OWNER_LEASE_REQUESTED
+      - RUNTIME_CLIENT_OWNER_READY
+      - BIND_ABOVE_CLIENT
+      - BIND_IMPORTANT
+    blocks_current_campaign: true
+    fix_policy: C4_R03_NBB_VA_PROCESS_OWNER_LEASE_AND_FULL_MATRIX
+    notes: >
+      Before the fix, the command created RuntimeClient only after PACKAGE_LOOKUP_BEGIN and
+      the Android bind edge used only BIND_AUTO_CREATE. MuMu's lowmemorykiller then killed the
+      large Guest or Broker during lookup/launch even with substantial free device memory;
+      the resulting DeadObject/LAUNCH_GATE_FAILED path was a CAS generic process-lifetime
+      owner defect, not evidence of Quark or SX/UI incompatibility. The implementation now
+      keeps explicit BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT edges for the Broker,
+      Guest and long-lived authority clients and primes the RuntimeClient owner before package
+      lookup, matching the NBB/VA live virtual ProcessRecord ownership boundary. Quark user0/
+      user1 and DingTalk user0/user1 then passed 200/200 final-code launch rows with no retry,
+      sleep or deadline extension. Status remains RECORDED because the eight-hour cutoff left
+      the required Hongguo/Fanqie lanes and part of fixture user1 unexecuted; full matrix
+      validation is still required before this issue or C4-R03 can be closed.

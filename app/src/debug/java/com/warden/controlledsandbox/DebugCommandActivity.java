@@ -265,6 +265,14 @@ public final class DebugCommandActivity extends Activity {
                 return;
             }
             if (packageName.trim().isEmpty()) throw new IllegalArgumentException("package extra is required");
+            // Keep the command's foreground owner edge to Runtime Broker alive before package
+            // lookup.  A running large Guest must remain attached to the NBB/VA-style virtual
+            // ProcessRecord owner while lookup/import resolves the next operation; creating the
+            // RuntimeClient only after lookup leaves a hot Guest exposed to MuMu background LMK.
+            if (!"import-only".equals(command)) {
+                runtime = new RuntimeClient(this);
+                runtime.primeOperationOwner(requestId, operationId);
+            }
             Log.i(TAG, "PACKAGE_LOOKUP_BEGIN command=" + command + " package=" + packageName);
             packages = new PackageServiceClient(this);
             SandboxRecord record = packages.findRecord(packageName);
@@ -309,7 +317,7 @@ public final class DebugCommandActivity extends Activity {
                 Log.i(TAG, "PASS import-only " + packageName + " user=" + virtualUserId);
                 return;
             }
-            runtime = new RuntimeClient(this);
+            if (runtime == null) runtime = new RuntimeClient(this);
             Bundle operation;
             if ("stop".equals(command)) {
                 Log.i(TAG, "STOP_CALL_BEGIN package=" + packageName + " user=" + virtualUserId);

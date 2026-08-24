@@ -26,6 +26,13 @@ public final class RuntimeEventLog {
             append(line, "package", normalized.getString(RuntimeKeys.PACKAGE_NAME, ""));
             append(line, "session", normalized.getString(RuntimeKeys.SESSION_ID, ""));
             append(line, "traceDomain", normalized.getString("traceDomain", ""));
+            append(line, "requestId", normalized.getString(RuntimeKeys.REQUEST_ID, ""));
+            append(line, "operationId", normalized.getString(RuntimeKeys.OPERATION_ID, ""));
+            append(line, "launchStage", normalized.getString(RuntimeKeys.LAUNCH_STAGE, ""));
+            if (normalized.containsKey(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS)) {
+                line.append(" launchStageAtElapsedMs=")
+                        .append(normalized.getLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, 0L));
+            }
             append(line, "launchId", normalized.getString("launchId", ""));
             append(line, "binderToken", normalized.getString("binderToken", ""));
             append(line, "processName", normalized.getString(RuntimeKeys.PROCESS_NAME, ""));

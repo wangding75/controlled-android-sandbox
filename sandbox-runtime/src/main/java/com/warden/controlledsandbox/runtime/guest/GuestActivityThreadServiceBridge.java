@@ -324,6 +324,7 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         copyBinder(route.request, intent, RuntimeKeys.SERVICE_CONNECTION_BINDER);
         copyInt(route.request, intent, RuntimeKeys.ACTIVITY_FLAGS);
         copyStringList(route.request, intent, RuntimeKeys.BROADCAST_CATEGORIES);
+        copyIntentPayload(route.request, intent);
         Bundle extras = route.request.getBundle(RuntimeKeys.INTENT_EXTRAS);
         if (extras != null) intent.putExtra(RuntimeKeys.INTENT_EXTRAS, new Bundle(extras));
         return intent;
@@ -419,6 +420,26 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         if (source != null && source.containsKey(key)) {
             ArrayList<String> values = source.getStringArrayList(key);
             if (values != null) target.putStringArrayListExtra(key, new ArrayList<>(values));
+        }
+    }
+
+    private static void copyIntentPayload(Bundle source, Intent target) {
+        if (source == null) return;
+        Bundle extras = target.getExtras();
+        if (extras == null) {
+            extras = new Bundle();
+            target.putExtras(extras);
+        }
+        byte[] inline = source.getByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD);
+        if (inline != null && inline.length != 0) {
+            extras.putByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD, inline);
+        }
+        if (!source.containsKey(RuntimeKeys.INTENT_PAYLOAD_FD)) return;
+        android.os.Parcelable descriptor = source.getParcelable(RuntimeKeys.INTENT_PAYLOAD_FD);
+        if (descriptor != null) extras.putParcelable(RuntimeKeys.INTENT_PAYLOAD_FD, descriptor);
+        if (source.containsKey(RuntimeKeys.INTENT_PAYLOAD_BYTES)) {
+            extras.putInt(RuntimeKeys.INTENT_PAYLOAD_BYTES,
+                    source.getInt(RuntimeKeys.INTENT_PAYLOAD_BYTES, -1));
         }
     }
 

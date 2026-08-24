@@ -30,7 +30,7 @@ final class GuestPendingIntentDispatcher implements PendingIntentFrameworkInterc
         if (record.spec().kind() == VirtualPendingIntentRegistry.Kind.ACTIVITY_RESULT) {
             return dispatchActivityResult(record, intent, sendRequest);
         }
-        Bundle request = spec.toBundle();
+        Bundle request = spec.toRuntimeRequestBundle();
         applyIntent(request, intent, record.spec().kind());
         request.putString("pendingIntentSenderId", record.persistentTokenId());
         request.putInt("pendingIntentRequestCode", record.spec().requestCode());

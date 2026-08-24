@@ -74,7 +74,7 @@ final class GuestRuntimeBrokerBridge {
     }
 
     Bundle baseRequest() {
-        Bundle request = spec.toBundle();
+        Bundle request = spec.toRuntimeRequestBundle();
         request.putString(RuntimeKeys.CALLER_PACKAGE_NAME, spec.packageName);
         request.putInt(RuntimeKeys.CALLER_VIRTUAL_USER_ID, spec.virtualUserId);
         request.putInt(RuntimeKeys.CALLER_VIRTUAL_UID, spec.virtualUid);

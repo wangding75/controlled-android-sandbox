@@ -152,7 +152,7 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
             CallerGuard.requireOwningApplication(BaseIsolatedGuestProcessService.this);
             try {
                 validateRequest(request, "STATUS_ISOLATED_SERVICE", true);
-                Bundle status = GuestRuntimeEnvironment.status();
+                Bundle status = GuestRuntimeEnvironment.diagnosticStatus();
                 status.putBoolean(RuntimeKeys.ISOLATED_PROCESS, true);
                 status.putInt(RuntimeKeys.ISOLATED_PLATFORM_PID, Process.myPid());
                 status.putInt(RuntimeKeys.ISOLATED_PLATFORM_UID, Process.myUid());

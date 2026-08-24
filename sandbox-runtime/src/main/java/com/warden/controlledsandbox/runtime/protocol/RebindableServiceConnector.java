@@ -49,6 +49,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     private final BinderAdapter<T> adapter;
     private final ServiceCloser<T> closer;
     private final String serviceName;
+    private final int bindingFlags;
     private final long timeoutMs;
     private final long initialRetryMs;
     private final long maxRetryMs;
@@ -67,7 +68,25 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
 
     public RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName) {
-        this(context, intent, adapter, closer, serviceName,
+        this(context, intent, adapter, closer, serviceName, Context.BIND_AUTO_CREATE,
+                DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS, () -> { });
+    }
+
+    /**
+     * Creates a connector with an explicit Android binding importance policy.
+     *
+     * <p>The default remains {@link Context#BIND_AUTO_CREATE}. Long-lived authority clients may
+     * opt into {@link Context#BIND_IMPORTANT} and {@link Context#BIND_ABOVE_CLIENT} when a live
+     * virtual session owns the capability.
+     * This is the Android-side process-lifetime lease corresponding to the NBB/VA process record:
+     * the authority must not fall to a cached service-B process merely because its Broker client
+     * has no visible Activity. These flags change process importance only; they do not retry a
+     * failed operation or extend an operation deadline.</p>
+     */
+    public RebindableServiceConnector(Context context, Intent intent,
+            BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
+            int bindingFlags) {
+        this(context, intent, adapter, closer, serviceName, bindingFlags,
                 DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS, () -> { });
     }
 
@@ -79,7 +98,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     public RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
             Runnable invalidationListener) {
-        this(context, intent, adapter, closer, serviceName,
+        this(context, intent, adapter, closer, serviceName, Context.BIND_AUTO_CREATE,
                 DEFAULT_TIMEOUT_MS, DEFAULT_INITIAL_RETRY_MS, DEFAULT_MAX_RETRY_MS,
                 invalidationListener);
     }
@@ -87,7 +106,8 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     RebindableServiceConnector(Context context, Intent intent,
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
             long timeoutMs, long initialRetryMs, long maxRetryMs) {
-        this(context, intent, adapter, closer, serviceName, timeoutMs, initialRetryMs,
+        this(context, intent, adapter, closer, serviceName, Context.BIND_AUTO_CREATE,
+                timeoutMs, initialRetryMs,
                 maxRetryMs, () -> { });
     }
 
@@ -95,11 +115,23 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
             long timeoutMs, long initialRetryMs, long maxRetryMs,
             Runnable invalidationListener) {
+        this(context, intent, adapter, closer, serviceName, Context.BIND_AUTO_CREATE,
+                timeoutMs, initialRetryMs, maxRetryMs, invalidationListener);
+    }
+
+    private RebindableServiceConnector(Context context, Intent intent,
+            BinderAdapter<T> adapter, ServiceCloser<T> closer, String serviceName,
+            int bindingFlags, long timeoutMs, long initialRetryMs, long maxRetryMs,
+            Runnable invalidationListener) {
         this.context = Objects.requireNonNull(context, "context").getApplicationContext();
         this.intent = Objects.requireNonNull(intent, "intent");
         this.adapter = Objects.requireNonNull(adapter, "adapter");
         this.closer = closer == null ? ignored -> { } : closer;
         this.serviceName = required(serviceName, "serviceName");
+        if ((bindingFlags & Context.BIND_AUTO_CREATE) == 0) {
+            throw new IllegalArgumentException("Binder connector requires BIND_AUTO_CREATE");
+        }
+        this.bindingFlags = bindingFlags;
         this.invalidationListener = invalidationListener == null ? () -> { }
                 : invalidationListener;
         if (timeoutMs <= 0L || initialRetryMs < 0L || maxRetryMs < initialRetryMs) {
@@ -315,7 +347,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     private void start(Attempt target) {
         boolean bound;
         try {
-            bound = context.bindService(intent, target.connection, Context.BIND_AUTO_CREATE);
+            bound = context.bindService(intent, target.connection, bindingFlags);
         } catch (RuntimeException error) {
             failAttempt(target.epoch, target, "BIND_EXCEPTION", error, true);
             return;

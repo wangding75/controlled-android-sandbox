@@ -35,6 +35,8 @@ public abstract class StubActivityBase extends Activity {
     private String sessionId = "";
     private long generation;
     private String activityToken = "";
+    private String requestId = "";
+    private String operationId = "";
     private final Deque<Bundle> activityEvents = new ArrayDeque<>();
     private boolean activityEventInFlight;
     private boolean destroying;
@@ -43,6 +45,8 @@ public abstract class StubActivityBase extends Activity {
     private Bundle pendingRouteState;
     private boolean guestCreationPosted;
     private boolean windowEvidenceEmitted;
+    private boolean firstFrameListenerInstalled;
+    private boolean firstFrameReported;
     private final StubActivityWindowOwnership windowOwnership = new StubActivityWindowOwnership();
     private StubActivityWindowOwnership.Lease ownerLease;
     private boolean windowRecoveryRequired;
@@ -132,6 +136,8 @@ public abstract class StubActivityBase extends Activity {
             GuestRuntimeEnvironment.Session session = GuestRuntimeEnvironment.require(spec.sessionId, spec.generation);
             guestSession = session;
             activityToken = route.getString(RuntimeKeys.ACTIVITY_TOKEN, "");
+            requestId = route.getString(RuntimeKeys.REQUEST_ID, "");
+            operationId = route.getString(RuntimeKeys.OPERATION_ID, "");
             int taskId = route.getInt(RuntimeKeys.TASK_ID, 0);
             frameworkActivityToken = ActivityFieldBridge.hostToken(this);
             logActivityRecordMapping(route.getString(RuntimeKeys.ROUTE_TOKEN, ""),
@@ -383,6 +389,8 @@ public abstract class StubActivityBase extends Activity {
         request.putLong(RuntimeKeys.GENERATION, generation);
         request.putString(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
         request.putString(RuntimeKeys.ACTIVITY_EVENT, event);
+        request.putString(RuntimeKeys.REQUEST_ID, requestId);
+        request.putString(RuntimeKeys.OPERATION_ID, operationId);
         android.view.View decor = getWindow() == null ? null : getWindow().getDecorView();
         request.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
         request.putBoolean("windowAddedMarker", windowAddedMarker());
@@ -569,8 +577,42 @@ public abstract class StubActivityBase extends Activity {
         if (decor.isAttachedToWindow() || registered) {
             windowOwnership.attach(currentOwner, identity);
             emitWindowEvidenceIfNeeded(decor, registered);
+            observeFirstFrame(decor);
         }
         logWindowEvent("STUB_WINDOW_STATE", windowOwnership.stage().name());
+    }
+
+    /**
+     * The legacy Stub path still owns the physical window on Android/OEM builds that do not
+     * dispatch the Guest object through ActivityThread Instrumentation.  Report a real draw from
+     * that window so the launch gate has the same FIRST_FRAME_DRAWN witness as the framework path.
+     */
+    private void observeFirstFrame(android.view.View decor) {
+        if (decor == null || firstFrameListenerInstalled || destroying) return;
+        android.view.ViewTreeObserver observer = decor.getViewTreeObserver();
+        if (!observer.isAlive()) return;
+        firstFrameListenerInstalled = true;
+        android.view.ViewTreeObserver.OnDrawListener listener =
+                new android.view.ViewTreeObserver.OnDrawListener() {
+            @Override public void onDraw() {
+                if (firstFrameReported || destroying) return;
+                firstFrameReported = true;
+                Bundle details = new Bundle();
+                details.putBoolean("firstFrameDrawn", true);
+                details.putBoolean("windowAttached", decor.isAttachedToWindow());
+                details.putBoolean("windowRegistered", isWindowRegistered(decor));
+                details.putInt("firstFrameWidth", decor.getWidth());
+                details.putInt("firstFrameHeight", decor.getHeight());
+                enqueueActivityEvent("FIRST_FRAME_DRAWN", details);
+                try {
+                    android.view.ViewTreeObserver current = decor.getViewTreeObserver();
+                    if (current.isAlive()) current.removeOnDrawListener(this);
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                }
+            }
+        };
+        observer.addOnDrawListener(listener);
     }
 
     private void emitWindowEvidenceIfNeeded(android.view.View decor, boolean registered) {

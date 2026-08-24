@@ -255,7 +255,7 @@ final class PendingIntentFrameworkInterceptor implements FrameworkCallIntercepto
         try {
             IRuntimeBroker broker = IRuntimeBroker.Stub.asInterface(spec.runtimeBrokerBinder);
             if (broker == null) throw new IllegalStateException("RUNTIME_BROKER_BINDER_UNAVAILABLE");
-            Bundle request = spec.toBundle();
+            Bundle request = spec.toRuntimeRequestBundle();
             request.putString(ComponentOperations.OPERATION,
                     ComponentOperations.CREATE_PENDING_INTENT_SENDER);
             request.putString(RuntimeKeys.PENDING_INTENT_TOKEN_ID, tokenId);
