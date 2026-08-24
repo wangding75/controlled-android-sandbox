@@ -1,0 +1,29 @@
+{
+  "task": "C4-R03",
+  "status": "IN_PROGRESS",
+  "startedAt": "2026-08-24T14:46:10+08:00",
+  "baselineCommit": "3b042808eb0c1d63bfc5fea30e27e6e3725b3f16",
+  "ledgerNextTask": "C4-R03",
+  "previousTask": "C4-R02",
+  "branch": "feature/t57-r03-va-pro-capability-campaign",
+  "gitIdentity": {"name": "OpenAI", "email": "openai@users.noreply.github.com"},
+  "device": {
+    "instanceName": "RD测试",
+    "resolvedByName": true,
+    "adbSerial": "127.0.0.1:16416",
+    "model": "22041211A",
+    "api": "32",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "bootId": "d09f0f79-058d-42af-924c-3a99f1429ea4",
+    "androidId": "398eea33120cd887"
+  },
+  "preflight": {
+    "status": "PASS",
+    "nextTask": "C4-R03",
+    "firstReadyPending": "C4-R03",
+    "localRemoteHeadMatch": true,
+    "unexpectedHardcodedSerials": []
+  },
+  "scope": ["launch readiness", "window contract", "first-frame evidence"],
+  "excluded": ["C4-R04 fail-closed runner", "C4-R05 closure", "C6", "OEM adaptation"]
+}

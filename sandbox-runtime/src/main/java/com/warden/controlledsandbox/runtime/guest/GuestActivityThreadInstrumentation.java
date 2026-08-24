@@ -136,13 +136,16 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             Launch launch = new Launch(route.token, consumedActivityToken,
                     consumedSessionId, consumedGeneration, consumedTaskId, component, guestIntent,
                     restoredState, restoredPersistableState,
-                    consumed.getLong(RuntimeKeys.SAVED_STATE_VERSION, 0L));
+                    consumed.getLong(RuntimeKeys.SAVED_STATE_VERSION, 0L),
+                    consumed.getString(RuntimeKeys.REQUEST_ID, ""),
+                    consumed.getString(RuntimeKeys.OPERATION_ID, ""));
             launch.physicalActivityComponent = route.physicalActivityComponent;
             launches.put(guest, launch);
             Bundle evidence = evidence(route, guest);
             evidence.putBoolean("restoredStatePresent", restoredState != null);
             evidence.putBoolean("restoredPersistableStatePresent", restoredPersistableState != null);
             RuntimeEventLog.event("GUEST_ACTIVITY_FRAMEWORK_INSTANTIATED", evidence);
+            emit(guest, launch, "GUEST_READY", new Bundle());
             return guest;
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
@@ -415,6 +418,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         ActivityFieldBridge.repairFrameworkWindowBeforeResume(activity);
         ActivityFieldBridge.ensureWindowPublishedAfterResume(activity);
         emit(activity, route, "RESUMED", new Bundle());
+        observeFirstFrame(activity, route);
         }
     }
 
@@ -1016,6 +1020,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         request.putString(RuntimeKeys.ACTIVITY_TOKEN, route.activityToken);
         request.putString(RuntimeKeys.ACTIVITY_EVENT, event);
         request.putString(RuntimeKeys.COMPONENT_CLASS, route.component);
+        request.putString(RuntimeKeys.REQUEST_ID, route.requestId);
+        request.putString(RuntimeKeys.OPERATION_ID, route.operationId);
         Bundle evidence;
         try {
             evidence = ActivityFieldBridge.frameworkEvidence(activity);
@@ -1042,6 +1048,42 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 android.util.Log.e("CS_FRAMEWORK_ACTIVITY", "event dispatch failed", error);
             }
         });
+    }
+
+    private void observeFirstFrame(Activity activity, Launch route) {
+        if (activity == null || route == null || route.firstFrameListenerInstalled) return;
+        android.view.Window window = activity.getWindow();
+        android.view.View decor = window == null ? null : window.getDecorView();
+        if (decor == null) {
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "FIRST_FRAME_LISTENER_UNAVAILABLE decor=null");
+            return;
+        }
+        android.view.ViewTreeObserver observer = decor.getViewTreeObserver();
+        if (!observer.isAlive()) {
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "FIRST_FRAME_LISTENER_UNAVAILABLE observer=dead");
+            return;
+        }
+        route.firstFrameListenerInstalled = true;
+        android.view.ViewTreeObserver.OnDrawListener listener = new android.view.ViewTreeObserver.OnDrawListener() {
+            @Override public void onDraw() {
+                if (route.firstFrameReported) return;
+                route.firstFrameReported = true;
+                Bundle details = new Bundle();
+                details.putBoolean("firstFrameDrawn", true);
+                details.putBoolean("windowAttached", decor.isAttachedToWindow());
+                details.putBoolean("windowRegistered", true);
+                details.putInt("firstFrameWidth", decor.getWidth());
+                details.putInt("firstFrameHeight", decor.getHeight());
+                emit(activity, route, "FIRST_FRAME_DRAWN", details);
+                try {
+                    android.view.ViewTreeObserver current = decor.getViewTreeObserver();
+                    if (current.isAlive()) current.removeOnDrawListener(this);
+                } catch (Throwable error) {
+                    com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                }
+            }
+        };
+        observer.addOnDrawListener(listener);
     }
 
     private static Bundle evidence(Launch route, Activity activity) {
@@ -1142,18 +1184,23 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         final Intent intent;
         final Bundle restoredState;
         final PersistableBundle restoredPersistableState;
+        final String requestId;
+        final String operationId;
         long savedStateVersion;
         boolean restoreCallbacksDispatched;
+        boolean firstFrameListenerInstalled;
+        boolean firstFrameReported;
 
         Launch(String token, String activityToken, String sessionId, long generation,
                int taskId, String component, Intent intent) {
             this(token, activityToken, sessionId, generation, taskId, component, intent,
-                    null, null, 0L);
+                    null, null, 0L, "", "");
         }
 
         Launch(String token, String activityToken, String sessionId, long generation,
                int taskId, String component, Intent intent, Bundle restoredState,
-               PersistableBundle restoredPersistableState, long savedStateVersion) {
+               PersistableBundle restoredPersistableState, long savedStateVersion,
+               String requestId, String operationId) {
             this.token = token;
             this.activityToken = activityToken == null ? "" : activityToken;
             this.sessionId = sessionId;
@@ -1163,6 +1210,8 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             this.intent = intent;
             this.restoredState = restoredState;
             this.restoredPersistableState = restoredPersistableState;
+            this.requestId = requestId == null ? "" : requestId;
+            this.operationId = operationId == null ? "" : operationId;
             this.savedStateVersion = Math.max(0L, savedStateVersion);
         }
 

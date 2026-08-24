@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import android.os.Bundle;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -18,22 +19,55 @@ public final class GuestLaunchObservation {
     private boolean created;
     private boolean resumed;
     private boolean windowEvidence;
+    private boolean firstFrameDrawn;
     private boolean observed;
     private int fatalCount;
     private int anrCount;
     private boolean stubPresent = true;
     private boolean guestProcessPresent = true;
     private String failure = "";
+    private final String requestId;
+    private final String operationId;
+    private final long acceptedAtElapsedMs;
+    private final ArrayList<String> timeline = new ArrayList<>();
 
     public GuestLaunchObservation(String activityToken, String componentClass) {
+        this(activityToken, componentClass, "", "");
+    }
+
+    public GuestLaunchObservation(String activityToken, String componentClass,
+                                  String requestId, String operationId) {
+        this(activityToken, componentClass, requestId, operationId,
+                android.os.SystemClock.elapsedRealtime());
+    }
+
+    public GuestLaunchObservation(String activityToken, String componentClass,
+                                  String requestId, String operationId,
+                                  long acceptedAtElapsedMs) {
         this.activityToken = activityToken == null ? "" : activityToken;
         this.componentClass = componentClass == null ? "" : componentClass.trim();
         this.launcherResolved = !this.componentClass.isEmpty();
+        this.requestId = requestId == null ? "" : requestId.trim();
+        this.operationId = operationId == null ? "" : operationId.trim();
+        this.acceptedAtElapsedMs = acceptedAtElapsedMs > 0L
+                ? acceptedAtElapsedMs : android.os.SystemClock.elapsedRealtime();
+        timeline.add("REQUEST_ACCEPTED@" + this.acceptedAtElapsedMs);
     }
 
     public synchronized void onActivityEvent(Bundle request) {
         if (request == null) return;
         String event = request.getString(RuntimeKeys.ACTIVITY_EVENT, "");
+        String eventRequestId = request.getString(RuntimeKeys.REQUEST_ID, "");
+        String eventOperationId = request.getString(RuntimeKeys.OPERATION_ID, "");
+        if ((!requestId.isEmpty() && !requestId.equals(eventRequestId))
+                || (!operationId.isEmpty() && !operationId.equals(eventOperationId))) {
+            failure = "LAUNCH_CORRELATION_MISMATCH";
+        }
+        String stage = "GUEST_READY".equals(event) ? "GUEST_READY"
+                : "RESUMED".equals(event) ? "ACTIVITY_RESUMED"
+                : "FIRST_FRAME_DRAWN".equals(event) ? "FIRST_FRAME_DRAWN"
+                : "LIFECYCLE_" + event;
+        timeline.add(stage + "@" + android.os.SystemClock.elapsedRealtime());
         if (request.getBoolean("windowAttached", false)
                 || request.getBoolean("windowAddedMarker", false)
                 || request.getBoolean("windowRegistered", false)
@@ -57,6 +91,12 @@ public final class GuestLaunchObservation {
             attached = true;
             created = true;
             resumed = true;
+        } else if ("GUEST_READY".equals(event)) {
+            classLoaded = true;
+            instantiated = true;
+        } else if ("FIRST_FRAME_DRAWN".equals(event)) {
+            firstFrameDrawn = true;
+            windowEvidence = true;
         } else if ("FAILED".equals(event)) {
             fatalCount++;
             failure = request.getString(RuntimeKeys.ERROR_MESSAGE, event);
@@ -83,7 +123,7 @@ public final class GuestLaunchObservation {
     private boolean passedLocked() {
         return launcherResolved && classLoaded && instantiated && attached && created
                 && resumed && windowEvidence && fatalCount == 0 && anrCount == 0
-                && failure.isEmpty();
+                && firstFrameDrawn && failure.isEmpty();
     }
 
     private void finishLocked() {
@@ -93,7 +133,9 @@ public final class GuestLaunchObservation {
 
     private GuestLaunchEvidence evidenceLocked() {
         return new GuestLaunchEvidence(prepared, launcherResolved, classLoaded, instantiated,
-                attached, created, resumed, windowEvidence, observed, fatalCount, anrCount,
-                stubPresent, guestProcessPresent, failure);
+                attached, created, resumed, windowEvidence, firstFrameDrawn, observed,
+                fatalCount, anrCount, stubPresent, guestProcessPresent, failure, timeline);
     }
+
+    public long acceptedAtElapsedMs() { return acceptedAtElapsedMs; }
 }

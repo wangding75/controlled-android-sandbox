@@ -8,19 +8,19 @@ public final class GuestLaunchGateSelfTest {
         require(!GuestLaunchGate.isLaunchPass(GuestLaunchGate.prepareStatus(true)),
                 "PREPARE_PASS is not LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
-                        evidence(true, false, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
+                        evidence(true, false, false, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
                 "prepared process without Activity is not LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
-                        evidence(true, true, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
+                        evidence(true, true, false, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
                 "stub/process presence is not LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_PENDING.equals(GuestLaunchGate.evaluate(
-                        evidence(true, true, true, true, true, true, true, true, false, 0, 0, true, true, ""))),
+                        evidence(true, true, true, true, true, true, true, true, false, false, 0, 0, true, true, ""))),
                 "observation window must complete");
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(
-                        evidence(true, true, true, true, true, true, true, true, true, 0, 0, true, true, ""))),
+                        evidence(true, true, true, true, true, true, true, true, true, true, 0, 0, true, true, ""))),
                 "full real Activity evidence is LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
-                        evidence(true, true, true, true, true, true, true, true, true, 1, 0, true, true, "fatal"))),
+                        evidence(true, true, true, true, true, true, true, true, true, true, 1, 0, true, true, "fatal"))),
                 "FATAL rejects LAUNCH_PASS");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
                         evidence(true, true, true, true, true, true, true, true, true, 0, 1, true, true, ""))),
@@ -35,6 +35,10 @@ public final class GuestLaunchGateSelfTest {
         resumed.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
         resumed.putBoolean("windowAttached", true);
         live.onActivityEvent(resumed);
+        Bundle firstFrame = new Bundle();
+        firstFrame.putString(RuntimeKeys.ACTIVITY_EVENT, "FIRST_FRAME_DRAWN");
+        firstFrame.putBoolean("windowAttached", true);
+        live.onActivityEvent(firstFrame);
         GuestLaunchEvidence pass = live.close();
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(pass)),
                 "CREATED+RESUMED+window is LAUNCH_PASS");
@@ -50,6 +54,10 @@ public final class GuestLaunchGateSelfTest {
         window.putString(RuntimeKeys.ACTIVITY_EVENT, "WINDOW");
         window.putBoolean("windowAttached", true);
         delayedWindow.onActivityEvent(window);
+        Bundle delayedFrame = new Bundle();
+        delayedFrame.putString(RuntimeKeys.ACTIVITY_EVENT, "FIRST_FRAME_DRAWN");
+        delayedFrame.putBoolean("windowAttached", true);
+        delayedWindow.onActivityEvent(delayedFrame);
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(delayedWindow.close())),
                 "window evidence may arrive after resume");
 
@@ -65,11 +73,13 @@ public final class GuestLaunchGateSelfTest {
 
     private static GuestLaunchEvidence evidence(boolean prepared, boolean launcher, boolean loaded,
                                                 boolean instantiated, boolean attached, boolean created,
-                                                boolean resumed, boolean window, boolean observed,
+                                                boolean resumed, boolean window, boolean firstFrame,
+                                                boolean observed,
                                                 int fatal, int anr, boolean stub, boolean process,
                                                 String failure) {
         return new GuestLaunchEvidence(prepared, launcher, loaded, instantiated, attached, created,
-                resumed, window, observed, fatal, anr, stub, process, failure);
+                resumed, window, firstFrame, observed, fatal, anr, stub, process, failure,
+                new java.util.ArrayList<>());
     }
 
     private static void require(boolean condition, String label) {

@@ -85,6 +85,7 @@ public final class DebugCommandActivity extends Activity {
                          boolean trustNativeGuest, Bundle extras, String requestId) {
         requestId = requestId == null || requestId.trim().isEmpty()
                 ? UUID.randomUUID().toString() : requestId.trim();
+        String operationId = requestId + "-launch";
         JSONObject result = new JSONObject();
         RuntimeClient runtime = null;
         PackageServiceClient packages = null;
@@ -92,6 +93,7 @@ public final class DebugCommandActivity extends Activity {
             result.put("command", command).put("package", packageName)
                     .put("virtualUserId", virtualUserId).put("trustNativeGuest", trustNativeGuest)
                     .put("requestId", requestId)
+                    .put("operationId", operationId)
                     .put("startedAt", System.currentTimeMillis());
             if ("native-hostile".equals(command) || "c3-t04-hostile".equals(command)) {
                 JSONObject campaign = HostileProductionCampaign.run(this);
@@ -407,7 +409,7 @@ public final class DebugCommandActivity extends Activity {
                 requireStatus("provider-concurrent-campaign", operation,
                         "PROVIDER_CAMPAIGN_PASS");
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
-                operation = runtime.launch(record, virtualUserId);
+                operation = runtime.launch(record, virtualUserId, requestId, operationId);
                 requireStatus("launch", operation, "LAUNCH_PASS");
             } else if ("package-state-campaign".equals(command)) {
                 operation = packageStateCampaign(packages, record, packageName, virtualUserId);
@@ -1434,6 +1436,18 @@ public final class DebugCommandActivity extends Activity {
         copyIfPresent(bundle, out, "isolatedPlatformUid");
         copyIfPresent(bundle, out, "processName");
         copyIfPresent(bundle, out, "componentClass");
+        copyIfPresent(bundle, out, RuntimeKeys.REQUEST_ID);
+        copyIfPresent(bundle, out, RuntimeKeys.OPERATION_ID);
+        copyIfPresent(bundle, out, RuntimeKeys.ATTEMPT);
+        copyIfPresent(bundle, out, RuntimeKeys.RETRY_BUDGET);
+        copyIfPresent(bundle, out, RuntimeKeys.AUTOMATIC_RETRY_PERFORMED);
+        copyIfPresent(bundle, out, "activityCreated");
+        copyIfPresent(bundle, out, "activityResumed");
+        copyIfPresent(bundle, out, "windowEvidence");
+        copyIfPresent(bundle, out, "firstFrameDrawn");
+        copyIfPresent(bundle, out, "launchReadinessElapsedMs");
+        copyIfPresent(bundle, out, RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS);
+        copyIfPresent(bundle, out, "launchTimeline");
         copyIfPresent(bundle, out, "startId");
         copyIfPresent(bundle, out, "created");
         copyIfPresent(bundle, out, "accepted");

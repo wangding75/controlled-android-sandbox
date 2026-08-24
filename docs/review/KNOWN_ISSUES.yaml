@@ -1367,6 +1367,8 @@ issues:
       - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
       - tools/capability/run_c4_t05_rd.py
       - verification/catch-up/C4-T05/c4-t05-rd-summary.json
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
     match_patterns:
       - LAUNCH_PASS
       - GUEST_ACTIVITY_CREATE
@@ -1394,6 +1396,8 @@ issues:
       - app/src/main/java/com/warden/controlledsandbox/SandboxViewModel.java
       - verification/catch-up/C4-R01/c4-r01-rd-summary.json
       - docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
     match_patterns:
       - timed out
       - service unavailable
@@ -1402,10 +1406,11 @@ issues:
     fix_policy: C4_R01_REQUEST_TIMELINE_THEN_C4_R03_READINESS_DEADLINES
     notes: >
       C4-R01 preserved a current one-shot LAUNCH_GATE_FAILED after 43729 ms with all
-      device snapshots and retry budget zero. The debug request ID is not propagated
-      through queue, import, catalog, bind, prepare, attach, Activity, window, and draw,
-      so the first exhausted internal phase remains unprovable. Owner stays CAS generic
-      launch readiness; C4-R03 must add the phase contract. Status remains RECORDED.
+      device snapshots and retry budget zero. C4-R03 now adds a request-scoped phase timeline;
+      fixture and Fanqie smoke traces reach FIRST_FRAME_DRAWN, while the commercial first
+      failures are classified at the CAS Intent/Binder boundary. The required commercial
+      matrix remains unproven, so owner stays CAS generic launch readiness and status remains
+      RECORDED.
 
   - issue_id: KI-R03-055
     title: Hongguo and Fanqie Novel throw while Quark can be added
@@ -1424,6 +1429,8 @@ issues:
       - verification/catch-up/C4-R02/rd-acceptance/summary.json
       - verification/catch-up/C4-R02/rd-acceptance/first-attempt-com.phoenix.read.json
       - verification/catch-up/C4-R02/rd-acceptance/first-attempt-com.dragon.read.json
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
     match_patterns:
       - Hongguo
       - Fanqie Novel
@@ -1441,7 +1448,10 @@ issues:
       and Fanqie; all 272 product operations succeeded with no install residue. Owner
       was CAS generic import compatibility and is FIXED for import compatibility. Whether
       either mixed payload is requested by the app runtime loader remains pending for
-      C4-R03 launch validation; this issue does not close runtime compatibility.
+      C4-R03 launch validation now shows a mixed runtime result: Fanqie user0 cold/hot reached
+      FIRST_FRAME_DRAWN once, while Quark, Hongguo and DingTalk hit a CAS oversized Intent
+      transaction after import success. This issue remains FIXED only for import compatibility;
+      it does not close runtime compatibility or permit Quark to stand in for the other samples.
 
   - issue_id: KI-R03-056
     title: C4 retries and fixed sleeps can hide the first failure and encourage guess-driven fixes
@@ -1463,6 +1473,8 @@ issues:
       - verification/catch-up/C4-R02/rd-acceptance/death-recovery/report.json
       - verification/catch-up/C4-R02/rd-acceptance/negative-rollback.json
       - verification/catch-up/C4-R02/rd-acceptance/negative-rollback-first-observation.json
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
     match_patterns:
       - stopSoft
       - killSettled
@@ -1479,4 +1491,43 @@ issues:
       recovery each used attempt 1 with retry budget 0. A first negative-probe assertion
       was preserved as HARNESS_ASSERTION_FALSE_NEGATIVE and corrected from the authoritative
       nested errorMessage. The old C4 launch retry and fail-closed gate remain C4-R04 work;
-      status remains RECORDED and blocking.
+      status remains RECORDED and blocking. C4-R03 first failures all retained attempt=1,
+      retryBudget=0 and automaticRetryPerformed=false; no failed launch was hidden by a
+      second attempt.
+
+  - issue_id: KI-R03-057
+    title: C4 commercial launch hits oversized Guest-to-Broker Intent transaction before first frame
+    capability: activity_framework
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R03 RD launch readiness 2026-08-24
+    evidence:
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - verification/catch-up/C4-R03/rd-acceptance/summary.json
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeIntentWireCodec.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/protocol/RuntimeOperationTransport.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeBrokerBridge.java
+      - artifacts/capability-audit/catch-up-c4-r03/dingtalk-after-event-fix-20260824T1635
+      - artifacts/capability-audit/catch-up-c4-r03/quark-after-event-fix-20260824T1700
+      - artifacts/capability-audit/catch-up-c4-r03/hongguo-after-event-fix-20260824T1715
+    match_patterns:
+      - TransactionTooLargeException
+      - data parcel size 270596 bytes
+      - data parcel size 283304 bytes
+      - data parcel size 308616 bytes
+      - IRuntimeBroker.executeV2
+      - FIRST_FRAME_DRAWN
+    blocks_current_campaign: true
+    fix_policy: C4_R03_BOUNDED_INTENT_TRANSPORT_THEN_C4_R04_FAIL_CLOSED
+    notes: >
+      C4-R02 import/catalog succeeded, but first cold launch failed for DingTalk (270596 bytes),
+      Quark (283304 bytes), and Hongguo (308616 bytes) before FIRST_FRAME_DRAWN. Quark's
+      logcat stack identifies Guest Activity.startActivity -> GuestRuntimeBrokerBridge ->
+      RuntimeOperationTransport -> IRuntimeBroker.executeV2. RuntimeIntentWireCodec drops an
+      oversized complete wire payload but still copies Intent extras into the top-level
+      RuntimeOperationRequest Bundle, unlike NBB/VA's broker-owned ActivityRecord/Stub shadow
+      Intent boundary. Owner is confirmed CAS generic Activity/Intent transport; no evidence
+      assigns this to SX/UI. Fanqie user0 cold/hot passed once and remains insufficient for
+      the required matrix. A bounded generation/session-bound payload handle or equivalent
+      broker-owned record is required; do not retry, sleep, or silently truncate payloads.

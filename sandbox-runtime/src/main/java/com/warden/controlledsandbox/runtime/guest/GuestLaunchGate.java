@@ -23,7 +23,7 @@ public final class GuestLaunchGate {
         if (!evidence.launcherResolved || !evidence.targetClassLoaded
                 || !evidence.activityInstantiated || !evidence.activityAttached
                 || !evidence.onCreateCompleted || !evidence.resumed
-                || !evidence.windowEvidence) {
+                || !evidence.windowEvidence || !evidence.firstFrameDrawn) {
             return evidence.observationCompleted ? LAUNCH_FAILED : LAUNCH_PENDING;
         }
         if (!evidence.observationCompleted) return LAUNCH_PENDING;

@@ -62,7 +62,12 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle launch(SandboxRecord record) throws Exception { return launch(record, 0); }
     Bundle launch(SandboxRecord record, int virtualUserId) throws Exception {
-        Bundle request = request(record, virtualUserId, record.launchProcess);
+        return launch(record, virtualUserId, "", "");
+    }
+    Bundle launch(SandboxRecord record, int virtualUserId, String requestId,
+                  String operationId) throws Exception {
+        Bundle request = request(record, virtualUserId, record.launchProcess,
+                requestId, operationId);
         return companionRoute(record)
                 ? nativeCompanion.launchActivity(record, virtualUserId, request)
                 : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
@@ -272,6 +277,11 @@ final class RuntimeClient implements AutoCloseable {
     }
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName) throws Exception {
+        return request(record, virtualUserId, processName, "", "");
+    }
+
+    private Bundle request(SandboxRecord record, int virtualUserId, String processName,
+                           String requestId, String operationId) throws Exception {
         NativeGuestExecutionPolicy.requireRuntimeAllowed(record);
         VirtualPackageStateSnapshot packageState = packageService.virtualPackageState(
                 record.packageName, virtualUserId);
@@ -317,6 +327,12 @@ final class RuntimeClient implements AutoCloseable {
         request.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, record.containsNativeCode);
         request.putString(RuntimeKeys.NATIVE_GUEST_TRUST, record.nativeGuestTrust);
         request.putString(RuntimeKeys.NATIVE_EXECUTION_MODE, record.nativeExecutionMode());
+        if (requestId != null && !requestId.trim().isEmpty()) {
+            request.putString(RuntimeKeys.REQUEST_ID, requestId.trim());
+        }
+        if (operationId != null && !operationId.trim().isEmpty()) {
+            request.putString(RuntimeKeys.OPERATION_ID, operationId.trim());
+        }
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.launchActivity);
         ArrayList<String> permissions = new ArrayList<>();

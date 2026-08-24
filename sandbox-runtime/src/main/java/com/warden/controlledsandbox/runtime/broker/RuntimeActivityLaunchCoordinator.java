@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * implicit global router.</p>
  */
 final class RuntimeActivityLaunchCoordinator {
-    private static final long LAUNCH_OBSERVATION_MS = 35_000L;
+    private static final long LAUNCH_OBSERVATION_MS = 30_000L;
 
     private final RuntimeBrokerService owner;
 
@@ -37,6 +37,18 @@ final class RuntimeActivityLaunchCoordinator {
     Bundle launch(Bundle request) {
         owner.startService(new Intent(owner, RuntimeBrokerService.class));
         Bundle routedRequest = request == null ? new Bundle() : new Bundle(request);
+        String requestId = routedRequest.getString(RuntimeKeys.REQUEST_ID, "").trim();
+        if (requestId.isEmpty()) requestId = java.util.UUID.randomUUID().toString();
+        String operationId = routedRequest.getString(RuntimeKeys.OPERATION_ID, "").trim();
+        if (operationId.isEmpty()) operationId = requestId + "-launch";
+        routedRequest.putString(RuntimeKeys.REQUEST_ID, requestId);
+        routedRequest.putString(RuntimeKeys.OPERATION_ID, operationId);
+        routedRequest.putInt(RuntimeKeys.ATTEMPT, 1);
+        routedRequest.putInt(RuntimeKeys.RETRY_BUDGET, 0);
+        routedRequest.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+        long acceptedAtElapsedMs = android.os.SystemClock.elapsedRealtime();
+        routedRequest.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS, acceptedAtElapsedMs);
+        launchStage(requestId, operationId, "REQUEST_ACCEPTED", 0L, routedRequest);
         String callerPackage = routedRequest.getString(RuntimeKeys.PACKAGE_NAME, "");
             String targetPackage = RuntimeBrokerService.targetPackageForRequest(
                     routedRequest, callerPackage);
@@ -78,6 +90,8 @@ final class RuntimeActivityLaunchCoordinator {
 
             BrokerActivityRuntime activityRuntime = owner.activityRuntime;
             Bundle transaction = activityRuntime.launch(session, component, prepared, routedRequest);
+            transaction.putString(RuntimeKeys.REQUEST_ID, requestId);
+            transaction.putString(RuntimeKeys.OPERATION_ID, operationId);
             issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
             boolean frameworkHost = routedRequest.getBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, false);
             Intent launch = new Intent();
@@ -148,7 +162,10 @@ final class RuntimeActivityLaunchCoordinator {
                 nested.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
                 return nested;
             }
-            GuestLaunchObservation observation = new GuestLaunchObservation(activityToken, component);
+            GuestLaunchObservation observation = new GuestLaunchObservation(activityToken, component,
+                    requestId, operationId,
+                    routedRequest.getLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
+                            acceptedAtElapsedMs));
             if (!sessionId.isEmpty()) owner.launchObservations.put(sessionId, observation);
             owner.launchObservations.put(activityToken, observation);
             try {
@@ -167,6 +184,18 @@ final class RuntimeActivityLaunchCoordinator {
             out.putBoolean("activityCreated", evidence.onCreateCompleted);
             out.putBoolean("activityResumed", evidence.resumed);
             out.putBoolean("windowEvidence", evidence.windowEvidence);
+            out.putBoolean("firstFrameDrawn", evidence.firstFrameDrawn);
+            out.putStringArrayList("launchTimeline", evidence.timeline);
+            out.putLong("launchReadinessElapsedMs",
+                    Math.max(0L, android.os.SystemClock.elapsedRealtime()
+                            - observation.acceptedAtElapsedMs()));
+            out.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
+                    observation.acceptedAtElapsedMs());
+            out.putString(RuntimeKeys.REQUEST_ID, requestId);
+            out.putString(RuntimeKeys.OPERATION_ID, operationId);
+            out.putInt(RuntimeKeys.ATTEMPT, 1);
+            out.putInt(RuntimeKeys.RETRY_BUDGET, 0);
+            out.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
             out.putInt("fatalCount", evidence.fatalCount);
             out.putInt("anrCount", evidence.anrCount);
             if (GuestLaunchGate.LAUNCH_FAILED.equals(gate)) {
@@ -183,6 +212,16 @@ final class RuntimeActivityLaunchCoordinator {
             }
             return RuntimeBrokerService.failure(error);
         }
+    }
+
+    private static void launchStage(String requestId, String operationId, String stage,
+                                    long stageElapsedMs, Bundle source) {
+        Bundle details = source == null ? new Bundle() : new Bundle(source);
+        details.putString(RuntimeKeys.REQUEST_ID, requestId);
+        details.putString(RuntimeKeys.OPERATION_ID, operationId);
+        details.putString(RuntimeKeys.LAUNCH_STAGE, stage);
+        details.putLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, stageElapsedMs);
+        RuntimeEventLog.event("GUEST_LAUNCH_STAGE", details);
     }
 
     private static void copyActivityFrameworkField(Intent target, Bundle source, String key) {

@@ -173,6 +173,16 @@ public final class RuntimeKeys {
     public static final String STATUS = "status";
     public static final String ERROR_TYPE = "errorType";
     public static final String ERROR_MESSAGE = "errorMessage";
+    /** Caller-owned correlation id shared by import, launch and first-frame evidence. */
+    public static final String REQUEST_ID = "requestId";
+    /** Caller-owned operation id for the launch/readiness transaction. */
+    public static final String OPERATION_ID = "operationId";
+    public static final String ATTEMPT = "attempt";
+    public static final String RETRY_BUDGET = "retryBudget";
+    public static final String AUTOMATIC_RETRY_PERFORMED = "automaticRetryPerformed";
+    public static final String LAUNCH_STAGE = "launchStage";
+    public static final String LAUNCH_STAGE_AT_ELAPSED_MS = "launchStageAtElapsedMs";
+    public static final String LAUNCH_ACCEPTED_AT_ELAPSED_MS = "launchAcceptedAtElapsedMs";
 
     public static final String CONNECTION_ID = "connectionId";
     public static final String SERVICE_BIND_FLAGS = "serviceBindFlags";

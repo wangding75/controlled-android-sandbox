@@ -877,10 +877,13 @@ public final class ActivityFieldBridge {
     public static void ensureWindowPublishedAfterResume(Activity activity) {
         if (activity == null) return;
         android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-        handler.post(() -> publishWindowIfMissing(activity, 0));
+        // ActivityThread.handleResumeActivity owns the normal first addView.  This is one
+        // explicit post-resume observation/repair only; repeated delayed addView attempts made
+        // the first failure non-deterministic and could mask a framework black-screen state.
+        handler.post(() -> publishWindowIfMissing(activity));
     }
 
-    private static void publishWindowIfMissing(Activity activity, int attempt) {
+    private static void publishWindowIfMissing(Activity activity) {
         try {
             fixFrameworkWindowIdentity(activity);
             android.view.Window window = activity.getWindow();
@@ -910,7 +913,7 @@ public final class ActivityFieldBridge {
             HostWindowIdentity host = hostWindowIdentity(activity);
             if (host != null) applyHostPackageToLayoutParams(layout, host.packageName);
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
-                    "WINDOW_PUBLISH_ADDVIEW attempt=" + attempt
+                    "WINDOW_PUBLISH_ADDVIEW attempt=1"
                             + " wm=" + windowManager.getClass().getName()
                             + " pkg=" + layout.packageName
                             + " token=" + (layout.token != null)
@@ -928,24 +931,16 @@ public final class ActivityFieldBridge {
             boolean attached = decor.isAttachedToWindow();
             int viewCount = windowManagerViewCount();
             android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
-                    "WINDOW_PUBLISH_AFTER_RESUME attempt=" + attempt
+                    "WINDOW_PUBLISH_AFTER_RESUME attempt=1"
                             + " attached=" + attached
                             + " registered=" + windowRegistration(decor).name()
                             + " parent=" + (decor.getParent() == null ? "null" : decor.getParent().getClass().getName())
                             + " wmgViews=" + viewCount
                             + " activityClass=" + activity.getClass().getName());
-            if (!attached && attempt < 5) {
-                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-                handler.postDelayed(() -> publishWindowIfMissing(activity, attempt + 1), 80L);
-            }
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
-                    "WINDOW_PUBLISH_AFTER_RESUME failed attempt=" + attempt, error);
-            if (attempt < 5) {
-                android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
-                handler.postDelayed(() -> publishWindowIfMissing(activity, attempt + 1), 80L);
-            }
+                    "WINDOW_PUBLISH_AFTER_RESUME failed attempt=1 retryable=false", error);
         }
     }
 

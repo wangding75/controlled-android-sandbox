@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-24 14:39（Asia/Shanghai）
+更新时间：2026-08-24 17:55（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R03`（PENDING）
-下一任务：`C4-R03`
+当前任务：`C4-R03`（BLOCKED）
+下一任务：`C4-R03`（阻断未解除，不推进）
 最后完成任务：`C4-R02`
 
 ## 1. 使用规则
@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | PENDING | C4-R01 | - | - |
+| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | - | §5 C4-R03 |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,11 +82,11 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-056`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-057`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
-C5 已由用户明确排除，完成 C4-R05 后直接进入 C6-T01。
+C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
 
 ## 5. 任务回执
 

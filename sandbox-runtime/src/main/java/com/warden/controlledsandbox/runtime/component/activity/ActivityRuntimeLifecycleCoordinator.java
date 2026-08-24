@@ -81,8 +81,8 @@ final class ActivityRuntimeLifecycleCoordinator {
                 // These are real ActivityThread callbacks, but they do not mutate the virtual
                 // back stack.  Acknowledge them through the same generation/owner fence so a
                 // late callback from a dead process cannot be mistaken for a live Activity.
-                case "RESTORED_STATE", "POST_CREATED", "RESTARTED", "USER_LEAVING",
-                        "MULTI_WINDOW", "PICTURE_IN_PICTURE" ->
+                case "GUEST_READY", "FIRST_FRAME_DRAWN", "RESTORED_STATE", "POST_CREATED",
+                        "RESTARTED", "USER_LEAVING", "MULTI_WINDOW", "PICTURE_IN_PICTURE" ->
                         out.putBoolean("frameworkCallbackAcknowledged", true);
                 case "FINISH_RESULT" -> ledger.finishWithResult(
                         activityToken,
@@ -123,6 +123,7 @@ final class ActivityRuntimeLifecycleCoordinator {
                 || "STOPPED".equals(event) || "SAVE_STATE".equals(event)
                 || "DESTROYED".equals(event) || "NEW_INTENT".equals(event)
                 || "CONFIGURATION".equals(event) || "FINISH_RESULT".equals(event)
+                || "GUEST_READY".equals(event) || "FIRST_FRAME_DRAWN".equals(event)
                 || "RESTORED_STATE".equals(event) || "POST_CREATED".equals(event)
                 || "RESTARTED".equals(event) || "USER_LEAVING".equals(event)
                 || "MULTI_WINDOW".equals(event) || "PICTURE_IN_PICTURE".equals(event)

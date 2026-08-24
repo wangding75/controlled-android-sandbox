@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R03",
+  "status": "BLOCKED",
+  "baselineCommit": "3b042808eb0c1d63bfc5fea30e27e6e3725b3f16",
+  "instanceName": "RD测试",
+  "resolvedByName": true,
+  "adbSerialRecordedOnly": "127.0.0.1:16416",
+  "device": {
+    "model": "22041211A",
+    "api": 32,
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "bootId": "d09f0f79-058d-42af-924c-3a99f1429ea4",
+    "androidId": "398eea33120cd887"
+  },
+  "apkSha256": "0278ADAA13DA8A066423E5351F8FBD751B239F7B7EEB1322080744FD85360B13",
+  "attemptPolicy": {
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "productionColdSloMs": 30000,
+    "productionHotSloMs": 10000,
+    "collectorWaitIsNotProductionDeadline": true
+  },
+  "targets": [
+    {"name":"fixture","package":"com.warden.controlledsandbox.fixture","version":"1.0-fixture","baseCount":1,"splitCount":0,"abi":"arm64-v8a,x86_64","role":"fixture"},
+    {"name":"dingtalk","package":"com.alibaba.android.rimet","version":"7.8.10/1178","baseCount":1,"splitCount":0,"abi":"arm64-v8a","role":"required commercial sample"},
+    {"name":"quark","package":"com.quark.browser","version":"10.10.5.1080/1080","baseCount":1,"splitCount":0,"abi":"arm64-v8a","role":"positive control only"},
+    {"name":"hongguo","package":"com.phoenix.read","version":"7.0.5.33/70533","baseCount":1,"splitCount":0,"abi":"arm64-v8a","role":"independent commercial sample"},
+    {"name":"fanqie","package":"com.dragon.read","version":"7.1.9.32/71932","baseCount":1,"splitCount":0,"abi":"arm64-v8a","role":"independent commercial sample"}
+  ],
+  "positiveEvidence": {
+    "fixture": "artifacts/capability-audit/catch-up-c4-r03/fixture-after-event-fix-20260824T1645",
+    "fanqieUser0ColdHot": "artifacts/capability-audit/catch-up-c4-r03/fanqie-after-event-fix-20260824T1730",
+    "fixtureRows": 4,
+    "fanqieRows": 2,
+    "allRowsHaveFirstFrame": true
+  },
+  "firstFailures": [
+    {
+      "target":"dingtalk",
+      "package":"com.alibaba.android.rimet",
+      "user":0,
+      "mode":"cold",
+      "requestId":"ade67da601b74b9b81c7d6f46c5ce3e3",
+      "operationId":"ade67da601b74b9b81c7d6f46c5ce3e3-launch",
+      "error":"TransactionTooLargeException:data parcel size 270596 bytes",
+      "elapsedMs":68525,
+      "raw":"artifacts/capability-audit/catch-up-c4-r03/dingtalk-after-event-fix-20260824T1635/attempts/dingtalk/user-0/cold-001"
+    },
+    {
+      "target":"quark",
+      "package":"com.quark.browser",
+      "user":0,
+      "mode":"cold",
+      "requestId":"67a3de60be574c7bb97cc5480943297d",
+      "operationId":"67a3de60be574c7bb97cc5480943297d-launch",
+      "error":"TransactionTooLargeException:data parcel size 283304 bytes",
+      "elapsedMs":54882,
+      "raw":"artifacts/capability-audit/catch-up-c4-r03/quark-after-event-fix-20260824T1700/attempts/quark/user-0/cold-001",
+      "stackOwner":"CAS Guest Activity.startActivity -> GuestRuntimeBrokerBridge -> IRuntimeBroker.executeV2"
+    },
+    {
+      "target":"hongguo",
+      "package":"com.phoenix.read",
+      "user":0,
+      "mode":"cold",
+      "requestId":"b3b25112f8e24922b19bff1f590bc258",
+      "operationId":"b3b25112f8e24922b19bff1f590bc258-launch",
+      "error":"TransactionTooLargeException:data parcel size 308616 bytes",
+      "elapsedMs":52826,
+      "raw":"artifacts/capability-audit/catch-up-c4-r03/hongguo-after-event-fix-20260824T1715/attempts/hongguo/user-0/cold-001"
+    }
+  ],
+  "owner": {
+    "confirmed":"CAS generic Activity/Intent transport boundary after import/catalog success; no SX/UI call failure evidence",
+    "pending":"per-package oversized extras source, bounded handle protocol, red-fruit launchable mapping",
+    "quarkIsOnlyPositiveControl":true
+  },
+  "references": {
+    "design":"docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md",
+    "nbbVaMapping":"docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md",
+    "taskbook":"docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
+    "rootPlan":"docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md"
+  },
+  "blocker": "R03 commercial launch acceptance cannot pass while first cold launches for DingTalk, Quark and Hongguo fail at the CAS Binder Intent transport boundary; no retry or deadline extension was used.",
+  "nextTask": "C4-R03",
+  "nextTaskAdvanceAllowed": false
+}
