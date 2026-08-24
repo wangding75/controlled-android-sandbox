@@ -6,6 +6,10 @@ public interface SandboxSdk extends AutoCloseable {
     SandboxOperationResult importPackage(String source) throws Exception;
     SandboxOperationResult importInstalledApplication(String packageName, String nativeGuestTrust)
             throws Exception;
+    default SandboxOperationResult importInstalledApplication(String packageName,
+            String nativeGuestTrust, String requestId) throws Exception {
+        return importInstalledApplication(packageName, nativeGuestTrust);
+    }
     SandboxOperationResult ensureInstance(String packageName, int virtualUserId) throws Exception;
     SandboxOperationResult cloneInstance(String packageName) throws Exception;
     SandboxOperationResult launch(SandboxIdentity identity) throws Exception;

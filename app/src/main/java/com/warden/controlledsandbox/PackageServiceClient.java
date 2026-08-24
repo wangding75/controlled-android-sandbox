@@ -103,6 +103,36 @@ final class PackageServiceClient implements AutoCloseable {
         }
     }
 
+    PackageImportResult importInstalledApplicationAndEnsure(String requestId,
+            String packageName, String nativeGuestTrust, int virtualUserId) throws Exception {
+        PackageServiceResult raw = sessionConnection.requireSingleAttempt()
+                .importInstalledApplicationAndEnsure(
+                        requestId == null ? "" : requestId,
+                        packageName == null ? "" : packageName,
+                        nativeGuestTrust == null ? "" : nativeGuestTrust,
+                        virtualUserId);
+        if (raw == null) {
+            throw new PackageMutationFailureException("PACKAGE_SERVICE_NO_RESULT",
+                    "Package service returned no result", "");
+        }
+        if (!raw.successful()) {
+            throw new PackageMutationFailureException(raw.errorCode(), raw.errorMessage(),
+                    raw.operationTraceJson());
+        }
+        PackageServiceResult success = raw;
+        PackageRecordSnapshot snapshot = success.record();
+        if (snapshot == null) {
+            throw new IllegalStateException("Package service returned no package record");
+        }
+        return new PackageImportResult(PackageServiceMapper.fromSnapshot(snapshot),
+                success.operationTraceJson());
+    }
+
+    String packageOperation(String requestId) throws Exception {
+        return requireSuccess(requireSession().getPackageOperation(
+                requestId == null ? "" : requestId)).operationTraceJson();
+    }
+
     int createInstallSession(String expectedPackageName) throws Exception {
         return requireSuccess(requireSession().createInstallSession(
                 expectedPackageName == null ? "" : expectedPackageName)).intValue();
@@ -262,10 +292,18 @@ final class PackageServiceClient implements AutoCloseable {
     }
 
     SandboxCatalogState deleteInstance(String packageName, int virtualUserId) throws Exception {
-        PackageCatalogSnapshot snapshot = requireSuccess(
-                requireSession().deleteInstance(packageName, virtualUserId)).catalog();
+        return deleteInstanceWithOperation("", packageName, virtualUserId).catalog();
+    }
+
+    PackageDeleteResult deleteInstanceWithOperation(String requestId, String packageName,
+            int virtualUserId) throws Exception {
+        PackageServiceResult result = requireSuccess(sessionConnection.requireSingleAttempt()
+                .deleteInstanceWithOperation(
+                requestId == null ? "" : requestId, packageName, virtualUserId));
+        PackageCatalogSnapshot snapshot = result.catalog();
         if (snapshot == null) throw new IllegalStateException("Package service returned no catalog");
-        return PackageServiceMapper.fromSnapshot(snapshot);
+        return new PackageDeleteResult(PackageServiceMapper.fromSnapshot(snapshot),
+                result.operationTraceJson());
     }
 
     void clearInstanceData(String packageName, int virtualUserId) throws Exception {

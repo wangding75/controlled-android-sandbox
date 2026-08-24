@@ -1,0 +1,76 @@
+{
+  "captured_at": "2026-08-24T03:48:19.994820+00:00",
+  "screenshot": {
+    "returncode": 0,
+    "bytes": 16681,
+    "sha256": "3cdc58002e6a4eb9cbe9b700d0c96e2539c227aa943726e7fd4331f17166b898"
+  },
+  "probes": {
+    "logcat.txt": {
+      "returncode": 0
+    },
+    "activity-activities.txt": {
+      "returncode": 0
+    },
+    "activity-processes.txt": {
+      "returncode": 0
+    },
+    "window-windows.txt": {
+      "returncode": 0
+    },
+    "surface-list.txt": {
+      "returncode": 0
+    },
+    "surface-dump.txt": {
+      "returncode": 0
+    },
+    "processes.txt": {
+      "returncode": 0
+    },
+    "host-package.txt": {
+      "returncode": 0
+    },
+    "target-package.txt": {
+      "returncode": 0
+    },
+    "device-getprop.txt": {
+      "returncode": 0
+    },
+    "adb-devices.txt": {
+      "returncode": 0
+    },
+    "host-files.txt": {
+      "returncode": 0
+    }
+  },
+  "transactions": {
+    "files/debug-command-result.json": {
+      "returncode": 1,
+      "bytes": 0
+    },
+    "files/sandbox-catalog.json": {
+      "returncode": 0,
+      "bytes": 33664
+    },
+    "files/sandbox-catalog.json.lastgood": {
+      "returncode": 0,
+      "bytes": 33664
+    },
+    "files/package-lifecycle-transactions.json": {
+      "returncode": 0,
+      "bytes": 4944
+    },
+    "files/package-lifecycle-transactions.json.lastgood": {
+      "returncode": 0,
+      "bytes": 4944
+    },
+    "files/runtime/activity-tasks.checkpoint": {
+      "returncode": 0,
+      "bytes": 454
+    },
+    "files/runtime/virtual-uids.registry": {
+      "returncode": 0,
+      "bytes": 147
+    }
+  }
+}

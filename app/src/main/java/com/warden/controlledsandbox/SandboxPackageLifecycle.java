@@ -144,6 +144,27 @@ final class SandboxPackageLifecycle {
                 importer.importApkFiles(artifacts, current.records(), nativeGuestTrust), barrier);
     }
 
+    /** Imports the physical artifact set and publishes the initial instance in one catalog save. */
+    synchronized SandboxRecord importInstalledApplicationAndEnsure(String packageName,
+            String nativeGuestTrust, int virtualUserId, RevisionCommitBarrier barrier)
+            throws Exception {
+        String normalized = packageName == null ? "" : packageName.trim();
+        if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
+        ApplicationInfo application = context.getPackageManager().getApplicationInfo(
+                normalized, PackageManager.GET_META_DATA);
+        List<File> artifacts = new ArrayList<>();
+        artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
+        if (application.splitSourceDirs != null) {
+            for (String split : application.splitSourceDirs) {
+                artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
+            }
+        }
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxRecord imported = importer.importApkFiles(artifacts, current.records(),
+                nativeGuestTrust);
+        return commitImported(current, imported, barrier, virtualUserId);
+    }
+
     synchronized int createInstallSession(String expectedPackageName) throws Exception {
         return installSessions.create(expectedPackageName);
     }
@@ -363,6 +384,13 @@ final class SandboxPackageLifecycle {
     private SandboxRecord commitImported(SandboxCatalogState current,
                                          SandboxRecord imported,
                                          RevisionCommitBarrier barrier) throws Exception {
+        return commitImported(current, imported, barrier, null);
+    }
+
+    private SandboxRecord commitImported(SandboxCatalogState current,
+                                         SandboxRecord imported,
+                                         RevisionCommitBarrier barrier,
+                                         Integer ensureVirtualUserId) throws Exception {
         try {
             VirtualPackageStateBuilder.requireInstallableSharedLibraries(imported, current);
         } catch (Exception error) {
@@ -395,9 +423,31 @@ final class SandboxPackageLifecycle {
             transaction = transaction.switchUpdate(imported, now);
             lifecycleTransactions.put(transaction);
         }
-        SandboxCatalogState next = current.withImported(imported, now);
+        SandboxCatalogState next;
         try {
-            catalogRepository.save(next);
+            next = current.withImported(imported, now);
+            if (ensureVirtualUserId != null) {
+                PackageMutationTrace trace = PackageMutationTrace.current();
+                if (trace == null) {
+                    next = next.withEnsuredInstance(imported.packageName,
+                            ensureVirtualUserId, now);
+                } else {
+                    try (PackageMutationTrace.StageScope ignored =
+                                 trace.stage(PackageMutationTrace.ENSURE_INSTANCE)) {
+                        next = next.withEnsuredInstance(imported.packageName,
+                                ensureVirtualUserId, now);
+                    }
+                }
+            }
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace == null) {
+                catalogRepository.save(next);
+            } else {
+                try (PackageMutationTrace.StageScope ignored =
+                             trace.stage(PackageMutationTrace.CATALOG)) {
+                    catalogRepository.save(next);
+                }
+            }
         } catch (Exception error) {
             abortPreparedUpdate(imported.packageName, current, imported, error);
             throw error;

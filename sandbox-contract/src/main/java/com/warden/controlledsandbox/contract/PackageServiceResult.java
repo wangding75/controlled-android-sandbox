@@ -22,6 +22,7 @@ public final class PackageServiceResult implements Parcelable {
     private final ArrayList<InstallSessionInfoSnapshot> installSessions;
     private final int intValue;
     private final String textValue;
+    private final String operationTraceJson;
 
     private PackageServiceResult(boolean successful, String operation, String errorCode,
                                  String errorMessage, PackageCatalogSnapshot catalog,
@@ -31,7 +32,7 @@ public final class PackageServiceResult implements Parcelable {
                                  List<PermissionAuditSnapshot> permissionAudit,
                                  InstallSessionInfoSnapshot installSession,
                                  List<InstallSessionInfoSnapshot> installSessions,
-                                 int intValue, String textValue) {
+                                 int intValue, String textValue, String operationTraceJson) {
         this.successful = successful;
         this.operation = value(operation);
         this.errorCode = value(errorCode);
@@ -46,6 +47,7 @@ public final class PackageServiceResult implements Parcelable {
         this.installSessions = new ArrayList<>(installSessions == null ? List.of() : installSessions);
         this.intValue = intValue;
         this.textValue = value(textValue);
+        this.operationTraceJson = value(operationTraceJson);
     }
 
     private PackageServiceResult(Parcel in) {
@@ -58,7 +60,7 @@ public final class PackageServiceResult implements Parcelable {
                 in.createTypedArrayList(PermissionAuditSnapshot.CREATOR),
                 in.readParcelable(InstallSessionInfoSnapshot.class.getClassLoader()),
                 in.createTypedArrayList(InstallSessionInfoSnapshot.CREATOR),
-                in.readInt(), in.readString());
+                in.readInt(), in.readString(), in.readString());
     }
 
     public static PackageServiceResult successCatalog(String operation, PackageCatalogSnapshot catalog) {
@@ -114,7 +116,7 @@ public final class PackageServiceResult implements Parcelable {
     }
     public static PackageServiceResult failure(String operation, String errorCode, String errorMessage) {
         return new PackageServiceResult(false, operation, errorCode, errorMessage,
-                null, null, null, null, null, null, null, null, 0, "");
+                null, null, null, null, null, null, null, null, 0, "", "");
     }
 
     private static PackageServiceResult value(boolean successful, String operation,
@@ -129,7 +131,14 @@ public final class PackageServiceResult implements Parcelable {
                                                int intValue, String textValue) {
         return new PackageServiceResult(successful, operation, "", "", catalog, record,
                 packageState, permissionRequest, requests, audit, installSession,
-                installSessions, intValue, textValue);
+                installSessions, intValue, textValue, "");
+    }
+
+    /** Returns the same typed payload with request-scoped package mutation telemetry attached. */
+    public PackageServiceResult withOperationTrace(String traceJson) {
+        return new PackageServiceResult(successful, operation, errorCode, errorMessage,
+                catalog, record, packageState, permissionRequest, permissionRequests,
+                permissionAudit, installSession, installSessions, intValue, textValue, traceJson);
     }
 
     public boolean successful() { return successful; }
@@ -152,6 +161,7 @@ public final class PackageServiceResult implements Parcelable {
     }
     public int intValue() { return intValue; }
     public String textValue() { return textValue; }
+    public String operationTraceJson() { return operationTraceJson; }
 
     @Override public void writeToParcel(Parcel out, int flags) {
         out.writeInt(successful ? 1 : 0); out.writeString(operation); out.writeString(errorCode);
@@ -160,6 +170,7 @@ public final class PackageServiceResult implements Parcelable {
         out.writeParcelable(permissionRequest, flags); out.writeTypedList(permissionRequests);
         out.writeTypedList(permissionAudit); out.writeParcelable(installSession, flags);
         out.writeTypedList(installSessions); out.writeInt(intValue); out.writeString(textValue);
+        out.writeString(operationTraceJson);
     }
     @Override public int describeContents() { return 0; }
 

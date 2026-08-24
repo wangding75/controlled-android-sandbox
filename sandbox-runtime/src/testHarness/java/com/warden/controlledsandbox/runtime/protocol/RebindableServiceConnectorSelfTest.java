@@ -23,6 +23,7 @@ public final class RebindableServiceConnectorSelfTest {
         reconnectsAfterBinderDeath();
         retiresSilentlyDeadBindingBeforeRebind();
         usesBoundedExponentialBackoff();
+        singleAttemptDoesNotHideRejectedBind();
         timesOutMissingCallbackAndRebinds();
         timeoutAfterBackoffCancelsAttempt();
         ignoresLateConnectionAfterTimeout();
@@ -93,6 +94,24 @@ public final class RebindableServiceConnectorSelfTest {
         require(elapsedMillis(times, 2, 3) >= 35L, "third retry must honor the 40 ms cap");
         require(connector.snapshot().consecutiveFailures() == 0,
                 "successful reconnect must clear failure count");
+        connector.close();
+    }
+
+    private static void singleAttemptDoesNotHideRejectedBind() throws Exception {
+        FakeContext context = new FakeContext();
+        context.enqueue(BindBehavior.REJECT, BindBehavior.CONNECT);
+        RebindableServiceConnector<String> connector = new RebindableServiceConnector<>(
+                context, new Intent(), ignored -> "ready", ignored -> { },
+                "single attempt service", 1_000L, 0L, 0L);
+
+        Throwable first = captureFailure(connector::requireSingleAttempt);
+        require(hasMessage(first, "BIND_REJECTED"),
+                "single-attempt acquisition must preserve the first rejected bind");
+        require(context.bindCount() == 1,
+                "single-attempt acquisition must not start a hidden second bind");
+        require("ready".equals(connector.requireSingleAttempt()),
+                "a separately initiated recovery operation may acquire a fresh capability");
+        require(context.bindCount() == 2, "recovery is a distinct bind attempt");
         connector.close();
     }
 

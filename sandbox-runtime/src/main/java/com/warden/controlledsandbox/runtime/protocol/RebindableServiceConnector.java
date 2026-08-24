@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -109,7 +111,23 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
     }
 
     public T require() throws Exception {
+        return requireAttempts(Integer.MAX_VALUE);
+    }
+
+    /**
+     * Acquires the capability with one bind generation only.  Callers that own a mutating
+     * transaction use this entry point so a connector-level retry cannot invisibly replay the
+     * beginning of an operation.  A recovery attempt, when policy allows it, must be started and
+     * recorded explicitly by the caller.
+     */
+    public T requireSingleAttempt() throws Exception {
+        return requireAttempts(1);
+    }
+
+    private T requireAttempts(int maxAttempts) throws Exception {
+        if (maxAttempts <= 0) throw new IllegalArgumentException("maxAttempts must be positive");
         long deadline = safeAdd(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(timeoutMs));
+        Set<Long> observedAttempts = new HashSet<>();
         while (true) {
             T current;
             Attempt waiting;
@@ -136,9 +154,18 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
                     long now = System.nanoTime();
                     delayNanos = Math.max(0L, nextBindAtNanos - now);
                     if (delayNanos == 0L) {
-                        if (attempt == null || attempt.completed()) attempt = newAttemptLocked();
+                        if (attempt == null || attempt.completed()) {
+                            if (observedAttempts.size() >= maxAttempts) throw unavailable();
+                            attempt = newAttemptLocked();
+                        }
                         waiting = attempt;
+                        if (!observedAttempts.contains(waiting.epoch)
+                                && observedAttempts.size() >= maxAttempts) {
+                            throw unavailable();
+                        }
+                        observedAttempts.add(waiting.epoch);
                     } else {
+                        if (observedAttempts.size() >= maxAttempts) throw unavailable();
                         waiting = null;
                     }
                 }

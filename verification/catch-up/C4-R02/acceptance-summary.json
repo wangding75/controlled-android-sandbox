@@ -1,0 +1,46 @@
+{
+  "task": "C4-R02",
+  "status": "PASS",
+  "scope": "package mutation transactions, deadlines, UI state, rollback and recovery only",
+  "environment": {
+    "instanceName": "RD测试",
+    "resolvedByName": true,
+    "adbSerial": "127.0.0.1:16416",
+    "model": "22041211A",
+    "api": 32,
+    "bootId": "d09f0f79-058d-42af-924c-3a99f1429ea4",
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi"
+  },
+  "apk": {
+    "path": "app/build/outputs/apk/debug/app-debug.apk",
+    "sha256": "17138281206690EA5B3C10AD0E0D21FC2C33C8DD7051A2386E0B9464CCB72CC6"
+  },
+  "matrix": {
+    "fixture": {"package": "com.warden.controlledsandbox.fixture", "version": "1.0-fixture", "versionCode": 1, "baseCount": 1, "splitCount": 0, "abi": "x86_64", "cycles": 50, "operations": 150, "successes": 150},
+    "dingtalk": {"package": "com.alibaba.android.rimet", "version": "7.8.10", "versionCode": 1178, "baseCount": 1, "splitCount": 0, "abi": "arm64-v8a", "cycles": 10, "operations": 30, "successes": 30},
+    "quark": {"package": "com.quark.browser", "version": "10.10.5.1080", "versionCode": 1080, "baseCount": 1, "splitCount": 0, "abi": "arm64-v8a", "role": "positive_control_only", "cycles": 10, "operations": 30, "successes": 30},
+    "hongguo": {"package": "com.phoenix.read", "version": "7.0.5.33", "versionCode": 70533, "baseCount": 1, "splitCount": 0, "abi": "arm64-v8a", "cycles": 10, "operations": 31, "successes": 31, "anomaly": "MIXED_ELF_MACHINE:libcvt.so:ARM32 ELF under arm64-v8a"},
+    "fanqie": {"package": "com.dragon.read", "version": "7.1.9.32", "versionCode": 71932, "baseCount": 1, "splitCount": 0, "abi": "arm64-v8a", "cycles": 10, "operations": 31, "successes": 31, "anomaly": "MIXED_ELF_MACHINE:libcvt.so:ARM32 ELF under arm64-v8a"}
+  },
+  "totals": {"productOperations": 272, "productFailures": 0, "firstFailureCount": 0, "attempt": 1, "retryBudget": 0, "latencyMs": {"min": 5513, "median": 7595, "p95": 16416, "max": 23565}},
+  "concurrentAdd": {"status": "PASS", "successfulCount": 1, "busyCount": 1, "sameOperationId": true},
+  "negativeRollback": {"status": "PASS", "errorCode": "UNTRUSTED_NATIVE_GUEST_DENIED", "attempt": 1, "retryBudget": 0, "retryDecision": "NO_RETRY_NON_RETRYABLE_SECURITY_POLICY", "residuePass": true},
+  "deathRecovery": {"status": "PASS", "hostDeath": "PASS", "packageServiceDeath": "PASS", "revisionShaStable": true, "recoveryAttempt": 1, "recoveryRetryBudget": 0},
+  "residue": {"installStaging": [], "inFlightTransactions": [], "settledTransactionState": "ACTIVE catalog records are settled, not in-flight"},
+  "knownHarnessObservations": [
+    "A runner ACTIVE-state false positive was preserved and classified; product operations were successful.",
+    "A request-ID shell encoding failure was preserved and classified; runner now uses shell-safe IDs.",
+    "An import-only scope leak into Guest prepare was preserved and classified; R02 runner uses import-only for mutation gates.",
+    "The first negative assertion checked the wrong nesting level; raw error and residue were preserved, then the authoritative errorMessage assertion was corrected and passed."
+  ],
+  "evidence": [
+    "verification/catch-up/C4-R02/rd-acceptance/summary.json",
+    "verification/catch-up/C4-R02/rd-acceptance/operations.json",
+    "verification/catch-up/C4-R02/rd-acceptance/concurrent-add.json",
+    "verification/catch-up/C4-R02/rd-acceptance/negative-rollback.json",
+    "verification/catch-up/C4-R02/rd-acceptance/death-recovery/report.json",
+    "verification/catch-up/C4-R02/commercial-sample-discovery.json",
+    "verification/catch-up/C4-R02/reference-mapping.json"
+  ],
+  "notCovered": ["C4-R03 Guest launch/first-frame/window fix", "C4-R04 fail-closed launch runner", "C4-R05 C4 closure", "C6", "OEM adaptation"]
+}

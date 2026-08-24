@@ -41,6 +41,9 @@ import java.security.MessageDigest;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.UUID;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -80,6 +83,8 @@ public final class DebugCommandActivity extends Activity {
 
     private void execute(String command, String packageName, int virtualUserId,
                          boolean trustNativeGuest, Bundle extras, String requestId) {
+        requestId = requestId == null || requestId.trim().isEmpty()
+                ? UUID.randomUUID().toString() : requestId.trim();
         JSONObject result = new JSONObject();
         RuntimeClient runtime = null;
         PackageServiceClient packages = null;
@@ -172,6 +177,23 @@ public final class DebugCommandActivity extends Activity {
                 Log.i(TAG, "PASS c4-t05-dingtalk");
                 return;
             }
+            if ("c4-r02-concurrent-add".equals(command)) {
+                if (packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("package extra is required");
+                }
+                JSONObject concurrent = runConcurrentPackageAdds(packageName, virtualUserId,
+                        trustNativeGuest, requestId);
+                result.put("concurrentAdds", concurrent);
+                result.put("operation", new JSONObject().put("status",
+                        concurrent.optBoolean("pass", false)
+                                ? "CONCURRENT_ADD_SINGLE_FLIGHT_PASS"
+                                : "CONCURRENT_ADD_SINGLE_FLIGHT_FAIL"));
+                if (!concurrent.optBoolean("pass", false)) {
+                    throw new IllegalStateException("CONCURRENT_ADD_SINGLE_FLIGHT_FAILED");
+                }
+                result.put("status", "PASS");
+                return;
+            }
             if ("c4-t03-migrate".equals(command)) {
                 if (packageName.trim().isEmpty()) {
                     throw new IllegalArgumentException("package extra is required");
@@ -253,22 +275,38 @@ public final class DebugCommandActivity extends Activity {
                     || "clear".equals(command) || "delete".equals(command)
                     || "launch-virtual-component".equals(command);
             boolean importRequested = !virtualLifecycleOnly && ("import-launch".equals(command)
-                    || "import-prepare".equals(command) || record == null
+                    || "import-prepare".equals(command) || "import-only".equals(command)
+                    || record == null
                     || installedApkRevisionChanged(record, packageName));
+            boolean instanceEnsuredByImport = false;
             if (importRequested) {
                 // Resolve the complete host-installed artifact set.  A package with a dynamic
                 // feature or ABI/resource split must enter the same multi-artifact pipeline as
                 // the foreground import flow; importing only sourceDir silently publishes a
                 // base-only revision and makes split classes invisible at runtime.
-                record = packages.importInstalledApplication(packageName,
+                PackageImportResult imported = packages.importInstalledApplicationAndEnsure(
+                        requestId, packageName,
                         trustNativeGuest
                                 ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
-                                : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED);
+                                : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED,
+                        virtualUserId);
+                record = imported.record();
+                instanceEnsuredByImport = true;
+                if (!imported.operationTraceJson().isEmpty()) {
+                    result.put("packageOperationTrace",
+                            new JSONObject(imported.operationTraceJson()));
+                }
             }
             result.put("nativeGuestTrust", record.nativeGuestTrust);
-            packages.ensureInstance(packageName, virtualUserId);
+            if (!instanceEnsuredByImport) packages.ensureInstance(packageName, virtualUserId);
             Log.i(TAG, "INSTANCE_READY command=" + command + " package=" + packageName
                     + " user=" + virtualUserId);
+            if ("import-only".equals(command)) {
+                result.put("operation", new JSONObject().put(RuntimeKeys.STATUS, "IMPORTED"));
+                result.put("status", "PASS");
+                Log.i(TAG, "PASS import-only " + packageName + " user=" + virtualUserId);
+                return;
+            }
             runtime = new RuntimeClient(this);
             Bundle operation;
             if ("stop".equals(command)) {
@@ -283,7 +321,12 @@ public final class DebugCommandActivity extends Activity {
                 operation.putString(RuntimeKeys.STATUS, "CLEARED");
             } else if ("delete".equals(command)) {
                 runtime.stop(record, virtualUserId);
-                packages.deleteInstance(packageName, virtualUserId);
+                PackageDeleteResult deleted = packages.deleteInstanceWithOperation(
+                        requestId, packageName, virtualUserId);
+                if (!deleted.operationTraceJson().isEmpty()) {
+                    result.put("packageOperationTrace",
+                            new JSONObject(deleted.operationTraceJson()));
+                }
                 operation = new Bundle();
                 operation.putString(RuntimeKeys.STATUS, "DELETED");
             } else if ("dingtalk-disable".equals(command)) {
@@ -1995,6 +2038,66 @@ public final class DebugCommandActivity extends Activity {
             output.getFD().sync();
         } catch (Exception error) {
             Log.e(TAG, "Cannot write command result: " + error);
+        }
+    }
+
+    private JSONObject runConcurrentPackageAdds(String packageName, int virtualUserId,
+            boolean trustNativeGuest, String requestId) throws Exception {
+        String trust = trustNativeGuest
+                ? InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_EXPLICITLY_TRUSTED
+                : InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED;
+        ExecutorService callers = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<JSONObject> first = callers.submit(() -> packageAddAttempt(packageName,
+                    virtualUserId, trust, requestId + "-a", ready, start));
+            Future<JSONObject> second = callers.submit(() -> packageAddAttempt(packageName,
+                    virtualUserId, trust, requestId + "-b", ready, start));
+            if (!ready.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("CONCURRENT_ADD_READY_TIMEOUT");
+            }
+            start.countDown();
+            JSONObject a = first.get(240, TimeUnit.SECONDS);
+            JSONObject b = second.get(240, TimeUnit.SECONDS);
+            int succeeded = (a.optBoolean("successful", false) ? 1 : 0)
+                    + (b.optBoolean("successful", false) ? 1 : 0);
+            int busy = ("MUTATION_BUSY".equals(a.optString("errorCode")) ? 1 : 0)
+                    + ("MUTATION_BUSY".equals(b.optString("errorCode")) ? 1 : 0);
+            String aOperation = a.optJSONObject("trace") == null ? ""
+                    : a.optJSONObject("trace").optString("operationId");
+            String bOperation = b.optJSONObject("trace") == null ? ""
+                    : b.optJSONObject("trace").optString("operationId");
+            boolean sameOperation = !aOperation.isEmpty() && aOperation.equals(bOperation);
+            return new JSONObject().put("first", a).put("second", b)
+                    .put("successfulCount", succeeded).put("busyCount", busy)
+                    .put("sameOperationId", sameOperation)
+                    .put("pass", succeeded == 1 && busy == 1 && sameOperation);
+        } finally {
+            start.countDown();
+            callers.shutdownNow();
+        }
+    }
+
+    private JSONObject packageAddAttempt(String packageName, int virtualUserId, String trust,
+            String requestId, CountDownLatch ready, CountDownLatch start) throws Exception {
+        ready.countDown();
+        if (!start.await(10, TimeUnit.SECONDS)) {
+            throw new IllegalStateException("CONCURRENT_ADD_START_TIMEOUT");
+        }
+        try (PackageServiceClient client = new PackageServiceClient(this)) {
+            PackageImportResult imported = client.importInstalledApplicationAndEnsure(
+                    requestId, packageName, trust, virtualUserId);
+            return new JSONObject().put("requestId", requestId).put("successful", true)
+                    .put("errorCode", "").put("trace",
+                            new JSONObject(imported.operationTraceJson()));
+        } catch (PackageMutationFailureException failure) {
+            JSONObject row = new JSONObject().put("requestId", requestId)
+                    .put("successful", false).put("errorCode", failure.code);
+            if (!failure.operationTraceJson.isEmpty()) {
+                row.put("trace", new JSONObject(failure.operationTraceJson));
+            }
+            return row;
         }
     }
 }

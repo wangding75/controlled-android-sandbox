@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R02",
+  "status": "IN_PROGRESS",
+  "started_at": "2026-08-24T11:14:19+08:00",
+  "baseline": {
+    "branch": "feature/t57-r03-va-pro-capability-campaign",
+    "local_head": "577d0e6a79a14b269058a01affebf1e482b20237",
+    "remote_head": "577d0e6a79a14b269058a01affebf1e482b20237",
+    "worktree_clean_before_preflight": true,
+    "git_identity": "OpenAI <openai@users.noreply.github.com>"
+  },
+  "continuation": {
+    "ledger_next_task": "C4-R02",
+    "last_completed_task": "C4-R01",
+    "preflight": "PASS"
+  },
+  "device": {
+    "instance_name": "RD测试",
+    "resolution": "dynamic",
+    "api": "32",
+    "model": "22041211A",
+    "boot_id": "d09f0f79-058d-42af-924c-3a99f1429ea4",
+    "android_id": "398eea33120cd887",
+    "abi_list": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi"
+  },
+  "blocking_known_issues": [
+    "KI-R03-053",
+    "KI-R03-054",
+    "KI-R03-055",
+    "KI-R03-056"
+  ],
+  "scope": "C4-R02 only"
+}

@@ -1412,27 +1412,36 @@ issues:
     capability: package_lifecycle_clear_delete_reinstall
     classification: COMPATIBILITY_GAP
     severity: HIGH
-    status: RECORDED
+    status: FIXED
     discovered_by: RD测试 C4 post-acceptance feedback 2026-08-24
     evidence:
       - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
       - docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md
       - verification/catch-up/C4-R01/c4-r01-rd-summary.json
       - docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md
+      - docs/review/C4_R02_PACKAGE_MUTATION_TRANSACTION_DESIGN.md
+      - verification/catch-up/C4-R02/commercial-sample-discovery.json
+      - verification/catch-up/C4-R02/rd-acceptance/summary.json
+      - verification/catch-up/C4-R02/rd-acceptance/first-attempt-com.phoenix.read.json
+      - verification/catch-up/C4-R02/rd-acceptance/first-attempt-com.dragon.read.json
     match_patterns:
       - Hongguo
       - Fanqie Novel
       - Quark
       - add installed application
-    blocks_current_campaign: true
-    fix_policy: C4_R01_BOUNDARY_CLASSIFICATION_AND_C4_R02_COMMERCIAL_SAMPLE_MATRIX
+    blocks_current_campaign: false
+    fix_policy: C4_R02_CAS_IMPORT_TRANSACTION_MIXED_ELF_COMPATIBILITY
     notes: >
       C4-R01 dynamically identified Quark 10.10.5.1080, Hongguo 7.0.5.33, and Fanqie
-      Novel 7.1.9.32. Quark passed only as a positive control. Hongguo and Fanqie each
-      failed their first attempt at CAS native ELF validation with
-      NATIVE_ELF_ABI_MISMATCH:arm64-v8a, before a verifiable catalog commit; owner is
-      therefore CAS generic import compatibility, not SX/UI. The exact ELF mechanism
-      and production fix remain C4-R02 work. Status remains RECORDED and blocking.
+      Novel 7.1.9.32. Quark remains positive control only. C4-R02 confirmed the two
+      anomalous entries are known-target ARM32 ELF payloads under arm64-v8a directories
+      (libcvt.so), accepted by Android PMS and recorded as MIXED_ELF_MACHINE rather than
+      rejected by the generic CAS import validator. Final APK evidence completed 50
+      fixture add/delete/re-add cycles and 10 cycles each for DingTalk, Quark, Hongguo,
+      and Fanqie; all 272 product operations succeeded with no install residue. Owner
+      was CAS generic import compatibility and is FIXED for import compatibility. Whether
+      either mixed payload is requested by the app runtime loader remains pending for
+      C4-R03 launch validation; this issue does not close runtime compatibility.
 
   - issue_id: KI-R03-056
     title: C4 retries and fixed sleeps can hide the first failure and encourage guess-driven fixes
@@ -1448,6 +1457,12 @@ issues:
       - tools/capability/run_c4_r01_rd.py
       - verification/catch-up/C4-R01/c4-r01-rd-summary.json
       - docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md
+      - docs/review/C4_R02_PACKAGE_MUTATION_TRANSACTION_DESIGN.md
+      - verification/catch-up/C4-R02/rd-acceptance/summary.json
+      - verification/catch-up/C4-R02/rd-acceptance/concurrent-add.json
+      - verification/catch-up/C4-R02/rd-acceptance/death-recovery/report.json
+      - verification/catch-up/C4-R02/rd-acceptance/negative-rollback.json
+      - verification/catch-up/C4-R02/rd-acceptance/negative-rollback-first-observation.json
     match_patterns:
       - stopSoft
       - killSettled
@@ -1457,7 +1472,11 @@ issues:
     fix_policy: FIRST_FAILURE_EVIDENCE_REFERENCE_MAPPING_AND_BOUNDED_TYPED_RETRY
     notes: >
       C4-R01 confirmed the historical C4 loop silently stops, sleeps 400 ms, and starts
-      again after a first launch failure. Its controlled negative used attempt 1,
-      retryable=false, retry budget 0 and preserved the first failure. VA/NBB mapping is
-      now recorded, but production retry removal and the fail-closed gate remain C4-R04;
+      again after a first launch failure. C4-R02 now makes package mutations single-flight,
+      uses one connector attempt for import/delete, records stage deadlines, and preserves
+      attempt/retryBudget/retryable in every trace. Concurrent add returned one success and
+      one MUTATION_BUSY sharing the in-flight operation ID; Host and PackageService death
+      recovery each used attempt 1 with retry budget 0. A first negative-probe assertion
+      was preserved as HARNESS_ASSERTION_FALSE_NEGATIVE and corrected from the authoritative
+      nested errorMessage. The old C4 launch retry and fail-closed gate remain C4-R04 work;
       status remains RECORDED and blocking.

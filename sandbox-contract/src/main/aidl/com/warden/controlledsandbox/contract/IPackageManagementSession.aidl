@@ -21,6 +21,9 @@ interface IPackageManagementSession {
     PackageServiceResult importApkFile(String sourcePath);
     PackageServiceResult importApkFileWithNativeTrust(String sourcePath, String nativeGuestTrust);
     PackageServiceResult importInstalledApplication(String packageName, String nativeGuestTrust);
+    PackageServiceResult importInstalledApplicationAndEnsure(String requestId, String packageName,
+            String nativeGuestTrust, int virtualUserId);
+    PackageServiceResult getPackageOperation(String requestId);
     PackageServiceResult createInstallSession(String expectedPackageName);
     PackageServiceResult createInstallSessionWithParams(in InstallSessionParamsSnapshot params);
     PackageServiceResult getInstallSessionInfo(int sessionId);
@@ -48,6 +51,8 @@ interface IPackageManagementSession {
     PackageServiceResult lifecycleTransaction(String packageName);
     PackageServiceResult updateInstanceStatus(String packageName, int virtualUserId, String status);
     PackageServiceResult deleteInstance(String packageName, int virtualUserId);
+    PackageServiceResult deleteInstanceWithOperation(String requestId, String packageName,
+            int virtualUserId);
     PackageServiceResult clearInstanceData(String packageName, int virtualUserId);
     VirtualDeviceServiceProfileSnapshot getDeviceServiceProfile(String packageName, int virtualUserId);
     VirtualDeviceServiceProfileSnapshot setDeviceServiceProfile(String packageName, int virtualUserId,

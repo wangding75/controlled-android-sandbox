@@ -1,0 +1,11 @@
+{
+  "classification": "HARNESS_TASK_SCOPE_LEAK",
+  "confirmed": true,
+  "packageMutation": "SUCCEEDED before the wait",
+  "leakedStage": "Guest runtime prepare",
+  "owner": "acceptance runner command selection",
+  "reason": "import-prepare validates both package import and Guest prepare; C4-R02 must not be blocked by the C4-R03 launch/readiness surface",
+  "retryable": false,
+  "retryDecision": "NO_AUTOMATIC_RETRY; preserve snapshot and introduce a distinct import-only debug gate",
+  "productionRuntimeFix": false
+}

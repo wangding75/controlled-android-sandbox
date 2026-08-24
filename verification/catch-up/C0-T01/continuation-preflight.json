@@ -1,48 +1,49 @@
 {
   "schema_version": 1,
-  "task_id": "C4-T05",
+  "task_id": "C4-R02",
   "status": "PASS",
-  "captured_at": "2026-08-23T13:12:59.961390+00:00",
+  "captured_at": "2026-08-24T03:14:14.059253+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-T05",
-    "active_task": "C4-T05",
-    "last_completed": "C4-T04",
-    "first_ready_pending": "C5-T01",
-    "dependencies": "C4-T04"
+    "next_task": "C4-R02",
+    "active_task": "",
+    "last_completed": "C4-R01",
+    "first_ready_pending": "C4-R02",
+    "dependencies": "C4-R01"
   },
   "last_receipt": {
-    "task_id": "C4-T04",
+    "task_id": "C4-R01",
     "status": "DONE",
     "implementation_commits": [
-      "525f3aec84ae1ff09192f11a417adf51464f965e"
+      "d2f1b0aa7137195661525c442e290bd6e009646c"
     ],
-    "receipt_commit": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
-    "baseline_commit": "b931724fbe2aef0854eac7bb65409a26b9c24b82",
+    "receipt_commit": "577d0e6a79a14b269058a01affebf1e482b20237",
+    "baseline_commit": "d73003748d64ef70fe8b74c03b8c733be1338636",
     "evidence_paths": [
-      "docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md",
-      "verification/catch-up/C4-T04/c4-t04-rd-summary.json"
+      "verification/catch-up/C4-R01/c4-r01-rd-summary.json",
+      "verification/catch-up/C4-R01/reference-mapping.json",
+      "docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
+    "head": "577d0e6a79a14b269058a01affebf1e482b20237",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "6aed424ea38b2eea7aa29e776a8bc0f804d9e9d6",
+    "remote_head": "577d0e6a79a14b269058a01affebf1e482b20237",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M app/src/debug/java/com/warden/controlledsandbox/DebugCommandActivity.java\n M app/src/main/java/com/warden/controlledsandbox/ApkImportManager.java\n M docs/capability/CAPABILITY_REGISTRY.yaml\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/review/KNOWN_ISSUES.yaml\n M fixture-basic/src/main/java/com/warden/controlledsandbox/fixture/C2T06DeviceNetworkMediaActivity.java\n M scripts/verify-catch-up-continuation.py\n M tools/capability/campaign_gates.yaml\n M verification/catch-up/C0-T01/continuation-preflight.json\n?? docs/review/C4_T05_SX_BUSINESS_DESIGN.md\n?? scripts/check-c4-t05-sx-business.py\n?? tools/capability/run_c4_t05_rd.py\n?? verification/catch-up/C4-T05/"
+    "status_short": ""
   },
   "device": {
     "instance_name": "RD测试",
     "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
-    "android_id": "8acae00bece8090b",
-    "model": "V2241A"
+    "boot_id": "d09f0f79-058d-42af-924c-3a99f1429ea4",
+    "android_id": "398eea33120cd887",
+    "model": "22041211A"
   },
   "static_checks": {
     "required_files": [
@@ -300,5 +301,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-T05"
+  "evidence_directory": "verification/catch-up/C4-R02"
 }

@@ -55,13 +55,26 @@ public final class CasSandboxEngine {
 
     public SandboxOperationResult installFromHost(String packageName, String nativeGuestTrust)
             throws Exception {
+        return installFromHost(packageName, nativeGuestTrust,
+                java.util.UUID.randomUUID().toString());
+    }
+
+    public SandboxOperationResult installFromHost(String packageName, String nativeGuestTrust,
+            String requestId) throws Exception {
         if (blank(packageName)) {
             return publish(SandboxOperationResult.failure("installFromHost", PACKAGE_REQUIRED,
                     "packageName is required", null, Map.of()));
         }
         SandboxOperationResult imported = sdk.importInstalledApplication(packageName,
-                nativeGuestTrust == null ? "" : nativeGuestTrust);
+                nativeGuestTrust == null ? "" : nativeGuestTrust,
+                requestId == null ? "" : requestId);
         if (!imported.successful()) return publish(imported);
+        // The production CAS adapter publishes record + initial instance in one Package Service
+        // transaction and proves that with an operation trace. Keep the legacy ensure fallback
+        // only for SDK implementations that do not yet expose that combined contract.
+        if (!imported.diagnostics().getOrDefault("operationTrace", "").isEmpty()) {
+            return publish(imported);
+        }
         SandboxOperationResult ready = sdk.ensureInstance(packageName, 0);
         return publish(ready.successful() ? imported : ready);
     }

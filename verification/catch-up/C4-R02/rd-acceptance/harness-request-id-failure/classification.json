@@ -1,0 +1,12 @@
+{
+  "classification": "HARNESS_ARGUMENT_ENCODING_FAILURE",
+  "confirmed": true,
+  "productTransactionFailure": false,
+  "requestIdRequested": "contained an ASCII space derived from the fixture display label",
+  "requestIdObserved": "c4-r02-package-neutral",
+  "errorCode": "UNTRUSTED_NATIVE_GUEST_DENIED",
+  "rootCause": "adb shell argument transport split the request ID at the space, shifting later extras so trustNativeGuest was observed false",
+  "retryable": false,
+  "retryDecision": "NO_AUTOMATIC_RETRY; terminate the malformed harness run, preserve the full snapshot, correct request-ID encoding, then start a distinct acceptance operation",
+  "productionChangeRequired": false
+}

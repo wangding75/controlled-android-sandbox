@@ -46,9 +46,21 @@ final class SandboxApplicationLayer implements AutoCloseable {
     }
     SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust)
             throws Exception {
-        SandboxOperationResult result = engine.installFromHost(packageName, nativeGuestTrust);
-        requireSuccess(result);
-        return requireRecord(packageName);
+        return importInstalledApplication(packageName, nativeGuestTrust,
+                java.util.UUID.randomUUID().toString());
+    }
+    SandboxRecord importInstalledApplication(String packageName, String nativeGuestTrust,
+            String requestId) throws Exception {
+        ImportResult imported = importInstalledApplicationOperation(packageName,
+                nativeGuestTrust, requestId);
+        requireSuccess(imported.operation());
+        return imported.record();
+    }
+    ImportResult importInstalledApplicationOperation(String packageName, String nativeGuestTrust,
+            String requestId) throws Exception {
+        SandboxOperationResult result = engine.installFromHost(packageName, nativeGuestTrust,
+                requestId);
+        return new ImportResult(result.successful() ? requireRecord(packageName) : null, result);
     }
     int createClone(String packageName) throws Exception {
         SandboxOperationResult result = engine.clone(packageName);
@@ -124,6 +136,8 @@ final class SandboxApplicationLayer implements AutoCloseable {
         return adapter.applicationEnvironmentProfile(packageName, userId);
     }
     Context context() { return context; }
+
+    record ImportResult(SandboxRecord record, SandboxOperationResult operation) { }
 
     Bundle componentSmoke(String packageName, int userId) throws Exception {
         SandboxRecord record = requireRecord(packageName);

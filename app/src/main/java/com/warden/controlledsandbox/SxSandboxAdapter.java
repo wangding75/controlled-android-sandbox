@@ -191,19 +191,38 @@ final class SxSandboxAdapter implements SandboxSdk {
 
     @Override public SandboxOperationResult importInstalledApplication(String packageName,
             String nativeGuestTrust) throws Exception {
+        return importInstalledApplication(packageName, nativeGuestTrust,
+                java.util.UUID.randomUUID().toString());
+    }
+
+    @Override public SandboxOperationResult importInstalledApplication(String packageName,
+            String nativeGuestTrust, String requestId) throws Exception {
         try {
             if (packageName == null || packageName.trim().isEmpty()) {
                 return SandboxOperationResult.failure("importInstalledApplication",
                         "PACKAGE_REQUIRED", "packageName is required", null, Map.of());
             }
-            SandboxRecord record = packageService.importInstalledApplication(packageName,
-                    nativeGuestTrust == null ? "" : nativeGuestTrust);
-            packageService.ensureInstance(packageName, 0);
+            PackageImportResult imported = packageService.importInstalledApplicationAndEnsure(
+                    requestId, packageName, nativeGuestTrust == null ? "" : nativeGuestTrust, 0);
+            SandboxRecord record = imported.record();
             return SandboxOperationResult.success("importInstalledApplication", "IMPORTED",
-                    identityFor(record, 0), diagnostics(record));
+                    identityFor(record, 0), operationDiagnostics(record,
+                            imported.operationTraceJson()));
+        } catch (PackageMutationFailureException error) {
+            return SandboxOperationResult.failure("importInstalledApplication", error.code,
+                    String.valueOf(error.getMessage()), null,
+                    operationDiagnostics(null, error.operationTraceJson));
         } catch (Exception error) {
+            String code = code("IMPORT_FAILED", error);
+            Map<String, String> diagnostics = new LinkedHashMap<>();
+            diagnostics.put("requestId", requestId == null ? "" : requestId);
+            diagnostics.put("stage", "BIND");
+            diagnostics.put("attempt", "1");
+            diagnostics.put("retryBudget", "0");
+            diagnostics.put("retryable", Boolean.toString(
+                    "PACKAGE_SERVICE_UNAVAILABLE".equals(code)));
             return SandboxOperationResult.failure("importInstalledApplication",
-                    code("IMPORT_FAILED", error), String.valueOf(error.getMessage()), null, Map.of());
+                    code, String.valueOf(error.getMessage()), null, diagnostics);
         }
     }
 
@@ -388,6 +407,12 @@ final class SxSandboxAdapter implements SandboxSdk {
         String message = error == null ? "" : String.valueOf(error.getMessage());
         if (message.contains("not installed")) return "PACKAGE_NOT_INSTALLED";
         if (message.contains("required")) return "SOURCE_REQUIRED";
+        if (message.contains("Package management service is unavailable")) {
+            return "PACKAGE_SERVICE_UNAVAILABLE";
+        }
+        int separator = message.indexOf(':');
+        String prefix = separator < 0 ? message : message.substring(0, separator);
+        if (prefix.matches("[A-Z][A-Z0-9_]+")) return prefix;
         return fallback;
     }
 
@@ -442,6 +467,30 @@ final class SxSandboxAdapter implements SandboxSdk {
         values.put("versionName", record.versionName);
         values.put("versionCode", Long.toString(record.versionCode));
         values.put("nativeAbi", record.nativeAbi);
+        return values;
+    }
+
+    private Map<String, String> operationDiagnostics(SandboxRecord record, String traceJson) {
+        Map<String, String> values = new LinkedHashMap<>();
+        if (record != null) values.putAll(diagnostics(record));
+        String raw = traceJson == null ? "" : traceJson;
+        values.put("operationTrace", raw);
+        if (!raw.isEmpty()) {
+            try {
+                org.json.JSONObject trace = new org.json.JSONObject(raw);
+                values.put("requestId", trace.optString("requestId", ""));
+                values.put("operationId", trace.optString("operationId", ""));
+                values.put("stage", trace.optString("stage", ""));
+                values.put("elapsedMs", Long.toString(trace.optLong("elapsedMs", -1L)));
+                values.put("attempt", Integer.toString(trace.optInt("attempt", 1)));
+                values.put("retryBudget", Integer.toString(trace.optInt("retryBudget", 0)));
+                values.put("retryable", Boolean.toString(trace.optBoolean("retryable", false)));
+                values.put("stageTimingsMs", trace.optJSONObject("stageTimingsMs") == null
+                        ? "{}" : trace.optJSONObject("stageTimingsMs").toString());
+            } catch (org.json.JSONException malformed) {
+                values.put("traceParseError", "MALFORMED_OPERATION_TRACE");
+            }
+        }
         return values;
     }
 

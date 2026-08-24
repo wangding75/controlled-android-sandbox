@@ -92,6 +92,28 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
                                 required(nativeGuestTrust, "nativeGuestTrust"),
                                 dependencies::stopGuestBeforeRevisionCommit))));
     }
+    @Override public PackageServiceResult importInstalledApplicationAndEnsure(
+            String requestId, String packageName, String nativeGuestTrust, int virtualUserId) {
+        String normalizedPackage = required(packageName, "packageName");
+        return executeMutation(requestId, "importInstalledApplicationAndEnsure",
+                normalizedPackage, virtualUserId, () -> PackageServiceResult.successRecord(
+                        "importInstalledApplicationAndEnsure", PackageServiceMapper.toSnapshot(
+                                lifecycle.importInstalledApplicationAndEnsure(normalizedPackage,
+                                        required(nativeGuestTrust, "nativeGuestTrust"),
+                                        virtualUserId,
+                                        dependencies::stopGuestBeforeRevisionCommit))));
+    }
+    @Override public PackageServiceResult getPackageOperation(String requestId) {
+        return execute("getPackageOperation", () -> {
+            String trace = dependencies.packageMutations.snapshot(required(requestId, "requestId"));
+            if (trace.isEmpty()) {
+                return PackageServiceResult.failure("getPackageOperation",
+                        "PACKAGE_OPERATION_NOT_FOUND", "No package operation for requestId");
+            }
+            return PackageServiceResult.successText("getPackageOperation", trace)
+                    .withOperationTrace(trace);
+        });
+    }
     @Override public PackageServiceResult createInstallSession(String expectedPackageName) {
         return execute("createInstallSession", () -> PackageServiceResult.successInt(
                 "createInstallSession", lifecycle.createInstallSession(
@@ -279,15 +301,26 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
 
     @Override
     public PackageServiceResult ensureInstance(String packageName, int virtualUserId) {
-        return execute("ensureInstance", () -> {
-            lifecycle.ensureInstance(required(packageName, "packageName"), virtualUserId);
+        String normalized = required(packageName, "packageName");
+        return executeMutation("", "ensureInstance", normalized, virtualUserId, () -> {
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace == null) {
+                lifecycle.ensureInstance(normalized, virtualUserId);
+            } else {
+                try (PackageMutationTrace.StageScope ignored =
+                             trace.stage(PackageMutationTrace.ENSURE_INSTANCE)) {
+                    lifecycle.ensureInstance(normalized, virtualUserId);
+                }
+            }
             return PackageServiceResult.success("ensureInstance");
         });
     }
 
     @Override public PackageServiceResult createClone(String packageName) {
-        return execute("createClone", () -> PackageServiceResult.successInt(
-                "createClone", lifecycle.createClone(required(packageName, "packageName"))));
+        String normalized = required(packageName, "packageName");
+        return executeMutation("", "createClone", normalized, -1,
+                () -> PackageServiceResult.successInt(
+                        "createClone", lifecycle.createClone(normalized)));
     }
 
     @Override public PackageServiceResult rollbackPackage(String packageName) {
@@ -329,13 +362,22 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
 
     @Override
     public PackageServiceResult deleteInstance(String packageName, int virtualUserId) {
-        return execute("deleteInstance", () -> {
-            String normalizedPackage = required(packageName, "packageName");
+        return deleteInstanceWithOperation("", packageName, virtualUserId);
+    }
+
+    @Override
+    public PackageServiceResult deleteInstanceWithOperation(
+            String requestId, String packageName, int virtualUserId) {
+        String normalizedPackage = required(packageName, "packageName");
+        return executeMutation(requestId, "deleteInstance", normalizedPackage, virtualUserId, () -> {
             // Destructive catalog/data mutation is behind a broker stop barrier. If the
             // generation cannot be stopped, execute() returns a failure and the authoritative
             // catalog remains unchanged.
             dependencies.stopGuestBeforeDestructiveOperation(normalizedPackage, virtualUserId);
-            var catalog = lifecycle.deleteInstance(normalizedPackage, virtualUserId);
+            var trace = PackageMutationTrace.current();
+            var catalog = trace == null
+                    ? lifecycle.deleteInstance(normalizedPackage, virtualUserId)
+                    : deleteInstanceWithinCatalogStage(trace, normalizedPackage, virtualUserId);
             VirtualSystemServiceStore.Scope scope =
                     new VirtualSystemServiceStore.Scope(normalizedPackage, virtualUserId);
             dependencies.deleteScopeBestEffort(scope);
@@ -349,10 +391,18 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
         });
     }
 
+    private SandboxCatalogState deleteInstanceWithinCatalogStage(PackageMutationTrace trace,
+            String packageName, int virtualUserId) throws Exception {
+        try (PackageMutationTrace.StageScope ignored =
+                     trace.stage(PackageMutationTrace.CATALOG)) {
+            return lifecycle.deleteInstance(packageName, virtualUserId);
+        }
+    }
+
     @Override
     public PackageServiceResult clearInstanceData(String packageName, int virtualUserId) {
-        return execute("clearInstanceData", () -> {
-            String normalizedPackage = required(packageName, "packageName");
+        String normalizedPackage = required(packageName, "packageName");
+        return executeMutation("", "clearInstanceData", normalizedPackage, virtualUserId, () -> {
             dependencies.stopGuestBeforeDestructiveOperation(normalizedPackage, virtualUserId);
             lifecycle.clearInstanceData(normalizedPackage, virtualUserId);
             dependencies.deleteScopeBestEffort(
@@ -507,6 +557,56 @@ final class PackageManagementSession extends IPackageManagementSession.Stub
                 return PackageServiceResult.failure(operation, code, String.valueOf(error.getMessage()));
             }
         }
+    }
+
+    private PackageServiceResult executeMutation(String requestId, String operation,
+            String packageName, int virtualUserId, PackageManagementOperation action) {
+        requireOwner();
+        PackageMutationCoordinator.Start start = dependencies.packageMutations.begin(
+                requestId, operation, packageName, virtualUserId);
+        if (!start.owner) {
+            return PackageServiceResult.failure(operation, "MUTATION_BUSY",
+                    "A package/user mutation is already in progress; operationId="
+                            + start.trace.operationId())
+                    .withOperationTrace(start.trace.toJson());
+        }
+        PackageMutationTrace trace = start.trace;
+        try (PackageMutationTrace.Scope ignored = trace.attach()) {
+            synchronized (operationLock) {
+                try {
+                    PackageServiceResult result = action.run();
+                    trace.success();
+                    return result.withOperationTrace(trace.toJson());
+                } catch (Throwable error) {
+                    FatalErrorPolicy.rethrowIfFatal(error);
+                    String code = mutationFailureCode(error);
+                    trace.failure(code, false);
+                    android.util.Log.e("CS_PACKAGE", "FAIL operation=" + operation
+                            + " requestId=" + trace.requestId()
+                            + " operationId=" + trace.operationId(), error);
+                    return PackageServiceResult.failure(operation, code,
+                            String.valueOf(error.getMessage()))
+                            .withOperationTrace(trace.toJson());
+                }
+            }
+        } finally {
+            dependencies.packageMutations.complete(trace);
+        }
+    }
+
+    private static String mutationFailureCode(Throwable error) {
+        if (error instanceof PackageOperationStageTimeoutException timeout) {
+            return "PACKAGE_OPERATION_STAGE_TIMEOUT_" + timeout.stage;
+        }
+        if (error instanceof NativeGuestPolicyException policyError) return policyError.code();
+        String message = error == null ? "" : String.valueOf(error.getMessage());
+        int separator = message.indexOf(':');
+        String prefix = separator < 0 ? message : message.substring(0, separator);
+        if (prefix.matches("[A-Z][A-Z0-9_]+")) return prefix;
+        if (error instanceof SecurityException) return "PACKAGE_MUTATION_SECURITY_FAILURE";
+        if (error instanceof IllegalArgumentException) return "PACKAGE_MUTATION_VALIDATION_FAILURE";
+        if (error instanceof IllegalStateException) return "PACKAGE_MUTATION_STATE_FAILURE";
+        return "PACKAGE_MUTATION_FAILURE";
     }
 
     private void requireOwner() { guard.requireOwner(); }

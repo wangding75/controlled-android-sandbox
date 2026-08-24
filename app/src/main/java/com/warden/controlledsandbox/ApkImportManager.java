@@ -121,7 +121,8 @@ final class ApkImportManager {
             CopyResult copied = copyFileAndHash(source, staged, MAX_APK_BYTES);
             totalBytes += copied.bytes;
             if (totalBytes > MAX_INSTALL_BYTES) throw new IllegalArgumentException("Install set exceeds 3 GiB limit");
-            ManifestModel manifest = parseManifest(staged);
+            ManifestModel manifest = traced(PackageMutationTrace.PARSE,
+                    () -> parseManifest(staged));
             if (manifest.splitName().isEmpty()) {
                 if (baseFile != null) throw new IllegalArgumentException("Install set contains more than one base APK");
                 baseFile = staged;
@@ -130,11 +131,16 @@ final class ApkImportManager {
             stagedDigests.add(copied.sha256);
         }
         if (baseFile == null) throw new IllegalArgumentException("Install set does not contain a base APK");
-        PackageInfo baseInfo = packageInfoForArchive(baseFile);
+        File resolvedBaseFile = baseFile;
+        PackageInfo baseInfo = traced(PackageMutationTrace.PARSE,
+                () -> packageInfoForArchive(resolvedBaseFile));
         if (baseInfo == null) throw new IllegalArgumentException("PackageManager rejected the base APK artifact");
         for (int index = 0; index < stagedFiles.size(); index++) {
-            artifacts.add(inspect(stagedFiles.get(index), stagedDigests.get(index), baseInfo,
-                    sources.get(index)));
+            int artifactIndex = index;
+            artifacts.add(traced(PackageMutationTrace.PARSE,
+                    () -> inspect(stagedFiles.get(artifactIndex),
+                            stagedDigests.get(artifactIndex), baseInfo,
+                            sources.get(artifactIndex))));
         }
         validateArtifactSet(artifacts);
         Collections.sort(artifacts);
@@ -178,7 +184,8 @@ final class ApkImportManager {
         boolean containsNativeCode = containsNativeCode(stagedRecords);
         NativeGuestExecutionPolicy.requireInstallAllowed(containsNativeCode, nativeGuestTrust);
         File stagedNativeDir = new File(transactionDir, "lib");
-        String selectedAbi = extractNativeLibraries(stagedRecords, stagedNativeDir);
+        String selectedAbi = traced(PackageMutationTrace.NATIVE_EXTRACT,
+                () -> extractNativeLibraries(stagedRecords, stagedNativeDir));
         if (containsNativeCode && selectedAbi.isEmpty()) {
             throw new SecurityException("NATIVE_ABI_UNSUPPORTED");
         }
@@ -189,15 +196,18 @@ final class ApkImportManager {
         File revisionDir = storageLayout.revisionDirectory(packageName, revisionSha256);
         storageLayout.requireInsidePackagesRoot(revisionDir);
         storageLayout.requireNoManagedSymlinks(revisionDir);
-        if (revisionDir.exists()) {
-            removeKnownRuntimeProfileSidecars(revisionDir);
-            requireMatchingPublishedRevision(transactionDir, revisionDir, selectedAbi);
-            sealPublishedRevision(revisionDir);
-            deleteTreeOrThrow(transactionDir);
-        } else {
-            publishDirectory(transactionDir, revisionDir);
-            sealPublishedRevision(revisionDir);
-        }
+        traced(PackageMutationTrace.PUBLISH, () -> {
+            if (revisionDir.exists()) {
+                removeKnownRuntimeProfileSidecars(revisionDir);
+                requireMatchingPublishedRevision(transactionDir, revisionDir, selectedAbi);
+                sealPublishedRevision(revisionDir);
+                deleteTreeOrThrow(transactionDir);
+            } else {
+                publishDirectory(transactionDir, revisionDir);
+                sealPublishedRevision(revisionDir);
+            }
+            return null;
+        });
 
         File apk = new File(revisionDir, "base.apk");
         File nativeDir = new File(revisionDir, "lib");
@@ -389,10 +399,23 @@ final class ApkImportManager {
         if (offset < header.length) throw new SecurityException("NATIVE_ELF_HEADER_SHORT");
         int type = (header[16] & 0xff) | ((header[17] & 0xff) << 8);
         int machine = (header[18] & 0xff) | ((header[19] & 0xff) << 8);
-        if ((header[4] & 0xff) != expectedClass
-                || (header[5] & 0xff) != 1 || (header[6] & 0xff) != 1
-                || type != 3 || machine != expectedMachine) {
-            throw new SecurityException("NATIVE_ELF_ABI_MISMATCH:" + abi);
+        int elfClass = header[4] & 0xff;
+        if ((header[5] & 0xff) != 1 || (header[6] & 0xff) != 1 || type != 3) {
+            throw new SecurityException("NATIVE_ELF_FORMAT_UNSUPPORTED:" + abi);
+        }
+        boolean knownTarget = (elfClass == 2 && machine == 183)
+                || (elfClass == 1 && machine == 40)
+                || (elfClass == 2 && machine == 62)
+                || (elfClass == 1 && machine == 3);
+        if (!knownTarget) {
+            throw new SecurityException("NATIVE_ELF_TARGET_UNSUPPORTED:" + abi);
+        }
+        if (elfClass != expectedClass || machine != expectedMachine) {
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace != null) {
+                trace.anomaly("MIXED_ELF_MACHINE", file.getName() + ":directoryAbi=" + abi
+                        + ":class=" + elfClass + ":machine=" + machine);
+            }
         }
     }
 
@@ -630,26 +653,49 @@ final class ApkImportManager {
 
     private static CopyResult copyStreamAndHash(InputStream raw, File destination, long limit)
             throws Exception {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        long total = 0;
-        try (BufferedInputStream input = new BufferedInputStream(raw);
-             FileOutputStream file = new FileOutputStream(destination);
-             BufferedOutputStream output = new BufferedOutputStream(file)) {
-            byte[] buffer = new byte[64 * 1024];
-            int count;
-            while ((count = input.read(buffer)) != -1) {
-                total += count;
-                if (total > limit) throw new IllegalArgumentException("APK exceeds size limit");
-                digest.update(buffer, 0, count); output.write(buffer, 0, count);
+        return traced(PackageMutationTrace.COPY, () -> {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            long total = 0;
+            try (BufferedInputStream input = new BufferedInputStream(raw);
+                 FileOutputStream file = new FileOutputStream(destination);
+                 BufferedOutputStream output = new BufferedOutputStream(file)) {
+                byte[] buffer = new byte[64 * 1024];
+                int count;
+                while ((count = input.read(buffer)) != -1) {
+                    total += count;
+                    if (total > limit) throw new IllegalArgumentException("APK exceeds size limit");
+                    long hashStarted = System.nanoTime();
+                    digest.update(buffer, 0, count);
+                    PackageMutationTrace trace = PackageMutationTrace.current();
+                    if (trace != null) {
+                        trace.addMeasuredNanos(PackageMutationTrace.HASH,
+                                System.nanoTime() - hashStarted);
+                        trace.checkpoint();
+                    }
+                    output.write(buffer, 0, count);
+                }
+                output.flush(); file.getFD().sync();
             }
-            output.flush(); file.getFD().sync();
-        }
-        if (total < 4) throw new IllegalArgumentException("APK artifact is empty");
-        try (FileInputStream input = new FileInputStream(destination)) {
-            if (input.read() != 'P' || input.read() != 'K') throw new IllegalArgumentException("Artifact is not a ZIP/APK");
-        }
-        return new CopyResult(total, toHex(digest.digest()));
+            if (total < 4) throw new IllegalArgumentException("APK artifact is empty");
+            try (FileInputStream input = new FileInputStream(destination)) {
+                if (input.read() != 'P' || input.read() != 'K') {
+                    throw new IllegalArgumentException("Artifact is not a ZIP/APK");
+                }
+            }
+            return new CopyResult(total, toHex(digest.digest()));
+        });
     }
+
+    private static <T> T traced(String stage, CheckedSupplier<T> action) throws Exception {
+        PackageMutationTrace trace = PackageMutationTrace.current();
+        if (trace == null) return action.get();
+        try (PackageMutationTrace.StageScope ignored = trace.stage(stage)) {
+            return action.get();
+        }
+    }
+
+    @FunctionalInterface
+    private interface CheckedSupplier<T> { T get() throws Exception; }
 
     private static SandboxRecord existingRecord(String packageName, List<SandboxRecord> trustedRecords) {
         for (SandboxRecord record : trustedRecords) {

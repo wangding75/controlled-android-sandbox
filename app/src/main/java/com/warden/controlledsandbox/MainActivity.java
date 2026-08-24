@@ -5,6 +5,9 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -23,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /** Flash 2 product shell: Home, Apps, and Me. Developer diagnostics are a separate destination. */
 public final class MainActivity extends Activity implements PackageAdapter.Listener {
@@ -36,6 +40,22 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private TextView appStatus;
     private TextView emptyText;
     private Button importButton;
+    private Button addInstalledButton;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private String activeMutationRequestId = "";
+    private String activeMutationLabel = "";
+    private long activeMutationStartedElapsedMs;
+    private final Runnable mutationTicker = new Runnable() {
+        @Override public void run() {
+            if (activeMutationRequestId.isEmpty()) return;
+            if (appStatus != null) {
+                appStatus.setText(activeMutationLabel + " stage=BIND_OR_IMPORT elapsed="
+                        + (SystemClock.elapsedRealtime() - activeMutationStartedElapsedMs)
+                        + "ms request=" + activeMutationRequestId);
+            }
+            mainHandler.postDelayed(this, 250L);
+        }
+    };
     private boolean metadataHealthy = true;
     private SandboxUiState uiState = SandboxUiState.empty();
 
@@ -88,12 +108,12 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
         LinearLayout actions = row(12);
         importButton = actionButton(R.string.action_import);
         importButton.setOnClickListener(v -> chooseApk());
-        Button installed = actionButton(R.string.action_add_installed);
-        installed.setOnClickListener(v -> chooseInstalledApplication());
+        addInstalledButton = actionButton(R.string.action_add_installed);
+        addInstalledButton.setOnClickListener(v -> chooseInstalledApplication());
         Button refresh = actionButton(R.string.action_refresh);
         refresh.setOnClickListener(v -> refresh());
         actions.addView(importButton, weight(1));
-        actions.addView(installed, weight(1));
+        actions.addView(addInstalledButton, weight(1));
         actions.addView(refresh, weight(1));
         root.addView(actions, margins(12, 12, 12, 4));
         appStatus = label("正在读取应用列表…", 13, false);
@@ -253,14 +273,54 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     }
 
     private void importInstalledApplication(InstalledApplication application, String trust) {
-        appStatus.setText("正在添加 " + application.label + "…");
-        viewModel.execute(() -> viewModel.application().importInstalledApplication(
-                        application.packageName, trust),
-                record -> runOnUiThread(() -> {
-                    appStatus.setText("已从已安装应用添加 " + record.label);
-                    refresh();
+        String requestId = UUID.randomUUID().toString();
+        if (!beginMutation("正在添加 " + application.label, requestId)) return;
+        viewModel.execute(() -> viewModel.application().importInstalledApplicationOperation(
+                        application.packageName, trust, requestId),
+                imported -> runOnUiThread(() -> {
+                    com.warden.controlledsandbox.sdk.SandboxOperationResult operation =
+                            imported.operation();
+                    String elapsed = operation.diagnostics().getOrDefault("elapsedMs", "-1");
+                    String operationId = operation.diagnostics().getOrDefault("operationId", "");
+                    String timings = operation.diagnostics().getOrDefault("stageTimingsMs", "{}");
+                    if (operation.successful()) {
+                        finishMutation("已添加 " + imported.record().label + " stage=DONE elapsed="
+                                + elapsed + "ms request=" + requestId + " operation="
+                                + operationId + " timings=" + timings);
+                        refresh();
+                    } else {
+                        finishMutation("添加失败 code=" + operation.errorCode() + " stage="
+                                + operation.diagnostics().getOrDefault("stage", "FAILED")
+                                + " elapsed=" + elapsed + "ms request=" + requestId
+                                + " operation=" + operationId);
+                    }
                 }),
-                error -> runOnUiThread(() -> showFailure("已安装应用添加失败", error)));
+                error -> runOnUiThread(() -> finishMutation("添加失败 code=IMPORT_CLIENT_FAILURE"
+                        + " request=" + requestId + " detail=" + error.getMessage())));
+    }
+
+    private boolean beginMutation(String label, String requestId) {
+        if (!activeMutationRequestId.isEmpty()) {
+            if (appStatus != null) appStatus.setText("操作忙：request=" + activeMutationRequestId);
+            return false;
+        }
+        activeMutationRequestId = requestId;
+        activeMutationLabel = label;
+        activeMutationStartedElapsedMs = SystemClock.elapsedRealtime();
+        if (importButton != null) importButton.setEnabled(false);
+        if (addInstalledButton != null) addInstalledButton.setEnabled(false);
+        mainHandler.removeCallbacks(mutationTicker);
+        mainHandler.post(mutationTicker);
+        return true;
+    }
+
+    private void finishMutation(String message) {
+        mainHandler.removeCallbacks(mutationTicker);
+        activeMutationRequestId = "";
+        activeMutationLabel = "";
+        if (importButton != null) importButton.setEnabled(metadataHealthy);
+        if (addInstalledButton != null) addInstalledButton.setEnabled(metadataHealthy);
+        if (appStatus != null) appStatus.setText(message);
     }
 
     private void createAdditionalInstance(SandboxRecord record) {
@@ -321,7 +381,9 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
             if (record != null) items.add(new SandboxItem(record, instance));
         }
         adapter.replace(items);
-        if (importButton != null) importButton.setEnabled(metadataHealthy);
+        boolean mutationIdle = activeMutationRequestId.isEmpty();
+        if (importButton != null) importButton.setEnabled(metadataHealthy && mutationIdle);
+        if (addInstalledButton != null) addInstalledButton.setEnabled(metadataHealthy && mutationIdle);
         if (emptyText != null) emptyText.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
@@ -450,6 +512,7 @@ public final class MainActivity extends Activity implements PackageAdapter.Liste
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
     @Override protected void onDestroy() {
+        mainHandler.removeCallbacks(mutationTicker);
         if (viewModel != null) viewModel.close();
         super.onDestroy();
     }

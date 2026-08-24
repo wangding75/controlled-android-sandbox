@@ -1,0 +1,278 @@
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        2764c2a com.warden.controlledsandbox.fixture/.MainActivity filter a0f6a1b
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      com.warden.controlledsandbox.fixture.C1_T03_ORDERED:
+        d297764 com.warden.controlledsandbox.fixture/.BroadcastCampaignHighReceiver filter 8607dcd
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=200, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+        f83682 com.warden.controlledsandbox.fixture/.BroadcastCampaignLowReceiver filter 4d70193
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=100, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM:
+        6c697b8 com.warden.controlledsandbox.fixture/.SystemHolderPendingIntentReceiver filter 518d991
+          Action: "com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM"
+          Action: "com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_NOTIFICATION"
+      com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_NOTIFICATION:
+        6c697b8 com.warden.controlledsandbox.fixture/.SystemHolderPendingIntentReceiver filter 518d991
+          Action: "com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_ALARM"
+          Action: "com.warden.controlledsandbox.fixture.SYSTEM_HOLDER_NOTIFICATION"
+      com.warden.controlledsandbox.fixture.FRAMEWORK_RECEIVER_PROBE:
+        50500f6 com.warden.controlledsandbox.fixture/.FixtureReceiver filter db08cf7
+          Action: "com.warden.controlledsandbox.fixture.PING"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE"
+      com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT:
+        d297764 com.warden.controlledsandbox.fixture/.BroadcastCampaignHighReceiver filter 8607dcd
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=200, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.warden.controlledsandbox.fixture.C1_T03_PERMISSION:
+        d297764 com.warden.controlledsandbox.fixture/.BroadcastCampaignHighReceiver filter 8607dcd
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=200, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+        f83682 com.warden.controlledsandbox.fixture/.BroadcastCampaignLowReceiver filter 4d70193
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=100, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.warden.controlledsandbox.fixture.PING:
+        50500f6 com.warden.controlledsandbox.fixture/.FixtureReceiver filter db08cf7
+          Action: "com.warden.controlledsandbox.fixture.PING"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE"
+      com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE:
+        50500f6 com.warden.controlledsandbox.fixture/.FixtureReceiver filter db08cf7
+          Action: "com.warden.controlledsandbox.fixture.PING"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE"
+      com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT:
+        d297764 com.warden.controlledsandbox.fixture/.BroadcastCampaignHighReceiver filter 8607dcd
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=200, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+        f83682 com.warden.controlledsandbox.fixture/.BroadcastCampaignLowReceiver filter 4d70193
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=100, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.warden.controlledsandbox.fixture.C1_T03_ABORT:
+        d297764 com.warden.controlledsandbox.fixture/.BroadcastCampaignHighReceiver filter 8607dcd
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_EXPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=200, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+        f83682 com.warden.controlledsandbox.fixture/.BroadcastCampaignLowReceiver filter 4d70193
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_IMPLICIT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ORDERED"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ABORT"
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_PERMISSION"
+          mPriority=100, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.warden.controlledsandbox.fixture.C1_T03_ASYNC:
+        cb8a5d0 com.warden.controlledsandbox.fixture/.BroadcastCampaignAsyncReceiver filter c0429c9
+          Action: "com.warden.controlledsandbox.fixture.C1_T03_ASYNC"
+      com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_PROBE:
+        50500f6 com.warden.controlledsandbox.fixture/.FixtureReceiver filter db08cf7
+          Action: "com.warden.controlledsandbox.fixture.PING"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_PROBE"
+          Action: "com.warden.controlledsandbox.fixture.FRAMEWORK_ORDERED_RECEIVER_ASYNC_PROBE"
+
+Domain verification status:
+
+Registered ContentProviders:
+  com.warden.controlledsandbox.fixture/.FaultAnrProvider:
+    Provider{7c0ffe5 com.warden.controlledsandbox.fixture/.FaultAnrProvider}
+  com.warden.controlledsandbox.fixture/.FixtureProvider:
+    Provider{b42eaba com.warden.controlledsandbox.fixture/.FixtureProvider}
+
+ContentProvider Authorities:
+  [com.warden.controlledsandbox.fixture.fault.anr]:
+    Provider{7c0ffe5 com.warden.controlledsandbox.fixture/.FaultAnrProvider}
+      applicationInfo=ApplicationInfo{b05b648 com.warden.controlledsandbox.fixture}
+  [com.warden.controlledsandbox.fixture.provider]:
+    Provider{b42eaba com.warden.controlledsandbox.fixture/.FixtureProvider}
+      applicationInfo=ApplicationInfo{2a8bce1 com.warden.controlledsandbox.fixture}
+
+Key Set Manager:
+  [com.warden.controlledsandbox.fixture]
+      Signing KeySets: 40
+
+Packages:
+  Package [com.warden.controlledsandbox.fixture] (a505303):
+    userId=10197
+    pkg=Package{e86b561 com.warden.controlledsandbox.fixture}
+    codePath=/data/app/~~37WjZu4zBSit9ZQeuz2v6g==/com.warden.controlledsandbox.fixture-IRSRrckqKeC1CUgQe3bjlw==
+    resourcePath=/data/app/~~37WjZu4zBSit9ZQeuz2v6g==/com.warden.controlledsandbox.fixture-IRSRrckqKeC1CUgQe3bjlw==
+    legacyNativeLibraryDir=/data/app/~~37WjZu4zBSit9ZQeuz2v6g==/com.warden.controlledsandbox.fixture-IRSRrckqKeC1CUgQe3bjlw==/lib
+    extractNativeLibs=false
+    primaryCpuAbi=x86_64
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1 minSdk=26 targetSdk=35
+    minExtensionVersions=[]
+    versionName=1.0-fixture
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    applicationInfo=PackageImpl{e86b561 com.warden.controlledsandbox.fixture}
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    queriesIntents=[Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] }]
+    dataDir=/data/user/0/com.warden.controlledsandbox.fixture
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-08-24 11:39:13
+    firstInstallTime=2026-08-20 23:25:54
+    lastUpdateTime=2026-08-24 11:39:13
+    signatures=PackageSignatures{ea3f0b9 version:2, signatures:[cc97f9bd], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    requested permissions:
+      android.permission.QUERY_ALL_PACKAGES
+      android.permission.INTERNET
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.CHANGE_WIFI_STATE
+      android.permission.ACCESS_FINE_LOCATION
+      android.permission.ACCESS_COARSE_LOCATION
+      android.permission.CAMERA
+      android.permission.READ_PHONE_STATE
+      android.permission.ACCESS_WIFI_STATE
+      android.permission.RECORD_AUDIO
+      android.permission.MODIFY_AUDIO_SETTINGS
+      android.permission.BLUETOOTH
+      android.permission.BLUETOOTH_ADMIN
+      android.permission.BLUETOOTH_CONNECT
+      android.permission.BLUETOOTH_SCAN
+      android.permission.BODY_SENSORS
+      android.permission.FOREGROUND_SERVICE
+      android.permission.FOREGROUND_SERVICE_DATA_SYNC
+      android.permission.SCHEDULE_EXACT_ALARM
+      android.permission.USE_EXACT_ALARM
+    install permissions:
+      android.permission.MODIFY_AUDIO_SETTINGS: granted=true
+      android.permission.FOREGROUND_SERVICE: granted=true
+      android.permission.BLUETOOTH: granted=true
+      android.permission.INTERNET: granted=true
+      android.permission.BLUETOOTH_ADMIN: granted=true
+      android.permission.CHANGE_WIFI_STATE: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.SCHEDULE_EXACT_ALARM: granted=true
+      android.permission.ACCESS_WIFI_STATE: granted=true
+      android.permission.QUERY_ALL_PACKAGES: granted=true
+    User 0: ceDataInode=4589312 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=false enabled=0 instant=false virtual=false
+      overlay paths:
+        /data/resource-cache/com.android.systemui-neutral-QHHk.frro
+        /data/resource-cache/com.android.systemui-accent-iN1c.frro
+      gids=[3002, 3003, 3001]
+      runtime permissions:
+        android.permission.ACCESS_FINE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BODY_SENSORS: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_CONNECT: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ACCESS_COARSE_LOCATION: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_PHONE_STATE: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CAMERA: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.RECORD_AUDIO: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_SCAN: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+
+Queries:
+  system apps queryable: false
+  queries via package name:
+    com.warden.controlledsandbox.debug:
+      com.warden.controlledsandbox.fixture
+    com.warden.controlledsandbox.fixture:
+      com.warden.controlledsandbox.fixture32
+  queries via intent:
+  queryable via interaction:
+    User 0:
+  queryable via uses-library:
+
+Package Changes:
+  Sequence number=11
+  User 0:
+    seq=0, package=com.mumu.minigame
+    seq=3, package=com.android.settings
+    seq=5, package=com.warden.controlledsandbox.companion32.debug
+    seq=7, package=com.warden.controlledsandbox.fixture32
+    seq=9, package=com.warden.controlledsandbox.fixture
+    seq=10, package=com.warden.controlledsandbox.debug
+
+
+Dexopt state:
+  [com.warden.controlledsandbox.fixture]
+    path: /data/app/~~37WjZu4zBSit9ZQeuz2v6g==/com.warden.controlledsandbox.fixture-IRSRrckqKeC1CUgQe3bjlw==/base.apk
+      x86_64: [status=run-from-apk] [reason=unknown]
+
+
+Compiler stats:
+  [com.warden.controlledsandbox.fixture]
+     base.apk - 66
+Snapshot statistics
+   Unrecorded-hits: 137  Cork-level: 0
+   Summary stats               TotBlds     TotUsed     TotCork     BigBlds    ShortLvd     TotTime     MaxTime
+          0:11         now           0           0           0           0           0           0           0
+          1:11        0:11           0           0           0           0           0           0           0
+          2:11        1:11           4         825           0           0           1           9           9
+          3:11        2:11           0           0           0           0           0           0           0
+          4:11        3:11           3         499           0           0           0           1           0
+          5:11        4:11           8        5802           0           0           1           8           4
+          6:11        5:11           0           0           0           0           0           0           0
+          7:11        6:11           5        5583           0           0           2           5           2
+          8:11        7:11           0           0           0           0           0           0           0
+          9:11        8:11           0           0           0           0           0           0           0
+      01:27:11         now         126       53903           0           0          34          69           9
+
+   Build times                  <= 1ms      <= 2ms      <= 5ms     <= 10ms     <= 20ms     <= 50ms    <= 100ms     > 100ms
+          0:11         now           0           0           0           0           0           0           0           0
+          1:11        0:11           0           0           0           0           0           0           0           0
+          2:11        1:11           3           0           0           1           0           0           0           0
+          3:11        2:11           0           0           0           0           0           0           0           0
+          4:11        3:11           3           0           0           0           0           0           0           0
+          5:11        4:11           7           0           1           0           0           0           0           0
+          6:11        5:11           0           0           0           0           0           0           0           0
+          7:11        6:11           4           1           0           0           0           0           0           0
+          8:11        7:11           0           0           0           0           0           0           0           0
+          9:11        8:11           0           0           0           0           0           0           0           0
+      01:27:11         now         119           3           2           2           0           0           0           0
+
+   Use counters                   <= 1        <= 2        <= 5       <= 10       <= 20       <= 50      <= 100       > 100
+          0:11         now           0           0           0           0           0           0           0           0
+          1:11        0:11           0           0           0           0           0           0           0           0
+          2:11        1:11           1           0           0           0           0           0           0           3
+          3:11        2:11           0           0           0           0           0           0           0           0
+          4:11        3:11           0           0           0           0           0           0           0           3
+          5:11        4:11           1           0           0           0           0           2           1           4
+          6:11        5:11           0           0           0           0           0           0           0           0
+          7:11        6:11           1           1           0           0           0           0           0           3
+          8:11        7:11           0           0           0           0           0           0           0           0
+          9:11        8:11           0           0           0           0           0           0           0           0
+      01:27:11         now          25           3           5           6           4          11          10          61

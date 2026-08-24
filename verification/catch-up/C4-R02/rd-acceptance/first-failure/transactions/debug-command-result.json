@@ -1,0 +1,62 @@
+{
+  "command": "import-prepare",
+  "package": "com.dragon.read",
+  "virtualUserId": 0,
+  "trustNativeGuest": true,
+  "requestId": "c4-r02-first-番茄免费小说-cca76747-924e-4348-823d-70679b413dc0",
+  "startedAt": 1787542925094,
+  "packageOperationTrace": {
+    "requestId": "c4-r02-first-番茄免费小说-cca76747-924e-4348-823d-70679b413dc0",
+    "operationId": "23ae8c46-4d45-4928-a1b7-1c96419010b0",
+    "operation": "importInstalledApplicationAndEnsure",
+    "packageName": "com.dragon.read",
+    "virtualUserId": 0,
+    "stage": "DONE",
+    "status": "SUCCEEDED",
+    "errorCode": "",
+    "retryable": false,
+    "attempt": 1,
+    "retryBudget": 0,
+    "startedAtMs": 1787542926746,
+    "elapsedMs": 7274,
+    "stageTimingsMs": {
+      "HASH": 554,
+      "COPY": 1080,
+      "PARSE": 1712,
+      "NATIVE_EXTRACT": 1384,
+      "PUBLISH": 11,
+      "ENSURE_INSTANCE": 0,
+      "CATALOG": 1762
+    },
+    "stageDeadlinesMs": {
+      "CATALOG": 30000,
+      "PARSE": 60000,
+      "COPY": 120000,
+      "ENSURE_INSTANCE": 10000,
+      "PUBLISH": 30000,
+      "NATIVE_EXTRACT": 180000,
+      "HASH": 30000
+    },
+    "anomalies": [
+      {
+        "code": "MIXED_ELF_MACHINE",
+        "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+      }
+    ]
+  },
+  "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+  "operation": {
+    "status": "PREPARED",
+    "errorType": "",
+    "errorMessage": "",
+    "sessionId": "d179967b-c5df-4a45-a1ab-6acd5b3673bf",
+    "generation": 1,
+    "processSlot": 62,
+    "platformPid": 6746,
+    "pid": 6746,
+    "isolatedProcess": false,
+    "processName": "com.dragon.read",
+    "componentClass": "com.dragon.read.pages.splash.SplashActivity"
+  },
+  "status": "PASS"
+}

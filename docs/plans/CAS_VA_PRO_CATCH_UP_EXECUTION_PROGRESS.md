@@ -6,7 +6,7 @@
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R02`（PENDING）
+当前任务：`C4-R02`（IN_PROGRESS）
 下一任务：`C4-R02`
 最后完成任务：`C4-R01`
 
@@ -65,7 +65,7 @@
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
-| C4-R02 | 添加事务、超时与 UI 状态机 | PENDING | C4-R01 | - | - |
+| C4-R02 | 添加事务、超时与 UI 状态机 | IN_PROGRESS | C4-R01 | - | - |
 | C4-R03 | 启动 readiness 与窗口合同 | PENDING | C4-R01 | - | - |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |

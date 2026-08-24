@@ -9,6 +9,7 @@ import java.util.Objects;
 /** Immutable dependency graph shared by package-service Binder capabilities. */
 final class PackageServiceDependencies implements AutoCloseable {
     final Object operationLock = new Object();
+    final PackageMutationCoordinator packageMutations = new PackageMutationCoordinator();
     final File filesDir;
     final SandboxPackageLifecycle lifecycle;
     final PackageCallerVerifier callerVerifier;
