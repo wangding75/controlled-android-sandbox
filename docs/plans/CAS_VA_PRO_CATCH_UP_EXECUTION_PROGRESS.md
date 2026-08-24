@@ -7,7 +7,7 @@
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
 当前任务：`C4-R03`（BLOCKED）
-下一任务：`C4-R03`（阻断未解除，不推进）
+下一任务：`C4-R03`
 最后完成任务：`C4-R02`
 
 ## 1. 使用规则
@@ -2194,3 +2194,8 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
   user1 未完成，且 C4-R04 fail-closed 与 C4-R05 两轮正式重验尚未执行。恢复时从当前 `C4-R03`
   继续，先完成剩余 240 rows（含红果/番茄小说完整双用户矩阵），再按任务书验证 C4-R04/R05；不得
   复制旧 PASS 或把本回执推进为 C4-R04。
+- **最终续接预检**：已修正账本 `下一任务` 标题为脚本可解析的 `C4-R03`；随后运行
+  `python scripts/verify-catch-up-continuation.py`，脚本按 fail-closed 规则报告
+  `ledger next task C4-R03 is not first dependency-ready PENDING task None`。这是当前任务保持
+  `BLOCKED`、没有可安全推进的 PENDING 任务的预期结果；本次不把 C4-R03 改成 PENDING，也不伪造
+  C4-R04 续接通过。恢复执行前必须先满足本回执的剩余矩阵和阻断恢复条件。
