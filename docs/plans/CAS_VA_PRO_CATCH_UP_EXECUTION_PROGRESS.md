@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-24 10:29（Asia/Shanghai）
+更新时间：2026-08-24 11:08（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R01`（PENDING）
-下一任务：`C4-R01`
-最后完成任务：`C4-T05`
+当前任务：`C4-R02`（PENDING）
+下一任务：`C4-R02`
+最后完成任务：`C4-R01`
 
 ## 1. 使用规则
 
@@ -64,7 +64,7 @@
 | C4-T03 | SX 数据迁移 | DONE | C4-T01,C4-T02 | `e064e2174854c661248e0c2970b8fe621bc161ef` | §5 C4-T03 |
 | C4-T04 | 移除 BlackBox/Pine/Xposed runtime | DONE | C4-T02,C4-T03 | `525f3aec84ae1ff09192f11a417adf51464f965e` | §5 C4-T04 |
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
-| C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | PENDING | C4-T05 | - | - |
+| C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | PENDING | C4-R01 | - | - |
 | C4-R03 | 启动 readiness 与窗口合同 | PENDING | C4-R01 | - | - |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
@@ -1978,3 +1978,68 @@ C5 已由用户明确排除，完成 C4-R05 后直接进入 C6-T01。
 - **遗留风险**：四个问题的实际首次失败签名和最终 owner 仍待 C4-R01；C4-R02..R05 尚未执行；历史
   C4-T05 summary 仅保留审计，不得用于关闭重新打开的 C4。
 - **下一任务**：`C4-R01`；执行前必须先读取任务书 1.2、本账本最后回执、Known Issues 和 Git/远端状态。
+
+### C4-R01：证据纠偏、确定性复现与 VA/NBB 映射
+
+- **状态**：DONE
+- **开始/结束时间**：2026-08-24 10:37 / 2026-08-24 11:08（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析，本轮观测 endpoint
+  为 `127.0.0.1:16416`，脚本未硬编码 ADB 地址。设备 API 32、model `22041211A`、boot ID
+  `d09f0f79-058d-42af-924c-3a99f1429ea4`、Android ID `398eea33120cd887`、ABI list
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`。
+- **开始基线与预检**：`d73003748d64ef70fe8b74c03b8c733be1338636`；开始时工作区干净，本地与远端
+  HEAD 一致，Git 身份为 `OpenAI <openai@users.noreply.github.com>`，账本下一任务为 `C4-R01`；开始后先将
+  C4-R01 标记 `IN_PROGRESS`。
+- **范围与实现摘要**：只新增 fail-fast 诊断 collector、机器可读 evidence、证据纠偏、owner 分类和
+  VA/NBB mapping；没有修改生产代码，没有执行 C4-R02..R05、C6 或 OEM 适配。原 C4-T05 两份 summary
+  均已标记 `SUPERSEDED`、`historical_only=true`、`usable_for_c4_closure=false`，历史证据保留但禁止关闭 C4。
+- **构建与 APK**：device-test build PASS；manifest SHA-256
+  `a25258d81e78cfc1d04524cd5edc5b58e5b457fddf0ae601ffccddbc2686df55`；Host
+  `97d0ea1d3a6f492ee1b07311ac0a39f17027d0534f65f89b7e19f09c98d65b7f`；fixture
+  `e4f9d4458eee7d3d123f7be11426424c0d2533329435e60185f6fd6c78691058`；companion32
+  `6f9d2e6aaf7d704e5ae74d72e938fe8ccb413c565ebbf83dd7e018ff53d44ef0`。
+- **商业样本动态清单**：夸克 `com.quark.browser` 10.10.5.1080/1080、base 1/split 0、arm64-v8a，首次
+  PASS 且截图可见真实隐私页，仅作正向对照；红果免费短剧 `com.phoenix.read` 7.0.5.33/70533、base 1/split 0、
+  arm64-v8a，首次 FAIL；番茄免费小说 `com.dragon.read` 7.1.9.32/71932、base 1/split 0、arm64-v8a，首次
+  FAIL。红果和番茄均为 `SecurityException: NATIVE_ELF_ABI_MISMATCH:arm64-v8a`，夸克 PASS 未替代二者。
+- **首次失败与 owner**：修复前同一 RD raw 已确认黑屏为 `LAUNCH_PASS` + Guest Stub `RESUMED` +
+  `windows=[]/hasVisible=false/reportedDrawn=false`；该精确签名当前未重现，明确列为待 C4-R03/R04/R05 验证，
+  未伪装成当前失败。当前 resume-crash 单次启动在 43.729 秒以 `LAUNCH_GATE_FAILED` 失败并保存完整设备快照，
+  超过 cold first-frame 30 秒 SLO，但内部首要阶段因 telemetry gap 待验证，owner 保持 CAS 通用启动 readiness。
+  红果/番茄在 CAS native 校验、catalog success 之前失败，owner 确认为 CAS 通用导入兼容性，不转交 SX/UI。
+- **首次失败策略与时间线**：每个 operation `attempt=1`、`retry_budget=0`、无自动 operation retry；保留
+  request/operation ID、错误分类、retryable 判断和 snapshot 时间。已确认当前生产路径未把 ID 贯穿
+  import/catalog/bind/prepare/attach/Activity/window/draw，缺失阶段写为 telemetry gap，不编造时间。原 C4 loop
+  lines 1550-1558 的 stop + 400 ms + relaunch 已确认可隐藏第一次失败，生产移除归 C4-R04。
+- **VA/NBB mapping**：已在设计前查阅并固化 NewBlackBox 的
+  `BPackageManagerService`/`BPackageInstallerService`、`BlackBoxCore`/AMS/`ActivityStack`、
+  `BProcessManagerService`/`BActivityThread`、`ContextCompat`/WindowManager/WindowSession，以及 VirtualApp 的
+  `VAppManagerService`、`VActivityManager`/AMS/`ActivityStack`、Stub/HCallback/Instrumentation/Window
+  实现和 SHA-256。采纳原子安装状态、显式 Stub/process attach/death、最小 Host window identity、正常
+  ActivityThread draw；不采纳直接复制、固定 sleep、无分类重试、broad addView retry 或 raw Host Context 暴露。
+- **指定提交审查**：`6e1044b013fab19a53dd4ceab75230963c4dd83f` 是 12 文件 `+548/-34` 的部分
+  Window/Audio/Context 恢复，但多假设面、broad post-resume addView retry 和 Quark-only evidence 不能关闭 C4；
+  `1bef0951218ec8356f94c869ae9131ad5859864e` 仅追加 9 行说明，不是完整重验回执。
+- **Evidence**：`verification/catch-up/C4-R01/c4-r01-rd-summary.json`、
+  `verification/catch-up/C4-R01/reference-mapping.json`、
+  `docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md`；raw 当前目录
+  `artifacts/capability-audit/catch-up-c4-r01/20260824T025555Z`，summary SHA-256
+  `f40d0fa694ebac1b144ddaf57f35756263e53165a8382ba7ad8269b8c3d35950`；历史黑屏 transition SHA-256
+  `cba8dd7aeb9e7a0a9d75026ef853328e35b91a636c447486d763924c493ce9ca`。
+- **Known Issues**：`KI-R03-053` 至 `KI-R03-056` 均已补充独立证据、最小复现、owner 和已确认/待验证边界；
+  它们仍为 `RECORDED` 且 `blocks_current_campaign: true`，由 C4-R02..R05 后续关闭，本任务没有伪造 FIXED。
+- **验收命令与结果**：collector AST、tracked JSON/YAML parse PASS；
+  `python scripts/test_catch_up_continuation.py` PASS（6 tests）；
+  `python tools/capability/validate_campaign_infra.py` PASS；`git diff --check` PASS；设备 collect-all 完成。
+- **偏离与裁决**：修复前黑屏精确签名在当前 HEAD 未重现，故保留历史 raw 作为已确认首次失败证据，并把
+  当前完整回归明确留给 R03/R04/R05；没有通过降级代码、延长 sleep/deadline 或重复启动制造/掩盖结果。
+  C4-R01 的证据纠偏、独立 Known Issue、原始 evidence、最小复现、owner 分类和参考合同均已闭合，因此本任务
+  DONE；这不表示四个 runtime/gate issue 已关闭，也不表示 C4 已关闭。
+- **实现/证据提交 SHA**：`d2f1b0aa7137195661525c442e290bd6e009646c`
+  （`test(c4): [C4-R01] preserve and classify first failures`）。
+- **回执提交**：主题 `docs(progress): record [C4-R01] receipt`。
+- **推送与远端验证**：本回执提交后将两个提交非强制推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，再以 `git ls-remote --heads` 比较本地/远端 HEAD。
+- **下一任务**：`C4-R02`（PENDING）；下一环境必须从本回执和续接预检无损继续，禁止跳到 C4-R03、C6 或 OEM。
