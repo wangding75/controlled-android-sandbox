@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | - | §5 C4-R03 |
+| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `f65ea6f3` | §5 C4-R03 |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2087,3 +2087,63 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
 - **回执提交**：本段为独立的 `docs(progress): record [C4-R02] receipt` 提交。
 - **下一任务**：`C4-R03`（PENDING）；下一环境必须从本回执和最终续接预检无损继续，禁止跳到
   C4-R04、C4-R05、C6 或 OEM。
+
+### C4-R03：启动 readiness、窗口合同与超时修复
+
+- **状态**：BLOCKED
+- **开始/结束时间**：2026-08-24 14:46 / 2026-08-24 17:55（Asia/Shanghai）
+- **执行环境**：Windows amd64；PowerShell；JDK 17；Gradle 8.13；仓库
+  `D:\github\controlled-android-sandbox`；分支
+  `feature/t57-r03-va-pro-capability-campaign`。MuMu 实例按名称 `RD测试` 动态解析，观测 endpoint
+  `127.0.0.1:16416` 只作为快照字段记录，runner 没有硬编码 ADB 地址；设备 model `22041211A`、
+  API 32、boot ID `d09f0f79-058d-42af-924c-3a99f1429ea4`、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`。
+- **开始预检**：开始时账本下一任务为 `C4-R03`，工作区、本地 HEAD、远端 HEAD 和 Git 身份符合规范，
+  身份为 `OpenAI <openai@users.noreply.github.com>`；开始状态记录在
+  `verification/catch-up/C4-R03/start-state.json`。
+- **任务边界**：只执行 R03 启动 readiness、窗口合同、首帧证据和参考实现映射；没有进入 C4-R04、
+  C4-R05、C6 或 OEM。未实施 R04 的 fail-closed runner，也未实施 R05 关门压力。
+- **实现摘要**：加入 `REQUEST_ACCEPTED`、`GUEST_READY`、`ACTIVITY_RESUMED`、`FIRST_FRAME_DRAWN`
+  阶段、request/operation ID、attempt/retry metadata、token 绑定的 Activity event 过滤和首帧 gate；
+  将 post-resume window 修复限定为一次明确观察/一次 fallback，不使用循环重试、固定 sleep 或扩大生产
+  deadline。新增动态 target discovery 和首次失败立即 snapshot 的 R03 runner。
+- **NBB/VA 参考映射**：已在设计前查阅并记录 NBB 的 AMS/ActivityStack、process attach/death、
+  ContextCompat/WindowManager/WindowSession，以及 VA 的 VActivityManager/ActivityStack、
+  StubActivityRecord、Instrumentation、WindowManager/Session 实现。R03 采用其“broker-owned
+  ActivityRecord/route + 小 Host Stub Intent + 正常 framework ActivityThread draw”边界，不复制源码。
+  详细记录见 `docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md`。
+- **动态商业样本**：夸克 `com.quark.browser` 10.10.5.1080/1080，base 1/split 0，arm64-v8a；
+  红果 `com.phoenix.read` 7.0.5.33/70533，base 1/split 0，arm64-v8a；番茄小说
+  `com.dragon.read` 7.1.9.32/71932，base 1/split 0，arm64-v8a；钉钉动态识别为
+  `com.alibaba.android.rimet` 7.8.10/1178，base 1/split 0，arm64-v8a。夸克只作正向对照，
+  没有用于判定红果或番茄兼容。
+- **验收证据**：fixture user0/user1 各一轮 cold/hot 共 4 行通过；番茄 user0 cold/hot 一轮通过，
+  cold 29400 ms、hot 4829 ms，均有首帧、非空 Window/Surface 和非黑截图。该证据不满足任务书的
+  5 target × 2 users × 50 cold/hot 全矩阵。
+- **首次失败**：钉钉 request `ade67da601b74b9b81c7d6f46c5ce3e3` 首次冷启动在
+  `TransactionTooLargeException` 270596 bytes 失败；夸克 request
+  `67a3de60be574c7bb97cc5480943297d` 在 283304 bytes 失败；红果 request
+  `b3b25112f8e24922b19bff1f590bc258` 在 308616 bytes 失败。每个均为
+  `attempt=1/retryBudget=0/automaticRetryPerformed=false`，并立即保存 logcat、dumpsys、Surface、
+  进程、事务、截图和设备快照；证据索引见 `verification/catch-up/C4-R03/rd-acceptance/summary.json`。
+- **owner 裁决**：夸克 logcat 已确认 `Guest Activity.startActivity → GuestRuntimeBrokerBridge →
+  RuntimeOperationTransport → IRuntimeBroker.executeV2`，失败发生在 CAS import/catalog 成功之后、
+  首帧之前。当前 owner 保持 CAS 通用 Activity/Intent transport；没有 SX/UI 调用失败证据，
+  不猜测下游 owner。新增 `KI-R03-057`，状态 `RECORDED`、阻断为 true；`KI-R03-055` 仍仅表示
+  导入兼容 FIXED，不代表运行时兼容。
+- **设计裁决**：参考 NBB/VA 后确认 CAS 当前把大 Intent extras 直接复制到顶层
+  `RuntimeOperationRequest`，完整 wire 超过 256 KiB 时又只丢弃 wire 而保留 extras，导致 Guest→Broker
+  Binder 事务过大。候选修复必须采用 generation/session 绑定的有界 payload handle 或等价 broker-owned
+  record，不能静默截断；在协议和边界测试未完成前不再盲目重试。本任务不提前实施 R04/R05。
+- **验证命令**：`python scripts/test_catch_up_continuation.py` PASS（6 tests）；
+  `python tools/capability/validate_campaign_infra.py` PASS；Known Issues YAML、R03 summary JSON
+  解析 PASS；`git diff --check` PASS；Gradle `:app:assembleDebug :sandbox-runtime:compileDebugJavaWithJavac`
+  PASS。APK SHA-256 为 `0278ADAA13DA8A066423E5351F8FBD751B239F7B7EEB1322080744FD85360B13`。
+- **阻断结论**：R03 商业启动验收未满足，不能标记 DONE，不能推进 C4-R04。账本当前任务保持
+  `C4-R03 (BLOCKED)`，下一任务不前移；恢复执行前必须先完成有界 Intent transport 设计/实现及其
+  证据闭环。
+- **实现/证据提交 SHA**：`f65ea6f3`（`feat(c4): record [C4-R03] launch readiness blocker`）。
+- **回执提交**：本段为独立的 `docs(progress): record [C4-R03] receipt` 提交。
+- **推送与远端验证**：本回执提交后将实现提交和回执提交非强制推送至
+  `origin/feature/t57-r03-va-pro-capability-campaign`，再比较本地/远端 HEAD；由于任务 BLOCKED，
+  最终续接预检确认仍停留在 C4-R03，不能伪造下一任务 C4-R04。
