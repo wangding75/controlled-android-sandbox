@@ -50,7 +50,7 @@ ALLOWED_GUARD_FILES = {
 }
 HARD_CODED_SERIAL = re.compile(r"127\.0\.0\.1:\d+")
 TASK_ROW = re.compile(
-    r"^\|\s*(C\d+-T\d+)\s*\|\s*([^|]+?)\s*\|\s*"
+    r"^\|\s*(C\d+-[TR]\d+)\s*\|\s*([^|]+?)\s*\|\s*"
     r"(PENDING|IN_PROGRESS|BLOCKED|DONE|NOT_APPLICABLE)\s*\|\s*([^|]+?)\s*\|"
 )
 HEX = re.compile(r"\b[0-9a-f]{7,40}\b", re.IGNORECASE)

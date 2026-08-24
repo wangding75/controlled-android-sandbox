@@ -16,6 +16,15 @@ _SPEC.loader.exec_module(continuation)
 
 
 class ContinuationLedgerTests(unittest.TestCase):
+    def test_parse_rows_accepts_revalidation_task_ids(self) -> None:
+        rows = continuation.parse_rows(
+            "| C4-R01 | evidence correction | PENDING | C4-T05 | - | - |\n"
+            "| C5-T01 | skipped scope | NOT_APPLICABLE | C2,C3 | - | receipt |\n"
+        )
+        self.assertEqual(rows["C4-R01"]["status"], "PENDING")
+        self.assertEqual(rows["C4-R01"]["dependencies"], "C4-T05")
+        self.assertEqual(rows["C5-T01"]["status"], "NOT_APPLICABLE")
+
     def test_expands_range_dependencies(self) -> None:
         self.assertEqual(
             continuation.expand_dependencies("C1-T01..T03,C2-T01"),
