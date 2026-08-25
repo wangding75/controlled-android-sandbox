@@ -1,8 +1,8 @@
 # C4-R05 formal RD closure orchestration design
 
-日期：2026-08-25  
-任务：`C4-R05`  
-前置：`C4-R04`  
+日期：2026-08-25
+任务：`C4-R05`
+前置：`C4-R04`
 设备：MuMu instance name `RD测试`，运行时动态解析
 
 ## 1. 目标与边界
