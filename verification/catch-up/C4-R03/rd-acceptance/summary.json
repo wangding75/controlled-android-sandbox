@@ -1,7 +1,16 @@
 {
   "schemaVersion": 1,
   "task": "C4-R03",
-  "status": "BLOCKED",
+  "status": "DONE_WITH_ACCEPTED_RISK",
+  "taskLedgerStatus": "DONE",
+  "formalMatrixClosure": false,
+  "acceptanceException": {
+    "approvedBy": "user directive 2026-08-25",
+    "decision": "retain KI-R03-060 as an open Issue, accept residual risk for administrative C4-R03 closure, and advance to C4-R04",
+    "regressionRequired": true,
+    "regressionTasks": ["C4-R04", "C4-R05"],
+    "doesNotClaim500FirstAttemptPass": true
+  },
   "baselineCommit": "3b042808eb0c1d63bfc5fea30e27e6e3725b3f16",
   "instanceName": "RD测试",
   "resolvedByName": true,
@@ -108,9 +117,9 @@
     "taskbook":"docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
     "rootPlan":"docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md"
   },
-  "blocker": "C4-R03 remains blocked: Fanqie user0 cold-001 first failed at 33167 ms and Fanqie user1 cold-002 first failed at 31071 ms; after an explicit RD测试 restart, the same user1 cold-002 resumed observation failed again at 42106 ms with GUEST_MAIN_THREAD_TIMEOUT in the CAS Guest ContentProvider bridge. The required 500-row matrix remains incomplete; no automatic retry, sleep extension, or production deadline extension was used.",
-  "nextTask": "C4-R03",
-  "nextTaskAdvanceAllowed": false,
+  "blocker": "FORMAL_MATRIX_DEFERRED_BY_ACCEPTED_RISK: historical readiness failures and incomplete 500-row first-attempt evidence remain open for C4-R04/R05 regression; no automatic retry, sleep extension, or production deadline extension was used.",
+  "nextTask": "C4-R04",
+  "nextTaskAdvanceAllowed": true,
   "targetedFix": {
     "status": "TARGETED_PASS_MATRIX_INCOMPLETE",
     "evidence": "verification/catch-up/C4-R03/rd-acceptance/targeted-fix-20260825.json",

@@ -1374,7 +1374,10 @@ issues:
       - GUEST_ACTIVITY_CREATE
       - reportedDrawn=false
       - windows=[]
-    blocks_current_campaign: true
+    blocks_current_campaign: false
+    follow_up_required: true
+    follow_up_task: C4-R04/R05 regression
+    acceptance: ACCEPTED_RISK_FOR_C4_R03_ADVANCE_NOT_FIXED
     fix_policy: C4_R03_FIRST_FRAME_DRAWN_AND_C4_R04_FAIL_CLOSED_GATE
     notes: >
       C4-R01 marked both historical C4-T05 summaries SUPERSEDED and unusable for C4
@@ -1663,4 +1666,8 @@ issues:
       and 8515 ms; all eight finalized replay rows passed, but the passing rows still contained
       unrelated WebView LMK markers. This is recorded as NON_REPRODUCED_NOT_PASS: historical
       first-failure evidence remains authoritative, the issue is not FIXED or cleared, and the
-      CAS-versus-MuMu owner split remains pending. Fixture remains intentionally last.
+      CAS-versus-MuMu owner split remains pending. On 2026-08-25 the user explicitly accepted
+      this residual risk for administrative C4-R03 closure and requested advancement to C4-R04;
+      this does not change the historical evidence or claim a 500/500 first-attempt PASS. The
+      issue remains open and must be included in the subsequent C4-R04/R05 regression gate.
+      Fixture remains intentionally last.

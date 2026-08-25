@@ -346,7 +346,17 @@ request/operation ID 保留在：
 
 通过复现并不能清除历史首次失败。更重要的是，本次通过的 `hot-017` 和 `hot-019` logcat 仍各自
 出现了与目标无关的 WebView LMK `reason: device is not responding`，说明“有 LMK 就一定失败”也
-不成立。当前结论只能升级为：两个历史失败在同一 boot 的有界复现中未复现，故问题具有非确定性，
-但 CAS launch/readiness 与 MuMu responsiveness 的主导因果仍未分离；不能标记 PASS 或关闭
-`KI-R03-060`。机器回执为 `verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json`，
-C4-R03 继续 `BLOCKED`。
+不成立。当时的证据结论只能是：两个历史失败在同一 boot 的有界复现中未复现，故问题具有非确定性，
+但 CAS launch/readiness 与 MuMu responsiveness 的主导因果仍未分离；不能把问题标记为已修复或关闭
+`KI-R03-060`。机器回执为 `verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json`。
+该段的 `BLOCKED` 是复现完成时的历史状态；后续用户批准的行政关账和风险豁免见第 13 节。
+
+## 13. 2026-08-25 用户批准的条件性关账与回归安排
+
+用户明确要求：保留 DingTalk readiness 问题为 Issue，接受当前残余风险，将 C4-R03 记录为 `DONE` 并
+推进下一任务，后续把该 Issue 纳入回归。账本据此采用“行政 DONE、风险豁免、正式矩阵门禁延期”的记录方式：
+历史 `hot-017`/`hot-019` 首次失败、8 条有界复现通过和 10 条未执行坐标均保持原样，未被改写为 500/500 PASS。
+
+因此 `KI-R03-060` 仍为开放 Issue，owner 仍待 CAS process/prepare 与 MuMu responsiveness 的因果分离；
+本节只记录用户批准的推进决策，不构成生产修复或 C4 阶段关闭。C4-R04/R05 必须将该 Issue 作为回归门禁，
+并在最终关门前重新验证失败坐标及完整矩阵。
