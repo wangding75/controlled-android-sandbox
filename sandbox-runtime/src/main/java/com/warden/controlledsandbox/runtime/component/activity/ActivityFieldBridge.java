@@ -283,7 +283,16 @@ public final class ActivityFieldBridge {
                                 + " token=" + token);
                 return;
             }
-            throw new IllegalStateException("ACTIVITY_CLIENT_RECORD_LAUNCHING_NOT_FOUND");
+            // Some API-32 ActivityThread builds consume the temporary launching record before
+            // the Handler callback observes the transaction (DingTalk can enqueue a second
+            // Activity while its first Activity is still being attached).  The LaunchActivityItem
+            // has already received the Guest ActivityInfo/Intent above, so failing the entire
+            // process here turns a recoverable ordering difference into a false launch crash.
+            // Keep the evidence explicit and let ActivityThread continue with its own record.
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY",
+                    "PRELAUNCH_RECORD_NOT_FOUND_CONTINUE api=" + Build.VERSION.SDK_INT
+                            + " token=" + token);
+            return;
         }
         Field infoField = findField(record.getClass(), "activityInfo");
         Field intentField = findField(record.getClass(), "intent");

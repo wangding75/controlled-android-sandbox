@@ -30,7 +30,7 @@ public final class ActivityFieldBridgeSelfTest {
         testFirstResumeDoesNotLookLikeStaleWindow();
         testFixFrameworkWindowIdentityNullSafe();
         testLegacyPreLaunchRecordSuccess();
-        testLegacyPreLaunchRecordMissingFailsClosed();
+        testLegacyPreLaunchRecordAlreadyConsumedContinues();
         testAndroid15DirectLaunchActivityItemAuthoritative();
 
         System.out.println("PASS audited Activity field bridge self-test");
@@ -110,7 +110,7 @@ public final class ActivityFieldBridgeSelfTest {
                 "legacy mLaunchingActivities ActivityClientRecord.intent must be projected");
     }
 
-    private static void testLegacyPreLaunchRecordMissingFailsClosed() throws Exception {
+    private static void testLegacyPreLaunchRecordAlreadyConsumedContinues() throws Exception {
         GuestRuntimeEnvironment.Session session = createTestSession("session-fail", 1L, "com.guest.fail");
         IBinder token = new Binder();
 
@@ -129,8 +129,13 @@ public final class ActivityFieldBridgeSelfTest {
         message.what = 159;
         message.obj = transaction;
 
-        expectFailure(() -> ActivityFieldBridge.projectFrameworkLaunchTransaction(thread, message, session),
-                "missing record in existing mLaunchingActivities must fail closed");
+        boolean projected = ActivityFieldBridge.projectFrameworkLaunchTransaction(thread, message, session);
+        check(projected, "transaction must stay projected after the temporary record is consumed");
+        check("com.guest.fail.MainActivity".equals(launchItem.mInfo.name),
+                "LaunchActivityItem.mInfo remains authoritative after record consumption");
+        check("com.guest.fail.MainActivity".equals(
+                        launchItem.mIntent.getComponent().getClassName()),
+                "LaunchActivityItem.mIntent remains authoritative after record consumption");
     }
 
     private static void testAndroid15DirectLaunchActivityItemAuthoritative() throws Exception {
@@ -283,4 +288,3 @@ public final class ActivityFieldBridgeSelfTest {
     private static final class WrongTypeHost { String required = "wrong"; }
     private static final class WrongTypeTarget { Integer required = 1; }
 }
-

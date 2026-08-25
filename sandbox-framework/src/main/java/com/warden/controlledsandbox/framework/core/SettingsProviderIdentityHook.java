@@ -10,7 +10,9 @@ import com.warden.controlledsandbox.contract.VirtualLocationProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingSnapshot;
 import com.warden.controlledsandbox.contract.VirtualSettingsProfileSnapshot;
 import com.warden.controlledsandbox.contract.VirtualGoogleServicesProfileSnapshot;
+import com.warden.controlledsandbox.framework.identity.AttributionSourceChain;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
+import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
@@ -41,13 +43,19 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         boolean virtualAndroidId = !VirtualLocationProfileSnapshot.MODE_HOST.equals(device.mode());
         boolean virtualSettings = settings != null
                 && !VirtualLocationProfileSnapshot.MODE_HOST.equals(settings.mode());
-        if (!virtualAndroidId && !virtualSettings) return () -> { };
         List<ProviderReplacement> replacements = new ArrayList<>();
         List<ContentProviderClient> providerLeases = new ArrayList<>();
         try {
-            installNamespace(context, identity, device, settings, "Secure",
-                    VirtualSettingsProfileSnapshot.NAMESPACE_SECURE, virtualAndroidId,
-                    replacements, providerLeases);
+            // DeviceConfig routes through Settings.Config even when the virtual identity and
+            // settings profiles are HOST.  Its Android 12 provider verifies that the submitted
+            // AttributionSource matches the physical Binder caller, so its transport proxy is
+            // always required.
+            installTransportNamespace(context, identity, "Config", replacements, providerLeases);
+            if (virtualAndroidId || virtualSettings) {
+                installNamespace(context, identity, device, settings, "Secure",
+                        VirtualSettingsProfileSnapshot.NAMESPACE_SECURE, virtualAndroidId,
+                        replacements, providerLeases);
+            }
             if (virtualSettings) {
                 installNamespace(context, identity, device, settings, "System",
                         VirtualSettingsProfileSnapshot.NAMESPACE_SYSTEM, false,
@@ -63,6 +71,31 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException("VIRTUAL_SETTINGS_PROVIDER_INSTALL_FAILED", error);
         }
+    }
+
+    private static void installTransportNamespace(Context context, GuestIdentity identity,
+            String nestedName, List<ProviderReplacement> replacements,
+            List<ContentProviderClient> providerLeases) throws Exception {
+        Class<?> owner = Class.forName("android.provider.Settings$" + nestedName);
+        Field cacheField = ReflectiveServiceHook.findField(owner, "sNameValueCache");
+        cacheField.setAccessible(true);
+        Object cache = cacheField.get(null);
+        if (cache == null) throw new IllegalStateException(
+                "Settings." + nestedName + " cache is unavailable");
+        ProviderField provider = providerField(cache);
+        Object original = provider.field.get(provider.owner);
+        if (original == null) {
+            original = acquireProvider(transportContext(context), nestedName, providerLeases);
+            if (original != null) provider.field.set(provider.owner, original);
+        }
+        if (original == null) {
+            initializeCache(transportContext(context), owner, "runtime");
+            original = provider.field.get(provider.owner);
+        }
+        if (original == null) throw new IllegalStateException(
+                "Settings." + nestedName + " provider is unavailable");
+        provider.field.set(provider.owner, transportProxy(original, identity));
+        replacements.add(new ProviderReplacement(provider.owner, provider.field, original));
     }
 
     private static void installNamespace(Context context, GuestIdentity identity,
@@ -162,6 +195,16 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         return null;
     }
 
+    /** Return the Host Context when the runtime exposes one, without coupling this module to it. */
+    private static Context transportContext(Context context) {
+        try {
+            Method method = context.getClass().getMethod("hostServiceContext");
+            Object value = method.invoke(context);
+            if (value instanceof Context host) return host;
+        } catch (Throwable ignored) { }
+        return context;
+    }
+
     private static ProviderField providerField(Object cache) throws Exception {
         try {
             Field direct = ReflectiveServiceHook.findField(cache.getClass(), "mContentProvider");
@@ -205,15 +248,33 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         return Proxy.newProxyInstance(loader, interfaces.toArray(new Class<?>[0]), handler);
     }
 
+    private static Object transportProxy(Object original, GuestIdentity identity) {
+        Set<Class<?>> interfaces = new LinkedHashSet<>();
+        Class<?> cursor = original.getClass();
+        while (cursor != null) {
+            for (Class<?> value : cursor.getInterfaces()) interfaces.add(value);
+            cursor = cursor.getSuperclass();
+        }
+        if (interfaces.isEmpty()) throw new IllegalStateException(
+                "Settings transport exposes no interfaces");
+        ClassLoader loader = original.getClass().getClassLoader();
+        if (loader == null) loader = SettingsProviderIdentityHook.class.getClassLoader();
+        InvocationHandler handler = (ignored, method, args) -> {
+            if (method.getDeclaringClass() == Object.class) return method.invoke(original, args);
+            return invokeOriginal(original, method, args, identity);
+        };
+        return Proxy.newProxyInstance(loader, interfaces.toArray(new Class<?>[0]), handler);
+    }
+
     private static Object invoke(Object original, Method method, Object[] args,
             GuestIdentity identity, VirtualDeviceIdentitySnapshot device,
             VirtualSettingsProfileSnapshot settings, String namespace, boolean virtualAndroidId)
             throws Throwable {
         if (method.getDeclaringClass() == Object.class) return method.invoke(original, args);
-        if (!"call".equals(method.getName())) return invokeOriginal(original, method, args);
+        if (!"call".equals(method.getName())) return invokeOriginal(original, method, args, identity);
         String operation = operation(args, namespace);
         String key = settingKey(args, operation, namespace);
-        if (key.isEmpty()) return invokeOriginal(original, method, args);
+        if (key.isEmpty()) return invokeOriginal(original, method, args, identity);
         String upper = operation.toUpperCase(Locale.ROOT);
         boolean get = upper.contains("GET") || (!upper.contains("PUT") && !upper.contains("DELETE"));
         boolean put = upper.contains("PUT") || upper.contains("INSERT") || upper.contains("UPDATE");
@@ -237,7 +298,7 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
             return resultBundle(key, androidId);
         }
         if (settings == null || VirtualLocationProfileSnapshot.MODE_HOST.equals(settings.mode())) {
-            return invokeOriginal(original, method, args);
+            return invokeOriginal(original, method, args, identity);
         }
         if (VirtualLocationProfileSnapshot.MODE_BLOCKED.equals(settings.mode())
                 || !settings.namespaceAllowed(namespace) || settings.keyBlocked(key)) {
@@ -280,9 +341,15 @@ public final class SettingsProviderIdentityHook implements AutoCloseable {
         };
     }
 
-    private static Object invokeOriginal(Object original, Method method, Object[] args) throws Throwable {
-        try { return method.invoke(original, args); }
-        catch (InvocationTargetException error) { throw error.getCause(); }
+    private static Object invokeOriginal(Object original, Method method, Object[] args,
+                                         GuestIdentity identity) throws Throwable {
+        Object[] rewritten = args == null ? null : args.clone();
+        try (IdentityObjectRewriter.RewriteScope scope =
+                     IdentityObjectRewriter.rewriteArguments(rewritten, identity)) {
+            AttributionSourceChain.rewriteOutbound(rewritten, identity, scope);
+            try { return method.invoke(original, rewritten); }
+            catch (InvocationTargetException error) { throw error.getCause(); }
+        }
     }
 
     private static Bundle resultBundle(String key, String value) {

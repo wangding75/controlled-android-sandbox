@@ -498,16 +498,12 @@ public final class GuestRuntimeEnvironment {
             session.bindApplication(application);
             GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
             stagedProcessIdentity.attachApplication(application);
-            guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
-            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
-                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
-                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_ATTACH installed="
-                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
-            }
-            if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
-                throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
-                        + NativePolicy.hookStatus());
-            }
+
+            // Publish the session and install the framework bridges before attachBaseContext.
+            // Applications are allowed to register dynamic receivers from attach/onCreate, and
+            // those calls must see the same PREPARING session and framework transport that will
+            // own the later Activity/Service lifecycle.  Leaving this publication after
+            // attachBaseContext makes the first receiver calls fail with GUEST_NOT_PREPARED.
             stagedProcessIdentity = null;
             session.components = new GuestComponentRuntime(session);
             session.jobServices = new GuestJobServiceBridge(session);
@@ -524,17 +520,24 @@ public final class GuestRuntimeEnvironment {
             });
             synchronized (GuestRuntimeEnvironment.class) { current = session; }
             // Service CREATE_SERVICE/BIND/SERVICE_ARGS/STOP messages are owned by Android's
-            // ActivityThread. Install this before Application.onCreate so services started from
-            // application bootstrap take the same framework path as Activity launches.
+            // ActivityThread. Install this before application bootstrap so receiver/service
+            // registration from attachBaseContext uses the same framework transport.
             session.serviceFrameworkBridge = GuestActivityThreadServiceBridge.install(session);
             guestContext.installServiceFrameworkBridge(session.serviceFrameworkBridge);
-            // Install before Application.onCreate so launches triggered by Application startup
-            // enter the real ActivityThread Instrumentation path as well. The bridge is restored
-            // during Session.shutdown and is generation-owned just like native hooks and Binder
-            // callbacks.
             session.activityThreadInstrumentation = GuestActivityThreadInstrumentation.install(session);
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
+
+            guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
+            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
+                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
+                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_ATTACH installed="
+                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
+            }
+            if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
+                throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
+                        + NativePolicy.hookStatus());
+            }
             session.components.prepareDeclaredProviders();
             session.mainThread.run(application::onCreate);
             if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {

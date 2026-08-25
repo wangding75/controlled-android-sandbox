@@ -5,11 +5,12 @@ import android.os.Bundle;
 import com.warden.controlledsandbox.framework.identity.AttributionSourceChain;
 import com.warden.controlledsandbox.framework.identity.GuestIdentity;
 import com.warden.controlledsandbox.framework.identity.IdentityObjectRewriter;
+import java.lang.reflect.Method;
 import java.util.Set;
 
 /** Focused proof that shared service identity/callback semantics are not service-name hooks. */
 public final class SystemServiceSemanticSelfTest {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         ApplicationInfo info = new ApplicationInfo();
         info.packageName = "guest.pkg";
         info.uid = 12001;
@@ -38,6 +39,16 @@ public final class SystemServiceSemanticSelfTest {
                         && source.uid == 12001 && "guest.pkg".equals(next.packageName)
                         && next.uid == 12001,
                 "returned AttributionSource chain must project back to Guest identity");
+
+        SettingsTransportDelegate settingsDelegate = new SettingsTransportDelegate();
+        SettingsTransportApi settingsTransport = settingsTransport(settingsDelegate, identity);
+        settingsTransport.call("guest.pkg", source);
+        require("host.pkg".equals(settingsDelegate.callingPackage)
+                        && "host.pkg".equals(settingsDelegate.callingSource.packageName)
+                        && settingsDelegate.callingSource.uid == 10001,
+                "Settings transport must submit physical Binder attribution");
+        require("guest.pkg".equals(source.packageName) && source.uid == 12001,
+                "Settings transport must restore Guest attribution after the Binder call");
 
         require(SystemServiceSemanticCatalog.all().size() >= 20,
                 "semantic catalog must cover the P4 service domains");
@@ -84,6 +95,30 @@ public final class SystemServiceSemanticSelfTest {
         public final int value;
 
         UnrelatedRequest(int value) { this.value = value; }
+    }
+
+    public interface SettingsTransportApi {
+        void call(String callingPackage, AttributionSourceFixture source);
+    }
+
+    public static final class SettingsTransportDelegate implements SettingsTransportApi {
+        String callingPackage;
+        AttributionSourceFixture callingSource;
+
+        @Override public void call(String callingPackage, AttributionSourceFixture source) {
+            this.callingPackage = callingPackage;
+            this.callingSource = new AttributionSourceFixture(source.packageName, source.uid,
+                    source.next == null ? null : new AttributionSourceFixture(
+                            source.next.packageName, source.next.uid, null));
+        }
+    }
+
+    private static SettingsTransportApi settingsTransport(SettingsTransportApi delegate,
+                                                           GuestIdentity identity) throws Exception {
+        Method method = SettingsProviderIdentityHook.class.getDeclaredMethod(
+                "transportProxy", Object.class, GuestIdentity.class);
+        method.setAccessible(true);
+        return (SettingsTransportApi) method.invoke(null, delegate, identity);
     }
 
     private static void require(boolean condition, String message) {

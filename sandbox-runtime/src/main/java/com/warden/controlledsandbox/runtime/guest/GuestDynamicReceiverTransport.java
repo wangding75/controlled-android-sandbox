@@ -48,7 +48,12 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         DynamicReceiverLease lease = new DynamicReceiverLease(receiverId, guestReceiver, filter,
                 permission, scheduler, flags);
         try {
-            Intent sticky = session.mainThread.call(() -> registerHost(lease));
+            // Context.registerReceiver is thread-safe and accepts the caller-provided Handler
+            // for delivery.  Do not marshal the registration through the Guest main dispatcher:
+            // Application.attachBaseContext/onCreate may register receivers from worker threads
+            // while the Guest main thread is still inside bootstrap.  Waiting here creates a
+            // 15-second dispatcher timeout and can prevent preparation from reaching READY.
+            Intent sticky = registerHost(lease);
             synchronized (leasesLock) {
                 requireOpen();
                 if (leases.put(receiverId, lease) != null) {
@@ -77,10 +82,7 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         synchronized (leasesLock) { lease = leases.remove(receiverId); }
         if (lease == null) return;
         try {
-            session.mainThread.call(() -> {
-                unregisterHost(lease);
-                return null;
-            });
+            unregisterHost(lease);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.w("CS_RECEIVER_FRAMEWORK",
@@ -247,10 +249,7 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         }
         for (DynamicReceiverLease lease : toClose) {
             try {
-                session.mainThread.call(() -> {
-                    unregisterHost(lease);
-                    return null;
-                });
+                unregisterHost(lease);
             } catch (Throwable error) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
