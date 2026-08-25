@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.4
-更新时间：2026-08-25 23:55（Asia/Shanghai）
+更新时间：2026-08-26 00:41（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（BLOCKED）
+当前任务：`C4-R05`（IN_PROGRESS）
 下一任务：`C4-R05`
 最后完成任务：`C4-R04`
 
@@ -2604,3 +2604,35 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   仍阻断 C4-R05；不将慢启动、截图或后续 lane 结果升级为 PASS。
 - **下一步**：按用户“记录后提交、停止任务”指令停在当前阻断点。后续只有在 Guest dispatcher/receiver
   owner 修复或有界恢复方案明确后，才能从本回执继续执行剩余商业矩阵并重新评估 C4 关门。
+
+### C4-R05：本机 DingTalk user0 首例复验与继续矩阵回执（2026-08-26）
+
+- **状态**：`IN_PROGRESS`。按用户最新条件执行：新机器首例失败保留为历史证据；本机动态解析
+  `RD测试` 后，若首例复现同一异常或任意其他失败则停止。本机 `dingtalk/user0/cold-001`
+  首次尝试通过，因此按用户指示忽略新机器这条观察并继续本机 lane；C4-R05 未完成，C4 阶段未关闭。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，commit
+  `4ad796a24acd39216b439862b50e746efaae066e`；本机证据 lane 使用该 clean commit 现有 APK，
+  未启用自动重试或隐式补跑。
+- **执行环境**：MuMu `RD测试` 动态解析到 `127.0.0.1:16416`，API 32、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、boot ID
+  `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a`、Android ID `398eea33120cd887`、Redmi
+  `22041211A`；DingTalk 动态发现为 `com.alibaba.android.rimet` 7.8.10/1178，base 1、split 0、
+  primary ABI `arm64-v8a`。
+- **验收命令**：`python tools/capability/run_c4_r03_rd.py --instance-name 'RD测试' --loops 25
+  --users 0 --targets dingtalk --output verification/catch-up/C4-R05/continuation-local-dingtalk-user0-20260825-235820`。
+- **结果**：冷启动 25/25、热启动 25/25，共 50/50；runner `PASS`、`blockedAt=null`；首次尝试
+  失败 0、FIRST_FRAME_DRAWN 缺失 0、FATAL/ANR 0、Surface 空 0、黑屏/透明/均匀截图 0，
+  所有行 `errorClassification=NONE`。冷启动 readiness 21,441–23,977 ms，热启动 7,747–8,944 ms。
+  首例截图是 DingTalk 首次启动隐私协议页，证明真实首帧和非黑内容；采集器没有自动点击同意，
+  不将其描述为协议确认后的会话首页。
+- **证据目录**：`verification/catch-up/C4-R05/continuation-local-dingtalk-user0-20260825-235820/`；
+  汇总、设备、发现、
+  每行 `case.json` 和首例截图均已保留。结构化 lane 回执见该目录 `local-lane-receipt.json`。
+- **问题处理**：KI-R03-061 的两次新机器失败证据仍保留，`acceptance=NOT_FIXED`；本机 50/50
+  只证明该提交在本机 RD 环境未复现，不清除该 Known Issue，也不替代另一台机器 user1 的独立
+  证据。按用户条件，本条不再阻止本次继续矩阵，但仍属于最终 C4-R05 回归与关门风险。
+- **实现/证据提交 SHA**：`49f11df397c19daa4244a0f99f82a84faa899b46`
+  （`test(c4): [C4-R05] record local DingTalk user0 lane`），已推送并用 `git ls-remote` 验证。
+- **下一步**：继续当前 R05 剩余减半矩阵：本机 user0 的 fixture、夸克、红果、番茄小说及所需
+  添加门禁、C1/C2/C4 回归和双用户压力；另一台机器 user1 继续使用独立 `RD测试` 和独立证据目录。
+  只有所有门禁、回归和压力均通过后，才重新评估 C4 关门。
