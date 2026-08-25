@@ -1,0 +1,100 @@
+{
+  "status": "PASS",
+  "returncode": 0,
+  "result": {
+    "command": "c4-r02-concurrent-add",
+    "package": "com.dragon.read",
+    "virtualUserId": 0,
+    "trustNativeGuest": true,
+    "requestId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734",
+    "operationId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734-launch",
+    "startedAt": 1787663893697,
+    "concurrentAdds": {
+      "first": {
+        "requestId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734-a",
+        "successful": true,
+        "errorCode": "",
+        "trace": {
+          "requestId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734-a",
+          "operationId": "a3af473b-416c-446c-9223-997a0acd2010",
+          "operation": "importInstalledApplicationAndEnsure",
+          "packageName": "com.dragon.read",
+          "virtualUserId": 0,
+          "stage": "DONE",
+          "status": "SUCCEEDED",
+          "errorCode": "",
+          "retryable": false,
+          "attempt": 1,
+          "retryBudget": 0,
+          "startedAtMs": 1787663894200,
+          "elapsedMs": 13670,
+          "stageTimingsMs": {
+            "HASH": 470,
+            "COPY": 977,
+            "PARSE": 1390,
+            "NATIVE_EXTRACT": 1501,
+            "PUBLISH": 1958,
+            "ENSURE_INSTANCE": 0,
+            "CATALOG": 3015
+          },
+          "stageDeadlinesMs": {
+            "CATALOG": 30000,
+            "PARSE": 60000,
+            "COPY": 120000,
+            "ENSURE_INSTANCE": 10000,
+            "PUBLISH": 30000,
+            "NATIVE_EXTRACT": 180000,
+            "HASH": 30000
+          },
+          "anomalies": [
+            {
+              "code": "MIXED_ELF_MACHINE",
+              "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+            }
+          ]
+        }
+      },
+      "second": {
+        "requestId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734-b",
+        "successful": false,
+        "errorCode": "MUTATION_BUSY",
+        "trace": {
+          "requestId": "c4-r02-concurrent-f0683dbf-2384-40ae-9b84-e061685dd734-a",
+          "operationId": "a3af473b-416c-446c-9223-997a0acd2010",
+          "operation": "importInstalledApplicationAndEnsure",
+          "packageName": "com.dragon.read",
+          "virtualUserId": 0,
+          "stage": "ACCEPTED",
+          "status": "IN_PROGRESS",
+          "errorCode": "",
+          "retryable": false,
+          "attempt": 1,
+          "retryBudget": 0,
+          "startedAtMs": 1787663894200,
+          "elapsedMs": 0,
+          "stageTimingsMs": {},
+          "stageDeadlinesMs": {
+            "CATALOG": 30000,
+            "PARSE": 60000,
+            "COPY": 120000,
+            "ENSURE_INSTANCE": 10000,
+            "PUBLISH": 30000,
+            "NATIVE_EXTRACT": 180000,
+            "HASH": 30000
+          },
+          "anomalies": []
+        }
+      },
+      "successfulCount": 1,
+      "busyCount": 1,
+      "sameOperationId": true,
+      "pass": true
+    },
+    "operation": {
+      "status": "CONCURRENT_ADD_SINGLE_FLIGHT_PASS"
+    },
+    "status": "PASS"
+  },
+  "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 540\nWaitTime: 543\nComplete\n",
+  "start_stderr": ""
+}

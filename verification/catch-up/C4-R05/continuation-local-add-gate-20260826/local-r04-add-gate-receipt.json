@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R05",
+  "childTasks": ["C4-R04", "C4-R02"],
+  "lane": "local-user0-r04-and-reduced-add-gate",
+  "status": "PASS_OBSERVATION",
+  "runtimeSourceCommit": "4ad796a24acd39216b439862b50e746efaae066e",
+  "ledgerCommitAtRun": "a0866b071cb55d5e2c0d86bb67e56dddaca47636",
+  "environment": {
+    "instanceName": "RD测试",
+    "resolvedSerial": "127.0.0.1:16416",
+    "api": 32,
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "bootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "androidId": "398eea33120cd887"
+  },
+  "r04": {
+    "failureInjection": "continuation-local-r04-20260826/failure-injection/runner-summary.json",
+    "recovery": "continuation-local-r04-20260826/recovery/runner-summary.json",
+    "failureInjectionStatus": "PASS",
+    "recoveryStatus": "PASS",
+    "automaticRetryPerformed": false,
+    "retryBudget": 0
+  },
+  "addGate": {
+    "command": "python tools/capability/run_c4_r02_rd.py --instance-name 'RD测试' --reduced-r05-scope --output verification/catch-up/C4-R05/continuation-local-add-gate-20260826",
+    "status": "PASS",
+    "scope": "user-approved-reduced",
+    "fixtureCycles": 25,
+    "commercialCyclesPerTarget": 5,
+    "commercialTargets": ["dingtalk", "quark", "hongguo", "fanqie"],
+    "operationCount": 137,
+    "firstFailureCount": 0,
+    "firstAttemptFailures": 0,
+    "automaticRetries": 0,
+    "concurrentAdd": "PASS",
+    "installResidue": [],
+    "activeTransactions": [],
+    "startedAt": "2026-08-26T00:45:25.577421+08:00",
+    "completedAt": "2026-08-26T01:20:17.364369+08:00"
+  },
+  "evidence": {
+    "addSummary": "summary.json",
+    "operations": "operations.json",
+    "sampleInventory": "sample-inventory.json",
+    "concurrentAdd": "concurrent-add.json",
+    "residue": "residue.json"
+  },
+  "scopeNote": "R04 and the user0 reduced add gate passed. This does not complete the launch matrix, C1/C2/C4/SX regressions, dual-user pressure, or C4-R05 closure."
+}
