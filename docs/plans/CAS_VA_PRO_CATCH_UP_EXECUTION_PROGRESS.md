@@ -2478,8 +2478,7 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **任务边界**：按任务书和 `C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`，
   本任务实现可审计的 fail-closed 验收编排、五类故障注入、独立 recovery contract 和一条
   fixture live smoke；没有把离线注入结果冒充商业全矩阵，也没有提前宣称 C4-R05 通过。
-- **实现与证据提交 SHA**：
-  `57d2c34a04c3c33b0292934373d763c3e4369ea7`（实现初始提交）及
+- **实现与证据提交 SHA**：`57d2c34a04c3c33b0292934373d763c3e4369ea7`（实现初始提交）及
   `1d9b83d54c13d2a758752281dbc492859d8bd05d`（修正合成 mutation fixture 包名并重生成证据的
   补充实现提交，作为本任务最终实现提交）。远端已核验到
   `1d9b83d54c13d2a758752281dbc492859d8bd05d`。
