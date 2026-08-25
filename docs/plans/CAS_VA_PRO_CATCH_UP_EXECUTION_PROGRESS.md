@@ -2576,4 +2576,9 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **偏离任务书**：无静默偏离；任务书和执行器已显式更新，旧 50 次历史证据保留为补充，当前 C4-R05
   正式阶段验收以 1 轮、25 次重复为准，完成后可关闭 C4。待 C0-C7 全部任务完成，再另行使用两轮
   `loops=50` 执行整体验收。C4 仍需完成这一轮减半矩阵、减半添加门禁、C1/C2/C4/SX 回归和双用户压力。
+- **验收命令与结果**：`python -m py_compile tools/capability/run_c4_r02_rd.py tools/capability/run_c4_r03_rd.py
+  tools/capability/run_c4_r05_rd.py` PASS；`python scripts/check-c4-r05-orchestrator.py` PASS；`git diff --check` PASS。
+- **实现提交 SHA**：`4e15d219`（任务书 1.4、分层 scope 编排器、减半添加矩阵、动态视觉等待和续接证据）。
+- **回执提交**：本段使用独立主题 `docs(progress): record [C4-R05] scope receipt`；推送后用
+  `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 核验远端 HEAD。
 - **下一任务**：仍为 `C4-R05`；从当前新环境和保存的续接证据继续执行剩余减半矩阵。
