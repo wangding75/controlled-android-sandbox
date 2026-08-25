@@ -1,0 +1,71 @@
+[
+  {
+    "target": "fanqie",
+    "label": "番茄免费小说",
+    "package": "com.dragon.read",
+    "versionName": "7.1.9.32",
+    "versionCode": "71932",
+    "launchableActivity": "com.dragon.read.pages.splash.SplashActivity",
+    "baseAndSplits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~AbvgTZxktOldVQNMbH0gqA==/com.dragon.read-8cElAyxeE32FI09wzhEfEg==/base.apk",
+        "bytes": 124857929
+      }
+    ],
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a",
+    "secondaryCpuAbi": "null",
+    "apkNativeCode": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -> pm path -> aapt2 label -> dumpsys package"
+  },
+  {
+    "target": "hongguo",
+    "label": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "versionName": "7.0.5.33",
+    "versionCode": "70533",
+    "launchableActivity": "com.dragon.read.pages.splash.SplashActivity",
+    "baseAndSplits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~IQOp_5p7hdanloKIVOPxNA==/com.phoenix.read-f5FIo9Q1r8aepeVMpN7Tdg==/base.apk",
+        "bytes": 116439278
+      }
+    ],
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a",
+    "secondaryCpuAbi": "null",
+    "apkNativeCode": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -> pm path -> aapt2 label -> dumpsys package"
+  },
+  {
+    "target": "quark",
+    "label": "夸克",
+    "package": "com.quark.browser",
+    "versionName": "10.10.5.1080",
+    "versionCode": "1080",
+    "launchableActivity": "com.ucpro.MainActivity",
+    "baseAndSplits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~tC_OsqdFD5BJc_937XuTog==/com.quark.browser-74dZvhMoWcrKwbH11fUk3A==/base.apk",
+        "bytes": 169654003
+      }
+    ],
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a",
+    "secondaryCpuAbi": "null",
+    "apkNativeCode": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -> pm path -> aapt2 label -> dumpsys package"
+  }
+]

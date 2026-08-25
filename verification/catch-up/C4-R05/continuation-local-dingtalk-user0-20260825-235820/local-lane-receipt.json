@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R05",
+  "childTask": "C4-R03",
+  "lane": "local-dingtalk-user0",
+  "decision": "first-case-pass-ignore-remote-observation-and-continue",
+  "status": "PASS_OBSERVATION",
+  "startedAt": "2026-08-25T23:59:37.214685+08:00",
+  "completedAt": "2026-08-26T00:41:06.739055+08:00",
+  "branch": "feature/t57-r03-va-pro-capability-campaign",
+  "commit": "4ad796a24acd39216b439862b50e746efaae066e",
+  "command": "python tools/capability/run_c4_r03_rd.py --instance-name 'RD测试' --loops 25 --users 0 --targets dingtalk --output verification/catch-up/C4-R05/continuation-local-dingtalk-user0-20260825-235820",
+  "attemptPolicy": {
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetries": 0
+  },
+  "matrix": {
+    "target": "dingtalk",
+    "package": "com.alibaba.android.rimet",
+    "versionName": "7.8.10",
+    "versionCode": "1178",
+    "user": 0,
+    "cold": 25,
+    "hot": 25,
+    "rows": 50,
+    "passed": 50,
+    "failed": 0,
+    "blockedAt": null,
+    "firstAttemptFailures": 0,
+    "firstFrameFailures": 0,
+    "fatalRows": 0,
+    "surfaceEmptyRows": 0,
+    "screenshotBadRows": 0
+  },
+  "readinessMs": {
+    "coldMin": 21441,
+    "coldMax": 23977,
+    "hotMin": 7747,
+    "hotMax": 8944
+  },
+  "environment": {
+    "instanceName": "RD测试",
+    "resolvedSerial": "127.0.0.1:16416",
+    "api": 32,
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "bootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "androidId": "398eea33120cd887",
+    "manufacturer": "Redmi",
+    "model": "22041211A"
+  },
+  "apkSha256": {
+    "host": "26C8DE3FA63DA5249C7A38A07397ACB996833332ABC71E06E1E85621583B2E45",
+    "companion32": "962EFBE3887E2ADE9C2A7E9450D0B766C9263658FDC07040CBBEF9A5FC62FCAB",
+    "fixture": "E4F9D4458EEE7D3D123F7BE11426424C0D2533329435E60185F6FD6C78691058",
+    "fixture32": "38A150DEAFD3281D7E593BF81BF072F9B1EE895850DD0C132F0B0A0B1EA670BE"
+  },
+  "evidence": {
+    "summary": "c4-r03-summary.json",
+    "environment": "environment.json",
+    "discovery": "dingtalk-discovery.json",
+    "firstSuccessfulColdCase": "attempts/dingtalk/user-0/cold-001/case.json",
+    "firstSuccessfulScreenshot": "attempts/dingtalk/user-0/cold-001/screenshot.png",
+    "remoteFailureRetained": "verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0/attempts/dingtalk/user-0/cold-001/case.json"
+  },
+  "scopeNote": "This is a local user0 DingTalk PASS observation after the remote first-case failure. It does not close C4-R05, clear KI-R03-061, or substitute for the remaining C4-R05 targets, add gates, regressions, and pressure lanes."
+}
