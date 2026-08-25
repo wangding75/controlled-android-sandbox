@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 18:46（Asia/Shanghai）
+更新时间：2026-08-25 19:17（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -2398,3 +2398,34 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
 - **验收结论**：fixture 最后 target 已完成当前缺失唯一观察，不能覆盖 DingTalk
   `user1/hot-017` 与 `hot-019` 的 readiness 首失败；C4-R03 继续 `BLOCKED`，下一任务仍为
   `C4-R03`，不得推进 C4-R04。
+
+### C4-R03：DingTalk 有界复现回执（2026-08-25）
+
+- **状态**：`BLOCKED`；本回执状态为 `NON_REPRODUCED_NOT_PASS`，不是 `PASS`，不改变 C4-R03
+  的阻断状态，也不推进 C4-R04/R05、C6 或 OEM 适配。
+- **用户指定动作**：fixture 最后续接完成后，对 DingTalk 直接建立一条有界人工复现 lane，目标是
+  覆盖历史首次失败点；不是自动重试，不延长 sleep/deadline，不增加 retry budget。运行前按实例名
+  动态解析 MuMu `RD测试`；boot ID `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a` 未改变。
+- **重试审计**：`attempt=3`、`retryBudget=0`、`automaticRetryPerformed=false`、
+  `retryable=false`；没有自动重试。runner 在覆盖历史点并生成 `cold/hot-020` 后、进入无关的
+  `cold-021` 前主动停止，避免把一次复现验证扩大成无意义矩阵重跑。
+- **结果**：`cold/hot-017`、`cold/hot-018`、`cold/hot-019`、`cold/hot-020` 共 8 行全部通过；
+  历史失败点 `hot-017` readiness `8546 ms`、`hot-019` readiness `8515 ms`，均低于 hot SLO。
+  8 行均有首帧、Window、Surface、非黑截图且无 FATAL/ANR。两条通过行仍有与目标无关的
+  WebView LMK 标记，故 LMK 只能作为环境信号，不能单独解释历史 readiness 失败。
+- **证据与结论**：机器回执为
+  `verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json`，原始 lane 为
+  `artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825`。
+  本次未复现只能说明问题具有非确定性；历史 `hot-017`/`hot-019` 首次失败及其完整日志、
+  dumpsys、窗口、Surface、进程、事务和设备快照继续有效，不能将历史证据改写为 PASS。
+- **开始基线**：`999ffa47f2786c69d8c91c2427b8f29ddf600933`（fixture 最后续接回执之后、
+  本次有界复现之前）。
+- **实现/证据提交 SHA**：`736464d6515efa037d82220bf7f47648d50b148f`
+  （`test(c4): [C4-R03] record bounded DingTalk non-reproduction`）。
+- **回执提交**：本段为独立的
+  `docs(progress): record [C4-R03] bounded replay receipt` 进度回执提交。
+- **owner 与门禁**：当前仍无证据转交 SX/UI，也不能据夸克正向对照推断红果或番茄小说兼容性；
+  owner 保持 CAS 通用 launch/readiness 边界，CAS process/prepare 延迟与 MuMu responsiveness
+  的因果分离待验证。`KI-R03-060` 保持 `RECORDED` 且阻断当前 campaign；500 行正式门禁仍未满足，
+  C4-R03 不能标记 `DONE`。
+- **下一任务**：仍为 `C4-R03`；续接预检应 fail-closed，不能进入 C4-R04。
