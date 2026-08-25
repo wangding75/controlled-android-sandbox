@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 19:17（Asia/Shanghai）
+更新时间：2026-08-25 19:46（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R03`（BLOCKED）
-下一任务：`C4-R03`
-最后完成任务：`C4-R02`
+当前任务：`C4-R04`（PENDING）
+下一任务：`C4-R04`
+最后完成任务：`C4-R03`
 
 ## 1. 使用规则
 
@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `d8797c89` | §5 C4-R03 |
+| C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -86,7 +86,9 @@
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
-C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-060` 的未闭合矩阵/启动证据阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
+C5 已由用户明确排除；`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-060` 的未闭合矩阵/启动证据继续保留。
+按用户 2026-08-25 明确指令，C4-R03 以“行政 DONE、残余风险接受、Issue 后续回归”的例外方式关账并推进到
+C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶段已关闭。`KI-R03-060` 保持开放，后续回归为强制项。
 
 ## 5. 任务回执
 
@@ -2429,3 +2431,31 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
   的因果分离待验证。`KI-R03-060` 保持 `RECORDED` 且阻断当前 campaign；500 行正式门禁仍未满足，
   C4-R03 不能标记 `DONE`。
 - **下一任务**：仍为 `C4-R03`；续接预检应 fail-closed，不能进入 C4-R04。
+
+### C4-R03：用户批准的条件性关账与后续回归安排（2026-08-25）
+
+- **状态**：`DONE`（用户明确批准的残余风险豁免/行政关账）。本状态不改写正式证据：
+  `KI-R03-060` 仍为开放 Issue，500 条正式首试矩阵仍未闭合；本回执不宣称 500/500 PASS，
+  也不表示 C4 阶段已经关闭。
+- **用户指令与决策**：保留 DingTalk readiness 问题为 Issue，接受当前残余风险，先关闭 C4-R03
+  账本任务并让远端进入 C4-R04；后续在 C4-R04/C4-R05 将该 Issue 作为强制回归项。没有执行
+  C4-R04 生产修复、没有删除首次失败证据，也没有用最新复现 PASS 覆盖历史失败。
+- **已知结果**：500 个唯一坐标的当前汇总仍为 `482 PASS + 8 首次失败 + 10 未执行`；DingTalk
+  的 `hot-017`/`hot-019` 首次失败仍在 `KI-R03-060` 中，后续有界复现通过仅作为非确定性证据。
+- **Issue 状态**：`KI-R03-060` 保持 `RECORDED`、`ACCEPTED_RISK_FOR_C4_R03_ADVANCE_NOT_FIXED`，
+  `follow_up_required=true`，后续任务为 `C4-R04/R05 regression`。CAS 与 MuMu 的主导因果仍待
+  分离；该 Issue 不得被描述为已修复。
+- **机器证据**：
+  `verification/catch-up/C4-R03/rd-acceptance/summary.json`、
+  `verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json`、
+  `docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md` 和
+  `docs/review/KNOWN_ISSUES.yaml`。
+- **开始基线**：`0be42eb6d053945fa6caf79bc42f9923d73c1c56`；工作区在本次变更前干净，
+  分支仍为 `feature/t57-r03-va-pro-capability-campaign`。
+- **实现/证据提交 SHA**：`18d79039027cdab2fc1d18e8cb6d315b222bdb36`
+  （`docs(c4): [C4-R03] record accepted-risk closure and regression`）。
+- **偏离任务书**：按用户明确风险接受推进；任务书规定的 500/500 首试门禁被延期到后续回归，
+  未静默改写任务书验收标准。
+- **回执提交**：本段为独立的 `docs(progress): record [C4-R03] receipt` 提交。
+- **下一任务**：`C4-R04`（PENDING）；下一环境可从 C4-R04 续接，但必须携带
+  `KI-R03-060` 回归要求，且不得把本次行政 DONE 当作 C4 阶段关闭。
