@@ -14,6 +14,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -45,6 +46,7 @@ from run_rd_campaign import (  # noqa: E402
 )
 
 TASK_ID = "C4-R03"
+VISUAL_CONTENT_DEADLINE_SEC = 30
 TARGET_ALIASES = {
     "quark": {"夸克"},
     "hongguo": {"红果免费短剧"},
@@ -380,13 +382,25 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
                                or readiness_ms > (30_000 if mode == "cold" else 10_000)):
         failure_reason = "READINESS_SLO_EXCEEDED"
     device = light_snapshot(serial, case_dir, target["package"])
+    visual_attempts = [{"elapsedMs": round((time.monotonic() - start) * 1000),
+                        "quality": device["screenshot"]}]
+    first_screenshot = case_dir / "screenshot.png"
+    if first_screenshot.is_file():
+        shutil.copyfile(first_screenshot, case_dir / "screenshot-first-observation.png")
+    visual_deadline = time.monotonic() + VISUAL_CONTENT_DEADLINE_SEC
+    while device["screenshot"].get("uniform") and time.monotonic() < visual_deadline:
+        time.sleep(0.5)
+        device = light_snapshot(serial, case_dir, target["package"])
+        visual_attempts.append({"elapsedMs": round((time.monotonic() - start) * 1000),
+                                "quality": device["screenshot"]})
     guest = device["guestWindowState"]
     quality = device["screenshot"]
     if not guest["resumed_guest_stub_count"] or guest["windows_empty"] or not guest["drawn"]:
         failure_reason = failure_reason or "GUEST_WINDOW_NOT_READY"
     if not device["surfaceNonEmpty"]:
         failure_reason = failure_reason or "SURFACE_EMPTY"
-    if not quality.get("nonTransparent") or not quality.get("nonBlack"):
+    if (not quality.get("nonTransparent") or not quality.get("nonBlack")
+            or quality.get("uniform") is True):
         failure_reason = failure_reason or "SCREENSHOT_BLACK_OR_TRANSPARENT"
     fatal, historical_fatal = classify_logcat_markers(
         device["logcat"], result_json.get("startedAt"))
@@ -419,6 +433,7 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
             "screenshot": quality,
             "fatalMarkers": fatal,
             "historicalFatalMarkers": historical_fatal,
+            "visualContentAttempts": visual_attempts,
         },
         "errorClassification": failure_reason or "NONE",
         "firstAttemptFailure": bool(failure_reason) and attempt_number == 1,

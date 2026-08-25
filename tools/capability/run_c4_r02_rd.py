@@ -173,6 +173,8 @@ def main() -> int:
     parser.add_argument("--instance-name", default="RD测试")
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--skip-first-smoke", action="store_true")
+    parser.add_argument("--reduced-r05-scope", action="store_true",
+                        help="use the user-approved C4-R05 half-size add matrix")
     parser.add_argument("--output", type=Path, default=OUTPUT,
                         help="durable evidence directory; defaults to the C4-R02 lane")
     args = parser.parse_args()
@@ -217,7 +219,9 @@ def main() -> int:
                              "step": "first-attempt", "requestId": request_id, "trace": trace})
                 write_json(OUTPUT / f"first-attempt-{sample['package']}.json", payload)
         if not args.smoke_only:
-            matrix = [(fixture, 50), *[(sample, 10) for sample in samples]]
+            matrix = ([(fixture, 25), *[(sample, 5) for sample in samples]]
+                      if args.reduced_r05_scope
+                      else [(fixture, 50), *[(sample, 10) for sample in samples]])
             for sample, loops in matrix:
                 current = sample
                 for index in range(1, loops + 1):
@@ -238,6 +242,9 @@ def main() -> int:
             raise RuntimeError("PACKAGE_TRANSACTION_RESIDUE")
         elapsed = [int(row["trace"].get("elapsedMs", 0)) for row in rows]
         summary.update({"status": "PASS", "completedAt": now_iso(),
+                        "r05Scope": "user-approved-reduced" if args.reduced_r05_scope else "standard",
+                        "addMatrixLoops": {"fixture": 25 if args.reduced_r05_scope else 50,
+                                           "commercial": 5 if args.reduced_r05_scope else 10},
                         "operationCount": len(rows), "firstFailureCount": 0,
                         "latencyMs": {"min": min(elapsed) if elapsed else 0,
                                       "median": int(statistics.median(elapsed)) if elapsed else 0,

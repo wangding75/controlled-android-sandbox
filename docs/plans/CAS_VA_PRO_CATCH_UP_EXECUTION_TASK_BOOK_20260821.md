@@ -1,6 +1,6 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.2
+版本：1.4
 制定日期：2026-08-21
 基准分支：`feature/t57-r03-va-pro-capability-campaign`
 首要验收环境：MuMu 模拟器实例 `RD测试`
@@ -13,6 +13,18 @@
 修订记录：2026-08-24 按用户明确指示跳过 C5 XH 路线；C4-T05 原验收被黑屏、启动超时、偶发
 添加失败和隐藏重试证明不充分，C4 阶段重新打开并新增 C4-R01 至 C4-R05。根因与验收方案见
 `docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`。C6/C7 不再依赖或宣称 XH。
+
+修订记录：2026-08-25 按用户明确指示将 C4-R05 的重复用例量减半。两轮启动矩阵由每个目标/用户
+冷热各 50 次调整为各 25 次（总计 1,000 个启动观察）；每轮添加门禁由 fixture 50 次、商业样本
+各 10 次调整为 fixture 25 次、商业样本各 5 次。两用户各 15 分钟且每用户至少 50 周期的压力
+门禁保持不变。该修订只改变重复次数，不降低首帧、窗口、Surface、截图、FATAL/ANR、无重试、
+资源收敛和 fail-closed 证据要求；旧 50 次结果不再是本次 R05 的必需数量，但可作为历史补充证据。
+按同日用户补充决策，`loops=25` 是 C4-R05 正式阶段关闭门禁；待 C0-C7 全部任务完成后，另行执行
+`loops=50` 的整体验收，不以 C4-R05 阶段证据替代整体验收。
+
+修订记录：2026-08-25 按用户进一步明确的分层策略，C4 阶段正式门禁只执行 1 轮 `loops=25`（clean
+install/cold）；待所有阶段任务完成后，整体验收再执行 2 轮 `loops=50`（clean-install/cold 与
+retained-state/hot/recovery）。C4 阶段的添加门禁、回归和双用户压力要求保持不变。
 
 ## 1. 任务书目标
 
@@ -505,14 +517,17 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 ### C4-R05：MuMu RD 正式重验与 C4 关门
 
 - **任务目标**：在修复后的同一 clean commit 上重新证明 CAS-only SX 添加、启动、F1-F5 和 DingTalk 业务。
-- **执行方案**：动态解析 `RD测试`，同一 commit 执行两轮完整 suite；第一轮 clean install/cold，第二轮 retained
-  state/hot/recovery；将夸克作为当前可添加的对照样本，将红果、番茄小说作为必须关闭的兼容性样本，并连同
+- **执行方案**：动态解析 `RD测试`，同一 commit 执行 1 轮完整阶段 suite（clean install/cold）；每个目标/用户
+  执行 25 次冷启动和 25 次热启动（fixture、DingTalk、夸克、红果、番茄小说，两用户，合计 500 个启动观察）；
+  添加门禁执行 fixture 25 次、DingTalk/夸克/红果/番茄小说各 5 次真实
+  add/delete/re-add；将夸克作为当前可添加的对照样本，将红果、番茄小说作为必须关闭的兼容性样本，并连同
   DingTalk 记录实际 package/version/APK 形态；运行 C1 Activity、C2 Window/Audio、C4 CAS-only/F1-F5 回归；
   执行 user0 15 分钟且至少 50 周期、user1 15 分钟且至少 50 周期的 30 分钟压力。
-- **验收标准**：两轮均通过；fixture、DingTalk、夸克、红果、番茄小说的规定添加轮次全部通过；添加失败、
+- **验收标准**：两轮均通过；fixture、DingTalk、夸克、红果、番茄小说的上述减半添加轮次全部通过；添加失败、
   启动超时、黑屏、隐藏重试、FATAL、ANR 为 0；所有启动达到
   `FIRST_FRAME_DRAWN`；资源与 staging/transaction/Window/ViewRoot/process slot 收敛；新的机器可读 evidence
-  记录修复 commit、APK hash、设备快照、截图/帧 hash和原始日志。P0/P1 未关闭不得关门。
+  记录修复 commit、APK hash、设备快照、截图/帧 hash和原始日志。P0/P1 未关闭不得关门。满足本条后
+  C4 阶段可正式关闭；后续整体验收仍必须使用两轮 `loops=50`。
 - **任务回执**：记录两轮矩阵、30 分钟双用户统计、所有问题状态、完整证据索引、C4 阶段结论和下一任务 C6-T01。
 
 ### 8.3 阶段门禁

@@ -2,7 +2,7 @@
 """C4-R05 fail-fast formal RD revalidation and closure orchestrator.
 
 The orchestrator owns the C4-R05 evidence boundary.  It builds one commit, resolves the
-MuMu instance by name, runs two ordered rounds, and stops at the first non-PASS phase.  Child
+MuMu instance by name, runs the configured stage or overall acceptance rounds, and stops at the first non-PASS phase.  Child
 campaigns keep their own request-scoped raw evidence; this runner records the command, summary,
 commit and phase decision without turning a later observation into a retry.
 """
@@ -231,10 +231,13 @@ def run_r04_contracts(instance_name: str, round_output: Path, root_output: Path)
     return records
 
 
-def run_add_gate(instance_name: str, round_output: Path, root_output: Path) -> dict[str, Any]:
+def run_add_gate(instance_name: str, round_output: Path, root_output: Path,
+                 reduced_scope: bool) -> dict[str, Any]:
     phase_output = round_output / "add-gate"
     command = [sys.executable, str(TOOLS / "run_c4_r02_rd.py"),
                "--instance-name", instance_name, "--output", str(phase_output)]
+    if reduced_scope:
+        command.append("--reduced-r05-scope")
     record = run_command(f"{round_output.name}-c4-r02-add-gate", command, root_output,
                          summary_path=phase_output / "summary.json", timeout_seconds=14_400)
     return require_pass(record, f"{round_output.name}-c4-r02-add-gate")
@@ -356,20 +359,27 @@ def run_pressure_lane(environment: dict[str, Any], user: int, minutes: int,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
-    parser.add_argument("--loops", type=int, default=50)
+    parser.add_argument("--loops", type=int, default=25)
     parser.add_argument("--users", default="0,1")
     parser.add_argument("--targets", default="fixture,dingtalk,quark,hongguo,fanqie")
-    parser.add_argument("--rounds", type=int, default=2)
+    parser.add_argument("--rounds", type=int, default=1)
     parser.add_argument("--pressure-minutes", type=int, default=15)
     parser.add_argument("--pressure-minimum-cycles", type=int, default=50)
+    parser.add_argument("--acceptance-scope", choices=("c4-stage-reduced", "overall-50"),
+                        default="c4-stage-reduced",
+                        help="C4 stage gate uses 25 loops; overall post-C7 acceptance uses 50")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
-    if args.rounds != 2 or args.loops != 50 or args.pressure_minutes != 15 \
+    expected_loops = 25 if args.acceptance_scope == "c4-stage-reduced" else 50
+    expected_rounds = 1 if args.acceptance_scope == "c4-stage-reduced" else 2
+    if args.rounds != expected_rounds or args.loops != expected_loops or args.pressure_minutes != 15 \
             or args.pressure_minimum_cycles < 50:
-        raise SystemExit("C4-R05 requires exactly two rounds, 50 launch loops, 15-minute lanes, and >=50 cycles")
+        raise SystemExit(f"{args.acceptance_scope} requires exactly {expected_rounds} round(s), {expected_loops} launch loops, "
+                         "15-minute lanes, and >=50 cycles")
     users = [int(value.strip()) for value in args.users.split(",") if value.strip()]
     if users != [0, 1]:
         raise SystemExit("C4-R05 requires users=0,1")
+    reduced_scope = args.acceptance_scope == "c4-stage-reduced"
     output = args.output if args.output.is_absolute() else ROOT / args.output
     output.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
@@ -380,9 +390,13 @@ def main() -> int:
         "instanceName": args.instance_name,
         "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False},
         "acceptance": {
-            "rounds": ["clean-install-cold", "retained-hot-recovery"],
-            "addGates": {"fixture": 50, "dingtalk": 10, "quark": 10, "hongguo": 10, "fanqie": 10},
-            "launchLoops": 50,
+            "rounds": (["clean-install-cold"] if reduced_scope
+                       else ["clean-install-cold", "retained-hot-recovery"]),
+            "addGates": ({"fixture": 25, "dingtalk": 5, "quark": 5, "hongguo": 5, "fanqie": 5}
+                         if reduced_scope
+                         else {"fixture": 50, "dingtalk": 10, "quark": 10, "hongguo": 10, "fanqie": 10}),
+            "launchLoops": args.loops,
+            "scope": args.acceptance_scope,
             "users": users,
             "pressureMinutesPerUser": args.pressure_minutes,
             "pressureMinimumCyclesPerUser": args.pressure_minimum_cycles,
@@ -411,7 +425,9 @@ def main() -> int:
         )
         require_pass(build, "build-clean-commit")
         report["buildAndApk"] = commit_and_apk_snapshot()
-        for index, round_name in enumerate(("clean-install-cold", "retained-hot-recovery"), start=1):
+        round_names = ("clean-install-cold",) if reduced_scope \
+            else ("clean-install-cold", "retained-hot-recovery")
+        for index, round_name in enumerate(round_names, start=1):
             round_output = output / f"round-{index}-{round_name}"
             round_report: dict[str, Any] = {"round": index, "name": round_name,
                                             "status": "IN_PROGRESS", "startedAt": now_iso()}
@@ -419,7 +435,8 @@ def main() -> int:
             round_report["prepare"] = prepare_round(args.instance_name, round_name, round_output)
             round_report["r04"] = [record["summary"] for record in
                                     run_r04_contracts(args.instance_name, round_output, output)]
-            round_report["addGate"] = run_add_gate(args.instance_name, round_output, output)["summary"]
+            round_report["addGate"] = run_add_gate(
+                args.instance_name, round_output, output, reduced_scope=reduced_scope)["summary"]
             round_report["launchMatrix"] = run_launch_matrix(
                 args.instance_name, args.loops, args.users, args.targets, round_output, output)["summary"]
             round_report.update({"status": "PASS", "completedAt": now_iso()})

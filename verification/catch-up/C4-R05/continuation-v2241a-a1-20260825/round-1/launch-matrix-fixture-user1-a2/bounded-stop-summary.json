@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R05",
+  "runner": "run_c4_r03_rd.py",
+  "status": "INCOMPLETE",
+  "outcome": "USER_REQUESTED_SCOPE_CHANGE",
+  "target": "fixture",
+  "package": "com.warden.controlledsandbox.fixture",
+  "user": 1,
+  "configuredLoopsBeforeStop": 50,
+  "reducedStageLoops": 25,
+  "completedCaseFiles": 75,
+  "coldCases": 38,
+  "hotCases": 37,
+  "validCases": 75,
+  "firstFailureCount": 0,
+  "caseContract": {
+    "firstFrameDrawn": 75,
+    "windowEvidence": 75,
+    "surfaceNonEmpty": 75,
+    "nonBlackScreenshot": 75,
+    "fatalMarkers": 0,
+    "anrMarkers": 0,
+    "automaticRetryPerformed": 0
+  },
+  "stopReason": "User changed C4 stage scope to one round with loops=25; the pre-change lane was stopped after preserving complete cases.",
+  "evidenceDirectory": "verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-fixture-user1-a2",
+  "emptyInterruptedDirectory": "attempts/fixture/user-1/hot-038",
+  "formalStageGate": "The lane exceeds the reduced per-target/user requirement of 25 cold + 25 hot; it is not itself a complete target matrix."
+}
