@@ -168,11 +168,15 @@ def percentile(values: list[int], percentile_value: float) -> int:
 
 
 def main() -> int:
+    global OUTPUT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance-name", default="RD测试")
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--skip-first-smoke", action="store_true")
+    parser.add_argument("--output", type=Path, default=OUTPUT,
+                        help="durable evidence directory; defaults to the C4-R02 lane")
     args = parser.parse_args()
+    OUTPUT = args.output if args.output.is_absolute() else ROOT / args.output
     OUTPUT.mkdir(parents=True, exist_ok=True)
     environment = resolve_rd_environment(args.instance_name)
     serial = str(environment["adb_serial"])

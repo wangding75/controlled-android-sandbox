@@ -1,41 +1,42 @@
 {
   "schema_version": 1,
-  "task_id": "C4-R04",
+  "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-08-25T12:02:08.124271+00:00",
+  "captured_at": "2026-08-25T12:21:11.449326+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-R04",
-    "active_task": "C4-R04",
-    "last_completed": "C4-R03",
+    "next_task": "C4-R05",
+    "active_task": "C4-R05",
+    "last_completed": "C4-R04",
     "first_ready_pending": null,
-    "dependencies": "C4-R02,C4-R03"
+    "dependencies": "C4-R04"
   },
   "last_receipt": {
-    "task_id": "C4-R03",
-    "status": "`DONE`（用户明确批准的残余风险豁免/行政关账）。本状态不改写正式证据：",
+    "task_id": "C4-R04",
+    "status": "`DONE`。本回执只关闭 C4-R04 任务，不关闭 C4 阶段；C4-R05 的正式 MuMu",
     "implementation_commits": [
-      "18d79039027cdab2fc1d18e8cb6d315b222bdb36"
+      "57d2c34a04c3c33b0292934373d763c3e4369ea7"
     ],
-    "receipt_commit": "70b93ea5b2f7749a5c77588e4d82072ffc3ae828",
-    "baseline_commit": "0be42eb6d053945fa6caf79bc42f9923d73c1c56",
+    "receipt_commit": "c134ae3735d74cd179b7235b220dd9456c762ce3",
+    "baseline_commit": "46a59f3a9c1f8703213705562f9f48c2bff02691",
     "evidence_paths": [
-      "verification/catch-up/C4-R03/rd-acceptance/summary.json",
-      "verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json",
-      "docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md",
-      "docs/review/KNOWN_ISSUES.yaml"
+      "verification/catch-up/C0-T01/continuation-preflight.json",
+      "docs/review/C4_R04_FAIL_CLOSED_ACCEPTANCE_ORCHESTRATION_DESIGN_20260825.md",
+      "verification/catch-up/C4-R04/acceptance/failure-injection/failure-injection-summary.json",
+      "verification/catch-up/C4-R04/acceptance/recovery/recovery-summary.json",
+      "verification/catch-up/C4-R04/live-smoke-fixed/live-summary.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "46a59f3a9c1f8703213705562f9f48c2bff02691",
+    "head": "7ead87c015ca9a86671d30b893744347a83b4700",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "46a59f3a9c1f8703213705562f9f48c2bff02691",
+    "remote_head": "7ead87c015ca9a86671d30b893744347a83b4700",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M verification/catch-up/C0-T01/continuation-preflight.json\n?? docs/review/C4_R04_FAIL_CLOSED_ACCEPTANCE_ORCHESTRATION_DESIGN_20260825.md\n?? scripts/check-c4-r04-fail-closed.py\n?? scripts/test_c4_r04_fail_closed.py\n?? tools/capability/c4_r04_fail_closed.py\n?? tools/capability/run_c4_r04_rd.py\n?? verification/catch-up/C4-R04/"
+    "status_short": "M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md"
   },
   "device": {
     "instance_name": "RD测试",
@@ -302,5 +303,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-R04"
+  "evidence_directory": "verification/catch-up/C4-R05"
 }
