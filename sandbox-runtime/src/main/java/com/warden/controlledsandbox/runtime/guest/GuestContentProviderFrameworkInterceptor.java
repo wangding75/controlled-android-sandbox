@@ -3,6 +3,7 @@ package com.warden.controlledsandbox.runtime.guest;
 import android.content.ContentProvider;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ProviderInfo;
+import android.os.Looper;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
@@ -11,16 +12,28 @@ import com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Supplies Broker-backed IContentProvider transports to the platform ContentResolver. */
 final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInterceptor, AutoCloseable {
     private final GuestContext context;
     private final GuestPackageSpec spec;
     private final Map<String, ProviderDescriptor> descriptors = new LinkedHashMap<>();
+    private final Object stateLock = new Object();
     private final Map<String, Object> holders = new LinkedHashMap<>();
     private final Map<String, GuestBrokerContentProvider> providers = new LinkedHashMap<>();
+    /**
+     * Provider creation is single-flight per authority, but it must not use one monitor for all
+     * authorities.  A provider's onCreate() can synchronously acquire a second provider through
+     * the same framework hook; a global monitor would then create a lock cycle with the Guest
+     * main-thread lifecycle dispatch.  These short-lived state records let concurrent callers
+     * share one creation while allowing a different authority to re-enter the hook.
+     */
+    private final Map<String, ProviderInitialization> initializations = new LinkedHashMap<>();
     /**
      * The framework hook can remain installed for a short interval while the guest generation
      * is being torn down.  Without an explicit fence, a late ActivityManager
@@ -74,7 +87,7 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         }
     }
 
-    @Override public synchronized Interception intercept(
+    @Override public Interception intercept(
             String serviceName, Method method, Object[] arguments) throws Throwable {
         if (closed) {
             throw new SecurityException("CONTENT_PROVIDER_TRANSPORT_CLOSED");
@@ -95,49 +108,166 @@ final class GuestContentProviderFrameworkInterceptor implements FrameworkCallInt
         if (descriptor == null) {
             throw new SecurityException("CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:" + authority);
         }
-        Object holder = holders.get(authority);
-        if (holder == null) {
-            holder = createHolder(method.getReturnType(), descriptor);
-            holders.put(authority, holder);
-        }
-        return Interception.handled(holder);
-    }
 
-    @Override public synchronized void close() {
-        if (closed) return;
-        // Publish the terminal state before closing any provider.  Shutdown callbacks may re-enter
-        // framework code; they must observe this interceptor as dead and cannot allocate a holder.
-        closed = true;
-        for (GuestBrokerContentProvider provider : providers.values()) {
-            try { provider.shutdown(); }
-            catch (Throwable ignored) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+        ProviderInitialization initialization;
+        for (;;) {
+            synchronized (stateLock) {
+                if (closed) {
+                    throw new SecurityException("CONTENT_PROVIDER_TRANSPORT_CLOSED");
+                }
+                Object holder = holders.get(authority);
+                if (holder != null) return Interception.handled(holder);
+                ProviderInitialization active = initializations.get(authority);
+                if (active == null) {
+                    initialization = new ProviderInitialization(Thread.currentThread());
+                    initializations.put(authority, initialization);
+                    break;
+                }
+                if (active.owner == Thread.currentThread() || isGuestMainThread()) {
+                    // A provider must not recursively acquire itself from onCreate(). Waiting
+                    // here would deadlock the same Guest main thread that is completing init.
+                    throw new IllegalStateException(
+                            "CONTENT_PROVIDER_INITIALIZATION_REENTRANT:" + authority);
+                }
+                initialization = active;
             }
+
+            try {
+                if (!initialization.completed.await(GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS,
+                        TimeUnit.MILLISECONDS)) {
+                    throw new IllegalStateException(
+                            "CONTENT_PROVIDER_INITIALIZATION_TIMEOUT:" + authority);
+                }
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                        "CONTENT_PROVIDER_INITIALIZATION_INTERRUPTED:" + authority, error);
+            }
+            if (initialization.failure != null) rethrow(initialization.failure);
+            if (initialization.holder != null) {
+                return Interception.handled(initialization.holder);
+            }
+            throw new IllegalStateException("CONTENT_PROVIDER_INITIALIZATION_EMPTY:" + authority);
         }
-        holders.clear();
-        providers.clear();
+
+        CreatedHolder created = null;
+        boolean published = false;
+        try {
+            // Do not hold stateLock while attachInfo()/prepare() runs. Provider onCreate() is
+            // allowed to call another virtual ContentProvider and must be able to re-enter this
+            // interceptor from the Guest main thread.
+            created = createHolder(method.getReturnType(), descriptor);
+            synchronized (stateLock) {
+                if (closed) {
+                    throw new SecurityException("CONTENT_PROVIDER_TRANSPORT_CLOSED");
+                }
+                holders.put(authority, created.holder);
+                providers.put(authority, created.provider);
+                initialization.holder = created.holder;
+                published = true;
+            }
+            return Interception.handled(created.holder);
+        } catch (Throwable error) {
+            initialization.failure = error;
+            throw error;
+        } finally {
+            synchronized (stateLock) {
+                initializations.remove(authority, initialization);
+            }
+            initialization.completed.countDown();
+            if (!published && created != null) shutdown(created.provider);
+        }
     }
 
-    private Object createHolder(Class<?> holderType, ProviderDescriptor descriptor) throws Exception {
+    @Override public void close() {
+        ArrayList<GuestBrokerContentProvider> toClose;
+        synchronized (stateLock) {
+            if (closed) return;
+            // Publish the terminal state before closing any provider. Shutdown callbacks may
+            // re-enter framework code; they must observe this interceptor as dead and cannot
+            // allocate a holder. Do not hold stateLock across shutdown callbacks.
+            closed = true;
+            toClose = new ArrayList<>(providers.values());
+            holders.clear();
+            providers.clear();
+            initializations.clear();
+        }
+        for (GuestBrokerContentProvider provider : toClose) {
+            shutdown(provider);
+        }
+    }
+
+    private static void shutdown(GuestBrokerContentProvider provider) {
+        try {
+            provider.shutdown();
+        } catch (Throwable ignored) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(ignored);
+        }
+    }
+
+    private static boolean isGuestMainThread() {
+        Looper current = Looper.myLooper();
+        Looper main = Looper.getMainLooper();
+        // The static Android harness represents both loopers as null. Treat that as an
+        // unspecified worker context so concurrent self-tests exercise the single-flight path.
+        return current != null && current == main;
+    }
+
+    private static void rethrow(Throwable error) throws Throwable {
+        com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        throw error;
+    }
+
+    private CreatedHolder createHolder(Class<?> holderType, ProviderDescriptor descriptor)
+            throws Exception {
         ProviderInfo info = providerInfo(descriptor);
         GuestBrokerContentProvider provider = new GuestBrokerContentProvider(
                 context, spec, descriptor.packageName, descriptor.virtualUserId,
                 descriptor.processName, descriptor.authority, descriptor.componentClass,
                 descriptor.exported);
-        provider.attachInfo(context, info);
-        provider.prepare();
-        Method transportMethod = ContentProvider.class.getDeclaredMethod("getIContentProvider");
-        transportMethod.setAccessible(true);
-        Object transport = transportMethod.invoke(provider);
-        if (transport == null) throw new IllegalStateException("CONTENT_PROVIDER_TRANSPORT_UNAVAILABLE");
+        try {
+            provider.attachInfo(context, info);
+            provider.prepare();
+            Method transportMethod = ContentProvider.class.getDeclaredMethod("getIContentProvider");
+            transportMethod.setAccessible(true);
+            Object transport = transportMethod.invoke(provider);
+            if (transport == null) throw new IllegalStateException(
+                    "CONTENT_PROVIDER_TRANSPORT_UNAVAILABLE");
 
-        Object holder = instantiateHolder(holderType, info);
-        setField(holder, "info", info, false);
-        setField(holder, "provider", transport, true);
-        setField(holder, "connection", null, false);
-        setField(holder, "noReleaseNeeded", true, false);
-        providers.put(descriptor.authority, provider);
-        return holder;
+            Object holder = instantiateHolder(holderType, info);
+            setField(holder, "info", info, false);
+            setField(holder, "provider", transport, true);
+            setField(holder, "connection", null, false);
+            setField(holder, "noReleaseNeeded", true, false);
+            return new CreatedHolder(holder, provider);
+        } catch (Throwable error) {
+            shutdown(provider);
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            if (error instanceof Exception exception) throw exception;
+            if (error instanceof Error fatal) throw fatal;
+            throw new IllegalStateException("CONTENT_PROVIDER_HOLDER_CREATE_FAILED", error);
+        }
+    }
+
+    private static final class ProviderInitialization {
+        private final Thread owner;
+        private final CountDownLatch completed = new CountDownLatch(1);
+        private volatile Object holder;
+        private volatile Throwable failure;
+
+        private ProviderInitialization(Thread owner) {
+            this.owner = owner;
+        }
+    }
+
+    private static final class CreatedHolder {
+        private final Object holder;
+        private final GuestBrokerContentProvider provider;
+
+        private CreatedHolder(Object holder, GuestBrokerContentProvider provider) {
+            this.holder = holder;
+            this.provider = provider;
+        }
     }
 
     private ProviderInfo providerInfo(ProviderDescriptor descriptor) {

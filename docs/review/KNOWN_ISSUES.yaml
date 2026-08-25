@@ -1585,9 +1585,10 @@ issues:
     classification: ARCHITECTURE_GAP
     severity: HIGH
     status: RECORDED
-    discovered_by: C4-R03 Fanqie continuation and post-restart resume 2026-08-25
+    discovered_by: C4-R03 Fanqie continuation and post-restart resume 2026-08-25; targeted provider fix validation 2026-08-25
     evidence:
       - verification/catch-up/C4-R03/rd-acceptance/summary.json
+      - verification/catch-up/C4-R03/rd-acceptance/targeted-fix-20260825.json
       - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
       - artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825/attempts/fanqie/user-0/cold-001
       - artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825/attempts/fanqie/user-1/cold-002
@@ -1604,13 +1605,20 @@ issues:
     blocks_current_campaign: true
     fix_policy: C4_R03_CLASSIFY_PROVIDER_READINESS_THEN_C4_R04_FAIL_CLOSED
     notes: >
-      Fanqie `com.dragon.read` was dynamically imported and catalogued successfully. The first
-      user0 cold launch reached FIRST_FRAME_DRAWN at 33167 ms and was classified
+      Fanqie `com.dragon.read` was dynamically imported and catalogued successfully. The historical
+      first user0 cold launch reached FIRST_FRAME_DRAWN at 33167 ms and was classified
       READINESS_SLO_EXCEEDED; user1 cold-002 independently reached FIRST_FRAME_DRAWN at 31071 ms
       and failed the same cold 30000 ms gate. After an explicit RD测试 restart, a bounded manual
       resume of user1 cold-002 (attempt 2, retryBudget 0, automaticRetryPerformed false) reached
       FIRST_FRAME_DRAWN at 42106 ms and reproduced GUEST_MAIN_THREAD_TIMEOUT in the CAS Guest
       ContentProvider bridge while the app accessed its Mira plugin provider. Window, Surface and
-      screenshot evidence were valid, so this is not evidence of an SX/UI owner. The exact app-side
-      trigger and minimal CAS provider/broker wait or payload contract remain pending; no production
-      fix, sleep extension, or repeated retry is authorized in C4-R03.
+      screenshot evidence were valid, so this is not evidence of an SX/UI owner. Source review
+      confirmed a CAS-global interceptor monitor was held across synchronous provider preparation;
+      the provider's Guest-main-thread re-entry could therefore form a lock cycle. The targeted
+      fix now uses per-authority single-flight state, releases the state lock before provider
+      preparation/shutdown, and fails closed on same-authority Guest-main-thread re-entry. It does
+      not change the 15000 ms Guest timeout, production readiness SLO, sleep, or retry budget.
+      Fanqie user0/user1 cold/hot targeted validation then passed 4/4 at 15978/463/16744/626 ms
+      with valid Activity, Window, Surface and non-black screenshot evidence. The required 500-row
+      matrix is still incomplete, so this issue remains RECORDED and blocking; the historical first
+      failures remain authoritative and no conclusion is generalized from Quark.

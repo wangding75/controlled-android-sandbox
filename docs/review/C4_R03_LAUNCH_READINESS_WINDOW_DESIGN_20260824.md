@@ -200,7 +200,49 @@ readiness 边界；具体 app-side plugin/provider 触发点和最小 CAS provid
 - `artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825`；
 - `artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825`。
 
-## 8. 证据索引
+## 8. 修复设计与定向验证（2026-08-25）
+
+### 8.1 根因与参考实现映射
+
+在实施修复前重新对照 NBB/VA 实现：NBB 的进程记录、Binder owner/death 状态和生命周期归属，
+以及 VA 的 ActivityStack/进程启动、Provider 生命周期边界，均把“生命周期状态发布”和“执行
+回调”分开处理。这里仅借鉴 owner、生命周期和死亡回收的边界原则，不复制旧的全局 singleton 或
+私有 API 假设。结合番茄首次失败的完整栈，已确认 CAS 的具体锁环为：
+
+`GuestContentProviderFrameworkInterceptor` 的全局 `synchronized` → `attachInfo()/prepare()` →
+Guest 主线程 Broker 调用 → Fanqie Mira plugin provider 再次通过 ContentResolver 进入
+ContentProvider 拦截器。全局锁使回入无法取得拦截器，15 秒后才出现 `GUEST_MAIN_THREAD_TIMEOUT`，
+随后首帧才被绘制。该 owner 是 CAS 通用 Guest ContentProvider/launch readiness 边界；Mira 是触发
+路径证据，不足以把问题猜测为番茄专属，也没有 SX/UI owner 证据。
+
+### 8.2 最小修复边界
+
+`GuestContentProviderFrameworkInterceptor` 现在按 authority 维护短生命周期 single-flight 状态，
+只在读取/发布/关闭状态时持有短 `stateLock`。`attachInfo()`、`prepare()`、反射构造和 shutdown
+回调都在锁外执行；同一 authority 在 Guest 主线程回入时 fail-closed，避免把主线程变成等待者，
+其他线程只等待该 authority 的一次创建结果。关闭先发布 terminal state，再在锁外回调 Provider。
+该修复不延长 Guest 主线程 15000 ms timeout、不放宽冷/热 readiness SLO、不增加 retry，也不通过
+固定 sleep 或重复运行掩盖首次失败；因此不提前实施 C4-R04/C4-R05 的验收编排。
+
+### 8.3 回归与 RD 测试
+
+静态 Android 编译、自检和 Gradle Debug 构建均通过。以实例名 `RD测试` 动态解析到本次 boot
+`70f2ef8b-daf7-4492-b011-4a1da57a5c49`；ADB endpoint 只写入 evidence，不进入 runner 常量。当前
+APK `89DCBEB082F9F6452813CF363BB5E5AE17632ACE2031EAE4490D17C2FB6B75A1` 下，番茄
+`com.dragon.read` 7.1.9.32/71932（base 1、split 0、arm64-v8a）用户 0/1 冷/热各 1 轮共
+4/4 PASS：readiness 分别为 15978、463、16744、626 ms，均有
+`REQUEST_ACCEPTED → GUEST_READY → ACTIVITY_RESUMED → FIRST_FRAME_DRAWN`、非空 Window、
+Surface 和非黑截图。每行 `attempt=1/retryBudget=0/automaticRetryPerformed=false`，当前 case-scoped
+fatal markers 为空；完整 request/operation ID 和快照见：
+
+`verification/catch-up/C4-R03/rd-acceptance/targeted-fix-20260825.json` 及
+`artifacts/capability-audit/catch-up-c4-r03/after-provider-interceptor-single-flight-20260825`。
+
+这只是修复后的定向验证，不是 500 行正式矩阵。番茄完整双用户矩阵、C4-R04/C4-R05 仍未完成，
+因此 C4-R03 保持 `BLOCKED`，不得更新为 `DONE` 或推进下一任务；历史首次失败证据继续保留并可
+用于对比，夸克仍只作正向对照。
+
+## 9. 证据索引
 
 - R03 start preflight：`verification/catch-up/C4-R03/start-state.json`。
 - 机器汇总：`verification/catch-up/C4-R03/rd-acceptance/summary.json`。

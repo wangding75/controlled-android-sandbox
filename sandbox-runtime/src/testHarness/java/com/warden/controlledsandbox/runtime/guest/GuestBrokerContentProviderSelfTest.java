@@ -24,6 +24,7 @@ import com.warden.controlledsandbox.contract.RuntimeOperationResult;
 import com.warden.controlledsandbox.contract.RuntimeStatusRequest;
 import com.warden.controlledsandbox.contract.RuntimeStatusResult;
 import com.warden.controlledsandbox.contract.VirtualComponentSnapshot;
+import com.warden.controlledsandbox.contract.VirtualPackageProjectionSnapshot;
 import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.runtime.protocol.ComponentOperations;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
@@ -214,11 +215,49 @@ public final class GuestBrokerContentProviderSelfTest {
         require(modernUnknownDenied,
                 "modern getContentProvider signature resolves authority immediately before user id");
         interceptor.close();
+
+        providerCreationIsSingleFlight();
         System.out.println("PASS standard ContentProvider Broker bridge self-test");
+    }
+
+    /** Provider holders are cached per authority after the bounded Broker preparation succeeds. */
+    private static void providerCreationIsSingleFlight() throws Throwable {
+        FakeBroker broker = new FakeBroker();
+        GuestPackageSpec spec = new GuestPackageSpec(specBundleWithForeignProvider(broker));
+        GuestContext context = new GuestContext(new Context(), spec,
+                GuestBrokerContentProviderSelfTest.class.getClassLoader(),
+                new Resources(new AssetManager(), new DisplayMetrics(), new Configuration()),
+                new AssetManager(), new android.content.pm.PackageManager());
+        GuestContentProviderFrameworkInterceptor interceptor =
+                new GuestContentProviderFrameworkInterceptor(context, spec);
+        Method providerMethod = KnownActivityManager.class.getMethod(
+                "getContentProvider", String.class, String.class);
+        com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor.Interception first =
+                interceptor.intercept("activity-manager", providerMethod,
+                        new Object[]{"guest.pkg", "foreign.authority"});
+        com.warden.controlledsandbox.framework.core.FrameworkCallInterceptor.Interception second =
+                interceptor.intercept("activity-manager", providerMethod,
+                        new Object[]{"guest.pkg", "foreign.authority"});
+        require(first.handled() && first.result() == second.result(),
+                "resolver callers did not share the provider holder");
+        require(broker.prepareCalls == 1,
+                "provider preparation was not single-flight per authority");
+        interceptor.close();
     }
 
     public interface FakeActivityManager {
         Object getContentProvider(String callerPackage, String authority);
+    }
+
+    public interface KnownActivityManager {
+        Holder getContentProvider(String callerPackage, String authority);
+
+        final class Holder {
+            private Object info;
+            private Object provider;
+            private Object connection;
+            private boolean noReleaseNeeded;
+        }
     }
 
     public interface ModernActivityManager {
@@ -230,12 +269,18 @@ public final class GuestBrokerContentProviderSelfTest {
         final List<String> operations = new ArrayList<>();
         final List<Bundle> requests = new ArrayList<>();
         Bundle insertValues = new Bundle();
+        int prepareCalls;
 
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
             Bundle payload = request.payload();
             String operation = payload.getString(ComponentOperations.OPERATION, "");
-            operations.add(operation);
-            requests.add(new Bundle(payload));
+            synchronized (this) {
+                operations.add(operation);
+                requests.add(new Bundle(payload));
+            }
+            if (ComponentOperations.PREPARE_PROVIDER.equals(operation)) {
+                prepareCalls++;
+            }
             Bundle result = new Bundle();
             result.putString(RuntimeKeys.STATUS, "OK");
             switch (operation) {
@@ -364,6 +409,23 @@ public final class GuestBrokerContentProviderSelfTest {
                 new VirtualPackageStateSnapshot("guest.pkg", 2, "Guest", "1.0", 1L,
                         sha, sha, "guest.pkg.MainActivity", "", true,
                         List.of(provider), List.of(), List.of()));
+        return input;
+    }
+
+    private static Bundle specBundleWithForeignProvider(FakeBroker broker) {
+        Bundle input = specBundle(broker);
+        VirtualComponentSnapshot provider = new VirtualComponentSnapshot(
+                "PROVIDER", "foreign.pkg.Provider", "foreign.pkg", false, true, false,
+                "foreign.authority", "", List.of());
+        VirtualPackageStateSnapshot state = new VirtualPackageStateSnapshot(
+                "foreign.pkg", 2, "Foreign", "1.0", 1L,
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "foreign.pkg.MainActivity", "", true,
+                List.of(provider), List.of(), List.of());
+        input.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                new ArrayList<>(List.of(new VirtualPackageProjectionSnapshot(
+                        state, "/tmp/foreign.apk", "", 13003))));
         return input;
     }
 
