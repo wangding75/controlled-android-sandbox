@@ -166,6 +166,11 @@ fixture user1 的 `cold-006` 在时间上限到达时处于截图质量采集阶
 夸克只继续作为正向对照，不能推导红果或番茄兼容；红果/番茄的 owner 与启动结论保持待验证。由于矩阵
 未完成、C4-R04/R05 尚未执行，C4-R03 保持 `BLOCKED`，不得更新为 `DONE` 或推进下一任务。
 
+2026-08-25 的 2 小时续接进一步完成了红果 user0/user1 各 50/50（100/100 PASS），并完成番茄
+user0 的 4 个 PASS；番茄 user1 尚未开始，番茄 user0 尚缺 46 个 case。红果的成功只证明当前
+CAS 通用 owner/readiness 修复在该动态样本上的已执行范围，不改变夸克正向对照规则，也不替代番茄
+剩余矩阵。完整非重复矩阵为 404/500，故 owner/阶段结论继续保持待关闭。
+
 ## 8. 证据索引
 
 - R03 start preflight：`verification/catch-up/C4-R03/start-state.json`。

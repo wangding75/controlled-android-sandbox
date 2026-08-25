@@ -1550,6 +1550,9 @@ issues:
       - artifacts/capability-audit/catch-up-c4-r03/post-prelookup-owner-clean-reboot-quark-u0-25-20260825
       - artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-quark-u1-25-20260825
       - artifacts/capability-audit/catch-up-c4-r03/final-prelookup-owner-dingtalk-u0-u1-25-20260825
+      - artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fixture-u1-25-20260825
+      - artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825
+      - artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fanqie-u0-u1-25-20260825
       - verification/catch-up/C4-R03/rd-acceptance/summary.json
     match_patterns:
       - lowmemorykiller: Kill 'com.quark.browser'
@@ -1570,7 +1573,8 @@ issues:
       keeps explicit BIND_AUTO_CREATE|BIND_IMPORTANT|BIND_ABOVE_CLIENT edges for the Broker,
       Guest and long-lived authority clients and primes the RuntimeClient owner before package
       lookup, matching the NBB/VA live virtual ProcessRecord ownership boundary. Quark user0/
-      user1 and DingTalk user0/user1 then passed 200/200 final-code launch rows with no retry,
-      sleep or deadline extension. Status remains RECORDED because the eight-hour cutoff left
-      the required Hongguo/Fanqie lanes and part of fixture user1 unexecuted; full matrix
-      validation is still required before this issue or C4-R03 can be closed.
+      user1, DingTalk user0/user1 and Hongguo user0/user1 then passed 300/300 final-code launch
+      rows with no retry, sleep or deadline extension; Fanqie user0 passed 4 rows before the
+      continuation cutoff. Status remains RECORDED because Fanqie is incomplete (user0 has 46
+      missing rows and user1 has 50 missing rows); full matrix validation is still required
+      before this issue or C4-R03 can be closed.

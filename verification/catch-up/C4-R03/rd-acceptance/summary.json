@@ -83,7 +83,7 @@
     "taskbook":"docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
     "rootPlan":"docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md"
   },
-  "blocker": "R03 commercial launch acceptance cannot pass while first cold launches for DingTalk, Quark and Hongguo fail at the CAS Binder Intent transport boundary; no retry or deadline extension was used.",
+  "blocker": "Historical first cold launches for DingTalk, Quark and Hongguo failed at the CAS Binder/Intent boundary; the owner-lifetime fix now has partial final-matrix evidence, but the required 500-row matrix remains incomplete and no retry or deadline extension was used.",
   "nextTask": "C4-R03",
   "nextTaskAdvanceAllowed": false,
   "continuation8h": {
@@ -144,5 +144,62 @@
       "apkSha256": "3F8D3CB58B29E2FE9A39566DDBA7A8D277DB9318F0A120326DA9BE7683AB5E7E"
     },
     "conclusion": "BLOCKED: the eight-hour window ended before the required 500-row matrix completed; the current evidence does not prove Hongguo/Fanqie launch or full C4-R03 acceptance."
+  },
+  "continuation2h": {
+    "requestedByUser": true,
+    "effectiveWindowStart": "2026-08-25T07:31:53+08:00",
+    "cutoff": "2026-08-25T09:31:53+08:00",
+    "stoppedAtCutoff": true,
+    "stopReason": "time_limit_reached",
+    "matrixDefinition": {
+      "targets": ["fixture", "dingtalk", "quark", "hongguo", "fanqie"],
+      "users": [0, 1],
+      "loopsPerUser": 25,
+      "rowsPerTargetUser": 50,
+      "requiredRows": 500,
+      "coldRowsPerTargetUser": 25,
+      "hotRowsPerTargetUser": 25
+    },
+    "nonOverlappingCompletedRows": 404,
+    "nonOverlappingCompletedPassRows": 404,
+    "nonOverlappingCompletedNonPassRows": 0,
+    "rowsByTargetUser": {
+      "fixture/user0": 50,
+      "fixture/user1": 50,
+      "dingtalk/user0": 50,
+      "dingtalk/user1": 50,
+      "quark/user0": 50,
+      "quark/user1": 50,
+      "hongguo/user0": 50,
+      "hongguo/user1": 50,
+      "fanqie/user0": 4,
+      "fanqie/user1": 0
+    },
+    "missingRows": {
+      "fanqie/user0": 46,
+      "fanqie/user1": 50
+    },
+    "retryAudit": {
+      "attempt1Rows": 404,
+      "retryBudget0Rows": 404,
+      "automaticRetryFalseRows": 404,
+      "retryableFalseRows": 404
+    },
+    "continuationEvidence": {
+      "fixtureUser1": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fixture-u1-25-20260825",
+      "hongguoUsers01": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825",
+      "fanqiePartial": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fanqie-u0-u1-25-20260825",
+      "fanqieInterruptedCase": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fanqie-u0-u1-25-20260825/attempts/fanqie/user-0/cold-003",
+      "dynamicEnvironment": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825/environment.json",
+      "dynamicCommercialDiscovery": "artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825/commercial-sample-discovery.json"
+    },
+    "sampleObservations": {
+      "hongguoImport": "PASS; MIXED_ELF_MACHINE recorded and import operation SUCCEEDED",
+      "hongguoLaunch": "100/100 PASS with FIRST_FRAME_DRAWN evidence",
+      "fanqieImportUser0": "PASS; MIXED_ELF_MACHINE recorded and import operation SUCCEEDED",
+      "fanqieLaunch": "4/4 PASS for user0 before the two-hour cutoff; user1 not started",
+      "quarkRole": "positive control only; not used to infer Hongguo or Fanqie compatibility"
+    },
+    "conclusion": "BLOCKED: the two-hour continuation completed fixture user1 and Hongguo, but the Fanqie matrix was interrupted at 4/100; full 500-row C4-R03 acceptance remains unproven."
   }
 }
