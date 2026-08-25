@@ -1374,10 +1374,7 @@ issues:
       - GUEST_ACTIVITY_CREATE
       - reportedDrawn=false
       - windows=[]
-    blocks_current_campaign: false
-    follow_up_required: true
-    follow_up_task: C4-R04/R05 regression
-    acceptance: ACCEPTED_RISK_FOR_C4_R03_ADVANCE_NOT_FIXED
+    blocks_current_campaign: true
     fix_policy: C4_R03_FIRST_FRAME_DRAWN_AND_C4_R04_FAIL_CLOSED_GATE
     notes: >
       C4-R01 marked both historical C4-T05 summaries SUPERSEDED and unusable for C4
@@ -1647,7 +1644,10 @@ issues:
       - "reason: device is not responding"
       - com.alibaba.android.rimet
       - FIRST_FRAME_DRAWN
-    blocks_current_campaign: true
+    blocks_current_campaign: false
+    follow_up_required: true
+    follow_up_task: C4-R04/R05 regression
+    acceptance: ACCEPTED_RISK_FOR_C4_R03_ADVANCE_NOT_FIXED
     fix_policy: BOUND_RESOURCE_SNAPSHOT_AND_REPRODUCE_OWNER_BEFORE_PRODUCTION_CHANGE
     notes: >
       DingTalk was dynamically recorded as com.alibaba.android.rimet 7.8.10/1178, base 1,
