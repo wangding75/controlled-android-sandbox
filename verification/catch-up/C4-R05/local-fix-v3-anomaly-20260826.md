@@ -1,6 +1,6 @@
 # C4-R05 local-fix-v3 DingTalk anomaly record
 
-Date: 2026-08-26 (Asia/Shanghai)  
+Date: 2026-08-26 (Asia/Shanghai)
 Device: MuMu `RD测试`, API 32 / Android 12, host serial `127.0.0.1:16416`, emulator memory 8 GB.
 
 ## Scope and result
