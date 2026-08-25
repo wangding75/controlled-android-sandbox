@@ -64,7 +64,7 @@
     "windowsCount": 0,
     "reportedDrawn": false,
     "hasVisible": false,
-    "targetActivity": "com.warden.controlsandbox.fixture.MainActivity",
+    "targetActivity": "com.warden.controlledsandbox.fixture.MainActivity",
     "targetPackage": "com.warden.controlledsandbox.fixture",
     "revision": "revision-fixture-1"
   },
