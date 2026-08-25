@@ -1679,3 +1679,47 @@ issues:
       this does not change the historical evidence or claim a 500/500 first-attempt PASS. The
       issue remains open and must be included in the subsequent C4-R04/R05 regression gate.
       Fixture remains intentionally last.
+
+  - issue_id: KI-R03-061
+    title: DingTalk cold launch blocks Guest prepare on dynamic receiver registration
+    capability: activity_framework
+    classification: ARCHITECTURE_GAP
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 reduced stage matrix on new MuMu environment 2026-08-25
+    evidence:
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0/c4-r03-summary.json
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0/attempts/dingtalk/user-0/cold-001/case.json
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0/attempts/dingtalk/user-0/cold-001/first-failure-full
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0-a2/c4-r03-summary.json
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0-a2/attempts/dingtalk/user-0/cold-001/case.json
+      - verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0-a2/attempts/dingtalk/user-0/cold-001/first-failure-full
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestMainThreadDispatcher.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestDynamicReceiverTransport.java
+    match_patterns:
+      - GUEST_PREPARE_MAIN_THREAD_TIMEOUT
+      - GUEST_MAIN_THREAD_TIMEOUT
+      - GUEST_NOT_PREPARED
+      - GuestDynamicReceiverTransport.register
+      - com.alibaba.android.rimet
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 recovery and DingTalk cold-launch regression
+    acceptance: NOT_FIXED
+    fix_policy: REPRODUCE_GUEST_DISPATCHER_AND_RECEIVER_OWNER_BEFORE_PRODUCTION_CHANGE
+    notes: >
+      Dynamic discovery recorded DingTalk as com.alibaba.android.rimet 7.8.10/1178, base 1,
+      split 0, primary ABI arm64-v8a. import-only passed, then the first cold launch stopped at
+      96.2 seconds with GUEST_PREPARE_MAIN_THREAD_TIMEOUT. After the user increased RD测试 to
+      8 GB and restarted the emulator, a separately recorded manual resume attempt also stopped
+      at 97.9 seconds with the same error; this confirms the memory change did not clear the
+      failure. The Guest process reached framework
+      readiness and emitted a non-black screenshot with a non-empty Surface, but no resumed Guest
+      Activity or FIRST_FRAME_DRAWN. During startup, repeated dynamic receiver registration calls
+      blocked in GuestMainThreadDispatcher and emitted GUEST_MAIN_THREAD_TIMEOUT/GUEST_NOT_PREPARED;
+      the stack crosses GuestDynamicReceiverTransport and DingTalk application startup. No automatic
+      retry, deadline extension, or package-specific production fix was used; the post-restart run
+      was a manual attempt=2 with retryBudget=0 and remains a separate failed observation. This is a CAS generic
+      Guest dispatcher/receiver transport owner candidate, not evidence for SX/UI or a DingTalk-only
+      compatibility patch. The first failure remains authoritative and blocks C4-R05 until a bounded
+      recovery and regression lane passes.

@@ -1,0 +1,14 @@
+{
+  "instanceName": "RD测试",
+  "instanceIndex": 1,
+  "resolvedSerial": "127.0.0.1:16416",
+  "androidVersion": "12.0",
+  "deviceModel": "V2241A",
+  "bootId": "5ee64f03-d178-4236-a615-16b7b196e41e",
+  "mumuVmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+  "configuredMemoryGiB": 8.0,
+  "configuredMemoryRaw": "8.000000",
+  "guestMemTotalKiB": 8157056,
+  "verifiedAt": "2026-08-25T15:52:00+08:00",
+  "verification": "MuMu vm_config memory=8.000000 and guest /proc/meminfo MemTotal=8157056 kB after restart"
+}

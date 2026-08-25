@@ -1,0 +1,12 @@
+{
+  "kind": "MANUAL_RESUME_AFTER_RESTART",
+  "resumeTarget": "dingtalk",
+  "resumeUser": 0,
+  "resumeIteration": 1,
+  "resumeMode": "cold",
+  "attempt": 2,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "previousLane": "verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0",
+  "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+}

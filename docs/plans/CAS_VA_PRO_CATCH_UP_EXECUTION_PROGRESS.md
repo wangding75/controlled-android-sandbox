@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.4
-更新时间：2026-08-25 22:20（Asia/Shanghai）
+更新时间：2026-08-25 23:55（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（IN_PROGRESS）
+当前任务：`C4-R05`（BLOCKED）
 下一任务：`C4-R05`
 最后完成任务：`C4-R04`
 
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 100-case checkpoint |
+| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 failure receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,7 +82,7 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`；
+当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`；
 `KI-R03-060` 为已接受但仍开放的强制回归项。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
@@ -2582,3 +2582,25 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **回执提交**：本段使用独立主题 `docs(progress): record [C4-R05] scope receipt`；推送后用
   `git ls-remote --heads origin feature/t57-r03-va-pro-capability-campaign` 核验远端 HEAD。
 - **下一任务**：仍为 `C4-R05`；从当前新环境和保存的续接证据继续执行剩余减半矩阵。
+
+### C4-R05：DingTalk 冷启动失败与 8 GB 重启复验回执（2026-08-25）
+
+- **状态**：`BLOCKED`。用户明确要求将首发失败不计入用例数，并把 `RD测试` 模拟器内存提升到 8 GB、重启后重新测试；首发证据仍保留，未覆盖或删除。
+- **首发失败**：减半正式矩阵在 `dingtalk/user0/cold-001` 的首个观察失败，耗时约 96.2 秒，生产返回
+  `GUEST_PREPARE_MAIN_THREAD_TIMEOUT`；`import-only` 通过，截图非黑且 Surface 非空，但没有
+  `ACTIVITY_RESUMED/FIRST_FRAME_DRAWN`。按用户指令执行独立手动 `attempt=2` 后，8 GB 配置已由
+  MuMu `vms/MuMuPlayer-12.0-1/configs/vm_config.json` 的 `memory=8.000000` 和 Guest
+  `/proc/meminfo MemTotal=8157056 kB` 复核，重试仍在约 97.9 秒以同一错误失败。
+- **重试范围与策略**：只重跑 `dingtalk/user0`、`loops=25` lane 的 `cold-001`，使用
+  `--resume-target dingtalk --resume-user 0 --resume-iteration 1 --resume-mode cold
+  --resume-attempt 2`；`retryBudget=0`、无自动重试，旧首发目录通过 `--resume-of` 关联。
+- **证据**：首发 lane 为
+  `verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0/`；
+  8 GB 重启复验 lane 为
+  `verification/catch-up/C4-R05/continuation-v2241a-a1-20260825/round-1/launch-matrix-dingtalk-user0-a2/`，
+  其中 `c4-r03-summary.json`、`case.json`、`emulator-memory8.json` 和 `first-failure-full/` 为可审计证据。
+- **分类与影响**：两次结果均为 `LAUNCH_RESULT_NOT_PASS`，Guest 动态 Receiver 注册栈继续出现
+  `GUEST_MAIN_THREAD_TIMEOUT/GUEST_NOT_PREPARED`；本次内存调整未清除阻断。该问题已登记为 `KI-R03-061`，
+  仍阻断 C4-R05；不将慢启动、截图或后续 lane 结果升级为 PASS。
+- **下一步**：按用户“记录后提交、停止任务”指令停在当前阻断点。后续只有在 Guest dispatcher/receiver
+  owner 修复或有界恢复方案明确后，才能从本回执继续执行剩余商业矩阵并重新评估 C4 关门。
