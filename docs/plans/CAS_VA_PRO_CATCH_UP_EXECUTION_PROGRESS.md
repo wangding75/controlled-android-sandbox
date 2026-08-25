@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.4
-更新时间：2026-08-26 01:20（Asia/Shanghai）
+更新时间：2026-08-26 02:04（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（IN_PROGRESS）
+当前任务：`C4-R05`（BLOCKED）
 下一任务：`C4-R05`
 最后完成任务：`C4-R04`
 
@@ -2663,3 +2663,32 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **下一步**：继续本机 user0 的剩余 launch matrix（fixture、夸克、红果、番茄，各 25 cold + 25 hot），
   同时保留已完成 DingTalk 50/50 作为独立 lane；之后执行 C1/C2/C4/SX 回归和本机压力，另一台机器
   user1 的独立证据仍需汇总到同一最终提交范围后才能重新评估 C4 关门。
+
+### C4-R05：本机 user0 Quark 宿主低内存首发阻断回执（2026-08-26）
+
+- **状态**：`BLOCKED`。本机剩余启动矩阵按首次失败即停执行；fixture 已完成 50/50，Quark
+  `cold-001`、`hot-001`、`cold-002`、`hot-002` 通过后，在 `quark/user-0/cold-003` 首次失败，
+  因此没有继续红果或番茄，也没有执行自动重试。
+- **首发合同**：请求 `requestId=4647d04f6e5540b2a4c74c313331f311`，
+  `attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`；runner 返回
+  `LAUNCH_RESULT_NOT_PASS`，原因是 `RD_ENVIRONMENT_RESOLUTION_BLOCKED:
+  debug-command-result timeout`，同 requestId 的生产 `operation` 不可用。
+- **根因分类**：设备 `ApplicationExitInfo` 显示被杀进程为
+  `com.warden.controlledsandbox.debug` pid 17929，原因 `LOW_MEMORY`，PSS 约 120 MB、RSS
+  约 201 MB。失败快照仍有 Quark focused Window、非空 Surface、非黑截图和 0 个 FATAL/ANR，
+  但这些观察没有 request-scoped launch result 关联，不能升级为 PASS。该证据归入既有
+  `KI-R03-058` 的 CAS 进程 owner / MuMu 低内存边界，问题仍为 `RECORDED`、阻断当前 campaign；
+  不新增 Quark 专属修复结论。
+- **进度**：本 lane 已保留 55 条 case（fixture 50 条通过、Quark 4 条通过 + 1 条首发失败），
+  本 lane 尚有 145 条未执行；Hongguo/Fanqie 均为 0 条。已完成 DingTalk user0 50/50、R04
+  failure-injection/recovery 和减半添加门禁仍保持独立证据，不能覆盖本次首发阻断。
+- **证据**：结构化回执为
+  `verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/local-launch-failure-receipt.json`；
+  完整分类与恢复设计为
+  `docs/review/C4_R05_QUARK_HOST_PROCESS_LOW_MEMORY_BLOCK_DESIGN_20260826.md`；原始失败目录为
+  `verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/attempts/quark/user-0/cold-003/first-failure-full/`。
+- **恢复约束**：恢复前不得继续剩余 lane；后续只能在 RD 进程 owner/低内存边界明确恢复后，
+  使用新的 requestId、独立目录和显式手动 resume 观察，首发证据仍然权威。C4-R05 尚未完成，
+  C4 阶段不得关闭。
+- **实现/证据提交**：`90aceaf7`（`test(c4): [C4-R05] record local Quark low-memory block`），
+  已推送；随后用独立主题 `docs(progress): record [C4-R05] receipt` 提交本回执并核验远端 HEAD。
