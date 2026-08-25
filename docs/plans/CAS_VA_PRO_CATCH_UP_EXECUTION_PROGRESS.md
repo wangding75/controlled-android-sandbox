@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-24 17:55（Asia/Shanghai）
+更新时间：2026-08-25 10:46（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `f65ea6f3` | §5 C4-R03 |
+| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `d8797c89` | §5 C4-R03 |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,11 +82,11 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-057`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-059`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
-C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
+C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、`KI-R03-059` 的未闭合矩阵/启动证据阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
 
 ## 5. 任务回执
 
@@ -2271,3 +2271,31 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
 - **本回执提交**：本段为独立的 `docs(progress): record [C4-R03] restart resume receipt` 提交。
 - **下一任务**：继续为 `C4-R03`；由于阻断未解除，续接预检应 fail-closed，不能把下一任务改成
   `C4-R04`，也不能标记 C4-R03 `DONE`。
+
+### C4-R03：Guest ContentProvider 初始化锁环修复与定向验证回执（2026-08-25）
+
+- **状态**：`BLOCKED`。本轮只处理 CAS Guest ContentProvider 初始化锁环的生产修复、回归和定向
+  验证；没有进入 C4-R04、C4-R05、C6 或 OEM 适配。历史首次失败仍是权威证据，不能被本轮定向
+  PASS 覆盖。
+- **根因与 owner**：在查阅并记录 NBB 的 ProcessRecord/Binder owner/death 状态、VA 的
+  ActivityStack/进程启动与 Provider 生命周期实现后，结合首次失败完整栈确认：
+  `GuestContentProviderFrameworkInterceptor` 的全局 `synchronized` 在
+  `attachInfo()/prepare()` 和 Guest 主线程 Broker 调用期间保持，番茄 Mira plugin provider
+  再通过 ContentResolver 回入另一个 Provider，形成 CAS 通用 ContentProvider/launch readiness
+  锁环。owner 保持 CAS 通用边界，不猜测为番茄专属，也没有 SX/UI owner 证据。
+- **修复范围**：按 authority single-flight；读取、发布和关闭只持有短 `stateLock`；Provider
+  创建、Broker `prepare()`、反射和 shutdown 回调均在锁外；同 authority 的 Guest-main-thread
+  回入 fail-closed。没有延长 15000 ms Guest timeout、冷/热 readiness SLO、sleep 或 retry budget，
+  也没有提前实施 C4-R04/R05 的生产修复。
+- **定向结果**：通过实例名动态解析 MuMu `RD测试`（boot ID
+  `70f2ef8b-daf7-4492-b011-4a1da57a5c49`），对 `com.dragon.read` 7.1.9.32/71932（base 1、
+  split 0、arm64-v8a）用户 0/1 冷/热各 1 轮，4/4 `LAUNCH_PASS`。readiness 为
+  `15978/463/16744/626 ms`；Activity created/resumed、FIRST_FRAME_DRAWN、Window、Surface 和
+  非黑截图均通过。每行 `attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`、
+  `retryable=false`，case-scoped fatal markers 为空。完整 request/operation ID、环境、截图和
+  快照见 `verification/catch-up/C4-R03/rd-acceptance/targeted-fix-20260825.json` 及其 raw lane。
+- **门禁结论**：4/4 是修复后的定向观察，不是 500 行正式矩阵；番茄完整双用户矩阵仍缺失，
+  C4-R03 不得改为 `DONE`，下一任务继续为 `C4-R03`。
+- **实现/证据提交 SHA**：`d8797c89`（`fix(c4): break Guest ContentProvider initialization lock cycle`）。
+- **本回执提交**：本段为独立的进度回执提交；按两提交协议晚于实现/证据提交。
+- **下一任务**：继续 `C4-R03`；先补齐规定矩阵并完成正式门禁，之后才可评估 C4-R04。
