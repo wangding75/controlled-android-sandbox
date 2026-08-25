@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 10:46（Asia/Shanghai）
+更新时间：2026-08-25 10:50（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R03`（BLOCKED）
+当前任务：`C4-R03`（IN_PROGRESS）
 下一任务：`C4-R03`
 最后完成任务：`C4-R02`
 
@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `d8797c89` | §5 C4-R03 |
+| C4-R03 | 启动 readiness 与窗口合同 | IN_PROGRESS | C4-R01 | `d8797c89` | §5 C4-R03 |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2299,3 +2299,19 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
 - **实现/证据提交 SHA**：`d8797c89`（`fix(c4): break Guest ContentProvider initialization lock cycle`）。
 - **本回执提交**：本段为独立的进度回执提交；按两提交协议晚于实现/证据提交。
 - **下一任务**：继续 `C4-R03`；先补齐规定矩阵并完成正式门禁，之后才可评估 C4-R04。
+
+### C4-R03：按恢复条件继续最终矩阵（2026-08-25）
+
+- **状态**：`IN_PROGRESS`。用户明确要求继续完成 C4-R03；此前 `BLOCKED` 的直接恢复条件
+  （CAS Provider 锁环修复、静态/Gradle 验证、Fanqie 用户 0/1 冷热 4/4 定向通过）已满足。
+- **续接边界**：原 404/500 rows 是修复前代码的历史矩阵证据，本轮不把它们直接升级为修复后
+  通过；将使用当前 APK SHA-256 `89DCBEB082F9F6452813CF363BB5E5AE17632ACE2031EAE4490D17C2FB6B75A1`
+  重新执行 C4-R03 规定的 fixture、DingTalk、夸克、红果、番茄小说双用户冷/热矩阵。夸克仍只作
+  正向对照，不推导红果或番茄兼容性。
+- **设备与重试策略**：运行前再次按实例名动态解析 MuMu `RD测试`，ADB endpoint 仅写入环境快照；
+  每个 case 保持 `attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`，首次失败立即
+  保存日志、dumpsys、窗口、Surface、进程、事务和截图并停止该 lane，不延长 deadline、不增加
+  sleep、不自动重试。
+- **完成条件**：500/500 rows 满足 readiness、首帧、Window、Surface、截图和无 fatal/ANR 后，
+  再把 C4-R03 更新为 `DONE`，写入完整回执并进入两提交/推送/远端对比；任一首次失败则保持
+  `BLOCKED` 并记录阻断证据。
