@@ -331,3 +331,22 @@ hot 50/50，唯一 100 行均通过。由于 user1 的后 35 个唯一行是切�
 独立机器回执为 `verification/catch-up/C4-R03/fixture-priority-last-20260825.json`。C4-R03
 仍为 `BLOCKED`，不推进 C4-R04；fixture PASS 不能覆盖 DingTalk readiness 首失败，也不能关闭
 商业矩阵。
+
+## 12. 2026-08-25 DingTalk 有界复现结果
+
+按用户要求，在 fixture 最后续接完成后，对 DingTalk 建立一条有界人工复现 lane；它不是自动重试，
+也不把未复现结果直接改成 PASS。当前 boot ID 未改变，`attempt=3`、`retryBudget=0`、
+`automaticRetryPerformed=false`、`retryable=false`。
+
+该 lane 覆盖了两个历史失败点：`hot-017` readiness `8546 ms`、`hot-019` readiness `8515 ms`，
+均通过；同时 `cold/hot-017`、`cold/hot-018`、`cold/hot-019`、`cold/hot-020` 共 8 行均有首帧、
+Window、Surface、非黑截图且无 FATAL/ANR。runner 在下一个无关诊断行开始前停止，原始 lane 和
+request/operation ID 保留在：
+`artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825`。
+
+通过复现并不能清除历史首次失败。更重要的是，本次通过的 `hot-017` 和 `hot-019` logcat 仍各自
+出现了与目标无关的 WebView LMK `reason: device is not responding`，说明“有 LMK 就一定失败”也
+不成立。当前结论只能升级为：两个历史失败在同一 boot 的有界复现中未复现，故问题具有非确定性，
+但 CAS launch/readiness 与 MuMu responsiveness 的主导因果仍未分离；不能标记 PASS 或关闭
+`KI-R03-060`。机器回执为 `verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json`，
+C4-R03 继续 `BLOCKED`。

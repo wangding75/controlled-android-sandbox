@@ -1632,8 +1632,10 @@ issues:
     discovered_by: C4-R03 DingTalk-priority continuation 2026-08-25
     evidence:
       - verification/catch-up/C4-R03/dingtalk-priority-20260825.json
+      - verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json
       - artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825/attempts/dingtalk/user-1/hot-017/first-failure-full
       - artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/attempts/dingtalk/user-1/hot-019/first-failure-full
+      - artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825
       - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
       - docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md
     match_patterns:
@@ -1656,4 +1658,9 @@ issues:
       Device resource pressure is therefore a confirmed environmental signal, not a complete
       causal proof. Owner remains the CAS generic launch/readiness boundary pending separation of
       CAS process/prepare latency from MuMu responsiveness; there is no SX/UI evidence and no
-      package-specific production fix is authorized by C4-R03. Fixture remains intentionally last.
+      package-specific production fix is authorized by C4-R03. A bounded same-boot manual replay
+      after fixture covered the historical hot-017 and hot-019 points and passed them at 8546 ms
+      and 8515 ms; all eight finalized replay rows passed, but the passing rows still contained
+      unrelated WebView LMK markers. This is recorded as NON_REPRODUCED_NOT_PASS: historical
+      first-failure evidence remains authoritative, the issue is not FIXED or cleared, and the
+      CAS-versus-MuMu owner split remains pending. Fixture remains intentionally last.

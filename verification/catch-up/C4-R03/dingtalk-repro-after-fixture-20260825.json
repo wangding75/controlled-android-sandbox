@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R03",
+  "status": "NON_REPRODUCED_NOT_PASS",
+  "instanceName": "RD测试",
+  "resolvedByName": true,
+  "environment": {
+    "lane": "artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825/environment.json",
+    "bootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "model": "22041211A",
+    "api": 32,
+    "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi"
+  },
+  "target": {
+    "name": "dingtalk",
+    "package": "com.alibaba.android.rimet",
+    "version": "7.8.10/1178",
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a"
+  },
+  "replay": {
+    "lane": "artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825",
+    "context": "MANUAL_REPRO_AFTER_FIXTURE_TARGET_SWITCH",
+    "resumeFrom": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/attempts/dingtalk/user-1/hot-019",
+    "attempt": 3,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "retryable": false,
+    "bootChanged": false,
+    "finalizedRows": 8,
+    "stoppedBefore": "user1/cold-021",
+    "stopReason": "historical hot-017 and hot-019 points were both covered; no failure was observed, so the bounded diagnostic lane was stopped before unrelated later iterations"
+  },
+  "historicalFailurePoints": {
+    "hot017": {
+      "replayReadinessMs": 8546,
+      "replayRequestId": "63236921724a4d30b06d45ac6da04f0d",
+      "replayOperationId": "63236921724a4d30b06d45ac6da04f0d-launch",
+      "replayResult": "PASS",
+      "historicalFirstFailure": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825/attempts/dingtalk/user-1/hot-017/first-failure-full"
+    },
+    "hot019": {
+      "replayReadinessMs": 8515,
+      "replayRequestId": "66ffe385c00f40d0a23c92a2ed5bae41",
+      "replayOperationId": "66ffe385c00f40d0a23c92a2ed5bae41-launch",
+      "replayResult": "PASS",
+      "historicalFirstFailure": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/attempts/dingtalk/user-1/hot-019/first-failure-full"
+    }
+  },
+  "replayEvidence": {
+    "allFinalizedRowsPass": true,
+    "readinessMinMs": 8282,
+    "readinessMaxMs": 28153,
+    "allRowsHaveFirstFrameWindowSurfaceNonBlack": true,
+    "fatalOrAnrMarkers": false,
+    "lmKMarkers": [
+      "hot-017 logcat: lowmemorykiller killed an unrelated WebView sandbox process",
+      "hot-019 logcat: lowmemorykiller killed unrelated WebView service"
+    ],
+    "lmKMarkersAreNotTargetKills": true
+  },
+  "classification": {
+    "confirmed": [
+      "The two historical readiness failures were not reproduced in this bounded same-boot replay.",
+      "The replay still observed unrelated LMK device-not-responding events while the target launch passed.",
+      "A passing replay does not invalidate either authoritative first-failure snapshot."
+    ],
+    "pending": [
+      "Whether the dominant cause is CAS launch/prepare latency, MuMu responsiveness, or their interaction.",
+      "A production fix owner and a clean first-attempt matrix closure decision."
+    ],
+    "owner": "CAS generic launch/readiness boundary remains unresolved; no SX/UI or package-specific owner is proven."
+  },
+  "acceptance": {
+    "markPass": false,
+    "currentTaskStatus": "BLOCKED",
+    "reason": "This is a non-reproduction diagnostic observation, not a first-attempt 100% acceptance result.",
+    "nextTask": "C4-R03",
+    "nextTaskAdvanceAllowed": false
+  }
+}

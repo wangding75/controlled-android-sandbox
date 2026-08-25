@@ -315,6 +315,33 @@
     },
     "conclusion": "BLOCKED: the bounded post-restart resume reproduced the Fanqie cold readiness failure; fail-fast stopped before hot-002 and later cases. The prior first failure remains authoritative, and the matrix cannot be marked DONE or advanced."
   },
+  "dingtalkReproAfterFixture": {
+    "requestedByUser": true,
+    "status": "NON_REPRODUCED_NOT_PASS",
+    "instanceName": "RD测试",
+    "resolvedByName": true,
+    "bootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "lane": "artifacts/capability-audit/catch-up-c4-r03/dingtalk-repro-after-fixture-a3-20260825",
+    "evidence": "verification/catch-up/C4-R03/dingtalk-repro-after-fixture-20260825.json",
+    "attempt": 3,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "retryable": false,
+    "bootChanged": false,
+    "finalizedRows": 8,
+    "coveredHistoricalFailures": ["user1/hot-017", "user1/hot-019"],
+    "replayResults": {
+      "hot017ReadinessMs": 8546,
+      "hot019ReadinessMs": 8515,
+      "nonPassRows": 0,
+      "fatalOrAnrMarkers": false
+    },
+    "lmKMarkers": "Unrelated WebView processes were killed in both passing replays; no target/CAS host direct kill.",
+    "markPass": false,
+    "reason": "Historical first failures remain authoritative; replay is non-reproduction evidence only.",
+    "nextTask": "C4-R03",
+    "nextTaskAdvanceAllowed": false
+  },
   "fixturePriorityLast": {
     "requestedByUser": true,
     "status": "PASS_OBSERVATION",
