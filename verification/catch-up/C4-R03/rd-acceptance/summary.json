@@ -70,11 +70,36 @@
       "error":"TransactionTooLargeException:data parcel size 308616 bytes",
       "elapsedMs":52826,
       "raw":"artifacts/capability-audit/catch-up-c4-r03/hongguo-after-event-fix-20260824T1715/attempts/hongguo/user-0/cold-001"
+    },
+    {
+      "target":"fanqie",
+      "package":"com.dragon.read",
+      "user":0,
+      "mode":"cold",
+      "requestId":"3a8b8bbed37e414ba99c8ae98c3c6b28",
+      "operationId":"3a8b8bbed37e414ba99c8ae98c3c6b28-launch",
+      "error":"READINESS_SLO_EXCEEDED; GUEST_MAIN_THREAD_TIMEOUT observed in GuestContentProviderFrameworkInterceptor",
+      "elapsedMs":78368,
+      "readinessElapsedMs":33167,
+      "raw":"artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825/attempts/fanqie/user-0/cold-001"
+    },
+    {
+      "target":"fanqie",
+      "package":"com.dragon.read",
+      "user":1,
+      "mode":"cold",
+      "iteration":2,
+      "requestId":"07c71754343b4808872459a62e119ece",
+      "operationId":"07c71754343b4808872459a62e119ece-launch",
+      "error":"READINESS_SLO_EXCEEDED; GUEST_MAIN_THREAD_TIMEOUT observed in GuestContentProviderFrameworkInterceptor",
+      "elapsedMs":78463,
+      "readinessElapsedMs":31071,
+      "raw":"artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825/attempts/fanqie/user-1/cold-002"
     }
   ],
   "owner": {
-    "confirmed":"CAS generic Activity/Intent transport boundary after import/catalog success; no SX/UI call failure evidence",
-    "pending":"per-package oversized extras source, bounded handle protocol, red-fruit launchable mapping",
+    "confirmed":"CAS generic launch/readiness boundary after import/catalog success: the Fanqie cold timeout reaches GuestContentProviderFrameworkInterceptor -> GuestRuntimeBrokerBridge and then eventually draws a real Window/Surface; no SX/UI call failure evidence",
+    "pending":"per-package ContentProvider call trigger and bounded provider/guest broker wait protocol; oversized extras source, bounded Intent handle protocol, red-fruit launchable mapping",
     "quarkIsOnlyPositiveControl":true
   },
   "references": {
@@ -83,7 +108,7 @@
     "taskbook":"docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md",
     "rootPlan":"docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md"
   },
-  "blocker": "Historical first cold launches for DingTalk, Quark and Hongguo failed at the CAS Binder/Intent boundary; the owner-lifetime fix now has partial final-matrix evidence, but the required 500-row matrix remains incomplete and no retry or deadline extension was used.",
+  "blocker": "C4-R03 remains blocked: Fanqie user0 cold-001 first failed at 33167 ms and Fanqie user1 cold-002 first failed at 31071 ms; after an explicit RD测试 restart, the same user1 cold-002 resumed observation failed again at 42106 ms with GUEST_MAIN_THREAD_TIMEOUT in the CAS Guest ContentProvider bridge. The required 500-row matrix remains incomplete; no automatic retry, sleep extension, or production deadline extension was used.",
   "nextTask": "C4-R03",
   "nextTaskAdvanceAllowed": false,
   "continuation8h": {
@@ -201,5 +226,67 @@
       "quarkRole": "positive control only; not used to infer Hongguo or Fanqie compatibility"
     },
     "conclusion": "BLOCKED: the two-hour continuation completed fixture user1 and Hongguo, but the Fanqie matrix was interrupted at 4/100; full 500-row C4-R03 acceptance remains unproven."
+  },
+  "continuationAfterRestart": {
+    "requestedByUser": true,
+    "restart": {
+      "instanceName": "RD测试",
+      "resolvedByName": true,
+      "managerAction": "control restart",
+      "preRestartBootId": "60d44ff7-2d1b-44a3-8cec-7b1f0608b633",
+      "postRestartBootId": "70f2ef8b-daf7-4492-b011-4a1da57a5c49",
+      "postRestartEnvironment": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/environment.json"
+    },
+    "resume": {
+      "target": "fanqie",
+      "package": "com.dragon.read",
+      "user": 1,
+      "from": "cold-002",
+      "attempt": 2,
+      "retryBudget": 0,
+      "automaticRetryPerformed": false,
+      "previousFirstFailure": "artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825/attempts/fanqie/user-1/cold-002",
+      "lane": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825"
+    },
+    "matrixDefinition": {
+      "target": "fanqie",
+      "users": [1],
+      "loopsPerUser": 25,
+      "resumeExpectedRows": 48,
+      "requiredFullMatrixRows": 500
+    },
+    "observedRows": 1,
+    "observedPassRows": 0,
+    "observedNonPassRows": 1,
+    "blockedAt": {
+      "mode": "cold",
+      "iteration": 2,
+      "classification": "READINESS_SLO_EXCEEDED",
+      "readinessElapsedMs": 42106,
+      "requestId": "a4df0ec6320d48fb904780f7891e3c26",
+      "operationId": "a4df0ec6320d48fb904780f7891e3c26-launch",
+      "firstFailureFull": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/attempts/fanqie/user-1/cold-002/first-failure-full"
+    },
+    "commonSignature": {
+      "confirmed": [
+        "com.dragon.read imported/catalogued successfully",
+        "Activity created/resumed and FIRST_FRAME_DRAWN eventually observed",
+        "non-empty Window/Surface and non-black screenshot observed",
+        "GUEST_MAIN_THREAD_TIMEOUT appears in GuestContentProviderFrameworkInterceptor -> GuestRuntimeBrokerBridge during Mira plugin provider access",
+        "cold readiness exceeded 30000 ms both before and after the RD测试 restart"
+      ],
+      "pending": [
+        "the exact app-side plugin/provider trigger and whether it requires a package-specific provider contract",
+        "the minimal CAS provider/broker wait or payload protocol needed for a production design"
+      ],
+      "owner": "CAS generic Guest ContentProvider/launch readiness boundary; app-specific trigger remains pending; no SX/UI owner evidence"
+    },
+    "evidence": {
+      "fanqieUser0FirstFailure": "artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825/attempts/fanqie/user-0/cold-001",
+      "fanqieUser1FirstFailure": "artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825/attempts/fanqie/user-1/cold-002",
+      "fanqieUser1AfterRestart": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/attempts/fanqie/user-1/cold-002",
+      "dynamicCommercialDiscovery": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/commercial-sample-discovery.json"
+    },
+    "conclusion": "BLOCKED: the bounded post-restart resume reproduced the Fanqie cold readiness failure; fail-fast stopped before hot-002 and later cases. The prior first failure remains authoritative, and the matrix cannot be marked DONE or advanced."
   }
 }

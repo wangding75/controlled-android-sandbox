@@ -293,9 +293,11 @@ def light_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str, 
 
 
 def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
-            mode: str, iteration: int) -> dict[str, Any]:
+            mode: str, iteration: int, *, attempt_number: int = 1,
+            resume_metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     request_id = uuid.uuid4().hex
-    operation_id = f"{TASK_ID.lower()}-{target['target']}-u{user}-{mode}-{iteration}-{request_id[:10]}"
+    attempt_tag = f"-a{attempt_number}" if attempt_number != 1 else ""
+    operation_id = f"{TASK_ID.lower()}-{target['target']}-u{user}-{mode}-{iteration}{attempt_tag}-{request_id[:10]}"
     case_dir = root / "attempts" / target["target"] / f"user-{user}" / f"{mode}-{iteration:03d}"
     case_dir.mkdir(parents=True, exist_ok=True)
     started_at = now_iso()
@@ -312,18 +314,23 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
             force_stop_host=True,
         )
         setup = {"kind": "cold-stop", "requestId": stop_request_id, "result": stop,
-                 "attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False}
+                  "attempt": attempt_number, "retryBudget": 0,
+                  "automaticRetryPerformed": False}
         write_json(case_dir / "cold-stop.json", setup)
         if stop.get("status") != "PASS":
             row = {
                 "task": TASK_ID, "target": target["target"], "package": target["package"],
                 "user": user, "mode": mode, "iteration": iteration,
                 "requestId": request_id, "operationId": request_id + "-launch",
-                "attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False,
+                "attempt": attempt_number, "retryBudget": 0,
+                "automaticRetryPerformed": False,
                 "retryable": False, "errorClassification": "COLD_STOP_SETUP_FAILED",
-                "firstAttemptFailure": True, "setup": setup,
+                "firstAttemptFailure": attempt_number == 1,
+                "failureDetected": True, "setup": setup,
                 "artifacts": str(case_dir.resolve()),
             }
+            if resume_metadata:
+                row["resume"] = resume_metadata
             write_json(case_dir / "case.json", row)
             full = capture_snapshot(serial, case_dir / "first-failure-full", target["package"])
             row["firstFailureFullSnapshot"] = full
@@ -395,7 +402,7 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
         "requestId": request_id,
         "operationId": request_id + "-launch",
         "runnerOperationId": operation_id,
-        "attempt": 1,
+        "attempt": attempt_number,
         "retryBudget": 0,
         "automaticRetryPerformed": False,
         "retryable": False,
@@ -414,13 +421,16 @@ def run_one(serial: str, root: Path, target: dict[str, Any], user: int,
             "historicalFatalMarkers": historical_fatal,
         },
         "errorClassification": failure_reason or "NONE",
-        "firstAttemptFailure": bool(failure_reason),
+        "firstAttemptFailure": bool(failure_reason) and attempt_number == 1,
+        "failureDetected": bool(failure_reason),
         "artifacts": str(case_dir.resolve()),
     }
+    if resume_metadata:
+        row["resume"] = resume_metadata
     write_json(case_dir / "case.json", row)
     if failure_reason:
-        # Preserve the first failure's complete snapshot immediately; no retry is allowed to
-        # overwrite the evidence or turn a failure into a later PASS.
+        # Preserve this lane's first failure's complete snapshot immediately; no in-lane retry
+        # is allowed to overwrite the evidence or turn a failure into a later PASS.
         full = capture_snapshot(serial, case_dir / "first-failure-full", target["package"])
         row["firstFailureFullSnapshot"] = full
         write_json(case_dir / "case.json", row)
@@ -435,10 +445,29 @@ def main() -> int:
     parser.add_argument("--targets", default="fixture,dingtalk,quark,hongguo,fanqie")
     parser.add_argument("--output", type=Path,
                         default=ROOT / "artifacts/capability-audit/catch-up-c4-r03/matrix")
+    parser.add_argument("--resume-target", default="",
+                        help="resume at a specific target after a separately recorded failure")
+    parser.add_argument("--resume-user", type=int, default=None)
+    parser.add_argument("--resume-iteration", type=int, default=None)
+    parser.add_argument("--resume-mode", choices=("cold", "hot"), default="")
+    parser.add_argument("--resume-attempt", type=int, default=1,
+                        help="manual post-restart attempt number; automatic retries remain disabled")
+    parser.add_argument("--resume-of", default="",
+                        help="prior lane/case path retained as the first-failure evidence")
     args = parser.parse_args()
     if not 1 <= args.loops <= 50:
         raise SystemExit("--loops must be between 1 and 50")
     users = [int(value.strip()) for value in args.users.split(",") if value.strip()]
+    resume_requested = bool(args.resume_target or args.resume_user is not None
+                            or args.resume_iteration is not None or args.resume_mode)
+    if resume_requested:
+        if not args.resume_target or args.resume_user is None or args.resume_iteration is None \
+                or not args.resume_mode:
+            raise SystemExit("resume requires --resume-target, --resume-user, --resume-iteration and --resume-mode")
+        if args.resume_iteration < 1:
+            raise SystemExit("--resume-iteration must be >= 1")
+        if args.resume_attempt < 2:
+            raise SystemExit("manual resume attempt must be >= 2")
     environment = resolve_rd_environment(args.instance_name)
     args.output.mkdir(parents=True, exist_ok=True)
     write_json(args.output / "environment.json", environment)
@@ -448,10 +477,48 @@ def main() -> int:
     targets["dingtalk"] = discover_dingtalk(environment["adb_serial"], args.output)
     write_json(args.output / "targets.json", targets)
     selected = [targets[name] for name in args.targets.split(",") if name]
+    selected_names = [target["target"] for target in selected]
+    resume_metadata: dict[str, Any] | None = None
+    resume_position: tuple[int, int, int, int] | None = None
+    if resume_requested:
+        if args.resume_target not in selected_names:
+            raise SystemExit(f"resume target is not selected: {args.resume_target}")
+        if args.resume_user not in users:
+            raise SystemExit(f"resume user is not selected: {args.resume_user}")
+        if not args.resume_of:
+            raise SystemExit("manual resume requires --resume-of")
+        resume_position = (
+            selected_names.index(args.resume_target),
+            users.index(args.resume_user),
+            args.resume_iteration,
+            0 if args.resume_mode == "cold" else 1,
+        )
+        resume_metadata = {
+            "kind": "MANUAL_RESUME_AFTER_RESTART",
+            "resumeTarget": args.resume_target,
+            "resumeUser": args.resume_user,
+            "resumeIteration": args.resume_iteration,
+            "resumeMode": args.resume_mode,
+            "attempt": args.resume_attempt,
+            "retryBudget": 0,
+            "automaticRetryPerformed": False,
+            "previousLane": args.resume_of,
+            "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation.",
+        }
+        write_json(args.output / "resume.json", resume_metadata)
     rows: list[dict[str, Any]] = []
     blocked_at = None
-    for target in selected:
-        for user in users:
+    expected_rows = 0
+    for target_index, target in enumerate(selected):
+        for user_index, user in enumerate(users):
+            pair_position = (target_index, user_index)
+            if resume_position is not None and pair_position < resume_position[:2]:
+                continue
+            if resume_position is not None and pair_position == resume_position[:2]:
+                pair_expected = (args.loops * 2) - (resume_position[2] - 1) * 2 - resume_position[3]
+            else:
+                pair_expected = args.loops * 2
+            expected_rows += pair_expected
             setup_request_id = uuid.uuid4().hex
             setup = debug_command(
                 environment["adb_serial"],
@@ -462,9 +529,12 @@ def main() -> int:
                 force_stop_host=True,
             )
             setup_row = {"target": target["target"], "package": target["package"],
-                         "user": user, "requestId": setup_request_id, "attempt": 1,
+                         "user": user, "requestId": setup_request_id,
+                         "attempt": args.resume_attempt if resume_metadata else 1,
                          "retryBudget": 0, "automaticRetryPerformed": False,
                          "command": "import-only", "result": setup}
+            if resume_metadata:
+                setup_row["resume"] = resume_metadata
             write_json(args.output / "setup" / target["target"] / f"user-{user}.json", setup_row)
             if setup.get("status") != "PASS":
                 blocked_at = {"target": target["target"], "user": user,
@@ -473,10 +543,15 @@ def main() -> int:
                 break
             for iteration in range(1, args.loops + 1):
                 for mode in ("cold", "hot"):
+                    position = (target_index, user_index, iteration, 0 if mode == "cold" else 1)
+                    if resume_position is not None and position < resume_position:
+                        continue
                     row = run_one(environment["adb_serial"], args.output, target, user,
-                                  mode, iteration)
+                                  mode, iteration,
+                                  attempt_number=args.resume_attempt if resume_metadata else 1,
+                                  resume_metadata=resume_metadata)
                     rows.append(row)
-                    if row["firstAttemptFailure"]:
+                    if row["failureDetected"]:
                         blocked_at = {"target": target["target"], "user": user,
                                       "mode": mode, "iteration": iteration,
                                       "classification": row["errorClassification"]}
@@ -490,13 +565,20 @@ def main() -> int:
     summary = {
         "schemaVersion": 1,
         "task": TASK_ID,
-        "status": "PASS" if not blocked_at and len(rows) == len(selected) * len(users) * args.loops * 2 else "FAIL",
+        "status": "PASS" if not blocked_at and len(rows) == expected_rows else "FAIL",
         "instanceName": environment["instance_name"],
         "resolvedSerial": environment["adb_serial"],
         "loops": args.loops,
         "users": users,
         "targetNames": [target["target"] for target in selected],
-        "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetries": 0},
+        "attemptPolicy": {
+            "attempt": args.resume_attempt if resume_metadata else 1,
+            "retryBudget": 0,
+            "automaticRetries": 0,
+            "manualResumeAfterRestart": bool(resume_metadata),
+        },
+        "expectedRows": expected_rows,
+        "resume": resume_metadata,
         "blockedAt": blocked_at,
         "rows": rows,
         "rawDirectory": str(args.output.resolve()),

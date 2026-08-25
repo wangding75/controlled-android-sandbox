@@ -171,6 +171,35 @@ user0 的 4 个 PASS；番茄 user1 尚未开始，番茄 user0 尚缺 46 个 ca
 CAS 通用 owner/readiness 修复在该动态样本上的已执行范围，不改变夸克正向对照规则，也不替代番茄
 剩余矩阵。完整非重复矩阵为 404/500，故 owner/阶段结论继续保持待关闭。
 
+### 7.3 2026-08-25 重启后断点复核
+
+用户要求重启 `RD测试` 后从断点继续。运行器先停止正在执行的番茄 user1 lane，保留其已经生成的
+`cold-001`、`hot-001` 和 `cold-002` 首次失败证据；随后通过 MuMu 实例名动态解析 index 并执行
+`MuMuManager control --vmindex <resolved-index> restart`。重启前 boot ID 为
+`60d44ff7-2d1b-44a3-8cec-7b1f0608b633`，重启后重新解析为
+`70f2ef8b-daf7-4492-b011-4a1da57a5c49`；ADB serial 只保存在本次动态解析快照中，未写入 runner 常量。
+
+为避免从头重跑已完成 case，C4-R03 collector 增加了显式的
+`MANUAL_RESUME_AFTER_RESTART` 起点元数据。它不改变生产 deadline、不执行自动重试，且把续接观察记录为
+`attempt=2/retryBudget=0/automaticRetryPerformed=false`，并通过 `resume.previousLane` 链回首次失败。
+续接从番茄 user1 `cold-002` 开始；新 boot 下 readiness 为 `42106 ms`，仍超过 cold `30000 ms` SLO。
+Activity created/resumed、`FIRST_FRAME_DRAWN`、Window、Surface 和非黑截图均存在，因此错误不是黑屏或
+SX/UI Surface owner；collector 在保存完整 first-failure snapshot 后按 fail-fast 停止，未进入 `hot-002`。
+
+两次 user1 `cold-002` 以及 user0 `cold-001` 的共同调用链都出现
+`com.dragon.read` 的 Mira plugin provider 访问进入
+`GuestContentProviderFrameworkInterceptor -> GuestRuntimeBrokerBridge`，并出现
+`GUEST_MAIN_THREAD_TIMEOUT`，随后才绘制首帧。已确认 owner 保持 CAS 通用 Guest ContentProvider/launch
+readiness 边界；具体 app-side plugin/provider 触发点和最小 CAS provider/broker 协议仍待验证，不能猜测为
+番茄专属兼容性，也不能转交 SX/UI。该结果使 C4-R03 继续 `BLOCKED`，不得更新为 `DONE` 或推进任务。
+
+机器可读证据见 `verification/catch-up/C4-R03/rd-acceptance/summary.json` 的
+`continuationAfterRestart`，raw 目录为：
+
+- `artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825`；
+- `artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825`；
+- `artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825`。
+
 ## 8. 证据索引
 
 - R03 start preflight：`verification/catch-up/C4-R03/start-state.json`。
