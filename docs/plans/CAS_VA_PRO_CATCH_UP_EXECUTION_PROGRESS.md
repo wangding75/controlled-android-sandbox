@@ -2199,3 +2199,32 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
   `ledger next task C4-R03 is not first dependency-ready PENDING task None`。这是当前任务保持
   `BLOCKED`、没有可安全推进的 PENDING 任务的预期结果；本次不把 C4-R03 改成 PENDING，也不伪造
   C4-R04 续接通过。恢复执行前必须先满足本回执的剩余矩阵和阻断恢复条件。
+
+### C4-R03：2 小时续接回执（2026-08-25）
+
+- **状态与窗口**：按用户指示从 C4-R03 阻断恢复点继续运行 2 小时，窗口为 2026-08-25
+  07:31:53–09:31:53（Asia/Shanghai）。工作区、Git 本地/远端 HEAD 和身份预检通过；MuMu
+  `RD测试` 继续由名称动态解析，未硬编码 ADB 地址。到点停止番茄小说 runner，C4-R03 仍为
+  `BLOCKED`，没有进入 C4-R04/R05、C6 或 OEM。
+- **非重复矩阵结果**：延续先前最终代码证据后，当前非重复完成 404/500 rows，404/404 PASS、
+  0 non-PASS：fixture user0/user1 各 50/50；DingTalk user0/user1 各 50/50；夸克 user0/user1
+  各 50/50；红果 user0/user1 各 50/50；番茄小说 user0 4/50 PASS、user1 0/50。番茄小说
+  user0 的第 3 个 cold case 在截止时只有 cold-stop 文件，没有 `case.json`，不计为通过；
+  未启动番茄 user1。
+- **新增证据目录**：fixture user1 完整补跑见
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fixture-u1-25-20260825`；红果
+  双用户完整矩阵见
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825`；
+  番茄部分矩阵见
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fanqie-u0-u1-25-20260825`。
+  三个新车道均无 `first-failure-full` 目录；已完成 rows 全部保存 request/operation ID、窗口、
+  Surface、截图和设备证据。
+- **样本结论边界**：红果导入 operation `SUCCEEDED` 并记录 `MIXED_ELF_MACHINE`，启动 100/100
+  PASS；番茄 user0 导入 operation `SUCCEEDED` 并记录同类 anomaly，启动已完成的 4/4 PASS。
+  夸克仍只作正向对照，不能用来推断红果或番茄；番茄完整双用户兼容性仍待验证。
+- **重试审计**：本次新增非重复 154 rows 全部为 `attempt=1`、`retryBudget=0`、
+  `automaticRetryPerformed=false`、`retryable=false`；没有重试、延长 sleep 或扩大 deadline。
+  截止停止的番茄 cold case 是时间上限中断，不是产品 PASS/FAIL。
+- **阻断结论与恢复条件**：C4-R03 仍不能标记 `DONE`，因为番茄小说缺少 user0 剩余 46 个和
+  user1 全部 50 个最终 case，尚未达到 500 rows；C4-R04/R05 也尚未执行。下一次从 C4-R03
+  继续，先补齐番茄小说 96 rows，再运行规定的 R04/R05 门禁；不得复制部分 PASS 或推进下一任务。
