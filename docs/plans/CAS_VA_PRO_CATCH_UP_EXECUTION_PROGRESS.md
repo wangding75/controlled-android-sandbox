@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 18:06（Asia/Shanghai）
+更新时间：2026-08-25 18:46（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -2368,5 +2368,33 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
   `verification/catch-up/C4-R03/dingtalk-priority-20260825.json`；原始首次失败目录见上述两条
   lane 的 `attempts/dingtalk/user-1/hot-017/first-failure-full` 和
   `attempts/dingtalk/user-1/hot-019/first-failure-full`。
-- **下一任务**：仍为 `C4-R03`；续接预检必须 fail-closed，fixture 只有在 DingTalk 阻断解除后
-  按用户要求作为最后 target 继续，不能推进 C4-R04。
+- **下一任务**：仍为 `C4-R03`；续接预检必须 fail-closed。DingTalk lane 停止后仍应按用户要求
+  将 fixture 作为最后 target 执行；本回执后的更正段已完成该顺序，不能推进 C4-R04。
+
+### C4-R03：fixture 最后续接更正回执（2026-08-25）
+
+- **状态**：`BLOCKED`（fixture 续接本身为 `PASS_OBSERVATION`，但 DingTalk 首失败仍阻断 C4-R03）。
+  先前在 DingTalk lane fail-fast 后停止整个流程是顺序判断错误；本回执更正为 DingTalk lane 停止后
+  继续执行 fixture，且 fixture 是最后一个 target。未进入 C4-R04、C4-R05、C6 或 OEM。
+- **执行环境**：通过实例名动态解析 MuMu `RD测试`；boot ID
+  `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a` 与 DingTalk lane 相同，未发生设备重启；ADB endpoint
+  仅记录在环境快照。fixture package `com.warden.controlledsandbox.fixture`、version
+  `1.0-fixture/1`、base 1、split 0、ABI `arm64-v8a,x86_64`。
+- **续接策略**：fixture user0 已有 50 行，user1 已有 15 行。由于 DingTalk 在两段 fixture 之间
+  运行，旧 hot 前置不再有效；从 user1 `cold-008/hot-008` 重建有效对照，再继续 iteration 9–25。
+  新 lane 产生 36 行，其中 `cold-008` 是替换观察，新增唯一行 35 行。runner 原始 resume 标签
+  是通用 `MANUAL_RESUME_AFTER_RESTART`，但 boot ID 未变化、实际没有重启；高层证据按实际原因记为
+  `MANUAL_CONTINUATION_AFTER_DINGTALK_TARGET_SWITCH`。
+- **结果**：36/36 PASS，0 non-pass；按 `(user, mode, iteration)` 去重后 fixture 唯一观察为
+  100/100：user0 50/50、user1 50/50、cold 50/50、hot 50/50。所有行都有
+  `REQUEST_ACCEPTED → GUEST_READY → ACTIVITY_RESUMED → FIRST_FRAME_DRAWN`、非空 Window、
+  非空 Surface、非黑截图和空 fatal/ANR markers。续接行记录 `attempt=2`、`retryBudget=0`、
+  `automaticRetryPerformed=false`、`retryable=false`，无自动重试；这不是一次未经中断的全量
+  attempt=1 门禁，因此不能单独关闭 C4-R03。
+- **机器证据**：
+  `verification/catch-up/C4-R03/fixture-priority-last-20260825.json`；
+  `artifacts/capability-audit/catch-up-c4-r03/fix-fixture-u1-after-dingtalk-last-a2-20260825`；
+  汇总已写入 `verification/catch-up/C4-R03/rd-acceptance/summary.json`。
+- **验收结论**：fixture 最后 target 已完成当前缺失唯一观察，不能覆盖 DingTalk
+  `user1/hot-017` 与 `hot-019` 的 readiness 首失败；C4-R03 继续 `BLOCKED`，下一任务仍为
+  `C4-R03`，不得推进 C4-R04。
