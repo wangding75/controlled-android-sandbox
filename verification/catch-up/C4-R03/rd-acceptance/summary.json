@@ -315,6 +315,49 @@
     },
     "conclusion": "BLOCKED: the bounded post-restart resume reproduced the Fanqie cold readiness failure; fail-fast stopped before hot-002 and later cases. The prior first failure remains authoritative, and the matrix cannot be marked DONE or advanced."
   },
+  "fixturePriorityLast": {
+    "requestedByUser": true,
+    "status": "PASS_OBSERVATION",
+    "instanceName": "RD测试",
+    "resolvedByName": true,
+    "bootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "lane": "artifacts/capability-audit/catch-up-c4-r03/fix-fixture-u1-after-dingtalk-last-a2-20260825",
+    "evidence": "verification/catch-up/C4-R03/fixture-priority-last-20260825.json",
+    "target": {
+      "package": "com.warden.controlledsandbox.fixture",
+      "version": "1.0-fixture/1",
+      "baseCount": 1,
+      "splitCount": 0,
+      "abi": "arm64-v8a,x86_64"
+    },
+    "continuation": {
+      "observedRows": 36,
+      "passRows": 36,
+      "nonPassRows": 0,
+      "newUniqueRows": 35,
+      "duplicateReplacement": "user1/cold-008",
+      "context": "MANUAL_CONTINUATION_AFTER_DINGTALK_TARGET_SWITCH",
+      "bootChanged": false,
+      "attempt": 2,
+      "retryBudget": 0,
+      "automaticRetryPerformed": false,
+      "retryable": false,
+      "readinessMinMs": 679,
+      "readinessMaxMs": 10629
+    },
+    "uniqueMatrix": {
+      "rows": 100,
+      "passRows": 100,
+      "nonPassRows": 0,
+      "user0": 50,
+      "user1": 50,
+      "cold": 50,
+      "hot": 50
+    },
+    "overallC4R03": "BLOCKED_BY_DINGTALK_FIRST_FAILURE",
+    "nextTask": "C4-R03",
+    "nextTaskAdvanceAllowed": false
+  },
   "dingtalkPriority": {
     "requestedByUser": true,
     "fixtureOrder": "LAST",

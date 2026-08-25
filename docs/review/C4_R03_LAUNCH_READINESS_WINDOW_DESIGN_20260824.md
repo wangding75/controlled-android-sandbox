@@ -305,3 +305,29 @@ NBB/VA 参考映射；不通过延长 deadline、增加 sleep、扩大 retry 或
 `verification/catch-up/C4-R03/dingtalk-priority-20260825.json`、
 `artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825`、
 `artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825`。
+
+## 11. 2026-08-25 fixture 最后续接更正
+
+在 DingTalk lane 按首次失败规则停止后，fixture 仍按用户指定的“最后一个 target”执行；此前将
+fixture 留在暂停状态是流程判断错误，已通过本节和独立机器证据更正。fixture user0 原有 50 行，
+user1 原有 15 行；DingTalk 运行期间使旧 hot 前置失效，因此从 user1 `cold-008/hot-008` 重新
+建立有效对照，再继续 iteration 9–25。续接 lane 共 36 行，其中 `cold-008` 是替换观察，新增
+唯一行 35 行。
+
+fixture 续接 lane
+`artifacts/capability-audit/catch-up-c4-r03/fix-fixture-u1-after-dingtalk-last-a2-20260825`
+的 36/36 行通过，`errorClassification=NONE`、`failureDetected=false`；每行有统一
+request/operation ID、Activity created/resumed、`FIRST_FRAME_DRAWN`、非空 Window、非空 Surface
+和非黑截图，case-scoped fatal/ANR markers 为空。续接外层字段为 `attempt=2`、`retryBudget=0`、
+`automaticRetryPerformed=false`、`retryable=false`，没有自动重试。
+
+按唯一 `(user, mode, iteration)` 去重后，fixture 观察为 user0 50/50、user1 50/50，cold 50/50、
+hot 50/50，唯一 100 行均通过。由于 user1 的后 35 个唯一行是切换 target 后的人工续接观察，
+这证明 fixture 的当前观察矩阵完整，不把它表述为一次未经中断的 100 行 attempt=1 门禁；DingTalk
+的历史首次失败仍是 C4-R03 的阻断条件。runner 原始 `resume.json` 使用了通用
+`MANUAL_RESUME_AFTER_RESTART` 标签，但本 lane 的 boot ID 与 DingTalk 相同、实际没有设备重启，
+因此高层回执明确记录为 `MANUAL_CONTINUATION_AFTER_DINGTALK_TARGET_SWITCH`，不把该标签误解为重启。
+
+独立机器回执为 `verification/catch-up/C4-R03/fixture-priority-last-20260825.json`。C4-R03
+仍为 `BLOCKED`，不推进 C4-R04；fixture PASS 不能覆盖 DingTalk readiness 首失败，也不能关闭
+商业矩阵。
