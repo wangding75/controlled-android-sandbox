@@ -2604,3 +2604,28 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   仍阻断 C4-R05；不将慢启动、截图或后续 lane 结果升级为 PASS。
 - **下一步**：按用户“记录后提交、停止任务”指令停在当前阻断点。后续只有在 Guest dispatcher/receiver
   owner 修复或有界恢复方案明确后，才能从本回执继续执行剩余商业矩阵并重新评估 C4 关门。
+
+### C4-R05：本机修复后 DingTalk 首帧成功但就绪 SLO 超时回执（2026-08-26）
+
+- **状态**：`BLOCKED`。本段记录从 `9e5d898b` 进度继续后的本机修复、重编译和独立冷/热复验；不计为
+  正式用例 PASS，不关闭 C4-R05 或 C4。
+- **实现修复**：动态 Receiver 注册不再等待 Guest 主线程；PREPARING session 在早期组件回调前发布；
+  API 32 缺失临时 pre-launch record 时 fail-open 并继续投影；Settings.Config transport 只在出站调用时
+  重写为物理 Host `AttributionSource`，返回后恢复 Guest 身份。
+- **验证**：`python tools/static_android_compile.py` PASS；
+  `:app:assembleDebug :fixture-basic:assembleDebug :sandbox-companion32:assembleDebug
+  :fixture-compat32:assembleDebug` PASS。DingTalk user0 cold-001 的功能字段全部成功且首帧绘制，
+  `launchReadinessElapsedMs=61090`，严格 30s 门禁分类为 `READINESS_SLO_EXCEEDED`；手动 hot resume
+  attempt=2 同样功能成功且首帧绘制，`launchReadinessElapsedMs=24927`，严格 10s 门禁分类为
+  `READINESS_SLO_EXCEEDED`。两次当前 `fatalMarkers=[]`，历史 marker 与当前运行分离。
+- **现场日志证据**：当前冷日志依次出现 `GUEST_PREPARED status=READY`、
+  `PRELAUNCH_RECORD_NOT_FOUND_CONTINUE api=32`、`PRELAUNCH_TRANSACTION_PROJECTED`、
+  `GUEST_ACTIVITY_FIRST_FRAME_DRAWN`；当前日志不再出现旧的 `ACTIVITY_CLIENT_RECORD_LAUNCHING_NOT_FOUND`
+  或 `Calling uid: 10045 doesn't match source uid: 10002`。旧 v2 UID 异常和旧 API32 activity-record
+  异常仍保留在对应历史证据目录，详见
+  `verification/catch-up/C4-R05/local-fix-v3-anomaly-20260826.md`。
+- **原因结论**：此前三类启动崩溃已由通用 runtime/framework 修复并在本机复验消失；剩余失败是
+  商业 App 冷/热启动就绪时延超过严格门禁，可能包含 MuMu/宿主调度压力。另一台机器首帧成功是对照
+  证据，不足以单独证明纯环境原因，必须用同一构建做匹配时延和日志对比。
+- **下一步**：在另一台机器以同一 APK/分支做匹配冷热复验；在比较完成前保持 C4-R05 `BLOCKED`，不得把
+  本段升级为正式关闭或静默放宽 SLO。
