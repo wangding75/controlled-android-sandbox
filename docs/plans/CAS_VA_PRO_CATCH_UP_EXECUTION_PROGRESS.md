@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 10:50（Asia/Shanghai）
+更新时间：2026-08-25 18:06（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R03`（IN_PROGRESS）
+当前任务：`C4-R03`（BLOCKED）
 下一任务：`C4-R03`
 最后完成任务：`C4-R02`
 
@@ -66,7 +66,7 @@
 | C4-T05 | SX F1-F5/DingTalk/长稳 | DONE | C4-T04 | `0e34f37535aec5d3dd93cdf9bc2463c61639310b` | §5 C4-T05 |
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
-| C4-R03 | 启动 readiness 与窗口合同 | IN_PROGRESS | C4-R01 | `d8797c89` | §5 C4-R03 |
+| C4-R03 | 启动 readiness 与窗口合同 | BLOCKED | C4-R01 | `d8797c89` | §5 C4-R03 |
 | C4-R04 | C4 fail-closed 验收编排 | PENDING | C4-R02,C4-R03 | - | - |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,11 +82,11 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-059`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-060`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
-C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、`KI-R03-059` 的未闭合矩阵/启动证据阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
+C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-060` 的未闭合矩阵/启动证据阻断，未进入 C4-R04/R05，不能推进到 C6-T01。
 
 ## 5. 任务回执
 
@@ -2302,7 +2302,9 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
 
 ### C4-R03：按恢复条件继续最终矩阵（2026-08-25）
 
-- **状态**：`IN_PROGRESS`。用户明确要求继续完成 C4-R03；此前 `BLOCKED` 的直接恢复条件
+- **状态**：`BLOCKED`。本段从此前 `BLOCKED` 恢复后执行正式矩阵；DingTalk 优先续接在首次
+  readiness SLO 失败后再次观察到同类阻断，故不能继续保持 `IN_PROGRESS`。用户明确要求继续完成
+  C4-R03；此前 `BLOCKED` 的直接恢复条件
   （CAS Provider 锁环修复、静态/Gradle 验证、Fanqie 用户 0/1 冷热 4/4 定向通过）已满足。
 - **续接边界**：原 404/500 rows 是修复前代码的历史矩阵证据，本轮不把它们直接升级为修复后
   通过；将使用当前 APK SHA-256 `89DCBEB082F9F6452813CF363BB5E5AE17632ACE2031EAE4490D17C2FB6B75A1`
@@ -2315,3 +2317,56 @@ C5 已由用户明确排除；C4-R03 当前仍被 `KI-R03-057`、`KI-R03-058`、
 - **完成条件**：500/500 rows 满足 readiness、首帧、Window、Surface、截图和无 fatal/ANR 后，
   再把 C4-R03 更新为 `DONE`，写入完整回执并进入两提交/推送/远端对比；任一首次失败则保持
   `BLOCKED` 并记录阻断证据。
+
+### C4-R03：DingTalk 优先、fixture 最后续接回执（2026-08-25）
+
+- **任务 ID / 名称**：`C4-R03` / 启动 readiness、窗口合同与超时修复。
+- **最终状态**：`BLOCKED`。本回合按用户顺序先跑 DingTalk；fixture 保持暂停并留到最后，未用
+  fixture 或夸克对照替代 DingTalk 的失败，也未进入 C4-R04、C4-R05、C6 或 OEM 适配。
+- **开始/结束时间（Asia/Shanghai）**：2026-08-25 17:55 / 2026-08-25 18:06。
+- **执行环境**：Windows PowerShell；分支
+  `feature/t57-r03-va-pro-capability-campaign`；开始 HEAD `c07f96f80c85e9086875ec27504f2abf32f64b71`；
+  MuMu `RD测试` 通过实例名动态解析，重启后 boot ID
+  `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a`；model `22041211A`、API 32、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`。ADB endpoint 只存在于 environment evidence，
+  未写入 runner 选择器。
+- **样本事实**：DingTalk 动态记录为 `com.alibaba.android.rimet`、7.8.10/1178、base 1、split 0、
+  primary ABI `arm64-v8a`，launchable Activity 为
+  `com.alibaba.android.rimet.biz.LaunchHomeActivity`。
+- **执行与首次失败**：正式优先 lane
+  `artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825` 产生 84 行，
+  83 行满足 readiness 门禁；user1/hot-017 首次非通过，readiness `11720 ms`，request ID
+  `33720dd87741423c9042654f7f5a3d99`，operation ID
+  `33720dd87741423c9042654f7f5a3d99-launch`。该行已立即保存 logcat、dumpsys、Window、
+  Surface、进程、事务、设备快照和截图。
+- **重启后有限观察**：按 NBB/VA 生命周期参考和 fail-fast 规则，重启后只做独立的
+  `MANUAL_RESUME_AFTER_RESTART` 观察，lane 为
+  `artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825`，共 6 行，
+  其中 cold/hot-017、cold/hot-018 和 cold-019 通过，hot-019 再次首次非通过，readiness
+  `10179 ms`，超出 hot SLO `179 ms`，request ID `417dbc1ae7534d39b82429871b779de6`，
+  operation ID `417dbc1ae7534d39b82429871b779de6-launch`。该行完整 first-failure snapshot
+  已保留；没有自动重试、sleep 延长、deadline 延长或 retry budget 增加。
+- **证据结论**：两次失败最终均有 `ACTIVITY_RESUMED`、`FIRST_FRAME_DRAWN`、非空 Window、
+  非空 Surface 和非黑截图，不是黑屏或 SX/UI Surface 缺失。hot-019 的首次失败快照记录了
+  三条 `lowmemorykiller ... reason: device is not responding`，目标为 WebView、Contacts、
+  ExternalStorage；没有 DingTalk 或 CAS host 的同类直接 LMK kill，也没有
+  `GUEST_MAIN_THREAD_TIMEOUT`、`ANR in` 或 `FATAL EXCEPTION`。设备资源压力是已确认环境信号，
+  但不是完整因果证明。
+- **owner 与 Known Issues**：导入/catalog 已成功，owner 继续保持 CAS 通用 launch/readiness
+  边界；MuMu 资源压力作为已确认贡献信号单独记录。没有证据转交 SX/UI，也不根据夸克正向对照
+  推断其他商业样本。新增 `KI-R03-060`，状态 `RECORDED`、`blocks_current_campaign: true`；
+  恢复条件是保留资源快照、分离 CAS process/prepare 延迟与 MuMu responsiveness，再决定是否
+  需要 CAS 通用设计变更。
+- **变更文件**：`tools/capability/run_c4_r01_rd.py`（Windows 长路径交易证据保存的诊断性
+  collector 修正）、`docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md`、
+  `docs/review/KNOWN_ISSUES.yaml`、`verification/catch-up/C4-R03/dingtalk-priority-20260825.json`；
+  fixture 仍未启动。
+- **验收命令与结果**：`python -m py_compile tools/capability/run_c4_r01_rd.py tools/capability/run_c4_r03_rd.py`；
+  `python -m json.tool verification/catch-up/C4-R03/dingtalk-priority-20260825.json`；
+  `git diff --check` 均通过。C4-R03 500 行门禁未满足，不能标记 `DONE`。
+- **机器证据**：完整索引见
+  `verification/catch-up/C4-R03/dingtalk-priority-20260825.json`；原始首次失败目录见上述两条
+  lane 的 `attempts/dingtalk/user-1/hot-017/first-failure-full` 和
+  `attempts/dingtalk/user-1/hot-019/first-failure-full`。
+- **下一任务**：仍为 `C4-R03`；续接预检必须 fail-closed，fixture 只有在 DingTalk 阻断解除后
+  按用户要求作为最后 target 继续，不能推进 C4-R04。
