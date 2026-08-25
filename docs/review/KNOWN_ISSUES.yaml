@@ -1622,3 +1622,38 @@ issues:
       with valid Activity, Window, Surface and non-black screenshot evidence. The required 500-row
       matrix is still incomplete, so this issue remains RECORDED and blocking; the historical first
       failures remain authoritative and no conclusion is generalized from Quark.
+
+  - issue_id: KI-R03-060
+    title: DingTalk hot launch readiness exceeds SLO while MuMu reports device-not-responding LMK pressure
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R03 DingTalk-priority continuation 2026-08-25
+    evidence:
+      - verification/catch-up/C4-R03/dingtalk-priority-20260825.json
+      - artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825/attempts/dingtalk/user-1/hot-017/first-failure-full
+      - artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/attempts/dingtalk/user-1/hot-019/first-failure-full
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - docs/review/C4_R01_EVIDENCE_REPRO_CLASSIFICATION_AND_REFERENCE_MAPPING_20260824.md
+    match_patterns:
+      - READINESS_SLO_EXCEEDED
+      - "lowmemorykiller: Kill"
+      - "reason: device is not responding"
+      - com.alibaba.android.rimet
+      - FIRST_FRAME_DRAWN
+    blocks_current_campaign: true
+    fix_policy: BOUND_RESOURCE_SNAPSHOT_AND_REPRODUCE_OWNER_BEFORE_PRODUCTION_CHANGE
+    notes: >
+      DingTalk was dynamically recorded as com.alibaba.android.rimet 7.8.10/1178, base 1,
+      split 0, arm64-v8a. The first lane stopped at user1/hot-017 with readiness 11720 ms;
+      after the RD测试 reboot, a separately recorded manual continuation passed cold/hot-017,
+      cold/hot-018 and cold-019, then stopped at hot-019 with readiness 10179 ms. Both failures
+      eventually had Activity, Window, Surface and non-black frame evidence and neither used an
+      automatic retry, sleep extension or deadline extension. The hot-019 snapshot contains
+      three lowmemorykiller events for WebView, Contacts and ExternalStorage with reason
+      device is not responding; it contains no direct LMK kill of DingTalk or the CAS host.
+      Device resource pressure is therefore a confirmed environmental signal, not a complete
+      causal proof. Owner remains the CAS generic launch/readiness boundary pending separation of
+      CAS process/prepare latency from MuMu responsiveness; there is no SX/UI evidence and no
+      package-specific production fix is authorized by C4-R03. Fixture remains intentionally last.

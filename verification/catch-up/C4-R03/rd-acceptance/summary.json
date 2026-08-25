@@ -314,5 +314,84 @@
       "dynamicCommercialDiscovery": "artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825/commercial-sample-discovery.json"
     },
     "conclusion": "BLOCKED: the bounded post-restart resume reproduced the Fanqie cold readiness failure; fail-fast stopped before hot-002 and later cases. The prior first failure remains authoritative, and the matrix cannot be marked DONE or advanced."
+  },
+  "dingtalkPriority": {
+    "requestedByUser": true,
+    "fixtureOrder": "LAST",
+    "status": "BLOCKED",
+    "instanceName": "RD测试",
+    "resolvedByName": true,
+    "postRestartBootId": "7fec8065-1d25-4e25-8c53-f7cb7eb3b26a",
+    "postRestartEnvironment": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/environment.json",
+    "target": {
+      "name": "dingtalk",
+      "package": "com.alibaba.android.rimet",
+      "version": "7.8.10/1178",
+      "baseCount": 1,
+      "splitCount": 0,
+      "primaryCpuAbi": "arm64-v8a"
+    },
+    "initialLane": {
+      "lane": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825",
+      "rows": 84,
+      "passRows": 83,
+      "nonPassRows": 1,
+      "blockedAt": {
+        "user": 1,
+        "mode": "hot",
+        "iteration": 17,
+        "classification": "READINESS_SLO_EXCEEDED",
+        "readinessElapsedMs": 11720,
+        "requestId": "33720dd87741423c9042654f7f5a3d99",
+        "operationId": "33720dd87741423c9042654f7f5a3d99-launch",
+        "firstFailureFull": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825/attempts/dingtalk/user-1/hot-017/first-failure-full"
+      },
+      "attempt": 1,
+      "retryBudget": 0,
+      "automaticRetryPerformed": false,
+      "retryable": false
+    },
+    "postRestartObservation": {
+      "lane": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825",
+      "kind": "MANUAL_RESUME_AFTER_RESTART",
+      "rows": 6,
+      "passRows": 5,
+      "nonPassRows": 1,
+      "blockedAt": {
+        "user": 1,
+        "mode": "hot",
+        "iteration": 19,
+        "classification": "READINESS_SLO_EXCEEDED",
+        "readinessElapsedMs": 10179,
+        "overSloMs": 179,
+        "requestId": "417dbc1ae7534d39b82429871b779de6",
+        "operationId": "417dbc1ae7534d39b82429871b779de6-launch",
+        "firstFailureFull": "artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825/attempts/dingtalk/user-1/hot-019/first-failure-full"
+      },
+      "attempt": 2,
+      "retryBudget": 0,
+      "automaticRetryPerformed": false,
+      "retryBudgetValue": 0,
+      "retryable": false
+    },
+    "confirmed": [
+      "DingTalk imported/catalogued before launch readiness observation",
+      "both non-pass rows eventually have Activity/Window/Surface/non-black first-frame evidence",
+      "hot-019 snapshot contains three lowmemorykiller device-not-responding events for unrelated system processes",
+      "no direct LMK kill of DingTalk or CAS host, no GUEST_MAIN_THREAD_TIMEOUT, ANR or FATAL marker"
+    ],
+    "pending": [
+      "dominant contribution of CAS process/prepare latency versus MuMu responsiveness",
+      "whether the LaunchHomeActivity -> PrivacyPolicyActivity transition needs a CAS-generic bounded readiness design"
+    ],
+    "owner": "CAS generic launch/readiness boundary with a confirmed device resource-pressure contributor; no SX/UI evidence",
+    "fixture": {
+      "status": "PAUSED_LAST_BY_USER_ORDER",
+      "startedAfterDingTalk": false
+    },
+    "nextTask": "C4-R03",
+    "nextTaskAdvanceAllowed": false,
+    "c4R04R05Started": false,
+    "c6OrOemStarted": false
   }
 }

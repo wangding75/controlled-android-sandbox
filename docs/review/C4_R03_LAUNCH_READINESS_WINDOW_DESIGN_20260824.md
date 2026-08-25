@@ -250,3 +250,58 @@ fatal markers 为空；完整 request/operation ID 和快照见：
 - 番茄单次 cold/hot：`artifacts/capability-audit/catch-up-c4-r03/fanqie-after-event-fix-20260824T1730`。
 - DingTalk/夸克/红果首次失败：见第 4 节 raw paths；每个目录含 logcat、dumpsys、Surface、进程、
   事务文件、截图和设备快照。
+
+## 10. 2026-08-25 DingTalk 优先续接与资源压力首次失败
+
+用户指定本轮先执行 DingTalk，fixture 放到最后。fixture 因此继续保持暂停，没有用 fixture 的正向
+结果替代 DingTalk，也没有进入 C4-R04、C4-R05、C6 或 OEM 适配。
+
+### 10.1 动态环境与样本事实
+
+本轮仍通过 MuMu 实例名 `RD测试` 动态解析设备；重启后的 boot ID 为
+`7fec8065-1d25-4e25-8c53-f7cb7eb3b26a`，设备为 `22041211A` / API 32，ABI 为
+`x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`。ADB serial 只保存在 raw environment evidence，
+未进入 runner 选择器。DingTalk 动态记录为 `com.alibaba.android.rimet`、7.8.10/1178、base 1、
+split 0、primary ABI `arm64-v8a`，启动 Activity 为
+`com.alibaba.android.rimet.biz.LaunchHomeActivity`；完整记录见
+`verification/catch-up/C4-R03/dingtalk-priority-20260825.json`。
+
+### 10.2 首次失败与有限续接
+
+第一条 DingTalk lane `fix-dingtalk-u0-u1-a1-20260825` 产生 84 行，其中 83 行满足 readiness
+门禁，user1/hot-017 为首次非通过：readiness `11720 ms`，超过 hot `10000 ms`，request ID 为
+`33720dd87741423c9042654f7f5a3d99`，operation ID 为
+`33720dd87741423c9042654f7f5a3d99-launch`。该行已经保存 logcat、Activity/Window、Surface、
+进程、设备属性、事务文件和截图，且 `attempt=1`、`retryBudget=0`、
+`automaticRetryPerformed=false`、`retryable=false`。
+
+按重启后的独立观察策略，仅以 `MANUAL_RESUME_AFTER_RESTART`、`attempt=2`、retry budget 0 续接，
+没有把旧 hot-017 改写为 PASS。续接 lane 的 cold/hot-017 和 cold/hot-018、cold-019 通过，
+但 hot-019 再次首次失败：readiness `10179 ms`（超出 `179 ms`），request ID 为
+`417dbc1ae7534d39b82429871b779de6`，operation ID 为
+`417dbc1ae7534d39b82429871b779de6-launch`。它同样具有完整首次失败快照；runner 在该行 fail-fast
+停止，没有继续剩余 DingTalk 行，也没有启动 fixture。
+
+两次失败都最终观察到 `ACTIVITY_RESUMED`、`FIRST_FRAME_DRAWN`、非空 Window、非空 Surface 和
+非黑截图；因此这些证据不是黑屏或 Surface/UI 缺失。hot-019 快照还记录了此前三次 MuMu
+`lowmemorykiller` 事件，分别杀死 WebView、Contacts 和 ExternalStorage，均带有
+`reason: device is not responding`；没有发现 DingTalk target 或 CAS host 被同类 LMK 直接杀死，
+也没有 `GUEST_MAIN_THREAD_TIMEOUT`、`ANR in` 或 `FATAL EXCEPTION`。这确认了设备资源压力信号，
+但不能单凭时间相关性证明完整根因。
+
+### 10.3 owner 结论与恢复条件
+
+已确认：导入/catalog 成功后，失败位于 CAS 通用 launch/readiness 观察边界；DingTalk 的
+`LaunchHomeActivity -> PrivacyPolicyActivity` 子 Activity 仍通过统一 request/operation 时间线
+关联，并最终绘制首帧。已确认的设备 LMK 是环境贡献信号。没有证据把 owner 归给 SX adapter/UI，
+也不能把夸克正向对照外推为 DingTalk、红果或番茄小说兼容。
+
+待验证：CAS 进程 owner/launch preparation 延迟与 MuMu responsiveness 哪一个占主导，以及该
+Activity transition 是否需要 CAS 通用的有界 readiness 设计。C4-R03 只记录证据、复现、分类和
+NBB/VA 参考映射；不通过延长 deadline、增加 sleep、扩大 retry 或猜测 package 特判实施生产修复。
+
+当前结论为 `BLOCKED`：DingTalk 仍有 readiness 首次失败，fixture 按用户顺序留待最后，500 行
+正式矩阵未闭合。机器可读回执和 raw evidence：
+`verification/catch-up/C4-R03/dingtalk-priority-20260825.json`、
+`artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u0-u1-a1-20260825`、
+`artifacts/capability-audit/catch-up-c4-r03/fix-dingtalk-u1-r17-a2-20260825`。

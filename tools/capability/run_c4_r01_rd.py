@@ -51,6 +51,22 @@ def write_json(path: Path, value: Any) -> None:
     write_text(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
+def transaction_evidence_path(case_dir: Path, safe_name: str) -> Path:
+    """Choose a Windows-safe path without dropping the transaction evidence.
+
+    Long C4-R03 lane names can put the final ``*.lastgood`` transaction path at
+    the legacy MAX_PATH boundary.  Keep the descriptive path when it fits; if
+    it does not, store a short, deterministic file under the case directory's
+    parent and record that location in the structured snapshot.
+    """
+    preferred = case_dir / "transactions" / safe_name
+    if len(str(preferred)) < 240:
+        return preferred
+    digest = hashlib.sha256(safe_name.encode("utf-8")).hexdigest()[:10]
+    short_name = f"{digest}-{Path(safe_name).name}"
+    return case_dir.parent / "tx" / short_name
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -195,9 +211,11 @@ def capture_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str
     for relative in transaction_files:
         probe = run_as_file(serial, relative)
         safe_name = relative.removeprefix("files/").replace("/", "__")
-        write_text(case_dir / "transactions" / safe_name, probe["stdout"])
+        stored_path = transaction_evidence_path(case_dir, safe_name)
+        write_text(stored_path, probe["stdout"])
         transactions[relative] = {"returncode": probe["returncode"],
-                                  "bytes": len(probe["stdout"].encode("utf-8"))}
+                                  "bytes": len(probe["stdout"].encode("utf-8")),
+                                  "storedPath": str(stored_path.relative_to(case_dir.parent))}
     return {
         "captured_at": captured_at,
         "screenshot": {"returncode": screen.returncode, "bytes": screen_path.stat().st_size,
