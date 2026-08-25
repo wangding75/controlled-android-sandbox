@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "root": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R04\\acceptance\\recovery",
+  "artifacts": [
+    {
+      "path": "artifact-index.json",
+      "bytes": 971,
+      "sha256": "3b61b52cfb41588c2322308a5440fc98f7266d7daafa2b77d5fb5d6f92383915"
+    },
+    {
+      "path": "first-failure-decision.json",
+      "bytes": 2795,
+      "sha256": "b9c0c4bb4107d34428531e99304c4f6930ee6f22d7469226f201c1a5a92f69d4"
+    },
+    {
+      "path": "first-failure.json",
+      "bytes": 1969,
+      "sha256": "0d15ca539d950d562a9f5cd8304be516e402daca796003e0d7d8de4bc64b2179"
+    },
+    {
+      "path": "recovery-decision.json",
+      "bytes": 3085,
+      "sha256": "3020c09198c33bddae71e1f96b9145b89b3276751febf5e44f7f592e42698c99"
+    },
+    {
+      "path": "recovery-observation.json",
+      "bytes": 2252,
+      "sha256": "fca679464bf309bdeefe990aabf6c0d9b84053df15485d353d7da97b67ff7e72"
+    },
+    {
+      "path": "recovery-summary.json",
+      "bytes": 6634,
+      "sha256": "549bea9944bb6568d6338146ef20c29d44cd15ad11462643cae4902725ab0ccf"
+    }
+  ]
+}

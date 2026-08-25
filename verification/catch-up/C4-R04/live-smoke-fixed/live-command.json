@@ -1,0 +1,21 @@
+{
+  "command": [
+    "C:\\Users\\wangding\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "D:\\github\\controlled-android-sandbox\\tools\\capability\\run_c4_r03_rd.py",
+    "--instance-name",
+    "RD测试",
+    "--loops",
+    "1",
+    "--users",
+    "0,1",
+    "--targets",
+    "fixture",
+    "--output",
+    "verification\\catch-up\\C4-R04\\live-smoke-fixed\\live-r03"
+  ],
+  "startedAt": "2026-08-25T12:07:25.485541+00:00",
+  "completedAt": "2026-08-25T12:11:16.435108+00:00",
+  "returncode": 0,
+  "stdout": "{\n  \"status\": \"PASS\",\n  \"rows\": 4,\n  \"blockedAt\": null,\n  \"output\": \"verification\\\\catch-up\\\\C4-R04\\\\live-smoke-fixed\\\\live-r03\"\n}\n",
+  "stderr": "D:\\github\\controlled-android-sandbox\\tools\\capability\\run_c4_r03_rd.py:209: DeprecationWarning: Image.Image.getdata is deprecated and will be removed in Pillow 14 (2027-10-15). Use get_flattened_data instead.\n  pixels = list(image.getdata())\n"
+}

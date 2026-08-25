@@ -1458,7 +1458,7 @@ issues:
     capability: activity_framework
     classification: NEEDS_GATE_AND_CODE_REVIEW
     severity: HIGH
-    status: RECORDED
+    status: FIXED
     discovered_by: C4 post-acceptance review 2026-08-24
     evidence:
       - docs/review/C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md
@@ -1475,13 +1475,19 @@ issues:
       - verification/catch-up/C4-R02/rd-acceptance/negative-rollback-first-observation.json
       - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
       - verification/catch-up/C4-R03/rd-acceptance/summary.json
+      - docs/review/C4_R04_FAIL_CLOSED_ACCEPTANCE_ORCHESTRATION_DESIGN_20260825.md
+      - tools/capability/c4_r04_fail_closed.py
+      - tools/capability/run_c4_r04_rd.py
+      - verification/catch-up/C4-R04/acceptance/failure-injection/failure-injection-summary.json
+      - verification/catch-up/C4-R04/acceptance/recovery/recovery-summary.json
+      - verification/catch-up/C4-R04/live-smoke-fixed/live-summary.json
     match_patterns:
       - stopSoft
       - killSettled
       - ensureWindowPublishedAfterResume
       - Thread.sleep
-    blocks_current_campaign: true
-    fix_policy: FIRST_FAILURE_EVIDENCE_REFERENCE_MAPPING_AND_BOUNDED_TYPED_RETRY
+    blocks_current_campaign: false
+    fix_policy: C4_R04_FAIL_CLOSED_ORCHESTRATOR_WITH_SEPARATE_RECOVERY
     notes: >
       C4-R01 confirmed the historical C4 loop silently stops, sleeps 400 ms, and starts
       again after a first launch failure. C4-R02 now makes package mutations single-flight,
@@ -1490,10 +1496,12 @@ issues:
       one MUTATION_BUSY sharing the in-flight operation ID; Host and PackageService death
       recovery each used attempt 1 with retry budget 0. A first negative-probe assertion
       was preserved as HARNESS_ASSERTION_FALSE_NEGATIVE and corrected from the authoritative
-      nested errorMessage. The old C4 launch retry and fail-closed gate remain C4-R04 work;
-      status remains RECORDED and blocking. C4-R03 first failures all retained attempt=1,
-      retryBudget=0 and automaticRetryPerformed=false; no failed launch was hidden by a
-      second attempt.
+      nested errorMessage. C4-R04 now makes the new closure runner fail-closed: first failure
+      stops its lane, retry budget is zero, retry decisions are classified, readiness uses
+      request-scoped dynamic Window/Surface/frame evidence, and recovery is a separate mode.
+      The historical C4-T05 runner remains SUPERSEDED historical evidence and is not permitted
+      to close C4. C4-R03 first failures retained attempt=1, retryBudget=0 and
+      automaticRetryPerformed=false; no failed launch was hidden by a second attempt.
 
   - issue_id: KI-R03-057
     title: C4 commercial launch hits oversized Guest-to-Broker Intent transaction before first frame

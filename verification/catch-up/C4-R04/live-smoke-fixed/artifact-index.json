@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "root": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R04\\live-smoke-fixed",
+  "artifacts": [
+    {
+      "path": "live-command.json",
+      "bytes": 973,
+      "sha256": "8568edba9068760a8cce530d5a04f2b24da50cc91b0611041b1098641fe753dd"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/activity-activities.txt",
+      "bytes": 23026,
+      "sha256": "0c90321f28461114afbbf98f58bf0ace1ded2bf5f7d5117ba64a877ed3b41119"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/case.json",
+      "bytes": 5779,
+      "sha256": "70b005fb0bb2cd208b6d858d7a665a27f72f3643bcb79ce47df12b7fe979136d"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/cold-stop.json",
+      "bytes": 1245,
+      "sha256": "29bd6beb22908113f6d1feae010777e4d5fce3255ee0d687653ef306f48967d1"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/logcat.txt",
+      "bytes": 2290837,
+      "sha256": "f188c4c372b8df227112e4450bc0c4cc43a8f702e6b4dc4ad3333ada43a7e688"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/screenshot.png",
+      "bytes": 48836,
+      "sha256": "32f9d6c531d12dcc2b320c215eca7f820f7590d43153c39ab9343788a885596f"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/surface-list.txt",
+      "bytes": 2469,
+      "sha256": "28eeb0c3eea1c74a298816c6900de4542aa31bbb2d4ebce6c935c47f5801ac38"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/cold-001/window-windows.txt",
+      "bytes": 25934,
+      "sha256": "00fd2c881f99df670b7fb9c38c8b2258c0a811bc5a5bf12b0a796881d7d64448"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/activity-activities.txt",
+      "bytes": 23029,
+      "sha256": "24e48c3d78db5239cc01c3c51419aa19643fc8024a2aa8ece263953073d52966"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/case.json",
+      "bytes": 4301,
+      "sha256": "128d58c2210d443c230c2f50b363c177b05a8efa8df8d40aa92cdc5d059bc650"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/logcat.txt",
+      "bytes": 2306223,
+      "sha256": "36aaf5fcc361161a17e10692f4ede8827d8d0aae7cd7b4bf39121be5273ebc3d"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/screenshot.png",
+      "bytes": 16620,
+      "sha256": "0c72388798edfd6d248fe84991fface6a436b0d2475957cd96a5c68fb0b00c89"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/surface-list.txt",
+      "bytes": 2469,
+      "sha256": "526a8079f143102f6a8b2b4f3cbb88d80b075a7715923ebc046e67fe6a70ad9d"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-0/hot-001/window-windows.txt",
+      "bytes": 25936,
+      "sha256": "79805b9b33afc080eadf5ccdd95d30e3e62c0a731478b56898b4b647e791d6bb"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/activity-activities.txt",
+      "bytes": 23022,
+      "sha256": "010c922435cd369ee1870de64870eda206e41565e5f28b0fc92fd5535ab905ce"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/case.json",
+      "bytes": 5779,
+      "sha256": "f6d03a16440a01f8c793402cf09a3ac3d993c6dd6c23336c773ff5d4ca84129b"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/cold-stop.json",
+      "bytes": 1245,
+      "sha256": "80c7e071e70895289e7d8173d5f2c7a3c76b81a1244c685e34853d5f9848f4d1"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/logcat.txt",
+      "bytes": 2299582,
+      "sha256": "2a3c8a96f11d30ff4032dbef02e54bb2fcde14d680e059f96a0e4e39de93d7e1"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/screenshot.png",
+      "bytes": 49469,
+      "sha256": "70f0232ada74d65824fa665445a90a145a276eb71992a941bc48f7336c6256f4"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/surface-list.txt",
+      "bytes": 2468,
+      "sha256": "32198a178f34e9df8978ffaacae0f91ca2d5c16a941900c12a46425943413aa9"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/cold-001/window-windows.txt",
+      "bytes": 25932,
+      "sha256": "3b158d570e47996366bf0d7cbfc91eeb20bd24ba3fa55038191276cb902fe367"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/activity-activities.txt",
+      "bytes": 23024,
+      "sha256": "9392e0a2930508e1986b3d7dca607724ab9681476371544d5437c15e6e9c8b95"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/case.json",
+      "bytes": 4308,
+      "sha256": "3955e7ab2ba765b774915fb3866fb5d93ceebd897574f9197d90ab7aa82afa6c"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/logcat.txt",
+      "bytes": 2318354,
+      "sha256": "a6ce00cfc48bc97a86ec8562e480c9238c9c018bbfa330a835b1f500661356f8"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/screenshot.png",
+      "bytes": 49037,
+      "sha256": "87926d076b13cc2b26a5f72d7f344e11ee69947a85b046b06502312ffe751d70"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/surface-list.txt",
+      "bytes": 2468,
+      "sha256": "07cc882deb9ae3d85531d51efb0be08921c73caa7b21627c1c2a0905bef0ea07"
+    },
+    {
+      "path": "live-r03/attempts/fixture/user-1/hot-001/window-windows.txt",
+      "bytes": 25934,
+      "sha256": "6c17f123ae27a1339337820b528083d16cf7ad4e90a5e0482079c2a1f124a1df"
+    },
+    {
+      "path": "live-r03/c4-r03-summary.json",
+      "bytes": 22758,
+      "sha256": "493982ec93efc3bd0a2920cd1d2c549353e1f8bfd329e549cca7278906bc0c47"
+    },
+    {
+      "path": "live-r03/commercial-sample-discovery.json",
+      "bytes": 2078,
+      "sha256": "d313da84f8df0ade1397c46a5a426f962f288d7d0eae53daa9bea7e7e9dc3be4"
+    },
+    {
+      "path": "live-r03/dingtalk-discovery.json",
+      "bytes": 581,
+      "sha256": "5b9dbd8212072877fe86fbbb557ecd176ee3c09f70e79e8d85f69116156285ca"
+    },
+    {
+      "path": "live-r03/environment.json",
+      "bytes": 2067,
+      "sha256": "83082f05f7781e08131a6cc6f1e4f4a8fc6f2a1390654bde7f2c94abf534eccd"
+    },
+    {
+      "path": "live-r03/install.json",
+      "bytes": 1096,
+      "sha256": "993a9b999a09198684ca74644a6f4435b9cc8e94175be41f06b03d8de9fc2caa"
+    },
+    {
+      "path": "live-r03/setup/fixture/user-0.json",
+      "bytes": 2246,
+      "sha256": "b92b3405cc8fbf8511f414a05596d8d9428ddee36e82839b187b2f01a786696e"
+    },
+    {
+      "path": "live-r03/setup/fixture/user-1.json",
+      "bytes": 2246,
+      "sha256": "89a373505a87e7c771813892bbc5edf5338212380dd2825ee8ac53facfb57f2b"
+    },
+    {
+      "path": "live-r03/targets.json",
+      "bytes": 3159,
+      "sha256": "42c59d3f9cf28ae9ba07e9a563bebfa8fab54b0ac7daa44a9005fa3cea1dd127"
+    },
+    {
+      "path": "live-summary.json",
+      "bytes": 24239,
+      "sha256": "c9560df52dd67a3363282e758853b4af6ef62040cc4b7d50f8a477727e56765b"
+    }
+  ]
+}
