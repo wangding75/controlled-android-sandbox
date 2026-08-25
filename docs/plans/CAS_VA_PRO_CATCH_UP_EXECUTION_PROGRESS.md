@@ -2228,3 +2228,46 @@ C5 已由用户明确排除；C4-R03 当前被 `KI-R03-057` 阻断，未进入 C
 - **阻断结论与恢复条件**：C4-R03 仍不能标记 `DONE`，因为番茄小说缺少 user0 剩余 46 个和
   user1 全部 50 个最终 case，尚未达到 500 rows；C4-R04/R05 也尚未执行。下一次从 C4-R03
   继续，先补齐番茄小说 96 rows，再运行规定的 R04/R05 门禁；不得复制部分 PASS 或推进下一任务。
+
+### C4-R03：重启后断点续接回执（2026-08-25）
+
+- **状态**：`BLOCKED`。按用户指示安全停止番茄 user1 runner，保留已完成的 `cold-001`、`hot-001`
+  和随后生成的 `cold-002` 首次失败证据；没有把已完成 case 重置成新的 attempt。C4-R03 仍是当前任务，
+  没有进入 C4-R04、C4-R05、C6 或 OEM。
+- **RD测试重启与续接预检**：停止 runner 后以实例名 `RD测试` 动态解析 MuMu index，再执行实例级
+  `control restart`。重启前 boot ID 为 `60d44ff7-2d1b-44a3-8cec-7b1f0608b633`，重启后重新解析
+  为 `70f2ef8b-daf7-4492-b011-4a1da57a5c49`；设备仍为 model `22041211A`、API 32。当前 ADB
+  endpoint 只出现在动态 environment 快照，runner 没有硬编码地址。
+- **断点 collector**：原 runner 只有从头 fail-fast 模式；本回执新增显式
+  `MANUAL_RESUME_AFTER_RESTART` 起点参数和 `resume.json`，仅为测试采集器能力，不改生产代码。
+  续接从番茄 `com.dragon.read` user1 `cold-002` 开始，使用独立 lane 记录
+  `attempt=2/retryBudget=0/automaticRetryPerformed=false`，并通过 `previousLane` 链回首次失败。
+  生产 readiness SLO、collector wait budget 和 fail-fast 规则均未放宽。
+- **断点结果**：重启后 `cold-002` 仍失败，`readinessElapsedMs=42106`，分类为
+  `READINESS_SLO_EXCEEDED`；`Activity` created/resumed、`FIRST_FRAME_DRAWN`、Window、Surface 和
+  非黑截图均存在。运行器在保存完整 first-failure snapshot 后停止，未进入 `hot-002` 和后续 case。
+  重启前 user0 `cold-001` 为 33167 ms 首次失败，user1 `cold-002` 为 31071 ms 首次失败；三次证据
+  均保留 request/operation ID、logcat、dumpsys、截图、Window、Surface、进程和事务快照。
+- **owner 分类**：两次 user1 `cold-002` 与 user0 `cold-001` 的共同日志均出现
+  `GUEST_MAIN_THREAD_TIMEOUT`，调用链为 `GuestContentProviderFrameworkInterceptor` →
+  `GuestRuntimeBrokerBridge`，触发点落在 `com.dragon.read` Mira plugin provider 访问；之后才绘制首帧。
+  已确认 owner 保持 CAS 通用 Guest ContentProvider/launch readiness 边界；具体 app-side provider 触发
+  和最小 CAS provider/broker 协议仍为待验证，不猜测为番茄专属兼容性，也不转交 SX/UI。新增
+  `KI-R03-059`，状态 `RECORDED`、阻断为 true。
+- **矩阵与重试审计**：番茄 user1 续接 lane 预期剩余 48 行，但在第一个续接行阻断；该 lane 实际
+  观察 1 行且为非通过。原 user1 lane 已观察 `cold-001/hot-001` 通过和 `cold-002` 首次失败；原
+  user0 lane 在 `cold-001` 首次失败。不能把这些不同 attempt 合并为 500/500 PASS，也不能用此前
+  的 4 个 user0 PASS 推断番茄兼容。所有自动重试字段仍为 false，retry budget 为 0；没有延长 sleep、
+  deadline 或不停重试。
+- **机器证据**：
+  `verification/catch-up/C4-R03/rd-acceptance/summary.json` 的 `continuationAfterRestart`；
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u0-u1-25-20260825`；
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-final-fanqie-u1-25-20260825`；
+  `artifacts/capability-audit/catch-up-c4-r03/continuation-after-reboot-fanqie-u1-from-cold2-a2-20260825`。
+- **验证命令**：`python -m py_compile tools/capability/run_c4_r03_rd.py`、
+  `python scripts/test_catch_up_continuation.py`（6 tests）、summary JSON/YAML parse 和
+  `git diff --check` PASS。
+- **实现/证据提交 SHA**：`18c07cd3`（`test(c4): [C4-R03] preserve Fanqie timeout and restart resume`）。
+- **本回执提交**：本段为独立的 `docs(progress): record [C4-R03] restart resume receipt` 提交。
+- **下一任务**：继续为 `C4-R03`；由于阻断未解除，续接预检应 fail-closed，不能把下一任务改成
+  `C4-R04`，也不能标记 C4-R03 `DONE`。
