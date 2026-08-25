@@ -1,14 +1,14 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 19:56（Asia/Shanghai）
+更新时间：2026-08-25 20:18（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R04`（IN_PROGRESS）
-下一任务：`C4-R04`
-最后完成任务：`C4-R03`
+当前任务：`C4-R05`（PENDING）
+下一任务：`C4-R05`
+最后完成任务：`C4-R04`
 
 ## 1. 使用规则
 
@@ -67,7 +67,7 @@
 | C4-R01 | 证据纠偏、复现与 VA/NBB 映射 | DONE | C4-T05 | `d2f1b0aa7137195661525c442e290bd6e009646c` | §5 C4-R01 |
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
-| C4-R04 | C4 fail-closed 验收编排 | IN_PROGRESS | C4-R02,C4-R03 | - | - |
+| C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
 | C4-R05 | MuMu RD 正式重验与关门 | PENDING | C4-R04 | - | - |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,7 +82,8 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053` 至 `KI-R03-060`。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
+当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`；
+`KI-R03-060` 为已接受但仍开放的强制回归项。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
 外部设备、ARM/16KB 环境和可选 ART/Xposed 产品决策在对应任务中确认。当前主线为 C4-R01..R05；
@@ -2459,3 +2460,74 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **回执提交**：本段为独立的 `docs(progress): record [C4-R03] receipt` 提交。
 - **下一任务**：`C4-R04`（PENDING）；下一环境可从 C4-R04 续接，但必须携带
   `KI-R03-060` 回归要求，且不得把本次行政 DONE 当作 C4 阶段关闭。
+
+### C4-R04：C4 fail-closed 验收编排（2026-08-25）
+
+- **状态**：`DONE`。本回执只关闭 C4-R04 任务，不关闭 C4 阶段；C4-R05 的正式 MuMu
+  双轮矩阵、C1/C2/C4/SX 门禁和 30 分钟双用户压力仍是强制后续项。
+- **执行窗口与基线**：Asia/Shanghai 2026-08-25 19:55:58 至 20:18；Windows
+  PowerShell；分支 `feature/t57-r03-va-pro-capability-campaign`；开始基线为
+  `46a59f3a9c1f8703213705562f9f48c2bff02691`。开始时远端与基线一致；工作区仅保留续接预检
+  自动更新的 `verification/catch-up/C0-T01/continuation-preflight.json`，该既有证据变更已纳入
+  本轮记录。Git 身份为 `OpenAI <openai@users.noreply.github.com>`。
+- **设备快照**：MuMu `RD测试` 由实例名动态解析为本轮证据中的
+  `127.0.0.1:16416`，API 32，ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，model
+  `22041211A`，Android ID `398eea33120cd887`，boot ID
+  `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a`。该 endpoint 只存在于环境快照，runner 没有硬编码
+  ADB serial。
+- **任务边界**：按任务书和 `C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`，
+  本任务实现可审计的 fail-closed 验收编排、五类故障注入、独立 recovery contract 和一条
+  fixture live smoke；没有把离线注入结果冒充商业全矩阵，也没有提前宣称 C4-R05 通过。
+- **实现与证据提交 SHA**：
+  `57d2c34a04c3c33b0292934373d763c3e4369ea7`（实现初始提交）及
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`（修正合成 mutation fixture 包名并重生成证据的
+  补充实现提交，作为本任务最终实现提交）。远端已核验到
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`。
+- **实现内容**：新增 `tools/capability/c4_r04_fail_closed.py`，将
+  `REQUEST_ACCEPTED → GUEST_READY → ACTIVITY_RESUMED → FIRST_FRAME_DRAWN` 阶段时序、
+  request/operation/package/user/revision 关联、动态 Window/Surface/截图、FATAL/ANR、
+  retryDecision 和 mutation residue 纳入判定；静态 `LAUNCH_PASS` 等 marker 明确为非权威。
+  新增 `tools/capability/run_c4_r04_rd.py`，failure-injection、recovery、live 三种模式均为
+  首次失败停止、retry budget=0；live 模式只委托一次现有 R03 fail-fast runner。新增静态门禁
+  `scripts/check-c4-r04-fail-closed.py`、7 项单测 `scripts/test_c4_r04_fail_closed.py`，并补充
+  `docs/review/C4_R04_FAIL_CLOSED_ACCEPTANCE_ORCHESTRATION_DESIGN_20260825.md`。
+- **离线故障注入结果**：`verification/catch-up/C4-R04/acceptance/failure-injection/failure-injection-summary.json`
+  为 `PASS`，五个场景全部按预期由 runner 返回 `FAIL`，且保留首次失败：
+
+  | 场景 | 预期/实际分类 | runner 状态 |
+  |---|---|---|
+  | `windows-empty` | `WINDOWS_EMPTY` | `FAIL` |
+  | `draw-timeout` | `DRAW_TIMEOUT` | `FAIL` |
+  | `bind-failure` | `BIND_FIRST_ATTEMPT_FAILED` | `FAIL` |
+  | `duplicate-add` | `DUPLICATE_MUTATION_ACCEPTED` | `FAIL` |
+  | `staging-residue` | `STAGING_RESIDUE` | `FAIL` |
+
+- **独立恢复结果**：`verification/catch-up/C4-R04/acceptance/recovery/recovery-summary.json`
+  为 `PASS`。首失败与恢复使用不同 request ID，恢复不是隐式 retry；两阶段都记录
+  `attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`、`retryDecision=NO_RETRY`。
+- **设备 live smoke**：第一次 wrapper 运行发现委托文件名解析错误（wrapper 错找
+  `summary.json`，实际委托输出为 `c4-r03-summary.json`），该 harness 错误保留在被忽略的
+  `verification/catch-up/C4-R04/live-smoke/` 原始目录中并修正；它不是 runtime failure，也
+  没有触发自动 retry。修正后的独立 lane
+  `verification/catch-up/C4-R04/live-smoke-fixed/live-summary.json` 为 `PASS`，fixture
+  user0/user1 冷/热共 4/4，全部具备动态 FIRST_FRAME_DRAWN、非空 Window、非空 Surface、非黑
+  截图、空 FATAL/ANR、`attempt=1` 和零 retry budget。
+- **验收命令**：`python scripts/test_c4_r04_fail_closed.py`（7 tests OK）；
+  `python scripts/check-c4-r04-fail-closed.py`（PASS）；`python -m py_compile
+  tools/capability/c4_r04_fail_closed.py tools/capability/run_c4_r04_rd.py
+  scripts/test_c4_r04_fail_closed.py scripts/check-c4-r04-fail-closed.py`（PASS）；
+  两次 `run_c4_r04_rd.py --mode failure-injection/recovery`（PASS）；
+  `python scripts/test_catch_up_continuation.py`（6 tests OK）；
+  `python tools/capability/validate_campaign_infra.py`（PASS）；`git diff --check`（PASS）。
+- **Known Issues 结论**：`KI-R03-056` 已按本任务的 fail-closed 注入、独立 recovery 和 live
+  smoke 证据改为 `FIXED` 且不再阻断当前 campaign；`KI-R03-055` 仍仅在 import compatibility
+  范围为 `FIXED`。`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`
+  保持 `RECORDED`/阻断；`KI-R03-060` 保持 `RECORDED`、接受风险但不阻断当前推进，必须在
+  C4-R05 回归并不得被描述为已修复。
+- **偏离与残余风险**：R04 没有声称 500/500 首试、商业样本双轮、C1/C2/C4/SX F1-F5 或
+  30 分钟压力已通过；这些门禁严格留给同一最终提交上的 C4-R05。历史首次失败证据没有被
+  PASS 观察覆盖，旧 C4-T05 runner 仍是历史证据，不用于 C4 关门。
+- **回执提交**：本段为独立的 `docs(progress): record [C4-R04] receipt` 提交；实现提交和
+  本回执提交均已推送，并以 `git ls-remote` 核验远端 HEAD 与本地一致。
+- **下一任务**：`C4-R05`（PENDING）；下一环境必须从本回执、续接预检和
+  `KI-R03-053/054/057/058/059/060` 回归要求开始，完成正式双轮矩阵后才能判断 C4 是否关闭。
