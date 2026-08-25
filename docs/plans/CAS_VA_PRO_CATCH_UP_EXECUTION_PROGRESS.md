@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.4
-更新时间：2026-08-26 00:41（Asia/Shanghai）
+更新时间：2026-08-26 01:20（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -2636,3 +2636,30 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **下一步**：继续当前 R05 剩余减半矩阵：本机 user0 的 fixture、夸克、红果、番茄小说及所需
   添加门禁、C1/C2/C4 回归和双用户压力；另一台机器 user1 继续使用独立 `RD测试` 和独立证据目录。
   只有所有门禁、回归和压力均通过后，才重新评估 C4 关门。
+
+### C4-R05：本机 R04 与减半添加门禁回执（2026-08-26）
+
+- **状态**：`IN_PROGRESS`。这是当前 C4-R05 的继续执行回执，不关闭 C4 阶段；本机 DingTalk
+  user0 启动矩阵已由上一回执记录，当前补齐 R04 合同和 R02 减半添加门禁。
+- **执行环境**：同一动态 `RD测试`，解析到 `127.0.0.1:16416`，API 32、boot ID
+  `7fec8065-1d25-4e25-8c53-f7cb7eb3b26a`、Android ID `398eea33120cd887`；DingTalk、夸克、
+  红果、番茄的 package/version/base/split/ABI 由设备运行时发现并保存在样本清单。
+- **C4-R04 验收**：`run_c4_r04_rd.py --mode failure-injection` 与 `--mode recovery` 均为
+  `PASS`；failure-injection 的 windows-empty、draw-timeout、bind-failure、duplicate-add、
+  staging-residue 均正确得到预期 FAIL 分类且首失败保留；recovery PASS，retry budget=0、无自动重试、
+  动态首帧/Window/Surface/非黑截图门禁通过。证据见
+  `verification/catch-up/C4-R05/continuation-local-r04-20260826/`。
+- **C4-R02 添加门禁**：执行 `python tools/capability/run_c4_r02_rd.py --instance-name 'RD测试'
+  --reduced-r05-scope --output verification/catch-up/C4-R05/continuation-local-add-gate-20260826`；
+  fixture 25 个 add/delete/re-add 循环，DingTalk、夸克、红果、番茄各 5 个循环，合计 137 条操作，
+  `status=PASS`、`firstFailureCount=0`、全部 `attempt=1`、无自动重试。并发添加为一成功一
+  `MUTATION_BUSY` 且同 operation ID，判定 `CONCURRENT_ADD_SINGLE_FLIGHT_PASS`；`.install-*` 残留和
+  active transaction 均为空。
+- **证据**：添加汇总为该目录 `summary.json`，逐条操作为 `operations.json`，动态样本为
+  `sample-inventory.json`，并发和清理结果分别为 `concurrent-add.json`、`residue.json`；结构化回执为
+  `local-r04-add-gate-receipt.json`。
+- **实现/证据提交 SHA**：`31efe59d40c3f1bfd28bc6b3239c10a7900c631e`
+  （`test(c4): [C4-R05] record local R04 and add gates`），已推送并用 `git ls-remote` 验证。
+- **下一步**：继续本机 user0 的剩余 launch matrix（fixture、夸克、红果、番茄，各 25 cold + 25 hot），
+  同时保留已完成 DingTalk 50/50 作为独立 lane；之后执行 C1/C2/C4/SX 回归和本机压力，另一台机器
+  user1 的独立证据仍需汇总到同一最终提交范围后才能重新评估 C4 关门。
