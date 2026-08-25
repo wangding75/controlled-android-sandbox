@@ -11,6 +11,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -91,8 +92,18 @@ def text_probe(serial: str, args: list[str]) -> dict[str, Any]:
 
 
 def aapt2_path() -> Path:
-    sdk = Path.home() / "AppData" / "Local" / "Android" / "Sdk" / "build-tools"
-    candidates = sorted(sdk.glob("*/aapt2.exe"), reverse=True)
+    sdk_roots: list[Path] = []
+    for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        value = os.environ.get(variable, "").strip()
+        if value:
+            sdk_roots.append(Path(value))
+    sdk_roots.append(Path.home() / "AppData" / "Local" / "Android" / "Sdk")
+    candidates = [
+        candidate
+        for sdk in dict.fromkeys(sdk_roots)
+        for candidate in sdk.glob("build-tools/*/aapt2.exe")
+    ]
+    candidates.sort(reverse=True)
     if not candidates:
         raise RuntimeError("AAPT2_NOT_FOUND")
     return candidates[0]
