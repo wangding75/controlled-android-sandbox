@@ -1562,6 +1562,9 @@ issues:
       - artifacts/capability-audit/catch-up-c4-r03/continuation-2h-hongguo-u0-u1-25-20260825
       - artifacts/capability-audit/catch-up-c4-r03/continuation-2h-fanqie-u0-u1-25-20260825
       - verification/catch-up/C4-R03/rd-acceptance/summary.json
+      - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/attempts/quark/user-0/cold-003/case.json
+      - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/attempts/quark/user-0/cold-003/first-failure-full
+      - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/local-launch-failure-receipt.json
     match_patterns:
       - lowmemorykiller: Kill 'com.quark.browser'
       - reason: device is not responding
@@ -1585,7 +1588,15 @@ issues:
       rows with no retry, sleep or deadline extension; Fanqie user0 passed 4 rows before the
       continuation cutoff. Status remains RECORDED because Fanqie is incomplete (user0 has 46
       missing rows and user1 has 50 missing rows); full matrix validation is still required
-      before this issue or C4-R03 can be closed.
+      before this issue or C4-R03 can be closed. On 2026-08-26, the C4-R05 local user0 lane
+      added a new first-failure observation at Quark cold-003: the CAS host process itself
+      (com.warden.controlledsandbox.debug pid 17929) exited with ApplicationExitInfo reason
+      LOW_MEMORY before a non-empty request-scoped debug-command result was available. The
+      device still exposed a Quark-focused Window, non-empty Surface and non-black screenshot,
+      but those observations are not a correlated launch PASS. The lane therefore remains
+      fail-closed and blocked; this evidence strengthens the process-owner/low-memory boundary
+      classification without proving a Quark application defect or authorizing a package-specific
+      fix.
 
   - issue_id: KI-R03-059
     title: Fanqie cold launch exceeds readiness SLO while CAS Guest ContentProvider bridge times out
