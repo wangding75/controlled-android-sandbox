@@ -1,0 +1,17 @@
+{
+  "label": "build-clean-commit",
+  "command": [
+    "D:\\github\\controlled-android-sandbox\\gradlew.bat",
+    ":app:assembleDebug",
+    ":fixture-basic:assembleDebug",
+    ":sandbox-companion32:assembleDebug",
+    ":fixture-compat32:assembleDebug",
+    "--no-daemon"
+  ],
+  "startedAt": "2026-08-25T12:31:01.209029+00:00",
+  "completedAt": "2026-08-25T12:31:26.981633+00:00",
+  "elapsedMs": 25773,
+  "returncode": 0,
+  "stdoutPath": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\commands\\000-build-clean-commit.stdout.txt",
+  "stderrPath": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\commands\\000-build-clean-commit.stderr.txt"
+}

@@ -1,0 +1,59 @@
+{
+  "status": "PASS",
+  "returncode": 0,
+  "result": {
+    "command": "import-only",
+    "package": "com.dragon.read",
+    "virtualUserId": 0,
+    "trustNativeGuest": true,
+    "requestId": "c4-r02-first-番茄免费小说-bb409255-fd39-4409-9f2d-84d91d9fb43c",
+    "operationId": "c4-r02-first-番茄免费小说-bb409255-fd39-4409-9f2d-84d91d9fb43c-launch",
+    "startedAt": 1787646621251,
+    "packageOperationTrace": {
+      "requestId": "c4-r02-first-番茄免费小说-bb409255-fd39-4409-9f2d-84d91d9fb43c",
+      "operationId": "2c7bcc8c-d9ef-4c67-a6dc-ab9f3f7f8908",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787646622116,
+      "elapsedMs": 5583,
+      "stageTimingsMs": {
+        "HASH": 511,
+        "COPY": 954,
+        "PARSE": 1538,
+        "NATIVE_EXTRACT": 1426,
+        "PUBLISH": 20,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 1037
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    },
+    "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+    "operation": {
+      "status": "IMPORTED"
+    },
+    "status": "PASS"
+  },
+  "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 447\nWaitTime: 449\nComplete\n",
+  "start_stderr": ""
+}

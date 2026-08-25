@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.2
-更新时间：2026-08-25 20:22（Asia/Shanghai）
+更新时间：2026-08-25 22:20（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04 | - | - |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 100-case checkpoint |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2530,3 +2530,29 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   本回执提交均已推送，并以 `git ls-remote` 核验远端 HEAD 与本地一致。
 - **下一任务**：`C4-R05`（PENDING）；下一环境必须从本回执、续接预检和
   `KI-R03-053/054/057/058/059/060` 回归要求开始，完成正式双轮矩阵后才能判断 C4 是否关闭。
+
+### C4-R05：100-case 有界进度回执（2026-08-25）
+
+- **状态**：`IN_PROGRESS`。本段是用户要求“完成这 100 个后停止”的进度回执，不是
+  C4-R05 完成回执，不是正式 `PASS`，也不关闭 C4 阶段。当前任务和下一任务仍为 `C4-R05`。
+- **执行范围与停止**：在同一 clean commit `2667d0f3956751f85c83bec4ade4f89145e7bb2e` 上，
+  R05 第一轮 `clean-install-cold` 的 R03 fixture/user0 lane 完成 100/100：cold 50/50、hot 50/50。
+  用户指定的有界范围完成后停止父进程；停止时间为 2026-08-25 22:18:26（Asia/Shanghai）。
+  停止后无 Python R05/R03 进程，未继续执行剩余 400 行。
+- **结果**：100/100 `case.json` 可解析且满足首试合同；100/100 `failureDetected=false`、
+  `errorClassification=NONE`、`attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`，
+  均有 `FIRST_FRAME_DRAWN`、Window、Surface、非黑截图，FATAL/ANR marker 为 0。该结果仅证明
+  已完成的 fixture/user0 100 行，不外推到 DingTalk、夸克、红果、番茄小说、user1、第二轮或压力。
+- **机器证据**：聚合核验见
+  `verification/catch-up/C4-R05/round-1-clean-install-cold/launch-matrix/fixture-user0-100-summary.json`；
+  逐用例目录为
+  `verification/catch-up/C4-R05/round-1-clean-install-cold/launch-matrix/attempts/fixture/user-0/`，
+  最新文件为 `hot-050/case.json`；设备与开始基线见
+  `verification/catch-up/C4-R05/start-state.json` 和 `environment-at-start.json`。
+- **实现与证据提交 SHA**：`d75d0dbcae4a223abdad4d109aaf03dcf97b889f`、
+  `2667d0f3956751f85c83bec4ade4f89145e7bb2e`；本段回执提交完成后，须与实现提交一起推送并
+  用 `git ls-remote` 核验远端 HEAD。
+- **偏离与遗留风险**：按用户有界停止指令，R05 任务书要求的本轮剩余 400 行、第二轮、
+  C1/C2/C4/SX 回归、双用户压力、完整添加矩阵及 C4 关门证据均未执行；不能进入 C6。
+- **下一任务**：仍为 `C4-R05`；后续必须显式续接并完成完整两轮正式门禁，不能把本段 100-case
+  观察升级为 R05 或 C4 `DONE`。

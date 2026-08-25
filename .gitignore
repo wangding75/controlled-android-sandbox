@@ -34,4 +34,11 @@ artifacts/capability-audit/
 verification/catch-up/C4-R04/live-smoke/
 verification/catch-up/C4-R04/live-smoke-fixed/live-r03/
 
+# C4-R05 RD child lanes retain large raw log/screenshot output locally; the
+# tracked JSON summaries, command records, and per-case contracts are the
+# durable review evidence.
+verification/catch-up/C4-R05/round-*/**/*.txt
+verification/catch-up/C4-R05/round-*/**/*.png
+verification/catch-up/C4-R05/commands/*.txt
+
 _delivery/
