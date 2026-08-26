@@ -2692,3 +2692,43 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   C4 阶段不得关闭。
 - **实现/证据提交**：`90aceaf7`（`test(c4): [C4-R05] record local Quark low-memory block`），
   已推送；随后用独立主题 `docs(progress): record [C4-R05] receipt` 提交本回执并核验远端 HEAD。
+
+### C4-R05：ActivityThread 生命周期与进程边界对照修复回执（2026-08-26）
+
+- **状态**：`IN_PROGRESS`。本回执只记录一次通用生命周期修复和本机定向回归，不关闭
+  C4-R05 或 C4 阶段；user1 未在本机执行。
+- **修复起点与 owner**：修复基线为 `f517d025`。对照 VA 的 `HCallbackStub`/
+  `AppInstrumentation`/`VirtualRuntime` 和 NBB 的 `HCallbackProxy`/
+  `BaseInstrumentationDelegate`/`IActivityClientProxy` 后确认，上一轮把
+  `Runtime.nativeExit` 吞掉后再用 Activity `mCalled`/`onDestroy` 特例维持 root 进程，混淆了
+  ActivityThread 生命周期与 ProcessRecord/Binder death 生命周期，导致“修一层才显露下一层”。
+- **实现提交**：`8ce27b8b6a041cb1664183fd309ed29821865173`（`fix(c4): align ActivityThread and process lifetime contracts`）。
+  ActivityThread 侧恢复完整 delegate/base lifecycle；删除 `mCalled` 伪造、`onDestroy` 跳过和
+  退出特例；translated Guest 侧仅保留 direct native `kill/_exit/abort` 的 deny-only 保护，
+  `Runtime.nativeExit` 进入 libopenjdk 原始实现并产生真实进程退出，由 Binder death、slot 和
+  generation recovery 收敛。专项对照见
+  `docs/review/C4_R05_ACTIVITYTHREAD_LIFECYCLE_ALIGNMENT_20260826.md`。
+- **验证命令**：`:app:assembleDebug :fixture-basic:assembleDebug` PASS；
+  `:sandbox-native:testDebugUnitTest` PASS（无 Java unit source）；
+  `python tools/static_android_compile.py` PASS；
+  `python scripts/check-activity-task-virtualization.py` PASS；
+  `python scripts/check-c4-r05-orchestrator.py` PASS；`git diff --check` PASS。
+- **本机定向回归**：动态解析 `RD测试` 后仅执行
+  `python tools/capability/run_c4_r03_rd.py --instance-name 'RD测试' --loops 1 --users 0
+  --targets dingtalk --output verification/catch-up/C4-R05/continuation-local-launch-user0-runtime-exit-forwarded-probe-20260826`；
+  `c4-r03-summary.json` 为 `PASS`，cold/hot 2/2 均 `LAUNCH_PASS`，动态 Activity
+  created/resumed、Window、Surface、FIRST_FRAME_DRAWN 和非黑截图均有效，零自动重试。
+  cold 为 `generation=1/PID=16306`，hot 为 `generation=2/PID=16618`；hot logcat 记录
+  `Runtime.nativeExit(0) forwarded as process boundary` 后 root `guest4` death，证明发生
+  真实退出和新代际重建，而不是旧 root 保活复用。
+- **Known Issue/停止规则**：本机定向回归未复现新的非 `LOW_MEMORY` 失败；历史首发失败和
+  `KI-R03-061` 仍保留，不能因 2/2 定向 PASS 标记为 FIXED。按用户最新指令，纯
+  `LOW_MEMORY` 作为 RD 环境信号不阻断流程，遇到时重启模拟器并从新的 request/证据目录
+  继续；任何首个非 `LOW_MEMORY` 失败仍按 fail-fast 停止。该操作规则不等于清除历史
+  `LOW_MEMORY`/进程 owner 证据。
+- **推送核验**：实现与定向证据已推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，远端 HEAD 已核验为
+  `8ce27b8b6a041cb1664183fd309ed29821865173`。工作区仍保留未纳入本提交的历史回执/探针
+  目录及既有证据变更，未删除或覆盖。
+- **下一步**：继续本机 user0 的剩余 C4-R05 矩阵和回归；不启动 user1。只有用户另行授权并
+  汇总另一台机器 user1 的独立证据后，才可重新评估 C4-R05/C4 关门。

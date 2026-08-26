@@ -1565,6 +1565,7 @@ issues:
       - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/attempts/quark/user-0/cold-003/case.json
       - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/attempts/quark/user-0/cold-003/first-failure-full
       - verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-20260826/local-launch-failure-receipt.json
+      - verification/catch-up/C4-R05/continuation-local-launch-user0-runtime-exit-forwarded-probe-20260826
     match_patterns:
       - lowmemorykiller: Kill 'com.quark.browser'
       - reason: device is not responding
@@ -1596,7 +1597,10 @@ issues:
       but those observations are not a correlated launch PASS. The lane therefore remains
       fail-closed and blocked; this evidence strengthens the process-owner/low-memory boundary
       classification without proving a Quark application defect or authorizing a package-specific
-      fix.
+      fix. A later CAS lifecycle-boundary repair was separately verified on DingTalk user0 with
+      real Runtime.nativeExit process death and a new slot generation; that targeted observation
+      is evidence for the generic owner design, not closure of this issue or the remaining full
+      matrix.
 
   - issue_id: KI-R03-059
     title: Fanqie cold launch exceeds readiness SLO while CAS Guest ContentProvider bridge times out
