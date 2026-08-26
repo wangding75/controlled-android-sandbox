@@ -486,7 +486,20 @@ def main() -> int:
     environment = resolve_rd_environment(args.instance_name)
     args.output.mkdir(parents=True, exist_ok=True)
     write_json(args.output / "environment.json", environment)
-    write_json(args.output / "install.json", install_rd_apks(environment["adb_serial"]))
+    # A resumed hot coordinate must retain the runtime state left by the preceding cold
+    # coordinate.  Reinstalling the host APK can tear down that state before the hot launch
+    # is even requested.  The initial lane already installed the exact build, and the R05
+    # continuation is only allowed from that durable lane, so record the deliberate skip.
+    preserve_hot_resume_state = resume_requested and args.resume_mode == "hot"
+    if preserve_hot_resume_state:
+        install = {
+            "status": "SKIPPED",
+            "reason": "HOT_RESUME_PRESERVES_PREVIOUS_LANE_RUNTIME_STATE",
+            "previousLane": str(Path(args.resume_of).resolve()),
+        }
+    else:
+        install = install_rd_apks(environment["adb_serial"])
+    write_json(args.output / "install.json", install)
     targets = {"fixture": fixture_target()}
     targets.update(discover_commercial_targets(environment["adb_serial"], args.output))
     targets["dingtalk"] = discover_dingtalk(environment["adb_serial"], args.output)
@@ -534,24 +547,43 @@ def main() -> int:
             else:
                 pair_expected = args.loops * 2
             expected_rows += pair_expected
-            setup_request_id = uuid.uuid4().hex
-            setup = debug_command(
-                environment["adb_serial"],
-                ["--es", "command", "import-only", "--es", "package", target["package"],
-                 "--ei", "user", str(user), "--es", "requestId", setup_request_id,
-                 "--ez", "trustNativeGuest", "true"],
-                deadline_sec=60,
-                force_stop_host=True,
+            preserve_pair_runtime_state = (
+                preserve_hot_resume_state
+                and resume_position is not None
+                and pair_position == resume_position[:2]
             )
+            if preserve_pair_runtime_state:
+                # import-only calls debug_command with force_stop_host=True.  That is valid
+                # for a fresh lane, but invalid when the first missing coordinate is hot: it
+                # destroys the recovered Guest process that makes the coordinate hot.
+                setup_request_id = None
+                setup = {
+                    "status": "SKIPPED",
+                    "returncode": 0,
+                    "reason": "HOT_RESUME_PRESERVES_PREVIOUS_LANE_RUNTIME_STATE",
+                }
+            else:
+                setup_request_id = uuid.uuid4().hex
+                setup = debug_command(
+                    environment["adb_serial"],
+                    ["--es", "command", "import-only", "--es", "package", target["package"],
+                     "--ei", "user", str(user), "--es", "requestId", setup_request_id,
+                     "--ez", "trustNativeGuest", "true"],
+                    deadline_sec=60,
+                    force_stop_host=True,
+                )
             setup_row = {"target": target["target"], "package": target["package"],
                          "user": user, "requestId": setup_request_id,
                          "attempt": args.resume_attempt if resume_metadata else 1,
                          "retryBudget": 0, "automaticRetryPerformed": False,
                          "command": "import-only", "result": setup}
+            if preserve_pair_runtime_state:
+                setup_row["status"] = "SKIPPED"
+                setup_row["skipReason"] = "HOT_RESUME_PRESERVES_PREVIOUS_LANE_RUNTIME_STATE"
             if resume_metadata:
                 setup_row["resume"] = resume_metadata
             write_json(args.output / "setup" / target["target"] / f"user-{user}.json", setup_row)
-            if setup.get("status") != "PASS":
+            if setup.get("status") not in ("PASS", "SKIPPED"):
                 blocked_at = {"target": target["target"], "user": user,
                               "mode": "import-only", "iteration": 0,
                               "classification": "IMPORT_SETUP_FAILED"}
