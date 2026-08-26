@@ -118,4 +118,8 @@ Additional RD acceptance, still on `RD测试` API32:
    package branch in production runtime).
 3. A RESUMED Guest stub must not be a black screen: fail if the Guest
    `:guest` Hist block is `windows=[]` and `reportedDrawn=false`.
-4. Logcat must show `GUEST_ACTIVITY_CREATE` for the Quark package.
+4. Activity evidence must prove Guest creation, resume, and first frame. The legacy Stub path
+   may provide `GUEST_ACTIVITY_CREATE`; the framework-owned ActivityThread path may provide
+   its framework marker, or the structured launch result (`activityCreated`, `activityResumed`,
+   `windowEvidence`, `firstFrameDrawn`, and lifecycle timeline) together with the dumpsys
+   drawn-window gate. A missing marker is not sufficient to pass without the structured proof.

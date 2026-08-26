@@ -40,7 +40,8 @@ public class FixtureService extends Service {
                 .equals(intent.getAction())) {
             if (intent != null && "com.warden.controlledsandbox.fixture.C2_T05_FGS"
                     .equals(intent.getAction())) {
-                c2t05Session = intent.getStringExtra("c2t05Session");
+                String requestedSession = intent.getStringExtra("c2t05Session");
+                c2t05Session = requestedSession == null ? "" : requestedSession;
                 c2t05Loop = intent.getIntExtra("c2t05Loop", 0);
             }
             int foregroundType = invokeForegroundTransport("fixture-foreground");

@@ -109,6 +109,8 @@ public final class InteractionServiceVirtualizationSelfTest {
                 "EditorInfo identity is restored");
         require(identity.interactions().inputMethods().active(client),
                 "input session ownership is recorded");
+        require(api.hideSoftInput(new WindowToken()),
+                "normal input hide delegates successfully");
         api.showInputMethodPicker();
         require(delegate.pickerCalls == 0, "IME picker is denied by policy");
         api.finishInput(client);
@@ -158,6 +160,11 @@ public final class InteractionServiceVirtualizationSelfTest {
         catch (IllegalStateException expected) { failed = true; }
         require(failed && identity.interactions().inputMethods().size() == 0,
                 "failed input start rolls back ownership");
+
+        InputMethodApi stale = proxy(InputMethodApi.class,
+                new StaleInputMethodDelegate(), identity, "inputMethod");
+        require(!stale.hideSoftInput(new WindowToken()),
+                "stale input hide returns a safe default instead of crashing the Guest");
     }
 
     private static void testHostMode() {
@@ -284,6 +291,7 @@ public final class InteractionServiceVirtualizationSelfTest {
     interface InputMethodApi {
         List<String> getInputMethodList();
         boolean startInput(Object client, Object focus, FakeEditorInfo info);
+        boolean hideSoftInput(Object token);
         void finishInput(Object client);
         void showInputMethodPicker();
     }
@@ -293,6 +301,7 @@ public final class InteractionServiceVirtualizationSelfTest {
         public boolean startInput(Object client, Object focus, FakeEditorInfo info) {
             calls++; seenPackage = info.packageName; seenUser = info.targetInputMethodUserId; return true;
         }
+        public boolean hideSoftInput(Object token) { calls++; return true; }
         public void finishInput(Object client) { calls++; }
         public void showInputMethodPicker() { calls++; pickerCalls++; }
     }
@@ -301,6 +310,14 @@ public final class InteractionServiceVirtualizationSelfTest {
         public boolean startInput(Object client, Object focus, FakeEditorInfo info) {
             throw new IllegalStateException("input failure");
         }
+        public boolean hideSoftInput(Object token) { throw new IllegalArgumentException("unknown client stale"); }
+        public void finishInput(Object client) { }
+        public void showInputMethodPicker() { }
+    }
+    static final class StaleInputMethodDelegate implements InputMethodApi {
+        public List<String> getInputMethodList() { return List.of(); }
+        public boolean startInput(Object client, Object focus, FakeEditorInfo info) { return true; }
+        public boolean hideSoftInput(Object token) { throw new IllegalArgumentException("unknown client stale"); }
         public void finishInput(Object client) { }
         public void showInputMethodPicker() { }
     }

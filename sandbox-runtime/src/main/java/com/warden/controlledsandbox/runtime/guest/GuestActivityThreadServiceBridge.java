@@ -432,15 +432,22 @@ public final class GuestActivityThreadServiceBridge implements AutoCloseable {
         }
         byte[] inline = source.getByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD);
         if (inline != null && inline.length != 0) {
-            extras.putByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD, inline);
+            // Re-attach the modified Bundle below.  The API32 source gate exposes getExtras()
+            // as a defensive copy, and mutating that copy without putExtras() drops the wire
+            // payload before the AMS service-argument parcel is created.
+            extras.putByteArray(RuntimeKeys.INTENT_WIRE_PAYLOAD, inline.clone());
         }
-        if (!source.containsKey(RuntimeKeys.INTENT_PAYLOAD_FD)) return;
+        if (!source.containsKey(RuntimeKeys.INTENT_PAYLOAD_FD)) {
+            if (inline != null && inline.length != 0) target.putExtras(extras);
+            return;
+        }
         android.os.Parcelable descriptor = source.getParcelable(RuntimeKeys.INTENT_PAYLOAD_FD);
         if (descriptor != null) extras.putParcelable(RuntimeKeys.INTENT_PAYLOAD_FD, descriptor);
         if (source.containsKey(RuntimeKeys.INTENT_PAYLOAD_BYTES)) {
             extras.putInt(RuntimeKeys.INTENT_PAYLOAD_BYTES,
                     source.getInt(RuntimeKeys.INTENT_PAYLOAD_BYTES, -1));
         }
+        target.putExtras(extras);
     }
 
     private record Route(String sessionId, long generation, int slot, String packageName,

@@ -176,8 +176,27 @@ def run_quark_launch(serial: str, output: Path) -> dict[str, Any]:
     ).stdout
     log_path = output / "quark-runtime-logcat.txt"
     log_path.write_text(runtime_log, encoding="utf-8", errors="replace")
-    if "GUEST_ACTIVITY_CREATE" not in runtime_log:
-        raise RuntimeError("quark launch missing GUEST_ACTIVITY_CREATE")
+    operation = (launched.get("result") or {}).get("operation") or {}
+    timeline = str(operation.get("launchTimeline") or "")
+    structured_activity_evidence = (
+        operation.get("activityCreated") is True
+        and operation.get("activityResumed") is True
+        and operation.get("windowEvidence") is True
+        and operation.get("firstFrameDrawn") is True
+        and "LIFECYCLE_CREATED@" in timeline
+        and "ACTIVITY_RESUMED@" in timeline
+        and "FIRST_FRAME_DRAWN@" in timeline
+    )
+    runtime_activity_markers = [marker for marker in (
+        "GUEST_ACTIVITY_CREATE",
+        "GUEST_ACTIVITY_FRAMEWORK_INSTANTIATED",
+        "GUEST_ACTIVITY_CREATED",
+    ) if marker in runtime_log]
+    if not runtime_activity_markers and not structured_activity_evidence:
+        raise RuntimeError(
+            "quark launch missing lifecycle evidence: no runtime activity marker and "
+            "launch result did not prove created/resumed/first-frame"
+        )
     if QUARK_PACKAGE not in runtime_log and "quark" not in runtime_log.lower():
         raise RuntimeError("quark launch logcat does not name com.quark.browser")
     if launched.get("result", {}).get("status", "").upper() != "PASS":
@@ -187,6 +206,13 @@ def run_quark_launch(serial: str, output: Path) -> dict[str, Any]:
         "package": QUARK_PACKAGE,
         "launch": launched,
         "window": window,
+        "activity_evidence": {
+            "source": "runtime_event" if runtime_activity_markers
+            else "launch_result_and_dumpsys",
+            "runtime_markers": runtime_activity_markers,
+            "structured": structured_activity_evidence,
+            "timeline": timeline,
+        },
         "dumpsys": str(dump_path),
         "logcat": str(log_path),
     }

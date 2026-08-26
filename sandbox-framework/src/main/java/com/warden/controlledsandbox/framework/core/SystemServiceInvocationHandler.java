@@ -260,9 +260,9 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
                     // Android's InputMethodManager keeps a process-local client Binder. After a
                     // Guest process death the new process has a new client, while the Host IME
                     // service can still observe the old window transaction briefly. Treat only
-                    // this exact framework rejection as a failed input session so a transient
-                    // recovery race cannot crash the Guest; the next window-focus callback will
-                    // retry against the new generation.
+                    // this exact framework rejection as a failed input session or best-effort
+                    // hide so a transient recovery race cannot crash the Guest; the next
+                    // window-focus callback will retry against the new generation.
                     android.util.Log.w("CS_INTERACTION_PROXY",
                             "INPUT_METHOD_STALE_CLIENT_RECOVERED method=" + method.getName()
                                     + " message=" + String.valueOf(cause.getMessage()));
@@ -287,8 +287,10 @@ public final class SystemServiceInvocationHandler implements InvocationHandler {
     }
 
     private boolean isRecoverableStaleInputClient(Method method, Throwable cause) {
-        if (!"inputmethod".equalsIgnoreCase(serviceName) || method == null
-                || !"startInputOrWindowGainedFocus".equals(method.getName())) return false;
+        if (!"inputmethod".equalsIgnoreCase(serviceName) || method == null) return false;
+        String methodName = method.getName();
+        if (!"startInputOrWindowGainedFocus".equals(methodName)
+                && !"hideSoftInput".equals(methodName)) return false;
         if (!(cause instanceof IllegalArgumentException)) return false;
         String message = cause.getMessage();
         return message != null && message.startsWith("unknown client");
