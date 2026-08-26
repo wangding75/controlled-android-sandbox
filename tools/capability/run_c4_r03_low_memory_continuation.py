@@ -307,6 +307,66 @@ def run_child(args: argparse.Namespace, child_dir: Path, *, resume: dict[str, An
     return record
 
 
+def reconstruct_interrupted_summary(args: argparse.Namespace, child_dir: Path) -> dict[str, Any]:
+    """Rebuild the completed rows when a host-side runner session ended mid-case.
+
+    R03 writes each case atomically, while its final summary is written only after the matrix
+    exits.  A bounded runner/session interruption can therefore leave valid case evidence but
+    no summary.  Treat that lane as interrupted and seed only its completed rows; the next
+    coordinate is supplied explicitly by the caller.
+    """
+    rows: list[dict[str, Any]] = []
+    for path in sorted(child_dir.rglob("case.json")):
+        row = read_json(path)
+        if row.get("task") == TASK_ID:
+            rows.append(row)
+    targets = parse_csv(args.targets)
+    users = parse_csv(args.users, cast=int)
+    return {
+        "schemaVersion": 1,
+        "task": TASK_ID,
+        "status": "INTERRUPTED",
+        "instanceName": args.instance_name,
+        "loops": args.loops,
+        "users": users,
+        "targetNames": targets,
+        "expectedRows": len(targets) * len(users) * args.loops * 2,
+        "observedRows": len(rows),
+        "attemptPolicy": {
+            "attempt": 1,
+            "retryBudget": 0,
+            "automaticRetries": 0,
+            "sessionInterrupted": True,
+        },
+        "blockedAt": None,
+        "rows": rows,
+        "rawDirectory": str(child_dir.resolve()),
+    }
+
+
+def seed_existing_child(args: argparse.Namespace, child_dir: Path) -> dict[str, Any]:
+    summary = read_json(child_dir / "c4-r03-summary.json")
+    if not summary:
+        summary = reconstruct_interrupted_summary(args, child_dir)
+    rows = summary.get("rows") or []
+    if not rows:
+        raise SystemExit(f"seed child has no completed case rows: {child_dir}")
+    record = {
+        "attempt": 1,
+        "startedAt": rows[0].get("startedAt") if isinstance(rows[0], dict) else "",
+        "completedAt": rows[-1].get("completedAt") if isinstance(rows[-1], dict) else "",
+        "elapsedMs": 0,
+        "command": ["seed-existing-child", str(child_dir.resolve())],
+        "returncode": 124,
+        "output": str(child_dir.resolve()),
+        "summary": summary,
+        "seededExisting": True,
+        "note": "Completed case.json rows are retained; the missing final summary represents a session interruption, not a test pass.",
+    }
+    write_json(args.output / "seed-existing-child.json", record)
+    return record
+
+
 def aggregate(args: argparse.Namespace, children: list[dict[str, Any]],
               low_memory_events: list[dict[str, Any]], terminal_failure: dict[str, Any] | None) -> dict[str, Any]:
     terminal: dict[tuple[str, int, int, str], dict[str, Any]] = {}
@@ -363,6 +423,12 @@ def main() -> int:
     parser.add_argument("--targets", default=DEFAULT_TARGETS)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--child-timeout-seconds", type=int, default=14_400)
+    parser.add_argument("--seed-existing-child", type=Path, default=None,
+                        help="seed completed case rows from a child whose final summary was interrupted")
+    parser.add_argument("--resume-target", default="")
+    parser.add_argument("--resume-user", type=int, default=None)
+    parser.add_argument("--resume-iteration", type=int, default=None)
+    parser.add_argument("--resume-mode", choices=("cold", "hot"), default="")
     args = parser.parse_args()
     if not 1 <= args.loops <= 50:
         raise SystemExit("--loops must be between 1 and 50")
@@ -374,6 +440,23 @@ def main() -> int:
     resume: dict[str, Any] | None = None
     terminal_failure: dict[str, Any] | None = None
     attempt = 1
+    if args.seed_existing_child is not None:
+        seed = args.seed_existing_child if args.seed_existing_child.is_absolute() \
+            else ROOT / args.seed_existing_child
+        required = (args.resume_target, args.resume_user, args.resume_iteration, args.resume_mode)
+        if not seed.is_dir() or not all(value not in (None, "") for value in required):
+            raise SystemExit("seed-existing-child requires an existing child and explicit resume target/user/iteration/mode")
+        children.append(seed_existing_child(args, seed))
+        resume = {
+            "target": args.resume_target,
+            "user": args.resume_user,
+            "iteration": args.resume_iteration,
+            "mode": args.resume_mode,
+            "previousLane": str(seed.resolve()),
+        }
+        attempt = 2
+        while (args.output / f"attempt-{attempt:03d}").exists():
+            attempt += 1
     while True:
         child_dir = args.output / f"attempt-{attempt:03d}"
         child = run_child(args, child_dir, resume=resume, attempt=attempt)

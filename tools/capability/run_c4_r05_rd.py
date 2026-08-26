@@ -18,6 +18,7 @@ import datetime as dt
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -32,6 +33,7 @@ if str(TOOLS) not in sys.path:
 
 from run_p1_00_rd import debug_command  # noqa: E402
 from run_c4_r03_rd import capture_snapshot  # noqa: E402
+from run_c4_r03_low_memory_continuation import restart_mumu  # noqa: E402
 from run_rd_campaign import (  # noqa: E402
     GUEST_PACKAGE,
     HOST_PACKAGE,
@@ -51,6 +53,8 @@ APK_PATHS = {
     "companion32": ROOT / "sandbox-companion32/build/outputs/apk/debug/sandbox-companion32-debug.apk",
     "fixture32": ROOT / "fixture-compat32/build/outputs/apk/debug/fixture-compat32-debug.apk",
 }
+LOW_MEMORY_RE = re.compile(r"\bLOW_MEMORY\b", re.IGNORECASE)
+HOST_PACKAGE_RE = re.compile(re.escape(HOST_PACKAGE), re.IGNORECASE)
 
 
 class PhaseFailure(RuntimeError):
@@ -115,6 +119,66 @@ def read_summary(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {"status": "INVALID_SCHEMA", "summaryPath": str(path)}
     return payload
+
+
+def find_command_record(output: Path, label: str) -> dict[str, Any]:
+    for path in sorted((output / "commands").glob("*.json")):
+        record = read_summary(path)
+        if record.get("label") == label:
+            return record
+    return {}
+
+
+def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dict[str, Any]:
+    """Find the first missing coordinate in an interrupted, ordered launch lane."""
+    child = lane / "attempt-001"
+    if not child.is_dir():
+        raise PhaseFailure("launch-continuation", "existing attempt-001 lane is missing",
+                           {"lane": str(lane.resolve())})
+    observed: dict[tuple[str, int, int, str], dict[str, Any]] = {}
+    duplicates: list[tuple[str, int, int, str]] = []
+    for path in sorted(child.rglob("case.json")):
+        row = read_summary(path)
+        if row.get("task") != "C4-R03":
+            continue
+        coordinate = (str(row.get("target", "")), int(row.get("user", -1)),
+                      int(row.get("iteration", -1)), str(row.get("mode", "")))
+        if coordinate in observed:
+            duplicates.append(coordinate)
+        observed[coordinate] = row
+    if duplicates:
+        raise PhaseFailure("launch-continuation", "duplicate completed coordinates",
+                           {"duplicates": duplicates, "lane": str(child.resolve())})
+
+    target_names = [value.strip() for value in targets.split(",") if value.strip()]
+    user_values = [int(value.strip()) for value in users.split(",") if value.strip()]
+    expected = [(target, user, iteration, mode)
+                for target in target_names
+                for user in user_values
+                for iteration in range(1, loops + 1)
+                for mode in ("cold", "hot")]
+    for coordinate in expected:
+        row = observed.get(coordinate)
+        if row is None:
+            target, user, iteration, mode = coordinate
+            return {
+                "previousLane": str(child.resolve()),
+                "target": target,
+                "user": user,
+                "iteration": iteration,
+                "mode": mode,
+                "completedRows": len(observed),
+                "expectedRows": len(expected),
+            }
+        if row.get("failureDetected"):
+            raise PhaseFailure("launch-continuation", "existing lane contains a non-terminal failure",
+                               {"coordinate": coordinate, "row": row})
+    return {
+        "previousLane": str(child.resolve()),
+        "completedRows": len(observed),
+        "expectedRows": len(expected),
+        "complete": True,
+    }
 
 
 def run_command(label: str, command: list[str], output: Path, *,
@@ -248,7 +312,8 @@ def run_add_gate(instance_name: str, round_output: Path, root_output: Path,
 
 
 def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
-                      round_output: Path, root_output: Path) -> dict[str, Any]:
+                      round_output: Path, root_output: Path,
+                      continuation: dict[str, Any] | None = None) -> dict[str, Any]:
     phase_output = round_output / "launch-matrix"
     # The wrapper delegates every observation to run_c4_r03_rd.py and only handles the
     # user-approved MuMu LOW_MEMORY restart boundary around that fail-fast child.
@@ -256,6 +321,22 @@ def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
                "--instance-name", instance_name, "--loops", str(loops),
                "--users", users, "--targets", targets,
                "--output", str(phase_output)]
+    if continuation and not continuation.get("complete"):
+        command.extend([
+            "--seed-existing-child", str(continuation["previousLane"]),
+            "--" + "resume-target", str(continuation["target"]),
+            "--" + "resume-user", str(continuation["user"]),
+            "--" + "resume-iteration", str(continuation["iteration"]),
+            "--" + "resume-mode", str(continuation["mode"]),
+        ])
+    if continuation and continuation.get("complete"):
+        summary = read_summary(phase_output / "c4-r03-summary.json")
+        if summary.get("status") != "PASS":
+            raise PhaseFailure("launch-continuation", "existing launch lane is incomplete",
+                               {"summary": summary})
+        return {"label": f"{round_output.name}-c4-r03-launch-matrix",
+                "returncode": 0, "summary": summary,
+                "continuedExistingOutput": True}
     record = run_command(f"{round_output.name}-c4-r03-launch-matrix", command, root_output,
                          summary_path=phase_output / "c4-r03-summary.json", timeout_seconds=14_400)
     return require_pass(record, f"{round_output.name}-c4-r03-launch-matrix")
@@ -302,14 +383,35 @@ def capture_pressure_resources(serial: str, output: Path, tag: str) -> dict[str,
     return resources
 
 
-def run_pressure_lane(environment: dict[str, Any], user: int, minutes: int,
+def classify_pressure_low_memory(snapshot_dir: Path) -> dict[str, Any] | None:
+    evidence_path = snapshot_dir / "application-exit-info.txt"
+    if not evidence_path.is_file():
+        return None
+    try:
+        evidence = evidence_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if not LOW_MEMORY_RE.search(evidence) or not HOST_PACKAGE_RE.search(evidence):
+        return None
+    return {
+        "classification": "LOW_MEMORY",
+        "reason": "explicit host-scoped ApplicationExitInfo LOW_MEMORY",
+        "evidencePath": str(evidence_path.resolve()),
+        "policy": "NON_BLOCKING_RESTART_AND_CONTINUE",
+    }
+
+
+def run_pressure_lane(instance_name: str, environment: dict[str, Any], user: int, minutes: int,
                       minimum_cycles: int, output: Path) -> dict[str, Any]:
     serial = str(environment["adb_serial"])
     lane = output / f"user-{user}"
     lane.mkdir(parents=True, exist_ok=True)
+    write_json(lane / "environment.json", environment)
     started = time.monotonic()
     rows: list[dict[str, Any]] = []
-    while time.monotonic() - started < minutes * 60 or len(rows) < minimum_cycles:
+    successful_cycles = 0
+    low_memory_events: list[dict[str, Any]] = []
+    while time.monotonic() - started < minutes * 60 or successful_cycles < minimum_cycles:
         request_id = f"c4-r05-pressure-u{user}-{uuid.uuid4().hex}"
         result = debug_command(
             serial,
@@ -334,7 +436,6 @@ def run_pressure_lane(environment: dict[str, Any], user: int, minutes: int,
             "snapshot": snapshot,
         }
         rows.append(row)
-        write_json(lane / "cycles.json", rows)
         good = (
             str(result.get("status", "")).upper() == "PASS"
             and bool(operation.get("firstFrameDrawn"))
@@ -344,8 +445,43 @@ def run_pressure_lane(environment: dict[str, Any], user: int, minutes: int,
             and bool(snapshot.get("surfaceNonEmpty"))
             and bool(snapshot.get("screenshot", {}).get("nonBlack"))
         )
+        if good:
+            row["classification"] = "NONE"
+            successful_cycles += 1
+            write_json(lane / "cycles.json", rows)
+            continue
+
+        low_memory = classify_pressure_low_memory(snapshot_dir)
+        if low_memory is not None:
+            event_number = len(low_memory_events) + 1
+            recovery_dir = lane / "low-memory-recovery" / f"event-{event_number:03d}"
+            low_memory.update({
+                "user": user,
+                "cycle": row["cycle"],
+                "requestId": request_id,
+                "resources": capture_pressure_resources(serial, recovery_dir, "before-restart"),
+            })
+            low_memory["restart"] = restart_mumu(instance_name, lane, recovery_dir)
+            row.update({"classification": "LOW_MEMORY", "nonBlocking": True,
+                        "lowMemoryRecovery": low_memory})
+            low_memory_events.append(low_memory)
+            write_json(lane / "cycles.json", rows)
+            if low_memory["restart"].get("status") != "PASS":
+                failure = {"row": row, "resources": low_memory.get("resources"),
+                           "lowMemoryRecovery": low_memory}
+                write_json(lane / "first-failure.json", failure)
+                raise PhaseFailure(f"pressure-user-{user}",
+                                   "LOW_MEMORY restart failed", failure)
+            environment = low_memory["restart"].get("environmentAfter") or environment
+            serial = str(environment["adb_serial"])
+            write_json(lane / f"environment-after-low-memory-{event_number:03d}.json", environment)
+            continue
+
+        row["classification"] = "DYNAMIC_READINESS_FAILURE"
+        write_json(lane / "cycles.json", rows)
+        failure = {"row": row,
+                   "resources": capture_pressure_resources(serial, lane, "first-failure")}
         if not good:
-            failure = {"row": row, "resources": capture_pressure_resources(serial, lane, "first-failure")}
             write_json(lane / "first-failure.json", failure)
             raise PhaseFailure(f"pressure-user-{user}", "pressure cycle failed dynamic readiness", failure)
     resources = capture_pressure_resources(serial, lane, "final")
@@ -353,8 +489,11 @@ def run_pressure_lane(environment: dict[str, Any], user: int, minutes: int,
         "user": user,
         "status": "PASS",
         "durationSeconds": round(time.monotonic() - started, 3),
-        "cycles": len(rows),
+        "cycles": successful_cycles,
+        "attemptedCycles": len(rows),
         "minimumCycles": minimum_cycles,
+        "lowMemoryRecoveries": len(low_memory_events),
+        "nonBlockingLowMemory": low_memory_events,
         "resources": resources,
         "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False},
     }
@@ -375,6 +514,8 @@ def main() -> int:
                         default="c4-stage-reduced",
                         help="C4 stage gate uses 25 loops; overall post-C7 acceptance uses 50")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--continue-existing-output", action="store_true",
+                        help="continue an interrupted clean-install-cold run from its durable evidence")
     args = parser.parse_args()
     expected_loops = 25 if args.acceptance_scope == "c4-stage-reduced" else 50
     expected_rounds = 1 if args.acceptance_scope == "c4-stage-reduced" else 2
@@ -388,6 +529,7 @@ def main() -> int:
     reduced_scope = args.acceptance_scope == "c4-stage-reduced"
     output = args.output if args.output.is_absolute() else ROOT / args.output
     output.mkdir(parents=True, exist_ok=True)
+    continuation: dict[str, Any] | None = None
     report: dict[str, Any] = {
         "schemaVersion": 1,
         "task": TASK_ID,
@@ -422,14 +564,28 @@ def main() -> int:
         report["buildAndApk"] = commit_and_apk_snapshot()
         if report["buildAndApk"]["missingApks"]:
             raise PhaseFailure("build-metadata", "required APKs missing", report["buildAndApk"])
-        build = run_command(
-            "build-clean-commit",
-            [str(ROOT / "gradlew.bat"), ":app:assembleDebug", ":fixture-basic:assembleDebug",
-             ":sandbox-companion32:assembleDebug", ":fixture-compat32:assembleDebug", "--no-daemon"],
-            output,
-            timeout_seconds=3_600,
-        )
-        require_pass(build, "build-clean-commit")
+        if args.continue_existing_output:
+            if not reduced_scope:
+                raise PhaseFailure("continuation", "existing-output continuation is only defined for the reduced C4 scope")
+            prior_build = find_command_record(output, "build-clean-commit")
+            if int(prior_build.get("returncode", 1)) != 0:
+                raise PhaseFailure("continuation", "the prior build evidence is missing or failed",
+                                   {"record": prior_build})
+            continuation = launch_continuation(
+                output / "round-1-clean-install-cold" / "launch-matrix",
+                args.targets, args.users, args.loops)
+            report["continuedFromExistingOutput"] = str(output.resolve())
+            report["continuation"] = continuation
+            report["priorBuild"] = prior_build
+        else:
+            build = run_command(
+                "build-clean-commit",
+                [str(ROOT / "gradlew.bat"), ":app:assembleDebug", ":fixture-basic:assembleDebug",
+                 ":sandbox-companion32:assembleDebug", ":fixture-compat32:assembleDebug", "--no-daemon"],
+                output,
+                timeout_seconds=3_600,
+            )
+            require_pass(build, "build-clean-commit")
         report["buildAndApk"] = commit_and_apk_snapshot()
         round_names = ("clean-install-cold",) if reduced_scope \
             else ("clean-install-cold", "retained-hot-recovery")
@@ -438,21 +594,42 @@ def main() -> int:
             round_report: dict[str, Any] = {"round": index, "name": round_name,
                                             "status": "IN_PROGRESS", "startedAt": now_iso()}
             report["rounds"].append(round_report)
-            round_report["prepare"] = prepare_round(args.instance_name, round_name, round_output)
-            round_report["r04"] = [record["summary"] for record in
-                                    run_r04_contracts(args.instance_name, round_output, output)]
-            round_report["addGate"] = run_add_gate(
-                args.instance_name, round_output, output, reduced_scope=reduced_scope)["summary"]
+            if continuation is not None and index == 1:
+                prepare_path = round_output / "prepare.json"
+                if not prepare_path.is_file():
+                    raise PhaseFailure("continuation", "existing prepare evidence is missing",
+                                       {"path": str(prepare_path.resolve())})
+                round_report["prepare"] = read_summary(prepare_path)
+                r04_paths = (
+                    round_output / "r04-failure-injection" / "runner-summary.json",
+                    round_output / "r04-recovery" / "runner-summary.json",
+                )
+                round_report["r04"] = [read_summary(path) for path in r04_paths]
+                if any(summary.get("status") != "PASS" for summary in round_report["r04"]):
+                    raise PhaseFailure("continuation", "existing R04 evidence is missing or not PASS",
+                                       {"r04": round_report["r04"]})
+                add_gate = read_summary(round_output / "add-gate" / "summary.json")
+                if add_gate.get("status") != "PASS":
+                    raise PhaseFailure("continuation", "existing add-gate evidence is missing or not PASS",
+                                       {"addGate": add_gate})
+                round_report["addGate"] = add_gate
+            else:
+                round_report["prepare"] = prepare_round(args.instance_name, round_name, round_output)
+                round_report["r04"] = [record["summary"] for record in
+                                        run_r04_contracts(args.instance_name, round_output, output)]
+                round_report["addGate"] = run_add_gate(
+                    args.instance_name, round_output, output, reduced_scope=reduced_scope)["summary"]
             round_report["launchMatrix"] = run_launch_matrix(
-                args.instance_name, args.loops, args.users, args.targets, round_output, output)["summary"]
+                args.instance_name, args.loops, args.users, args.targets, round_output, output,
+                continuation=continuation if index == 1 else None)["summary"]
             round_report.update({"status": "PASS", "completedAt": now_iso()})
         report["regressions"] = [record.get("summary") or {"label": record.get("label"),
                                                               "returncode": record.get("returncode")}
                                  for record in run_regressions(args.instance_name, output / "regressions")]
-        pressure_environment = resolve_rd_environment(args.instance_name)
         for user in users:
+            pressure_environment = resolve_rd_environment(args.instance_name)
             report["pressure"].append(run_pressure_lane(
-                pressure_environment, user, args.pressure_minutes,
+                args.instance_name, pressure_environment, user, args.pressure_minutes,
                 args.pressure_minimum_cycles, output / "pressure"))
         report["status"] = "PASS"
         report["completedAt"] = now_iso()
