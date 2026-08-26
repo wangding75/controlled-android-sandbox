@@ -259,7 +259,19 @@ public final class NativePolicy {
         return AVAILABLE && nativeInstallSystemIoHooks();
     }
 
+    /**
+     * Installs only the host runtime-library process-lifetime boundary used by translated guests.
+     * Direct native termination remains deny-only; Runtime.nativeExit is forwarded as the normal
+     * process boundary. This never rewrites the translated guest's foreign-ABI ELF modules.
+     */
+    public static boolean installProcessLifetimeHooks() {
+        return AVAILABLE && nativeInstallProcessLifetimeHooks();
+    }
+
     public static boolean refreshHooks() { return AVAILABLE && nativeRefreshHooks(); }
+    public static boolean refreshProcessLifetimeHooks() {
+        return AVAILABLE && nativeRefreshProcessLifetimeHooks();
+    }
     public static String hookStatus() { return AVAILABLE ? nativeHookStatus() : "unavailable:" + loadError; }
     public static void resetHooks() { if (AVAILABLE) nativeResetHooks(); }
     public static boolean installCamera1Adapter() {
@@ -361,7 +373,9 @@ public final class NativePolicy {
     private static native String nativeHostileSeccompDenyNames();
     private static native boolean nativeInstallHooks(String guestLibraryRoot);
     private static native boolean nativeInstallSystemIoHooks();
+    private static native boolean nativeInstallProcessLifetimeHooks();
     private static native boolean nativeRefreshHooks();
+    private static native boolean nativeRefreshProcessLifetimeHooks();
     private static native String nativeHookStatus();
     private static native void nativeResetHooks();
     private static native boolean nativeInstallCamera1Adapter();

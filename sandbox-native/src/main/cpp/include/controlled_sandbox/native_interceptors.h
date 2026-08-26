@@ -15,8 +15,10 @@ namespace controlled_sandbox {
 void revoke_native_audio_captures() noexcept;
 
 /**
- * Guest code (CrashSDK, splash recycle) must not SIGKILL the sandbox-owned slot.
- * The Host GuestProcessService sets this true only during its own teardown.
+ * Direct Guest native termination (CrashSDK, splash recycle) must not SIGKILL the sandbox-owned
+ * slot. The translated Java Runtime.nativeExit bridge temporarily opens this gate only while
+ * entering the platform's original process-exit implementation; GuestProcessService teardown
+ * sets it true for its intentional killProcess().
  */
 void set_guest_process_exit_allowed(bool allowed) noexcept;
 [[nodiscard]] bool guest_process_exit_allowed() noexcept;

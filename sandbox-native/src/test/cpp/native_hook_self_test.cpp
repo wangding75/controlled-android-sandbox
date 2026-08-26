@@ -114,6 +114,13 @@ int main(int argc, char** argv) {
     require_hook(!runtime.install(fixture_root.string()), "install rejected without policy");
     controlled_sandbox::global_policy().configure("hook-session", 1, "com.example.guest", "com.example.guest:main", 0, 10000, 20000, "x86_64",
             instance.string(), apk.string(), fixture_root.string(), true, {}, {}, {}, {});
+    NativeHookRuntime lifetime_runtime;
+    require_hook(lifetime_runtime.install_process_lifetime(), "host lifetime install");
+    require_hook(lifetime_runtime.status().process_lifetime_installed,
+            "host lifetime installed state");
+    require_hook(lifetime_runtime.status().process_lifetime_refresh_count >= 1,
+            "host lifetime initial refresh");
+    lifetime_runtime.reset();
     require_hook(runtime.install(fixture_root.string()), "install");
     auto status = runtime.status();
     require_hook(status.installed, "installed state");

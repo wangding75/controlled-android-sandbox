@@ -259,6 +259,26 @@ final class ActivityRuntimeRouteCoordinator {
     ActivityLaunchCoordinator coordinator() { return coordinator; }
 
     /**
+     * Returns a launcher-task reuse candidate only while its existing physical Activity identity
+     * is still known to this Broker generation. A restored/detached task must use the normal
+     * recovery route so the Host task is rebuilt rather than guessed.
+     */
+    ActivityTaskLedger.LauncherTaskReuse launcherTaskReuse(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String launcherComponent,
+            String taskAffinity) {
+        ActivityTaskLedger.LauncherTaskReuse candidate = ledger.findLauncherTaskReuse(
+                virtualUserId, packageName, packageRevision, launcherComponent, taskAffinity);
+        if (candidate == null
+                || physicalIdentities.windowFor(candidate.top().token()) == null) {
+            return null;
+        }
+        return candidate;
+    }
+
+    /**
      * Resolves the bounded physical Activity identity for a launch. Reuse keeps the selected
      * record's identity. CLEAR_TOP+STANDARD rebinds the old target's physical identity to the
      * replacement, allowing the Host ActivityStarter to clear the real old record and create the

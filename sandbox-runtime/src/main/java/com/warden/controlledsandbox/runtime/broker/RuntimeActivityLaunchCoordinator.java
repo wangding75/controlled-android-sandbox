@@ -14,7 +14,10 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeIntentWireCodec;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
 import com.warden.controlledsandbox.domain.session.GuestSession;
+import com.warden.controlledsandbox.domain.session.SessionState;
+import com.warden.controlledsandbox.framework.activity.ActivityTaskLedger;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -72,6 +75,20 @@ final class RuntimeActivityLaunchCoordinator {
                     }
                     routedRequest = owner.prepareForeignTargetRequest(routedRequest, caller,
                             targetPackage, VirtualPackageMetadata.Type.ACTIVITY, true);
+            }
+            ActivityTaskLedger.LauncherTaskReuse launcherTaskReuse =
+                    selectLauncherTaskReuse(routedRequest, callerPackage, targetPackage);
+            if (launcherTaskReuse != null) {
+                applyLauncherTaskReuse(routedRequest, launcherTaskReuse);
+                Bundle reuseDetails = new Bundle(routedRequest);
+                reuseDetails.putInt(RuntimeKeys.TASK_ID, launcherTaskReuse.taskId());
+                reuseDetails.putString(RuntimeKeys.COMPONENT_CLASS,
+                        launcherTaskReuse.top().identity().componentName());
+                reuseDetails.putString(RuntimeKeys.PROCESS_NAME,
+                        launcherTaskReuse.top().processName());
+                launchStage(requestId, operationId, "LAUNCHER_TASK_REUSE_SELECTED",
+                        elapsedSince(acceptedAtElapsedMs), reuseDetails);
+                RuntimeEventLog.event("GUEST_LAUNCH_TASK_REUSE", reuseDetails);
             }
             Bundle prepared = owner.prepareGuestInternal(routedRequest);
             launchStage(requestId, operationId, "PREPARE_RETURN",
@@ -300,6 +317,82 @@ final class RuntimeActivityLaunchCoordinator {
         // processName: NBB/VA allow a same-task launcher and child Activity to cross Guest
         // process/session boundaries.
         return "task:" + session.virtualUserId() + ":" + session.packageName() + ":" + taskId;
+    }
+
+    /**
+     * Performs a read-only task lookup before Guest preparation. The lookup is intentionally
+     * narrow: only the ordinary external NEW_TASK launcher shape may take it, so explicit task,
+     * document, clear, reorder and nested-launch contracts retain their existing semantics.
+     */
+    private ActivityTaskLedger.LauncherTaskReuse selectLauncherTaskReuse(
+            Bundle request, String callerPackage, String targetPackage) {
+        if (request == null || callerPackage == null || callerPackage.trim().isEmpty()
+                || (!targetPackage.isEmpty() && !targetPackage.equals(callerPackage))
+                || request.getBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, false)
+                || request.getInt(RuntimeKeys.CALLER_TASK_ID, 0) > 0) {
+            return null;
+        }
+        String launchMode = request.getString(RuntimeKeys.ACTIVITY_LAUNCH_MODE, "STANDARD");
+        if (!"STANDARD".equalsIgnoreCase(launchMode == null ? "" : launchMode.trim())) {
+            return null;
+        }
+        String documentMode = request.getString(RuntimeKeys.DOCUMENT_LAUNCH_MODE, "NONE");
+        if (!"NONE".equalsIgnoreCase(documentMode == null ? "" : documentMode.trim())) {
+            return null;
+        }
+        int flags = request.containsKey(RuntimeKeys.ACTIVITY_FLAGS)
+                ? request.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0) : LaunchFlags.NEW_TASK;
+        int launcherSafeFlags = LaunchFlags.NEW_TASK | LaunchFlags.RESET_TASK_IF_NEEDED;
+        if (!LaunchFlags.has(flags, LaunchFlags.NEW_TASK)
+                || (flags & ~launcherSafeFlags) != 0) {
+            return null;
+        }
+        int userId = request.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
+        String component = request.getString(RuntimeKeys.COMPONENT_CLASS, "");
+        String packageName = targetPackage == null || targetPackage.trim().isEmpty()
+                ? callerPackage.trim() : targetPackage.trim();
+        String revision = packageRevision(request);
+        if (userId < 0 || component == null || component.trim().isEmpty() || revision.isEmpty()) {
+            return null;
+        }
+        String affinity = request.getString(RuntimeKeys.TASK_AFFINITY, packageName);
+        if (affinity == null || affinity.trim().isEmpty()) affinity = packageName;
+        ActivityTaskLedger.LauncherTaskReuse candidate = owner.activityRuntime.launcherTaskReuse(
+                userId, packageName, revision, component.trim(), affinity.trim());
+        if (candidate == null) return null;
+        GuestSession topSession = owner.sessions.get(
+                packageName, userId, candidate.top().processName());
+        if (topSession == null || topSession.generation() != candidate.top().processGeneration()
+                || (topSession.state() != SessionState.READY
+                && topSession.state() != SessionState.ACTIVE)) {
+            return null;
+        }
+        return candidate;
+    }
+
+    private static void applyLauncherTaskReuse(
+            Bundle request, ActivityTaskLedger.LauncherTaskReuse candidate) {
+        String originalComponent = request.getString(RuntimeKeys.COMPONENT_CLASS, "").trim();
+        request.putString(RuntimeKeys.LAUNCHER_REQUESTED_COMPONENT, originalComponent);
+        request.putBoolean(RuntimeKeys.LAUNCHER_TASK_REUSE, true);
+        request.putString(RuntimeKeys.COMPONENT_CLASS,
+                candidate.top().identity().componentName());
+        request.putString(RuntimeKeys.PROCESS_NAME, candidate.top().processName());
+        request.putString(RuntimeKeys.TASK_AFFINITY, candidate.taskAffinity());
+        request.putString(RuntimeKeys.ACTIVITY_LAUNCH_MODE, "SINGLE_TOP");
+        int flags = request.containsKey(RuntimeKeys.ACTIVITY_FLAGS)
+                ? request.getInt(RuntimeKeys.ACTIVITY_FLAGS, 0) : LaunchFlags.NEW_TASK;
+        request.putInt(RuntimeKeys.ACTIVITY_FLAGS,
+                flags | LaunchFlags.NEW_TASK | LaunchFlags.SINGLE_TOP);
+    }
+
+    private static String packageRevision(Bundle request) {
+        String explicit = request.getString(RuntimeKeys.PACKAGE_REVISION, "");
+        if (explicit != null && !explicit.trim().isEmpty()) return explicit.trim();
+        long versionCode = request.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
+        String sha256 = request.getString(RuntimeKeys.APK_SHA256, "");
+        if (versionCode < 0 || sha256 == null || sha256.trim().isEmpty()) return "";
+        return "v" + versionCode + ":sha256:" + sha256.trim().toLowerCase(Locale.ROOT);
     }
 
     private static void launchStage(String requestId, String operationId, String stage,

@@ -514,6 +514,7 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             Intent guestIntent = RuntimeIntentWireCodec.decode(consumed);
             guestIntent.putExtra(RuntimeKeys.ROUTE_TOKEN, routeToken);
             guestIntent.putExtra(RuntimeKeys.ACTIVITY_TOKEN, activityToken);
+            route.adoptNewIntent(consumed);
             ActivityFieldBridge.projectFrameworkNewIntent(activity, session, route.component,
                     guestIntent);
             emitActivityRecordMapping(activity, route, routeToken, activityToken,
@@ -522,7 +523,15 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             Bundle details = new Bundle();
             details.putString(RuntimeKeys.ROUTE_TOKEN, routeToken);
             details.putBoolean("frameworkNewIntentProjected", true);
+            details.putBoolean("activityResumed", activityResumed(activity));
             emit(activity, route, "NEW_INTENT", details);
+            // A reused Activity has already consumed its original first-frame listener. Request a
+            // real fresh traversal for this task-front operation so the Broker can retain the
+            // same strict FIRST_FRAME_DRAWN gate without manufacturing evidence from old state.
+            observeFirstFrame(activity, route);
+            android.view.Window window = activity.getWindow();
+            android.view.View decor = window == null ? null : window.getDecorView();
+            requestFreshFrame(decor);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             emitFailure(activity, route, error);
@@ -1086,6 +1095,36 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         observer.addOnDrawListener(listener);
     }
 
+    private static boolean activityResumed(Activity activity) {
+        if (activity == null) return false;
+        try {
+            Method method = Activity.class.getMethod("isResumed");
+            Object value = method.invoke(activity);
+            return value instanceof Boolean && (Boolean) value;
+        } catch (NoSuchMethodException ignored) {
+            return false;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            return false;
+        }
+    }
+
+    private static void requestFreshFrame(android.view.View decor) {
+        if (decor == null) return;
+        try {
+            Method method;
+            try {
+                method = android.view.View.class.getMethod("postInvalidateOnAnimation");
+            } catch (NoSuchMethodException unavailable) {
+                method = android.view.View.class.getMethod("invalidate");
+            }
+            method.invoke(decor);
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            android.util.Log.w("CS_FRAMEWORK_ACTIVITY", "fresh frame request unavailable", error);
+        }
+    }
+
     private static Bundle evidence(Launch route, Activity activity) {
         Bundle out = new Bundle();
         out.putString(RuntimeKeys.ROUTE_TOKEN, route.token);
@@ -1179,13 +1218,13 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         final String sessionId;
         final long generation;
         final int taskId;
-        final String component;
+        String component;
         String physicalActivityComponent;
         final Intent intent;
         final Bundle restoredState;
         final PersistableBundle restoredPersistableState;
-        final String requestId;
-        final String operationId;
+        String requestId;
+        String operationId;
         long savedStateVersion;
         boolean restoreCallbacksDispatched;
         boolean firstFrameListenerInstalled;
@@ -1213,6 +1252,28 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             this.requestId = requestId == null ? "" : requestId;
             this.operationId = operationId == null ? "" : operationId;
             this.savedStateVersion = Math.max(0L, savedStateVersion);
+        }
+
+        synchronized void adoptNewIntent(Bundle consumed) {
+            if (consumed == null) return;
+            String nextComponent = consumed.getString(RuntimeKeys.COMPONENT_CLASS, "");
+            if (nextComponent != null && !nextComponent.trim().isEmpty()) {
+                component = nextComponent.trim();
+            }
+            String nextRequestId = consumed.getString(RuntimeKeys.REQUEST_ID, "");
+            if (nextRequestId != null && !nextRequestId.trim().isEmpty()) {
+                requestId = nextRequestId.trim();
+            }
+            String nextOperationId = consumed.getString(RuntimeKeys.OPERATION_ID, "");
+            if (nextOperationId != null && !nextOperationId.trim().isEmpty()) {
+                operationId = nextOperationId.trim();
+            }
+            String nextPhysical = consumed.getString(RuntimeKeys.PHYSICAL_ACTIVITY_COMPONENT, "");
+            if (nextPhysical != null && !nextPhysical.trim().isEmpty()) {
+                physicalActivityComponent = nextPhysical.trim();
+            }
+            firstFrameListenerInstalled = false;
+            firstFrameReported = false;
         }
 
         synchronized long nextSavedStateVersion() {

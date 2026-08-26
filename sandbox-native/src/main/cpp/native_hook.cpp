@@ -293,6 +293,29 @@ bool NativeHookRuntime::install_system_io() {
     return refresh();
 }
 
+bool NativeHookRuntime::install_process_lifetime() {
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    if (!policy.configured) return false;
+    {
+        auto& state = hook_state();
+        std::lock_guard lock(state.mutex);
+        const bool hooks_active = state.status.installed
+                || state.status.process_lifetime_installed;
+        if (hooks_active && state.status.policy_revision != policy.revision) {
+            state.status.last_error = "POLICY_REVISION_CHANGED_REINSTALL_REQUIRED";
+            state.status.installed = false;
+            state.status.process_lifetime_installed = false;
+            return false;
+        }
+        state.status.process_lifetime_installed = true;
+        state.status.policy_revision = policy.revision;
+    }
+    // A new Guest generation must start with the virtual process alive.  The service teardown
+    // path explicitly sets this back to true immediately before its intentional killProcess().
+    set_guest_process_exit_allowed(false);
+    return refresh_process_lifetime();
+}
+
 bool NativeHookRuntime::refresh() {
     auto& state = hook_state();
     std::string root;
@@ -336,6 +359,45 @@ bool NativeHookRuntime::refresh() {
     }
     const bool success = result == 0 && context.failures == 0 && system.failures == 0;
     if (!success) state.status.installed = false;
+    return success;
+}
+
+bool NativeHookRuntime::refresh_process_lifetime() {
+    auto& state = hook_state();
+    {
+        std::lock_guard lock(state.mutex);
+        if (!state.status.process_lifetime_installed) return false;
+    }
+    const NativePolicySnapshot policy = global_policy().snapshot();
+    {
+        std::lock_guard lock(state.mutex);
+        if (!policy.configured || policy.revision != state.status.policy_revision) {
+            state.status.last_error = "POLICY_REVISION_CHANGED_REINSTALL_REQUIRED";
+            state.status.process_lifetime_installed = false;
+            return false;
+        }
+    }
+
+    // This scan is intentionally independent from the Guest-ELF scan in refresh().  A translated
+    // guest can legitimately appear in dl_iterate_phdr(), but its foreign relocation tables must
+    // remain untouched.  scan_module() still requires an exact host runtime-library basename.
+    ScanContext context{this, {}, false, true, false};
+    const int result = dl_iterate_phdr(scan_module, &context);
+    std::lock_guard lock(state.mutex);
+    state.status.process_lifetime_refresh_count++;
+    state.status.process_lifetime_modules_scanned = context.scanned;
+    state.status.process_lifetime_modules_matched = context.matched;
+    state.status.process_lifetime_relocations_patched += context.patched;
+    state.status.process_lifetime_target_relocations = context.targets;
+    state.status.process_lifetime_patch_failures += context.failures;
+    if (result != 0) {
+        state.status.last_error = "DL_ITERATE_PHDR_FAILED:" + std::to_string(result);
+    } else if (context.failures > 0) {
+        state.status.last_error = "PROCESS_LIFETIME_PLT_PATCH_FAILED:" + std::to_string(
+                context.failures);
+    }
+    const bool success = result == 0 && context.failures == 0;
+    if (!success) state.status.process_lifetime_installed = false;
     return success;
 }
 

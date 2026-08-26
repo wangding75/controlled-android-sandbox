@@ -294,17 +294,24 @@ public final class GuestRuntimeEnvironment {
             // A foreign-ABI guest is executed by Android's native bridge. The host process
             // cannot safely rewrite that guest ELF's PLT/GOT, so the platform bridge remains
             // the loader boundary and Java framework proxies provide the compatibility path.
-            // Keep the host-ABI lifetime boundary even for a translated guest. NativeHookRuntime
-            // rejects foreign guest ELFs, but it can still safely protect host framework/runtime
-            // modules from guest self-termination (the same recovery boundary used by VA/NBB).
-            // A foreign-ABI module is executed by the platform native bridge.  Until the
-            // translated syscall boundary is available, do not patch host PLT/lifetime symbols
-            // from the guest process: the bridge can legitimately enter those host modules with
-            // translated register state, and a host-side replacement is not ABI-transparent.
+            // Keep a narrow host-ABI lifetime boundary even for a translated guest. It protects
+            // the CAS-owned service from direct native kill/_exit/abort calls without parsing the
+            // foreign Guest ELF. Java Runtime.nativeExit is handled separately by the supported
+            // JNI registration boundary and is forwarded as a real process-lifetime event, just
+            // as VA/NBB do; Binder death/recovery owns the resulting new process record.
+            // Do not patch the translated guest ELF or its general host-ABI PLT entries: the
+            // platform bridge may enter those modules with translated register state.
             boolean enableNativeHooks = requiresNativeHooks && nativePolicyConfigured
                     && !translatedGuestAbi;
             if (requiresNativeHooks && !nativePolicyConfigured) {
                 throw new IllegalStateException("NATIVE_FILE_POLICY_UNAVAILABLE");
+            }
+            if (requiresNativeHooks) NativePolicy.setGuestProcessExitAllowed(false);
+            boolean processLifetimeHooksInstalled = translatedGuestAbi && nativePolicyConfigured
+                    && NativePolicy.installProcessLifetimeHooks();
+            if (translatedGuestAbi && !processLifetimeHooksInstalled) {
+                throw new IllegalStateException("NATIVE_PROCESS_LIFETIME_HOOK_INSTALL_FAILED:"
+                        + NativePolicy.hookStatus());
             }
             boolean nativeHooksInstalled = systemIoHooksInstalled
                     || (enableNativeHooks && NativePolicy.installHooks(nativePolicyLibraryRoot));
@@ -330,9 +337,11 @@ public final class GuestRuntimeEnvironment {
             String nativeBoundaryMode = translatedGuestAbi
                     ? (nativeLoadRedirect ? "translated-loader-redirect" : "translated-platform-loader")
                     : (nativeHooksInstalled ? "native-plt-io" : "java-framework-only");
+            if (processLifetimeHooksInstalled) nativeBoundaryMode += "+host-lifetime";
             android.util.Log.i("CS_NATIVE_BIND", "PROBE nativeLoadDiagnostic=" + nativeLoadDiag
                     + " nativeLoadRedirect=" + nativeLoadRedirect
                     + " translatedAbi=" + translatedGuestAbi
+                    + " processLifetimeHooks=" + processLifetimeHooksInstalled
                     + " boundaryMode=" + nativeBoundaryMode);
             // handleBindApplication publishes process identity before LoadedApk asks the
             // AppComponentFactory to wrap the ClassLoader. The hidden-API bridge must be
@@ -508,6 +517,11 @@ public final class GuestRuntimeEnvironment {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
             }
+            if (processLifetimeHooksInstalled && !NativePolicy.refreshProcessLifetimeHooks()) {
+                throw new IllegalStateException(
+                        "NATIVE_PROCESS_LIFETIME_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
+                                + NativePolicy.hookStatus());
+            }
             stagedProcessIdentity = null;
             session.components = new GuestComponentRuntime(session);
             session.jobServices = new GuestJobServiceBridge(session);
@@ -546,6 +560,11 @@ public final class GuestRuntimeEnvironment {
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                         + NativePolicy.hookStatus());
+            }
+            if (processLifetimeHooksInstalled && !NativePolicy.refreshProcessLifetimeHooks()) {
+                throw new IllegalStateException(
+                        "NATIVE_PROCESS_LIFETIME_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
+                                + NativePolicy.hookStatus());
             }
             Bundle ready = session.status("READY", started);
             RuntimeEventLog.event("GUEST_PREPARED", ready);

@@ -383,6 +383,54 @@ public final class ActivityTaskLedger {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    /**
+     * Finds a live task that can satisfy an external launcher request without recreating the
+     * package's entry Activity. Android launchers bring an existing task to the front and leave
+     * its current top Activity in place; this read-only preflight lets the runtime select that
+     * already-live process before it performs Guest preparation.
+     *
+     * <p>This deliberately does not change the normal {@link #launch(LaunchRequest)} policy. The
+     * caller must prove that the request is an unqualified same-package NEW_TASK launch, and the
+     * runtime still performs the real ActivityStarter transition after the preflight.</p>
+     */
+    public synchronized LauncherTaskReuse findLauncherTaskReuse(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String launcherComponent,
+            String taskAffinity) {
+        if (virtualUserId < 0) throw new IllegalArgumentException("virtualUserId must be non-negative");
+        String normalizedPackageName = requireText(packageName, "packageName");
+        String normalizedRevision = requireText(packageRevision, "packageRevision");
+        String normalizedLauncher = requireText(launcherComponent, "launcherComponent");
+        String normalizedAffinity = requireText(taskAffinity, "taskAffinity");
+        LauncherTaskReuse found = null;
+        for (ActivityTaskMutableTask task : tasks.values()) {
+            if (task.virtualUserId != virtualUserId
+                    || !task.packageName.equals(normalizedPackageName)
+                    || !task.packageRevision.equals(normalizedRevision)
+                    || !task.affinity.equals(normalizedAffinity)
+                    || task.documentTask
+                    || task.hostTaskDetached
+                    || task.activities.size() < 2) {
+                continue;
+            }
+            ActivityTaskMutableActivity root = task.activities.get(0);
+            ActivityTaskMutableActivity top = top(task);
+            if (top == null || top == root
+                    || !root.identity.componentName().equals(normalizedLauncher)
+                    || top.lifecycleState == LifecycleState.INITIALIZED
+                    || top.lifecycleState == LifecycleState.DESTROYED) {
+                continue;
+            }
+            // Iterating in task-map order and retaining the last match mirrors findByAffinity():
+            // the most recently brought-to-front matching task wins.
+            found = new LauncherTaskReuse(
+                    task.taskId, task.affinity, root.snapshot(), top.snapshot(), false);
+        }
+        return found;
+    }
+
     public synchronized List<TaskQuerySnapshot> runningTasks(
             int virtualUserId,
             String packageName,
@@ -1514,6 +1562,25 @@ public final class ActivityTaskLedger {
 
     private static boolean revisionActivityTaskMatches(String taskRevision, String requestedRevision) {
         return requestedRevision.isEmpty() || taskRevision.equals(requestedRevision);
+    }
+
+    /** Immutable result of the external-launch task-reuse preflight. */
+    public record LauncherTaskReuse(
+            int taskId,
+            String taskAffinity,
+            ActivitySnapshot root,
+            ActivitySnapshot top,
+            boolean hostTaskDetached) {
+
+        public LauncherTaskReuse {
+            if (taskId < 1) throw new IllegalArgumentException("taskId must be positive");
+            taskAffinity = requireText(taskAffinity, "taskAffinity");
+            root = Objects.requireNonNull(root, "root");
+            top = Objects.requireNonNull(top, "top");
+            if (root.token().equals(top.token())) {
+                throw new IllegalArgumentException("launcher reuse requires a distinct top Activity");
+            }
+        }
     }
 
     public static final class RollbackState {

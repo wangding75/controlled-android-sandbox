@@ -31,6 +31,7 @@ public final class ActivityTaskLedgerSelfTest {
         testRootActivityQuery();
         testLaunchFlagValidationMatrix();
         testResetTaskIfNeededContract();
+        testExternalLauncherTaskReusePreflight();
         testCrossPackageAffinityAndReparenting();
         testDocumentLaunchModes();
         testFinishMoveBackAndRevisionCleanup();
@@ -144,6 +145,43 @@ public final class ActivityTaskLedgerSelfTest {
                 "alwaysRetainTaskState should suppress ordinary reset pruning");
         check(retained.activityCount() == 3,
                 "a retained task should keep its child before a standard root launch");
+    }
+
+    private static void testExternalLauncherTaskReusePreflight() {
+        ActivityTaskLedger ledger = new ActivityTaskLedger();
+        LaunchDecision root = ledger.launch(new LaunchRequest(
+                new ActivityIdentity(0, "guest.example", "Launcher"),
+                "guest.example", LaunchMode.STANDARD, LaunchFlags.NEW_TASK, null,
+                "guest.example:main", 1, "route-launcher-root", "", -1,
+                "revision-1", DocumentLaunchMode.NONE, "", "", "", 0));
+        LaunchDecision child = ledger.launch(new LaunchRequest(
+                new ActivityIdentity(0, "guest.example", "Child"),
+                "guest.example", LaunchMode.STANDARD, 0, root.taskId(),
+                "guest.example:child", 1, "route-launcher-child", "", -1,
+                "revision-1", DocumentLaunchMode.NONE, "", "", "", 0));
+        ledger.transition(child.activityToken(), LifecycleState.CREATED);
+        ledger.transition(child.activityToken(), LifecycleState.STARTED);
+        ledger.transition(child.activityToken(), LifecycleState.RESUMED);
+
+        ActivityTaskLedger.LauncherTaskReuse reuse = ledger.findLauncherTaskReuse(
+                0, "guest.example", "revision-1", "Launcher", "guest.example");
+        check(reuse != null, "launcher preflight should find the existing task");
+        check(reuse.taskId() == root.taskId()
+                        && reuse.root().identity().componentName().equals("Launcher")
+                        && reuse.top().identity().componentName().equals("Child")
+                        && reuse.top().processName().equals("guest.example:child"),
+                "launcher preflight must return the live task top and its process");
+        check(ledger.activityCount() == 2 && ledger.taskCount() == 1,
+                "launcher preflight must not mutate the virtual task");
+        check(ledger.findLauncherTaskReuse(
+                0, "guest.example", "other-revision", "Launcher", "guest.example") == null,
+                "launcher preflight must retain revision fencing");
+
+        ActivityTaskLedger restored = new ActivityTaskLedger();
+        restored.restore(ledger.checkpoint());
+        check(restored.findLauncherTaskReuse(
+                0, "guest.example", "revision-1", "Launcher", "guest.example") == null,
+                "detached restored task must not be reused before Host rebind");
     }
 
     private static void testCrossPackageAffinityAndReparenting() {

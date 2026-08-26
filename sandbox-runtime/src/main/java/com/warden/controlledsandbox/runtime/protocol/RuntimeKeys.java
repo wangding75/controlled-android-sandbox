@@ -94,6 +94,10 @@ public final class RuntimeKeys {
      * the command Activity must remain the visible task owner after each Guest stop.
      */
     public static final String HOST_TASK_REUSE = "hostTaskReuse";
+    /** True when an external launcher request is routed directly to an existing task top. */
+    public static final String LAUNCHER_TASK_REUSE = "launcherTaskReuse";
+    /** Original entry Activity requested before the existing-task top was selected. */
+    public static final String LAUNCHER_REQUESTED_COMPONENT = "launcherRequestedComponent";
     public static final String ACTIVITY_EVENT = "activityEvent";
     public static final String ACTIVITY_LAUNCH_MODE = "activityLaunchMode";
     public static final String ACTIVITY_FLAGS = "activityFlags";

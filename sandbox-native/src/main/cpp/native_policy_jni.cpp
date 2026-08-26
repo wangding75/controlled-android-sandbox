@@ -26,6 +26,12 @@
 
 namespace {
 
+bool install_runtime_native_exit(JNIEnv* env);
+
+}  // namespace
+
+namespace {
+
 std::string string_value(JNIEnv* env, jstring value) {
     if (value == nullptr) return {};
     const char* chars = env->GetStringUTFChars(value, nullptr);
@@ -726,20 +732,56 @@ Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallSystemI
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeInstallProcessLifetimeHooks(
+        JNIEnv* env, jclass) {
+    try {
+        const bool runtime_exit = install_runtime_native_exit(env);
+        const bool native_lifetime = runtime_exit
+                && controlled_sandbox::global_hooks().install_process_lifetime();
+        return native_lifetime ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& error) {
+        throw_java(env, "java/lang/IllegalStateException", error.what());
+        return JNI_FALSE;
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeRefreshHooks(JNIEnv*, jclass) {
     return controlled_sandbox::global_hooks().refresh() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeRefreshProcessLifetimeHooks(
+        JNIEnv* env, jclass) {
+    return install_runtime_native_exit(env)
+            && controlled_sandbox::global_hooks().refresh_process_lifetime()
+            ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_warden_controlledsandbox_nativebridge_NativePolicy_nativeHookStatus(JNIEnv* env, jclass) {
     const auto status = controlled_sandbox::global_hooks().status();
     std::string value = "installed=" + std::string(status.installed ? "true" : "false")
+            + ";processLifetimeInstalled=" + std::string(
+                    status.process_lifetime_installed ? "true" : "false")
             + ";scanned=" + std::to_string(status.modules_scanned)
             + ";matched=" + std::to_string(status.modules_matched)
             + ";patched=" + std::to_string(status.relocations_patched)
             + ";refresh=" + std::to_string(status.refresh_count)
             + ";targets=" + std::to_string(status.target_relocations)
             + ";patchFailures=" + std::to_string(status.patch_failures)
+            + ";processLifetimeScanned=" + std::to_string(
+                    status.process_lifetime_modules_scanned)
+            + ";processLifetimeMatched=" + std::to_string(
+                    status.process_lifetime_modules_matched)
+            + ";processLifetimePatched=" + std::to_string(
+                    status.process_lifetime_relocations_patched)
+            + ";processLifetimeRefresh=" + std::to_string(
+                    status.process_lifetime_refresh_count)
+            + ";processLifetimeTargets=" + std::to_string(
+                    status.process_lifetime_target_relocations)
+            + ";processLifetimePatchFailures=" + std::to_string(
+                    status.process_lifetime_patch_failures)
             + ";policyRevision=" + std::to_string(status.policy_revision)
             + ";root=" + status.guest_library_root
             + ";error=" + status.last_error;
@@ -763,6 +805,7 @@ using NativeLoadStatic3 = jstring (*)(JNIEnv*, jclass, jstring, jobject, jobject
 using NativeLoadStatic2 = jstring (*)(JNIEnv*, jclass, jstring, jobject);
 using NativeLoadInstance3 = jstring (*)(JNIEnv*, jobject, jstring, jobject, jobject);
 using NativeLoadInstance2 = jstring (*)(JNIEnv*, jobject, jstring, jobject);
+using NativeExitStatic = void (*)(JNIEnv*, jclass, jint);
 
 NativeLoadStatic3 orig_native_load_static3 = nullptr;
 NativeLoadStatic2 orig_native_load_static2 = nullptr;
@@ -770,6 +813,8 @@ NativeLoadInstance3 orig_native_load_instance3 = nullptr;
 NativeLoadInstance2 orig_native_load_instance2 = nullptr;
 bool native_load_diag_installed = false;
 bool native_load_redirect_installed = false;
+NativeExitStatic orig_runtime_native_exit = nullptr;
+bool runtime_native_exit_installed = false;
 
 struct LoadedSymbolLookup {
     const char* symbol = nullptr;
@@ -841,7 +886,7 @@ int find_loaded_openjdk_symbol(struct dl_phdr_info* info, size_t, void* opaque) 
     return 0;
 }
 
-void* lookup_native_load(const char* symbol) {
+void* lookup_openjdk_symbol(const char* symbol) {
     if (symbol == nullptr) return nullptr;
     dlerror();
     void* value = dlsym(RTLD_DEFAULT, symbol);
@@ -870,8 +915,38 @@ void* lookup_native_load(const char* symbol) {
         if (value != nullptr) return value;
     }
     __android_log_print(ANDROID_LOG_WARN, "CS_NATIVE_BIND",
-            "nativeLoad symbol unavailable symbol=%s", symbol);
+            "OpenJDK symbol unavailable symbol=%s", symbol);
     return nullptr;
+}
+
+void controlled_runtime_native_exit(JNIEnv* env, jclass clazz, jint status) {
+    if (!controlled_sandbox::guest_process_exit_allowed()) {
+        __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+                "guest Runtime.nativeExit(%d) forwarded as process boundary", status);
+        // Runtime.exit() is a Java process-lifetime transaction. VA/NBB leave this boundary as
+        // a real process death; the virtual process record/Binder death path then owns recovery.
+        // Temporarily open the native gate while entering the platform implementation. It
+        // normally never returns because libopenjdk terminates through exit/_exit, which remain
+        // denied for every other Guest caller.
+        controlled_sandbox::set_guest_process_exit_allowed(true);
+        if (orig_runtime_native_exit != nullptr) {
+            orig_runtime_native_exit(env, clazz, status);
+            controlled_sandbox::set_guest_process_exit_allowed(false);
+            return;
+        }
+        controlled_sandbox::set_guest_process_exit_allowed(false);
+        __android_log_print(ANDROID_LOG_ERROR, "CS_GUEST_LIFETIME",
+                "Runtime.nativeExit original entry point unavailable status=%d", status);
+        return;
+    }
+    if (orig_runtime_native_exit != nullptr) {
+        orig_runtime_native_exit(env, clazz, status);
+        return;
+    }
+    // Installation requires the original entry point, so this is defensive only.  Returning
+    // keeps a missing symbol fail-closed instead of allowing an unmediated process exit.
+    __android_log_print(ANDROID_LOG_ERROR, "CS_GUEST_LIFETIME",
+            "Runtime.nativeExit original entry point unavailable status=%d", status);
 }
 
 void report_native_load(JNIEnv* env, jstring filename, jobject loader, jobject caller) {
@@ -987,8 +1062,8 @@ jstring redirect_native_load_instance2(JNIEnv* env, jobject runtime, jstring fil
 bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature, void* replacement,
                              void** original_slot, const char* symbol_a, const char* symbol_b) {
     if (env->GetStaticMethodID(runtime, "nativeLoad", signature) != nullptr) {
-        *original_slot = lookup_native_load(symbol_a);
-        if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+        *original_slot = lookup_openjdk_symbol(symbol_a);
+        if (*original_slot == nullptr) *original_slot = lookup_openjdk_symbol(symbol_b);
         if (*original_slot == nullptr) {
             env->ExceptionClear();
             return false;
@@ -1000,8 +1075,8 @@ bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature,
     }
     env->ExceptionClear();
     if (env->GetMethodID(runtime, "nativeLoad", signature) != nullptr) {
-        *original_slot = lookup_native_load(symbol_a);
-        if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+        *original_slot = lookup_openjdk_symbol(symbol_a);
+        if (*original_slot == nullptr) *original_slot = lookup_openjdk_symbol(symbol_b);
         if (*original_slot == nullptr) return false;
         JNINativeMethod method{"nativeLoad", signature, replacement};
         const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
@@ -1018,12 +1093,42 @@ bool install_one_native_load(JNIEnv* env, jclass runtime, const char* signature,
 bool register_native_load_unchecked(JNIEnv* env, jclass runtime, const char* signature,
                                     void* replacement, void** original_slot,
                                     const char* symbol_a, const char* symbol_b) {
-    *original_slot = lookup_native_load(symbol_a);
-    if (*original_slot == nullptr) *original_slot = lookup_native_load(symbol_b);
+    *original_slot = lookup_openjdk_symbol(symbol_a);
+    if (*original_slot == nullptr) *original_slot = lookup_openjdk_symbol(symbol_b);
     if (*original_slot == nullptr) return false;
     JNINativeMethod method{"nativeLoad", signature, replacement};
     const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
     if (!ok) env->ExceptionClear();
+    return ok;
+}
+
+bool install_runtime_native_exit(JNIEnv* env) {
+    if (runtime_native_exit_installed) return true;
+    if (env == nullptr) return false;
+    jclass runtime = env->FindClass("java/lang/Runtime");
+    if (runtime == nullptr) {
+        env->ExceptionClear();
+        return false;
+    }
+    void* original = lookup_openjdk_symbol("Runtime_nativeExit");
+    if (original == nullptr) original = lookup_openjdk_symbol("Java_java_lang_Runtime_nativeExit");
+    if (original == nullptr) {
+        env->DeleteLocalRef(runtime);
+        return false;
+    }
+    orig_runtime_native_exit = reinterpret_cast<NativeExitStatic>(original);
+    JNINativeMethod method{"nativeExit", "(I)V",
+            reinterpret_cast<void*>(&controlled_runtime_native_exit)};
+    const bool ok = env->RegisterNatives(runtime, &method, 1) == 0;
+    if (!ok) {
+        env->ExceptionClear();
+        orig_runtime_native_exit = nullptr;
+    } else {
+        runtime_native_exit_installed = true;
+    }
+    env->DeleteLocalRef(runtime);
+    __android_log_print(ANDROID_LOG_INFO, "CS_GUEST_LIFETIME",
+            "Runtime.nativeExit hook installed=%d", ok ? 1 : 0);
     return ok;
 }
 

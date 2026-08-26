@@ -11,12 +11,19 @@ namespace controlled_sandbox {
 struct NativeHookStatus {
     bool installed{false};
     bool system_io_installed{false};
+    bool process_lifetime_installed{false};
     std::size_t modules_scanned{0};
     std::size_t modules_matched{0};
     std::size_t relocations_patched{0};
     std::size_t refresh_count{0};
     std::size_t target_relocations{0};
     std::size_t patch_failures{0};
+    std::size_t process_lifetime_modules_scanned{0};
+    std::size_t process_lifetime_modules_matched{0};
+    std::size_t process_lifetime_relocations_patched{0};
+    std::size_t process_lifetime_refresh_count{0};
+    std::size_t process_lifetime_target_relocations{0};
+    std::size_t process_lifetime_patch_failures{0};
     std::uint64_t policy_revision{0};
     std::string guest_library_root;
     std::string last_error;
@@ -34,7 +41,13 @@ public:
     bool install(std::string guest_library_root);
     /** Patch the Android Java/native file boundary for an isolated capability-backed process. */
     bool install_system_io();
+    /**
+     * Patch only host runtime-library process-lifetime imports for a translated guest.
+     * Foreign guest ELF modules are never parsed or modified by this path.
+     */
+    bool install_process_lifetime();
     bool refresh();
+    bool refresh_process_lifetime();
     bool installCamera1();
     bool refreshCamera1();
     void reset();

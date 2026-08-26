@@ -53,6 +53,15 @@ public final class BrokerActivityRuntime {
     public synchronized Bundle launch(GuestSession session, String component, Bundle prepared, Bundle request) {
         return routes.launch(session, component, prepared, request);
     }
+    public synchronized ActivityTaskLedger.LauncherTaskReuse launcherTaskReuse(
+            int virtualUserId,
+            String packageName,
+            String packageRevision,
+            String launcherComponent,
+            String taskAffinity) {
+        return routes.launcherTaskReuse(
+                virtualUserId, packageName, packageRevision, launcherComponent, taskAffinity);
+    }
     public synchronized Bundle consume(String token, GuestSession session) {
         return routes.consume(token, session);
     }

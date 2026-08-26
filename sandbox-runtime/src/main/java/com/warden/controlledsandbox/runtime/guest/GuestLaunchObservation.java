@@ -139,6 +139,15 @@ public final class GuestLaunchObservation {
         } else if ("GUEST_READY".equals(event)) {
             classLoaded = true;
             instantiated = true;
+        } else if ("NEW_INTENT".equals(event)) {
+            // Reopening a task can deliver the launcher Intent to an already-created Activity;
+            // that path has no CREATED callback. Preserve the lifecycle facts that the callback
+            // itself proves, while RESUMED/FIRST_FRAME_DRAWN remain independently required.
+            classLoaded = true;
+            instantiated = true;
+            attached = true;
+            created = true;
+            if (request.getBoolean("activityResumed", false)) resumed = true;
         } else if ("FIRST_FRAME_DRAWN".equals(event)) {
             firstFrameDrawn = true;
             windowEvidence = true;
