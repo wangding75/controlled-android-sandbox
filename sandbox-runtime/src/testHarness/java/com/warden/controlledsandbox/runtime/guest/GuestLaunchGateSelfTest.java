@@ -69,6 +69,26 @@ public final class GuestLaunchGateSelfTest {
         require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(taskHandoff.close())),
                 "same-task child lifecycle correlation is LAUNCH_PASS");
 
+        GuestLaunchObservation reusedActivity = new GuestLaunchObservation(
+                "reused-token", "guest.SingleTop", "initial-request", "initial-operation");
+        reusedActivity.linkActivity("reused-token", "delivery-request", "delivery-operation",
+                "guest.SingleTop");
+        Bundle reusedCreated = new Bundle();
+        reusedCreated.putString(RuntimeKeys.ACTIVITY_EVENT, "CREATED");
+        reusedCreated.putString(RuntimeKeys.ACTIVITY_TOKEN, "reused-token");
+        reusedCreated.putString(RuntimeKeys.REQUEST_ID, "initial-request");
+        reusedCreated.putString(RuntimeKeys.OPERATION_ID, "initial-operation");
+        reusedCreated.putBoolean("windowAttached", true);
+        reusedActivity.onActivityEvent(reusedCreated);
+        Bundle reusedResumed = new Bundle(reusedCreated);
+        reusedResumed.putString(RuntimeKeys.ACTIVITY_EVENT, "RESUMED");
+        reusedActivity.onActivityEvent(reusedResumed);
+        Bundle reusedFrame = new Bundle(reusedCreated);
+        reusedFrame.putString(RuntimeKeys.ACTIVITY_EVENT, "FIRST_FRAME_DRAWN");
+        reusedActivity.onActivityEvent(reusedFrame);
+        require(GuestLaunchGate.LAUNCH_PASS.equals(GuestLaunchGate.evaluate(reusedActivity.close())),
+                "same Activity token keeps creation correlation across a new delivery");
+
         GuestLaunchObservation delayedWindow = new GuestLaunchObservation("tok", "guest.Main");
         Bundle createdOnly = new Bundle();
         createdOnly.putString(RuntimeKeys.ACTIVITY_EVENT, "CREATED");

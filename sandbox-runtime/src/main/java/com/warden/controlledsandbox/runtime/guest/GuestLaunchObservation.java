@@ -71,9 +71,16 @@ public final class GuestLaunchObservation {
                                            String childOperationId, String component) {
         String normalizedToken = token == null ? "" : token.trim();
         if (normalizedToken.isEmpty()) return;
-        activityCorrelations.put(normalizedToken, new Correlation(
-                childRequestId == null ? "" : childRequestId.trim(),
-                childOperationId == null ? "" : childOperationId.trim()));
+        // An Activity token identifies one physical Activity instance.  A singleTop or
+        // CLEAR_TOP|SINGLE_TOP delivery can issue a new route for that same instance, while
+        // StubActivityBase continues to emit lifecycle events with the instance's original
+        // request/operation identity.  Do not replace that identity with the delivery request;
+        // doing so turns a valid onNewIntent/resume sequence into a false correlation failure.
+        if (!activityCorrelations.containsKey(normalizedToken)) {
+            activityCorrelations.put(normalizedToken, new Correlation(
+                    childRequestId == null ? "" : childRequestId.trim(),
+                    childOperationId == null ? "" : childOperationId.trim()));
+        }
         String normalizedComponent = component == null ? "" : component.trim();
         timeline.add("ACTIVITY_LINK:" + (normalizedComponent.isEmpty()
                 ? normalizedToken : normalizedComponent) + "@"
