@@ -347,11 +347,13 @@ final class RuntimeActivityLaunchCoordinator {
                 && transaction.getBoolean(RuntimeKeys.CREATED_NEW_TASK, false);
         boolean hostTaskRebind = transaction != null
                 && transaction.getBoolean(RuntimeKeys.HOST_TASK_REBIND_REQUIRED, false);
+        boolean hostTaskReuse = transaction != null
+                && transaction.getBoolean(RuntimeKeys.HOST_TASK_REUSE, false);
         if (!frameworkHost || createdNewTask || hostTaskRebind) flags |= LaunchFlags.NEW_TASK;
         // A restored virtual task needs a fresh Host boundary, but it is still the same virtual
         // task.  MULTIPLE_TASK on MuMu API32 can make ActivityThread replay the parent route in
         // ActivityResult flows; reserve it for an actual virtual-task creation.
-        if (createdNewTask) {
+        if (createdNewTask && !hostTaskReuse) {
             flags |= LaunchFlags.MULTIPLE_TASK | LaunchFlags.RESET_TASK_IF_NEEDED;
         }
         // Project the virtual desired operation into real ActivityStarter flags.  The selected

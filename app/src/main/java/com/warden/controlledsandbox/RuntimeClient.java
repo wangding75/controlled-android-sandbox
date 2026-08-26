@@ -102,7 +102,17 @@ final class RuntimeClient implements AutoCloseable {
         Bundle request = request(record, virtualUserId, record.launchProcess);
         request.putString(RuntimeKeys.COMPONENT_CLASS, component.trim());
         if (intentExtras != null && !intentExtras.isEmpty()) {
-            request.putBundle(RuntimeKeys.INTENT_EXTRAS, new Bundle(intentExtras));
+            Bundle copiedExtras = new Bundle(intentExtras);
+            // Keep the RD-only Host-task hint in the broker envelope. It is a launch-policy
+            // control, not a Guest Intent extra, and must be visible when the Broker derives the
+            // physical ActivityStarter flags.
+            if (copiedExtras.getBoolean(RuntimeKeys.HOST_TASK_REUSE, false)) {
+                request.putBoolean(RuntimeKeys.HOST_TASK_REUSE, true);
+                copiedExtras.remove(RuntimeKeys.HOST_TASK_REUSE);
+            }
+            if (!copiedExtras.isEmpty()) {
+                request.putBundle(RuntimeKeys.INTENT_EXTRAS, copiedExtras);
+            }
         }
         return companionRoute(record)
                 ? nativeCompanion.launchActivity(record, virtualUserId, request)

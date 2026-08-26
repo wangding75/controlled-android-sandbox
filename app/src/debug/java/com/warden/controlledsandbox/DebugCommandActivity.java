@@ -1612,14 +1612,16 @@ public final class DebugCommandActivity extends Activity {
             int passed = 0;
             int plannedLoops = skipLoops ? 0 : loops;
             for (int loop = 1; loop <= plannedLoops; loop++) {
+                Bundle loopLaunchExtras = new Bundle();
+                loopLaunchExtras.putBoolean(RuntimeKeys.HOST_TASK_REUSE, true);
                 Bundle launched = runtime.launchComponent(record, 0,
-                        "com.warden.controlledsandbox.fixture.MainActivity");
+                        "com.warden.controlledsandbox.fixture.MainActivity", loopLaunchExtras);
                 String launchStatus = launched.getString(RuntimeKeys.STATUS, "FAILED");
                 if (!"LAUNCH_PASS".equals(launchStatus)) {
                     stopSoft(runtime, record);
                     Thread.sleep(400L);
                     launched = runtime.launchComponent(record, 0,
-                            "com.warden.controlledsandbox.fixture.MainActivity");
+                            "com.warden.controlledsandbox.fixture.MainActivity", loopLaunchExtras);
                     launchStatus = launched.getString(RuntimeKeys.STATUS, "FAILED");
                 }
                 if (!"LAUNCH_PASS".equals(launchStatus)) {

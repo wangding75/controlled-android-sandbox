@@ -8,7 +8,6 @@
             android:exported="true"
             android:permission="android.permission.DUMP"
             android:excludeFromRecents="true"
-            android:noHistory="true"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
         <service
             android:name=".NativeEnforcementIsolatedService"

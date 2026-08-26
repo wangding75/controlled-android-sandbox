@@ -88,6 +88,12 @@ public final class RuntimeKeys {
     /** True when the virtual Activity ledger created a new virtual task for this launch. */
     public static final String CREATED_NEW_TASK = "createdNewTask";
     public static final String HOST_TASK_REBIND_REQUIRED = "hostTaskRebindRequired";
+    /**
+     * Debug/RD campaign hint: reuse the visible command Activity's physical Host task while
+     * exercising repeated Guest launch/stop rounds. It does not grant background-start privilege;
+     * the command Activity must remain the visible task owner after each Guest stop.
+     */
+    public static final String HOST_TASK_REUSE = "hostTaskReuse";
     public static final String ACTIVITY_EVENT = "activityEvent";
     public static final String ACTIVITY_LAUNCH_MODE = "activityLaunchMode";
     public static final String ACTIVITY_FLAGS = "activityFlags";
