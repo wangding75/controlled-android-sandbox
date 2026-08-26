@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""C4-R05 fail-fast formal RD revalidation and closure orchestrator.
+"""C4-R05 formal RD revalidation and closure orchestrator.
 
 The orchestrator owns the C4-R05 evidence boundary.  It builds one commit, resolves the
-MuMu instance by name, runs the configured stage or overall acceptance rounds, and stops at the first non-PASS phase.  Child
-campaigns keep their own request-scoped raw evidence; this runner records the command, summary,
-commit and phase decision without turning a later observation into a retry.
+MuMu instance by name, runs the configured stage or overall acceptance rounds, and stops at the
+first non-PASS phase.  The launch-matrix child delegates its individual observations to
+``run_c4_r03_rd.py`` and has one explicit environment exception: a host-scoped LOW_MEMORY
+exit is recorded, the emulator is restarted, and the matrix continues from a separately
+recorded coordinate.  Child campaigns keep their own request-scoped raw evidence; this runner
+records the command, summary, commit and phase decision without turning a later observation into
+an automatic retry.
 """
 
 from __future__ import annotations
@@ -246,7 +250,9 @@ def run_add_gate(instance_name: str, round_output: Path, root_output: Path,
 def run_launch_matrix(instance_name: str, loops: int, users: str, targets: str,
                       round_output: Path, root_output: Path) -> dict[str, Any]:
     phase_output = round_output / "launch-matrix"
-    command = [sys.executable, str(TOOLS / "run_c4_r03_rd.py"),
+    # The wrapper delegates every observation to run_c4_r03_rd.py and only handles the
+    # user-approved MuMu LOW_MEMORY restart boundary around that fail-fast child.
+    command = [sys.executable, str(TOOLS / "run_c4_r03_low_memory_continuation.py"),
                "--instance-name", instance_name, "--loops", str(loops),
                "--users", users, "--targets", targets,
                "--output", str(phase_output)]

@@ -192,6 +192,7 @@ def capture_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str
         "logcat.txt": ["logcat", "-d", "-v", "threadtime"],
         "activity-activities.txt": ["shell", "dumpsys", "activity", "activities"],
         "activity-processes.txt": ["shell", "dumpsys", "activity", "processes"],
+        "application-exit-info.txt": ["shell", "dumpsys", "activity", "exit-info", HOST_PACKAGE],
         "window-windows.txt": ["shell", "dumpsys", "window", "windows"],
         "surface-list.txt": ["shell", "dumpsys", "SurfaceFlinger", "--list"],
         "surface-dump.txt": ["shell", "dumpsys", "SurfaceFlinger"],

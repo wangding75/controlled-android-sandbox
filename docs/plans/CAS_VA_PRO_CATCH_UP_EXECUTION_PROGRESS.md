@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.4
-更新时间：2026-08-26 02:04（Asia/Shanghai）
+更新时间：2026-08-26 15:05（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（BLOCKED）
+当前任务：`C4-R05`（IN_PROGRESS）
 下一任务：`C4-R05`
 最后完成任务：`C4-R04`
 
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 failure receipt |
+| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 continuation receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2732,3 +2732,23 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   目录及既有证据变更，未删除或覆盖。
 - **下一步**：继续本机 user0 的剩余 C4-R05 矩阵和回归；不启动 user1。只有用户另行授权并
   汇总另一台机器 user1 的独立证据后，才可重新评估 C4-R05/C4 关门。
+
+### C4-R05：本机双用户无分片续跑策略回执（2026-08-26）
+
+- **状态**：`IN_PROGRESS`。根据用户最新指令，当前执行不再按机器分片；同一台动态解析的
+  `RD测试` 必须依次执行 user0 和 user1，不能再把 user1 排除在本机矩阵之外。
+- **续跑规则**：正式 R05 启动矩阵保持每个 target/user 25 个 cold + 25 个 hot，
+  共 500 条 launch observation；仍为一次清洁安装回合、retry budget=0。普通首个失败仍
+  fail-fast，保留首失败证据并停止。
+- **LOW_MEMORY 例外**：仅当失败快照的 `adb shell dumpsys activity exit-info
+  com.warden.controlledsandbox.debug` 明确给出宿主 `LOW_MEMORY` 时，记录为非阻断环境事件；
+  通过动态解析的 MuMu root/index 执行 emulator restart，等待新 `boot_id`，再用新的
+  requestId、独立证据目录和显式手动续接从失败 target/user/iteration/mode 继续。首失败仍
+  权威保留，不把续接观察写成自动重试，也不把其他应用或历史 `lowmemorykiller` 行误判为该例外。
+- **实现变更**：R03 失败快照新增 `application-exit-info.txt`；新增
+  `tools/capability/run_c4_r03_low_memory_continuation.py`，R05 启动矩阵改由该包装器调用
+  原始 `run_c4_r03_rd.py`，并汇总首失败与续接观察。静态合同、Activity/Task 检查和 Python
+  编译检查均已通过；正式运行前仍需完成提交、推送和 continuation preflight。
+- **当前边界**：本回执只恢复 R05 进行中状态，不关闭 C4；只有 user0/user1 全矩阵、添加
+  门禁、C1/C2/C4/SX 回归及双用户压力全部通过，且没有未处理的非 `LOW_MEMORY` P0/P1，
+  才能形成正式关门回执。
