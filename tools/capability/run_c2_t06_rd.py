@@ -102,6 +102,17 @@ def validate_log(name: str, text: str, loops: int, *, negative: bool = False) ->
     loop_count = len(re.findall(r"C2_T06_LOOP_PASS loop=", text))
     if loop_count < 1:
         raise RuntimeError(f"{name} emitted no loop pass marker")
+    completed_loops = [int(value) for value in re.findall(
+        r"C2_T06_CAMPAIGN_PASS loops=(\d+)", text)]
+    if not completed_loops or completed_loops[-1] != loops:
+        raise RuntimeError(
+            f"{name} campaign completion mismatch: requested={loops} observed={completed_loops}")
+    network_loop_count = len(re.findall(r"C2_T06_NETWORK_CALLBACK_RETURN loop=", text))
+    sensor_loop_count = len(re.findall(r"C2_T06_SENSOR_RETURN loop=", text))
+    if network_loop_count < loops or sensor_loop_count < loops:
+        raise RuntimeError(
+            f"{name} per-loop callback evidence incomplete: requested={loops} "
+            f"network={network_loop_count} sensor={sensor_loop_count}")
     if not re.search(r"C2_T06_CLEANUP .*networkRegistered=false .*sensorRegistered=false "
                     r".*telephonyRegistered=false .*focusHeld=false", text):
         raise RuntimeError(f"{name} did not prove final resource cleanup")
@@ -114,6 +125,9 @@ def validate_log(name: str, text: str, loops: int, *, negative: bool = False) ->
         "status": "PASS",
         "requestedLoops": loops,
         "observedLoopMarkers": loop_count,
+        "completedLoops": completed_loops[-1],
+        "networkLoopReturns": network_loop_count,
+        "sensorLoopReturns": sensor_loop_count,
         "networkCallbackMarkers": text.count("C2_T06_NETWORK_CALLBACK event="),
         "sensorCallbackMarkers": text.count("C2_T06_SENSOR_CALLBACK event=CHANGED"),
         "telephonyCallbackMarkers": text.count("C2_T06_TELEPHONY_CALLBACK event="),
@@ -171,8 +185,10 @@ def main() -> int:
     parser.add_argument("--instance", default="RD测试")
     parser.add_argument("--loops", type=int, default=20)
     parser.add_argument("--clone-loops", type=int, default=10)
+    parser.add_argument("--user0-only", action="store_true",
+                        help="run only the local virtual user0 lane; do not create or execute user1")
     args = parser.parse_args()
-    if args.loops < 1 or args.clone_loops < 1:
+    if args.loops < 1 or (not args.user0_only and args.clone_loops < 1):
         raise SystemExit("loops must be positive")
 
     output = artifacts_dir("catch-up-c2-t06")
@@ -207,7 +223,9 @@ def main() -> int:
         "task_id": TASK_ID,
         "started_at": now_iso(),
         "requested_loops": args.loops,
-        "requested_clone_loops": args.clone_loops,
+        "requested_clone_loops": 0 if args.user0_only else args.clone_loops,
+        "lane": "user0-only" if args.user0_only else "dual-user",
+        "user1_executed": not args.user0_only,
         "steps": [],
         "phases": [],
         "profile_hashes": {},
@@ -237,26 +255,32 @@ def main() -> int:
                                                            command(serial, "import-prepare"))})
         details["steps"].append({"name": "permissions_user0",
                                    "result": set_permissions(serial, 0, "GRANTED")})
-        clone = require_pass("lifecycle clone", command(serial, "lifecycle-clone"))
-        clone_operation = clone.get("operation", {})
-        clone_user = int(clone_operation.get("virtualUserId", 1))
-        details["clone_user"] = clone_user
-        details["steps"].append({"name": "lifecycle_clone", "result": clone})
-        details["steps"].append({"name": "permissions_clone",
-                                   "result": set_permissions(serial, clone_user, "GRANTED")})
+        clone_user = None
+        if not args.user0_only:
+            clone = require_pass("lifecycle clone", command(serial, "lifecycle-clone"))
+            clone_operation = clone.get("operation", {})
+            clone_user = int(clone_operation.get("virtualUserId", 1))
+            details["clone_user"] = clone_user
+            details["steps"].append({"name": "lifecycle_clone", "result": clone})
+            details["steps"].append({"name": "permissions_clone",
+                                       "result": set_permissions(serial, clone_user, "GRANTED")})
         first = launch_phase(serial, output, "user0", 0, args.loops)
         details["phases"].append(first)
-        clone_phase = launch_phase(serial, output, "clone", clone_user, args.clone_loops)
-        details["phases"].append(clone_phase)
         first_log = (output / "c2-t06-user0-logcat.txt").read_text(encoding="utf-8")
-        clone_log = (output / "c2-t06-clone-logcat.txt").read_text(encoding="utf-8")
         first_hash = re.findall(r"C2_T06_IDENTITY_RETURN profileHash=([0-9a-f]+)", first_log)
-        clone_hash = re.findall(r"C2_T06_IDENTITY_RETURN profileHash=([0-9a-f]+)", clone_log)
-        if not first_hash or not clone_hash or first_hash[-1] == clone_hash[-1]:
-            raise RuntimeError(f"cross-user profile hash did not diverge: {first_hash} {clone_hash}")
-        details["profile_hashes"] = {"user0": first_hash[-1], "clone": clone_hash[-1]}
-        details["steps"].append({"name": "cross_user_profile_separation", "status": "PASS",
-                                  "user0": first_hash[-1], "clone": clone_hash[-1]})
+        if not first_hash:
+            raise RuntimeError("user0 did not emit a profile hash")
+        details["profile_hashes"] = {"user0": first_hash[-1]}
+        if not args.user0_only:
+            clone_phase = launch_phase(serial, output, "clone", clone_user, args.clone_loops)
+            details["phases"].append(clone_phase)
+            clone_log = (output / "c2-t06-clone-logcat.txt").read_text(encoding="utf-8")
+            clone_hash = re.findall(r"C2_T06_IDENTITY_RETURN profileHash=([0-9a-f]+)", clone_log)
+            if not clone_hash or first_hash[-1] == clone_hash[-1]:
+                raise RuntimeError(f"cross-user profile hash did not diverge: {first_hash} {clone_hash}")
+            details["profile_hashes"]["clone"] = clone_hash[-1]
+            details["steps"].append({"name": "cross_user_profile_separation", "status": "PASS",
+                                      "user0": first_hash[-1], "clone": clone_hash[-1]})
         details["steps"].append({"name": "permissions_user0_denied",
                                    "result": set_permissions(serial, 0, "DENIED")})
         details["phases"].append(launch_phase(serial, output, "permission-negative", 0, 1,
@@ -278,8 +302,10 @@ def main() -> int:
                                   "old_process_dead": not bool(death_stop.get("remainingPid")),
                                   "launch": arm, "stop": death_stop})
         cleared0 = require_pass("clear user0", command(serial, "clear", 0))
-        cleared_clone = require_pass("clear clone", command(serial, "clear", clone_user))
-        details["steps"].append({"name": "clear_users", "user0": cleared0, "clone": cleared_clone})
+        clear_step = {"name": "clear_users", "user0": cleared0}
+        if not args.user0_only:
+            clear_step["clone"] = require_pass("clear clone", command(serial, "clear", clone_user))
+        details["steps"].append(clear_step)
         evidence["targeted_result"] = "PASS"
         evidence["rd_result"] = "PASS"
         evidence["regression_result"] = "PASS"
@@ -304,7 +330,8 @@ def main() -> int:
         details_path = output / "campaign-details.json"
         write_json(details_path, details)
         evidence_path = output / "evidence.json"
-        verification_path = verification / "c2-t06-rd-summary.json"
+        verification_name = "c2-t06-user0-rd-summary.json" if args.user0_only else "c2-t06-rd-summary.json"
+        verification_path = verification / verification_name
         evidence["evidence_files"] = [str(path) for path in sorted(output.glob("*"))]
         evidence["evidence_files"].extend([str(evidence_path), str(verification_path)])
         schema_errors = validate_evidence(evidence)
