@@ -99,6 +99,12 @@ ActivityRecord 与 Window 均已消失；在有界 deadline 内未收敛则 fail
 这不是固定 sleep、静默 launch retry 或异常吞咽，也不改变 CAS package/Guest 生命周期。只有
 barrier 后的正式双轮重新通过，才能推翻本节当前的失败结论。
 
+正式续接还验证出一个独立的证据编排边界：外层会话可能在 R03 子进程已写入多个
+`attempt-NNN/**/case.json`、但尚未写最终 summary 时结束。R05 continuation selector 现在
+合并所有 durable attempt lane，拒绝重复 coordinate，并把最新含证据的 lane 作为下一次
+seed；因此不会因只读取 `attempt-001` 而重新执行已经完成的坐标。该合并只恢复执行位置，
+不把中断 lane 当成正式 PASS。
+
 此前 `verification/catch-up/C4-R05/diagnostic-no-second-stop-20260828` 的
 `attempt=1/retryBudget=0` 隔离复测仍已完成 fixture 25、夸克/红果/番茄/钉钉各 5 个
 add/delete/re-add，`operationCount=137`、`status=PASS`、`residue.pass=true`；它只证明

@@ -131,24 +131,38 @@ def find_command_record(output: Path, label: str) -> dict[str, Any]:
 
 def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dict[str, Any]:
     """Find the first missing coordinate in an interrupted, ordered launch lane."""
-    child = lane / "attempt-001"
-    if not child.is_dir():
-        raise PhaseFailure("launch-continuation", "existing attempt-001 lane is missing",
+    attempt_dirs = sorted(
+        (path for path in lane.glob("attempt-*") if path.is_dir()),
+        key=lambda path: (int(path.name.removeprefix("attempt-"))
+                          if path.name.removeprefix("attempt-").isdigit() else -1,
+                          path.name),
+    )
+    if not attempt_dirs:
+        raise PhaseFailure("launch-continuation", "no durable attempt lane is present",
                            {"lane": str(lane.resolve())})
     observed: dict[tuple[str, int, int, str], dict[str, Any]] = {}
+    sources: dict[tuple[str, int, int, str], Path] = {}
     duplicates: list[tuple[str, int, int, str]] = []
-    for path in sorted(child.rglob("case.json")):
-        row = read_summary(path)
-        if row.get("task") != "C4-R03":
-            continue
-        coordinate = (str(row.get("target", "")), int(row.get("user", -1)),
-                      int(row.get("iteration", -1)), str(row.get("mode", "")))
-        if coordinate in observed:
-            duplicates.append(coordinate)
-        observed[coordinate] = row
+    latest_child = attempt_dirs[-1]
+    for child in attempt_dirs:
+        child_has_rows = False
+        for path in sorted(child.rglob("case.json")):
+            row = read_summary(path)
+            if row.get("task") != "C4-R03":
+                continue
+            child_has_rows = True
+            coordinate = (str(row.get("target", "")), int(row.get("user", -1)),
+                          int(row.get("iteration", -1)), str(row.get("mode", "")))
+            if coordinate in observed:
+                duplicates.append(coordinate)
+            observed[coordinate] = row
+            sources[coordinate] = child
+        if child_has_rows:
+            latest_child = child
     if duplicates:
         raise PhaseFailure("launch-continuation", "duplicate completed coordinates",
-                           {"duplicates": duplicates, "lane": str(child.resolve())})
+                           {"duplicates": duplicates,
+                            "attempts": [str(path.resolve()) for path in attempt_dirs]})
 
     target_names = [value.strip() for value in targets.split(",") if value.strip()]
     user_values = [int(value.strip()) for value in users.split(",") if value.strip()]
@@ -162,21 +176,24 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
         if row is None:
             target, user, iteration, mode = coordinate
             return {
-                "previousLane": str(child.resolve()),
+                "previousLane": str(latest_child.resolve()),
                 "target": target,
                 "user": user,
                 "iteration": iteration,
                 "mode": mode,
                 "completedRows": len(observed),
                 "expectedRows": len(expected),
+                "attempts": [str(path.resolve()) for path in attempt_dirs],
             }
         if row.get("failureDetected"):
             raise PhaseFailure("launch-continuation", "existing lane contains a non-terminal failure",
-                               {"coordinate": coordinate, "row": row})
+                               {"coordinate": coordinate, "row": row,
+                                "source": str(sources[coordinate].resolve())})
     return {
-        "previousLane": str(child.resolve()),
+        "previousLane": str(latest_child.resolve()),
         "completedRows": len(observed),
         "expectedRows": len(expected),
+        "attempts": [str(path.resolve()) for path in attempt_dirs],
         "complete": True,
     }
 

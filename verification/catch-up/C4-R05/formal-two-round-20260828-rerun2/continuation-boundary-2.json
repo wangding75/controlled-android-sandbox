@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R05",
+  "status": "INCOMPLETE_CONTINUATION_REQUIRED",
+  "captured_at": "2026-08-28T06:11:38.785Z",
+  "cause": "The second host-side command session ended while the R03 child was still executing. No device fatal, timeout, or dynamic-readiness failure was observed in the completed cases.",
+  "formal_result": "NOT_PASSED",
+  "durable_attempts": [
+    "round-1-clean-install-cold/launch-matrix/attempt-001",
+    "round-1-clean-install-cold/launch-matrix/attempt-002"
+  ],
+  "completed_coordinate_count": 58,
+  "completed_coordinates_by_attempt": {
+    "attempt-001": 6,
+    "attempt-002": 52
+  },
+  "completed_coordinate_groups": {
+    "fixture/user-0": 50,
+    "fixture/user-1": 8
+  },
+  "next_coordinate": "fixture/user-1/cold-005",
+  "evidence": {
+    "child_lane": "round-1-clean-install-cold/launch-matrix",
+    "child_case_contracts": "round-1-clean-install-cold/launch-matrix/attempt-001/attempts/ and attempt-002/attempts/",
+    "add_gate_summary": "round-1-clean-install-cold/add-gate/summary.json",
+    "r04_summaries": "round-1-clean-install-cold/r04-failure-injection/runner-summary.json, round-1-clean-install-cold/r04-recovery/runner-summary.json"
+  },
+  "resume_policy": "The continuation selector now merges all durable attempt lanes, rejects duplicate coordinates, and seeds the newest lane containing evidence. The next run must use --continue-existing-output from a clean pushed commit."
+}
