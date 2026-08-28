@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,13 +42,22 @@ public final class PackageRevisionSetVerifier {
         List<Artifact> all = new ArrayList<>(base);
         if (splits != null) all.addAll(splits);
         validateArtifactSet(all);
-        String actualBase = digest(all.get(0));
-        requireDigest(all.get(0).sha256, actualBase, "BASE_APK_SHA256_MISMATCH");
+        // Hash each physical artifact once per verification transaction. The previous
+        // implementation hashed the base once for actualBase and then again in the all-artifact
+        // loop, doubling disk reads for every cold launch. A path/descriptor keyed cache preserves
+        // all integrity checks while guaranteeing one complete digest per artifact.
+        Map<String, String> digests = new LinkedHashMap<>();
         for (Artifact artifact : all) {
             if (!artifact.hasSource()) {
                 throw new IllegalArgumentException("APK artifact is missing: " + artifact.splitName);
             }
-            requireDigest(artifact.sha256, digest(artifact),
+            String key = artifactKey(artifact);
+            if (!digests.containsKey(key)) digests.put(key, digest(artifact));
+        }
+        String actualBase = digests.get(artifactKey(all.get(0)));
+        requireDigest(all.get(0).sha256, actualBase, "BASE_APK_SHA256_MISMATCH");
+        for (Artifact artifact : all) {
+            requireDigest(artifact.sha256, digests.get(artifactKey(artifact)),
                     artifact.base() ? "BASE_APK_SHA256_MISMATCH"
                             : "SPLIT_APK_SHA256_MISMATCH:" + artifact.splitName);
         }
@@ -60,6 +70,11 @@ public final class PackageRevisionSetVerifier {
         return artifact.descriptor == null
                 ? ApkRevisionVerifier.sha256(artifact.file)
                 : ApkRevisionVerifier.sha256(artifact.descriptor);
+    }
+
+    private static String artifactKey(Artifact artifact) throws Exception {
+        if (artifact.descriptor != null) return "fd:" + artifact.descriptor.getFd();
+        return "file:" + artifact.file.getCanonicalPath();
     }
 
     public static String revisionDigest(List<Artifact> artifacts) throws Exception {
