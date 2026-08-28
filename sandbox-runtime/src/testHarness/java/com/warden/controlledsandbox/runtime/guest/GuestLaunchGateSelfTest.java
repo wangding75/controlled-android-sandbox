@@ -7,6 +7,8 @@ public final class GuestLaunchGateSelfTest {
     public static void main(String[] args) {
         require(!GuestLaunchGate.isLaunchPass(GuestLaunchGate.prepareStatus(true)),
                 "PREPARE_PASS is not LAUNCH_PASS");
+        require(GuestLaunchGate.isLaunchAccepted(GuestLaunchGate.LAUNCH_ACCEPTED),
+                "LAUNCH_ACCEPTED is a product launch result");
         require(GuestLaunchGate.LAUNCH_FAILED.equals(GuestLaunchGate.evaluate(
                         evidence(true, false, false, false, false, false, false, false, false, true, 0, 0, true, true, ""))),
                 "prepared process without Activity is not LAUNCH_PASS");

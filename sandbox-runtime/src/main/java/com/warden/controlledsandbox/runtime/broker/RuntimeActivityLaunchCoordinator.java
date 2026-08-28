@@ -46,6 +46,7 @@ final class RuntimeActivityLaunchCoordinator {
         if (requestId.isEmpty()) requestId = java.util.UUID.randomUUID().toString();
         String operationId = routedRequest.getString(RuntimeKeys.OPERATION_ID, "").trim();
         if (operationId.isEmpty()) operationId = requestId + "-launch";
+        boolean awaitReadiness = routedRequest.getBoolean(RuntimeKeys.LAUNCH_AWAIT_READINESS, false);
         routedRequest.putString(RuntimeKeys.REQUEST_ID, requestId);
         routedRequest.putString(RuntimeKeys.OPERATION_ID, operationId);
         routedRequest.putInt(RuntimeKeys.ATTEMPT, 1);
@@ -221,6 +222,7 @@ final class RuntimeActivityLaunchCoordinator {
                                     routedRequest.getLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
                                     acceptedAtElapsedMs));
                     if (!sessionId.isEmpty()) owner.launchObservations.put(sessionId, observation);
+                    owner.launchObservations.put(requestId, observation);
                     owner.launchObservations.put(activityToken, observation);
                     if (!taskKey.isEmpty()) owner.launchObservations.put(taskKey, observation);
                 } else {
@@ -270,6 +272,32 @@ final class RuntimeActivityLaunchCoordinator {
             if (observation == null) {
                 return owner.sessionBundle(session, GuestLaunchGate.LAUNCH_PENDING);
             }
+            if (!awaitReadiness) {
+                String observationToken = activityToken.isEmpty() ? requestId : activityToken;
+                scheduleReadinessObservation(observation, session, transaction, observationToken,
+                        component, requestId, operationId);
+                Bundle accepted = owner.sessionBundle(session, GuestLaunchGate.LAUNCH_ACCEPTED);
+                accepted.putAll(transaction);
+                accepted.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_ACCEPTED);
+                accepted.putBoolean(RuntimeKeys.LAUNCH_RUNTIME_ACCEPTED, true);
+                accepted.putBoolean(RuntimeKeys.LAUNCH_GUEST_PROCESS_READY, true);
+                accepted.putBoolean(RuntimeKeys.LAUNCH_ESSENTIAL_RUNTIME_READY, true);
+                accepted.putBoolean(RuntimeKeys.LAUNCH_START_ACTIVITY_ACCEPTED, true);
+                accepted.putBoolean(RuntimeKeys.LAUNCH_READINESS_PENDING, true);
+                accepted.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, observationToken);
+                accepted.putBoolean("launcherResolved", true);
+                accepted.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS,
+                        observation.acceptedAtElapsedMs());
+                accepted.putLong("launchAcceptedElapsedMs", elapsedSince(
+                        observation.acceptedAtElapsedMs()));
+                accepted.putString(RuntimeKeys.REQUEST_ID, requestId);
+                accepted.putString(RuntimeKeys.OPERATION_ID, operationId);
+                accepted.putInt(RuntimeKeys.ATTEMPT, 1);
+                accepted.putInt(RuntimeKeys.RETRY_BUDGET, 0);
+                accepted.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+                perf.close();
+                return accepted;
+            }
             try {
                 observation.await(LAUNCH_OBSERVATION_MS);
             } catch (InterruptedException interrupted) {
@@ -304,6 +332,9 @@ final class RuntimeActivityLaunchCoordinator {
                 out.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
                         ? "guest Activity create/resume/window not confirmed" : evidence.failure);
             }
+            out.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN,
+                    activityToken.isEmpty() ? requestId : activityToken);
+            owner.publishLaunchReadiness(activityToken.isEmpty() ? requestId : activityToken, out);
             perf.close();
             return out;
         } catch (Throwable error) {
@@ -321,6 +352,47 @@ final class RuntimeActivityLaunchCoordinator {
         if (observation == null) return;
         owner.launchObservations.forEach((key, value) -> {
             if (value == observation) owner.launchObservations.remove(key, value);
+        });
+    }
+
+    private void scheduleReadinessObservation(GuestLaunchObservation observation,
+                                              GuestSession session, Bundle transaction,
+                                              String activityToken, String component,
+                                              String requestId, String operationId) {
+        owner.executeLaunchObservation(() -> {
+            try {
+                observation.await(LAUNCH_OBSERVATION_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            GuestLaunchEvidence evidence = observation.close();
+            removeObservationMappings(observation);
+            String gate = GuestLaunchGate.evaluate(evidence);
+            Bundle details = owner.sessionBundle(session, gate);
+            details.putAll(transaction);
+            details.putString(RuntimeKeys.STATUS, gate);
+            details.putString(RuntimeKeys.REQUEST_ID, requestId);
+            details.putString(RuntimeKeys.OPERATION_ID, operationId);
+            details.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, activityToken);
+            details.putString(RuntimeKeys.COMPONENT_CLASS, component);
+            details.putBoolean(RuntimeKeys.LAUNCH_READINESS_PENDING, false);
+            details.putString("readinessStatus", gate);
+            details.putBoolean("activityCreated", evidence.onCreateCompleted);
+            details.putBoolean("activityResumed", evidence.resumed);
+            details.putBoolean("windowEvidence", evidence.windowEvidence);
+            details.putBoolean("firstFrameDrawn", evidence.firstFrameDrawn);
+            details.putStringArrayList("launchTimeline", evidence.timeline);
+            details.putLong("launchReadinessElapsedMs", Math.max(0L,
+                    android.os.SystemClock.elapsedRealtime() - observation.acceptedAtElapsedMs()));
+            details.putInt("fatalCount", evidence.fatalCount);
+            details.putInt("anrCount", evidence.anrCount);
+            if (GuestLaunchGate.LAUNCH_FAILED.equals(gate)) {
+                details.putString(RuntimeKeys.ERROR_TYPE, "LAUNCH_GATE_FAILED");
+                details.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
+                        ? "guest Activity create/resume/window not confirmed" : evidence.failure);
+            }
+            owner.publishLaunchReadiness(activityToken, details);
+            RuntimeEventLog.event("GUEST_LAUNCH_READINESS", details);
         });
     }
 

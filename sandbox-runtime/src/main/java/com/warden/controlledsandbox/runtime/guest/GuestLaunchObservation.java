@@ -168,6 +168,16 @@ public final class GuestLaunchObservation {
         return evidenceLocked();
     }
 
+    /** Returns the facts observed so far without closing the readiness window. */
+    public synchronized GuestLaunchEvidence snapshot() {
+        return evidenceLocked();
+    }
+
+    /** True once the observation reached a terminal event or was explicitly closed. */
+    public synchronized boolean isComplete() {
+        return done.getCount() == 0;
+    }
+
     public String activityToken() { return activityToken; }
 
     private boolean failedLocked() {

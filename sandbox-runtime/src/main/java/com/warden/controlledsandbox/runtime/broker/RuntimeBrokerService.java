@@ -98,6 +98,12 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         thread.setDaemon(true);
         return thread;
     });
+    /** Keeps first-frame observation off the product launch Binder thread. */
+    private final ExecutorService launchObservationExecutor = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "sandbox-launch-observation");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final GuestRecoveryPrewarmCoordinator guestRecoveryPrewarm =
             new GuestRecoveryPrewarmCoordinator(brokerState, sessions,
                     this::prepareGuestInternal, this::sessionBundle);
@@ -115,6 +121,8 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
                     guest, RuntimeOperationRequest.INVOKE_COMPONENT, request)));
     final BrokerActivityRuntime activityRuntime = new BrokerActivityRuntime(brokerState);
     final ConcurrentHashMap<String, GuestLaunchObservation> launchObservations =
+            new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Bundle> launchReadinessResults =
             new ConcurrentHashMap<>();
     private final RuntimeActivityLaunchCoordinator activityLaunchCoordinator =
             new RuntimeActivityLaunchCoordinator(this);
@@ -344,6 +352,14 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
 
     @Override public Bundle activityEvent(Bundle request) {
         CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+        if (request != null && request.getBoolean(RuntimeKeys.LAUNCH_OBSERVE_ONLY, false)) {
+            try {
+                return observeLaunch(request);
+            } catch (Throwable error) {
+                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                return failure(error);
+            }
+        }
         return resourceOperationCoordinator.activityEvent(request);
     }
 
@@ -1247,6 +1263,8 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
 
     @Override public void onDestroy() {
         pendingIntentRelayExecutor.shutdownNow();
+        launchObservationExecutor.shutdownNow();
+        launchReadinessResults.clear();
         guestRecoveryPrewarm.close();
         for (GuestSession session : sessions.snapshot()) {
             if (ownershipSweep != null) {
@@ -1269,6 +1287,56 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         isolatedShares.close();
         RuntimePeerPolicy.installIsolatedPeerRegistry(null);
         super.onDestroy();
+    }
+
+    void executeLaunchObservation(Runnable task) {
+        if (task == null) return;
+        launchObservationExecutor.execute(task);
+    }
+
+    private Bundle observeLaunch(Bundle request) {
+        String token = request.getString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN,
+                request.getString(RuntimeKeys.ACTIVITY_TOKEN, ""));
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("launch observation token is required");
+        }
+        token = token.trim();
+        Bundle completed = launchReadinessResults.get(token);
+        if (completed != null) return new Bundle(completed);
+        GuestLaunchObservation direct = launchObservations.get(token);
+        if (direct != null) return launchObservationPending(token, direct);
+        for (GuestLaunchObservation observation : new java.util.LinkedHashSet<>(
+                launchObservations.values())) {
+            if (!observation.acceptsActivityToken(token)) continue;
+            return launchObservationPending(token, observation);
+        }
+        throw new IllegalStateException("LAUNCH_OBSERVATION_NOT_FOUND");
+    }
+
+    private static Bundle launchObservationPending(String token,
+                                                   GuestLaunchObservation observation) {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, GuestLaunchGate.LAUNCH_PENDING);
+        out.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, token);
+        GuestLaunchEvidence evidence = observation.snapshot();
+        out.putBoolean(RuntimeKeys.LAUNCH_READINESS_PENDING, true);
+        out.putBoolean("activityCreated", evidence.onCreateCompleted);
+        out.putBoolean("activityResumed", evidence.resumed);
+        out.putBoolean("windowEvidence", evidence.windowEvidence);
+        out.putBoolean("firstFrameDrawn", evidence.firstFrameDrawn);
+        out.putStringArrayList("launchTimeline", evidence.timeline);
+        out.putInt("fatalCount", evidence.fatalCount);
+        out.putInt("anrCount", evidence.anrCount);
+        return out;
+    }
+
+    void publishLaunchReadiness(String token, Bundle details) {
+        if (token == null || token.trim().isEmpty() || details == null) return;
+        launchReadinessResults.put(token.trim(), new Bundle(details));
+        while (launchReadinessResults.size() > 256) {
+            String first = launchReadinessResults.keys().nextElement();
+            launchReadinessResults.remove(first);
+        }
     }
 
     Bundle sessionBundle(GuestSession session, String status) {

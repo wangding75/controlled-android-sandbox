@@ -89,6 +89,10 @@ final class SandboxApplicationLayer implements AutoCloseable {
     Bundle launch(SandboxRecord record, int userId) throws Exception {
         return toBundle(requireSuccess(engine.launch(record.packageName, userId)));
     }
+    Bundle launchAndAwaitReadiness(SandboxRecord record, int userId) throws Exception {
+        return toBundle(requireSuccess(engine.launchAndAwaitReadiness(
+                record.packageName, userId)));
+    }
     Bundle prepare(SandboxRecord record, int userId) throws Exception { return adapter.prepare(record, userId); }
     Bundle startService(SandboxRecord record, int userId) throws Exception { return adapter.startService(record, userId); }
     Bundle sendBroadcast(SandboxRecord record, int userId) throws Exception { return adapter.sendBroadcast(record, userId); }

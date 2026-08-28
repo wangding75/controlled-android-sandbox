@@ -135,6 +135,19 @@ public final class CasSandboxEngine {
         return publish(sdk.launch(identity));
     }
 
+    /** Compatibility path for callers that still need the full first-frame readiness gate. */
+    public SandboxOperationResult launchAndAwaitReadiness(String packageName, int userId)
+            throws Exception {
+        SandboxIdentity identity = lookupIdentity(packageName, userId);
+        if (identity == null) {
+            return publish(SandboxOperationResult.failure("launchAndAwaitReadiness",
+                    PACKAGE_NOT_INSTALLED, "instance is not installed", null,
+                    Map.of("packageName", packageName == null ? "" : packageName,
+                            "virtualUserId", Integer.toString(userId))));
+        }
+        return publish(sdk.launchAndAwaitReadiness(identity));
+    }
+
     public SandboxOperationResult kill(String packageName, int userId) throws Exception {
         SandboxIdentity identity = lookupIdentity(packageName, userId);
         if (identity == null) {

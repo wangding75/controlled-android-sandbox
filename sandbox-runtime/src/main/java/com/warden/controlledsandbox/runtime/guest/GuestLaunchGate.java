@@ -7,6 +7,8 @@ package com.warden.controlledsandbox.runtime.guest;
 public final class GuestLaunchGate {
     public static final String PREPARE_PASS = "PREPARE_PASS";
     public static final String LAUNCH_PASS = "LAUNCH_PASS";
+    /** Product launch was accepted; first-frame readiness is observed asynchronously. */
+    public static final String LAUNCH_ACCEPTED = "LAUNCH_ACCEPTED";
     public static final String LAUNCH_FAILED = "LAUNCH_FAILED";
     public static final String LAUNCH_PENDING = "LAUNCH_PENDING";
 
@@ -32,5 +34,9 @@ public final class GuestLaunchGate {
 
     public static boolean isLaunchPass(String status) {
         return LAUNCH_PASS.equals(status);
+    }
+
+    public static boolean isLaunchAccepted(String status) {
+        return LAUNCH_ACCEPTED.equals(status) || LAUNCH_PASS.equals(status);
     }
 }

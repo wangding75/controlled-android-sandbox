@@ -84,17 +84,45 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle launch(SandboxRecord record) throws Exception { return launch(record, 0); }
     Bundle launch(SandboxRecord record, int virtualUserId) throws Exception {
-        return launch(record, virtualUserId, "", "");
+        return launch(record, virtualUserId, "", "", false);
     }
     Bundle launch(SandboxRecord record, int virtualUserId, String requestId,
                   String operationId) throws Exception {
+        return launch(record, virtualUserId, requestId, operationId, false);
+    }
+    Bundle launchAndAwaitReadiness(SandboxRecord record, int virtualUserId) throws Exception {
+        return launch(record, virtualUserId, "", "", true);
+    }
+    Bundle observeLaunch(Bundle accepted) throws Exception {
+        if (accepted == null) throw new IllegalArgumentException("launch result is required");
+        String token = accepted.getString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, "");
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("launch observation token is missing");
+        }
+        Bundle request = new Bundle();
+        request.putInt(RuntimeKeys.PROTOCOL, RuntimeProtocol.CURRENT);
+        request.putString(RuntimeKeys.PACKAGE_NAME,
+                accepted.getString(RuntimeKeys.PACKAGE_NAME, ""));
+        request.putInt(RuntimeKeys.VIRTUAL_USER_ID,
+                accepted.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1));
+        request.putString(RuntimeKeys.SESSION_ID,
+                accepted.getString(RuntimeKeys.SESSION_ID, ""));
+        request.putLong(RuntimeKeys.GENERATION,
+                accepted.getLong(RuntimeKeys.GENERATION, 0L));
+        request.putString(RuntimeKeys.LAUNCH_OBSERVATION_TOKEN, token.trim());
+        request.putBoolean(RuntimeKeys.LAUNCH_OBSERVE_ONLY, true);
+        return execute(RuntimeOperationRequest.ACTIVITY_EVENT, request);
+    }
+    private Bundle launch(SandboxRecord record, int virtualUserId, String requestId,
+                          String operationId, boolean awaitReadiness) throws Exception {
         RuntimePerformanceTrace perf = new RuntimePerformanceTrace(requestId, operationId,
                 record == null ? "" : record.packageName);
         ACTIVE_PERF_TRACE.set(perf);
         try {
             Bundle request;
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PACKAGE_STATE)) {
-                request = request(record, virtualUserId, record.launchProcess, requestId, operationId);
+                request = request(record, virtualUserId, record.launchProcess, requestId,
+                        operationId, awaitReadiness);
             }
             Bundle result;
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.BROKER_CONNECT)) {
@@ -329,6 +357,12 @@ final class RuntimeClient implements AutoCloseable {
 
     private Bundle request(SandboxRecord record, int virtualUserId, String processName,
                            String requestId, String operationId) throws Exception {
+        return request(record, virtualUserId, processName, requestId, operationId, false);
+    }
+
+    private Bundle request(SandboxRecord record, int virtualUserId, String processName,
+                           String requestId, String operationId,
+                           boolean awaitReadiness) throws Exception {
         NativeGuestExecutionPolicy.requireRuntimeAllowed(record);
         RuntimePerformanceTrace perf = ACTIVE_PERF_TRACE.get();
         VirtualPackageStateSnapshot packageState;
@@ -387,6 +421,7 @@ final class RuntimeClient implements AutoCloseable {
         if (operationId != null && !operationId.trim().isEmpty()) {
             request.putString(RuntimeKeys.OPERATION_ID, operationId.trim());
         }
+        request.putBoolean(RuntimeKeys.LAUNCH_AWAIT_READINESS, awaitReadiness);
         request.putString(RuntimeKeys.APPLICATION_CLASS, record.applicationClass);
         request.putString(RuntimeKeys.COMPONENT_CLASS, record.launchActivity);
         ArrayList<String> permissions = new ArrayList<>();

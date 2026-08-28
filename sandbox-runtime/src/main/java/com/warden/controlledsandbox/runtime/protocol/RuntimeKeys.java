@@ -196,6 +196,17 @@ public final class RuntimeKeys {
     public static final String LAUNCH_STAGE = "launchStage";
     public static final String LAUNCH_STAGE_AT_ELAPSED_MS = "launchStageAtElapsedMs";
     public static final String LAUNCH_ACCEPTED_AT_ELAPSED_MS = "launchAcceptedAtElapsedMs";
+    /** Opt-in for the compatibility launch API that waits for first-frame readiness. */
+    public static final String LAUNCH_AWAIT_READINESS = "launchAwaitReadiness";
+    /** Read-only ACTIVITY_EVENT request for querying the asynchronous launch observation. */
+    public static final String LAUNCH_OBSERVE_ONLY = "launchObserveOnly";
+    /** Opaque token returned by launch() and accepted by the observation query. */
+    public static final String LAUNCH_OBSERVATION_TOKEN = "launchObservationToken";
+    public static final String LAUNCH_READINESS_PENDING = "launchReadinessPending";
+    public static final String LAUNCH_RUNTIME_ACCEPTED = "runtimeAccepted";
+    public static final String LAUNCH_GUEST_PROCESS_READY = "guestProcessReady";
+    public static final String LAUNCH_ESSENTIAL_RUNTIME_READY = "essentialRuntimeReady";
+    public static final String LAUNCH_START_ACTIVITY_ACCEPTED = "startActivityAccepted";
 
     public static final String CONNECTION_ID = "connectionId";
     public static final String SERVICE_BIND_FLAGS = "serviceBindFlags";

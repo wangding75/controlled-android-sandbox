@@ -13,6 +13,11 @@ public interface SandboxSdk extends AutoCloseable {
     SandboxOperationResult ensureInstance(String packageName, int virtualUserId) throws Exception;
     SandboxOperationResult cloneInstance(String packageName) throws Exception;
     SandboxOperationResult launch(SandboxIdentity identity) throws Exception;
+    /** Launches and waits for the independent Activity readiness observation to complete. */
+    default SandboxOperationResult launchAndAwaitReadiness(SandboxIdentity identity)
+            throws Exception {
+        return launch(identity);
+    }
     SandboxOperationResult stop(SandboxIdentity identity) throws Exception;
     SandboxOperationResult stopAll() throws Exception;
     SandboxOperationResult clearData(SandboxIdentity identity) throws Exception;

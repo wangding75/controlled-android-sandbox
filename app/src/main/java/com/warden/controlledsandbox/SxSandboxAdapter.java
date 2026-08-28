@@ -288,6 +288,26 @@ final class SxSandboxAdapter implements SandboxSdk {
         }
     }
 
+    @Override public SandboxOperationResult launchAndAwaitReadiness(SandboxIdentity identity)
+            throws Exception {
+        try {
+            SandboxRecord record = requireRecord(identity);
+            if (record == null) {
+                return SandboxOperationResult.failure("launchAndAwaitReadiness", identity == null
+                                ? "IDENTITY_REQUIRED" : "PACKAGE_NOT_INSTALLED",
+                        identity == null ? "identity is required"
+                                : "Package is not installed: " + identity.packageName(),
+                        identity, Map.of());
+            }
+            return bundleResult("launchAndAwaitReadiness", identity,
+                    runtime.launchAndAwaitReadiness(record, identity.virtualUserId()));
+        } catch (Exception error) {
+            return SandboxOperationResult.failure("launchAndAwaitReadiness",
+                    code("LAUNCH_FAILED", error), String.valueOf(error.getMessage()), identity,
+                    Map.of());
+        }
+    }
+
     @Override public SandboxOperationResult stop(SandboxIdentity identity) throws Exception {
         try {
             SandboxRecord record = requireRecord(identity);
