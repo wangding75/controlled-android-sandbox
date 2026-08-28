@@ -381,6 +381,7 @@ public final class GuestBrokerContentProviderSelfTest {
                 String permission, int requestCode, boolean hostGranted, String reason) { return null; }
         @Override public RuntimeStatusResult runtimeStatusV2(RuntimeStatusRequest request) { return null; }
         @Override public int virtualUidFor(String packageName, int virtualUserId) { return 12002; }
+        @Override public int[] virtualUidsFor(String[] packageNames, int virtualUserId) { return new int[] { 12002 }; }
         @Override public void stopGuest(String packageName, int virtualUserId) { }
     }
 

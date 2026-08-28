@@ -243,6 +243,28 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
             return uidRegistry().uidFor(packageName.trim(), virtualUserId);
         }
 
+        @Override public int[] virtualUidsFor(String[] packageNames, int virtualUserId) {
+            CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
+            if (packageNames == null) {
+                throw new IllegalArgumentException("packageNames is required");
+            }
+            if (packageNames.length > 1024) {
+                throw new IllegalArgumentException("Too many package names");
+            }
+            if (virtualUserId < 0 || virtualUserId > 999) {
+                throw new IllegalArgumentException("virtualUserId out of range");
+            }
+            int[] result = new int[packageNames.length];
+            for (int index = 0; index < packageNames.length; index++) {
+                String packageName = packageNames[index];
+                if (packageName == null || packageName.trim().isEmpty()) {
+                    throw new IllegalArgumentException("packageName is required");
+                }
+                result[index] = uidRegistry().uidFor(packageName.trim(), virtualUserId);
+            }
+            return result;
+        }
+
         @Override public void stopGuest(String packageName, int virtualUserId) {
             CallerGuard.requireRuntimePeer(RuntimeBrokerService.this);
             RuntimeBrokerService.this.stopGuestInternal(packageName, virtualUserId);

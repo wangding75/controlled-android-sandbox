@@ -35,6 +35,8 @@ interface IPackageManagementSession {
     PackageServiceResult abandonInstallSession(int sessionId);
     PackageServiceResult findRecord(String packageName);
     PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);
+    /** Returns all package states installed for one virtual user in one authority transaction. */
+    PackageServiceResult getVirtualPackageStates(int virtualUserId);
     PackageServiceResult setPermissionDecision(String packageName, int virtualUserId, String permission, String decision);
     PackageServiceResult setAppOpMode(String packageName, int virtualUserId, String opName, String mode);
     PackageServiceResult setPackageEnabledSetting(String packageName, int virtualUserId, String state);

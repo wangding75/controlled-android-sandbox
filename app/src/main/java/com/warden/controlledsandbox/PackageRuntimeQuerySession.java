@@ -4,6 +4,10 @@ import android.os.Binder;
 import android.os.IBinder;
 import com.warden.controlledsandbox.contract.IPackageRuntimeQuerySession;
 import com.warden.controlledsandbox.contract.PackageServiceResult;
+import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 import static com.warden.controlledsandbox.PackageServiceDependencies.required;
 
@@ -47,6 +51,27 @@ final class PackageRuntimeQuerySession extends IPackageRuntimeQuerySession.Stub
             return PackageServiceResult.successPackageState("getVirtualPackageState",
                     packageStateBuilder.build(view.record, virtualUserId,
                             view.policy, view.catalog));
+        });
+    }
+
+    @Override public PackageServiceResult getVirtualPackageStates(int virtualUserId) {
+        return execute("getVirtualPackageStates", () -> {
+            if (virtualUserId < 0 || virtualUserId > 999) {
+                throw new IllegalArgumentException("virtualUserId out of range");
+            }
+            SandboxCatalogState catalog = lifecycle.load();
+            ArrayList<VirtualPackageStateSnapshot> states = new ArrayList<>();
+            Set<String> installedPackages = new HashSet<>();
+            for (SandboxInstance instance : catalog.instances()) {
+                if (virtualUserId == instance.virtualUserId) installedPackages.add(instance.packageName);
+            }
+            for (SandboxRecord record : catalog.records()) {
+                if (!installedPackages.contains(record.packageName)) continue;
+                states.add(packageStateBuilder.build(record, virtualUserId,
+                        catalog.policy(record.packageName, virtualUserId), catalog));
+            }
+            return PackageServiceResult.successPackageStates("getVirtualPackageStates", states,
+                    PackageServiceMapper.toSnapshot(catalog, ""));
         });
     }
 

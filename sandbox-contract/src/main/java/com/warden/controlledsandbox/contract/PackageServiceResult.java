@@ -15,6 +15,7 @@ public final class PackageServiceResult implements Parcelable {
     private final PackageCatalogSnapshot catalog;
     private final PackageRecordSnapshot record;
     private final VirtualPackageStateSnapshot packageState;
+    private final ArrayList<VirtualPackageStateSnapshot> packageStates;
     private final RuntimePermissionRequestSnapshot permissionRequest;
     private final ArrayList<RuntimePermissionRequestSnapshot> permissionRequests;
     private final ArrayList<PermissionAuditSnapshot> permissionAudit;
@@ -33,6 +34,21 @@ public final class PackageServiceResult implements Parcelable {
                                  InstallSessionInfoSnapshot installSession,
                                  List<InstallSessionInfoSnapshot> installSessions,
                                  int intValue, String textValue, String operationTraceJson) {
+        this(successful, operation, errorCode, errorMessage, catalog, record, packageState,
+                List.of(), permissionRequest, permissionRequests, permissionAudit, installSession,
+                installSessions, intValue, textValue, operationTraceJson);
+    }
+
+    private PackageServiceResult(boolean successful, String operation, String errorCode,
+                                 String errorMessage, PackageCatalogSnapshot catalog,
+                                 PackageRecordSnapshot record, VirtualPackageStateSnapshot packageState,
+                                 List<VirtualPackageStateSnapshot> packageStates,
+                                 RuntimePermissionRequestSnapshot permissionRequest,
+                                 List<RuntimePermissionRequestSnapshot> permissionRequests,
+                                 List<PermissionAuditSnapshot> permissionAudit,
+                                 InstallSessionInfoSnapshot installSession,
+                                 List<InstallSessionInfoSnapshot> installSessions,
+                                 int intValue, String textValue, String operationTraceJson) {
         this.successful = successful;
         this.operation = value(operation);
         this.errorCode = value(errorCode);
@@ -40,6 +56,7 @@ public final class PackageServiceResult implements Parcelable {
         this.catalog = catalog;
         this.record = record;
         this.packageState = packageState;
+        this.packageStates = new ArrayList<>(packageStates == null ? List.of() : packageStates);
         this.permissionRequest = permissionRequest;
         this.permissionRequests = new ArrayList<>(permissionRequests == null ? List.of() : permissionRequests);
         this.permissionAudit = new ArrayList<>(permissionAudit == null ? List.of() : permissionAudit);
@@ -55,6 +72,7 @@ public final class PackageServiceResult implements Parcelable {
                 in.readParcelable(PackageCatalogSnapshot.class.getClassLoader()),
                 in.readParcelable(PackageRecordSnapshot.class.getClassLoader()),
                 in.readParcelable(VirtualPackageStateSnapshot.class.getClassLoader()),
+                in.createTypedArrayList(VirtualPackageStateSnapshot.CREATOR),
                 in.readParcelable(RuntimePermissionRequestSnapshot.class.getClassLoader()),
                 in.createTypedArrayList(RuntimePermissionRequestSnapshot.CREATOR),
                 in.createTypedArrayList(PermissionAuditSnapshot.CREATOR),
@@ -75,6 +93,16 @@ public final class PackageServiceResult implements Parcelable {
                                                            VirtualPackageStateSnapshot packageState) {
         return value(true, operation, null, null, packageState, null, null, null,
                 null, null, 0, "");
+    }
+    public static PackageServiceResult successPackageStates(String operation,
+                                                            List<VirtualPackageStateSnapshot> packageStates) {
+        return successPackageStates(operation, packageStates, null);
+    }
+    public static PackageServiceResult successPackageStates(String operation,
+                                                            List<VirtualPackageStateSnapshot> packageStates,
+                                                            PackageCatalogSnapshot catalog) {
+        return new PackageServiceResult(true, operation, "", "", catalog, null, null,
+                packageStates, null, null, null, null, null, 0, "", "");
     }
     public static PackageServiceResult successPermissionRequest(String operation,
                                                                  RuntimePermissionRequestSnapshot request,
@@ -137,8 +165,9 @@ public final class PackageServiceResult implements Parcelable {
     /** Returns the same typed payload with request-scoped package mutation telemetry attached. */
     public PackageServiceResult withOperationTrace(String traceJson) {
         return new PackageServiceResult(successful, operation, errorCode, errorMessage,
-                catalog, record, packageState, permissionRequest, permissionRequests,
-                permissionAudit, installSession, installSessions, intValue, textValue, traceJson);
+                catalog, record, packageState, packageStates, permissionRequest,
+                permissionRequests, permissionAudit, installSession, installSessions,
+                intValue, textValue, traceJson);
     }
 
     public boolean successful() { return successful; }
@@ -148,6 +177,9 @@ public final class PackageServiceResult implements Parcelable {
     public PackageCatalogSnapshot catalog() { return catalog; }
     public PackageRecordSnapshot record() { return record; }
     public VirtualPackageStateSnapshot packageState() { return packageState; }
+    public List<VirtualPackageStateSnapshot> packageStates() {
+        return Collections.unmodifiableList(packageStates);
+    }
     public RuntimePermissionRequestSnapshot permissionRequest() { return permissionRequest; }
     public List<RuntimePermissionRequestSnapshot> permissionRequests() {
         return Collections.unmodifiableList(permissionRequests);
@@ -167,6 +199,7 @@ public final class PackageServiceResult implements Parcelable {
         out.writeInt(successful ? 1 : 0); out.writeString(operation); out.writeString(errorCode);
         out.writeString(errorMessage); out.writeParcelable(catalog, flags);
         out.writeParcelable(record, flags); out.writeParcelable(packageState, flags);
+        out.writeTypedList(packageStates);
         out.writeParcelable(permissionRequest, flags); out.writeTypedList(permissionRequests);
         out.writeTypedList(permissionAudit); out.writeParcelable(installSession, flags);
         out.writeTypedList(installSessions); out.writeInt(intValue); out.writeString(textValue);

@@ -361,6 +361,16 @@ public abstract class BaseIsolatedGuestProcessService extends Service {
             return delegate.virtualUidFor(packageName, virtualUserId);
         }
 
+        @Override public int[] virtualUidsFor(String[] packageNames, int virtualUserId)
+                throws android.os.RemoteException {
+            if (packageNames == null || packageNames.length != 1
+                    || !ScopedRuntimeBroker.this.packageName.equals(packageNames[0])
+                    || ScopedRuntimeBroker.this.virtualUserId != virtualUserId) {
+                throw new SecurityException("ISOLATED_UID_IDENTITY_MISMATCH");
+            }
+            return delegate.virtualUidsFor(packageNames, virtualUserId);
+        }
+
         @Override public void stopGuest(String packageName, int virtualUserId)
                 throws android.os.RemoteException {
             if (!ScopedRuntimeBroker.this.packageName.equals(packageName)

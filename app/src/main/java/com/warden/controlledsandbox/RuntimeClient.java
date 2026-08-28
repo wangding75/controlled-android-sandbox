@@ -21,6 +21,8 @@ import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 final class RuntimeClient implements AutoCloseable {
@@ -408,31 +410,41 @@ final class RuntimeClient implements AutoCloseable {
         ArrayList<VirtualPackageProjectionSnapshot> result = new ArrayList<>();
         RuntimePerformanceTrace perf = ACTIVE_PERF_TRACE.get();
         if (perf != null) perf.addCounter("packageUniverseCount", 1);
-        for (SandboxRecord record : packageService.load().records()) {
-            if (current.packageName.equals(record.packageName)) continue;
-            VirtualPackageStateSnapshot state;
-            try {
-                state = packageService.virtualPackageState(record.packageName, virtualUserId);
-                if (perf != null) perf.addCounter("binderCallCount", 1);
-            } catch (Exception unavailableForUser) {
-                // A package without an instance for this virtual user is not installed in that
-                // user's virtual PMS view. Do not fall back to Host PMS metadata.
-                android.util.Log.i("CS_PM_UNIVERSE_SKIP", "package=" + record.packageName
-                        + " user=" + virtualUserId + " reason="
-                        + unavailableForUser.getClass().getSimpleName());
-                continue;
-            }
-            // Runtime Broker is the single owner of the persistent package/user -> UID mapping.
-            // Do not synthesize sequential UIDs here: that silently diverges from the UID used
-            // by the target process, Binder identity and virtual system-service state whenever
-            // package enumeration order changes or a package was assigned an ID earlier.
-            int virtualUid = requireBroker().virtualUidFor(record.packageName, virtualUserId);
-            if (perf != null) perf.addCounter("binderCallCount", 1);
-            // The authority snapshot already contains the manifest-derived ApplicationInfo and
-            // split paths.  Parsing every peer APK through Host PackageManager on every request
-            // duplicated import work and made cold starts scale with unrelated APK size.
+        // The authority builds all user-visible package states while holding its existing
+        // transaction lock. This turns N per-package state calls into one bounded snapshot.
+        PackageServiceResult universe = packageService.virtualPackageStates(virtualUserId);
+        if (universe.catalog() == null) {
+            throw new IllegalStateException("PACKAGE_UNIVERSE_CATALOG_MISSING");
+        }
+        SandboxCatalogState catalog = PackageServiceMapper.fromSnapshot(universe.catalog());
+        ArrayList<VirtualPackageStateSnapshot> states =
+                new ArrayList<>(universe.packageStates());
+        Map<String, SandboxRecord> records = new HashMap<>();
+        for (SandboxRecord record : catalog.records()) records.put(record.packageName, record);
+
+        ArrayList<String> packageNames = new ArrayList<>();
+        ArrayList<VirtualPackageStateSnapshot> projectedStates = new ArrayList<>();
+        for (VirtualPackageStateSnapshot state : states) {
+            if (state == null || current.packageName.equals(state.packageName())) continue;
+            if (!records.containsKey(state.packageName())) continue;
+            packageNames.add(state.packageName());
+            projectedStates.add(state);
+        }
+        // Runtime Broker remains the single owner of persistent package/user -> UID mappings;
+        // resolve the whole projection in one Binder transaction instead of one call per APK.
+        int[] virtualUids = requireBroker().virtualUidsFor(
+                packageNames.toArray(new String[0]), virtualUserId);
+        if (virtualUids.length != projectedStates.size()) {
+            throw new IllegalStateException("PACKAGE_UNIVERSE_UID_COUNT_MISMATCH");
+        }
+        if (perf != null) perf.addCounter("binderCallCount", 2);
+        for (int index = 0; index < projectedStates.size(); index++) {
+            VirtualPackageStateSnapshot state = projectedStates.get(index);
+            SandboxRecord record = records.get(state.packageName());
+            // The authority snapshot already contains manifest-derived ApplicationInfo and split
+            // paths. Parsing every peer APK through Host PackageManager was duplicate import work.
             result.add(new VirtualPackageProjectionSnapshot(state, record.apkPath,
-                    record.nativeLibraryDir, virtualUid));
+                    record.nativeLibraryDir, virtualUids[index]));
         }
         return result;
     }

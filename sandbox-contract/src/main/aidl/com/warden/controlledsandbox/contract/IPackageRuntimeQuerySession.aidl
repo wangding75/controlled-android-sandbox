@@ -6,5 +6,7 @@ import com.warden.controlledsandbox.contract.PackageServiceResult;
 interface IPackageRuntimeQuerySession {
     PackageServiceResult findRecord(String packageName);
     PackageServiceResult getVirtualPackageState(String packageName, int virtualUserId);
+    /** Returns all package states installed for one virtual user in one authority transaction. */
+    PackageServiceResult getVirtualPackageStates(int virtualUserId);
     void close();
 }

@@ -12,6 +12,7 @@ import com.warden.controlledsandbox.contract.VirtualPackageStateSnapshot;
 import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
 import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityCapability;
 import com.warden.controlledsandbox.runtime.protocol.RuntimePackageAuthorityRecovery;
+import java.util.ArrayList;
 
 /**
  * Broker-only read capability for trusted installed-package and virtual-user state.
@@ -65,6 +66,12 @@ final class RuntimePackageAuthorityClient implements AutoCloseable {
             throws Exception {
         return requireSuccess(requireSession().getVirtualPackageState(packageName, virtualUserId))
                 .packageState();
+    }
+
+    ArrayList<VirtualPackageStateSnapshot> virtualPackageStates(int virtualUserId)
+            throws Exception {
+        return new ArrayList<>(requireSuccess(
+                requireSession().getVirtualPackageStates(virtualUserId)).packageStates());
     }
 
     private IPackageRuntimeQuerySession requireSession() throws Exception {

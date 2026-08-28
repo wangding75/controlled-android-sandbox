@@ -210,6 +210,10 @@ final class PackageServiceClient implements AutoCloseable {
         return packageState(requireSession().getVirtualPackageState(packageName, virtualUserId));
     }
 
+    PackageServiceResult virtualPackageStates(int virtualUserId) throws Exception {
+        return requireSuccess(requireSession().getVirtualPackageStates(virtualUserId));
+    }
+
     VirtualPackageStateSnapshot setPermissionDecision(String packageName, int virtualUserId,
                                                         String permission, String decision)
             throws Exception {
