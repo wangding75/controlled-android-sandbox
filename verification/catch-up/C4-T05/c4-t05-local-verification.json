@@ -4,46 +4,46 @@
   "historical_only": true,
   "usable_for_c4_closure": false,
   "superseded_by": "C4-R01",
-  "supersession_reason": "Historical local verification did not require Window/Surface/reportedDrawn/first-frame evidence.",
+  "evidence_role": "HISTORICAL_C4_T05",
   "status": "PASS",
   "environment": {
     "instance_name": "RD测试",
     "adb_serial": "127.0.0.1:16416",
-    "device_name": "V2241A",
+    "device_name": "22041211A",
     "api_level": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
-    "android_id": "8acae00bece8090b",
-    "manufacturer": "vivo",
+    "boot_id": "1c0f163e-6457-4160-b845-041d48fc0096",
+    "android_id": "398eea33120cd887",
+    "manufacturer": "Redmi",
     "release": "12",
     "mumu": {
       "project": "Controlled Android Sandbox / 闪现2",
       "instanceName": "RD测试",
       "instanceIndex": 1,
-      "instanceId": "ginstance1400672403315892101",
+      "instanceId": "ginstance1400698250451515301",
       "vmName": "MuMuPlayer-12.0-1",
       "runtimeStatus": "device",
       "mumuPlayerState": "",
       "mumuManager": {},
       "resolvedSerial": "127.0.0.1:16416",
       "configuredSerial": "127.0.0.1:16416",
-      "manufacturer": "vivo",
-      "model": "V2241A",
+      "manufacturer": "Redmi",
+      "model": "22041211A",
       "release": "12",
       "api": "32",
-      "androidId": "8acae00bece8090b",
+      "androidId": "398eea33120cd887",
       "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-      "bootId": "4e8df89b-cebc-41c1-9b1e-d4abf7ac2c31",
-      "timestamp": "2026-08-23T12:49:50.352417+00:00",
-      "mumuRoot": "D:\\install\\Netease\\MuMu",
+      "bootId": "1c0f163e-6457-4160-b845-041d48fc0096",
+      "timestamp": "2026-08-26T01:50:44.004389+00:00",
+      "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
       "config": {
-        "extraConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
-        "vmConfig": "D:\\install\\Netease\\MuMu\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+        "extraConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+        "vmConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
         "configuredHostPort": 16416,
         "runtimeHost": "127.0.0.1",
         "runtimeHostPort": 16416,
-        "configuredManufacturer": "vivo",
-        "configuredModel": "V2241A"
+        "configuredManufacturer": "Redmi",
+        "configuredModel": "22041211A"
       },
       "adb": {
         "path": "adb",
@@ -54,11 +54,11 @@
           "stderr": "",
           "getState": "device"
         },
-        "devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n",
+        "devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:600\n\n",
         "getState": "device"
       }
     },
-    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:PD2241 model:V2241A device:PD2241 transport_id:1\nemulator-5556          device product:PD2241 model:V2241A device:PD2241 transport_id:2\n\n"
+    "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:600\n\n"
   },
   "static_gates": [
     {
@@ -135,7 +135,9 @@
     ],
     "hosted_stub": true,
     "background_retained": true,
-    "foreground_reentry_markers": [],
+    "foreground_reentry_markers": [
+      "PrivacyPolicyActivity"
+    ],
     "guest_activity_create": true
   },
   "apk_metadata": {
@@ -144,25 +146,25 @@
         "name": "host",
         "path": "D:\\github\\controlled-android-sandbox\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
         "exists": true,
-        "sha256": "8434e8dd7b02518022d7e80aa99166a5fbce0b4383a56d53e97f098c9e63275c"
+        "sha256": "2459c76e86e03df3e22834227b2e0d4fa9525afac72578b79db2a2dc809d7e2d"
       },
       {
         "name": "companion32",
         "path": "D:\\github\\controlled-android-sandbox\\sandbox-companion32\\build\\outputs\\apk\\debug\\sandbox-companion32-debug.apk",
         "exists": true,
-        "sha256": "608b112fe269c1bda183e701c1ccbf5f91279f12e33a3df2d53c5d7986d5febd"
+        "sha256": "deb12d8f2c070dbaba59728fac0985b87847398faf15937655fdea942d0f0d49"
       },
       {
         "name": "fixture",
         "path": "D:\\github\\controlled-android-sandbox\\fixture-basic\\build\\outputs\\apk\\debug\\fixture-basic-debug.apk",
         "exists": true,
-        "sha256": "d9405a756e487ec522280688185dadc6d45240f280f8d8f89d37b15e0f2c0dbc"
+        "sha256": "8d8f4d776b287ea947358690882a33763c3967578952cc88e57d5188ca8275a5"
       },
       {
         "name": "fixture32",
         "path": "D:\\github\\controlled-android-sandbox\\fixture-compat32\\build\\outputs\\apk\\debug\\fixture-compat32-debug.apk",
         "exists": true,
-        "sha256": "a46d96f8a08ae86267ab04c45bf2a253ded21f5608a4c9c7c1a6e6dbeb4a7a5e"
+        "sha256": "9193694ee36848992e98d7e1ff7197a833182807784eb5a375f0d32bff5c96e1"
       }
     ]
   },

@@ -1,0 +1,64 @@
+{
+  "target": "dingtalk",
+  "package": "com.alibaba.android.rimet",
+  "user": 0,
+  "requestId": "10de69a5c092463da8fbab708d53f4bb",
+  "attempt": 1,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "10de69a5c092463da8fbab708d53f4bb",
+      "operationId": "10de69a5c092463da8fbab708d53f4bb-launch",
+      "startedAt": 1787722643789,
+      "packageOperationTrace": {
+        "requestId": "10de69a5c092463da8fbab708d53f4bb",
+        "operationId": "e2d0d9cf-4ad0-4b8a-a06a-52abf7847f3b",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.alibaba.android.rimet",
+        "virtualUserId": 0,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1787722649484,
+        "elapsedMs": 28022,
+        "stageTimingsMs": {
+          "HASH": 1317,
+          "COPY": 2769,
+          "PARSE": 3096,
+          "NATIVE_EXTRACT": 3410,
+          "PUBLISH": 4847,
+          "ENSURE_INSTANCE": 0,
+          "CATALOG": 4386
+        },
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": []
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 829\nWaitTime: 831\nComplete\n",
+    "start_stderr": ""
+  }
+}

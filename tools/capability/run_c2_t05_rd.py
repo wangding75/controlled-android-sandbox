@@ -382,12 +382,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--instance", default="RD测试")
     parser.add_argument("--loops", type=int, default=50)
+    parser.add_argument("--verification-dir", type=Path,
+                        default=ROOT / "verification/catch-up/C2-T05")
     args = parser.parse_args()
     if args.loops < 1 or args.loops > 100:
         raise SystemExit("--loops must be between 1 and 100")
 
     output = artifacts_dir("catch-up-c2-t05")
-    verification = ROOT / "verification/catch-up/C2-T05"
+    verification = args.verification_dir
     verification.mkdir(parents=True, exist_ok=True)
     identity = git_identity()
     evidence: dict[str, Any] = {

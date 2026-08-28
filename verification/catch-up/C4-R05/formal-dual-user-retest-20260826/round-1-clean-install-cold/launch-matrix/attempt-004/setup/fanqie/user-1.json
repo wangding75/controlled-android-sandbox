@@ -1,0 +1,81 @@
+{
+  "target": "fanqie",
+  "package": "com.dragon.read",
+  "user": 1,
+  "requestId": "db90c786fbb946ebb92a8c190ed1432d",
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.dragon.read",
+      "virtualUserId": 1,
+      "trustNativeGuest": true,
+      "requestId": "db90c786fbb946ebb92a8c190ed1432d",
+      "operationId": "db90c786fbb946ebb92a8c190ed1432d-launch",
+      "startedAt": 1787755099050,
+      "packageOperationTrace": {
+        "requestId": "db90c786fbb946ebb92a8c190ed1432d",
+        "operationId": "56ef6374-3883-492a-81d4-e21d7f0fcd36",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.dragon.read",
+        "virtualUserId": 1,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1787755103103,
+        "elapsedMs": 16399,
+        "stageTimingsMs": {
+          "HASH": 501,
+          "COPY": 923,
+          "PARSE": 2059,
+          "NATIVE_EXTRACT": 1355,
+          "PUBLISH": 2272,
+          "ENSURE_INSTANCE": 0,
+          "CATALOG": 4986
+        },
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": [
+          {
+            "code": "MIXED_ELF_MACHINE",
+            "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+          }
+        ]
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 627\nWaitTime: 629\nComplete\n",
+    "start_stderr": ""
+  },
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "dingtalk",
+    "resumeUser": 0,
+    "resumeIteration": 11,
+    "resumeMode": "hot",
+    "attempt": 4,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-001",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+  }
+}

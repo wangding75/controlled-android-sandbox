@@ -1,6 +1,6 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.4
+版本：1.5
 制定日期：2026-08-21
 基准分支：`feature/t57-r03-va-pro-capability-campaign`
 首要验收环境：MuMu 模拟器实例 `RD测试`
@@ -22,9 +22,10 @@
 按同日用户补充决策，`loops=25` 是 C4-R05 正式阶段关闭门禁；待 C0-C7 全部任务完成后，另行执行
 `loops=50` 的整体验收，不以 C4-R05 阶段证据替代整体验收。
 
-修订记录：2026-08-25 按用户进一步明确的分层策略，C4 阶段正式门禁只执行 1 轮 `loops=25`（clean
-install/cold）；待所有阶段任务完成后，整体验收再执行 2 轮 `loops=50`（clean-install/cold 与
-retained-state/hot/recovery）。C4 阶段的添加门禁、回归和双用户压力要求保持不变。
+修订记录：2026-08-27 按用户最新连续执行与正式关门指令，C4 阶段正式门禁恢复为 2 轮
+`loops=25`：clean-install/cold 与 retained-state/hot/recovery。每轮仍执行减半添加门禁和每个
+target/user 冷热各 25 次；C0-C7 全部完成后的整体验收仍另行执行 2 轮 `loops=50`。首帧、
+Window/Surface、SLO、零隐藏重试、回归和双用户压力门槛均不降低。
 
 ## 1. 任务书目标
 
@@ -517,7 +518,8 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 ### C4-R05：MuMu RD 正式重验与 C4 关门
 
 - **任务目标**：在修复后的同一 clean commit 上重新证明 CAS-only SX 添加、启动、F1-F5 和 DingTalk 业务。
-- **执行方案**：动态解析 `RD测试`，同一 commit 执行 1 轮完整阶段 suite（clean install/cold）；每个目标/用户
+- **执行方案**：动态解析 `RD测试`，同一 clean commit 执行 2 轮完整阶段 suite（第一轮 clean
+  install/cold，第二轮 retained state/hot/recovery）；每轮每个目标/用户
   执行 25 次冷启动和 25 次热启动（fixture、DingTalk、夸克、红果、番茄小说，两用户，合计 500 个启动观察）；
   添加门禁执行 fixture 25 次、DingTalk/夸克/红果/番茄小说各 5 次真实
   add/delete/re-add；将夸克作为当前可添加的对照样本，将红果、番茄小说作为必须关闭的兼容性样本，并连同

@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.4
-更新时间：2026-08-26 15:05（Asia/Shanghai）
+账本版本：1.5
+更新时间：2026-08-27 01:25（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`

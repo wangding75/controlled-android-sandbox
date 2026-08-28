@@ -77,12 +77,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 /** Central process allocator and route authority. Business/UI code does not own runtime state. */
 public final class RuntimeBrokerService extends Service implements RuntimeBrokerOperationHandler {
     private static final int SLOT_COUNT = ProcessSlotContract.ORDINARY_SLOT_COUNT;
-    private static final long RECOVERY_PREWARM_DELAY_MILLIS = 1_500L;
     private final Clock clock = new SystemMonotonicClock();
     private final TokenGenerator tokenGenerator = new UuidTokenGenerator();
     private final AuditSink auditSink = new RuntimeAuditSink();
@@ -101,15 +98,9 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         thread.setDaemon(true);
         return thread;
     });
-    /** Rebuilds a dead ordinary Guest process before the next hot Activity request arrives. */
-    private final ScheduledExecutorService guestRecoveryPrewarmExecutor =
-            Executors.newSingleThreadScheduledExecutor(runnable -> {
-                Thread thread = new Thread(runnable, "sandbox-guest-recovery-prewarm");
-                thread.setDaemon(true);
-                return thread;
-            });
-    private final ConcurrentHashMap<String, Boolean> guestRecoveryPrewarmPending =
-            new ConcurrentHashMap<>();
+    private final GuestRecoveryPrewarmCoordinator guestRecoveryPrewarm =
+            new GuestRecoveryPrewarmCoordinator(brokerState, sessions,
+                    this::prepareGuestInternal, this::sessionBundle);
     final RuntimeIsolatedShareManager isolatedShares =
             new RuntimeIsolatedShareManager(this);
     final RuntimeIsolatedProcessCoordinator isolatedProcessCoordinator =
@@ -1216,64 +1207,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         if (ownershipSweep != null) ownershipSweep.death(affected, reason);
         RuntimeEventLog.event("GUEST_PROCESS_DISCONNECTED",
                 sessionBundle(affected, affected.state().name()));
-        scheduleGuestRecoveryPrewarm(affected, reason);
-    }
-
-    /**
-     * The Guest may intentionally cross a real process boundary during a launcher handoff
-     * (DingTalk is one example).  NBB/VA retain the validated package/LoadedApk record and begin
-     * rebuilding the next ProcessRecord before a later Activity launch asks for it.  Do the same
-     * with the broker-owned immutable prepared spec.  This is deliberately best-effort and
-     * generation-fenced: it never changes the result of the already-running launch, never
-     * invents a package request, and exits if another operation has already started recovery.
-     */
-    private void scheduleGuestRecoveryPrewarm(GuestSession affected, String reason) {
-        if (affected == null || affected.state() != SessionState.RECOVERING) return;
-        String key = processKey(affected.packageName(), affected.virtualUserId(),
-                affected.processName());
-        if (guestRecoveryPrewarmPending.putIfAbsent(key, Boolean.TRUE) != null) return;
-        Bundle cached = brokerState.prepared(key);
-        if (cached == null) {
-            guestRecoveryPrewarmPending.remove(key);
-            return;
-        }
-        Bundle request = new Bundle(cached);
-        request.putString(RuntimeKeys.PACKAGE_NAME, affected.packageName());
-        request.putInt(RuntimeKeys.VIRTUAL_USER_ID, affected.virtualUserId());
-        request.putString(RuntimeKeys.PROCESS_NAME, affected.processName());
-        guestRecoveryPrewarmExecutor.schedule(() -> {
-            try {
-                GuestSession current;
-                synchronized (RuntimeBrokerService.this) {
-                    current = sessions.get(affected.packageName(), affected.virtualUserId(),
-                            affected.processName());
-                    if (current == null || current.state() != SessionState.RECOVERING
-                            || current.generation() != affected.generation()) {
-                        return;
-                    }
-                }
-                Bundle prepared = prepareGuestInternal(request);
-                GuestSession recovered = sessions.get(affected.packageName(),
-                        affected.virtualUserId(), affected.processName());
-                Bundle event = sessionBundle(recovered == null ? current : recovered,
-                        prepared.getString(RuntimeKeys.STATUS, ""));
-                event.putString("reason", reason == null ? "" : reason);
-                event.putString("prewarmStatus", prepared.getString(RuntimeKeys.STATUS, ""));
-                RuntimeEventLog.event("GUEST_RECOVERY_PREWARM_COMPLETED", event);
-            } catch (Throwable error) {
-                com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-                android.util.Log.w("CS_GUEST_RECOVERY",
-                        "prewarm failed package=" + affected.packageName()
-                                + " user=" + affected.virtualUserId()
-                                + " process=" + affected.processName(), error);
-                Bundle event = sessionBundle(affected, affected.state().name());
-                event.putString("reason", reason == null ? "" : reason);
-                event.putString("prewarmStatus", "FAILED:" + error.getClass().getSimpleName());
-                RuntimeEventLog.event("GUEST_RECOVERY_PREWARM_FAILED", event);
-            } finally {
-                guestRecoveryPrewarmPending.remove(key);
-            }
-        }, RECOVERY_PREWARM_DELAY_MILLIS, TimeUnit.MILLISECONDS);
+        guestRecoveryPrewarm.schedule(affected, reason);
     }
 
     GuestSession findSession(String sessionId, long generation) {
@@ -1291,8 +1225,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
 
     @Override public void onDestroy() {
         pendingIntentRelayExecutor.shutdownNow();
-        guestRecoveryPrewarmExecutor.shutdownNow();
-        guestRecoveryPrewarmPending.clear();
+        guestRecoveryPrewarm.close();
         for (GuestSession session : sessions.snapshot()) {
             if (ownershipSweep != null) {
                 ownershipSweep.stop(session, "ORDERED_RECEIVER_BROKER_DESTROYED");

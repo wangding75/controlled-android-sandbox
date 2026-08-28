@@ -53,9 +53,11 @@ def run_cmd(args: list[str], gate: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance", "--instance-name", dest="instance", default="RD测试")
+    parser.add_argument("--verification-dir", type=Path, default=VERIFICATION)
     args = parser.parse_args()
     output = artifacts_dir("catch-up-c4-t04")
-    VERIFICATION.mkdir(parents=True, exist_ok=True)
+    verification = args.verification_dir
+    verification.mkdir(parents=True, exist_ok=True)
     identity = git_identity()
     errors: list[str] = []
     static_rows: list[dict[str, Any]] = []
@@ -160,12 +162,12 @@ def main() -> int:
         str(output / "static-gates.json"),
         str(evidence_path),
         str(report_path),
-        str(VERIFICATION / "c4-t04-rd-summary.json"),
-        str(VERIFICATION / "c4-t04-local-verification.json"),
+        str(verification / "c4-t04-rd-summary.json"),
+        str(verification / "c4-t04-local-verification.json"),
         str(ROOT / "docs/review/C4_T04_CAS_ONLY_RUNTIME_DESIGN.md"),
     ]
     write_json(evidence_path, evidence)
-    write_json(VERIFICATION / "c4-t04-rd-summary.json", evidence)
+    write_json(verification / "c4-t04-rd-summary.json", evidence)
     local = {
         "task_id": TASK_ID,
         "status": "PASS" if not errors else "FAIL",
@@ -183,7 +185,7 @@ def main() -> int:
             "not VA Pro equivalence",
         ],
     }
-    write_json(VERIFICATION / "c4-t04-local-verification.json", local)
+    write_json(verification / "c4-t04-local-verification.json", local)
     report_path.write_text(
         f"# C4-T04 CAS-only runtime\n\n- status: {evidence['rd_result']}\n",
         encoding="utf-8",

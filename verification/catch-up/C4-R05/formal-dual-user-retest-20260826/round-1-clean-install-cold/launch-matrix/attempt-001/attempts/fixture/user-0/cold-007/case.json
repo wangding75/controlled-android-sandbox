@@ -1,0 +1,161 @@
+{
+  "task": "C4-R03",
+  "target": "fixture",
+  "package": "com.warden.controlledsandbox.fixture",
+  "user": 0,
+  "mode": "cold",
+  "iteration": 7,
+  "requestId": "2bca2c5682ce4a9287e6a49c9432f5e3",
+  "operationId": "2bca2c5682ce4a9287e6a49c9432f5e3-launch",
+  "runnerOperationId": "c4-r03-fixture-u0-cold-7-2bca2c5682",
+  "attempt": 1,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "retryable": false,
+  "startedAt": "2026-08-26T07:41:16.751958+00:00",
+  "completedAt": "2026-08-26T07:42:02.475648+00:00",
+  "elapsedMs": 45724,
+  "readinessElapsedMs": 7626,
+  "commandResult": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "launch",
+      "package": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "2bca2c5682ce4a9287e6a49c9432f5e3",
+      "operationId": "2bca2c5682ce4a9287e6a49c9432f5e3-launch",
+      "startedAt": 1787730084196,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "LAUNCH_PASS",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "efcba87a-03aa-4b9a-afc8-44e71b264ac7",
+        "generation": 1,
+        "processSlot": 54,
+        "platformPid": 12027,
+        "pid": 12027,
+        "isolatedProcess": false,
+        "processName": "com.warden.controlledsandbox.fixture",
+        "componentClass": "com.warden.controlledsandbox.fixture.MainActivity",
+        "requestId": "2bca2c5682ce4a9287e6a49c9432f5e3",
+        "operationId": "2bca2c5682ce4a9287e6a49c9432f5e3-launch",
+        "attempt": 1,
+        "retryBudget": 0,
+        "automaticRetryPerformed": false,
+        "activityCreated": true,
+        "activityResumed": true,
+        "windowEvidence": true,
+        "firstFrameDrawn": true,
+        "launchReadinessElapsedMs": 7626,
+        "launchAcceptedAtElapsedMs": 40407326,
+        "launchTimeline": "[REQUEST_ACCEPTED@40407326, GUEST_READY@40414498, LIFECYCLE_CREATED@40414878, LIFECYCLE_STARTED@40414883, LIFECYCLE_POST_CREATED@40414887, ACTIVITY_RESUMED@40414892, FIRST_FRAME_DRAWN@40414951]"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 718\nWaitTime: 721\nComplete\n",
+    "start_stderr": ""
+  },
+  "setup": {
+    "kind": "cold-stop",
+    "requestId": "34fa081f0b364d09b576a2c5f9fd9d82",
+    "result": {
+      "status": "PASS",
+      "returncode": 0,
+      "result": {
+        "command": "stop",
+        "package": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "trustNativeGuest": true,
+        "requestId": "34fa081f0b364d09b576a2c5f9fd9d82",
+        "operationId": "34fa081f0b364d09b576a2c5f9fd9d82-launch",
+        "startedAt": 1787730075629,
+        "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+        "operation": {
+          "status": "STOPPED",
+          "errorType": "",
+          "errorMessage": "",
+          "sessionId": "",
+          "generation": 0,
+          "processSlot": -1,
+          "platformPid": 0
+        },
+        "status": "PASS"
+      },
+      "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 627\nWaitTime: 631\nComplete\n",
+      "start_stderr": ""
+    },
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false
+  },
+  "operation": {
+    "status": "LAUNCH_PASS",
+    "errorType": "",
+    "errorMessage": "",
+    "sessionId": "efcba87a-03aa-4b9a-afc8-44e71b264ac7",
+    "generation": 1,
+    "processSlot": 54,
+    "platformPid": 12027,
+    "pid": 12027,
+    "isolatedProcess": false,
+    "processName": "com.warden.controlledsandbox.fixture",
+    "componentClass": "com.warden.controlledsandbox.fixture.MainActivity",
+    "requestId": "2bca2c5682ce4a9287e6a49c9432f5e3",
+    "operationId": "2bca2c5682ce4a9287e6a49c9432f5e3-launch",
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "activityCreated": true,
+    "activityResumed": true,
+    "windowEvidence": true,
+    "firstFrameDrawn": true,
+    "launchReadinessElapsedMs": 7626,
+    "launchAcceptedAtElapsedMs": 40407326,
+    "launchTimeline": "[REQUEST_ACCEPTED@40407326, GUEST_READY@40414498, LIFECYCLE_CREATED@40414878, LIFECYCLE_STARTED@40414883, LIFECYCLE_POST_CREATED@40414887, ACTIVITY_RESUMED@40414892, FIRST_FRAME_DRAWN@40414951]"
+  },
+  "device": {
+    "guestWindowState": {
+      "resumed_guest_stub_count": 1,
+      "windows_empty": false,
+      "reported_drawn_false": false,
+      "has_visible_false": false,
+      "drawn": true
+    },
+    "surfaceNonEmpty": true,
+    "screenshot": {
+      "width": 1080,
+      "height": 1920,
+      "sha256": "ba0ebf18c5082c86f2388ca85beea47eff63696ea07a5a223cae2a27f76494dd",
+      "nonTransparent": true,
+      "nonBlackFraction": 0.983313,
+      "nonBlack": true,
+      "uniform": false
+    },
+    "fatalMarkers": [],
+    "historicalFatalMarkers": [
+      "FATAL EXCEPTION",
+      "Fatal signal"
+    ],
+    "visualContentAttempts": [
+      {
+        "elapsedMs": 49548,
+        "quality": {
+          "width": 1080,
+          "height": 1920,
+          "sha256": "ba0ebf18c5082c86f2388ca85beea47eff63696ea07a5a223cae2a27f76494dd",
+          "nonTransparent": true,
+          "nonBlackFraction": 0.983313,
+          "nonBlack": true,
+          "uniform": false
+        }
+      }
+    ]
+  },
+  "errorClassification": "NONE",
+  "firstAttemptFailure": false,
+  "failureDetected": false,
+  "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-001\\attempts\\fixture\\user-0\\cold-007"
+}

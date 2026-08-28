@@ -185,6 +185,8 @@ def main() -> int:
     parser.add_argument("--instance", default="RD测试")
     parser.add_argument("--loops", type=int, default=20)
     parser.add_argument("--clone-loops", type=int, default=10)
+    parser.add_argument("--verification-dir", type=Path,
+                        default=ROOT / "verification/catch-up/C2-T06")
     parser.add_argument("--user0-only", action="store_true",
                         help="run only the local virtual user0 lane; do not create or execute user1")
     args = parser.parse_args()
@@ -192,7 +194,7 @@ def main() -> int:
         raise SystemExit("loops must be positive")
 
     output = artifacts_dir("catch-up-c2-t06")
-    verification = ROOT / "verification/catch-up/C2-T06"
+    verification = args.verification_dir
     verification.mkdir(parents=True, exist_ok=True)
     identity = git_identity()
     evidence: dict[str, Any] = {

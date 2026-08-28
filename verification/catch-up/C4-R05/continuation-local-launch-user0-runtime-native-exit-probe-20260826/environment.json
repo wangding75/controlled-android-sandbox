@@ -1,0 +1,54 @@
+{
+  "instance_name": "RD测试",
+  "adb_serial": "127.0.0.1:16416",
+  "device_name": "22041211A",
+  "api_level": "32",
+  "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+  "boot_id": "1c0f163e-6457-4160-b845-041d48fc0096",
+  "android_id": "398eea33120cd887",
+  "manufacturer": "Redmi",
+  "release": "12",
+  "mumu": {
+    "project": "Controlled Android Sandbox / 闪现2",
+    "instanceName": "RD测试",
+    "instanceIndex": 1,
+    "instanceId": "ginstance1400698250451515301",
+    "vmName": "MuMuPlayer-12.0-1",
+    "runtimeStatus": "device",
+    "mumuPlayerState": "",
+    "mumuManager": {},
+    "resolvedSerial": "127.0.0.1:16416",
+    "configuredSerial": "127.0.0.1:16416",
+    "manufacturer": "Redmi",
+    "model": "22041211A",
+    "release": "12",
+    "api": "32",
+    "androidId": "398eea33120cd887",
+    "abiList": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
+    "bootId": "1c0f163e-6457-4160-b845-041d48fc0096",
+    "timestamp": "2026-08-26T05:14:46.561977+00:00",
+    "mumuRoot": "C:\\Program Files\\Netease\\MuMu Player 12",
+    "config": {
+      "extraConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\extra_config.json",
+      "vmConfig": "C:\\Program Files\\Netease\\MuMu Player 12\\vms\\MuMuPlayer-12.0-1\\configs\\vm_config.json",
+      "configuredHostPort": 16416,
+      "runtimeHost": "127.0.0.1",
+      "runtimeHostPort": 16416,
+      "configuredManufacturer": "Redmi",
+      "configuredModel": "22041211A"
+    },
+    "adb": {
+      "path": "adb",
+      "connect": {
+        "attempt": 1,
+        "returnCode": 0,
+        "stdout": "already connected to 127.0.0.1:16416",
+        "stderr": "",
+        "getState": "device"
+      },
+      "devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:600\n\n",
+      "getState": "device"
+    }
+  },
+  "adb_devices": "List of devices attached\n127.0.0.1:16416        device product:rubens model:22041211A device:rubens transport_id:600\n\n"
+}

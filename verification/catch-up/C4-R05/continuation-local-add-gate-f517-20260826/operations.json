@@ -1,0 +1,5594 @@
+[
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 0,
+    "step": "first-attempt",
+    "requestId": "c4-r02-first-红果免费短剧-8caf26af-b64c-4fc1-be79-b793d7d47b60",
+    "trace": {
+      "requestId": "c4-r02-first-红果免费短剧-8caf26af-b64c-4fc1-be79-b793d7d47b60",
+      "operationId": "e2f63eef-1574-4d33-9834-3f65fa555730",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710419836,
+      "elapsedMs": 7421,
+      "stageTimingsMs": {
+        "HASH": 493,
+        "COPY": 987,
+        "PARSE": 1614,
+        "NATIVE_EXTRACT": 1518,
+        "PUBLISH": 7,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 1891
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 0,
+    "step": "first-attempt",
+    "requestId": "c4-r02-first-番茄免费小说-57b0da13-9206-4f58-b1b1-8800fa3b4f7b",
+    "trace": {
+      "requestId": "c4-r02-first-番茄免费小说-57b0da13-9206-4f58-b1b1-8800fa3b4f7b",
+      "operationId": "c1c8b529-73d7-4efb-aaa6-7af3bcd67dab",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710431100,
+      "elapsedMs": 8765,
+      "stageTimingsMs": {
+        "HASH": 648,
+        "COPY": 1242,
+        "PARSE": 1707,
+        "NATIVE_EXTRACT": 1494,
+        "PUBLISH": 10,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2487
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 1,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-add-8af1bda7-5081-4442-8b54-f90c3d620e15",
+    "wallMs": 9278,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-add-8af1bda7-5081-4442-8b54-f90c3d620e15",
+      "operationId": "874a4fc8-8491-40c9-a689-d7110a98d0d4",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710444631,
+      "elapsedMs": 4806,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 28,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 36,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2322
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 1,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-delete-eabb1f56-4627-4f19-a30e-09f07f906141",
+    "wallMs": 13431,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-delete-eabb1f56-4627-4f19-a30e-09f07f906141",
+      "operationId": "436a688b-f932-4bb6-af95-66cbe6868349",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710456537,
+      "elapsedMs": 6132,
+      "stageTimingsMs": {
+        "CATALOG": 4037
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 1,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-readd-35c12a9c-1b1c-47a0-90e0-88218724db9a",
+    "wallMs": 9289,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-001-readd-35c12a9c-1b1c-47a0-90e0-88218724db9a",
+      "operationId": "e02588f2-28ea-491b-9057-9eefeac02257",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710467294,
+      "elapsedMs": 4788,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 17,
+        "PARSE": 62,
+        "NATIVE_EXTRACT": 29,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2179
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 2,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-add-1e94d07e-ab3f-491b-8e12-103556378360",
+    "wallMs": 8549,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-add-1e94d07e-ab3f-491b-8e12-103556378360",
+      "operationId": "d36c586e-042b-4456-8d2d-bb866fc62f2b",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710476305,
+      "elapsedMs": 4356,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 55,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 30,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2038
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 2,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-delete-2232a46b-b01d-458b-b079-fd89a1ee0807",
+    "wallMs": 13303,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-delete-2232a46b-b01d-458b-b079-fd89a1ee0807",
+      "operationId": "88a12cd7-4274-4bd8-b3f4-e28152cbf64f",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710487379,
+      "elapsedMs": 6531,
+      "stageTimingsMs": {
+        "CATALOG": 4351
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 2,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-readd-83b09032-9cd0-4ad6-b748-35f17b18d475",
+    "wallMs": 8716,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-002-readd-83b09032-9cd0-4ad6-b748-35f17b18d475",
+      "operationId": "33b75eca-b2f2-4220-9a08-5ab2a4a4d50d",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710498100,
+      "elapsedMs": 4464,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 61,
+        "NATIVE_EXTRACT": 26,
+        "PUBLISH": 6,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2066
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 3,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-add-53fe0f85-509d-47ff-8ebb-7f555235320e",
+    "wallMs": 9031,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-add-53fe0f85-509d-47ff-8ebb-7f555235320e",
+      "operationId": "76794049-96d1-4a01-8d3a-4ef0a82e8a7c",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710506924,
+      "elapsedMs": 4468,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 59,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 35,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2104
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 3,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-delete-4e9fc0c6-1f22-4b5c-a620-a5dd8039b57e",
+    "wallMs": 13399,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-delete-4e9fc0c6-1f22-4b5c-a620-a5dd8039b57e",
+      "operationId": "e0243cf1-2c7c-41ea-b99a-77ab56dcb465",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710518652,
+      "elapsedMs": 6493,
+      "stageTimingsMs": {
+        "CATALOG": 4329
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 3,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-readd-8bd3d047-35d0-48f4-828e-6c5c6ead8b93",
+    "wallMs": 9045,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-003-readd-8bd3d047-35d0-48f4-828e-6c5c6ead8b93",
+      "operationId": "430f6608-7bbf-43c2-91d8-3f9d33c86ee6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710529283,
+      "elapsedMs": 4618,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 14,
+        "PARSE": 51,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2265
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 4,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-add-26343dfc-6f6d-4a63-ba85-64b04670335f",
+    "wallMs": 10079,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-add-26343dfc-6f6d-4a63-ba85-64b04670335f",
+      "operationId": "54abc366-4830-46d4-8045-9808d3d0f63a",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710539172,
+      "elapsedMs": 4811,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 33,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2204
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 4,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-delete-c456faa2-1ea0-43cf-9765-b994869d5bcf",
+    "wallMs": 13968,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-delete-c456faa2-1ea0-43cf-9765-b994869d5bcf",
+      "operationId": "3fe7b117-fcba-42b8-b5c0-0390afc148af",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710551079,
+      "elapsedMs": 6922,
+      "stageTimingsMs": {
+        "CATALOG": 4663
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 4,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-readd-e65a612c-3684-4868-9fa9-6823eb9261b5",
+    "wallMs": 9189,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-004-readd-e65a612c-3684-4868-9fa9-6823eb9261b5",
+      "operationId": "d56f3a89-b4be-41cf-90db-9b6d5061fa65",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710562519,
+      "elapsedMs": 4773,
+      "stageTimingsMs": {
+        "HASH": 12,
+        "COPY": 23,
+        "PARSE": 82,
+        "NATIVE_EXTRACT": 37,
+        "PUBLISH": 8,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2126
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 5,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-add-0cf5ee03-63bd-470d-869f-3fa6a01404b0",
+    "wallMs": 9862,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-add-0cf5ee03-63bd-470d-869f-3fa6a01404b0",
+      "operationId": "278caed7-ae83-4498-a690-3b62cde567f7",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710572059,
+      "elapsedMs": 4826,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 17,
+        "PARSE": 58,
+        "NATIVE_EXTRACT": 19,
+        "PUBLISH": 30,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2194
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 5,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-delete-ecf2eac7-46be-4ab7-8918-4805b14ba4ca",
+    "wallMs": 13984,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-delete-ecf2eac7-46be-4ab7-8918-4805b14ba4ca",
+      "operationId": "9dc9b75b-9cb1-4e02-b331-7b2d3963ed42",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710584043,
+      "elapsedMs": 7117,
+      "stageTimingsMs": {
+        "CATALOG": 4885
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 5,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-readd-5644196a-7af1-4ee8-bd91-0749811b1781",
+    "wallMs": 9145,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-005-readd-5644196a-7af1-4ee8-bd91-0749811b1781",
+      "operationId": "1113da9c-bcb2-4dac-8b20-ddf641897a35",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710595736,
+      "elapsedMs": 4365,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 16,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 24,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2043
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 6,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-add-d6f7114c-9a57-434b-8c90-e87abee6792c",
+    "wallMs": 9521,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-add-d6f7114c-9a57-434b-8c90-e87abee6792c",
+      "operationId": "a036274a-20ca-4905-97e1-310576eb19b4",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710604626,
+      "elapsedMs": 4933,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 19,
+        "PARSE": 66,
+        "NATIVE_EXTRACT": 26,
+        "PUBLISH": 33,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2302
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 6,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-delete-38fa55ee-e85f-411b-b735-60126acce315",
+    "wallMs": 13371,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-delete-38fa55ee-e85f-411b-b735-60126acce315",
+      "operationId": "0525d077-0189-4e15-b307-7ed21dbf6105",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710616779,
+      "elapsedMs": 6367,
+      "stageTimingsMs": {
+        "CATALOG": 4239
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 6,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-readd-1b3bb76b-4a6f-4691-b516-794be1b93048",
+    "wallMs": 9044,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-006-readd-1b3bb76b-4a6f-4691-b516-794be1b93048",
+      "operationId": "78d66d79-58f0-42e4-a0d0-5256a610ad55",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710627516,
+      "elapsedMs": 4471,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 53,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2130
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 7,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-add-8930761b-7e12-476e-8389-5bea73129ba4",
+    "wallMs": 9168,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-add-8930761b-7e12-476e-8389-5bea73129ba4",
+      "operationId": "ee251c78-514c-4d87-8a72-ad493737cdfc",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710636642,
+      "elapsedMs": 4891,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 36,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2314
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 7,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-delete-c55ba48f-fad0-4e58-8d77-6fe8719688d7",
+    "wallMs": 13458,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-delete-c55ba48f-fad0-4e58-8d77-6fe8719688d7",
+      "operationId": "2f251045-f9c9-4309-9bf2-723b67cb7881",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710648254,
+      "elapsedMs": 6407,
+      "stageTimingsMs": {
+        "CATALOG": 4326
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 7,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-readd-3909aff8-9fc7-4b2c-a7fb-e822fd37eec5",
+    "wallMs": 9135,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-007-readd-3909aff8-9fc7-4b2c-a7fb-e822fd37eec5",
+      "operationId": "e2c2b2be-b582-4a3b-b46f-ca477363d2a6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710659311,
+      "elapsedMs": 4656,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 58,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2204
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 8,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-add-9502c3f6-24da-45b0-a6c8-e529957871c6",
+    "wallMs": 8682,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-add-9502c3f6-24da-45b0-a6c8-e529957871c6",
+      "operationId": "4b151477-599f-4949-9915-baab8101e97f",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710668190,
+      "elapsedMs": 4535,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 60,
+        "NATIVE_EXTRACT": 30,
+        "PUBLISH": 38,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2151
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 8,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-delete-1a74d5a6-6676-4683-baf5-74d479ffbdaa",
+    "wallMs": 14022,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-delete-1a74d5a6-6676-4683-baf5-74d479ffbdaa",
+      "operationId": "e00f94e7-e465-4222-8af7-6021071a1013",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710679901,
+      "elapsedMs": 6616,
+      "stageTimingsMs": {
+        "CATALOG": 4468
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 8,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-readd-796386f1-fff3-4fac-8e79-af350b4e1716",
+    "wallMs": 9059,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-008-readd-796386f1-fff3-4fac-8e79-af350b4e1716",
+      "operationId": "5a003011-d696-46c9-8e2a-180b33f113ca",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710691030,
+      "elapsedMs": 4630,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 15,
+        "PARSE": 55,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2203
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 9,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-add-8f442c82-b7b2-4caa-be23-6c03bf6958d1",
+    "wallMs": 8978,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-add-8f442c82-b7b2-4caa-be23-6c03bf6958d1",
+      "operationId": "99a3fdfb-c233-4eb7-bd9d-20e2b2d2c325",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710699793,
+      "elapsedMs": 4639,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 56,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 29,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2205
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 9,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-delete-a24fc544-3867-4993-803c-8546412aa758",
+    "wallMs": 13812,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-delete-a24fc544-3867-4993-803c-8546412aa758",
+      "operationId": "01559827-4243-4b47-8978-500f1804b70b",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710712118,
+      "elapsedMs": 6249,
+      "stageTimingsMs": {
+        "CATALOG": 4167
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 9,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-readd-be2be93c-cfdc-4035-a32c-cd5d7c7e82ac",
+    "wallMs": 8992,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-009-readd-be2be93c-cfdc-4035-a32c-cd5d7c7e82ac",
+      "operationId": "e03ffc31-20b1-41ce-a48b-c5e9ebe76de3",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710722578,
+      "elapsedMs": 5010,
+      "stageTimingsMs": {
+        "HASH": 12,
+        "COPY": 20,
+        "PARSE": 63,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2259
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 10,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-add-01d9978e-0711-4770-8657-660aa67961df",
+    "wallMs": 8977,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-add-01d9978e-0711-4770-8657-660aa67961df",
+      "operationId": "71278e34-3c95-4e43-9d27-9937d308925e",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710731748,
+      "elapsedMs": 4736,
+      "stageTimingsMs": {
+        "HASH": 11,
+        "COPY": 20,
+        "PARSE": 62,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 34,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2188
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 10,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-delete-8cca5048-8f6b-41df-9c22-89e0407815fb",
+    "wallMs": 13188,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-delete-8cca5048-8f6b-41df-9c22-89e0407815fb",
+      "operationId": "33798a99-3c38-4814-8386-5bd8071067b8",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710743278,
+      "elapsedMs": 6310,
+      "stageTimingsMs": {
+        "CATALOG": 4190
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 10,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-readd-c08ccd48-e7e6-4173-ab7b-3781c5499547",
+    "wallMs": 9160,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-010-readd-c08ccd48-e7e6-4173-ab7b-3781c5499547",
+      "operationId": "ff1756da-6d7b-4fcb-9737-57e39093cc8a",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710754094,
+      "elapsedMs": 4914,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 18,
+        "PARSE": 59,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2288
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 11,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-add-f9e4e41c-23e9-49ab-b0c6-821ce5bcee73",
+    "wallMs": 8991,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-add-f9e4e41c-23e9-49ab-b0c6-821ce5bcee73",
+      "operationId": "2bba7c6c-d23b-465c-a5c3-e2067022c39a",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710763078,
+      "elapsedMs": 4528,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 58,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 30,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2129
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 11,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-delete-95199b0f-3d11-4848-926a-56abb32b0057",
+    "wallMs": 13791,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-delete-95199b0f-3d11-4848-926a-56abb32b0057",
+      "operationId": "1bab9dec-fbe2-4d98-ada0-40d0bc92a5cb",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710774896,
+      "elapsedMs": 6574,
+      "stageTimingsMs": {
+        "CATALOG": 4319
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 11,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-readd-a96e312d-12a4-42bc-9705-5228e1aa2036",
+    "wallMs": 9098,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-011-readd-a96e312d-12a4-42bc-9705-5228e1aa2036",
+      "operationId": "b9d50393-2755-47a5-9d56-e338b5289b1e",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710786045,
+      "elapsedMs": 4518,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 53,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2131
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 12,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-add-d16c7f0d-7a48-4982-b894-f09ef0c60b89",
+    "wallMs": 9755,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-add-d16c7f0d-7a48-4982-b894-f09ef0c60b89",
+      "operationId": "912f16b5-21f5-4e93-be1a-5a7cd9f687b6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710795636,
+      "elapsedMs": 4646,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 20,
+        "PARSE": 62,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 37,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2136
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 12,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-delete-d869bd86-86f1-4a68-a3f3-de73bddbe41d",
+    "wallMs": 13832,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-delete-d869bd86-86f1-4a68-a3f3-de73bddbe41d",
+      "operationId": "da5f0b53-a31a-4b7f-929f-c9a03c5b0efa",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710807643,
+      "elapsedMs": 6424,
+      "stageTimingsMs": {
+        "CATALOG": 4271
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 12,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-readd-6e1214fb-68e9-470a-852e-1ef1e61b1f24",
+    "wallMs": 9004,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-012-readd-6e1214fb-68e9-470a-852e-1ef1e61b1f24",
+      "operationId": "98f9aa10-f71c-45b8-985b-f16735a514d6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710818554,
+      "elapsedMs": 4636,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 3,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2229
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 13,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-add-1ab32037-a817-4131-9c2f-7043bcc29d45",
+    "wallMs": 9902,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-add-1ab32037-a817-4131-9c2f-7043bcc29d45",
+      "operationId": "e3ec48a1-4c4e-4a09-8a2c-d2e0eb57c3d2",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710828261,
+      "elapsedMs": 4994,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 16,
+        "PARSE": 65,
+        "NATIVE_EXTRACT": 21,
+        "PUBLISH": 30,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2455
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 13,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-delete-353d6dda-48df-49b7-84b6-59b1acb761b7",
+    "wallMs": 17810,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-delete-353d6dda-48df-49b7-84b6-59b1acb761b7",
+      "operationId": "b2dc6a9c-1dc4-4546-96e8-3130c0bf7f1c",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710843387,
+      "elapsedMs": 7655,
+      "stageTimingsMs": {
+        "CATALOG": 4956
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 13,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-readd-3a10dfef-c8da-4385-b882-95cddd124509",
+    "wallMs": 9170,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-013-readd-3a10dfef-c8da-4385-b882-95cddd124509",
+      "operationId": "7b1b9d0a-a910-4537-9f47-e2ff2bb11fbc",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710855883,
+      "elapsedMs": 4482,
+      "stageTimingsMs": {
+        "HASH": 11,
+        "COPY": 18,
+        "PARSE": 67,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2102
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 14,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-add-79bc7c0f-ba62-4bfd-8798-4746298b4297",
+    "wallMs": 9081,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-add-79bc7c0f-ba62-4bfd-8798-4746298b4297",
+      "operationId": "156414c2-11cb-44d6-a5cc-6227256dbf1f",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710864604,
+      "elapsedMs": 4738,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 67,
+        "NATIVE_EXTRACT": 25,
+        "PUBLISH": 36,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2116
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 14,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-delete-7ba28285-c58d-4aca-8b6e-4b9374652b91",
+    "wallMs": 14918,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-delete-7ba28285-c58d-4aca-8b6e-4b9374652b91",
+      "operationId": "1ebadd01-e580-4e6b-9deb-c7f6a5ae3f7c",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710876559,
+      "elapsedMs": 7525,
+      "stageTimingsMs": {
+        "CATALOG": 5040
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 14,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-readd-515b34ff-7c4a-4b5e-a53f-d95a24d341d9",
+    "wallMs": 9138,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-014-readd-515b34ff-7c4a-4b5e-a53f-d95a24d341d9",
+      "operationId": "315ae4d4-eb34-4493-9227-7847bcd9176a",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710888803,
+      "elapsedMs": 4686,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 57,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2185
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 15,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-add-8148d16a-3d83-4145-905a-80003dbf0382",
+    "wallMs": 9733,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-add-8148d16a-3d83-4145-905a-80003dbf0382",
+      "operationId": "766249f0-865b-4265-9e78-2949b0e6fe6e",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710898026,
+      "elapsedMs": 4825,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 17,
+        "PARSE": 63,
+        "NATIVE_EXTRACT": 24,
+        "PUBLISH": 32,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2206
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 15,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-delete-40a69386-e747-4310-8973-82f0cec10734",
+    "wallMs": 13190,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-delete-40a69386-e747-4310-8973-82f0cec10734",
+      "operationId": "a34e2c1e-3cb4-4076-b63a-be3b56a7e284",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710909711,
+      "elapsedMs": 6509,
+      "stageTimingsMs": {
+        "CATALOG": 4451
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 15,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-readd-4af31e86-8d17-4b20-84af-aea552588669",
+    "wallMs": 9260,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-015-readd-4af31e86-8d17-4b20-84af-aea552588669",
+      "operationId": "475ee592-f007-482e-9ad4-43ccd8072276",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710920643,
+      "elapsedMs": 4971,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 17,
+        "PARSE": 67,
+        "NATIVE_EXTRACT": 29,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2315
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 16,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-add-120721ae-739c-4552-a5b8-8c8edfec0e6c",
+    "wallMs": 9129,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-add-120721ae-739c-4552-a5b8-8c8edfec0e6c",
+      "operationId": "a9c670bf-4155-49b0-ad32-2ed8253600da",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710929864,
+      "elapsedMs": 4751,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 56,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 31,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2266
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 16,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-delete-11d9856e-9333-4613-bdaf-01bbf8910b9f",
+    "wallMs": 14374,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-delete-11d9856e-9333-4613-bdaf-01bbf8910b9f",
+      "operationId": "94362d13-6182-444f-9031-dcbf8e0a3fe5",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710941681,
+      "elapsedMs": 7110,
+      "stageTimingsMs": {
+        "CATALOG": 4843
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 16,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-readd-e4f34758-cb4a-4fcc-bbdf-e078e1dafe9b",
+    "wallMs": 9206,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-016-readd-e4f34758-cb4a-4fcc-bbdf-e078e1dafe9b",
+      "operationId": "f1dfa902-9903-45ff-8131-33dcaf7f3393",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710953718,
+      "elapsedMs": 4572,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 53,
+        "NATIVE_EXTRACT": 26,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2047
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 17,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-add-230d1008-f8c3-424a-ae52-95b5908bf96d",
+    "wallMs": 9566,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-add-230d1008-f8c3-424a-ae52-95b5908bf96d",
+      "operationId": "6f128aa1-ce70-4398-9fc4-6486fb38e994",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710962512,
+      "elapsedMs": 5082,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 16,
+        "PARSE": 77,
+        "NATIVE_EXTRACT": 31,
+        "PUBLISH": 45,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2362
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 17,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-delete-287de718-a817-4b5a-b691-a39eebf678f5",
+    "wallMs": 14144,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-delete-287de718-a817-4b5a-b691-a39eebf678f5",
+      "operationId": "44b25687-bdff-445f-bf45-834d5faac342",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710974901,
+      "elapsedMs": 7063,
+      "stageTimingsMs": {
+        "CATALOG": 4883
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 17,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-readd-9b31b285-460d-4406-8754-4c003d389824",
+    "wallMs": 9238,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-017-readd-9b31b285-460d-4406-8754-4c003d389824",
+      "operationId": "ac81819a-eba0-44da-a97a-0317b77418f9",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710986554,
+      "elapsedMs": 4564,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 55,
+        "NATIVE_EXTRACT": 24,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2126
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 18,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-add-3611a2c9-227f-441c-88e7-8943a4bc5966",
+    "wallMs": 9944,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-add-3611a2c9-227f-441c-88e7-8943a4bc5966",
+      "operationId": "2cc6a44d-c0ea-4ce8-b73b-f032305da005",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787710996195,
+      "elapsedMs": 4933,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 73,
+        "NATIVE_EXTRACT": 30,
+        "PUBLISH": 35,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2244
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 18,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-delete-05fee677-3a71-47d6-a11c-05dbc1297ff1",
+    "wallMs": 13439,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-delete-05fee677-3a71-47d6-a11c-05dbc1297ff1",
+      "operationId": "a2bfb796-48cd-433d-8cb8-97675648db86",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711008160,
+      "elapsedMs": 6485,
+      "stageTimingsMs": {
+        "CATALOG": 4448
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 18,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-readd-e553fa2d-5285-49cd-9689-0ff007b33d69",
+    "wallMs": 9840,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-018-readd-e553fa2d-5285-49cd-9689-0ff007b33d69",
+      "operationId": "f8dfafea-8d00-45b1-99ff-fe7532c231ed",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711019497,
+      "elapsedMs": 4738,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 17,
+        "PARSE": 55,
+        "NATIVE_EXTRACT": 26,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2244
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 19,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-add-4709bb2e-31e8-4b0b-bce6-62fb3a05106e",
+    "wallMs": 9172,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-add-4709bb2e-31e8-4b0b-bce6-62fb3a05106e",
+      "operationId": "862bd6df-6f91-414a-828d-6f31865ee667",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711028864,
+      "elapsedMs": 4553,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 30,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2188
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 19,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-delete-d51800a6-ddfb-4f2f-b6ed-601bc2b00645",
+    "wallMs": 13468,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-delete-d51800a6-ddfb-4f2f-b6ed-601bc2b00645",
+      "operationId": "bcca371b-97c3-4847-9e4d-2778cba128fb",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711040691,
+      "elapsedMs": 6405,
+      "stageTimingsMs": {
+        "CATALOG": 4307
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 19,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-readd-d2facde3-3e28-441b-bb38-e89f3ae774d3",
+    "wallMs": 9054,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-019-readd-d2facde3-3e28-441b-bb38-e89f3ae774d3",
+      "operationId": "61321dd2-b811-4eb4-a5c2-6fff2119176c",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711051286,
+      "elapsedMs": 4574,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 15,
+        "PARSE": 59,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 5,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2200
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 20,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-add-a0a141ec-ba62-4a29-94f8-1c72501d8c8b",
+    "wallMs": 9041,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-add-a0a141ec-ba62-4a29-94f8-1c72501d8c8b",
+      "operationId": "afd49034-dcca-49a0-b09e-2e7f6d826341",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711060472,
+      "elapsedMs": 4693,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 29,
+        "PUBLISH": 35,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2212
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 20,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-delete-c57c425e-0e42-4b98-8193-f323577affcf",
+    "wallMs": 13497,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-delete-c57c425e-0e42-4b98-8193-f323577affcf",
+      "operationId": "790a1f0d-f2e5-4fd5-af85-08594d35c1c0",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711072679,
+      "elapsedMs": 6138,
+      "stageTimingsMs": {
+        "CATALOG": 4031
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 20,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-readd-e4556ab0-97fb-481c-a994-1b0d6ada153f",
+    "wallMs": 9067,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-020-readd-e4556ab0-97fb-481c-a994-1b0d6ada153f",
+      "operationId": "80e9c717-17ba-4990-bd44-b5e05e9c8509",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711082616,
+      "elapsedMs": 4964,
+      "stageTimingsMs": {
+        "HASH": 11,
+        "COPY": 19,
+        "PARSE": 76,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 6,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2315
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 21,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-add-3871f07f-3f16-44a3-bcc0-32ad2e303335",
+    "wallMs": 9900,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-add-3871f07f-3f16-44a3-bcc0-32ad2e303335",
+      "operationId": "0edb7f69-2a13-4dc4-8934-c7dafdf1ea6e",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711092585,
+      "elapsedMs": 4915,
+      "stageTimingsMs": {
+        "HASH": 11,
+        "COPY": 21,
+        "PARSE": 72,
+        "NATIVE_EXTRACT": 33,
+        "PUBLISH": 38,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2221
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 21,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-delete-a290cddf-acb4-48b5-b44a-d01d247fd66e",
+    "wallMs": 14062,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-delete-a290cddf-acb4-48b5-b44a-d01d247fd66e",
+      "operationId": "887487c9-9437-4619-9d69-7f122d956c49",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711104910,
+      "elapsedMs": 6741,
+      "stageTimingsMs": {
+        "CATALOG": 4284
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 21,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-readd-b6c77211-28c8-4100-9d54-86a17e60290c",
+    "wallMs": 9116,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-021-readd-b6c77211-28c8-4100-9d54-86a17e60290c",
+      "operationId": "f89ce73c-807a-4659-a6ac-f2cfe66bacca",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711116139,
+      "elapsedMs": 4569,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 60,
+        "NATIVE_EXTRACT": 25,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2160
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 22,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-add-6059ee1c-3d26-4c20-a101-ce98ece4d0de",
+    "wallMs": 9641,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-add-6059ee1c-3d26-4c20-a101-ce98ece4d0de",
+      "operationId": "09976a2f-9848-45b5-a964-9058ce8c95e2",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711125671,
+      "elapsedMs": 4543,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 16,
+        "PARSE": 58,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 31,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2066
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 22,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-delete-e93b5529-1a78-438e-9d8f-d8d2aea48293",
+    "wallMs": 13882,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-delete-e93b5529-1a78-438e-9d8f-d8d2aea48293",
+      "operationId": "99cd67c3-0641-4e04-ac35-4e9e873a6b34",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711137505,
+      "elapsedMs": 6683,
+      "stageTimingsMs": {
+        "CATALOG": 4424
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 22,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-readd-253c3d84-16d4-4709-a37d-9d62a938c8f7",
+    "wallMs": 8535,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-022-readd-253c3d84-16d4-4709-a37d-9d62a938c8f7",
+      "operationId": "4fbcb340-be65-427b-9037-f49ca11dd264",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711148511,
+      "elapsedMs": 4364,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 13,
+        "PARSE": 50,
+        "NATIVE_EXTRACT": 19,
+        "PUBLISH": 3,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2109
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 23,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-add-d2cc64eb-574f-42e2-8a9a-a4c70a0eac95",
+    "wallMs": 9871,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-add-d2cc64eb-574f-42e2-8a9a-a4c70a0eac95",
+      "operationId": "4c8c470f-af07-4204-a04b-708ec1f9c275",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711157826,
+      "elapsedMs": 4608,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 15,
+        "PARSE": 58,
+        "NATIVE_EXTRACT": 20,
+        "PUBLISH": 32,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2123
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 23,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-delete-5f3285c1-2927-4565-b02e-e14e8e625086",
+    "wallMs": 13420,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-delete-5f3285c1-2927-4565-b02e-e14e8e625086",
+      "operationId": "42de7c10-f660-47ed-ac31-aec13a1683da",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711169748,
+      "elapsedMs": 6448,
+      "stageTimingsMs": {
+        "CATALOG": 4307
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 23,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-readd-91983c3e-391b-4dd6-b3bc-8842ea282711",
+    "wallMs": 9148,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-023-readd-91983c3e-391b-4dd6-b3bc-8842ea282711",
+      "operationId": "93776192-3656-4702-83bc-209edd42fced",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711180552,
+      "elapsedMs": 4762,
+      "stageTimingsMs": {
+        "HASH": 11,
+        "COPY": 20,
+        "PARSE": 75,
+        "NATIVE_EXTRACT": 33,
+        "PUBLISH": 7,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2249
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 24,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-add-1d06dd0a-ceaa-4d81-b005-13eb178954c9",
+    "wallMs": 9967,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-add-1d06dd0a-ceaa-4d81-b005-13eb178954c9",
+      "operationId": "65245d5c-6fe8-45e1-ad2c-3ec2e566501d",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711190548,
+      "elapsedMs": 4662,
+      "stageTimingsMs": {
+        "HASH": 10,
+        "COPY": 18,
+        "PARSE": 84,
+        "NATIVE_EXTRACT": 22,
+        "PUBLISH": 32,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2094
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 24,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-delete-fe760cd8-67d0-4f49-8400-54a03cc8b923",
+    "wallMs": 13234,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-delete-fe760cd8-67d0-4f49-8400-54a03cc8b923",
+      "operationId": "7f9341a1-0874-495e-96d6-7a2c1ebf64a4",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711201657,
+      "elapsedMs": 6684,
+      "stageTimingsMs": {
+        "CATALOG": 4558
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 24,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-readd-80228e8e-7a49-4c81-8e52-e05737322fde",
+    "wallMs": 9330,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-024-readd-80228e8e-7a49-4c81-8e52-e05737322fde",
+      "operationId": "1f2c71ac-3f94-43b9-b80c-1bd665650931",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711213123,
+      "elapsedMs": 4634,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 16,
+        "PARSE": 54,
+        "NATIVE_EXTRACT": 25,
+        "PUBLISH": 4,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2075
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 25,
+    "step": "add",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-add-c26a82d5-8ec6-4d44-9b76-6051e4af23d3",
+    "wallMs": 9018,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-add-c26a82d5-8ec6-4d44-9b76-6051e4af23d3",
+      "operationId": "dc44a395-c8ad-4ec7-850c-39f8510c29f6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711222150,
+      "elapsedMs": 4686,
+      "stageTimingsMs": {
+        "HASH": 8,
+        "COPY": 14,
+        "PARSE": 55,
+        "NATIVE_EXTRACT": 23,
+        "PUBLISH": 31,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2172
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 25,
+    "step": "delete",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-delete-a2467ff8-c2ff-40d4-88d6-758851a88945",
+    "wallMs": 13503,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-delete-a2467ff8-c2ff-40d4-88d6-758851a88945",
+      "operationId": "b60b3ea0-6409-4d7d-ae1e-1807cee387b4",
+      "operation": "deleteInstance",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711233856,
+      "elapsedMs": 6629,
+      "stageTimingsMs": {
+        "CATALOG": 4435
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "cycle": 25,
+    "step": "readd",
+    "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-readd-295d2837-06dc-40d9-9cf7-0e9046d0afd1",
+    "wallMs": 9244,
+    "trace": {
+      "requestId": "c4-r02-com-warden-controlledsandbox-fixture-025-readd-295d2837-06dc-40d9-9cf7-0e9046d0afd1",
+      "operationId": "8c901496-2a87-4639-bbe0-af4c4bec27d4",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711244915,
+      "elapsedMs": 4603,
+      "stageTimingsMs": {
+        "HASH": 9,
+        "COPY": 16,
+        "PARSE": 78,
+        "NATIVE_EXTRACT": 29,
+        "PUBLISH": 7,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2123
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 1,
+    "step": "add",
+    "requestId": "c4-r02-com-quark-browser-001-add-2c5e991d-c666-4ef8-af37-ca946287f9b1",
+    "wallMs": 16658,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-001-add-2c5e991d-c666-4ef8-af37-ca946287f9b1",
+      "operationId": "86729389-46ab-4d19-9958-b2539aa71f24",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711254294,
+      "elapsedMs": 12065,
+      "stageTimingsMs": {
+        "HASH": 731,
+        "COPY": 1712,
+        "PARSE": 2130,
+        "NATIVE_EXTRACT": 2382,
+        "PUBLISH": 12,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3184
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 1,
+    "step": "delete",
+    "requestId": "c4-r02-com-quark-browser-001-delete-4a0ac2cf-351b-4d00-bd9b-18011d0afd38",
+    "wallMs": 16859,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-001-delete-4a0ac2cf-351b-4d00-bd9b-18011d0afd38",
+      "operationId": "a137eb65-cb10-4417-bb66-721693206eb5",
+      "operation": "deleteInstance",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711274531,
+      "elapsedMs": 8378,
+      "stageTimingsMs": {
+        "CATALOG": 5256
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 1,
+    "step": "readd",
+    "requestId": "c4-r02-com-quark-browser-001-readd-f2f1c223-9360-4eb9-b791-b12c42433f5d",
+    "wallMs": 16031,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-001-readd-f2f1c223-9360-4eb9-b791-b12c42433f5d",
+      "operationId": "d5117b29-fc66-41f7-a151-1095473b7cb7",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711287860,
+      "elapsedMs": 11405,
+      "stageTimingsMs": {
+        "HASH": 675,
+        "COPY": 1527,
+        "PARSE": 1901,
+        "NATIVE_EXTRACT": 2570,
+        "PUBLISH": 9,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2921
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 2,
+    "step": "add",
+    "requestId": "c4-r02-com-quark-browser-002-add-5f80430e-2bc5-4240-a63f-d03a01dfd123",
+    "wallMs": 23577,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-002-add-5f80430e-2bc5-4240-a63f-d03a01dfd123",
+      "operationId": "f3bf451f-368a-4ae8-8f7a-fd5c14259838",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711304448,
+      "elapsedMs": 18239,
+      "stageTimingsMs": {
+        "HASH": 771,
+        "COPY": 1575,
+        "PARSE": 2200,
+        "NATIVE_EXTRACT": 2282,
+        "PUBLISH": 3216,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2942
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 2,
+    "step": "delete",
+    "requestId": "c4-r02-com-quark-browser-002-delete-ec979297-32ef-4704-a626-a99bcc9598a3",
+    "wallMs": 16922,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-002-delete-ec979297-32ef-4704-a626-a99bcc9598a3",
+      "operationId": "fdcf72f3-0e15-4fb2-ad48-d11b3a11b406",
+      "operation": "deleteInstance",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711331576,
+      "elapsedMs": 7862,
+      "stageTimingsMs": {
+        "CATALOG": 4938
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 2,
+    "step": "readd",
+    "requestId": "c4-r02-com-quark-browser-002-readd-ed8a475f-7464-425e-9e64-7595b75c6f08",
+    "wallMs": 15806,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-002-readd-ed8a475f-7464-425e-9e64-7595b75c6f08",
+      "operationId": "40762d4c-c968-41ec-bd7c-ee32da90a315",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711343943,
+      "elapsedMs": 11556,
+      "stageTimingsMs": {
+        "HASH": 701,
+        "COPY": 1595,
+        "PARSE": 1892,
+        "NATIVE_EXTRACT": 2484,
+        "PUBLISH": 10,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3077
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 3,
+    "step": "add",
+    "requestId": "c4-r02-com-quark-browser-003-add-1c805861-ee54-4339-9b78-b851e3ffa172",
+    "wallMs": 26254,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-003-add-1c805861-ee54-4339-9b78-b851e3ffa172",
+      "operationId": "f45edf3e-03d7-4975-8214-0f366b46ee74",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711361605,
+      "elapsedMs": 20046,
+      "stageTimingsMs": {
+        "HASH": 727,
+        "COPY": 1542,
+        "PARSE": 1956,
+        "NATIVE_EXTRACT": 2637,
+        "PUBLISH": 4511,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3814
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 3,
+    "step": "delete",
+    "requestId": "c4-r02-com-quark-browser-003-delete-23cc59b1-0cfe-4e51-8cb6-603ecd6e9a13",
+    "wallMs": 17060,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-003-delete-23cc59b1-0cfe-4e51-8cb6-603ecd6e9a13",
+      "operationId": "01d5c5bf-7631-4ccb-9c5f-b1841511e2fb",
+      "operation": "deleteInstance",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711390632,
+      "elapsedMs": 8053,
+      "stageTimingsMs": {
+        "CATALOG": 5200
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 3,
+    "step": "readd",
+    "requestId": "c4-r02-com-quark-browser-003-readd-d3594a62-c27f-45c6-88c6-09e4398bd1a8",
+    "wallMs": 16801,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-003-readd-d3594a62-c27f-45c6-88c6-09e4398bd1a8",
+      "operationId": "eee72c38-6fdd-491e-977b-032b2fd8250d",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711403830,
+      "elapsedMs": 11605,
+      "stageTimingsMs": {
+        "HASH": 658,
+        "COPY": 1241,
+        "PARSE": 1826,
+        "NATIVE_EXTRACT": 2676,
+        "PUBLISH": 12,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3124
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 4,
+    "step": "add",
+    "requestId": "c4-r02-com-quark-browser-004-add-2c13a32a-e36b-45bc-8409-01032d63a933",
+    "wallMs": 23575,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-004-add-2c13a32a-e36b-45bc-8409-01032d63a933",
+      "operationId": "008b3308-5444-4f66-b671-9b8db1fee3c9",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711667553,
+      "elapsedMs": 18109,
+      "stageTimingsMs": {
+        "HASH": 707,
+        "COPY": 1003,
+        "PARSE": 2022,
+        "NATIVE_EXTRACT": 2638,
+        "PUBLISH": 3207,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3343
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 4,
+    "step": "delete",
+    "requestId": "c4-r02-com-quark-browser-004-delete-1fc84957-e21f-4726-85c7-2285d700b344",
+    "wallMs": 16344,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-004-delete-1fc84957-e21f-4726-85c7-2285d700b344",
+      "operationId": "341e3a77-fae0-4d9f-9ff8-e081c22f474e",
+      "operation": "deleteInstance",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711693856,
+      "elapsedMs": 7847,
+      "stageTimingsMs": {
+        "CATALOG": 5020
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 4,
+    "step": "readd",
+    "requestId": "c4-r02-com-quark-browser-004-readd-ffd6795a-912c-486b-abee-054fc90dfd6f",
+    "wallMs": 16050,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-004-readd-ffd6795a-912c-486b-abee-054fc90dfd6f",
+      "operationId": "bf46ba6b-90cb-487c-bd7a-bd47241da527",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711706253,
+      "elapsedMs": 11606,
+      "stageTimingsMs": {
+        "HASH": 691,
+        "COPY": 1076,
+        "PARSE": 1961,
+        "NATIVE_EXTRACT": 2757,
+        "PUBLISH": 11,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3228
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 5,
+    "step": "add",
+    "requestId": "c4-r02-com-quark-browser-005-add-5fb00e89-2be2-40c2-94b6-6a2f33e3460c",
+    "wallMs": 23423,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-005-add-5fb00e89-2be2-40c2-94b6-6a2f33e3460c",
+      "operationId": "042aecec-852c-4550-b707-fabc899b89c7",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711723048,
+      "elapsedMs": 18273,
+      "stageTimingsMs": {
+        "HASH": 745,
+        "COPY": 1001,
+        "PARSE": 2074,
+        "NATIVE_EXTRACT": 2561,
+        "PUBLISH": 3680,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3126
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 5,
+    "step": "delete",
+    "requestId": "c4-r02-com-quark-browser-005-delete-86e4776f-dae0-4ed5-b09d-092d277a800c",
+    "wallMs": 15840,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-005-delete-86e4776f-dae0-4ed5-b09d-092d277a800c",
+      "operationId": "8d3d4815-9970-4a6b-8eba-4951c3022037",
+      "operation": "deleteInstance",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711749296,
+      "elapsedMs": 7978,
+      "stageTimingsMs": {
+        "CATALOG": 5173
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "夸克",
+    "package": "com.quark.browser",
+    "cycle": 5,
+    "step": "readd",
+    "requestId": "c4-r02-com-quark-browser-005-readd-d48a840a-09ef-4883-ab43-53c8cb78c0b3",
+    "wallMs": 14849,
+    "trace": {
+      "requestId": "c4-r02-com-quark-browser-005-readd-d48a840a-09ef-4883-ab43-53c8cb78c0b3",
+      "operationId": "f43b9b35-7375-4233-baa3-419500c22e2d",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.quark.browser",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711761320,
+      "elapsedMs": 10776,
+      "stageTimingsMs": {
+        "HASH": 694,
+        "COPY": 1354,
+        "PARSE": 1902,
+        "NATIVE_EXTRACT": 2335,
+        "PUBLISH": 12,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2666
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 1,
+    "step": "add",
+    "requestId": "c4-r02-com-phoenix-read-001-add-71a39214-9bdd-4e33-8a30-5176b846c6a6",
+    "wallMs": 18866,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-001-add-71a39214-9bdd-4e33-8a30-5176b846c6a6",
+      "operationId": "2090e12d-a53b-4658-9b71-eb28ff489284",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711777104,
+      "elapsedMs": 13906,
+      "stageTimingsMs": {
+        "HASH": 479,
+        "COPY": 1121,
+        "PARSE": 1558,
+        "NATIVE_EXTRACT": 1495,
+        "PUBLISH": 2204,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2703
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 1,
+    "step": "delete",
+    "requestId": "c4-r02-com-phoenix-read-001-delete-3afdb8d9-dc07-4d91-a63b-21b57239f95b",
+    "wallMs": 16346,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-001-delete-3afdb8d9-dc07-4d91-a63b-21b57239f95b",
+      "operationId": "9e64c7dd-e051-4ed0-9e7b-f6588bb890ff",
+      "operation": "deleteInstance",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711798779,
+      "elapsedMs": 8599,
+      "stageTimingsMs": {
+        "CATALOG": 5644
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 1,
+    "step": "readd",
+    "requestId": "c4-r02-com-phoenix-read-001-readd-3110e80f-ebb2-4b6f-b0dc-1dbb71f76326",
+    "wallMs": 14150,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-001-readd-3110e80f-ebb2-4b6f-b0dc-1dbb71f76326",
+      "operationId": "f5bf09d4-fdbc-4f01-8e6b-d0ef8585c5fb",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711811828,
+      "elapsedMs": 9646,
+      "stageTimingsMs": {
+        "HASH": 510,
+        "COPY": 1102,
+        "PARSE": 1430,
+        "NATIVE_EXTRACT": 1606,
+        "PUBLISH": 24,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2849
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 2,
+    "step": "add",
+    "requestId": "c4-r02-com-phoenix-read-002-add-5580fc29-ceaa-477f-979e-47ddf4ed7573",
+    "wallMs": 18948,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-002-add-5580fc29-ceaa-477f-979e-47ddf4ed7573",
+      "operationId": "b47a074d-e382-43f3-98a0-0f46dc906e3a",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711826557,
+      "elapsedMs": 13679,
+      "stageTimingsMs": {
+        "HASH": 481,
+        "COPY": 737,
+        "PARSE": 1527,
+        "NATIVE_EXTRACT": 1794,
+        "PUBLISH": 1935,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2869
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 2,
+    "step": "delete",
+    "requestId": "c4-r02-com-phoenix-read-002-delete-e2d8f153-bc44-48d2-b614-fc5404aed954",
+    "wallMs": 18231,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-002-delete-e2d8f153-bc44-48d2-b614-fc5404aed954",
+      "operationId": "4029c1af-4f41-4b02-bfd9-1b1025a10f9f",
+      "operation": "deleteInstance",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711849248,
+      "elapsedMs": 9339,
+      "stageTimingsMs": {
+        "CATALOG": 5819
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 2,
+    "step": "readd",
+    "requestId": "c4-r02-com-phoenix-read-002-readd-aaf19390-db5b-457e-968f-c95ebcfca575",
+    "wallMs": 14229,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-002-readd-aaf19390-db5b-457e-968f-c95ebcfca575",
+      "operationId": "822f962e-5487-4c4b-8af2-a76ff584417c",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711863240,
+      "elapsedMs": 9413,
+      "stageTimingsMs": {
+        "HASH": 445,
+        "COPY": 839,
+        "PARSE": 1411,
+        "NATIVE_EXTRACT": 1432,
+        "PUBLISH": 16,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3038
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 3,
+    "step": "add",
+    "requestId": "c4-r02-com-phoenix-read-003-add-b3fdc977-7e9b-4f01-bb2f-8a0d3d562ae6",
+    "wallMs": 19102,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-003-add-b3fdc977-7e9b-4f01-bb2f-8a0d3d562ae6",
+      "operationId": "068965f1-4e95-4bcb-84c2-ad0cdd14da0b",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711878190,
+      "elapsedMs": 13463,
+      "stageTimingsMs": {
+        "HASH": 463,
+        "COPY": 873,
+        "PARSE": 1472,
+        "NATIVE_EXTRACT": 1560,
+        "PUBLISH": 1780,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2792
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 3,
+    "step": "delete",
+    "requestId": "c4-r02-com-phoenix-read-003-delete-f152259a-e673-4832-bce4-3d9585a64422",
+    "wallMs": 17598,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-003-delete-f152259a-e673-4832-bce4-3d9585a64422",
+      "operationId": "6a6df3fb-77fe-4a62-b3e4-c9adb5baf68f",
+      "operation": "deleteInstance",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711900610,
+      "elapsedMs": 8783,
+      "stageTimingsMs": {
+        "CATALOG": 5386
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 3,
+    "step": "readd",
+    "requestId": "c4-r02-com-phoenix-read-003-readd-910de5a4-1992-4d70-83ef-e8c982df31d8",
+    "wallMs": 12865,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-003-readd-910de5a4-1992-4d70-83ef-e8c982df31d8",
+      "operationId": "d675b3c6-9d26-45ed-8676-74ddf43fbff4",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711913639,
+      "elapsedMs": 8797,
+      "stageTimingsMs": {
+        "HASH": 422,
+        "COPY": 763,
+        "PARSE": 1278,
+        "NATIVE_EXTRACT": 1295,
+        "PUBLISH": 13,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3028
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 4,
+    "step": "add",
+    "requestId": "c4-r02-com-phoenix-read-004-add-4c4e3fa1-e540-4f4e-a259-ee76d4d1f361",
+    "wallMs": 17689,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-004-add-4c4e3fa1-e540-4f4e-a259-ee76d4d1f361",
+      "operationId": "17376945-1022-4755-b4b7-a0a796c2f8cd",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711927358,
+      "elapsedMs": 12462,
+      "stageTimingsMs": {
+        "HASH": 449,
+        "COPY": 894,
+        "PARSE": 1246,
+        "NATIVE_EXTRACT": 1359,
+        "PUBLISH": 1619,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2770
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 4,
+    "step": "delete",
+    "requestId": "c4-r02-com-phoenix-read-004-delete-1ac6db0f-523f-4328-9de6-bbcd489fdd1e",
+    "wallMs": 16138,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-004-delete-1ac6db0f-523f-4328-9de6-bbcd489fdd1e",
+      "operationId": "6cadacc2-cb8b-407b-ad8b-6985fcfb91e4",
+      "operation": "deleteInstance",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711948102,
+      "elapsedMs": 8133,
+      "stageTimingsMs": {
+        "CATALOG": 5297
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 4,
+    "step": "readd",
+    "requestId": "c4-r02-com-phoenix-read-004-readd-716eeaf9-a8c0-4d39-b3be-e34cc38aaa86",
+    "wallMs": 13385,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-004-readd-716eeaf9-a8c0-4d39-b3be-e34cc38aaa86",
+      "operationId": "a2b84129-6eb2-4593-b569-0f8f6c7987b1",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711960452,
+      "elapsedMs": 9095,
+      "stageTimingsMs": {
+        "HASH": 442,
+        "COPY": 683,
+        "PARSE": 1296,
+        "NATIVE_EXTRACT": 1429,
+        "PUBLISH": 16,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3159
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 5,
+    "step": "add",
+    "requestId": "c4-r02-com-phoenix-read-005-add-790da183-c0c5-40f8-98e6-aab9bf3ada49",
+    "wallMs": 17250,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-005-add-790da183-c0c5-40f8-98e6-aab9bf3ada49",
+      "operationId": "0b921748-6e92-4a27-8dca-ae15d3cfcaac",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711974576,
+      "elapsedMs": 12347,
+      "stageTimingsMs": {
+        "HASH": 424,
+        "COPY": 654,
+        "PARSE": 1232,
+        "NATIVE_EXTRACT": 1240,
+        "PUBLISH": 1725,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2963
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 5,
+    "step": "delete",
+    "requestId": "c4-r02-com-phoenix-read-005-delete-a1138bed-1a24-4718-85ae-4aff52381c1e",
+    "wallMs": 16324,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-005-delete-a1138bed-1a24-4718-85ae-4aff52381c1e",
+      "operationId": "b254168a-4fc5-4604-addf-bf15811ea77d",
+      "operation": "deleteInstance",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787711995039,
+      "elapsedMs": 8158,
+      "stageTimingsMs": {
+        "CATALOG": 5325
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "cycle": 5,
+    "step": "readd",
+    "requestId": "c4-r02-com-phoenix-read-005-readd-a9218788-0c25-4f92-b7dd-092348634d94",
+    "wallMs": 13492,
+    "trace": {
+      "requestId": "c4-r02-com-phoenix-read-005-readd-a9218788-0c25-4f92-b7dd-092348634d94",
+      "operationId": "aab2679a-73c9-42ee-a847-868140e381b6",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712007532,
+      "elapsedMs": 9064,
+      "stageTimingsMs": {
+        "HASH": 458,
+        "COPY": 960,
+        "PARSE": 1355,
+        "NATIVE_EXTRACT": 1385,
+        "PUBLISH": 20,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2914
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 1,
+    "step": "add",
+    "requestId": "c4-r02-com-dragon-read-001-add-8e1dd232-5390-46e7-aa95-0b1b6f93a6d2",
+    "wallMs": 18077,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-001-add-8e1dd232-5390-46e7-aa95-0b1b6f93a6d2",
+      "operationId": "858da7c0-f7c1-4c12-8a70-45d28b1b5d01",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712021817,
+      "elapsedMs": 12679,
+      "stageTimingsMs": {
+        "HASH": 477,
+        "COPY": 826,
+        "PARSE": 1273,
+        "NATIVE_EXTRACT": 1288,
+        "PUBLISH": 1782,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2974
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 1,
+    "step": "delete",
+    "requestId": "c4-r02-com-dragon-read-001-delete-d0c3a43f-d8f5-4c61-b201-4713f4ea63a9",
+    "wallMs": 16201,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-001-delete-d0c3a43f-d8f5-4c61-b201-4713f4ea63a9",
+      "operationId": "8b001b7e-e749-4010-a945-4f5f009acf26",
+      "operation": "deleteInstance",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712042883,
+      "elapsedMs": 7808,
+      "stageTimingsMs": {
+        "CATALOG": 5036
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 1,
+    "step": "readd",
+    "requestId": "c4-r02-com-dragon-read-001-readd-134b2325-c21b-432f-bab9-94c045fd31ae",
+    "wallMs": 13969,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-001-readd-134b2325-c21b-432f-bab9-94c045fd31ae",
+      "operationId": "88b2a8f9-dd1d-4380-8110-bed8dd0a10f8",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712055501,
+      "elapsedMs": 9286,
+      "stageTimingsMs": {
+        "HASH": 528,
+        "COPY": 900,
+        "PARSE": 1404,
+        "NATIVE_EXTRACT": 1436,
+        "PUBLISH": 21,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2902
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 2,
+    "step": "add",
+    "requestId": "c4-r02-com-dragon-read-002-add-88e92f10-a566-4d17-81ea-30eead849ec2",
+    "wallMs": 17671,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-002-add-88e92f10-a566-4d17-81ea-30eead849ec2",
+      "operationId": "20c2e0c6-539c-49e0-8f78-445ae08be64e",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712069897,
+      "elapsedMs": 12739,
+      "stageTimingsMs": {
+        "HASH": 504,
+        "COPY": 661,
+        "PARSE": 1383,
+        "NATIVE_EXTRACT": 1263,
+        "PUBLISH": 1918,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3082
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 2,
+    "step": "delete",
+    "requestId": "c4-r02-com-dragon-read-002-delete-530db187-5d36-4b81-9b56-32c2f486c78b",
+    "wallMs": 16412,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-002-delete-530db187-5d36-4b81-9b56-32c2f486c78b",
+      "operationId": "02e82cfb-eec4-4f35-8459-d31ea7476719",
+      "operation": "deleteInstance",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712091421,
+      "elapsedMs": 7629,
+      "stageTimingsMs": {
+        "CATALOG": 4883
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 2,
+    "step": "readd",
+    "requestId": "c4-r02-com-dragon-read-002-readd-489bac58-c2bf-42d7-9b12-19561186ef91",
+    "wallMs": 13535,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-002-readd-489bac58-c2bf-42d7-9b12-19561186ef91",
+      "operationId": "0b230dcf-c4e3-4c80-9037-425d64b82577",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712103411,
+      "elapsedMs": 8909,
+      "stageTimingsMs": {
+        "HASH": 480,
+        "COPY": 731,
+        "PARSE": 1406,
+        "NATIVE_EXTRACT": 1357,
+        "PUBLISH": 22,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2842
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 3,
+    "step": "add",
+    "requestId": "c4-r02-com-dragon-read-003-add-a3d03210-705a-4d6d-bdaa-0ff0ab0c9bfa",
+    "wallMs": 18915,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-003-add-a3d03210-705a-4d6d-bdaa-0ff0ab0c9bfa",
+      "operationId": "4ed1e1f7-ca67-4d7c-82ae-81688e9d15af",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712117451,
+      "elapsedMs": 14120,
+      "stageTimingsMs": {
+        "HASH": 467,
+        "COPY": 1063,
+        "PARSE": 1302,
+        "NATIVE_EXTRACT": 1893,
+        "PUBLISH": 2067,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3056
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 3,
+    "step": "delete",
+    "requestId": "c4-r02-com-dragon-read-003-delete-ccfbcfab-4a0a-4ffb-b5df-f9bc1b7fd471",
+    "wallMs": 17067,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-003-delete-ccfbcfab-4a0a-4ffb-b5df-f9bc1b7fd471",
+      "operationId": "9756231f-c06d-4984-b127-4ca6ef266446",
+      "operation": "deleteInstance",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712140605,
+      "elapsedMs": 7900,
+      "stageTimingsMs": {
+        "CATALOG": 5199
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 3,
+    "step": "readd",
+    "requestId": "c4-r02-com-dragon-read-003-readd-ebfb6e88-713b-4fc6-a7f9-d6910d4b1367",
+    "wallMs": 14185,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-003-readd-ebfb6e88-713b-4fc6-a7f9-d6910d4b1367",
+      "operationId": "e32cf881-82fb-4164-b1d4-04c097c3b3e4",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712153186,
+      "elapsedMs": 9383,
+      "stageTimingsMs": {
+        "HASH": 524,
+        "COPY": 942,
+        "PARSE": 1387,
+        "NATIVE_EXTRACT": 1446,
+        "PUBLISH": 18,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2872
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 4,
+    "step": "add",
+    "requestId": "c4-r02-com-dragon-read-004-add-d3ad468d-ee88-403f-939a-a8580f352e50",
+    "wallMs": 18134,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-004-add-d3ad468d-ee88-403f-939a-a8580f352e50",
+      "operationId": "6c02d577-01f6-44a0-b3e0-01d6a1ced634",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712167526,
+      "elapsedMs": 13345,
+      "stageTimingsMs": {
+        "HASH": 491,
+        "COPY": 753,
+        "PARSE": 1469,
+        "NATIVE_EXTRACT": 1414,
+        "PUBLISH": 1974,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2937
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 4,
+    "step": "delete",
+    "requestId": "c4-r02-com-dragon-read-004-delete-7aca9f92-b883-4133-9aea-36fe7d2c7d70",
+    "wallMs": 16953,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-004-delete-7aca9f92-b883-4133-9aea-36fe7d2c7d70",
+      "operationId": "4d6d0c88-1773-4b5e-8ef1-fc07ab93f268",
+      "operation": "deleteInstance",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712189486,
+      "elapsedMs": 8208,
+      "stageTimingsMs": {
+        "CATALOG": 5435
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 4,
+    "step": "readd",
+    "requestId": "c4-r02-com-dragon-read-004-readd-0f263e5a-4f62-4b3f-9640-e8ad790be493",
+    "wallMs": 14717,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-004-readd-0f263e5a-4f62-4b3f-9640-e8ad790be493",
+      "operationId": "e13abaae-538a-4cdb-9f62-108b02e67ad5",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712202721,
+      "elapsedMs": 9697,
+      "stageTimingsMs": {
+        "HASH": 552,
+        "COPY": 909,
+        "PARSE": 1663,
+        "NATIVE_EXTRACT": 1543,
+        "PUBLISH": 18,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2742
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 5,
+    "step": "add",
+    "requestId": "c4-r02-com-dragon-read-005-add-89ba0b6a-3a40-4647-91d2-365fdb68dcd8",
+    "wallMs": 18759,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-005-add-89ba0b6a-3a40-4647-91d2-365fdb68dcd8",
+      "operationId": "b4a04c6a-effb-473a-a0b3-96f255ab76a1",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712217647,
+      "elapsedMs": 13694,
+      "stageTimingsMs": {
+        "HASH": 515,
+        "COPY": 971,
+        "PARSE": 1485,
+        "NATIVE_EXTRACT": 1512,
+        "PUBLISH": 1903,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2905
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 5,
+    "step": "delete",
+    "requestId": "c4-r02-com-dragon-read-005-delete-6a31b12b-eb82-48e3-b798-658f71a8244f",
+    "wallMs": 16659,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-005-delete-6a31b12b-eb82-48e3-b798-658f71a8244f",
+      "operationId": "015cd8e8-ac4f-466c-b4c1-e68fe8ef77be",
+      "operation": "deleteInstance",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712239580,
+      "elapsedMs": 8097,
+      "stageTimingsMs": {
+        "CATALOG": 5308
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "番茄免费小说",
+    "package": "com.dragon.read",
+    "cycle": 5,
+    "step": "readd",
+    "requestId": "c4-r02-com-dragon-read-005-readd-68b146c5-93e8-43ac-a142-b30f0daadf2d",
+    "wallMs": 14516,
+    "trace": {
+      "requestId": "c4-r02-com-dragon-read-005-readd-68b146c5-93e8-43ac-a142-b30f0daadf2d",
+      "operationId": "42391408-6433-4380-a4dd-ee854620ef81",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.dragon.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712252725,
+      "elapsedMs": 9455,
+      "stageTimingsMs": {
+        "HASH": 482,
+        "COPY": 944,
+        "PARSE": 1391,
+        "NATIVE_EXTRACT": 1608,
+        "PUBLISH": 18,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2807
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 1,
+    "step": "add",
+    "requestId": "c4-r02-com-alibaba-android-rimet-001-add-eb457dfa-d3a0-4d22-9b6f-22a83d30c445",
+    "wallMs": 32483,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-001-add-eb457dfa-d3a0-4d22-9b6f-22a83d30c445",
+      "operationId": "00605b75-0dd6-40ae-9ace-2e2550c5a282",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712268561,
+      "elapsedMs": 26429,
+      "stageTimingsMs": {
+        "HASH": 1471,
+        "COPY": 3378,
+        "PARSE": 3070,
+        "NATIVE_EXTRACT": 3063,
+        "PUBLISH": 5868,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3392
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 1,
+    "step": "delete",
+    "requestId": "c4-r02-com-alibaba-android-rimet-001-delete-7dc21471-7b13-4fc2-81d5-18a5a4567d3e",
+    "wallMs": 15841,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-001-delete-7dc21471-7b13-4fc2-81d5-18a5a4567d3e",
+      "operationId": "751d5d28-7107-4a0d-81e5-66d5bec60b55",
+      "operation": "deleteInstance",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712303322,
+      "elapsedMs": 7426,
+      "stageTimingsMs": {
+        "CATALOG": 4456
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 1,
+    "step": "readd",
+    "requestId": "c4-r02-com-alibaba-android-rimet-001-readd-11c50417-10b5-41b9-af9b-a3efa2eefe97",
+    "wallMs": 17272,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-001-readd-11c50417-10b5-41b9-af9b-a3efa2eefe97",
+      "operationId": "81bbe766-afbf-4e40-9025-678413316026",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712314560,
+      "elapsedMs": 13327,
+      "stageTimingsMs": {
+        "HASH": 1117,
+        "COPY": 2235,
+        "PARSE": 2536,
+        "NATIVE_EXTRACT": 3425,
+        "PUBLISH": 19,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3046
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 2,
+    "step": "add",
+    "requestId": "c4-r02-com-alibaba-android-rimet-002-add-98f0106a-6a0c-43e8-8f4f-3d0ea7892b48",
+    "wallMs": 27596,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-002-add-98f0106a-6a0c-43e8-8f4f-3d0ea7892b48",
+      "operationId": "0ccc1759-b31d-4ba2-b543-e74c8b549ffc",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712332696,
+      "elapsedMs": 22663,
+      "stageTimingsMs": {
+        "HASH": 1088,
+        "COPY": 2444,
+        "PARSE": 2901,
+        "NATIVE_EXTRACT": 2918,
+        "PUBLISH": 4622,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3172
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 2,
+    "step": "delete",
+    "requestId": "c4-r02-com-alibaba-android-rimet-002-delete-e8f95894-4675-4709-8fb1-18715a9f9235",
+    "wallMs": 16067,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-002-delete-e8f95894-4675-4709-8fb1-18715a9f9235",
+      "operationId": "825b1e33-5027-40eb-8924-ba801ccf7209",
+      "operation": "deleteInstance",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712364135,
+      "elapsedMs": 7528,
+      "stageTimingsMs": {
+        "CATALOG": 4682
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 2,
+    "step": "readd",
+    "requestId": "c4-r02-com-alibaba-android-rimet-002-readd-2fd4a137-f62b-492b-b22b-ce45a574430a",
+    "wallMs": 16689,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-002-readd-2fd4a137-f62b-492b-b22b-ce45a574430a",
+      "operationId": "adaa3613-f38e-41ab-93bb-f4079809ecf3",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712375876,
+      "elapsedMs": 12556,
+      "stageTimingsMs": {
+        "HASH": 958,
+        "COPY": 1672,
+        "PARSE": 2352,
+        "NATIVE_EXTRACT": 3317,
+        "PUBLISH": 24,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3209
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 3,
+    "step": "add",
+    "requestId": "c4-r02-com-alibaba-android-rimet-003-add-16a6dd5c-70cc-4165-b700-3ccb7d617f51",
+    "wallMs": 26476,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-003-add-16a6dd5c-70cc-4165-b700-3ccb7d617f51",
+      "operationId": "82f6d288-5c29-43d5-8278-e620057759a3",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712393680,
+      "elapsedMs": 21179,
+      "stageTimingsMs": {
+        "HASH": 998,
+        "COPY": 1388,
+        "PARSE": 2582,
+        "NATIVE_EXTRACT": 3084,
+        "PUBLISH": 4956,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2953
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 3,
+    "step": "delete",
+    "requestId": "c4-r02-com-alibaba-android-rimet-003-delete-44b6d477-91a9-41f6-8b1d-6aab22c25a42",
+    "wallMs": 15835,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-003-delete-44b6d477-91a9-41f6-8b1d-6aab22c25a42",
+      "operationId": "cb6b76ca-4e84-43b2-a82e-7265ed404544",
+      "operation": "deleteInstance",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712423124,
+      "elapsedMs": 7417,
+      "stageTimingsMs": {
+        "CATALOG": 4428
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 3,
+    "step": "readd",
+    "requestId": "c4-r02-com-alibaba-android-rimet-003-readd-c629a635-6e84-4b2f-8ba3-ed4d38ab667f",
+    "wallMs": 16637,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-003-readd-c629a635-6e84-4b2f-8ba3-ed4d38ab667f",
+      "operationId": "5cd80078-d975-411e-b56e-b85bff4cef7d",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712434731,
+      "elapsedMs": 12614,
+      "stageTimingsMs": {
+        "HASH": 1090,
+        "COPY": 2021,
+        "PARSE": 2560,
+        "NATIVE_EXTRACT": 3119,
+        "PUBLISH": 16,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2907
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 4,
+    "step": "add",
+    "requestId": "c4-r02-com-alibaba-android-rimet-004-add-9ad470a6-44c1-46b2-96c6-89e6c6380b78",
+    "wallMs": 31305,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-004-add-9ad470a6-44c1-46b2-96c6-89e6c6380b78",
+      "operationId": "e929d428-9208-486b-be6b-12d77ad9c3f8",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712452206,
+      "elapsedMs": 26383,
+      "stageTimingsMs": {
+        "HASH": 1256,
+        "COPY": 2203,
+        "PARSE": 3187,
+        "NATIVE_EXTRACT": 2837,
+        "PUBLISH": 5067,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3021
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 4,
+    "step": "delete",
+    "requestId": "c4-r02-com-alibaba-android-rimet-004-delete-5659a977-1a26-439d-b845-26404d7d8fae",
+    "wallMs": 16533,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-004-delete-5659a977-1a26-439d-b845-26404d7d8fae",
+      "operationId": "371a380f-a11a-4896-8bff-6c0cd63fd1db",
+      "operation": "deleteInstance",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712487223,
+      "elapsedMs": 7724,
+      "stageTimingsMs": {
+        "CATALOG": 4952
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 4,
+    "step": "readd",
+    "requestId": "c4-r02-com-alibaba-android-rimet-004-readd-a83965a2-9cda-4ddd-97ae-bca7d99d4138",
+    "wallMs": 18125,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-004-readd-a83965a2-9cda-4ddd-97ae-bca7d99d4138",
+      "operationId": "7436bcdc-4a11-4cda-95f5-ba44e1bfdc9c",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712499384,
+      "elapsedMs": 14008,
+      "stageTimingsMs": {
+        "HASH": 1021,
+        "COPY": 2203,
+        "PARSE": 2773,
+        "NATIVE_EXTRACT": 3867,
+        "PUBLISH": 25,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3178
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 5,
+    "step": "add",
+    "requestId": "c4-r02-com-alibaba-android-rimet-005-add-83bfc8ee-2d97-4776-a96c-4825f5ba4a34",
+    "wallMs": 27454,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-005-add-83bfc8ee-2d97-4776-a96c-4825f5ba4a34",
+      "operationId": "69913f4b-a0b4-4a13-bf28-8becd09995a8",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712518395,
+      "elapsedMs": 22475,
+      "stageTimingsMs": {
+        "HASH": 1012,
+        "COPY": 2265,
+        "PARSE": 2849,
+        "NATIVE_EXTRACT": 3116,
+        "PUBLISH": 4898,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 3025
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 5,
+    "step": "delete",
+    "requestId": "c4-r02-com-alibaba-android-rimet-005-delete-bb0b6c67-2e22-48f0-89fe-111ebf6b0455",
+    "wallMs": 16026,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-005-delete-bb0b6c67-2e22-48f0-89fe-111ebf6b0455",
+      "operationId": "dccfe6dd-6848-4a84-8f04-51e0c1c42859",
+      "operation": "deleteInstance",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712549294,
+      "elapsedMs": 7568,
+      "stageTimingsMs": {
+        "CATALOG": 4840
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  },
+  {
+    "sample": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "cycle": 5,
+    "step": "readd",
+    "requestId": "c4-r02-com-alibaba-android-rimet-005-readd-4464d0e5-b756-44c4-a298-8f5d46f63472",
+    "wallMs": 15956,
+    "trace": {
+      "requestId": "c4-r02-com-alibaba-android-rimet-005-readd-4464d0e5-b756-44c4-a298-8f5d46f63472",
+      "operationId": "9fcffa85-f68a-4556-8a51-cb40c04945da",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.alibaba.android.rimet",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787712560860,
+      "elapsedMs": 12038,
+      "stageTimingsMs": {
+        "HASH": 1099,
+        "COPY": 1965,
+        "PARSE": 2378,
+        "NATIVE_EXTRACT": 2930,
+        "PUBLISH": 17,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 2743
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": []
+    }
+  }
+]

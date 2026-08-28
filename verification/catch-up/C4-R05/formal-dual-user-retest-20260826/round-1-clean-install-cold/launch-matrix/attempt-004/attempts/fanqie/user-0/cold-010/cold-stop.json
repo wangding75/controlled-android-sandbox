@@ -1,0 +1,33 @@
+{
+  "kind": "cold-stop",
+  "requestId": "65c9e08cba0d49458cc128f0f418b314",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "stop",
+      "package": "com.dragon.read",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "65c9e08cba0d49458cc128f0f418b314",
+      "operationId": "65c9e08cba0d49458cc128f0f418b314-launch",
+      "startedAt": 1787753546680,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "STOPPED",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "",
+        "generation": 0,
+        "processSlot": -1,
+        "platformPid": 0
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 701\nWaitTime: 704\nComplete\n",
+    "start_stderr": ""
+  },
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false
+}

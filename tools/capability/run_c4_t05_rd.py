@@ -95,6 +95,24 @@ def dumpsys_activities(serial: str) -> str:
     ).stdout
 
 
+def wait_for_activity_evidence(serial: str, predicate: Any, *, deadline_sec: float = 10.0) -> str:
+    """Poll activity evidence until the caller's dynamic predicate is satisfied.
+
+    This is deliberately readiness-based: a fixed delay is not evidence that a retained
+    hosted task or foreground re-entry is ready.  The last dump is returned so the caller
+    can preserve it even when the deadline expires.
+    """
+    deadline = time.monotonic() + deadline_sec
+    latest = ""
+    while True:
+        latest = dumpsys_activities(serial)
+        if predicate(latest):
+            return latest
+        if time.monotonic() >= deadline:
+            return latest
+        time.sleep(0.25)
+
+
 def require_markers(blob: str, required: dict[str, tuple[str, ...]]) -> list[str]:
     missing: list[str] = []
     for name, markers in required.items():
@@ -106,9 +124,12 @@ def require_markers(blob: str, required: dict[str, tuple[str, ...]]) -> list[str
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--instance", "--instance-name", dest="instance", default="RD测试")
+    parser.add_argument("--verification-dir", type=Path, default=VERIFICATION)
     args = parser.parse_args()
     output = artifacts_dir("catch-up-c4-t05")
-    VERIFICATION.mkdir(parents=True, exist_ok=True)
+    verification = args.verification_dir
+    verification.mkdir(parents=True, exist_ok=True)
+    historical_output = verification.resolve() == VERIFICATION.resolve()
     identity = git_identity()
     errors: list[str] = []
     static_rows: list[dict[str, Any]] = []
@@ -252,8 +273,10 @@ def main() -> int:
         if "GUEST_ACTIVITY_CREATE" not in dt_log and not login_hit:
             raise RuntimeError("no GUEST_ACTIVITY_CREATE for DingTalk launch")
         run_adb(serial, ["shell", "input", "keyevent", "KEYCODE_HOME"], check=False)
-        time.sleep(2.5)
-        bg_dump = dumpsys_activities(serial)
+        bg_dump = wait_for_activity_evidence(
+            serial,
+            lambda dump: "StubActivity" in dump or DINGTALK_PACKAGE in dump,
+        )
         (output / "c4-t05-dingtalk-dumpsys-bg.txt").write_text(bg_dump, encoding="utf-8")
         if "StubActivity" not in bg_dump and DINGTALK_PACKAGE not in bg_dump:
             raise RuntimeError("DingTalk hosted task disappeared after HOME")
@@ -265,13 +288,20 @@ def main() -> int:
                 "--ez", "trustNativeGuest", "true",
             ],
             deadline_sec=120,
-            force_stop_host=True,
+            force_stop_host=False,
         )
         write_json(output / "c4-t05-dingtalk-fg-reentry.json", fg)
         if str(fg.get("status") or "").upper() != "PASS":
             raise RuntimeError(f"DingTalk foreground re-entry failed: {fg}")
-        time.sleep(4.0)
-        fg_dump = dumpsys_activities(serial)
+        operation = ((fg.get("result") or {}).get("operation") or {})
+        if operation.get("firstFrameDrawn") is not True:
+            raise RuntimeError(f"DingTalk foreground re-entry missing FIRST_FRAME_DRAWN: {operation}")
+        if not operation.get("windowEvidence"):
+            raise RuntimeError(f"DingTalk foreground re-entry missing window evidence: {operation}")
+        fg_dump = wait_for_activity_evidence(
+            serial,
+            lambda dump: "StubActivity" in dump or any(marker in dump for marker in LOGIN_MARKERS),
+        )
         (output / "c4-t05-dingtalk-dumpsys-reentry.txt").write_text(fg_dump, encoding="utf-8")
         if "StubActivity" not in fg_dump and not any(marker in fg_dump for marker in LOGIN_MARKERS):
             raise RuntimeError("DingTalk foreground re-entry has no hosted stub/login surface")
@@ -284,6 +314,11 @@ def main() -> int:
     evidence = {
         "schema_version": 1,
         "campaign_id": TASK_ID,
+        "evidence_status": "SUPERSEDED" if historical_output else "CURRENT_REGRESSION",
+        "historical_only": historical_output,
+        "usable_for_c4_closure": False,
+        "superseded_by": "C4-R01" if historical_output else "",
+        "evidence_role": "HISTORICAL_C4_T05" if historical_output else "C4_R05_REGRESSION_COMPONENT",
         "capability": "package_lifecycle_clear_delete_reinstall",
         "branch": identity.get("branch") or "unknown",
         "commit": identity.get("commit") or "unknown",
@@ -333,14 +368,19 @@ def main() -> int:
         str(output / "static-gates.json"),
         str(evidence_path),
         str(report_path),
-        str(VERIFICATION / "c4-t05-rd-summary.json"),
-        str(VERIFICATION / "c4-t05-local-verification.json"),
+        str(verification / "c4-t05-rd-summary.json"),
+        str(verification / "c4-t05-local-verification.json"),
         str(ROOT / "docs/review/C4_T05_SX_BUSINESS_DESIGN.md"),
     ]
     write_json(evidence_path, evidence)
-    write_json(VERIFICATION / "c4-t05-rd-summary.json", evidence)
+    write_json(verification / "c4-t05-rd-summary.json", evidence)
     local = {
         "task_id": TASK_ID,
+        "evidence_status": "SUPERSEDED" if historical_output else "CURRENT_REGRESSION",
+        "historical_only": historical_output,
+        "usable_for_c4_closure": False,
+        "superseded_by": "C4-R01" if historical_output else "",
+        "evidence_role": "HISTORICAL_C4_T05" if historical_output else "C4_R05_REGRESSION_COMPONENT",
         "status": "PASS" if not errors else "FAIL",
         "environment": environment,
         "static_gates": [
@@ -373,7 +413,7 @@ def main() -> int:
             "not Android matrix / OEM PASS",
         ],
     }
-    write_json(VERIFICATION / "c4-t05-local-verification.json", local)
+    write_json(verification / "c4-t05-local-verification.json", local)
     report_path.write_text(
         f"# C4-T05 SX F1-F5 / DingTalk\n\n- status: {evidence['rd_result']}\n",
         encoding="utf-8",

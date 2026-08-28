@@ -41,6 +41,10 @@ def main() -> int:
         errors.append("R05 orchestrator must not invoke a resume lane")
     if "return_code = 0" not in text or "return_code = 1" not in text:
         errors.append("R05 orchestrator does not expose fail/pass process status")
+    if "expected_rounds = 2" not in text:
+        errors.append("R05 stage and overall scopes must both require two formal rounds")
+    if 'round_names = ("clean-install-cold", "retained-hot-recovery")' not in text:
+        errors.append("R05 formal round sequence is not fixed to clean then retained")
     if errors:
         for error in errors:
             print(f"FAIL {error}")

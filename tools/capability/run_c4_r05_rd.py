@@ -346,21 +346,31 @@ def run_regressions(instance_name: str, output: Path) -> list[dict[str, Any]]:
     """Run the required C1/C2/C4/SX gates only after both formal rounds pass."""
     commands = [
         ("c1-activity", [sys.executable, str(TOOLS / "run_c1_t01_rd.py"),
-                         "--instance", instance_name, "--loops", "50",
-                         "--receipt", str(output / "c1-t01-rd-summary.json")]),
+                          "--instance", instance_name, "--loops", "50",
+                          "--receipt", str(output / "c1-t01-rd-summary.json")],
+         output / "c1-t01-rd-summary.json"),
         ("c2-window-audio", [sys.executable, str(TOOLS / "run_c2_t05_rd.py"),
-                             "--instance", instance_name, "--loops", "10"]),
+                              "--instance", instance_name, "--loops", "10",
+                              "--verification-dir", str(output / "c2-window-audio")],
+         output / "c2-window-audio" / "c2-t05-rd-summary.json"),
         ("c2-device-audio", [sys.executable, str(TOOLS / "run_c2_t06_rd.py"),
-                              "--instance", instance_name, "--loops", "20",
-                              "--clone-loops", "10"]),
+                               "--instance", instance_name, "--loops", "20",
+                               "--clone-loops", "10", "--verification-dir",
+                               str(output / "c2-device-audio")],
+         output / "c2-device-audio" / "c2-t06-rd-summary.json"),
         ("c4-cas-only", [sys.executable, str(TOOLS / "run_c4_t04_rd.py"),
-                         "--instance", instance_name]),
+                          "--instance", instance_name, "--verification-dir",
+                          str(output / "c4-cas-only")],
+         output / "c4-cas-only" / "c4-t04-rd-summary.json"),
         ("sx-f1-f5-business", [sys.executable, str(TOOLS / "run_c4_t05_rd.py"),
-                               "--instance", instance_name]),
+                                "--instance", instance_name, "--verification-dir",
+                                str(output / "sx-f1-f5-business")],
+         output / "sx-f1-f5-business" / "c4-t05-rd-summary.json"),
     ]
     records: list[dict[str, Any]] = []
-    for label, command in commands:
-        record = run_command(label, command, output, timeout_seconds=14_400)
+    for label, command, summary_path in commands:
+        record = run_command(label, command, output, summary_path=summary_path,
+                             timeout_seconds=14_400)
         records.append(require_pass(record, label))
     return records
 
@@ -407,6 +417,14 @@ def run_pressure_lane(instance_name: str, environment: dict[str, Any], user: int
     lane = output / f"user-{user}"
     lane.mkdir(parents=True, exist_ok=True)
     write_json(lane / "environment.json", environment)
+    initial_resources = capture_pressure_resources(serial, lane, "initial")
+    initial_logcat_reset = run_adb(serial, ["shell", "logcat", "-c"], check=False)
+    if initial_logcat_reset.returncode != 0:
+        raise PhaseFailure(f"pressure-user-{user}", "initial logcat boundary failed", {
+            "returncode": initial_logcat_reset.returncode,
+            "stdout": initial_logcat_reset.stdout,
+            "stderr": initial_logcat_reset.stderr,
+        })
     started = time.monotonic()
     rows: list[dict[str, Any]] = []
     successful_cycles = 0
@@ -436,6 +454,20 @@ def run_pressure_lane(instance_name: str, environment: dict[str, Any], user: int
             "snapshot": snapshot,
         }
         rows.append(row)
+        logcat_reset = run_adb(serial, ["shell", "logcat", "-c"], check=False)
+        row["postEvidenceLogcatReset"] = {
+            "returncode": logcat_reset.returncode,
+            "stdout": logcat_reset.stdout,
+            "stderr": logcat_reset.stderr,
+        }
+        if logcat_reset.returncode != 0:
+            row["classification"] = "LOGCAT_SCOPE_RESET_FAILED"
+            write_json(lane / "cycles.json", rows)
+            failure = {"row": row,
+                       "resources": capture_pressure_resources(serial, lane, "first-failure")}
+            write_json(lane / "first-failure.json", failure)
+            raise PhaseFailure(f"pressure-user-{user}",
+                               "post-evidence logcat boundary failed", failure)
         good = (
             str(result.get("status", "")).upper() == "PASS"
             and bool(operation.get("firstFrameDrawn"))
@@ -494,6 +526,7 @@ def run_pressure_lane(instance_name: str, environment: dict[str, Any], user: int
         "minimumCycles": minimum_cycles,
         "lowMemoryRecoveries": len(low_memory_events),
         "nonBlockingLowMemory": low_memory_events,
+        "initialResources": initial_resources,
         "resources": resources,
         "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False},
     }
@@ -507,18 +540,18 @@ def main() -> int:
     parser.add_argument("--loops", type=int, default=25)
     parser.add_argument("--users", default="0,1")
     parser.add_argument("--targets", default="fixture,dingtalk,quark,hongguo,fanqie")
-    parser.add_argument("--rounds", type=int, default=1)
+    parser.add_argument("--rounds", type=int, default=2)
     parser.add_argument("--pressure-minutes", type=int, default=15)
     parser.add_argument("--pressure-minimum-cycles", type=int, default=50)
     parser.add_argument("--acceptance-scope", choices=("c4-stage-reduced", "overall-50"),
                         default="c4-stage-reduced",
-                        help="C4 stage gate uses 25 loops; overall post-C7 acceptance uses 50")
+                        help="C4 stage gate uses two rounds of 25 loops; overall post-C7 acceptance uses two rounds of 50")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--continue-existing-output", action="store_true",
                         help="continue an interrupted clean-install-cold run from its durable evidence")
     args = parser.parse_args()
     expected_loops = 25 if args.acceptance_scope == "c4-stage-reduced" else 50
-    expected_rounds = 1 if args.acceptance_scope == "c4-stage-reduced" else 2
+    expected_rounds = 2
     if args.rounds != expected_rounds or args.loops != expected_loops or args.pressure_minutes != 15 \
             or args.pressure_minimum_cycles < 50:
         raise SystemExit(f"{args.acceptance_scope} requires exactly {expected_rounds} round(s), {expected_loops} launch loops, "
@@ -527,6 +560,9 @@ def main() -> int:
     if users != [0, 1]:
         raise SystemExit("C4-R05 requires users=0,1")
     reduced_scope = args.acceptance_scope == "c4-stage-reduced"
+    dirty_at_start = git_value("status", "--porcelain", "--untracked-files=all")
+    if dirty_at_start:
+        raise SystemExit("C4-R05 formal acceptance requires a clean worktree before evidence capture")
     output = args.output if args.output.is_absolute() else ROOT / args.output
     output.mkdir(parents=True, exist_ok=True)
     continuation: dict[str, Any] | None = None
@@ -538,8 +574,7 @@ def main() -> int:
         "instanceName": args.instance_name,
         "attemptPolicy": {"attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False},
         "acceptance": {
-            "rounds": (["clean-install-cold"] if reduced_scope
-                       else ["clean-install-cold", "retained-hot-recovery"]),
+            "rounds": ["clean-install-cold", "retained-hot-recovery"],
             "addGates": ({"fixture": 25, "dingtalk": 5, "quark": 5, "hongguo": 5, "fanqie": 5}
                          if reduced_scope
                          else {"fixture": 50, "dingtalk": 10, "quark": 10, "hongguo": 10, "fanqie": 10}),
@@ -555,9 +590,10 @@ def main() -> int:
     }
     try:
         report["git"] = {"commit": git_value("rev-parse", "HEAD"),
-                         "branch": git_value("branch", "--show-current"),
-                         "remote": git_value("config", "--get", "branch." +
-                                             git_value("branch", "--show-current") + ".remote")}
+                          "branch": git_value("branch", "--show-current"),
+                          "remote": git_value("config", "--get", "branch." +
+                                              git_value("branch", "--show-current") + ".remote"),
+                          "worktreeStatusAtStart": dirty_at_start}
         environment = resolve_rd_environment(args.instance_name)
         report["environmentAtStart"] = environment
         write_json(output / "environment-at-start.json", environment)
@@ -587,8 +623,7 @@ def main() -> int:
             )
             require_pass(build, "build-clean-commit")
         report["buildAndApk"] = commit_and_apk_snapshot()
-        round_names = ("clean-install-cold",) if reduced_scope \
-            else ("clean-install-cold", "retained-hot-recovery")
+        round_names = ("clean-install-cold", "retained-hot-recovery")
         for index, round_name in enumerate(round_names, start=1):
             round_output = output / f"round-{index}-{round_name}"
             round_report: dict[str, Any] = {"round": index, "name": round_name,

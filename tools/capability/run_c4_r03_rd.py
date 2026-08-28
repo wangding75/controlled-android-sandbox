@@ -277,7 +277,10 @@ def light_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str, 
     activity = run_adb(serial, ["shell", "dumpsys", "activity", "activities"], check=False).stdout
     windows = run_adb(serial, ["shell", "dumpsys", "window", "windows"], check=False).stdout
     surfaces = run_adb(serial, ["shell", "dumpsys", "SurfaceFlinger", "--list"], check=False).stdout
-    logcat = run_adb(serial, ["shell", "logcat", "-d", "-v", "threadtime"], check=False).stdout
+    logcat = run_adb(
+        serial, ["shell", "logcat", "-d", "-t", "20000", "-v", "threadtime"],
+        check=False,
+    ).stdout
     write_text(case_dir / "activity-activities.txt", activity)
     write_text(case_dir / "window-windows.txt", windows)
     write_text(case_dir / "surface-list.txt", surfaces)
@@ -588,6 +591,20 @@ def main() -> int:
                               "mode": "import-only", "iteration": 0,
                               "classification": "IMPORT_SETUP_FAILED"}
                 break
+            logcat_reset = run_adb(
+                environment["adb_serial"], ["shell", "logcat", "-c"], check=False)
+            write_json(args.output / "setup" / target["target"] /
+                       f"user-{user}-logcat-boundary.json", {
+                           "returncode": logcat_reset.returncode,
+                           "stdout": logcat_reset.stdout,
+                           "stderr": logcat_reset.stderr,
+                           "scope": "BEFORE_FIRST_REQUEST",
+                       })
+            if logcat_reset.returncode != 0:
+                blocked_at = {"target": target["target"], "user": user,
+                              "mode": "logcat-boundary", "iteration": 0,
+                              "classification": "LOGCAT_SCOPE_RESET_FAILED"}
+                break
             for iteration in range(1, args.loops + 1):
                 for mode in ("cold", "hot"):
                     position = (target_index, user_index, iteration, 0 if mode == "cold" else 1)
@@ -598,6 +615,19 @@ def main() -> int:
                                   attempt_number=args.resume_attempt if resume_metadata else 1,
                                   resume_metadata=resume_metadata)
                     rows.append(row)
+                    logcat_reset = run_adb(
+                        environment["adb_serial"], ["shell", "logcat", "-c"], check=False)
+                    row["postEvidenceLogcatReset"] = {
+                        "returncode": logcat_reset.returncode,
+                        "stdout": logcat_reset.stdout,
+                        "stderr": logcat_reset.stderr,
+                        "scope": "AFTER_CASE_EVIDENCE",
+                    }
+                    if logcat_reset.returncode != 0 and not row["failureDetected"]:
+                        row["failureDetected"] = True
+                        row["firstAttemptFailure"] = row["attempt"] == 1
+                        row["errorClassification"] = "LOGCAT_SCOPE_RESET_FAILED"
+                    write_json(Path(row["artifacts"]) / "case.json", row)
                     if row["failureDetected"]:
                         blocked_at = {"target": target["target"], "user": user,
                                       "mode": mode, "iteration": iteration,

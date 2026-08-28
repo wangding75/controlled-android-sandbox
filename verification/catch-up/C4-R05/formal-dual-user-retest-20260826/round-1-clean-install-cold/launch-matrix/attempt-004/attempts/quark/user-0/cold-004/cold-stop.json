@@ -1,0 +1,33 @@
+{
+  "kind": "cold-stop",
+  "requestId": "17386ab8a40644ed8fe4f2f6c3701737",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "stop",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "17386ab8a40644ed8fe4f2f6c3701737",
+      "operationId": "17386ab8a40644ed8fe4f2f6c3701737-launch",
+      "startedAt": 1787743121701,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "STOPPED",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "",
+        "generation": 0,
+        "processSlot": -1,
+        "platformPid": 0
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 1031\nWaitTime: 1033\nComplete\n",
+    "start_stderr": ""
+  },
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false
+}

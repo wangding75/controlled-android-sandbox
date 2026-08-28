@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R05",
+  "phase": "continuation-preflight",
+  "status": "BLOCKED_TRANSIENT_DEVICE_CONNECTIVITY",
+  "captured_at": "2026-08-28T03:02:53.3785138Z",
+  "attempt": 1,
+  "retry_decision": {
+    "decision": "RECONNECT_INSTANCE",
+    "automatic_retry": false,
+    "reason": "The dynamically resolved RD instance was not present in adb while MuMu reported the VM stopped; reconnect was performed only after preserving this first failure."
+  },
+  "request_id": null,
+  "operation_id": null,
+  "instance": {
+    "name": "RD测试",
+    "resolved_serial": "127.0.0.1:16416",
+    "mumu_manager_state_before_reconnect": {
+      "index": "1",
+      "name": "RD测试",
+      "is_android_started": false,
+      "is_process_started": false,
+      "player_state": null
+    },
+    "adb_devices_before_reconnect": "List of devices attached",
+    "adb_get_state_before_reconnect": "",
+    "port_listening_before_reconnect": false,
+    "boot_id_before_reconnect": null
+  },
+  "logs": {
+    "logcat": null,
+    "host_log": null,
+    "guest_log": null,
+    "dumpsys": null,
+    "note": "No Android-side artifacts could be collected because the resolved device had no adb transport."
+  },
+  "stage_timing": {
+    "preflight_start": "2026-08-28T03:02:53.3785138Z",
+    "preflight_end": "2026-08-28T03:02:53.3785138Z",
+    "deadline_seconds": 60
+  },
+  "error": {
+    "code": "RD_ENVIRONMENT_RESOLUTION_BLOCKED",
+    "message": "resolved MuMu instance 'RD测试' to 127.0.0.1:16416, but adb get-state was ''"
+  },
+  "recovery": {
+    "mumu_action": "control --vmindex 1 launch",
+    "mumu_launch_result": {"errcode": 0, "errmsg": ""},
+    "adb_connect": "connected to 127.0.0.1:16416",
+    "adb_get_state_after_reconnect": "device",
+    "follow_up": "Rerun continuation preflight before formal evidence capture."
+  }
+}

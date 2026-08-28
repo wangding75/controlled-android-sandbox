@@ -1,0 +1,137 @@
+{
+  "task": "C4-R03",
+  "target": "quark",
+  "package": "com.quark.browser",
+  "user": 0,
+  "mode": "hot",
+  "iteration": 7,
+  "requestId": "b2c34af6c8ff4348b9ec6f6dd78757de",
+  "operationId": "b2c34af6c8ff4348b9ec6f6dd78757de-launch",
+  "runnerOperationId": "c4-r03-quark-u0-hot-7-a4-b2c34af6c8",
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "retryable": false,
+  "startedAt": "2026-08-26T11:24:52.380813+00:00",
+  "completedAt": "2026-08-26T11:25:21.488851+00:00",
+  "elapsedMs": 29108,
+  "readinessElapsedMs": 931,
+  "commandResult": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "launch",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "b2c34af6c8ff4348b9ec6f6dd78757de",
+      "operationId": "b2c34af6c8ff4348b9ec6f6dd78757de-launch",
+      "startedAt": 1787743490464,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "LAUNCH_PASS",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "8243a04a-68de-406f-8891-44fdfdbe26a3",
+        "generation": 1,
+        "processSlot": 60,
+        "platformPid": 0,
+        "processName": "com.quark.browser",
+        "componentClass": "com.ucpro.MainActivity",
+        "requestId": "b2c34af6c8ff4348b9ec6f6dd78757de",
+        "operationId": "b2c34af6c8ff4348b9ec6f6dd78757de-launch",
+        "attempt": 1,
+        "retryBudget": 0,
+        "automaticRetryPerformed": false,
+        "activityCreated": true,
+        "activityResumed": true,
+        "windowEvidence": true,
+        "firstFrameDrawn": true,
+        "launchReadinessElapsedMs": 931,
+        "launchAcceptedAtElapsedMs": 53812722,
+        "launchTimeline": "[REQUEST_ACCEPTED@53812722, GUEST_READY@53812927, ACTIVITY_LINK:com.ucpro.BrowserActivity@53813016, LIFECYCLE_CREATED@53813155, LIFECYCLE_USER_LEAVING@53813160, GUEST_READY@53813289, LIFECYCLE_CREATED@53813363, LIFECYCLE_STARTED@53813368, LIFECYCLE_POST_CREATED@53813374, ACTIVITY_RESUMED@53813380, FIRST_FRAME_DRAWN@53813652]"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: WARM\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 60\nWaitTime: 65\nComplete\n",
+    "start_stderr": ""
+  },
+  "setup": null,
+  "operation": {
+    "status": "LAUNCH_PASS",
+    "errorType": "",
+    "errorMessage": "",
+    "sessionId": "8243a04a-68de-406f-8891-44fdfdbe26a3",
+    "generation": 1,
+    "processSlot": 60,
+    "platformPid": 0,
+    "processName": "com.quark.browser",
+    "componentClass": "com.ucpro.MainActivity",
+    "requestId": "b2c34af6c8ff4348b9ec6f6dd78757de",
+    "operationId": "b2c34af6c8ff4348b9ec6f6dd78757de-launch",
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "activityCreated": true,
+    "activityResumed": true,
+    "windowEvidence": true,
+    "firstFrameDrawn": true,
+    "launchReadinessElapsedMs": 931,
+    "launchAcceptedAtElapsedMs": 53812722,
+    "launchTimeline": "[REQUEST_ACCEPTED@53812722, GUEST_READY@53812927, ACTIVITY_LINK:com.ucpro.BrowserActivity@53813016, LIFECYCLE_CREATED@53813155, LIFECYCLE_USER_LEAVING@53813160, GUEST_READY@53813289, LIFECYCLE_CREATED@53813363, LIFECYCLE_STARTED@53813368, LIFECYCLE_POST_CREATED@53813374, ACTIVITY_RESUMED@53813380, FIRST_FRAME_DRAWN@53813652]"
+  },
+  "device": {
+    "guestWindowState": {
+      "resumed_guest_stub_count": 1,
+      "windows_empty": false,
+      "reported_drawn_false": false,
+      "has_visible_false": false,
+      "drawn": true
+    },
+    "surfaceNonEmpty": true,
+    "screenshot": {
+      "width": 1080,
+      "height": 1920,
+      "sha256": "bfa27576837732c87f4050f13076023b62b58eff70c422353bdd09ca5b890f29",
+      "nonTransparent": true,
+      "nonBlackFraction": 1.0,
+      "nonBlack": true,
+      "uniform": false
+    },
+    "fatalMarkers": [],
+    "historicalFatalMarkers": [
+      "FATAL EXCEPTION",
+      "Fatal signal"
+    ],
+    "visualContentAttempts": [
+      {
+        "elapsedMs": 37131,
+        "quality": {
+          "width": 1080,
+          "height": 1920,
+          "sha256": "bfa27576837732c87f4050f13076023b62b58eff70c422353bdd09ca5b890f29",
+          "nonTransparent": true,
+          "nonBlackFraction": 1.0,
+          "nonBlack": true,
+          "uniform": false
+        }
+      }
+    ]
+  },
+  "errorClassification": "NONE",
+  "firstAttemptFailure": false,
+  "failureDetected": false,
+  "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-004\\attempts\\quark\\user-0\\hot-007",
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "dingtalk",
+    "resumeUser": 0,
+    "resumeIteration": 11,
+    "resumeMode": "hot",
+    "attempt": 4,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-001",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+  }
+}

@@ -1,0 +1,137 @@
+{
+  "task": "C4-R03",
+  "target": "dingtalk",
+  "package": "com.alibaba.android.rimet",
+  "user": 1,
+  "mode": "hot",
+  "iteration": 4,
+  "requestId": "f90547f84fda4abda469541928c01f0d",
+  "operationId": "f90547f84fda4abda469541928c01f0d-launch",
+  "runnerOperationId": "c4-r03-dingtalk-u1-hot-4-a4-f90547f84f",
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "retryable": false,
+  "startedAt": "2026-08-26T10:35:51.343442+00:00",
+  "completedAt": "2026-08-26T10:36:18.432532+00:00",
+  "elapsedMs": 27089,
+  "readinessElapsedMs": 493,
+  "commandResult": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "launch",
+      "package": "com.alibaba.android.rimet",
+      "virtualUserId": 1,
+      "trustNativeGuest": true,
+      "requestId": "f90547f84fda4abda469541928c01f0d",
+      "operationId": "f90547f84fda4abda469541928c01f0d-launch",
+      "startedAt": 1787740549433,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "LAUNCH_PASS",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "0d4651e0-6f65-4fb1-9996-5add430037fd",
+        "generation": 2,
+        "processSlot": 5,
+        "platformPid": 0,
+        "processName": "com.alibaba.android.rimet",
+        "componentClass": "com.alibaba.android.rimet.biz.LaunchHomeActivity",
+        "requestId": "f90547f84fda4abda469541928c01f0d",
+        "operationId": "f90547f84fda4abda469541928c01f0d-launch",
+        "attempt": 1,
+        "retryBudget": 0,
+        "automaticRetryPerformed": false,
+        "activityCreated": true,
+        "activityResumed": true,
+        "windowEvidence": true,
+        "firstFrameDrawn": true,
+        "launchReadinessElapsedMs": 493,
+        "launchAcceptedAtElapsedMs": 50870519,
+        "launchTimeline": "[REQUEST_ACCEPTED@50870519, GUEST_READY@50870706, ACTIVITY_LINK:com.alibaba.android.rimet.PrivacyPolicyActivity@50870815, GUEST_READY@50870958, LIFECYCLE_CREATED@50870974, LIFECYCLE_STARTED@50870979, LIFECYCLE_POST_CREATED@50870985, ACTIVITY_RESUMED@50870990, FIRST_FRAME_DRAWN@50871012]"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: WARM\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 67\nWaitTime: 69\nComplete\n",
+    "start_stderr": ""
+  },
+  "setup": null,
+  "operation": {
+    "status": "LAUNCH_PASS",
+    "errorType": "",
+    "errorMessage": "",
+    "sessionId": "0d4651e0-6f65-4fb1-9996-5add430037fd",
+    "generation": 2,
+    "processSlot": 5,
+    "platformPid": 0,
+    "processName": "com.alibaba.android.rimet",
+    "componentClass": "com.alibaba.android.rimet.biz.LaunchHomeActivity",
+    "requestId": "f90547f84fda4abda469541928c01f0d",
+    "operationId": "f90547f84fda4abda469541928c01f0d-launch",
+    "attempt": 1,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "activityCreated": true,
+    "activityResumed": true,
+    "windowEvidence": true,
+    "firstFrameDrawn": true,
+    "launchReadinessElapsedMs": 493,
+    "launchAcceptedAtElapsedMs": 50870519,
+    "launchTimeline": "[REQUEST_ACCEPTED@50870519, GUEST_READY@50870706, ACTIVITY_LINK:com.alibaba.android.rimet.PrivacyPolicyActivity@50870815, GUEST_READY@50870958, LIFECYCLE_CREATED@50870974, LIFECYCLE_STARTED@50870979, LIFECYCLE_POST_CREATED@50870985, ACTIVITY_RESUMED@50870990, FIRST_FRAME_DRAWN@50871012]"
+  },
+  "device": {
+    "guestWindowState": {
+      "resumed_guest_stub_count": 1,
+      "windows_empty": false,
+      "reported_drawn_false": false,
+      "has_visible_false": false,
+      "drawn": true
+    },
+    "surfaceNonEmpty": true,
+    "screenshot": {
+      "width": 1080,
+      "height": 1920,
+      "sha256": "dd58969132a1380b0274d4c1a08b4edeacc63eb5d35ae3544a7003b59914a697",
+      "nonTransparent": true,
+      "nonBlackFraction": 0.963659,
+      "nonBlack": true,
+      "uniform": false
+    },
+    "fatalMarkers": [],
+    "historicalFatalMarkers": [
+      "FATAL EXCEPTION",
+      "Fatal signal"
+    ],
+    "visualContentAttempts": [
+      {
+        "elapsedMs": 33765,
+        "quality": {
+          "width": 1080,
+          "height": 1920,
+          "sha256": "dd58969132a1380b0274d4c1a08b4edeacc63eb5d35ae3544a7003b59914a697",
+          "nonTransparent": true,
+          "nonBlackFraction": 0.963659,
+          "nonBlack": true,
+          "uniform": false
+        }
+      }
+    ]
+  },
+  "errorClassification": "NONE",
+  "firstAttemptFailure": false,
+  "failureDetected": false,
+  "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-004\\attempts\\dingtalk\\user-1\\hot-004",
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "dingtalk",
+    "resumeUser": 0,
+    "resumeIteration": 11,
+    "resumeMode": "hot",
+    "attempt": 4,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-dual-user-retest-20260826\\round-1-clean-install-cold\\launch-matrix\\attempt-001",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "cold-stop",
+  "requestId": "1a8b9232d3aa4b739ab41bebdcc07448",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "stop",
+      "package": "com.phoenix.read",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "1a8b9232d3aa4b739ab41bebdcc07448",
+      "operationId": "1a8b9232d3aa4b739ab41bebdcc07448-launch",
+      "startedAt": 1787749353890,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "STOPPED",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "",
+        "generation": 0,
+        "processSlot": -1,
+        "platformPid": 0
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 709\nWaitTime: 711\nComplete\n",
+    "start_stderr": ""
+  },
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false
+}

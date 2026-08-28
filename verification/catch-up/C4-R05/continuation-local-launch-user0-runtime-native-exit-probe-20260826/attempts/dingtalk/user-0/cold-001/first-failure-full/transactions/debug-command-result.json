@@ -1,0 +1,13 @@
+{
+  "command": "launch",
+  "package": "com.alibaba.android.rimet",
+  "virtualUserId": 0,
+  "trustNativeGuest": true,
+  "requestId": "a70a87f009424c2d9a6d158a1213abd8",
+  "operationId": "a70a87f009424c2d9a6d158a1213abd8-launch",
+  "startedAt": 1787721460493,
+  "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+  "status": "FAIL",
+  "errorType": "java.lang.IllegalStateException",
+  "errorMessage": "launch failed: status=LAUNCH_FAILED, errorType=LAUNCH_GATE_FAILED, errorMessage=please call Doraemon init method first"
+}

@@ -189,7 +189,10 @@ def capture_snapshot(serial: str, case_dir: Path, package_name: str) -> dict[str
     screen_path.write_bytes(screen.stdout)
 
     probes = {
-        "logcat.txt": ["logcat", "-d", "-v", "threadtime"],
+        # Keep the failure snapshot bounded even if a prior device session left a large
+        # log buffer. R03/R05 clear the buffer at request evidence boundaries; the tail cap
+        # is the fail-safe for a failed clear or a standalone R01 capture.
+        "logcat.txt": ["logcat", "-d", "-t", "20000", "-v", "threadtime"],
         "activity-activities.txt": ["shell", "dumpsys", "activity", "activities"],
         "activity-processes.txt": ["shell", "dumpsys", "activity", "processes"],
         "application-exit-info.txt": ["shell", "dumpsys", "activity", "exit-info", HOST_PACKAGE],

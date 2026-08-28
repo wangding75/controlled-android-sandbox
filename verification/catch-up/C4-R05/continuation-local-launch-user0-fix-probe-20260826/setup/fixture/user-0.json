@@ -1,0 +1,64 @@
+{
+  "target": "fixture",
+  "package": "com.warden.controlledsandbox.fixture",
+  "user": 0,
+  "requestId": "d19316d5a384464495cd6712cdca6127",
+  "attempt": 1,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.warden.controlledsandbox.fixture",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "d19316d5a384464495cd6712cdca6127",
+      "operationId": "d19316d5a384464495cd6712cdca6127-launch",
+      "startedAt": 1787718026054,
+      "packageOperationTrace": {
+        "requestId": "d19316d5a384464495cd6712cdca6127",
+        "operationId": "20ae79ed-e8aa-46c6-8b90-a5608f45f1d5",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.warden.controlledsandbox.fixture",
+        "virtualUserId": 0,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1787718033620,
+        "elapsedMs": 8388,
+        "stageTimingsMs": {
+          "HASH": 9,
+          "COPY": 17,
+          "PARSE": 91,
+          "NATIVE_EXTRACT": 22,
+          "PUBLISH": 33,
+          "ENSURE_INSTANCE": 0,
+          "CATALOG": 2748
+        },
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": []
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 2019\nWaitTime: 2022\nComplete\n",
+    "start_stderr": ""
+  }
+}
