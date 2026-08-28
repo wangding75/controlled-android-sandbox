@@ -1,0 +1,12 @@
+{
+  "kind": "MANUAL_RESUME_AFTER_RESTART",
+  "resumeTarget": "fixture",
+  "resumeUser": 1,
+  "resumeIteration": 5,
+  "resumeMode": "cold",
+  "attempt": 3,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\launch-matrix\\attempt-002",
+  "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+}

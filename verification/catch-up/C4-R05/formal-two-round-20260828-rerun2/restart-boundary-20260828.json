@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "task": "C4-R05",
+  "phase": "round-1-clean-install-cold-c4-r03-launch-matrix",
+  "status": "ENVIRONMENT_EVENT_CONTINUE_ALLOWED",
+  "observedAt": "2026-08-28T14:53:32+08:00",
+  "instanceName": "RD测试",
+  "resolvedSerial": "127.0.0.1:16416",
+  "bootIdBefore": "58fcd82e-6ef8-4019-9ac8-924e710aea55",
+  "eventEvidence": {
+    "mumuProcessStartWindow": "2026-08-28T14:50:45+08:00..2026-08-28T14:50:52+08:00",
+    "adbStateAfterEvent": "offline",
+    "runnerLowMemoryRecoveries": 0,
+    "runnerIssuedRestartCommand": false,
+    "childAttempt": 3,
+    "childReturnCode": 1,
+    "childSummaryStatus": "MISSING",
+    "stderrPath": "round-1-clean-install-cold/launch-matrix/attempt-003/wrapper-stderr.txt"
+  },
+  "policy": {
+    "firstFailureEvidencePreserved": true,
+    "noAutomaticRetryClaimed": true,
+    "userDirective": "continue testing and ignore this restart",
+    "continuation": "resume from first missing durable coordinate after device is online"
+  },
+  "note": "The emulator restart is retained as an environment event and is not rewritten as a formal PASS or hidden from the R05 evidence boundary. The user's explicit direction permits continuing the same clean-commit test after readiness returns."
+}
