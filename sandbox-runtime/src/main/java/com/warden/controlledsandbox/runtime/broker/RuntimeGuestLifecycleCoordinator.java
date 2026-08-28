@@ -236,7 +236,7 @@ final class RuntimeGuestLifecycleCoordinator {
                 Throwable statusFailure = null;
                 try {
                     lifecycleStage(input, session, "STATUS_CALL_BEGIN", lifecycleStarted);
-                    runtimeStatus = owner.callGuest(session.processSlot(), guest ->
+                    runtimeStatus = owner.callGuestWithLaunchDeadline(session.processSlot(), input, guest ->
                             RuntimeBrokerService.guestOperation(guest,
                                     RuntimeOperationRequest.GUEST_RUNTIME_STATUS, new Bundle()));
                     lifecycleStage(input, session, "STATUS_CALL_RETURN", lifecycleStarted);
@@ -317,7 +317,7 @@ final class RuntimeGuestLifecycleCoordinator {
             owner.brokerState.putPrepared(key, new Bundle(spec));
             Bundle guestResult;
             try {
-                guestResult = owner.callGuest(session.processSlot(), guest ->
+                guestResult = owner.callGuestWithLaunchDeadline(session.processSlot(), input, guest ->
                         RuntimeBrokerService.guestOperation(guest,
                                 RuntimeOperationRequest.PREPARE_GUEST, spec));
             } catch (Throwable error) {

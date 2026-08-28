@@ -1232,6 +1232,16 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         return guestConnections.call(slot, call);
     }
 
+    Bundle callGuestWithLaunchDeadline(int slot, Bundle request,
+                                       RuntimeGuestConnectionPool.GuestCall call) throws Exception {
+        if (request == null || !request.containsKey(RuntimeKeys.LAUNCH_DEADLINE_AT_ELAPSED_MS)) {
+            return guestConnections.call(slot, call);
+        }
+        long remaining = LaunchDeadline.remaining(request);
+        if (remaining <= 0L) throw new IllegalStateException("LAUNCH_DEADLINE_EXCEEDED");
+        return guestConnections.callWithTimeout(slot, call, remaining);
+    }
+
     void releaseGuestConnection(int slot) {
         guestConnections.release(slot);
     }

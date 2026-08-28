@@ -689,6 +689,7 @@ run_java('com.warden.controlledsandbox.runtime.status.RuntimeStatusContractSelfT
 run_java('com.warden.controlledsandbox.runtime.status.RuntimeStatusDispatcherSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.BrokerArchitecturePortsSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnosticsSelfTest', assertions=False)
+run_java('com.warden.controlledsandbox.runtime.broker.LaunchDeadlineSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.BrokerStateStoreSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.RuntimeGuestConnectionPoolSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.RuntimePreparingSessionBoundarySelfTest', assertions=True)

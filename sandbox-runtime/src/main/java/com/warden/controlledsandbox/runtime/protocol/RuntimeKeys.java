@@ -207,6 +207,11 @@ public final class RuntimeKeys {
     public static final String LAUNCH_GUEST_PROCESS_READY = "guestProcessReady";
     public static final String LAUNCH_ESSENTIAL_RUNTIME_READY = "essentialRuntimeReady";
     public static final String LAUNCH_START_ACTIVITY_ACCEPTED = "startActivityAccepted";
+    public static final String LAUNCH_TOTAL_BUDGET_MS = "launchTotalBudgetMs";
+    public static final String LAUNCH_DEADLINE_AT_ELAPSED_MS = "launchDeadlineAtElapsedMs";
+    public static final String LAUNCH_TIMEOUT_OWNER = "timeoutOwner";
+    public static final String LAUNCH_STAGE_START_REMAINING_MS = "stageStartRemaining";
+    public static final String LAUNCH_STAGE_END_REMAINING_MS = "stageEndRemaining";
 
     public static final String CONNECTION_ID = "connectionId";
     public static final String SERVICE_BIND_FLAGS = "serviceBindFlags";

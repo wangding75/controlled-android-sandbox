@@ -47,6 +47,8 @@ final class RuntimeActivityLaunchCoordinator {
         String operationId = routedRequest.getString(RuntimeKeys.OPERATION_ID, "").trim();
         if (operationId.isEmpty()) operationId = requestId + "-launch";
         boolean awaitReadiness = routedRequest.getBoolean(RuntimeKeys.LAUNCH_AWAIT_READINESS, false);
+        LaunchDeadline deadline = LaunchDeadline.start(routedRequest);
+        deadline.attach(routedRequest);
         routedRequest.putString(RuntimeKeys.REQUEST_ID, requestId);
         routedRequest.putString(RuntimeKeys.OPERATION_ID, operationId);
         routedRequest.putInt(RuntimeKeys.ATTEMPT, 1);
@@ -59,11 +61,13 @@ final class RuntimeActivityLaunchCoordinator {
         }
         long acceptedAtElapsedMs = android.os.SystemClock.elapsedRealtime();
         routedRequest.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS, acceptedAtElapsedMs);
+        LaunchDeadline.owner(routedRequest, "BROKER_ACCEPT");
         launchStage(requestId, operationId, "REQUEST_ACCEPTED", 0L, routedRequest);
         // The Guest sends oversized Intents through a bounded FD capability. Materialize only
         // inside the Broker, before the broker-owned Activity route is created; never echo the
         // large byte array through RuntimeOperationResult.
         RuntimeIntentWireCodec.materializePayloadForBroker(routedRequest);
+        LaunchDeadline.owner(routedRequest, "GUEST_PREPARE");
         launchStage(requestId, operationId, "PREPARE_BEGIN",
                 elapsedSince(acceptedAtElapsedMs), routedRequest);
         String callerPackage = routedRequest.getString(RuntimeKeys.PACKAGE_NAME, "");
@@ -99,6 +103,9 @@ final class RuntimeActivityLaunchCoordinator {
             }
             Bundle prepared;
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.GUEST_PREPARE)) {
+                if (deadline.remainingMs() <= 0L) {
+                    throw new IllegalStateException("LAUNCH_DEADLINE_EXCEEDED");
+                }
                 prepared = owner.prepareGuestInternal(routedRequest);
             }
             launchStage(requestId, operationId, "PREPARE_RETURN",
@@ -243,6 +250,10 @@ final class RuntimeActivityLaunchCoordinator {
             // The virtual ledger supplies only the selected physical component and the desired
             // operation flags; it never finishes or retargets a live Activity itself.
             try {
+                if (deadline.remainingMs() <= 0L) {
+                    throw new IllegalStateException("LAUNCH_DEADLINE_EXCEEDED");
+                }
+                LaunchDeadline.owner(transaction, "HOST_START_ACTIVITY");
                 launchStage(requestId, operationId, "HOST_START_BEGIN",
                         elapsedSince(acceptedAtElapsedMs), transaction);
                 try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.HOST_START_ACTIVITY)) {
@@ -295,11 +306,14 @@ final class RuntimeActivityLaunchCoordinator {
                 accepted.putInt(RuntimeKeys.ATTEMPT, 1);
                 accepted.putInt(RuntimeKeys.RETRY_BUDGET, 0);
                 accepted.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+                LaunchDeadline.annotate(accepted, routedRequest);
                 perf.close();
                 return accepted;
             }
             try {
-                observation.await(LAUNCH_OBSERVATION_MS);
+                long remaining = deadline.remainingMs();
+                if (remaining <= 0L) throw new IllegalStateException("LAUNCH_DEADLINE_EXCEEDED");
+                observation.await(remaining);
             } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
             }
@@ -487,6 +501,7 @@ final class RuntimeActivityLaunchCoordinator {
         details.putString(RuntimeKeys.OPERATION_ID, operationId);
         details.putString(RuntimeKeys.LAUNCH_STAGE, stage);
         details.putLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, stageElapsedMs);
+        LaunchDeadline.annotate(details, source);
         RuntimeEventLog.event("GUEST_LAUNCH_STAGE", details);
     }
 
