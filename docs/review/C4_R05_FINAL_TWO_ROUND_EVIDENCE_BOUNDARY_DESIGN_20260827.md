@@ -1,8 +1,8 @@
 # C4-R05 双轮正式关门与证据边界设计
 
-日期：2026-08-27  
+日期：2026-08-28  
 任务：`C4-R05`  
-基线：`feature/t57-r03-va-pro-capability-campaign` @ `4fb42b736d921888ccdb4d82efb367a085787290`
+基线：`feature/t57-r03-va-pro-capability-campaign` @ `e4e598d6d717e7c4cdd914cc28d600d353473cd3`
 
 ## 1. 已确认事实与分类
 
@@ -68,6 +68,35 @@ CAS 差异是一个 hot 请求仍需在 10 秒内完成 translated Guest prepare
 - 不把 LOW_MEMORY 以外的 readiness failure 自动续跑；LOW_MEMORY 仍必须由 host-scoped
   `ApplicationExitInfo` 明确证明，并在独立目录/新 requestId 中继续。
 
+## 6. 首轮正式尝试的首次失败与修复边界
+
+2026-08-28 首轮 `round-1-clean-install-cold/add-gate` 在红果第 3 次 re-add
+首次失败。R02 的原始证据目录为
+`verification/catch-up/C4-R05/formal-two-round-20260828/round-1-clean-install-cold/add-gate/first-failure`；
+结构化签名为 `CAS_HOST_ACTIVITY_LIFECYCLE_FATAL`，Host pid `17782`、boot id
+`58fcd82e-6ef8-4019-9ac8-924e710aea55`，`ApplicationExitInfo.reason=4`
+(`APP CRASH(EXCEPTION)`) 而非 `LOW_MEMORY`。AndroidRuntime 首次 fatal 为
+`IllegalArgumentException: Activity client record must not be null to execute transaction item`
+（`ActivityTransactionItem.getActivityClientRecord -> execute -> ActivityThread$H.handleMessage`）。
+在 fatal 前一秒，AMS 明确记录了由 R05 runner 发起的 Host `force-stop`，随后才发出新的
+`START ... DebugCommandActivity`；因此 request/operation 尚未进入 DebugCommandActivity，
+证据中保持 `request_id=null`，不伪造 CAS operation ID。
+
+根因分类为验收编排的 Host ActivityThread 生命周期竞态：`debug_command()` 已经显式执行并
+等待 `am force-stop` 后，又追加 `am start -S`，API 32 的第二次异步 kill 与上一轮
+ClientTransaction 清理重叠，可能让新进程在 `onCreate` 前收到无 ActivityClientRecord 的旧
+transaction。修复只保留一次显式 stop 后的动态 PID/结果文件 readiness，再使用普通
+`am start -W`；不捕获异常、不重试、不改变 CAS package/Guest 生命周期。R02 的同一
+`attempt=1/retryBudget=0` 隔离复测目录
+`verification/catch-up/C4-R05/diagnostic-no-second-stop-20260828` 已完成 fixture 25、
+夸克/红果/番茄/钉钉各 5 个 add/delete/re-add，`operationCount=137`、`status=PASS`、
+`residue.pass=true`，作为修复回归输入，不能替代随后 clean commit 上的两轮正式验收。
+
+首轮 fatal 原始日志保留在 ignored raw artifact；`capture_snapshot()` 同时新增 bounded
+`logcat-critical.txt`（AndroidRuntime/ActivityManager/ActivityTaskManager）截面，避免噪声
+覆盖首失败签名。该修复仍要求 R05 正式双轮在新 clean commit 上重新执行；若再次出现
+`ActivityClientRecord` fatal，则按新的首次失败证据重新分类，不自动续跑。
+
 ## 5. 对应验证
 
 - `python -m py_compile` 覆盖所有修改的 runner。
@@ -77,4 +106,3 @@ CAS 差异是一个 hot 请求仍需在 10 秒内完成 translated Guest prepare
   rounds=2/loops=50。
 - 新 clean commit 上执行两轮完整 R05；随后 C1/C2/C4/SX 回归和 user0/user1 各 15 分钟且
   至少 50 cycle 压力。任何首次非 LOW_MEMORY 失败立即停止并保存 full snapshot。
-

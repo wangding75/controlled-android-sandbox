@@ -68,9 +68,14 @@ def debug_command(
         if probe.returncode != 0:
             break
         time.sleep(0.1)
+    # The explicit force-stop above is the cold-start boundary.  Do not append ``-S`` here:
+    # ``am start -S`` performs a second asynchronous kill while ActivityTaskManager is still
+    # removing the previous ClientTransaction.  On API 32 that race can dispatch an orphaned
+    # ActivityTransactionItem and crash the fresh Host process with
+    # ``Activity client record must not be null`` before DebugCommandActivity.onCreate().
+    # Keeping one stop followed by one start preserves cold semantics and leaves the framework
+    # as the sole owner of ActivityClientRecord creation/teardown.
     start_args = ["shell", "am", "start"]
-    if force_stop_host:
-        start_args.append("-S")
     start_args.extend(["-W", "-f", "0x10008000", "-n", DEBUG_ACTIVITY, *extras])
     started = run_adb(serial, start_args, check=False)
     try:

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R05",
+  "parent_task": "C4-R02",
+  "phase": "round-1-clean-install-cold/add-gate",
+  "classification": "CAS_HOST_ACTIVITY_LIFECYCLE_FATAL",
+  "status": "FIRST_FAILURE_PRESERVED",
+  "captured_at": "2026-08-28T03:21:57.5693477Z",
+  "attempt": 1,
+  "retry_budget": 0,
+  "retry_decision": "NO_RETRY",
+  "request_id": null,
+  "operation_id": null,
+  "identity_boundary": "The crash occurred while ActivityThread dispatched DebugCommandActivity before CS_COMMAND received the next re-add request; no CAS package operation ID was created. This is explicitly recorded as unavailable rather than synthesized.",
+  "package": "com.phoenix.read",
+  "user": 0,
+  "cycle": 3,
+  "step": "readd",
+  "host_process": {
+    "package": "com.warden.controlledsandbox.debug",
+    "pid": 17782,
+    "last_known_state": "died",
+    "boot_id": "58fcd82e-6ef8-4019-9ac8-924e710aea55"
+  },
+  "error": {
+    "exception": "java.lang.IllegalArgumentException",
+    "message": "Activity client record must not be null to execute transaction item",
+    "stack": "android.app.servertransaction.ActivityTransactionItem.getActivityClientRecord -> ActivityTransactionItem.execute -> TransactionExecutor.executeCallbacks -> TransactionExecutor.execute -> ActivityThread$H.handleMessage",
+    "logcat_timestamp": "08-28 11:18:15.358"
+  },
+  "timeline": {
+    "previous_delete_complete": "08-28 11:18:13.803",
+    "next_activity_start": "08-28 11:18:14.996",
+    "fatal": "08-28 11:18:15.358",
+    "host_process_died": "08-28 11:18:15.393",
+    "deadline_seconds": 240
+  },
+  "artifacts": {
+    "raw_logcat": "round-1-clean-install-cold/add-gate/first-failure/logcat.txt",
+    "critical_logcat_excerpt": "round-1-clean-install-cold/add-gate/first-failure/activity-client-record-fatal.logcat.txt",
+    "dumpsys_activity": "round-1-clean-install-cold/add-gate/first-failure/activity-activities.txt",
+    "dumpsys_window_surface_process": "round-1-clean-install-cold/add-gate/first-failure/window-windows.txt, surface-list.txt, surface-dump.txt, processes.txt",
+    "transactions_catalog": "round-1-clean-install-cold/add-gate/first-failure/transactions/",
+    "runner_summary": "round-1-clean-install-cold/add-gate/summary.json and first-failure/ under this add-gate directory"
+  },
+  "boundary": "This is a CAS Host ActivityThread/lifecycle defect, not a commercial-app UI result and not evidence of a successful add/re-add. The formal R05 runner must stop on the resulting R02 FAIL."
+}

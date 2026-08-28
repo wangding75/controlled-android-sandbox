@@ -1,0 +1,92 @@
+[
+  {
+    "label": "package-neutral fixture",
+    "package": "com.warden.controlledsandbox.fixture",
+    "version_name": "1.0-fixture",
+    "version_code": "1",
+    "base_and_splits": [
+      "/data/app/~~-aBT25Wb17tj9M_tVDiPJQ==/com.warden.controlledsandbox.fixture-Fo5wnl-P89iDcjRY5CHX2A==/base.apk"
+    ],
+    "split_count": 0,
+    "primary_cpu_abi": "x86_64"
+  },
+  {
+    "label": "夸克",
+    "package": "com.quark.browser",
+    "version_name": "10.10.5.1080",
+    "version_code": "1080",
+    "launchable_activity": "com.ucpro.MainActivity",
+    "base_and_splits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~tC_OsqdFD5BJc_937XuTog==/com.quark.browser-74dZvhMoWcrKwbH11fUk3A==/base.apk",
+        "bytes": 169654003
+      }
+    ],
+    "split_count": 0,
+    "primary_cpu_abi": "arm64-v8a",
+    "secondary_cpu_abi": "null",
+    "apk_native_code": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -3 -> pm path -> pulled base.apk -> aapt2 label match"
+  },
+  {
+    "label": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "version_name": "7.0.5.33",
+    "version_code": "70533",
+    "launchable_activity": "com.dragon.read.pages.splash.SplashActivity",
+    "base_and_splits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~IQOp_5p7hdanloKIVOPxNA==/com.phoenix.read-f5FIo9Q1r8aepeVMpN7Tdg==/base.apk",
+        "bytes": 116439278
+      }
+    ],
+    "split_count": 0,
+    "primary_cpu_abi": "arm64-v8a",
+    "secondary_cpu_abi": "null",
+    "apk_native_code": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -3 -> pm path -> pulled base.apk -> aapt2 label match"
+  },
+  {
+    "label": "番茄免费小说",
+    "package": "com.dragon.read",
+    "version_name": "7.1.9.32",
+    "version_code": "71932",
+    "launchable_activity": "com.dragon.read.pages.splash.SplashActivity",
+    "base_and_splits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~AbvgTZxktOldVQNMbH0gqA==/com.dragon.read-8cElAyxeE32FI09wzhEfEg==/base.apk",
+        "bytes": 124857929
+      }
+    ],
+    "split_count": 0,
+    "primary_cpu_abi": "arm64-v8a",
+    "secondary_cpu_abi": "null",
+    "apk_native_code": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -3 -> pm path -> pulled base.apk -> aapt2 label match"
+  },
+  {
+    "label": "DingTalk (identified by required version, package not predeclared)",
+    "package": "com.alibaba.android.rimet",
+    "version_name": "7.8.10",
+    "version_code": "1178",
+    "base_and_splits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~9Fp6GoZ2nwC8LbAz3s1AGw==/com.alibaba.android.rimet-oiThkVakZx8W3g__GP9jMg==/base.apk"
+      }
+    ],
+    "split_count": 0,
+    "primary_cpu_abi": "arm64-v8a",
+    "secondary_cpu_abi": "null",
+    "discovery": "third-party packages -> dumpsys exact required version -> pm path"
+  }
+]

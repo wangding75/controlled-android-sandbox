@@ -1,0 +1,59 @@
+{
+  "status": "PASS",
+  "returncode": 0,
+  "result": {
+    "command": "import-only",
+    "package": "com.phoenix.read",
+    "virtualUserId": 0,
+    "trustNativeGuest": true,
+    "requestId": "c4-r02-first-红果免费短剧-51f0fe13-0962-476e-a06b-ee9748b4c4ce",
+    "operationId": "c4-r02-first-红果免费短剧-51f0fe13-0962-476e-a06b-ee9748b4c4ce-launch",
+    "startedAt": 1787886329411,
+    "packageOperationTrace": {
+      "requestId": "c4-r02-first-红果免费短剧-51f0fe13-0962-476e-a06b-ee9748b4c4ce",
+      "operationId": "b3f145fc-7f02-4628-a539-2445d67a7939",
+      "operation": "importInstalledApplicationAndEnsure",
+      "packageName": "com.phoenix.read",
+      "virtualUserId": 0,
+      "stage": "DONE",
+      "status": "SUCCEEDED",
+      "errorCode": "",
+      "retryable": false,
+      "attempt": 1,
+      "retryBudget": 0,
+      "startedAtMs": 1787886330022,
+      "elapsedMs": 4472,
+      "stageTimingsMs": {
+        "HASH": 575,
+        "COPY": 1172,
+        "PARSE": 1533,
+        "NATIVE_EXTRACT": 1217,
+        "PUBLISH": 11,
+        "ENSURE_INSTANCE": 0,
+        "CATALOG": 460
+      },
+      "stageDeadlinesMs": {
+        "CATALOG": 30000,
+        "PARSE": 60000,
+        "COPY": 120000,
+        "ENSURE_INSTANCE": 10000,
+        "PUBLISH": 30000,
+        "NATIVE_EXTRACT": 180000,
+        "HASH": 30000
+      },
+      "anomalies": [
+        {
+          "code": "MIXED_ELF_MACHINE",
+          "detail": "libcvt.so.incoming:directoryAbi=arm64-v8a:class=1:machine=40"
+        }
+      ]
+    },
+    "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+    "operation": {
+      "status": "IMPORTED"
+    },
+    "status": "PASS"
+  },
+  "start_stdout": "Stopping: com.warden.controlledsandbox.debug\nStarting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 1169\nWaitTime: 1175\nComplete\n",
+  "start_stderr": ""
+}

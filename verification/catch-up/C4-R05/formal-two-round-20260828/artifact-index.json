@@ -1,0 +1,396 @@
+{
+  "schemaVersion": 1,
+  "root": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828",
+  "artifacts": [
+    {
+      "path": "c4-r05-summary.json",
+      "bytes": 33372,
+      "sha256": "8df98df612647747e14f01a836f84463064f83c25ea1756e9add871a3b793d62"
+    },
+    {
+      "path": "commands/000-build-clean-commit.json",
+      "bytes": 745,
+      "sha256": "50a9c833ac93cc873bbef26c584e25335d66c0b4bba401cef97a8275f689179f"
+    },
+    {
+      "path": "commands/000-build-clean-commit.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/000-build-clean-commit.stdout.txt",
+      "bytes": 19450,
+      "sha256": "ec601cd9c01213d4551dcbfaeb95e470c436c978284b82e30f920f0288fb4199"
+    },
+    {
+      "path": "commands/001-round-1-clean-install-cold-r04-failure-injection.json",
+      "bytes": 4194,
+      "sha256": "ac5767f3a72d4c1bffd29528054556ca2b4ee78178058f6c39c87c0540ca50fe"
+    },
+    {
+      "path": "commands/001-round-1-clean-install-cold-r04-failure-injection.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/001-round-1-clean-install-cold-r04-failure-injection.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/002-round-1-clean-install-cold-r04-recovery.json",
+      "bytes": 8122,
+      "sha256": "a7f34f0182634e7792b4090bc458712d95d5af6a8120a836aae60925d4ccb411"
+    },
+    {
+      "path": "commands/002-round-1-clean-install-cold-r04-recovery.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/002-round-1-clean-install-cold-r04-recovery.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/003-round-1-clean-install-cold-c4-r02-add-gate.json",
+      "bytes": 10313,
+      "sha256": "2f3bff0f948ff49031c2a599f0609f94113fe1ceec8096acb6d8c4e4575d3c65"
+    },
+    {
+      "path": "commands/003-round-1-clean-install-cold-c4-r02-add-gate.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "commands/003-round-1-clean-install-cold-c4-r02-add-gate.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "environment-at-start.json",
+      "bytes": 2013,
+      "sha256": "254e08353ae36b1b9dcda528a538e5db30574c3060c2bd1ccdc12a714f820485"
+    },
+    {
+      "path": "first-failure.json",
+      "bytes": 11084,
+      "sha256": "9e016c51d1973af5a00213ca91c145adfe265a18612a665842da9d487dd8ebce"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/discovery/commercial-samples.json",
+      "bytes": 1938,
+      "sha256": "c5d501cbd3d70205d2db305fd96f5d5153d9ad623c37ad8874bb7952f4c16099"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/environment.json",
+      "bytes": 2013,
+      "sha256": "07de2a6a2227b5a20c9987476d80fd003348b8ce05688f5b5bd420132e67e73b"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-attempt-com.dragon.read.json",
+      "bytes": 2043,
+      "sha256": "f8510e9740dc93fee35949524409f144606344b1b8684e0d81db3c6fa26ff7f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-attempt-com.phoenix.read.json",
+      "bytes": 2046,
+      "sha256": "02165eb80f10513f508dc0068880e23d395c6bf8949a23c080bb3e1e6ae09f59"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/activity-activities.txt",
+      "bytes": 17147,
+      "sha256": "c260a3137a7bf94aae4a3b3899da03d6a8c5bb759b18585f5036dc4c0ce235d0"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/activity-processes.txt",
+      "bytes": 104511,
+      "sha256": "10432eb3b46cf1cfe587e2b5cd82fe53ed7d2cc43958411a876cf00a5dfd81f5"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/adb-devices.txt",
+      "bytes": 118,
+      "sha256": "80a44af2c0c08a1b49ca9f5a1d04d0bce138038ee32101c00bc1446e5b573cf6"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/application-exit-info.txt",
+      "bytes": 9267,
+      "sha256": "d600e2a47a7d3e358b18184ecbb9faec310bdf126f0ceb12f7cbe8eb300d30e6"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/device-getprop.txt",
+      "bytes": 21042,
+      "sha256": "b70a1d0fc57fdd87f0265f7eb49b71bb366b07e5eff72dfafde0fc5e8bea32c0"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/host-files.txt",
+      "bytes": 14218,
+      "sha256": "61ffdea8998e298424c1b98fb391b9649ec48ebcb2883e746028cdfb69d52e3b"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/host-package.txt",
+      "bytes": 12211,
+      "sha256": "c732caddf5336180038c2a20a75f696479b3f0dbe4ad61329d4ab5f5e4d0f445"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/logcat.txt",
+      "bytes": 2645447,
+      "sha256": "bb89dc489a6c02767f7373cf3b29670e8a2b30dd7960e7ca08df2b3faef847a2"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/processes.txt",
+      "bytes": 10948,
+      "sha256": "b054f71d5bc18199874ea3626f935c2f950e7fe78ce34604297b2903a626f66c"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/screenshot.png",
+      "bytes": 991998,
+      "sha256": "44a02e123b6c86705de9b7fcb2583ba3c5c510c6f2e7b057cd57f472a04dd6d6"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/surface-dump.txt",
+      "bytes": 93841,
+      "sha256": "b0771fc3eff3a1868f7cadc9af2a0036c7475a3d56812a99b4014401cdfe9d76"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/surface-list.txt",
+      "bytes": 2305,
+      "sha256": "34a192f8192a4185a4f58dcdc239e667f83b0cbcce3c0b761bf093b4b9cfc850"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/target-package.txt",
+      "bytes": 94581,
+      "sha256": "d1bc605a8e0dc4e52686f9860c806bf5239e25df0a045b6efb1eba5072e31b6f"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/debug-command-result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/package-lifecycle-transactions.json",
+      "bytes": 1556,
+      "sha256": "033d99e0636251f5e18dffeb055ded4bc7d467c7673ffcf8fe4401c2b9555c67"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/package-lifecycle-transactions.json.lastgood",
+      "bytes": 1556,
+      "sha256": "033d99e0636251f5e18dffeb055ded4bc7d467c7673ffcf8fe4401c2b9555c67"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/runtime__activity-tasks.checkpoint",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/runtime__virtual-uids.registry",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/sandbox-catalog.json",
+      "bytes": 21130,
+      "sha256": "5030a898a2949e00dece03e8dafff80174ae1dab612996894115ca89be991d17"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/transactions/sandbox-catalog.json.lastgood",
+      "bytes": 21130,
+      "sha256": "5030a898a2949e00dece03e8dafff80174ae1dab612996894115ca89be991d17"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure/window-windows.txt",
+      "bytes": 25453,
+      "sha256": "ab2a91be02bb117fd40ddd18cfc59dfc0d28ff4091724d80e69ff302ed8e5cdc"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure-host-activity-fatal.json",
+      "bytes": 2224,
+      "sha256": "ae9387b938bda1cf56aae17021b8abb9d2771f5aa70f7feb1278b56f87865144"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/first-failure.txt",
+      "bytes": 105,
+      "sha256": "859fd8aba59ae10fe75e44f4b6ce6a9472cd0f3418ef5d929dddee8e47a3404a"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/operations.json",
+      "bytes": 120455,
+      "sha256": "c5067e73aad7ffd247f9e5910a687d52027a4f4c0d0e9edfd4da560e1cc882f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/sample-inventory.json",
+      "bytes": 2861,
+      "sha256": "3ed7b2a33c6212a56a32d48619227dd348fedc545fa9529f3c28840a257775d0"
+    },
+    {
+      "path": "round-1-clean-install-cold/add-gate/summary.json",
+      "bytes": 8616,
+      "sha256": "a8d9bd4885bce2c1c313705036e050233f29de4d7160e73a313d7719579fdea6"
+    },
+    {
+      "path": "round-1-clean-install-cold/environment.json",
+      "bytes": 2013,
+      "sha256": "0a9035f7135b971c61a6c9f02ef2697021ec18fcff8d4a1cb1b8f540f41a03aa"
+    },
+    {
+      "path": "round-1-clean-install-cold/prepare.json",
+      "bytes": 3496,
+      "sha256": "13e2e71b0505ce06166302f733e4c1e40e347fbae263121e564dee7c64413ce8"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/artifact-index.json",
+      "bytes": 3889,
+      "sha256": "1bb0e3330f9eccb8d44387e77c0320a02743bf2dc77f2ddcdddb9bc94e7604d1"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/bind-failure/final-decision.json",
+      "bytes": 2798,
+      "sha256": "192361510e214e38df353a693026deb788f44f3796532712361a857b606b99ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/bind-failure/final-observation.json",
+      "bytes": 1972,
+      "sha256": "c7a9dad2d19ce6924cf5811fb09a589dc0b0d495071908dfef75f2652875fe93"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/bind-failure/first-decision.json",
+      "bytes": 2798,
+      "sha256": "192361510e214e38df353a693026deb788f44f3796532712361a857b606b99ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/bind-failure/first-observation.json",
+      "bytes": 1972,
+      "sha256": "c7a9dad2d19ce6924cf5811fb09a589dc0b0d495071908dfef75f2652875fe93"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/draw-timeout/final-decision.json",
+      "bytes": 3160,
+      "sha256": "5084a57d2472c13c7903fe0043c4e6dde35d7dec1101dfba415268f280f8d3ba"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/draw-timeout/final-observation.json",
+      "bytes": 2330,
+      "sha256": "a17df9d6a4b734b44dd8827cce0fd55d833e68807971c61a8a46a6a28e4657ef"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/draw-timeout/first-decision.json",
+      "bytes": 3160,
+      "sha256": "5084a57d2472c13c7903fe0043c4e6dde35d7dec1101dfba415268f280f8d3ba"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/draw-timeout/first-observation.json",
+      "bytes": 2330,
+      "sha256": "a17df9d6a4b734b44dd8827cce0fd55d833e68807971c61a8a46a6a28e4657ef"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/duplicate-add/final-decision.json",
+      "bytes": 1142,
+      "sha256": "e3faec68889e6992bf03b1341da12abd3ad66c6419ae209bf9c51f0fa284b783"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/duplicate-add/final-observation.json",
+      "bytes": 575,
+      "sha256": "ef8eff1c64b63250dabc8b9e86a6824fdf6fee73399a9de7e29dabcf2af7bfd7"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/duplicate-add/first-decision.json",
+      "bytes": 1142,
+      "sha256": "e3faec68889e6992bf03b1341da12abd3ad66c6419ae209bf9c51f0fa284b783"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/duplicate-add/first-observation.json",
+      "bytes": 575,
+      "sha256": "ef8eff1c64b63250dabc8b9e86a6824fdf6fee73399a9de7e29dabcf2af7bfd7"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/failure-injection-summary.json",
+      "bytes": 2899,
+      "sha256": "a722af6911b9a9e869a9c138e3a78481d9fe21dd6003eb961cc0205ba24e016b"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/staging-residue/final-decision.json",
+      "bytes": 1168,
+      "sha256": "4afc870674018161c2aaeda1f3934220f02f7883fa5509926a10beff6d5d265c"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/staging-residue/final-observation.json",
+      "bytes": 609,
+      "sha256": "651e9eb67dc188504d181a026ce984435e3785d76e78d4487b4ad67f335dd4c0"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/staging-residue/first-decision.json",
+      "bytes": 1168,
+      "sha256": "4afc870674018161c2aaeda1f3934220f02f7883fa5509926a10beff6d5d265c"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/staging-residue/first-observation.json",
+      "bytes": 609,
+      "sha256": "651e9eb67dc188504d181a026ce984435e3785d76e78d4487b4ad67f335dd4c0"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/windows-empty/final-decision.json",
+      "bytes": 3124,
+      "sha256": "99b213db7f6926dc72815c8d284a92f16ac23a3df8ff0a88503522f2e40c35ee"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/windows-empty/final-observation.json",
+      "bytes": 2278,
+      "sha256": "c6f355348c5578d0f53f943aecd47b222da87d0b17ff6d510c69332925febca5"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/windows-empty/first-decision.json",
+      "bytes": 3124,
+      "sha256": "99b213db7f6926dc72815c8d284a92f16ac23a3df8ff0a88503522f2e40c35ee"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/failure-injection/windows-empty/first-observation.json",
+      "bytes": 2278,
+      "sha256": "c6f355348c5578d0f53f943aecd47b222da87d0b17ff6d510c69332925febca5"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-failure-injection/runner-summary.json",
+      "bytes": 2899,
+      "sha256": "a722af6911b9a9e869a9c138e3a78481d9fe21dd6003eb961cc0205ba24e016b"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/artifact-index.json",
+      "bytes": 1028,
+      "sha256": "3aa7dd3fc8320f5d94f876bbaa45c52c0fc666c8208db1ce9e6a678b6326a58a"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/first-failure-decision.json",
+      "bytes": 2798,
+      "sha256": "192361510e214e38df353a693026deb788f44f3796532712361a857b606b99ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/first-failure.json",
+      "bytes": 1972,
+      "sha256": "c7a9dad2d19ce6924cf5811fb09a589dc0b0d495071908dfef75f2652875fe93"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/recovery-decision.json",
+      "bytes": 3088,
+      "sha256": "14e093bce44bc1fed119c02bbfc6c54f28eaf45509734b50f9ab7cc700ec0694"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/recovery-observation.json",
+      "bytes": 2255,
+      "sha256": "a8540dec8ef8666f626d79d31f42b5e338e8440067e894e972d31eb40f926db1"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/recovery/recovery-summary.json",
+      "bytes": 6697,
+      "sha256": "ea91dbe6919f194d1c65e3ad1adda1ac3c4116528b34d09877ce20812fe17409"
+    },
+    {
+      "path": "round-1-clean-install-cold/r04-recovery/runner-summary.json",
+      "bytes": 6697,
+      "sha256": "ea91dbe6919f194d1c65e3ad1adda1ac3c4116528b34d09877ce20812fe17409"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 33372,
+      "sha256": "8df98df612647747e14f01a836f84463064f83c25ea1756e9add871a3b793d62"
+    }
+  ]
+}
