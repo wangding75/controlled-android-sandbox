@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-08-28T03:03:14.759609+00:00",
+  "captured_at": "2026-08-28T03:57:47.188265+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
     "next_task": "C4-R05",
@@ -29,14 +29,14 @@
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "4fb42b736d921888ccdb4d82efb367a085787290",
+    "head": "f8c230c855903f34250c580756b021a9f565fef0",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "4fb42b736d921888ccdb4d82efb367a085787290",
+    "remote_head": "f8c230c855903f34250c580756b021a9f565fef0",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M .gitignore\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_PROGRESS.md\n M docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java\n M scripts/check-c4-r05-orchestrator.py\n M tools/capability/run_c2_t05_rd.py\n M tools/capability/run_c2_t06_rd.py\n M tools/capability/run_c4_r01_rd.py\n M tools/capability/run_c4_r03_rd.py\n M tools/capability/run_c4_r05_rd.py\n M tools/capability/run_c4_t04_rd.py\n M tools/capability/run_c4_t05_rd.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n M verification/catch-up/C4-T04/c4-t04-local-verification.json\n M verification/catch-up/C4-T04/c4-t04-rd-summary.json\n M verification/catch-up/C4-T05/c4-t05-local-verification.json\n M verification/catch-up/C4-T05/c4-t05-rd-summary.json\n?? docs/review/C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md\n?? sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/GuestRecoveryPrewarmCoordinator.java\n?? verification/catch-up/C4-R05/closure-add-gate-20260826/\n?? verification/catch-up/C4-R05/closure-r04-20260826/\n?? verification/catch-up/C4-R05/continuation-local-add-gate-f517-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-exit-callback-destroy-mcalled-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-exit-callback-destroy-suppress-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-exit-callback-mcalled-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-exit-callback-no-finish-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-exit-callback-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-f517-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-fix-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-lifetime-fix-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-after-reboot-20260826/attempts/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-remaining-after-reboot-20260826/setup/\n?? verification/catch-up/C4-R05/continuation-local-launch-user0-runtime-native-exit-probe-20260826/\n?? verification/catch-up/C4-R05/continuation-local-r04-f517-20260826/\n?? verification/catch-up/C4-R05/dual-user-continuation-preflight-20260826.json\n?? verification/catch-up/C4-R05/formal-dual-user-retest-20260826/\n?? verification/catch-up/C4-R05/formal-preflight-device-unavailable-20260828.json\n?? verification/catch-up/C4-R05/repro-dingtalk-user0-cold011-hot011-preserve-20260826/\n?? verification/catch-up/C4-R05/repro-dingtalk-user0-cold012-hot012-prewarm-20260826/\n?? verification/catch-up/C4-R05/repro-dingtalk-user0-hot011-20260826/\n?? verification/catch-up/C4-R05/repro-dingtalk-user0-hot011-resume-preserve-20260826/"
+    "status_short": ""
   },
   "device": {
     "instance_name": "RD测试",

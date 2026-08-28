@@ -45,4 +45,13 @@ verification/catch-up/C4-R05/**/*.lastgood
 verification/catch-up/C4-R05/**/*.checkpoint
 verification/catch-up/C4-R05/**/*.registry
 
+# Superseded C4-R05 continuation/repro lanes are retained as local raw evidence; the
+# clean-commit formal lanes (for example formal-two-round-20260828) are tracked explicitly.
+verification/catch-up/C4-R05/closure-*/
+verification/catch-up/C4-R05/continuation-*/
+verification/catch-up/C4-R05/dual-user-continuation-preflight-*.json
+verification/catch-up/C4-R05/formal-dual-user-retest-*/
+verification/catch-up/C4-R05/formal-preflight-device-unavailable-*.json
+verification/catch-up/C4-R05/repro-*/
+
 _delivery/
