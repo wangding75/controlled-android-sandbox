@@ -1,0 +1,85 @@
+{
+  "label": "round-1-clean-install-cold-r04-failure-injection",
+  "command": [
+    "C:\\Users\\wangding\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+    "D:\\github\\controlled-android-sandbox\\tools\\capability\\run_c4_r04_rd.py",
+    "--mode",
+    "failure-injection",
+    "--instance-name",
+    "RD测试",
+    "--output",
+    "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection"
+  ],
+  "startedAt": "2026-08-28T05:02:46.777089+00:00",
+  "completedAt": "2026-08-28T05:02:47.014109+00:00",
+  "elapsedMs": 237,
+  "returncode": 0,
+  "stdoutPath": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\commands\\001-round-1-clean-install-cold-r04-failure-injection.stdout.txt",
+  "stderrPath": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\commands\\001-round-1-clean-install-cold-r04-failure-injection.stderr.txt",
+  "summaryPath": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\runner-summary.json",
+  "summary": {
+    "schemaVersion": 1,
+    "task": "C4-R04",
+    "mode": "failure-injection",
+    "status": "PASS",
+    "runnerContract": {
+      "firstFailureStopsLane": true,
+      "automaticRetryBudget": 0,
+      "fixedSleepReadiness": false,
+      "staticMarkersAuthoritative": false,
+      "recoveryIsSeparateMode": true
+    },
+    "scenarios": [
+      {
+        "scenario": "windows-empty",
+        "expectedRunnerStatus": "FAIL",
+        "runnerStatus": "FAIL",
+        "expectedErrorClassification": "WINDOWS_EMPTY",
+        "observedErrorClassification": "WINDOWS_EMPTY",
+        "firstFailurePreserved": true,
+        "guardPassed": true,
+        "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\failure-injection\\windows-empty"
+      },
+      {
+        "scenario": "draw-timeout",
+        "expectedRunnerStatus": "FAIL",
+        "runnerStatus": "FAIL",
+        "expectedErrorClassification": "DRAW_TIMEOUT",
+        "observedErrorClassification": "DRAW_TIMEOUT",
+        "firstFailurePreserved": true,
+        "guardPassed": true,
+        "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\failure-injection\\draw-timeout"
+      },
+      {
+        "scenario": "bind-failure",
+        "expectedRunnerStatus": "FAIL",
+        "runnerStatus": "FAIL",
+        "expectedErrorClassification": "BIND_FIRST_ATTEMPT_FAILED",
+        "observedErrorClassification": "BIND_FIRST_ATTEMPT_FAILED",
+        "firstFailurePreserved": true,
+        "guardPassed": true,
+        "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\failure-injection\\bind-failure"
+      },
+      {
+        "scenario": "duplicate-add",
+        "expectedRunnerStatus": "FAIL",
+        "runnerStatus": "FAIL",
+        "expectedErrorClassification": "DUPLICATE_MUTATION_ACCEPTED",
+        "observedErrorClassification": "DUPLICATE_MUTATION_ACCEPTED",
+        "firstFailurePreserved": true,
+        "guardPassed": true,
+        "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\failure-injection\\duplicate-add"
+      },
+      {
+        "scenario": "staging-residue",
+        "expectedRunnerStatus": "FAIL",
+        "runnerStatus": "FAIL",
+        "expectedErrorClassification": "STAGING_RESIDUE",
+        "observedErrorClassification": "STAGING_RESIDUE",
+        "firstFailurePreserved": true,
+        "guardPassed": true,
+        "artifacts": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-failure-injection\\failure-injection\\staging-residue"
+      }
+    ]
+  }
+}

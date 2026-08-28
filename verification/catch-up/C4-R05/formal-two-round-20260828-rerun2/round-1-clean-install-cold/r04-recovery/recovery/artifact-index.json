@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "root": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\r04-recovery\\recovery",
+  "artifacts": [
+    {
+      "path": "first-failure-decision.json",
+      "bytes": 2798,
+      "sha256": "192361510e214e38df353a693026deb788f44f3796532712361a857b606b99ce"
+    },
+    {
+      "path": "first-failure.json",
+      "bytes": 1972,
+      "sha256": "c7a9dad2d19ce6924cf5811fb09a589dc0b0d495071908dfef75f2652875fe93"
+    },
+    {
+      "path": "recovery-decision.json",
+      "bytes": 3088,
+      "sha256": "14e093bce44bc1fed119c02bbfc6c54f28eaf45509734b50f9ab7cc700ec0694"
+    },
+    {
+      "path": "recovery-observation.json",
+      "bytes": 2255,
+      "sha256": "a8540dec8ef8666f626d79d31f42b5e338e8440067e894e972d31eb40f926db1"
+    },
+    {
+      "path": "recovery-summary.json",
+      "bytes": 6704,
+      "sha256": "5728b81d9fe38dcf39ef463a7fc6633716a697c3ea8df733d797735c9ccabb8e"
+    }
+  ]
+}
