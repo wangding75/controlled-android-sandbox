@@ -13,6 +13,9 @@ import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Set;
@@ -29,7 +32,14 @@ final class RuntimeGuestLifecycleCoordinator {
     private static final long STOP_TIMEOUT_MILLIS = 10_000L;
     private static final String VALIDATED_STATE_FINGERPRINT =
             "validatedPackageStateFingerprint";
+    /** Package-state projection hash used as the immutable catalog generation for a proof. */
+    private static final String VALIDATED_CATALOG_GENERATION =
+            "validatedCatalogGeneration";
     private static final String VALIDATED_PROCESS_NAMES = "validatedProcessNames";
+    private static final String VALIDATED_ARTIFACT_PATHS = "validatedArtifactPaths";
+    private static final String VALIDATED_ARTIFACT_SIZES = "validatedArtifactSizes";
+    private static final String VALIDATED_ARTIFACT_IDENTITIES = "validatedArtifactIdentities";
+    private static final String VALIDATED_ARTIFACT_MODIFIED = "validatedArtifactModified";
 
     private static final String[] VALIDATED_STRING_KEYS = {
             RuntimeKeys.PACKAGE_NAME,
@@ -462,6 +472,9 @@ final class RuntimeGuestLifecycleCoordinator {
         String requestedState = packageStateFingerprint(input);
         if (requestedState.isEmpty() || !requestedState.equals(
                 cached.getString(VALIDATED_STATE_FINGERPRINT, ""))) return false;
+        if (!requestedState.equals(cached.getString(VALIDATED_CATALOG_GENERATION, ""))) {
+            return false;
+        }
         if (!sameText(input, cached, RuntimeKeys.APK_SHA256)
                 || input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
                 != cached.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
@@ -478,6 +491,7 @@ final class RuntimeGuestLifecycleCoordinator {
         for (String key : VALIDATED_LIST_KEYS) {
             if (!sameStringList(input, cached, key)) return false;
         }
+        if (!sameArtifactProof(input, cached)) return false;
         String requestedRevision = input.getString(RuntimeKeys.PACKAGE_REVISION, "").trim();
         if (requestedRevision.isEmpty()) {
             requestedRevision = "v" + input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L)
@@ -509,7 +523,10 @@ final class RuntimeGuestLifecycleCoordinator {
             out.putParcelable(RuntimeKeys.PACKAGE_STATE,
                     input.getParcelable(RuntimeKeys.PACKAGE_STATE));
         }
-        out.putString(VALIDATED_STATE_FINGERPRINT, packageStateFingerprint(input));
+        String catalogGeneration = packageStateFingerprint(input);
+        out.putString(VALIDATED_STATE_FINGERPRINT, catalogGeneration);
+        out.putString(VALIDATED_CATALOG_GENERATION, catalogGeneration);
+        putArtifactProof(out, input);
         ArrayList<String> processNames = new ArrayList<>();
         if (declaredProcesses != null) processNames.addAll(declaredProcesses);
         out.putStringArrayList(VALIDATED_PROCESS_NAMES, processNames);
@@ -540,6 +557,96 @@ final class RuntimeGuestLifecycleCoordinator {
     private static void copyStringList(Bundle source, Bundle target, String key) {
         ArrayList<String> values = source.getStringArrayList(key);
         if (values != null) target.putStringArrayList(key, new ArrayList<>(values));
+    }
+
+    /**
+     * Captures cheap, non-content identity for every immutable APK artifact. A cache hit must
+     * never be based on mtime alone: path, byte length, and the filesystem file key are all
+     * checked. Platforms that cannot provide a file key conservatively miss the cache and fall
+     * back to the complete SHA verification.
+     */
+    private static void putArtifactProof(Bundle target, Bundle input) {
+        ArrayList<String> paths = artifactPaths(input);
+        ArrayList<String> sizes = new ArrayList<>();
+        ArrayList<String> identities = new ArrayList<>();
+        ArrayList<String> modified = new ArrayList<>();
+        for (String path : paths) {
+            try {
+                File file = new File(path).getCanonicalFile();
+                BasicFileAttributes attributes = Files.readAttributes(file.toPath(),
+                        BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                Object fileKey = attributes.fileKey();
+                sizes.add(Long.toString(attributes.size()));
+                identities.add(fileKey == null ? "" : String.valueOf(fileKey));
+                modified.add(Long.toString(attributes.lastModifiedTime().toMillis()));
+            } catch (Exception error) {
+                sizes.add("-1");
+                identities.add("");
+                modified.add("-1");
+            }
+        }
+        target.putStringArrayList(VALIDATED_ARTIFACT_PATHS, paths);
+        target.putStringArrayList(VALIDATED_ARTIFACT_SIZES, sizes);
+        target.putStringArrayList(VALIDATED_ARTIFACT_IDENTITIES, identities);
+        target.putStringArrayList(VALIDATED_ARTIFACT_MODIFIED, modified);
+    }
+
+    private static boolean sameArtifactProof(Bundle input, Bundle cached) {
+        ArrayList<String> expectedPaths = cached.getStringArrayList(VALIDATED_ARTIFACT_PATHS);
+        ArrayList<String> expectedSizes = cached.getStringArrayList(VALIDATED_ARTIFACT_SIZES);
+        ArrayList<String> expectedIdentities =
+                cached.getStringArrayList(VALIDATED_ARTIFACT_IDENTITIES);
+        ArrayList<String> expectedModified = cached.getStringArrayList(VALIDATED_ARTIFACT_MODIFIED);
+        ArrayList<String> paths = artifactPaths(input);
+        if (expectedPaths == null || expectedSizes == null || expectedIdentities == null
+                || expectedModified == null || expectedPaths.size() != paths.size()
+                || expectedSizes.size() != paths.size()
+                || expectedIdentities.size() != paths.size()
+                || expectedModified.size() != paths.size()) return false;
+        for (int index = 0; index < paths.size(); index++) {
+            try {
+                File file = new File(paths.get(index)).getCanonicalFile();
+                if (!file.isFile() || !file.getCanonicalPath().equals(expectedPaths.get(index))) {
+                    return false;
+                }
+                BasicFileAttributes attributes = Files.readAttributes(file.toPath(),
+                        BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                Object fileKey = attributes.fileKey();
+                String identity = fileKey == null ? "" : String.valueOf(fileKey);
+                if (identity.isEmpty() || !identity.equals(expectedIdentities.get(index))) {
+                    return false;
+                }
+                if (!Long.toString(attributes.size()).equals(expectedSizes.get(index))
+                        || !Long.toString(attributes.lastModifiedTime().toMillis())
+                        .equals(expectedModified.get(index))) return false;
+            } catch (Exception error) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static ArrayList<String> artifactPaths(Bundle input) {
+        ArrayList<String> paths = new ArrayList<>();
+        String base = input.getString(RuntimeKeys.APK_PATH, "").trim();
+        if (base.isEmpty()) return paths;
+        try {
+            paths.add(new File(base).getCanonicalPath());
+        } catch (Exception error) {
+            return paths;
+        }
+        ArrayList<String> splits = input.getStringArrayList(RuntimeKeys.SPLIT_PATHS);
+        if (splits != null) {
+            for (String split : splits) {
+                if (split == null || split.trim().isEmpty()) return new ArrayList<>();
+                try {
+                    paths.add(new File(split).getCanonicalPath());
+                } catch (Exception error) {
+                    return new ArrayList<>();
+                }
+            }
+        }
+        return paths;
     }
 
     private static boolean sameStringList(Bundle left, Bundle right, String key) {
