@@ -55,6 +55,11 @@ APK_PATHS = {
 }
 LOW_MEMORY_RE = re.compile(r"\bLOW_MEMORY\b", re.IGNORECASE)
 HOST_PACKAGE_RE = re.compile(re.escape(HOST_PACKAGE), re.IGNORECASE)
+ENVIRONMENT_INTERRUPTION_RE = re.compile(
+    r"RD_ENVIRONMENT_RESOLUTION_BLOCKED|device\s+(?:offline|not found)|"
+    r"cannot identify image file",
+    re.IGNORECASE,
+)
 
 
 class PhaseFailure(RuntimeError):
@@ -121,6 +126,29 @@ def read_summary(path: Path) -> dict[str, Any]:
     return payload
 
 
+def is_environment_interruption(row: dict[str, Any]) -> bool:
+    """Recognize only a durable device-loss observation that may be resumed once.
+
+    A launch/readiness failure remains terminal by default.  The exception is deliberately
+    narrow: the command must report the explicit environment-resolution block and the device
+    snapshot must prove that no screenshot/surface was available.  This keeps real CAS/App
+    launch failures fail-closed while allowing a user-approved continuation after an emulator
+    restart, without deleting or rewriting the original failed row.
+    """
+    if not row.get("failureDetected"):
+        return False
+    command = row.get("commandResult") or {}
+    detail = str(command.get("detail") or "")
+    device = row.get("device") or {}
+    screenshot = device.get("screenshot") or {}
+    return (
+        bool(ENVIRONMENT_INTERRUPTION_RE.search(detail))
+        and str(command.get("status") or "").upper() == "ERROR"
+        and device.get("surfaceNonEmpty") is False
+        and bool(screenshot.get("error"))
+    )
+
+
 def find_command_record(output: Path, label: str) -> dict[str, Any]:
     for path in sorted((output / "commands").glob("*.json")):
         record = read_summary(path)
@@ -143,6 +171,7 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
     observed: dict[tuple[str, int, int, str], dict[str, Any]] = {}
     sources: dict[tuple[str, int, int, str], Path] = {}
     duplicates: list[tuple[str, int, int, str]] = []
+    recovered_environment_coordinates: list[tuple[str, int, int, str]] = []
     latest_child = attempt_dirs[-1]
     for child in attempt_dirs:
         child_has_rows = False
@@ -154,7 +183,14 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
             coordinate = (str(row.get("target", "")), int(row.get("user", -1)),
                           int(row.get("iteration", -1)), str(row.get("mode", "")))
             if coordinate in observed:
-                duplicates.append(coordinate)
+                previous = observed[coordinate]
+                # A later, successful observation may replace exactly one durable device-loss
+                # row.  The original row remains in its prior attempt and is still included by
+                # the child aggregate's observations; only the terminal coordinate is updated.
+                if is_environment_interruption(previous) and not row.get("failureDetected"):
+                    recovered_environment_coordinates.append(coordinate)
+                else:
+                    duplicates.append(coordinate)
             observed[coordinate] = row
             sources[coordinate] = child
         if child_has_rows:
@@ -186,16 +222,38 @@ def launch_continuation(lane: Path, targets: str, users: str, loops: int) -> dic
                 "attempts": [str(path.resolve()) for path in attempt_dirs],
             }
         if row.get("failureDetected"):
+            if is_environment_interruption(row):
+                target, user, iteration, mode = coordinate
+                return {
+                    "previousLane": str(latest_child.resolve()),
+                    "target": target,
+                    "user": user,
+                    "iteration": iteration,
+                    "mode": mode,
+                    "completedRows": len(observed) - 1,
+                    "expectedRows": len(expected),
+                    "attempts": [str(path.resolve()) for path in attempt_dirs],
+                    "environmentInterruption": {
+                        "coordinate": list(coordinate),
+                        "source": str(sources[coordinate].resolve()),
+                        "classification": "ENVIRONMENT_RESTART_INTERRUPTION",
+                        "originalFailurePreserved": True,
+                    },
+                }
             raise PhaseFailure("launch-continuation", "existing lane contains a non-terminal failure",
                                {"coordinate": coordinate, "row": row,
                                 "source": str(sources[coordinate].resolve())})
-    return {
+    result = {
         "previousLane": str(latest_child.resolve()),
         "completedRows": len(observed),
         "expectedRows": len(expected),
         "attempts": [str(path.resolve()) for path in attempt_dirs],
         "complete": True,
     }
+    if recovered_environment_coordinates:
+        result["recoveredEnvironmentCoordinates"] = [list(item)
+                                                     for item in recovered_environment_coordinates]
+    return result
 
 
 def run_command(label: str, command: list[str], output: Path, *,

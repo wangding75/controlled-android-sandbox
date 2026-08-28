@@ -105,6 +105,15 @@ barrier 后的正式双轮重新通过，才能推翻本节当前的失败结论
 seed；因此不会因只读取 `attempt-001` 而重新执行已经完成的坐标。该合并只恢复执行位置，
 不把中断 lane 当成正式 PASS。
 
+2026-08-28 的第三条续接 lane 还记录了一次 MuMu 环境重启边界：attempt-003 已完成 fixture
+两用户 100 行及 DingTalk user0 的前 6 个 cold/hot iteration，随后 MuMu 进程在
+14:50:45–14:50:52 重新启动，原 serial `127.0.0.1:16416` 短暂 offline；R03 在收集
+`dingtalk/u0/hot-006` 的 logcat/截图时以 `RD_ENVIRONMENT_RESOLUTION_BLOCKED` 超时退出。
+该事件没有 host-scoped `LOW_MEMORY` 证据、没有 runner 发出的 restart 命令，且完整失败
+行与 `wrapper-stderr` 保留在正式 evidence。用户明确要求忽略这次重启继续测试，因此 selector
+只对这一种“命令明确报告环境解析阻断 + 无 Surface/截图”的行允许一次同坐标人工续接；原始
+失败行仍留在 aggregate observations，任何 CAS/App readiness 失败和重复坐标继续 fail-closed。
+
 此前 `verification/catch-up/C4-R05/diagnostic-no-second-stop-20260828` 的
 `attempt=1/retryBudget=0` 隔离复测仍已完成 fixture 25、夸克/红果/番茄/钉钉各 5 个
 add/delete/re-add，`operationCount=137`、`status=PASS`、`residue.pass=true`；它只证明
