@@ -82,15 +82,27 @@ CAS 差异是一个 hot 请求仍需在 10 秒内完成 translated Guest prepare
 `START ... DebugCommandActivity`；因此 request/operation 尚未进入 DebugCommandActivity，
 证据中保持 `request_id=null`，不伪造 CAS operation ID。
 
-根因分类为验收编排的 Host ActivityThread 生命周期竞态：`debug_command()` 已经显式执行并
-等待 `am force-stop` 后，又追加 `am start -S`，API 32 的第二次异步 kill 与上一轮
-ClientTransaction 清理重叠，可能让新进程在 `onCreate` 前收到无 ActivityClientRecord 的旧
-transaction。修复只保留一次显式 stop 后的动态 PID/结果文件 readiness，再使用普通
-`am start -W`；不捕获异常、不重试、不改变 CAS package/Guest 生命周期。R02 的同一
-`attempt=1/retryBudget=0` 隔离复测目录
-`verification/catch-up/C4-R05/diagnostic-no-second-stop-20260828` 已完成 fixture 25、
-夸克/红果/番茄/钉钉各 5 个 add/delete/re-add，`operationCount=137`、`status=PASS`、
-`residue.pass=true`，作为修复回归输入，不能替代随后 clean commit 上的两轮正式验收。
+根因分类为验收编排与 MuMu API-32 Host ActivityThread 生命周期的竞态。第一次正式失败后，
+`debug_command()` 已经显式执行并等待 `am force-stop`，又追加 `am start -S`；该组合确实是
+一个可疑的第二次异步 kill 边界，因此先移除 `-S`。但是第二次正式尝试在**没有 `-S`**的
+同一 clean 流程仍复现完全相同的
+`Activity client record must not be null to execute transaction item`，故“仅移除 `-S`”被
+证据否定，不得作为修复结论。第二次首次失败目录为
+`verification/catch-up/C4-R05/formal-two-round-20260828-rerun1/round-1-clean-install-cold/add-gate/`，
+结构化签名仍为 `CAS_HOST_ACTIVITY_LIFECYCLE_FATAL/ACTIVITY_CLIENT_RECORD_MISSING`，Host
+pid `22280`、`ApplicationExitInfo.reason=4`。失败发生在 cycle 23 add 的新
+`DebugCommandActivity` 进程进入 `onCreate` 前，`request_id/operation_id` 继续保持不可用。
+
+新的实现边界是在每次显式 `force-stop` 后增加动态 ATMS/WM teardown barrier：除了 `pidof`
+为空，还必须从当前 `dumpsys activity activities` 与 `dumpsys window windows` 确认 Host 的
+ActivityRecord 与 Window 均已消失；在有界 deadline 内未收敛则 fail-closed 并记录最后状态。
+这不是固定 sleep、静默 launch retry 或异常吞咽，也不改变 CAS package/Guest 生命周期。只有
+barrier 后的正式双轮重新通过，才能推翻本节当前的失败结论。
+
+此前 `verification/catch-up/C4-R05/diagnostic-no-second-stop-20260828` 的
+`attempt=1/retryBudget=0` 隔离复测仍已完成 fixture 25、夸克/红果/番茄/钉钉各 5 个
+add/delete/re-add，`operationCount=137`、`status=PASS`、`residue.pass=true`；它只证明
+CAS mutation 在当时窗口可用，不能替代正式双轮。
 
 首轮 fatal 原始日志保留在 ignored raw artifact；`capture_snapshot()` 同时新增 bounded
 `logcat-critical.txt`（AndroidRuntime/ActivityManager/ActivityTaskManager）截面，避免噪声

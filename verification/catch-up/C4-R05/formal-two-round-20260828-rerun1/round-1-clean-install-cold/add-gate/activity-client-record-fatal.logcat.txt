@@ -1,0 +1,10 @@
+08-28 12:08:03.159  1296  1457 I ActivityManager: Force stopping com.warden.controlledsandbox.debug appid=10196 user=0: from pid 22265
+08-28 12:08:03.644  1296  3807 I ActivityTaskManager: START u0 {flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras)} from uid 2000, pid 22276
+08-28 12:08:03.678  1296  1326 I ActivityManager: Start proc 22280:com.warden.controlledsandbox.debug/u0a196 for pre-top-activity
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: FATAL EXCEPTION: main
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: Process: com.warden.controlledsandbox.debug, PID: 22280
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: java.lang.IllegalArgumentException: Activity client record must not be null to execute transaction item
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: at android.app.servertransaction.ActivityTransactionItem.getActivityClientRecord(ActivityTransactionItem.java:90)
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: at android.app.servertransaction.ActivityTransactionItem.execute(ActivityTransactionItem.java:43)
+08-28 12:08:04.350 22280 22280 E AndroidRuntime: at android.app.servertransaction.TransactionExecutor.execute(TransactionExecutor.java:95)
+08-28 12:08:04.422  1296  1643 I ActivityManager: Process com.warden.controlledsandbox.debug (pid 22280) has died: fg TOP

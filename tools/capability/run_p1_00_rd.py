@@ -34,6 +34,59 @@ ORDINARY_TARGETS = (0, 1, 7, 8, 31, 32, 62, 63)
 ISOLATED_TARGETS = (0, 7, 8, 14, 15)
 
 
+def _host_activity_teardown_state(serial: str) -> dict[str, Any]:
+    """Return the live ATMS/WM state used to fence a cold Host restart.
+
+    ``pidof`` becoming empty is not sufficient on the MuMu API-32 image: ATMS can
+    still be removing the old ActivityRecord and Window while the next process is
+    being launched.  The state is deliberately derived from live dumpsys output,
+    not from a fixed delay or a historical task id.
+    """
+    activities = run_adb(serial, ["shell", "dumpsys", "activity", "activities"], check=False)
+    windows = run_adb(serial, ["shell", "dumpsys", "window", "windows"], check=False)
+
+    def activity_line(line: str) -> bool:
+        return HOST_PACKAGE in line and any(
+            marker in line
+            for marker in ("ActivityRecord{", "cmp=", "mActivityComponent=", "packageName=")
+        )
+
+    def window_line(line: str) -> bool:
+        return HOST_PACKAGE in line and ("Window{" in line or "package=" in line)
+
+    activity_rows = [line.strip() for line in activities.stdout.splitlines() if activity_line(line)]
+    window_rows = [line.strip() for line in windows.stdout.splitlines() if window_line(line)]
+    return {
+        "activity_present": bool(activity_rows),
+        "window_present": bool(window_rows),
+        "activity_rows": activity_rows[-8:],
+        "window_rows": window_rows[-8:],
+        "activity_returncode": activities.returncode,
+        "window_returncode": windows.returncode,
+    }
+
+
+def _wait_for_host_activity_teardown(serial: str, deadline_sec: float = 15.0) -> dict[str, Any]:
+    """Wait for ATMS/WM to remove the old Host activity and window.
+
+    This is a dynamic readiness barrier.  A timeout is surfaced as a classified
+    failure with the last observed state; it is never converted into a retry or
+    hidden by a constant sleep.
+    """
+    deadline = time.monotonic() + deadline_sec
+    last: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        last = _host_activity_teardown_state(serial)
+        if not last["activity_present"] and not last["window_present"]:
+            return last
+        time.sleep(0.1)
+    raise CampaignBlocked(
+        "RD_ENVIRONMENT_RESOLUTION_BLOCKED",
+        "host activity teardown timeout; "
+        + json.dumps({"deadlineSec": deadline_sec, **last}, ensure_ascii=False),
+    )
+
+
 def debug_command(
     serial: str,
     extras: list[str],
@@ -47,6 +100,7 @@ def debug_command(
         except (ValueError, IndexError):
             return ""
 
+    teardown: dict[str, Any] | None = None
     if force_stop_host:
         run_adb(serial, ["shell", "am", "force-stop", HOST_PACKAGE], check=False)
         for _ in range(50):
@@ -54,6 +108,10 @@ def debug_command(
             if not process.stdout.strip():
                 break
             time.sleep(0.1)
+        # Fence the framework's ActivityRecord/Window teardown as well as the
+        # process death.  Starting immediately after pidof-empty can dispatch an
+        # orphaned ActivityTransactionItem on the MuMu API-32 image.
+        teardown = _wait_for_host_activity_teardown(serial)
     for _ in range(50):
         run_adb(
             serial,
@@ -92,6 +150,7 @@ def debug_command(
             "result": result,
             "start_stdout": started.stdout,
             "start_stderr": started.stderr,
+            "host_teardown": teardown,
         }
     except CampaignBlocked as exc:
         return {
@@ -100,6 +159,7 @@ def debug_command(
             "detail": str(exc),
             "start_stdout": started.stdout,
             "start_stderr": started.stderr,
+            "host_teardown": teardown,
         }
 
 

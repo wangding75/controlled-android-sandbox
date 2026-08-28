@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "task_id": "C4-R05",
+  "parent_task": "C4-R02",
+  "phase": "round-1-clean-install-cold/add-gate",
+  "status": "FIRST_FAILURE_PRESERVED",
+  "captured_at": "2026-08-28T04:08:04.350Z",
+  "attempt": 1,
+  "retry_budget": 0,
+  "retry_decision": "NO_RETRY",
+  "request_id": null,
+  "operation_id": null,
+  "boundary": "The runner was preparing fixture cycle 23 add. The preceding cycle 22 re-add completed, but the new DebugCommandActivity process crashed before the next CAS request reached CS_COMMAND.",
+  "package": "com.warden.controlledsandbox.fixture",
+  "user": 0,
+  "cycle": 23,
+  "step": "add",
+  "host_process": {
+    "package": "com.warden.controlledsandbox.debug",
+    "pid": 22280,
+    "boot_id": "58fcd82e-6ef8-4019-9ac8-924e710aea55",
+    "exit_reason": "APP CRASH(EXCEPTION)",
+    "exit_code": 0,
+    "evidence": "runner-abort-application-exit-info.txt"
+  },
+  "error": {
+    "classification": "CAS_HOST_ACTIVITY_LIFECYCLE_FATAL",
+    "signature": "ACTIVITY_CLIENT_RECORD_MISSING",
+    "exception": "java.lang.IllegalArgumentException",
+    "message": "Activity client record must not be null to execute transaction item",
+    "stack": "android.app.servertransaction.ActivityTransactionItem.getActivityClientRecord -> ActivityTransactionItem.execute -> TransactionExecutor.executeCallbacks -> ActivityThread$H.handleMessage",
+    "logcat_timestamp": "08-28 12:08:04.350"
+  },
+  "timeline": {
+    "previous_operation_pass": "08-28 12:08:02.575 CS_COMMAND: PASS import-only fixture",
+    "old_host_force_stop": "08-28 12:08:03.159",
+    "new_activity_start": "08-28 12:08:03.644",
+    "new_process_start": "08-28 12:08:03.678",
+    "fatal": "08-28 12:08:04.350",
+    "process_died": "08-28 12:08:04.422",
+    "stage_deadline_seconds": 240
+  },
+  "evidence": {
+    "raw_logcat": "runner-abort-logcat.txt",
+    "critical_logcat": "runner-abort-logcat-critical.txt",
+    "fatal_excerpt": "activity-client-record-fatal.logcat.txt",
+    "activity": "runner-abort-activity-activities.txt",
+    "window": "runner-abort-window-windows.txt",
+    "surface": "runner-abort-surface-list.txt",
+    "process": "runner-abort-processes.txt",
+    "application_exit_info": "runner-abort-application-exit-info.txt",
+    "operations": "operations.json",
+    "child_summary": "summary.json"
+  },
+  "comparison_to_prior_attempt": "The same fatal was reproduced after removing the extra am start -S flag; that mitigation is therefore ineffective and is not treated as a fix.",
+  "next_diagnostic": "Add a dynamic ATMS/WM teardown barrier after force-stop and before the next activity start; fail closed with captured state if the host ActivityRecord or Window does not disappear by deadline."
+}
