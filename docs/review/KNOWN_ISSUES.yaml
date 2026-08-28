@@ -1738,3 +1738,55 @@ issues:
       Guest dispatcher/receiver transport owner candidate, not evidence for SX/UI or a DingTalk-only
       compatibility patch. The first failure remains authoritative and blocks C4-R05 until a bounded
       recovery and regression lane passes.
+
+  - issue_id: KI-R03-062
+    title: Quark cold launch misses FIRST_FRAME_DRAWN deadline after nested BrowserActivity handoff
+    capability: activity_framework
+    classification: NEEDS_REPRODUCTION_AND_CLASSIFICATION
+    severity: HIGH
+    status: RECORDED
+    discovered_by: C4-R05 formal two-round rerun2 2026-08-28
+    evidence:
+      - verification/catch-up/C4-R05/formal-two-round-20260828-rerun2/c4-r05-summary.json
+      - verification/catch-up/C4-R05/formal-two-round-20260828-rerun2/round-1-clean-install-cold/launch-matrix/c4-r03-summary.json
+      - verification/catch-up/C4-R05/formal-two-round-20260828-rerun2/round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/case.json
+      - verification/catch-up/C4-R05/formal-two-round-20260828-rerun2/round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeActivityLaunchCoordinator.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestLaunchObservation.java
+      - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestLaunchGate.java
+      - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
+      - docs/review/C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md
+    match_patterns:
+      - READINESS_SLO_EXCEEDED
+      - LAUNCH_GATE_FAILED
+      - com.quark.browser
+      - com.ucpro.MainActivity
+      - com.ucpro.BrowserActivity
+      - GUEST_ACTIVITY_FIRST_FRAME_DRAWN
+    blocks_current_campaign: true
+    follow_up_required: true
+    follow_up_task: C4-R05 bounded Quark cold-readiness classification and full regression
+    acceptance: NOT_FIXED
+    fix_policy: CLASSIFY_CAS_READINESS_VS_APP_SDK_LATENCY_BEFORE_ANY_PRODUCTION_CHANGE
+    notes: >
+      In the first non-environment failure of the formal R05 rerun, Quark
+      `com.quark.browser` 10.10.5.1080 user0 cold-001 used request
+      `d261bd887c1d4970bd1a6debeb79adae` and operation
+      `d261bd887c1d4970bd1a6debeb79adae-launch`, attempt 5, retry budget 0,
+      automaticRetryPerformed false. Host preparation returned PREPARED at 12985 ms and
+      HOST_START_RETURN at 13055 ms. The Guest emitted GUEST_READY/CREATED for
+      `com.ucpro.MainActivity`, then synchronously handed off to
+      `com.ucpro.BrowserActivity` under the same session
+      `80460375-5156-46f0-a65b-7e5513b4bfbf` and task 155; the child request was
+      `b0b26b83-94b5-4671-b270-9934e21426ae`. The child reached CREATED at 16:18:12.525,
+      RESUMED at 16:18:12.786, and FIRST_FRAME_DRAWN with windowAttached/windowRegistered
+      true at 16:18:28.830. The Host launch gate failed at 16:18:25.465, approximately
+      30000 ms after HOST_START_RETURN, so the valid later Window/Surface/non-black screenshot
+      cannot convert the first failure into PASS. No FATAL/ANR marker, host LOW_MEMORY exit,
+      or device-loss condition was present. RuntimeActivityLaunchCoordinator and
+      GuestLaunchObservation show that the nested token/task correlation was linked as designed;
+      the remaining owner boundary is unresolved between generic CAS readiness latency and
+      Quark/app-SDK startup latency. Do not extend the deadline, add a package-specific fix,
+      or retry until that boundary is classified and a bounded regression passes. A later
+      CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:media exception is retained as post-failure
+      app evidence, not promoted to the gate root cause.

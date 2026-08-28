@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.5
-更新时间：2026-08-27 01:25（Asia/Shanghai）
+账本版本：1.6
+更新时间：2026-08-28 16:52（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
-当前阶段：`C4`（REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（IN_PROGRESS）
+当前阶段：`C4`（BLOCKED，REOPENED，原 C4-T05 证据不足）
+当前任务：`C4-R05`（BLOCKED）
 下一任务：`C4-R05`
 最后完成任务：`C4-R04`
 
@@ -26,7 +26,7 @@
 | C1 组件/包/进程 | DONE | 双用户、50 轮与任务书规定压力 | §5 C1-GATE |
 | C2 系统服务/F2-F5 | DONE | SX/XH 调用面 L3，P0/P1 无 NOT_PROVEN | §5 C2-T07 |
 | C3 Native/ABI/隔离 | IN_PROGRESS | trusted/hostile 闭环，条件项有决策 | §5 C3-T01 |
-| C4 SX 迁移 | IN_PROGRESS | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
+| C4 SX 迁移 | BLOCKED | C4-R01..R05；真实首帧、添加矩阵和 30 分钟双用户压力 | §5 PLAN-20260824-C4-REOPEN |
 | C5 XH 支持 | NOT_APPLICABLE | 用户决定跳过，不阻塞 C6/C7 | §5 PLAN-20260824-C4-REOPEN |
 | C6 API/ABI 矩阵 | PENDING | 声明组合均有 Android Matrix 证据 | - |
 | C7 OEM/发布 | PENDING | 商业矩阵与 VA PRO scope 总验收 | - |
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-R05 | MuMu RD 正式重验与关门 | IN_PROGRESS | C4-R04 | `2667d0f3956751f85c83bec4ade4f89145e7bb2e` | §5 C4-R05 continuation receipt |
+| C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T03 | 原始 XH/DingTalk 验收 | NOT_APPLICABLE | C5-T02,C4 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -82,7 +82,7 @@
 
 ## 4. 阻断项
 
-当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`；
+当前 C4 阶段阻断：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、`KI-R03-059`、`KI-R03-061`、`KI-R03-062`；
 `KI-R03-060` 为已接受但仍开放的强制回归项。原 `aapt2` 供应链缺口已按官方 Google Maven 字节比对修复，严格 Gradle 与
 M5-T19.1-U 供应链门均通过；`KI-R03-BUILD-001` 与 `KI-R03-BUILD-002` 均已 `FIXED`，
 两者 `blocks_current_campaign: false`。C0-T02 的锁定构建已连续两轮成功并完成哈希一致性核验。
@@ -2752,3 +2752,104 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 - **当前边界**：本回执只恢复 R05 进行中状态，不关闭 C4；只有 user0/user1 全矩阵、添加
   门禁、C1/C2/C4/SX 回归及双用户压力全部通过，且没有未处理的非 `LOW_MEMORY` P0/P1，
   才能形成正式关门回执。
+
+### C4-R05：正式双轮验收首轮 Quark 冷启动阻断回执（2026-08-28）
+
+- **任务 ID / 名称**：`C4-R05` / MuMu RD 正式重验与关门。
+- **最终状态**：`BLOCKED`。本次首轮 `clean-install-cold` 在第一个非环境中断之后的首个
+  商业样本 Quark 冷启动失败，按 fail-closed 规则停止；未进入第二轮、双用户短测或后续
+  回归，未将 R05 或 C4 标记为 DONE。
+- **开始/结束时间（Asia/Shanghai）**：2026-08-28 15:02:01 / 16:18:37。
+- **开始基线**：分支 `feature/t57-r03-va-pro-capability-campaign`，commit
+  `0cf92b03139cda347abaa29bb44bed1e51caaa76`，开始时工作区干净；上一任务 C4-R04 已于
+  2026-08-25 20:18 以 `1d9b83d54c13d2a758752281dbc492859d8bd05d` 完成并推送。
+- **执行环境与 RD 测试快照**：MuMu 实例名 `RD测试` 由实例发现解析，当前失败快照为
+  `127.0.0.1:16416`、API 32、ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、型号
+  `22041211A`、Android ID `398eea33120cd887`、boot ID
+  `818b4e5f-bbe0-4f2f-9503-971c16cc53ee`。没有使用固定 serial、端口或设备型号；
+  设备重启后的 serial/boot 变化按用户指令作为环境边界记录，未覆盖历史首失败。
+- **前置门禁**：运行 `python scripts/verify-catch-up-continuation.py` 时识别下一任务为
+  `C4-R05` 且状态为 PASS；构建/安装、C4-R04 failure-injection/recovery、C4-R02 减半
+  add gate 均保留为 PASS。R02 减半门禁为 137 个操作、首失败 0；R04 注入场景的
+  windows-empty、draw-timeout、首次 bind failure、重复添加、staging 残留均按预期 FAIL
+  且首证据保留，独立 recovery 为 PASS。
+- **已批准的环境中断**：先前 MuMu 自发重启和一次宿主 `LOW_MEMORY` 退出分别记录了新的
+  boot/session、独立 attempt 和续接边界；它们不是自动重试，也没有把旧失败改写为 PASS。
+  本回执之后没有再重启、重试或扩大 deadline。
+- **首次失败证据**：
+  - 目录：
+    `verification/catch-up/C4-R05/formal-two-round-20260828-rerun2/round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/`；
+    `case.json`、`first-failure-full/`、logcat、Activity/进程、Window、Surface、截图、
+    ApplicationExitInfo、package/catalog、transaction/staging 快照均保留，并在正式运行
+    `artifact-index.json` 中索引。
+  - request/operation：`d261bd887c1d4970bd1a6debeb79adae` /
+    `d261bd887c1d4970bd1a6debeb79adae-launch`；runner operation
+    `c4-r03-quark-u0-cold-1-a5-d261bd887c`；attempt 5，`retryBudget=0`，
+    `automaticRetryPerformed=false`，`retryable=false`。
+  - 命令在 16:18:25.465 返回 `LAUNCH_FAILED / LAUNCH_GATE_FAILED`：
+    `guest Activity create/resume/window not confirmed`；case 总耗时 80436 ms。
+    这是 request-scoped 的真实结果，不是静态 marker、Guest 进程存在或截图替代。
+  - Host 结构化诊断显示 PREPARE_RETURN 12985 ms、LEDGER_LAUNCH_RETURN 13038 ms、
+    HOST_START_BEGIN 13041 ms、HOST_START_RETURN 13055 ms；Host gate 在 HOST_START_RETURN
+    后 30000 ms 到期。
+  - Guest 结构化诊断显示 root `com.ucpro.MainActivity` 使用 session
+    `80460375-5156-46f0-a65b-7e5513b4bfbf`/task 155，随后同步交接到 child
+    `com.ucpro.BrowserActivity`，child request 为
+    `b0b26b83-94b5-4671-b270-9934e21426ae`。child CREATED 16:18:12.525、RESUMED
+    16:18:12.786、FIRST_FRAME_DRAWN 16:18:28.830（`windowAttached=true`、
+    `windowRegistered=true`），比 Host gate deadline 晚约 3.4 秒。
+  - 失败快照最终可见 Window、非空 Surface、1080x1920 非黑非均匀截图；
+    `FATAL/ANR/LOW_MEMORY` 均无证据。之后出现的
+    `CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:media` 是延迟的应用侧异常，保留为次级
+    风险，不能倒推为本次 gate 的根因。
+- **根因及分类**：CAS 的 fail-closed gate 正确拒绝了未在 30 秒观察窗内完成首帧的启动；
+  nested token/session/task/request 关联已由结构化事件证明存在。当前责任边界仍需在
+  “CAS 通用 readiness 延迟”与“Quark/app-SDK 冷启动延迟”之间做有界分类，不能猜测为
+  Quark 专属缺陷，也不能用晚到的首帧覆盖首失败；本项登记为 `KI-R03-062`
+  (`NEEDS_REPRODUCTION_AND_CLASSIFICATION`、`RECORDED`、阻断当前 campaign)。
+- **VA/NBB 对照**：复核了 VA `HCallbackStub`/`AppInstrumentation`/`VirtualRuntime` 与
+  NBB `HCallbackProxy`/`BaseInstrumentationDelegate`/`IActivityClientProxy` 的生命周期、
+  Binder/token/task/window identity 边界；当前 CAS 对应实现为
+  `RuntimeActivityLaunchCoordinator` 的 framework-owned child `linkActivity`、
+  `GuestLaunchObservation` 的 correlation map 和 `GuestLaunchGate.evaluate` 的真实
+  FIRST_FRAME_DRAWN 门禁。对照结论支持保留现有 gate，不采纳固定 sleep、隐藏重试、延长
+  SLO 或 package 特判；对应回归必须覆盖 Quark root→child handoff 与 deadline 边界。
+- **实现摘要 / 修改文件**：本次 R05 是正式验收任务，未在证据不足时修改生产代码；保留
+  运行产物和 `case.json`，并更新本账本、`docs/review/KNOWN_ISSUES.yaml` 及最新续接预检
+  快照。首失败证据已由 `5ee894f3e32339b951ba7c81f19010f1d13bf392` 推送。
+- **验收命令与结果**：R05 首轮 launch matrix 命令返回码 1、`c4-r03-summary.json`
+  为 `FAIL`，`blockedAt={target:quark,user:0,mode:cold,iteration:1,
+  classification:LAUNCH_RESULT_NOT_PASS}`；R05 汇总为 `FAIL/BLOCKED`，首轮未完成，故
+  后续验收均为未执行而非通过。
+- **商业样本矩阵**：package-neutral fixture 双用户 cold/hot 各 25/25 已通过；DingTalk
+  双用户 cold/hot 各 25/25 在批准的环境续接后通过，但续接观察不能覆盖旧环境边界；Quark
+  user0 cold-001 首次非环境失败，剩余 Quark、红果、番茄小说均未继续，不能以夸克或
+  fixture 代替红果/番茄验收。
+- **APK / commit / device hash**：运行基线构建 commit
+  `0cf92b03139cda347abaa29bb44bed1e51caaa76`；host APK SHA-256
+  `598067e83b1bfe87e21b6f0fead546d8bef56d3c61b3004953df12f480b1aae6`，fixture APK
+  SHA-256 `8d8f4d776b287ea947358690882a33763c3967578952cc88e57d5188ca8275a5`；设备
+  boot ID 见上，失败截图 SHA-256
+  `bb3137ce0d402fbb19813660d8822dbe779d04292ef962e15286a1b9e544c3ac`。
+- **Known Issues 变化**：新增 `KI-R03-062`；`KI-R03-053/054/057/058/059/061` 继续
+  `RECORDED` 且阻断，`KI-R03-060` 继续为已接受但开放的强制回归项；没有把任何历史
+  问题错误标记为 FIXED。
+- **重试记录**：Quark 首失败没有重试（retry budget 0、retryable false、retry decision
+  `NO_RETRY`）；没有捕获异常后循环、固定 sleep、延长总 timeout 或隐藏失败。前序两次
+  环境续接均有独立 request/operation/boot/attempt 证据，且不是本次 Quark 的重试。
+- **偏离任务书说明**：任务书要求的第二轮、完整商业矩阵、C1/C2/C4/SX 回归和 30 分钟
+  双用户短测因首个真实非环境失败按第 6 节停止，属于强制 fail-fast 偏离；没有降低门槛，
+  没有把 R05 或 C4 关闭。
+- **遗留风险与恢复条件**：先完成 `KI-R03-062` 的 CAS readiness 与 Quark/app-SDK
+  延迟责任分类；若需生产改动，先形成有 VA/NBB 对照和回归用例的独立设计，再用新的
+  clean commit、request/operation 和独立证据目录重跑 Quark cold 边界。只有完整两轮、
+  全商业样本 FIRST_FRAME_DRAWN、回归和 30 分钟双用户短测均通过，且 P0/P1 关闭，才可
+  重新评估 C4 关门。
+- **实现提交 SHA**：`5ee894f3e32339b951ba7c81f19010f1d13bf392`（首失败证据提交）。
+- **回执提交**：本段由独立提交主题
+  `docs(progress): record [C4-R05] block receipt` 定位；完成推送后以 Git SHA 核验。
+- **推送与远端验证**：账本/Known Issues/预检变更完成独立提交后推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，核验本地与远端 HEAD 一致，工作区
+  干净。
+- **下一任务**：仍为 `C4-R05`（BLOCKED，待满足恢复条件）；不得进入 `C6-T01`，C4 阶段
+  不得标记 DONE。

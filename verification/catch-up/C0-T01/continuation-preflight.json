@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-08-28T07:01:42.801659+00:00",
+  "captured_at": "2026-08-28T08:26:49.697976+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
     "next_task": "C4-R05",
@@ -29,9 +29,9 @@
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "861518a1d2f7a643249b4d15de11803512bb4bea",
+    "head": "5ee894f3e32339b951ba7c81f19010f1d13bf392",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "861518a1d2f7a643249b4d15de11803512bb4bea",
+    "remote_head": "5ee894f3e32339b951ba7c81f19010f1d13bf392",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
@@ -40,10 +40,10 @@
   },
   "device": {
     "instance_name": "RD测试",
-    "resolved_serial": "127.0.0.1:16417",
+    "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "c278a82a-d862-4415-bcb3-3775e7860fc2",
+    "boot_id": "818b4e5f-bbe0-4f2f-9503-971c16cc53ee",
     "android_id": "398eea33120cd887",
     "model": "22041211A"
   },
