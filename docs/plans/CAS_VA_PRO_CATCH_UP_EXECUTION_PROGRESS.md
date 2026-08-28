@@ -1,13 +1,13 @@
 # CAS 追平 VA PRO 执行进度
 
-账本版本：1.6
-更新时间：2026-08-28 16:52（Asia/Shanghai）
+账本版本：1.7
+更新时间：2026-08-28 18:11（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（BLOCKED，REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-R05`（BLOCKED）
-下一任务：`C4-R05`
+当前任务：`C4-TEMP-01`（IN_PROGRESS）
+下一任务：`C4-TEMP-01`
 最后完成任务：`C4-R04`
 
 ## 1. 使用规则
@@ -68,6 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | - | §5 C4-TEMP-01 |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2853,3 +2854,34 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   干净。
 - **下一任务**：仍为 `C4-R05`（BLOCKED，待满足恢复条件）；不得进入 `C6-T01`，C4 阶段
   不得标记 DONE。
+
+### C4-TEMP-01：CAS 导入/克隆/添加/启动耗时根因与修复（2026-08-28 起）
+
+- **状态**：`IN_PROGRESS`。按用户明确要求插入 C4-R05 之前，作为临时通用性能根因与修复前置；
+  C4-R05 原有 BLOCKED 状态、首帧门禁和历史证据均保留，不因本任务开始而自动恢复或关闭。
+- **开始时间 / 开始基线**：2026-08-28 18:11（Asia/Shanghai）；分支
+  `feature/t57-r03-va-pro-capability-campaign`；开始前工作区干净；任务书变更前置设计提交
+  `d6175da2`，账本插入后的实现基线待本回执提交时写入。
+- **上一任务回执**：C4-R04 已于 2026-08-25 20:18 以
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d` 完成并推送；C4-R05 于 2026-08-28 因 Quark
+  cold 首帧 gate 超时以 `5ee894f3e32339b951ba7c81f19010f1d13bf392` 形成首失败阻断回执，账本/KI
+  更新为 `4001c755a51af9db428f2a592cbc2f73a07c8ef6`。
+- **预检与环境**：开始前已执行 `python scripts/verify-catch-up-continuation.py`；原预检按
+  R05 BLOCKED 正确 fail-closed。插入临时任务后必须重新执行并识别 `C4-TEMP-01`；MuMu
+  `RD测试` serial/API/ABI/model/boot ID/Android ID 在动态 benchmark 开始前补写，禁止在代码或
+  命令中硬编码。
+- **事实源与专项设计**：本任务开始前完整读取任务书、进度账本、
+  `C4_RD_RETEST_ROOT_CAUSE_AND_ACCEPTANCE_PLAN_20260824.md`、`KNOWN_ISSUES.yaml`、
+  `CAPABILITY_CAMPAIGN_WORKFLOW.md`、`COMMIT_IDENTITY_POLICY.md`、C4-R01/R02/R03/R04/R05
+  设计与 VA/NBB 参考实现；根因/影响/迁移规则先提交于
+  `docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md`。
+- **当前工作边界**：先完成 CAS validator/Guest prepare/package-universe 的重复 hash/parse
+  证据与 VA/NBB mapping，再实施 broker-issued verification flag、权威 package state projection
+  和 peer-universe archive parse 移除；isolated 校验、身份/路径/事务安全边界不放宽。
+- **验收门槛**：同一 clean commit 动态解析 `RD测试`，夸克直启与 CAS 沙箱冷启动各至少 3 次，
+  真实首帧/可见为结束点，`sandbox/direct <= 10x` 硬门槛、`<= 3x` 目标；首次失败即保存完整
+  request/operation、stage timing、日志、dumpsys、Window/Surface、截图/帧和 hash，不自动重试。
+- **Known Issues**：本任务开始时不关闭 `KI-R03-053/054/057/058/059/061/062` 或开放的
+  `KI-R03-060`；只有证据闭环后才追加变化。
+- **下一任务**：临时任务完成且恢复条件满足后为 `C4-R05`；若设备、样本、构建或性能门禁真实
+  阻断，则本任务标记 `BLOCKED`，停止后续任务并提交阻断证据。

@@ -1,6 +1,6 @@
 # CAS 追平 VA PRO 执行任务书
 
-版本：1.5
+版本：1.6
 制定日期：2026-08-21
 基准分支：`feature/t57-r03-va-pro-capability-campaign`
 首要验收环境：MuMu 模拟器实例 `RD测试`
@@ -26,6 +26,12 @@
 `loops=25`：clean-install/cold 与 retained-state/hot/recovery。每轮仍执行减半添加门禁和每个
 target/user 冷热各 25 次；C0-C7 全部完成后的整体验收仍另行执行 2 轮 `loops=50`。首帧、
 Window/Surface、SLO、零隐藏重试、回归和双用户压力门槛均不降低。
+
+修订记录：2026-08-28 按用户明确要求在 C4-R05 之前插入临时前置任务 `C4-TEMP-01`，深度对照
+CAS、VA、NBB 的导入/克隆/添加/启动耗时链路，隔离 CAS 通用重复工作与商业 App/环境延迟并实施
+有证据的通用修复。该临时任务不降低、不替代 C4-R05 的首帧、添加矩阵、回归、双用户短测或
+P0/P1 门禁；R05 在临时任务完成前保持原阻断状态。设计、变更理由、影响和迁移规则见
+`docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md`。
 
 ## 1. 任务书目标
 
@@ -421,7 +427,7 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 
 `C4-T01` 冻结清单；`C4-T02` CAS adapter；`C4-T03` 数据迁移；`C4-T04` 移除旧 runtime；
 `C4-T05` F1-F5 与业务验收；`C4-R01` 证据纠偏；`C4-R02` 添加可靠性；`C4-R03` 启动与窗口；
-`C4-R04` 验收编排；`C4-R05` RD 正式重验。
+`C4-R04` 验收编排；`C4-TEMP-01` CAS 导入/克隆/添加/启动耗时根因与修复；`C4-R05` RD 正式重验。
 
 ### C4-T01：冻结 SX 依赖、功能与运行时清单
 
@@ -514,6 +520,31 @@ NOT_APPLICABLE 决策；C1/C2 回归无退化。
 - **验收标准**：注入 `windows=[]`、draw timeout、首发 bind failure、重复 add、staging 残留时 runner 必须 FAIL；
   静态检查不得以 marker 存在代替动态结果；测试自身 failure 能保留第一次和最终状态；无未分类自动重试。
 - **任务回执**：记录 runner 单元/故障注入结果、删除的弱判据、每个 fail-closed 样本和 artifact schema。
+
+### C4-TEMP-01：CAS 导入/克隆/添加/启动耗时根因与修复
+
+- **任务目标**：深度对照 CAS、VA、NBB 的导入、克隆、添加、prepare、进程启动和首帧链路，量化
+  CAS 通用重复成本，修复可归属于 CAS 的耗时；将商业 App/SDK 或 RD 环境成本明确分类，不以猜测
+  或扩大 timeout 代替证据。
+- **执行方案**：开始前完整读取任务书、进度账本、C4 验收计划、Known Issues、工作流、提交身份规范、
+  本任务专项设计及 VA/NBB 参考实现；执行 continuation preflight 和动态 `RD测试` 解析。先记录
+  R05 Quark 首失败原始证据与直启基线，再按设计移除普通 package 的重复 revision hash、重复
+  `getPackageArchiveInfo` 和 peer-universe archive parse；isolated descriptor 校验、路径/身份/事务
+  安全边界保持不变。使用同一 clean commit 运行 package-neutral 静态/单元回归和 Quark 直启/沙箱
+  对照，不添加 package/serial/model 分支、固定 sleep 或隐藏 retry。
+- **验收标准**：
+  1. 有独立设计、VA/NBB mapping、根因分类、首次失败证据和机器可读 benchmark；
+  2. 普通 package 的 Broker-issued revision verification 可安全复用，isolated package 仍每次验证，
+     未授权输入不能伪造已验证标志；package state 是 Guest metadata 的权威来源；
+  3. 动态解析 `RD测试`，夸克直启和 CAS 沙箱各至少 3 次冷启动，均以真实可见/`FIRST_FRAME_DRAWN`
+     结束；`sandbox/direct <= 10x` 为硬门槛，`<= 3x` 为目标；首次失败立即留证且不自动重试；
+  4. 导入/克隆/添加不产生新的 staging、半发布 revision、in-flight transaction 或孤儿实例，
+     既有 C1/C2/C4 静态/单元门禁无回归；
+  5. 若设备、样本、构建或基线不可用，任务标记 `BLOCKED` 并提交阻断证据；不得把临时任务或
+     单次性能结果写成 C4-R05/C4 `DONE`。
+- **任务回执**：记录任务起止时间、基线/分支/远端、RD 快照、首次失败证据、VA/NBB 对照、根因
+  分类、修改文件、测试与 benchmark 命令结果、直启/沙箱耗时矩阵及比值、APK/commit/device hash、
+  Known Issues 变化、重试记录、偏离、遗留风险、实现/回执提交与推送验证、下一任务 `C4-R05`。
 
 ### C4-R05：MuMu RD 正式重验与 C4 关门
 
