@@ -3,9 +3,14 @@
   "root": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2",
   "artifacts": [
     {
+      "path": "artifact-index.json",
+      "bytes": 220966,
+      "sha256": "ed27680f6b8252f58b977cb87fb59792673a9f0d5938161d668a207e58400172"
+    },
+    {
       "path": "c4-r05-summary.json",
-      "bytes": 1369055,
-      "sha256": "b4a2c75d7fcc3b06db2a6e5f10afdb9d9e01eed92a100552dea31085c7243372"
+      "bytes": 37143,
+      "sha256": "1d09d6e0e03e3a8326ea939e82fb486238cabdf164c3adc6e3dbfc6ed4df50f5"
     },
     {
       "path": "commands/000-build-clean-commit.json",
@@ -95,12 +100,17 @@
     {
       "path": "environment-at-start.json",
       "bytes": 2013,
-      "sha256": "f37741f777e5f2a66458463dd8f44cbdcc8e128e3b0c4f108c737ba70f99ada7"
+      "sha256": "cd21de61c79ef134ca9bdda38fa294e7a160ebf7b4a0b44b9f487f24acd03c14"
     },
     {
       "path": "first-failure.json",
-      "bytes": 1240338,
-      "sha256": "a2928a4b64c5993a29a08ef2c9ff37a252c74fef3dbdb4882137b93ae612adc7"
+      "bytes": 30458,
+      "sha256": "20453af38fef53e6b7c97a41993dc3f3ad16cb6c32e040b4eda069d9ca9a7ef4"
+    },
+    {
+      "path": "restart-boundary-20260828.json",
+      "bytes": 1238,
+      "sha256": "57c77bd0f43a874f8325434b878e3ea42f491c43f66d897774960466c6f11250"
     },
     {
       "path": "round-1-clean-install-cold/add-gate/concurrent-add.json",
@@ -4689,8 +4699,8 @@
     },
     {
       "path": "summary.json",
-      "bytes": 1369055,
-      "sha256": "b4a2c75d7fcc3b06db2a6e5f10afdb9d9e01eed92a100552dea31085c7243372"
+      "bytes": 37143,
+      "sha256": "1d09d6e0e03e3a8326ea939e82fb486238cabdf164c3adc6e3dbfc6ed4df50f5"
     }
   ]
 }
