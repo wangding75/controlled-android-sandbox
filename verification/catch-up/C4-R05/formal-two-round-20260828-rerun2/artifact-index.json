@@ -4,13 +4,13 @@
   "artifacts": [
     {
       "path": "artifact-index.json",
-      "bytes": 220966,
-      "sha256": "ed27680f6b8252f58b977cb87fb59792673a9f0d5938161d668a207e58400172"
+      "bytes": 221281,
+      "sha256": "a03e87bbc7d32aac7605d0081b80ab7cfe954bba1a896a37c014ec20aad82c74"
     },
     {
       "path": "c4-r05-summary.json",
-      "bytes": 37143,
-      "sha256": "1d09d6e0e03e3a8326ea939e82fb486238cabdf164c3adc6e3dbfc6ed4df50f5"
+      "bytes": 1369632,
+      "sha256": "52f24fda130c0df3ae5d80ea80f92f3a3b104d9c13d116ff858cc5beeabaf38b"
     },
     {
       "path": "commands/000-build-clean-commit.json",
@@ -88,6 +88,21 @@
       "sha256": "cf0c2b16a8efad53092bef7677c8623fda6787dd5ceb0b52d6d4926a2c5abd24"
     },
     {
+      "path": "commands/005-round-1-clean-install-cold-c4-r03-launch-matrix.json",
+      "bytes": 1187864,
+      "sha256": "d7823acf1dbea8a4762ab12551a8ba345c74e786bcdbe34d5104d55c75a625d3"
+    },
+    {
+      "path": "commands/005-round-1-clean-install-cold-c4-r03-launch-matrix.stderr.txt",
+      "bytes": 1715,
+      "sha256": "b672bef53a14b563b42891ad29ba06a32d976710c82f38eb43c5ef3559e36556"
+    },
+    {
+      "path": "commands/005-round-1-clean-install-cold-c4-r03-launch-matrix.stdout.txt",
+      "bytes": 480,
+      "sha256": "384e47d4d753060144801ad83d16ea00e739c0b66b6e63d745ae7316abf80ab8"
+    },
+    {
       "path": "continuation-boundary-2.json",
       "bytes": 1449,
       "sha256": "d1e307071977e7e2f949a0a10a462d79d3b326ba365020a75da7c2497eb070fc"
@@ -100,12 +115,12 @@
     {
       "path": "environment-at-start.json",
       "bytes": 2013,
-      "sha256": "cd21de61c79ef134ca9bdda38fa294e7a160ebf7b4a0b44b9f487f24acd03c14"
+      "sha256": "0acfb58e98132fe4ac0f7a9253f7af955d0812d0a681fa0d335b4fce5b3d27d1"
     },
     {
       "path": "first-failure.json",
-      "bytes": 30458,
-      "sha256": "20453af38fef53e6b7c97a41993dc3f3ad16cb6c32e040b4eda069d9ca9a7ef4"
+      "bytes": 1240338,
+      "sha256": "4c1c8f990008bd2e5df6bc0b5026482c54f16c9156c8b3f9f96ad921ada896ea"
     },
     {
       "path": "restart-boundary-20260828.json",
@@ -4528,19 +4543,3799 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/activity-activities.txt",
+      "bytes": 22974,
+      "sha256": "6ebce85cd3e2d42c8daef19ae99cc7ee100feec1bd39b9e1b8479d0bc8d0233b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/case.json",
+      "bytes": 7405,
+      "sha256": "2933ad2ae35dd6d5f3eb7328013584406e037cbe3b56346e0039f5ff288a4471"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "cf7a7eba7cadc0fc4536ba18cfb3d08b1976723187802aabd58fe4a42efba03d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/logcat.txt",
+      "bytes": 496032,
+      "sha256": "bf4052f8d3e6df6933b54e4f8ef5f55403eb3580309bfff8e57ab0eeed2750ab"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/screenshot-first-observation.png",
+      "bytes": 276008,
+      "sha256": "85fbdb77b65a7bae993a632f1bc8e1397bcbcb0344e7d871eea91a91582eca08"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/screenshot.png",
+      "bytes": 276008,
+      "sha256": "85fbdb77b65a7bae993a632f1bc8e1397bcbcb0344e7d871eea91a91582eca08"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "084ee149a8371e9539be230fc78af3f1b0eea0ef6fc4f2b625ec2f2f349acce4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-007/window-windows.txt",
+      "bytes": 28645,
+      "sha256": "fceb72d8278d6a64389c6f5ace0bde7bfb76fdf6582f5904307a8c517baa6bed"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/activity-activities.txt",
+      "bytes": 22963,
+      "sha256": "dcf8693eac6b1fec6c77cf4f7804cdac033a964d1346c2af4c07d103e4f40a25"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/case.json",
+      "bytes": 7405,
+      "sha256": "c9a5e3c091387ec958ad467a2710ad6d2bb1a988b2754f47ce2b16966771755f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "e327962237984d83e8cd4150932b39d0077d01460c1c92272575ecc9a64ca05d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/logcat.txt",
+      "bytes": 417882,
+      "sha256": "0ec0858b422743d2520911ec37d488ad7f70da9baa0fffb01b2568afcdcb2071"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/screenshot-first-observation.png",
+      "bytes": 276409,
+      "sha256": "43687d26e9744f220b41689103a8a20db7b10bd07b70aa9d1640b4e89ba8cc1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/screenshot.png",
+      "bytes": 276409,
+      "sha256": "43687d26e9744f220b41689103a8a20db7b10bd07b70aa9d1640b4e89ba8cc1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "9fe0f0c5451f3f231a6360669c4eb5d08bb985a639194be4b75b162871300621"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-008/window-windows.txt",
+      "bytes": 28641,
+      "sha256": "cc12b9ae15a7bea09c09d6eb7fb8fb937978f5c90c11d6e8a694d284a30a5a74"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/activity-activities.txt",
+      "bytes": 22979,
+      "sha256": "bb735a9346807a1f42c97996729eaf258c741c5e8bde097b6e255c9c9b566657"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/case.json",
+      "bytes": 7419,
+      "sha256": "d605930ee2f52e22830c126973b312a9748573aca9cf3a59aa31cfadaf6d44e1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "9606a8ae16015d1da9db2d1dc959ac4c343288ff1135da666c1de81710fa4ac4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/logcat.txt",
+      "bytes": 420970,
+      "sha256": "36f92c5d4b702317261a1661f44de28f483934285110d35b3b3da114b1ba4755"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/screenshot-first-observation.png",
+      "bytes": 276001,
+      "sha256": "f710c586c9b8ca70929c7416d18a917b051859161de0240727e2716b7dc8d249"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/screenshot.png",
+      "bytes": 276001,
+      "sha256": "f710c586c9b8ca70929c7416d18a917b051859161de0240727e2716b7dc8d249"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "8717362e8aea1efe4da5948deea480572edcff4d7d15fbf901c8b34b30eac199"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-009/window-windows.txt",
+      "bytes": 28645,
+      "sha256": "ff203cf4bef41b3420b79213407aa8514ef8ea59b53c08aa9bf821680e66cf0b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/activity-activities.txt",
+      "bytes": 22978,
+      "sha256": "eaf431fb5c97e12ff9fcfdbbfcc00692062a6f76aee19e31c20cb895520a68c8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/case.json",
+      "bytes": 7427,
+      "sha256": "5eb0bc862d8e2d4876e06ba48971265285fac2016288f9371d008e016d4cf6fd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "e8cbaee56391767724d4779b4da49304bb4d9771541c25f7654f2845f3b30636"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/logcat.txt",
+      "bytes": 492469,
+      "sha256": "b408132ae3a6d45667314670d981cea116a715897ce4b8ba63e05f10d28d7b8b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/screenshot-first-observation.png",
+      "bytes": 276464,
+      "sha256": "b5c4bbef71fa0551556eeb4592ecd748d6ff757ed61649862853ca929e301fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/screenshot.png",
+      "bytes": 276464,
+      "sha256": "b5c4bbef71fa0551556eeb4592ecd748d6ff757ed61649862853ca929e301fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "2522bfde6dda2f8b1f7a071ca804f4f2ec2db464eb3240d0c23eeb231c5a27c4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-010/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "dd6df026c72cf8d3ac849b8d9d3b2d7dbdaee4472dcd39c3d8dbe68561ff7b4b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/activity-activities.txt",
+      "bytes": 22980,
+      "sha256": "ace3f51fbffb345a23906f97c8979795f5c33687d9f943bb7a5ea3df2e146c4e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/case.json",
+      "bytes": 7431,
+      "sha256": "b63e4df7f7030c5583e219c3882648c823bbac26d49e7e25c2f1eee5c0d3817a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "c5c07029486435b50eb9081231b2bd9bf434a1d1f77f6bca787fd245d915d1d2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/logcat.txt",
+      "bytes": 528897,
+      "sha256": "a640df56b167f8e6faf85da9aae47391d1c2fb0f50de4233c5de0679bd7a3605"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/screenshot-first-observation.png",
+      "bytes": 275744,
+      "sha256": "f187a8a38fc41be4f0c3196b0b71a098aa62a7059d9acd5492a9637cbf4a07ff"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/screenshot.png",
+      "bytes": 275744,
+      "sha256": "f187a8a38fc41be4f0c3196b0b71a098aa62a7059d9acd5492a9637cbf4a07ff"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "dfce0ccc4c5e9dc34c40d44b5538d94b42981a1cc3d902bffa72818404273ff5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-011/window-windows.txt",
+      "bytes": 28647,
+      "sha256": "45b7a04cdf472d8372695cca340e65f015995dd130bef1c7e859aaa9616354f7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/activity-activities.txt",
+      "bytes": 22979,
+      "sha256": "a03fa8fc8b762239ecaf43b950a18316c47999a9b181598763148746829120d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/case.json",
+      "bytes": 7431,
+      "sha256": "fe8927ada274580ccf0c6b84ae78189978e8d1de04298abc19923f32e1b2a8e3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "80a1f02694c7ebd47cd7fe5bfb1b6979c9196ff1633fa5c27f7a2a2065a6f1a1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/logcat.txt",
+      "bytes": 398276,
+      "sha256": "15f0c6f886ab0ac571a708f852428498631890f71b15ef2a4644d2e02b299f59"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/screenshot-first-observation.png",
+      "bytes": 275713,
+      "sha256": "262f887d1ddb8cd33efc12812d2a7940856dda33969d87830f5949711ee53434"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/screenshot.png",
+      "bytes": 275713,
+      "sha256": "262f887d1ddb8cd33efc12812d2a7940856dda33969d87830f5949711ee53434"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "a34b649f0ddf10a9d78bad0d56af72c4ca520f31562a913b3c70c85d9f3b69d9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-012/window-windows.txt",
+      "bytes": 28648,
+      "sha256": "9da9d1e92a6dd3d2002aeaa900229d1d7919de7777b122b09381d74d087e3347"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/activity-activities.txt",
+      "bytes": 22978,
+      "sha256": "4be4ec2ac0a82e9e1aa1f23f126bf8473473f49b634ca0c271ea3f56c87fd5a8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/case.json",
+      "bytes": 7431,
+      "sha256": "9198ac3a33bd85b6736c9275a51a3cc9a3dc47bf681b90ace2549ef24fa296bc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "579e7bad08871d3d2c39b650522db50d702a76f3afdfd18d96bdd17e2162a03d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/logcat.txt",
+      "bytes": 471509,
+      "sha256": "9cc1bc3237ac5810ed7200ba1ea6f88683e220b227a10a827a9ff2d642e04cbe"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/screenshot-first-observation.png",
+      "bytes": 275421,
+      "sha256": "45b74e2adb77020708c875b6f6c7c1464f3b38afdd74cb3fd23b68032558066f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/screenshot.png",
+      "bytes": 275421,
+      "sha256": "45b74e2adb77020708c875b6f6c7c1464f3b38afdd74cb3fd23b68032558066f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "0533fefba35a7136aac82ece51c4dffaa01114ac63291ace901206c3e4078608"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-013/window-windows.txt",
+      "bytes": 28648,
+      "sha256": "e0621d9869be49aee465439f4ce2a577e623835944684a32d6a727ca38407226"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/activity-activities.txt",
+      "bytes": 22971,
+      "sha256": "4e21a30569ed49cc105d9bbf9a0acc97c05612f35d349ec87f1cb530def427b0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/case.json",
+      "bytes": 7431,
+      "sha256": "e3b3e3db4b577ddaf665e7ef0e8d94bdc53b48deeb95b7e436010cf604bbe84f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "99bb9d4dd8b2398669792565d57ba488265a2151ad5694f426090488bda78b39"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/logcat.txt",
+      "bytes": 396633,
+      "sha256": "1da4fa19f951687f55944c58594d07df78077fbf4247fae87cd366f5676d8638"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/screenshot-first-observation.png",
+      "bytes": 275750,
+      "sha256": "35147654824b2a5e9100ad1c4b6d03f212796b76e9fc2ff87ad99efa31e0ef41"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/screenshot.png",
+      "bytes": 275750,
+      "sha256": "35147654824b2a5e9100ad1c4b6d03f212796b76e9fc2ff87ad99efa31e0ef41"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "bdcca93860d58792f8ded8bb7a9ea499fe0d78f8d85049dd7321b08e032ac66e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-014/window-windows.txt",
+      "bytes": 28651,
+      "sha256": "a11dd9a5d20b2fdf658c2ee8383630e92b0ae1984b64efb6ebd2e91a4b94cab2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/activity-activities.txt",
+      "bytes": 22975,
+      "sha256": "38d0ee775c40408656561d548f398009e3987d62a24147c9a710386c4965635e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/case.json",
+      "bytes": 7431,
+      "sha256": "f9f45879ce85c80d62e7870b95b331f7706d420e86231a54c3a0f2ccaceaa1b0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "7f764045c7b80d9c1427044e95bdb8a7f3681a4a507cc91bb71cb373e3e06364"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/logcat.txt",
+      "bytes": 401221,
+      "sha256": "b66bd6e3768d0b13e520897277b4c9ab6e9737a41176644fa7034540e8726bf9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/screenshot-first-observation.png",
+      "bytes": 275449,
+      "sha256": "5371b11ef0aaab8aba0c2b9031402e9daa477cdc059841240844fbdbb81b05a0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/screenshot.png",
+      "bytes": 275449,
+      "sha256": "5371b11ef0aaab8aba0c2b9031402e9daa477cdc059841240844fbdbb81b05a0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "0a7ab8036c70ca6409e6bff9de5b3fd0a1b2cdbed2586efc358bb5b9bfc37ca8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-015/window-windows.txt",
+      "bytes": 28653,
+      "sha256": "a344d2f60ca5cd812274855d1085cff4178090bd7507db1f138830e75d8f58c9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/activity-activities.txt",
+      "bytes": 22976,
+      "sha256": "9eeb371aff6f764ede6129457875ace61592f3f97cab185dfd520197e8f90b1d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/case.json",
+      "bytes": 7431,
+      "sha256": "6877d9982af535200de94e30a1ab668ddd87d63dd7883c40d244fd5be59ff69f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "14a06c5a35288e310c2706d6b64be82480331ced3cac8590d8d82238cf946fe3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/logcat.txt",
+      "bytes": 536767,
+      "sha256": "6865861e63b98e7a73eca51557b8178a75b9dee6b2be61a9b8f695dde96649b6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/screenshot-first-observation.png",
+      "bytes": 276086,
+      "sha256": "567e81fb2bc731f83e36e4d388dd3af28afdd2fdf2b84f779ab309577c2992ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/screenshot.png",
+      "bytes": 276086,
+      "sha256": "567e81fb2bc731f83e36e4d388dd3af28afdd2fdf2b84f779ab309577c2992ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "e9240c2f6d53518e8ad02484094be0fc71908dfe708dc1c657553336761cd103"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-016/window-windows.txt",
+      "bytes": 28653,
+      "sha256": "cee07b5d7f8773336038971805c77b84233288218d3f231e52938d28840542c5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/activity-activities.txt",
+      "bytes": 22973,
+      "sha256": "1f27f26b18d1d212e62b11e8a397087ef851bca1c1e23fce754c4d3a8f1a2411"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/case.json",
+      "bytes": 7431,
+      "sha256": "a2708c67a160cf2e4bdb07adf62b75410c1b8c3f8f155575d6da544778ba5713"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "113a7644aecc9d65e810436bfa8e0793310c6287c1b95838c3666092185252a6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/logcat.txt",
+      "bytes": 452011,
+      "sha256": "e4027b2d1bba9575fbfcfa8d63d3843f7b408f230ef410d8a81f75af6c4407cd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/screenshot-first-observation.png",
+      "bytes": 276247,
+      "sha256": "38936569db340081e5ef19cbb0a00dd76e547696c18a4dce8bfdf06f7208e59d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/screenshot.png",
+      "bytes": 276247,
+      "sha256": "38936569db340081e5ef19cbb0a00dd76e547696c18a4dce8bfdf06f7208e59d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "bc06e42064640c8fd02385f9f5a0392a0fd989f091114de389e2299e97cb432e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-017/window-windows.txt",
+      "bytes": 28655,
+      "sha256": "85ce28e1751e88d1a2bfbd59da8e9991b61b9cafc7f86e2597eadc4cf8dc6db5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/activity-activities.txt",
+      "bytes": 22976,
+      "sha256": "77403023511fb34b4f9630a8260acc68a3746627aeac17a0aa95ae5774a72597"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/case.json",
+      "bytes": 7431,
+      "sha256": "4d00f8a53fbf4b134b671582e6defff4e7f2a05a7706b354f657cc2f67514eb8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "4ed2953402c15e13b24f695ac7f888240dc3f14d431cf6fdf2af44212a86c401"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/logcat.txt",
+      "bytes": 552126,
+      "sha256": "1787d61f43c9ab949a3aba5479bccda57470a4c5f66928786995be96f870f265"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/screenshot-first-observation.png",
+      "bytes": 275533,
+      "sha256": "8615c739086bf8fe176621f3e62c5db1452a44ed6eb054f33ec1f9ecb87c82f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/screenshot.png",
+      "bytes": 275533,
+      "sha256": "8615c739086bf8fe176621f3e62c5db1452a44ed6eb054f33ec1f9ecb87c82f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "260ddeafae64a0842ddb13b91257ac928df697a4040e49000bb6234babe2e9e8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-018/window-windows.txt",
+      "bytes": 28653,
+      "sha256": "edf4b65d1aa16d4fc6b92fa84b93ce7ebb06f23e4498213c190d5baca52bb3bc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/activity-activities.txt",
+      "bytes": 22980,
+      "sha256": "057ee0ed1d161f8ca12fcafa1035c6d1076efca34731e92ee58440df9c8e4d05"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/case.json",
+      "bytes": 7431,
+      "sha256": "a78467e1040e70e80c31fa0a2b77141d40603bf2ea2abe2d72ef828a6324e7a7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "ae8f93709e270c54bd6e4e26a0ded81c2541921a06351f3ddb946315cde67fef"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/logcat.txt",
+      "bytes": 507621,
+      "sha256": "07c10486fde82a98098c86ca4b32aa09491294e72321a6b6e84c034f7c9c6928"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/screenshot-first-observation.png",
+      "bytes": 275621,
+      "sha256": "b72a54c66606f8d4e4d3877c66bd3ead9696dfa65b0e55a5ea22e801f5e9419b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/screenshot.png",
+      "bytes": 275621,
+      "sha256": "b72a54c66606f8d4e4d3877c66bd3ead9696dfa65b0e55a5ea22e801f5e9419b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "d03ec1642b9f0097d9de6e0735daa369af3832e7d292a9376ebaa2b9811acc97"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-019/window-windows.txt",
+      "bytes": 28654,
+      "sha256": "c2e5b17d129286681b3f14d7cb83d28c03c94da6d9f7528f620b3c02e64f9b23"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/activity-activities.txt",
+      "bytes": 22984,
+      "sha256": "9340d3334eaa05c5ba219bd9577e3beb4e511619c88a8a1554893890135cb4d6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/case.json",
+      "bytes": 7363,
+      "sha256": "59cf27680a04795f762915d0eb4dc028a2102a0952aa675ce40dd496d12a7793"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "eead2431a573a0674e2e7103826175c50eed2121a1c04a5eaf81f493e9df33c8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/activity-activities.txt",
+      "bytes": 22644,
+      "sha256": "f5a7a86d221a7c12105521cf28f5821196c841c3c1679abfe52021fdfc80fdf3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/activity-processes.txt",
+      "bytes": 121795,
+      "sha256": "fac2c8a9408b35e1e6c9643c08412fc05874068f291a2ef23153c61a70be3004"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/adb-devices.txt",
+      "bytes": 118,
+      "sha256": "6e92dd4be4d40bb3b28dba88f3755b60dd6547f13bcce1749e130b39422b94e0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/application-exit-info.txt",
+      "bytes": 9004,
+      "sha256": "75c485a4bd1765957918fbcf6b182e93e298327f092a9bcd583304e246febaa5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/device-getprop.txt",
+      "bytes": 21042,
+      "sha256": "33eb690ae010c2f5a1e207c45afb60312e55ef70de3c1596f1d6a14ac69767ba"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/host-files.txt",
+      "bytes": 55072,
+      "sha256": "dc54a4fc4e4f18617c9d2eaeb27729d4ecfbd6954be825a2a80a2c82fe850909"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/host-package.txt",
+      "bytes": 11966,
+      "sha256": "b6ec0587e4d6c0576aeb26ad1bfcac7169bf2ff1e64871c7e4c5a1ccc21eca55"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/logcat-critical.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/logcat.txt",
+      "bytes": 593359,
+      "sha256": "9d948432c614c733fbc837ec253b2992b48eef0dff94a10a58a92f942a16ef4d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/processes.txt",
+      "bytes": 11310,
+      "sha256": "1625846f30896d92362a1fd0adfef1a06926ee75727f80f7bfc4a13a4e68dd59"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/screenshot.png",
+      "bytes": 274556,
+      "sha256": "d261bab1874f6d70b6c45f4d565e079a3ceee82d2620f790332a9211837d92e2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/surface-dump.txt",
+      "bytes": 93577,
+      "sha256": "e25b75a18aad31ad49a313553690add9d5697c1ab9b966d424275b7384838d20"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/surface-list.txt",
+      "bytes": 2550,
+      "sha256": "b9126445dff20bdaec04104ea1f9b7034d759125f45a49f9977812b2b6e840ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/target-package.txt",
+      "bytes": 1585494,
+      "sha256": "b85a876dd7b9aa54efd7e56d93b62466347d60135b5b466ab3655ba90ca11c9c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/transactions/sandbox-catalog.json",
+      "bytes": 42827,
+      "sha256": "e99cc2e9388dcdd44bee1bbd3cc0ccb28e88a937b508f54c2e2f23a67ea2c1a9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/first-failure-full/window-windows.txt",
+      "bytes": 28335,
+      "sha256": "2b2f2a95b9a9256479bb85f1139e972e1c61673c144f7c5091b693b5d34e6ee1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/logcat.txt",
+      "bytes": 592819,
+      "sha256": "93933721859e88af385f752b96ff015de69218161dab732ca4e6fbf5e9f3f977"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/screenshot-first-observation.png",
+      "bytes": 274556,
+      "sha256": "d261bab1874f6d70b6c45f4d565e079a3ceee82d2620f790332a9211837d92e2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/screenshot.png",
+      "bytes": 274556,
+      "sha256": "d261bab1874f6d70b6c45f4d565e079a3ceee82d2620f790332a9211837d92e2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "78eb647019c8ba577e7e69d2c27231c5c7683a9c4b3643d3ba54651b3dfe14fa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/089b0c2232-package-lifecycle-transactions.json",
+      "bytes": 1942,
+      "sha256": "6bc5e15eb8fd0e32bc5fac1ad5e8cb1b3b83a90295d0cc63d1f49110ee49f98b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/1990720c9a-debug-command-result.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/4fbde4f036-runtime__virtual-uids.registry",
+      "bytes": 179,
+      "sha256": "990f87544f4ce583c2cc4e6668b5147320f560f8d645aedc6f44ab0c7330a8a6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/5feeae5d8b-runtime__activity-tasks.checkpoint",
+      "bytes": 6183,
+      "sha256": "c529fbc0c91007deee76379c3b688b0fe37770597806ca2fd2923bb6e544b440"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/dd8e4ee3cc-sandbox-catalog.json.lastgood",
+      "bytes": 42827,
+      "sha256": "e99cc2e9388dcdd44bee1bbd3cc0ccb28e88a937b508f54c2e2f23a67ea2c1a9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/tx/f645766360-package-lifecycle-transactions.json.lastgood",
+      "bytes": 1942,
+      "sha256": "6bc5e15eb8fd0e32bc5fac1ad5e8cb1b3b83a90295d0cc63d1f49110ee49f98b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/cold-020/window-windows.txt",
+      "bytes": 28654,
+      "sha256": "dd4740a85b1aab30c321d63116741ce836c6e667ab9f7bfcc400b15ceb9d39d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/activity-activities.txt",
+      "bytes": 22980,
+      "sha256": "52d77337bb64cea78365db7336dc16742f4a9b40d45061061235c05908241d79"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/case.json",
+      "bytes": 5620,
+      "sha256": "52dc04b5952e9f8343a05d9595a006a53fa37fff17fc3f0add8f528e36fe8a75"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/logcat.txt",
+      "bytes": 100657,
+      "sha256": "693c834c2865cbc3dc9287d5625c7fef257bb9e035167846049a68b4bddc079e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/screenshot-first-observation.png",
+      "bytes": 275640,
+      "sha256": "82758d316886e88a3bf20ac073c2653f3768c4e94a3f88bc4969cc8c9e0c57d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/screenshot.png",
+      "bytes": 275640,
+      "sha256": "82758d316886e88a3bf20ac073c2653f3768c4e94a3f88bc4969cc8c9e0c57d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "d6a490501d806dca60050e841de9941254eee9c4e78c4cc1b577b3b5d9f90790"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-006/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "9ad627c262116dcec8ab0a00d1f7680ede96ad09ca1b8bac42d60b55637ff67c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/activity-activities.txt",
+      "bytes": 22973,
+      "sha256": "c10846087b5fa2307d028b1bbae985e85db572eb84b2514a291c7c967006bfaa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/case.json",
+      "bytes": 5619,
+      "sha256": "21b1c34f436109d9f3e03e58d483e9fa4890b0f3d41c79a530c9b6cf7e84587d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/logcat.txt",
+      "bytes": 151494,
+      "sha256": "24f18caa2950c71e76395ae189df82df183c1bde36d1c7175b0a298fdb3bea6c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/screenshot-first-observation.png",
+      "bytes": 276008,
+      "sha256": "85fbdb77b65a7bae993a632f1bc8e1397bcbcb0344e7d871eea91a91582eca08"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/screenshot.png",
+      "bytes": 276008,
+      "sha256": "85fbdb77b65a7bae993a632f1bc8e1397bcbcb0344e7d871eea91a91582eca08"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "25e43e23fd23685eb1ed5405bd19d8f01bf7cdf60977becc32773f2494fb84ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-007/window-windows.txt",
+      "bytes": 28640,
+      "sha256": "35495ee70cda57ce90b752bb9d722b17d513d40bc325c052f10d5830b64272da"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/activity-activities.txt",
+      "bytes": 22980,
+      "sha256": "101671e720de690a2d6dc4c1da3bd7534f8a056b5db02a5f92090d0742c607e3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/case.json",
+      "bytes": 5618,
+      "sha256": "891aa825fb0ee42f5b0c22f4e6a2707f6fe723f3a38c98623c5ab1a3bf8d2d91"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/logcat.txt",
+      "bytes": 150304,
+      "sha256": "d64cf82a23fef524878196e8ccf057168b9c232988671a8bc199e5cd009f8138"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/screenshot-first-observation.png",
+      "bytes": 276409,
+      "sha256": "43687d26e9744f220b41689103a8a20db7b10bd07b70aa9d1640b4e89ba8cc1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/screenshot.png",
+      "bytes": 276409,
+      "sha256": "43687d26e9744f220b41689103a8a20db7b10bd07b70aa9d1640b4e89ba8cc1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "cdd346f6fef561039848cc0e3dec0a54c6e1143d1dd66da6e68a6cd434001931"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-008/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "4fd52384d565b3c15b6a050ee71145b16e142cdef12d6443f510ce81bcb138ed"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/activity-activities.txt",
+      "bytes": 22977,
+      "sha256": "3e887c5f516b08a631e5d0afd6ee6c2b0ccd8e018edf306097cd340ceb4bbbb7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/case.json",
+      "bytes": 5638,
+      "sha256": "0be742335f3b16eaa171d7abfa4904e102b8e089f04899d209cb446a2e99134b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/logcat.txt",
+      "bytes": 260088,
+      "sha256": "67363cdf9b52c596c028055282bf940b27a4689880039530ee6b7e7e13eac7f3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/screenshot-first-observation.png",
+      "bytes": 276563,
+      "sha256": "b39c8565693f8b4fb14a8b6763ad824c1775dbd6e7000fa916e23f0fa975567c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/screenshot.png",
+      "bytes": 276563,
+      "sha256": "b39c8565693f8b4fb14a8b6763ad824c1775dbd6e7000fa916e23f0fa975567c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "8d4858321e4b3965aeee4330289097e583adf07c209a691635cd46bbf655f72f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-009/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "aad56aaa4b71b1dff748272d947374d5f8bf6caffe865d145682cc0ba69b93d9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/activity-activities.txt",
+      "bytes": 22979,
+      "sha256": "b98f511c6bff42a851905e7ace4034d1080689f0f62202d14f926f2bb43d5d15"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/case.json",
+      "bytes": 5640,
+      "sha256": "3c3d2dc53cd6542a7f44cb82a4515bb701e87999dd9a313f5f6dbded9079121d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/logcat.txt",
+      "bytes": 150992,
+      "sha256": "96e0e6f2c174fc19fdc60e04b81e26ecb127bffc1b97d902a496f7455d4d18f1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/screenshot-first-observation.png",
+      "bytes": 276464,
+      "sha256": "b5c4bbef71fa0551556eeb4592ecd748d6ff757ed61649862853ca929e301fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/screenshot.png",
+      "bytes": 276464,
+      "sha256": "b5c4bbef71fa0551556eeb4592ecd748d6ff757ed61649862853ca929e301fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "e3a2b88e9bcaf7d0ab13928c220e1410c68f14cba34cce3b0c783608401967f9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-010/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "9b6663d948d0c4f48801e78836f34c0e0bcc6807d8cb75ee139d5eb8284f8bcd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/activity-activities.txt",
+      "bytes": 22978,
+      "sha256": "01ed72c0466b674999c89202ee44fdf94a5fcc3b1e36e8bde697f6c1f2d9825d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/case.json",
+      "bytes": 5640,
+      "sha256": "bf04dd9da9a81d4a95b83f2ad7caadcdc3c7687bf7a6b3636887a81ff2699045"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/logcat.txt",
+      "bytes": 156345,
+      "sha256": "f1c4dbcc5580a89067e8fc95133aed9533d836d896bde326294a7e81ead89389"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/screenshot-first-observation.png",
+      "bytes": 274912,
+      "sha256": "7d17a47333fa94976e95f77d78dafc984970f4753f941514a8c32ca1ccc1fe79"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/screenshot.png",
+      "bytes": 274912,
+      "sha256": "7d17a47333fa94976e95f77d78dafc984970f4753f941514a8c32ca1ccc1fe79"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "092301262760a0c78da6ec1c26c1a4b17a1e9e8eb118b881682c6a9ccc6aaded"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-011/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "ba9c90bcf01ca6116ed257e14302bbdd654d813537d6b8a86890246161cbb87f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/activity-activities.txt",
+      "bytes": 22981,
+      "sha256": "f65fb116e2e957c8039b082a699e555136b64635840b3192b83acdd775d6f04b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/case.json",
+      "bytes": 5640,
+      "sha256": "03db91e474e9140e5ce9b4461a4e45a1658be3d070eb94bb16108b4d2841ed74"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/logcat.txt",
+      "bytes": 152276,
+      "sha256": "c4a8ac10bc75268848f9e26f761c14631abe615f286cb5a1141a75caae3746e8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/screenshot-first-observation.png",
+      "bytes": 275038,
+      "sha256": "f009d5ebf59a516e6e9b96beb7f059c6562496464003027bbb6702d5cd8a51ff"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/screenshot.png",
+      "bytes": 275038,
+      "sha256": "f009d5ebf59a516e6e9b96beb7f059c6562496464003027bbb6702d5cd8a51ff"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "688b3afbc7687a8b43f12695337adc1b2a7fc98c7ec96659f12bd679c1df9a7d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-012/window-windows.txt",
+      "bytes": 28648,
+      "sha256": "9beb214a0fa461f905d286ba70f9d2f060eb60bec25c43a8896ee108a24e2e61"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/activity-activities.txt",
+      "bytes": 22977,
+      "sha256": "7c78becb055a5466b6b5c333ce0110ad249e403c548ff5a5d212e20bb388bded"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/case.json",
+      "bytes": 5642,
+      "sha256": "6d0acf28d5eeca0063cc99391e7177f1b0f655507f8975a70683cc186554d439"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/logcat.txt",
+      "bytes": 154325,
+      "sha256": "9e077f126f50d179e0dc3d1a5d4c0ee0039fe3e7b3cc4d88fc0031c0134eec2c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/screenshot-first-observation.png",
+      "bytes": 275421,
+      "sha256": "45b74e2adb77020708c875b6f6c7c1464f3b38afdd74cb3fd23b68032558066f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/screenshot.png",
+      "bytes": 275421,
+      "sha256": "45b74e2adb77020708c875b6f6c7c1464f3b38afdd74cb3fd23b68032558066f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "bb5033ae180c9081ed82635139817fe947129589c3ed091163e2fa9fa9ed4b4d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-013/window-windows.txt",
+      "bytes": 28644,
+      "sha256": "8393a1ec2a0e9bbb0bbf74346b506a0f54f89c78a8a536fdf9d316c643ada0fa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/activity-activities.txt",
+      "bytes": 22967,
+      "sha256": "8cdac47d754ddbf29b350e2779fa1a5d6400f449fcfc248e98f441342db981d9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/case.json",
+      "bytes": 5640,
+      "sha256": "a3d736d73537959724d49fec6e350d5144f172bc57e924865d4d724a7a9ef06b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/logcat.txt",
+      "bytes": 157076,
+      "sha256": "f9129590f2cfd5697398ee6c7d4deff6262a4d09ab3503f9d57f7106cb7bdfe6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/screenshot-first-observation.png",
+      "bytes": 275892,
+      "sha256": "1a1496ae08ccf0bf518f23e6974e1ce4091d8acf7ffa9b53082f5fe183c4c45e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/screenshot.png",
+      "bytes": 275892,
+      "sha256": "1a1496ae08ccf0bf518f23e6974e1ce4091d8acf7ffa9b53082f5fe183c4c45e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/surface-list.txt",
+      "bytes": 2632,
+      "sha256": "84891db499ef6c1322347a7bbd12d22779059eae80ea9e1aea534e6ff9c6005c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-014/window-windows.txt",
+      "bytes": 28648,
+      "sha256": "b3a185368b36833af21122e9e9ffcacbbb4b5998175b527e6a5f2e81a797e136"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/activity-activities.txt",
+      "bytes": 22983,
+      "sha256": "b12dcd5c91b62cba1a4af2361dbe09eb776c006c145ed3c6e2078e8e278a0c2b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/case.json",
+      "bytes": 5640,
+      "sha256": "644a91b6593892c6b11d66680a4ed9ef2fdd0a645f0a40dc8c3f8865887cc9fc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/logcat.txt",
+      "bytes": 154179,
+      "sha256": "5e2433700b8470dfc3442ab719fb8a7b4709ee9eff8dcb01d08e679636c26a88"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/screenshot-first-observation.png",
+      "bytes": 275449,
+      "sha256": "5371b11ef0aaab8aba0c2b9031402e9daa477cdc059841240844fbdbb81b05a0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/screenshot.png",
+      "bytes": 275449,
+      "sha256": "5371b11ef0aaab8aba0c2b9031402e9daa477cdc059841240844fbdbb81b05a0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "ed199679415cc91759b45a99a754f5fad422269205b511ae2a9d1288687d23ca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-015/window-windows.txt",
+      "bytes": 28655,
+      "sha256": "5537446f5376ce35318a209ccb0738d4d692ab254eb1bfff4d0b109eb139c833"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/activity-activities.txt",
+      "bytes": 22983,
+      "sha256": "6576a5c0e9e3ae09667da86241bf5ff84b39741c19b01752b18bcbd7860fbfc3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/case.json",
+      "bytes": 5640,
+      "sha256": "1ffeba22b8171cfa799d66a347c86caf3728db26600329f233b4707821979260"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/logcat.txt",
+      "bytes": 157333,
+      "sha256": "95d296a1d4315e20e77c210e7dbe76e480b2fb9fceacf5f1de90f009adf7db61"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/screenshot-first-observation.png",
+      "bytes": 275918,
+      "sha256": "e2b5d56a5720ec80ed3853d284f5148d3460db7d3a3b520109eb6952c5a2b38e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/screenshot.png",
+      "bytes": 275918,
+      "sha256": "e2b5d56a5720ec80ed3853d284f5148d3460db7d3a3b520109eb6952c5a2b38e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "519ab84118a95850737fdffabed06df12c5c0870973662d2889186fdcdbb39b6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-016/window-windows.txt",
+      "bytes": 28655,
+      "sha256": "4d640d894c26699aa470779a4ca743d036189387a8c3e48fce37e952704cbcc7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/activity-activities.txt",
+      "bytes": 22974,
+      "sha256": "f38c936221364212513c53dac55a0065a80c4a5ddaa4029c6c06829739abb10a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/case.json",
+      "bytes": 5640,
+      "sha256": "7d41a61826fed5b42c1d42ad3e7fd02ceff241feb1b4540f595c1cc45d1cd49e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/logcat.txt",
+      "bytes": 156587,
+      "sha256": "46fbf7241ed2c96536071e7572a9baa69baacebe61ec6b969949fb3c01705df7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/screenshot-first-observation.png",
+      "bytes": 275689,
+      "sha256": "704d22ef03d4d5eeb755f4f6d1f7ec063149f9c254367e3510e3fa35ee79bf53"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/screenshot.png",
+      "bytes": 275689,
+      "sha256": "704d22ef03d4d5eeb755f4f6d1f7ec063149f9c254367e3510e3fa35ee79bf53"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "36b82188c9fba2c7b992ddd6d0fa05c6fec967a2f3cb00fab27c86580b9d8913"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-017/window-windows.txt",
+      "bytes": 28654,
+      "sha256": "ce517bf78b4dc1971731dd7c3e172029fbcac230b094ff5b9cb86af55973d658"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/activity-activities.txt",
+      "bytes": 22982,
+      "sha256": "ad255e3aa018bb743d70967d7e3dec768e93e33c5fa595a14b18eb25d84c7b11"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/case.json",
+      "bytes": 5640,
+      "sha256": "612055b91bcbf2a14df42bdd6624326205c4e0c6535fde8c7bb448ac6e67c7a5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/logcat.txt",
+      "bytes": 227006,
+      "sha256": "3cd57c0db8e4c3c2c30a66a842ffbfe884391c47fb1f7a16c910aa1922acbf40"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/screenshot-first-observation.png",
+      "bytes": 275533,
+      "sha256": "8615c739086bf8fe176621f3e62c5db1452a44ed6eb054f33ec1f9ecb87c82f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/screenshot.png",
+      "bytes": 275533,
+      "sha256": "8615c739086bf8fe176621f3e62c5db1452a44ed6eb054f33ec1f9ecb87c82f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "02b90922531c0dbeb464b1a095c0bd31d3060e4932b0c4b5032a8cc90ce1bcc6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-018/window-windows.txt",
+      "bytes": 28655,
+      "sha256": "39b85ac5863aa44abb27771f0f1d106db26185da0c0375f1173def47405cfc29"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/activity-activities.txt",
+      "bytes": 22982,
+      "sha256": "853b6c7d70400f16e1c1390f03ba79a9cc6248637046d5a2ae4a589e2400b78a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/case.json",
+      "bytes": 5641,
+      "sha256": "b7b1d7611c01744171492ba9aa87a4ec5727d0edc988d65d36862b9c68fd4f08"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/logcat.txt",
+      "bytes": 159691,
+      "sha256": "e6a1242e42c79dd3dba5f9897c7b39fb0f2aaba3762f4bc3992908807f537e0c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/screenshot-first-observation.png",
+      "bytes": 276003,
+      "sha256": "8e15f2e6efbf8b109ee6045284355f47ccd6320741fdfd2649c00942c89377e7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/screenshot.png",
+      "bytes": 276003,
+      "sha256": "8e15f2e6efbf8b109ee6045284355f47ccd6320741fdfd2649c00942c89377e7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/surface-list.txt",
+      "bytes": 2633,
+      "sha256": "110f136ae7b6ee0c8eca2bdd7149e1f29ae9d0bb8ee1bd9ff33a5535e25097cd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/attempts/dingtalk/user-0/hot-019/window-windows.txt",
+      "bytes": 28655,
+      "sha256": "d45abda8d27ac1a541d9173a6d76c1fa0f3a06837514e5ff6a54b6f97b3d33ba"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/c4-r03-summary.json",
+      "bytes": 202976,
+      "sha256": "b0d471c36f1df304cccc0db244d9863267400848758aaa20ad054190a27aa8fb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/commercial-sample-discovery.json",
+      "bytes": 2078,
+      "sha256": "d313da84f8df0ade1397c46a5a426f962f288d7d0eae53daa9bea7e7e9dc3be4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/dingtalk-discovery.json",
+      "bytes": 581,
+      "sha256": "5b9dbd8212072877fe86fbbb557ecd176ee3c09f70e79e8d85f69116156285ca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/environment.json",
+      "bytes": 2067,
+      "sha256": "503cc27235f0b90f371f2bc4886081ec9306d533bbf7398065eb4d57bb44452b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/install.json",
+      "bytes": 277,
+      "sha256": "db0b7d52f08ff6d0fa36b3d46cd812451cc4ad6c7cf3cbd14b6549f3cc0cdf8b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/resume.json",
+      "bytes": 536,
+      "sha256": "34d924f228dff1d9e03de58440dadaeb56818bc5d87953a06e699a35d36f0d99"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/setup/dingtalk/user-0-logcat-boundary.json",
+      "bytes": 95,
+      "sha256": "f4610af92da32ded963fb728c58421e58c4bd38c7f1c83aeecd6c6147c6412fc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/setup/dingtalk/user-0.json",
+      "bytes": 1012,
+      "sha256": "c7ef946dca68b4be582eb152838adf960945f639e1447701e37dd949bfdd1956"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/targets.json",
+      "bytes": 3159,
+      "sha256": "42c59d3f9cf28ae9ba07e9a563bebfa8fab54b0ac7daa44a9005fa3cea1dd127"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/wrapper-record.json",
+      "bytes": 208947,
+      "sha256": "c38be767e6a6378a4b50e0c50f275e39382066140e8a578e338678b0403d79e9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/wrapper-stderr.txt",
+      "bytes": 242,
+      "sha256": "4a519f12ccfadf7e306d8ca86ab210aef8a11e15672dd0c78df2b3cc79648ed6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-004/wrapper-stdout.txt",
+      "bytes": 364,
+      "sha256": "62ed6d22287bb707907459aca5cc518e03b7eabe4792af7aa78e080da83e5e90"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/activity-activities.txt",
+      "bytes": 22860,
+      "sha256": "e48a4c3762202e802f12db01b982cdc8639af02375f5f9449149f6bd868fa483"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/case.json",
+      "bytes": 7409,
+      "sha256": "745d8a8fae731fae5e724218efbc2a79276c9ff8c1909d9e4cf3644fb3e3675e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "b4c32a24d9d3c434c7c0cb63e1c3cec95c4e615199b66c69ba72205e7495b05a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/logcat.txt",
+      "bytes": 306346,
+      "sha256": "11c03385c58c4eed19b283b5453ebaffedba85805c9da05a60afe50518851bf9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/screenshot-first-observation.png",
+      "bytes": 276466,
+      "sha256": "3ce89264f822f90919308ad2ba1ae97a1507ecd5b139cb384b9092cfe1305fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/screenshot.png",
+      "bytes": 276466,
+      "sha256": "3ce89264f822f90919308ad2ba1ae97a1507ecd5b139cb384b9092cfe1305fbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "ddd22dcbeef5aa7af4565329afbfd9242d7dbb85eb68e09e7d68360236da0efd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-020/window-windows.txt",
+      "bytes": 28587,
+      "sha256": "87bb55bc0a829d2f026191940f9f44e19fecdb2c2784a7b7960acf77796ac07a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/activity-activities.txt",
+      "bytes": 22863,
+      "sha256": "7aea522539c5176de7a0c9ba99aedfb491b77fb5ae02d33f76d5c5914da297c3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/case.json",
+      "bytes": 7409,
+      "sha256": "cf60b2a517d4e421fe31eecb33c6d8b39f5dd23417afb0d832ac56b4fdc24540"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "f659deae739aac8b9f7b58a192037fb4f0901104c094480490a15c7004f17980"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/logcat.txt",
+      "bytes": 319890,
+      "sha256": "2ef295ec4c0606516381568856d0c4b0a82c52f206351e50991723e3bd532612"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/screenshot-first-observation.png",
+      "bytes": 275477,
+      "sha256": "ea1f241d24d723f2125afd269cb70aa7082f1c09e117183e9de3d75a37505c73"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/screenshot.png",
+      "bytes": 275477,
+      "sha256": "ea1f241d24d723f2125afd269cb70aa7082f1c09e117183e9de3d75a37505c73"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "623d0a20b1f555025bd44d8c63a46ded0d4d27c72853a6b1ceca34dd16f6eb11"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-021/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "df356b3d843ca918ab9bdc5cb9edd39ddbb1f0e10afcadbf5486cd89406c49f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/activity-activities.txt",
+      "bytes": 22867,
+      "sha256": "370b38ee0c90e95cb2c6cd3ca955a463c5b046339656ecbdff9d3801681cd599"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/case.json",
+      "bytes": 7409,
+      "sha256": "7f50b2fdda10c0c528f7851d144d01e08f7b5c0eeb19833490e192a723e39459"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "1408061da6ea16dec8af715c6bdfcebbd4e033010fcb1bbfda337b9d8ae48ec7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/logcat.txt",
+      "bytes": 320857,
+      "sha256": "877fa3d70d817281652a8296731321962ae4a1803fa00c05d7dfb60218bbe273"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/screenshot-first-observation.png",
+      "bytes": 275430,
+      "sha256": "46ba4e1ab69b39d84db32ea453986e7b12c97dcfbab1dba1393f8b7e3b98adbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/screenshot.png",
+      "bytes": 275430,
+      "sha256": "46ba4e1ab69b39d84db32ea453986e7b12c97dcfbab1dba1393f8b7e3b98adbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "7b2344c3caa0a4c6de884b8865d833ce5876c8cd7bd445f417ca8b2f243844bf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-022/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "89c515628ed11c6f2c35c81be12bdcdb5fe3d1beb26d04079c80c6b7e8a14954"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/activity-activities.txt",
+      "bytes": 22860,
+      "sha256": "ac806296f3d635b80db640e1d424265c3f99f21e759cc7466e31b3b653f7633e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/case.json",
+      "bytes": 7409,
+      "sha256": "4a743627ee1d6e7666c0895c3ac607d7b3bb6d2e54b29c0833d512b186a96db7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "82bfcd7366a2bab8d0e5a857ff7c3469bab64eaca91a4e36d80a2ec7d5c2a64a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/logcat.txt",
+      "bytes": 345116,
+      "sha256": "e8d7538aecb9be5a2a63c271a6221d11882fee40a388871059dc3d400cb6592f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/screenshot-first-observation.png",
+      "bytes": 398118,
+      "sha256": "85e537946c7f6d06efa45165a292cea055853228b0fd4ce5c074d99f365a4378"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/screenshot.png",
+      "bytes": 398118,
+      "sha256": "85e537946c7f6d06efa45165a292cea055853228b0fd4ce5c074d99f365a4378"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "462d039a113fa981d16d2d0614f49f94ba73f0d2f03a2230dfa71e10b64a4df9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-023/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "a9bba255639e71660dfe21100bdca52a44bcdb129c5e50f121272e46de65e90f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "45542fd72369f368e8d68135af7587f45b4e3a8418bdbda32b2e6bb88c645651"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/case.json",
+      "bytes": 7409,
+      "sha256": "6db760ccf495ecf62d9ff4b9fba7ffb457f704a8644beac4112d8a7ac3cedbcb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "97fe9d1e91345612aae7a69af438c2cfb25e9b3d9d6a4d30d312afbb4c62f2ca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/logcat.txt",
+      "bytes": 318106,
+      "sha256": "eefb1eb30150c51f8ee335524c3074ef1dc22e1fdd64f458e0a719f745dcef22"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/screenshot-first-observation.png",
+      "bytes": 275466,
+      "sha256": "8dade9f8d46d5a56b235ec4a2eaf575a47a27f3ce6adbc2ee56a08db3a6b07e9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/screenshot.png",
+      "bytes": 275466,
+      "sha256": "8dade9f8d46d5a56b235ec4a2eaf575a47a27f3ce6adbc2ee56a08db3a6b07e9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "7dc03d1c7436d350b04d56c18d41fd97db3e15adb97584c4b0bc5283ae563c4f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-024/window-windows.txt",
+      "bytes": 28604,
+      "sha256": "91d0292b68763bc0367d758b734db6f5b63dcf84b14af3801e3550fe3ea9d94e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/activity-activities.txt",
+      "bytes": 22866,
+      "sha256": "110d5e49ad910ebb8e3506eb75a00da53d5852d0c9e6d0ac813b81a55af1603c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/case.json",
+      "bytes": 7409,
+      "sha256": "a026e88ceacb8861018870686df828b4079ccf1a845faafab38450d13a4e3c27"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "5767d9c3b9c1b2a0d908b75d9319ae002b06da69c1856a04b26eb952a9b418bb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/logcat.txt",
+      "bytes": 330111,
+      "sha256": "97338262238e9c58f6c56dc91a810e872af5f222964f0bd755f5dd8775967eab"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/screenshot-first-observation.png",
+      "bytes": 275268,
+      "sha256": "0f6310da926ce447d818dade94d15e355e5b213b2d0b2cb2d818f52893580028"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/screenshot.png",
+      "bytes": 275268,
+      "sha256": "0f6310da926ce447d818dade94d15e355e5b213b2d0b2cb2d818f52893580028"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "285b8dd756b5e653fce79f1a3a11f698ce4626782ae238a03d90124968768e9b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/cold-025/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "08a1bb46292b3e19b716bd68e5d32e68b7adeafcf2ba8a8cda683cbce11184ba"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/activity-activities.txt",
+      "bytes": 22868,
+      "sha256": "e32b41276db2f1842770b215ee72146cb50395531923051f01275f19c1101b1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/case.json",
+      "bytes": 5624,
+      "sha256": "183a290b7af3989511e832f986851fa63c8a012135fa384fa5b36f567c6dcfc6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/logcat.txt",
+      "bytes": 144878,
+      "sha256": "3a87d52a54a51626692a77ceb03c09f251c2d793f8f89f324c4bee6433a6b2de"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/screenshot-first-observation.png",
+      "bytes": 276329,
+      "sha256": "83cfecf1153a46f816ee8ef5d2585d8f7013e0412d6d5b374a28fa6da9b1c29f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/screenshot.png",
+      "bytes": 276329,
+      "sha256": "83cfecf1153a46f816ee8ef5d2585d8f7013e0412d6d5b374a28fa6da9b1c29f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "740c3a2c9aebf45400b2572067f93b51f7b91eef47c177b292e9a3167c0d07ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-020/window-windows.txt",
+      "bytes": 28589,
+      "sha256": "c60c78c08ee0619562ee78e51edf06a108b3701d4f97787a6ff7c02a55a4c63b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/activity-activities.txt",
+      "bytes": 22865,
+      "sha256": "295f2379926a7d1f0005d3bd5b257ca0237ea166ba3fd8ad8796bf7f5d8fe602"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/case.json",
+      "bytes": 5624,
+      "sha256": "215ffc07e9ada019accc577bd7384832f963e0ede1c689bfda76e782e607b47e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/logcat.txt",
+      "bytes": 144247,
+      "sha256": "57a75737491484b45aa7cdec6cf26e79499b37e3bd97e7fb8572c3c362d8f3dc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/screenshot-first-observation.png",
+      "bytes": 275477,
+      "sha256": "ea1f241d24d723f2125afd269cb70aa7082f1c09e117183e9de3d75a37505c73"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/screenshot.png",
+      "bytes": 275477,
+      "sha256": "ea1f241d24d723f2125afd269cb70aa7082f1c09e117183e9de3d75a37505c73"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "6b6272f01183e8c02f1e8da6bc96f0450ee83ace27c969686e4cf82357519a6b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-021/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "e885f754d0f74e5b973da45640fc76f7c819d4f546d76dfdc3aff666298e54e3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "1a0cb4e58be57dedeb24f4a87a32d7211c40ba6f5ae3aaabc0ec41400832a06f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/case.json",
+      "bytes": 5622,
+      "sha256": "5f38b20bb96acb8b7132f32ef1300882481a6e9eb76001398bd1575711ff6c4d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/logcat.txt",
+      "bytes": 154175,
+      "sha256": "65b5903637f73858db7fe5b0b1d52d8f305ae2980443af56d1feae175906fc37"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/screenshot-first-observation.png",
+      "bytes": 275430,
+      "sha256": "46ba4e1ab69b39d84db32ea453986e7b12c97dcfbab1dba1393f8b7e3b98adbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/screenshot.png",
+      "bytes": 275430,
+      "sha256": "46ba4e1ab69b39d84db32ea453986e7b12c97dcfbab1dba1393f8b7e3b98adbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "d6e1f619be69db3b9ad9e7606adc0970affa1f844daf13ff3996dc3c733806b0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-022/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "227692756411e025493ff5844b8fdd065ecc48025958bb6c002808619ce87dc5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "673f3b8133613437bb450e630073104c6a71df51bc724a49ab4a9e002edb96eb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/case.json",
+      "bytes": 5622,
+      "sha256": "30e579151c7de3b58a0979c009498daf926f372144250c81ced514969c7f80fa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/logcat.txt",
+      "bytes": 153636,
+      "sha256": "909d7f47a5d3dbfe6ebba45fbe46e860c0d231ea09acb053e51cf45fad5ea967"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/screenshot-first-observation.png",
+      "bytes": 275145,
+      "sha256": "f36d9baad34a406e583c3375dd4cca995b27d4405298156bc4a67e0356bf5871"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/screenshot.png",
+      "bytes": 275145,
+      "sha256": "f36d9baad34a406e583c3375dd4cca995b27d4405298156bc4a67e0356bf5871"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "5110475b5c5f61fb1431888544c803bc6102beda3a3a97eac82d43c9fd4a8925"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-023/window-windows.txt",
+      "bytes": 28605,
+      "sha256": "7b2217f8726b9b405d20d74ba45ad17a069828a4d1f097acf14d2b6d6e302d05"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "132523fee314e4e014b51d9e2fdd5e7464c058a2b707dfeac220e4839e0f6650"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/case.json",
+      "bytes": 5624,
+      "sha256": "771df2169ea42d86f33dfba791f5c99b2f6b80c77d4ac7c8152abad935917b1d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/logcat.txt",
+      "bytes": 143468,
+      "sha256": "d188424491c1344fbecbc2b14d1aec0ffdaa58150b3c604b1095ed968eb4412a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/screenshot-first-observation.png",
+      "bytes": 275614,
+      "sha256": "623191164542cc4bee97d5b88c54cc7a17059ed200cda25c1bab845d28eb62d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/screenshot.png",
+      "bytes": 275614,
+      "sha256": "623191164542cc4bee97d5b88c54cc7a17059ed200cda25c1bab845d28eb62d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e84b1114ffe15e96b0cf69b40fafc1fd811ec3acddb01a57c8a74a6cbfce84c4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-024/window-windows.txt",
+      "bytes": 28606,
+      "sha256": "6a5e645552d04b4ffe31fb9d28fcea1735135c7679d89837932c85ca4005f93f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/activity-activities.txt",
+      "bytes": 22864,
+      "sha256": "09c40ed65cc41c719f97bb8032902b1e35cedf201c0536b540401553107a4fc2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/case.json",
+      "bytes": 5622,
+      "sha256": "284777f55646a2f63e198802f711d934fa467c65d788649f06115359dca3d63c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/logcat.txt",
+      "bytes": 137755,
+      "sha256": "917eff3ad0d1a3473c25da6b3f8190f6583157b4f6ea43f75c93eea8f93d8b8e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/screenshot-first-observation.png",
+      "bytes": 275893,
+      "sha256": "39125514df8984277b424d5b782f5fe8e72256fd322b31c8546de15d0eaecf11"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/screenshot.png",
+      "bytes": 275893,
+      "sha256": "39125514df8984277b424d5b782f5fe8e72256fd322b31c8546de15d0eaecf11"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e48e4308df00dda9390d3de1941b7aadf6c794b38151c3d026cf004231d11ad6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-0/hot-025/window-windows.txt",
+      "bytes": 28608,
+      "sha256": "2e235440977f1aaf673c3b6098c217c38e55741c20eb2ebdf7c2f8dcb25c7d6d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/activity-activities.txt",
+      "bytes": 22866,
+      "sha256": "eebc768b467c41082b1fe56f61d411dfcb331eac7ce348abcefebba3ae82c251"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/case.json",
+      "bytes": 7397,
+      "sha256": "906f2701ce8fdec07ae2f44740109961ab6c5b4b36881160e8c2a2602cee0194"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "f9d58a809d5bc3da5ac3bc63ac119248d3abd0fb5ff414175486115a1f79da02"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/logcat.txt",
+      "bytes": 292983,
+      "sha256": "58b64fe35b840f12de5e37856c323da187c992f64ece868fc246b9f258932013"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/screenshot-first-observation.png",
+      "bytes": 405541,
+      "sha256": "dc045d5b2ce24d4123a40028ceee37d4ed090fb7905d5bedf00f7d6adbadd884"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/screenshot.png",
+      "bytes": 405541,
+      "sha256": "dc045d5b2ce24d4123a40028ceee37d4ed090fb7905d5bedf00f7d6adbadd884"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "f0eb225728f5ed0e18db27729789ccafec2266ec04fb0e6c7e65da59f12ca486"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-001/window-windows.txt",
+      "bytes": 28608,
+      "sha256": "2a851b721b31e264f9bb22eb35e694bfe4a7658fef2112f66f58e26ba1d15b32"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/activity-activities.txt",
+      "bytes": 22868,
+      "sha256": "18e5b136d9d705db7d33a8caacc090ff3347ceebaaa719033d4c842716848912"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/case.json",
+      "bytes": 7411,
+      "sha256": "b9cfc66f3395fc3e40450167b53041beba8b8585dc7182d8f561482b86ee9fdf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "c06cf0f6de9a3e69d913d2a9491408a0fa51f878319f9b96f4eb51a218fd6f83"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/logcat.txt",
+      "bytes": 304608,
+      "sha256": "dff9af62fa5917e5b2d57cde9f8249e50135fa231eb368727ddee8a8799d1fe2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/screenshot-first-observation.png",
+      "bytes": 275366,
+      "sha256": "645256a7609a8c621a81a54e7e66044d1f6454f4bf960a54cdea69f47d3b7bd1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/screenshot.png",
+      "bytes": 275366,
+      "sha256": "645256a7609a8c621a81a54e7e66044d1f6454f4bf960a54cdea69f47d3b7bd1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e83bf9a01e67437ad01e173732dc50aaabfe9f6e4517e8c4397602a5d99bd52e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-002/window-windows.txt",
+      "bytes": 28610,
+      "sha256": "09b048a584cdf19f48bc404f55edf83dbe83cc0a10521368ab952b048a4d7e60"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "d30869dab46d45e4df6810443168a21f02b57cf8299ff06c855a51b033095277"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/case.json",
+      "bytes": 7411,
+      "sha256": "0d2534feb03be0316e0d36d340e2d8ede64f616f936a2a5d1ec3423f77011bb8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "f84a5547997c785dfd3d394d63a6142be6bfdb62e91dd33e98ee7284fb366261"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/logcat.txt",
+      "bytes": 313485,
+      "sha256": "06619e21f8b7a7c049c395461944eeada269caaf6989d8c3d20abfd33877ac9e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/screenshot-first-observation.png",
+      "bytes": 275949,
+      "sha256": "7cfa733732d62458a5d44c04241c0597ac9799182df7f81ec8007ef3e7f3fb82"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/screenshot.png",
+      "bytes": 275949,
+      "sha256": "7cfa733732d62458a5d44c04241c0597ac9799182df7f81ec8007ef3e7f3fb82"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "d6b181162e7c551aa32c9dfaa2f943c86acf9a7f106bf179ee8e24f73950279f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-003/window-windows.txt",
+      "bytes": 28612,
+      "sha256": "cb19ce1bbcad9b45ee68d0696e966d90d8f9f9f4a2c3aaba3f5c18e1ac959f1e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/activity-activities.txt",
+      "bytes": 22863,
+      "sha256": "85a7c991dfa810f4305226630c46aa042e44ed813fbeae2e4b403a2417a53055"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/case.json",
+      "bytes": 7431,
+      "sha256": "d1a1f79fb6bd0d592f1b0739369b480061402a24df733fbd2390b3158641cd2f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "4118fb9f576e0e63adb606f19ccc539bc181ffc2a462fd0520069b7b3a5632e2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/logcat.txt",
+      "bytes": 307866,
+      "sha256": "10dfc2cbed15edaffc264843a0736e26a7ee9811320d6484d51995baaa50681f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/screenshot-first-observation.png",
+      "bytes": 275234,
+      "sha256": "2bd5ea0654da4cd3c19245f9f93098ade79300aedc677c3f2ffdef100f6404ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/screenshot.png",
+      "bytes": 275234,
+      "sha256": "2bd5ea0654da4cd3c19245f9f93098ade79300aedc677c3f2ffdef100f6404ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "ab29bac174ecd0d9f48e6d26ec36cb2855abbfa0fd3a6add28f032e5ef3333a6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-004/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "b962c0277773c105d8e23ad674e566216862d09d25afbee8e12bf9e164846501"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "6b2edc5f4732692eba29cfbb92bce94c1514ae75b0d181dc0e967b96d3d577cb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/case.json",
+      "bytes": 7431,
+      "sha256": "d4b1bcf687616d71a20cd1b77b59360bf376ffb29a96af0e87fd40fab4e055f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "8ee267a6b9398e75e6e539923c08a68bd10a2447fbd38431db9fdec1e8c7ad97"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/logcat.txt",
+      "bytes": 306227,
+      "sha256": "c35dc17edc5754cfd7bc0c4ed9f7f416814612d9e28afb27b8a969ca481f6b12"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/screenshot-first-observation.png",
+      "bytes": 276045,
+      "sha256": "f90e9538d24ceeb57be8951d3e83dd060e5310d8de02dafea0960e22bf72db0e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/screenshot.png",
+      "bytes": 276045,
+      "sha256": "f90e9538d24ceeb57be8951d3e83dd060e5310d8de02dafea0960e22bf72db0e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "990a04c9cc6f75d6c78d8020a5a77b79a474bd0d1009e27c0440e79934af9eab"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-005/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "20bd37de06641d2c920901df6548521424fd29165436163d30c6b86d5dfd8ff5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "d21a370f3a1573fc14771b968bdd1c9178e1d25f7f48b76322ada9cbf4b6cbdd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/case.json",
+      "bytes": 7431,
+      "sha256": "9579ecca5a3f183650d66444bf42e5df891937ff36402deb91c09e87c2b889a6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "c641ce1947f363439a1dfe34fdf52b0eafacfda913bccc17b5c8e9ea15580b24"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/logcat.txt",
+      "bytes": 305802,
+      "sha256": "5cc059421f7e2b91d5ad9a9157a38c167fd4e8000b1cc7c933b25c5d2308da29"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/screenshot-first-observation.png",
+      "bytes": 275724,
+      "sha256": "d8e758f89aeffe96af78e6eb1fe9d98d70166d57b3a02c6907d2cadd8c467999"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/screenshot.png",
+      "bytes": 275724,
+      "sha256": "d8e758f89aeffe96af78e6eb1fe9d98d70166d57b3a02c6907d2cadd8c467999"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "fabe62b9f3fa5062d2fbb396b01cbda2e327239d9925e0c780b1cf40f8115463"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-006/window-windows.txt",
+      "bytes": 28609,
+      "sha256": "3ce4ce036539e5feb2275c8cef1c9cf079e9927cf0076dc54201b1475a36bf90"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "c700dde910f6872e095804090a3fe2af664be9ef49c6e557c8107b72bf5cc2ec"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/case.json",
+      "bytes": 7431,
+      "sha256": "4c5bb5d07b60cc72e775b63b3d457ea9dfdf3e6e698d40580e5d31f25701f90f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "f9b3b3da6bd6751754c099aaf2db73071dfc02420fe6915b45795ac248d112f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/logcat.txt",
+      "bytes": 309688,
+      "sha256": "33440a154bb789109ba68aaf64418ce9806fcb3394f18bcfc046ca29a6a2130a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/screenshot-first-observation.png",
+      "bytes": 276346,
+      "sha256": "013dadd1b04993bfcdd2df530839857373b17a819b081c541561ec5dd72b9647"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/screenshot.png",
+      "bytes": 276346,
+      "sha256": "013dadd1b04993bfcdd2df530839857373b17a819b081c541561ec5dd72b9647"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "4fd158651e7e3adb6e10bcd53290d6869056f7bb34f8a4cfbe2b8846acff981c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-007/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "b2e09b60d615a28c913b2f6ca2526bef02058fa0c5429a6a02c0bd1c6f073f7d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "04c9dc6e7ceeb5e9c5f1140810a941dc134b342ee986cba2eaef93cf1a1f9773"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/case.json",
+      "bytes": 7431,
+      "sha256": "aea89243e87a8477777ae5f3dae4ce42d79c707ac82728ba950f6d1b842dd98e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "8d22f4af760fc5583f062842583c4fc01d58087264fb1052f0f525736bca7827"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/logcat.txt",
+      "bytes": 307317,
+      "sha256": "64a6e81bb273e02d598c20510265f62a6db90bdbd25cdc425114b3932b7912a7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/screenshot-first-observation.png",
+      "bytes": 276327,
+      "sha256": "f7740622f54643e9b1c67ec49a7330809206189d333cc2f34da2688762ca502c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/screenshot.png",
+      "bytes": 276327,
+      "sha256": "f7740622f54643e9b1c67ec49a7330809206189d333cc2f34da2688762ca502c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "d3225c694712e24141db685ef0a963104eaa927c1d434a12a28d179b747eed14"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-008/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "d193ce755cae3212762bee9c1463eb5a2fbb36bf866c0ecfd9875e409b4f2520"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/activity-activities.txt",
+      "bytes": 22868,
+      "sha256": "83fc064bc592a28f74b24c796f3439d43383837b09b1a04e6d4b15d482eb111a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/case.json",
+      "bytes": 7431,
+      "sha256": "13a82899a8c901b6e01a44c1fd0f2313815ad0611874d7f988b38c5993ac113e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "9575cdb4e41fb2183d9feda4b5b1e7e107efb0eb80d06ffd3cdbf51379371327"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/logcat.txt",
+      "bytes": 320756,
+      "sha256": "941bdea81f50d25c8cde7e4db03f6e8cc35e67b3abecb8d04257e451feef6be3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/screenshot-first-observation.png",
+      "bytes": 275719,
+      "sha256": "ddc93992d870eec1bd9fbeaf2d0bff78daeaa696bb8450b69ff7d1e17f0666ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/screenshot.png",
+      "bytes": 275719,
+      "sha256": "ddc93992d870eec1bd9fbeaf2d0bff78daeaa696bb8450b69ff7d1e17f0666ce"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "0930702367a404451cd886019619b27d505b11c4bc64c53344316158bdfb5fce"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-009/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "a3b02588998b492510c5ec9050c1e57d9ba744a023b40e3016de6cb88cbe2488"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "501318e79dbe639555c1cd79a84a1542ccfaf5c69fe63bf1e0960eb28427c69f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/case.json",
+      "bytes": 7433,
+      "sha256": "abfaf53e17d3951dc0bde2231f7d17331b0358ff435ed0056d8d9ae5f5064aa5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "6a4bef3a56f0a350b6d9ba32aebf08c99722bf6964909e9650f3e3404f63b356"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/logcat.txt",
+      "bytes": 307332,
+      "sha256": "51147ec59fe5fff2006edb58bf1015d6026746dbfc11188e5052b1185b2d4db7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/screenshot-first-observation.png",
+      "bytes": 275660,
+      "sha256": "a2d5d90f9d8605b7f7f2b2faa17f7050ba16f5b2034858a60eea7124e95b215a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/screenshot.png",
+      "bytes": 275660,
+      "sha256": "a2d5d90f9d8605b7f7f2b2faa17f7050ba16f5b2034858a60eea7124e95b215a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "967053c0b4910abbc4b5f6f73673b341d20ec32d0643d4fd8764043ca2310291"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-010/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "460ce811fdcf5e1563ea405d610e87d26dff428465a014e787cbe945d10e8fe2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "5a4f3e227c064f678176ebda0bf85bc9481df85ff263ce0cd493aac70fcd1ffb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/case.json",
+      "bytes": 7433,
+      "sha256": "9159a2225df87ba1ad458073234062a5505d2388d4a051c293b365f4dd7552dd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "4d635ec14d16f6ec5a0edb868fdd0332eccc31f8d32d5339a22043d50e277e42"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/logcat.txt",
+      "bytes": 306359,
+      "sha256": "3b3540c28a437a10dd3978fe5b4f4b48790c33c5011542c30e8527037bb18ade"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/screenshot-first-observation.png",
+      "bytes": 425620,
+      "sha256": "da42b569dd8d606639440ff1ff794ed29326256c0d299fc96a8c6b8a2741939f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/screenshot.png",
+      "bytes": 425620,
+      "sha256": "da42b569dd8d606639440ff1ff794ed29326256c0d299fc96a8c6b8a2741939f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "9213c99a822509ebf65079d8546d3c524378d31558e8959329cbba4eae8b5d11"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-011/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "c7e917effb85757f2ce3e3ee9c0990440b6cd419c4d233a143ed0325e6d35ef4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "df5a2cd08da5ffb0789fbb98eac69247e5d89321eb5246debc6110603ac5ea6a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/case.json",
+      "bytes": 7433,
+      "sha256": "1710ebcc76f308fe139d841aa986d887d58449c2472c976a8f1b48022d7074df"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "96e933eabb237aeccf0ff3d8070238d760c0436d0e7f0e6ccd5a68033740cda2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/logcat.txt",
+      "bytes": 305920,
+      "sha256": "2c0c4bd5e736e9dfe40792ba9f33850cd872cadbfd0267749c39a975621c120c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/screenshot-first-observation.png",
+      "bytes": 276565,
+      "sha256": "d5c8058c2e1a8ccd29087c3a4aebdd6f5462c236e564f74c73f155f404162172"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/screenshot.png",
+      "bytes": 276565,
+      "sha256": "d5c8058c2e1a8ccd29087c3a4aebdd6f5462c236e564f74c73f155f404162172"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "792b64efe4beb0c61e3ce64781e1613ecd8300fb9168917bfe61aa91976f45de"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-012/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "26840152ecd62f0ee4261a3de11229540bce88906704caa64c6ccb7a6e3f6cb0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/activity-activities.txt",
+      "bytes": 22868,
+      "sha256": "8488a13f109a045a549332b742ada00ac8f3a01ddce57aa0c8b1c0ddbf60480b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/case.json",
+      "bytes": 7433,
+      "sha256": "62568a898ee0f74848616b64e4e86d2e96f38dfc183d0cf7b86c29fc52b06ca4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "2cecd777728f562364325d9e9f30098e4afa06896f614c50890eac6e9d1c7bbf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/logcat.txt",
+      "bytes": 309989,
+      "sha256": "8c25eb38f88a462c68a053f60665fae1aa861a4c2be9266b3ee0ae690f1c5c84"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/screenshot-first-observation.png",
+      "bytes": 275996,
+      "sha256": "b0572eb399ded2e69f6335141a8b99edeaec102fe5830b9fa5bebd5b41007808"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/screenshot.png",
+      "bytes": 275996,
+      "sha256": "b0572eb399ded2e69f6335141a8b99edeaec102fe5830b9fa5bebd5b41007808"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "a823dcf31160340823404c140b33b1b1fcc59957ad714d3a97f8eb1db251733f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-013/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "f5a58fea9dcacb27801d9a6cb91313132def6fd67154080b7f5e5c4127bba671"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "591abda9c441ac8c67c109ca387a399b3b582eee52c340aab6a34b55f356a061"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/case.json",
+      "bytes": 7433,
+      "sha256": "96fff25cb3742b99227cd23491fa25ddbb2f3187f3eb899f3a267bef9a567b8b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "3a21acabf859a1b300c990daab47df8c069578e27bcbcc39c7bd72282b60ebbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/logcat.txt",
+      "bytes": 312705,
+      "sha256": "527dd090efb7c9b34cb96bd48b3f474895789432edf0491c22067a54f53f3847"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/screenshot-first-observation.png",
+      "bytes": 276513,
+      "sha256": "7c62e83ee324d938e212b5d51568e5b124469dcd83f89a684986ac7a849c7758"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/screenshot.png",
+      "bytes": 276513,
+      "sha256": "7c62e83ee324d938e212b5d51568e5b124469dcd83f89a684986ac7a849c7758"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "b0ff0f51f410a74a3ed58a08f0212f01c8a4cda399d9ea37f632fe3dd902eb39"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-014/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "ec6165b371d07e4a9b8990444d7411b5855ac5e97b546c5104c1f93e78157548"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "b2ad9dce301282989748611e5a9b2a503094c4318d753961655b6567ee61cc82"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/case.json",
+      "bytes": 7433,
+      "sha256": "1f20ed59850621377243ae98a48aa6c131133b0e78acd44c01bd278107b7a6b0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "fd3349fa58723d7c5660da1e8849b7feb9a089840a5283eccf2c87a6203e49cf"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/logcat.txt",
+      "bytes": 310438,
+      "sha256": "395366cc7c01f18a51fe5ae3adea96fd872fb1fcfeffd4147be9f75d9d516160"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/screenshot-first-observation.png",
+      "bytes": 275280,
+      "sha256": "ea19871f92f7b7549961c71e072fedad32b5efcd8f9ff0085205fcdfdc22cccd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/screenshot.png",
+      "bytes": 275280,
+      "sha256": "ea19871f92f7b7549961c71e072fedad32b5efcd8f9ff0085205fcdfdc22cccd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "b8927380563cbe3665f1f6f064e56c61380f9ed241051602e8d3f8a72e6df6b4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-015/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "30df58f3b9699d6c1eb8876e0c2a68cbf0a127dec8a1fa8a0c24fe93b71f2b26"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "48673f915fc5acf9ac9191b843cb70d2d2465561a603a06d960e0b94d1eb1bd2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/case.json",
+      "bytes": 7433,
+      "sha256": "19f3d3f528d17bbe8d02bc7aba8d4eadb3c9a20a914450d77864f22e5edfcdbd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "77f80f75b6a3977bb7c60e58a9a7e388c14743987b0ae9fb923f5a0bf74a3b96"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/logcat.txt",
+      "bytes": 307181,
+      "sha256": "af02b5cbdefbcdd06ab244a4a097a2e9c21cb0053094e68adbcfb4b73c9d8e5b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/screenshot-first-observation.png",
+      "bytes": 275855,
+      "sha256": "532ad565ba5202867f63c2de4c2cd0438bb3b2ea2513d4ca20f642a79ec1558f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/screenshot.png",
+      "bytes": 275855,
+      "sha256": "532ad565ba5202867f63c2de4c2cd0438bb3b2ea2513d4ca20f642a79ec1558f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "a6411c6ce6d8e24728602b64adbed6f7d28b74a56ae1a9ebd541aa6fce88b395"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-016/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "02093e71fbe8ee3c208b8a0bdb1ca0a81a2bc7fe2629db99055fa6e0cc4a7dcd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "a8ab6d091bb36ccbaa385d888b00b066c804de426207351e75d2b75e0f46a5d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/case.json",
+      "bytes": 7433,
+      "sha256": "21f53b97bb3920389ad631289eeae8eb5978c888a3571c1da018e7c03d5e0977"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "086f406e615f1cbb762a73b760b1bd8f6538870e84533e9dac1da86c78666c18"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/logcat.txt",
+      "bytes": 314469,
+      "sha256": "d1f70eabe2b1f71f9b9beabc838a76d0516fe02ca8cb66076ba3f0c9ab12e57a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/screenshot-first-observation.png",
+      "bytes": 275192,
+      "sha256": "6470fc9b90323bd3ffd41f90e1987fec64bd22caad149aa0c316d5cbcf9441f5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/screenshot.png",
+      "bytes": 275192,
+      "sha256": "6470fc9b90323bd3ffd41f90e1987fec64bd22caad149aa0c316d5cbcf9441f5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "1a62631e90ec732dd161530138f25418ca861578c7dbf8a48d790a6f335f1fe8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-017/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "77165fcb0dac4531e3df13bbae9fee35ee9d97afcd580c3f5fcabe1a013676de"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "bfc0910447a4ed1a3c93f3ce4e159d52850db7ce1c0e724f4276a750b866afc1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/case.json",
+      "bytes": 7433,
+      "sha256": "530bed6da844a797e8c0672b07f13d3ed1533f94818a63fb774bbb251de604d7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "2b5f9d3b35d9532bb9fbedc906a35d653d8f2c988d93a858e3787891c6fb2aca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/logcat.txt",
+      "bytes": 311001,
+      "sha256": "5e26b288e7791fbf2cf3dd68fd7040f636c6c67570d37bb486aea8d8c26822d6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/screenshot-first-observation.png",
+      "bytes": 275892,
+      "sha256": "5f033dd3651f2d72fbd8ad2d38379ce57e2bbe4045582db095e6e4299d4bcc2d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/screenshot.png",
+      "bytes": 275892,
+      "sha256": "5f033dd3651f2d72fbd8ad2d38379ce57e2bbe4045582db095e6e4299d4bcc2d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "4f913da493bc979095dd759c2fd591e1fb558d80492f90479fdf8ffaa19cdc26"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-018/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "66f50c03c5f93ce4a3c2a425fabe1ef7872be9004931b59c1169f7d4f208be9c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/activity-activities.txt",
+      "bytes": 22856,
+      "sha256": "5d0078d641cc2ff1eb92f78bc49c549231be01cba1416fe624dc2ad127c4dcc0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/case.json",
+      "bytes": 7433,
+      "sha256": "d40e822032adbc42e55a8b0e7d4ff93a8a2dbfd7327a3701346d122633c986e3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "f82b62107f74ba8929987321d5350d3564ef0b46a50043ac1d79a41cce3b1d3d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/logcat.txt",
+      "bytes": 315843,
+      "sha256": "389757a3e44ec6d59c983fc21be9fcc863f94ff0af82beb249011dcbaf21120e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/screenshot-first-observation.png",
+      "bytes": 275572,
+      "sha256": "fa69bb3f22c2fecbf642b79c389ddb53a302a0c7e45a1ac9e67c340f58838cee"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/screenshot.png",
+      "bytes": 275572,
+      "sha256": "fa69bb3f22c2fecbf642b79c389ddb53a302a0c7e45a1ac9e67c340f58838cee"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/surface-list.txt",
+      "bytes": 2629,
+      "sha256": "6f119e4bc4dfc11f4ff4c52a89e78f5dfe69f836c7a88ccfb1d651499b69d3d1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-019/window-windows.txt",
+      "bytes": 28610,
+      "sha256": "6247de94f989f8265bbf458346c37003d945dc29a54108ec54e44d7d959699dd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "1187b66846fd02fd3e33b401b5acde05826311861e25a8598ac8962963b47e8f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/case.json",
+      "bytes": 7433,
+      "sha256": "043f7d07d70d468308aaee75dfd715d8b35db28de8c48c9d1ac6646d8cef7a82"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "b7fbfe00cfef338e96f9ac430b781e433c8eff814b00b36c9f964cfb277ecf0a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/logcat.txt",
+      "bytes": 306197,
+      "sha256": "4b28cd3fc0a8339402638ab5aa88649382a1a21899b1b3876cf977e72ab99143"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/screenshot-first-observation.png",
+      "bytes": 276171,
+      "sha256": "bc2fa267e6915524a365bca2fbf123360fd94304d4aeef097dbba125fc626efa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/screenshot.png",
+      "bytes": 276171,
+      "sha256": "bc2fa267e6915524a365bca2fbf123360fd94304d4aeef097dbba125fc626efa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "f85383d42f6e81bd755cb6fe25d0019f70b060100ace43a1dea399b79912a96d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-020/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "1f3e6222ff5b0a0e355de0f2997366f4b5e9eba16c4cb296e1701644667d784a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "2b1824df2293c326816ab97fc0f60369eab326a271307593c00d8a043207f8ca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/case.json",
+      "bytes": 7433,
+      "sha256": "8e580b69bdc3d6e4c4297820c762658ba3438f378fdb3f31238b85bf064dcb8e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "4c371df005c29c70b0db3fadcd2e1485c4ebe2f566043a868500cdf177a1f9dd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/logcat.txt",
+      "bytes": 308577,
+      "sha256": "34f8863133ae3e94c57bcd591b50426912ddcdb71c3a3f766ae47972e7cea028"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/screenshot-first-observation.png",
+      "bytes": 275299,
+      "sha256": "380e4157dee5700446e176ec161925ab301aeda0d0726831151fb2722d3994d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/screenshot.png",
+      "bytes": 275299,
+      "sha256": "380e4157dee5700446e176ec161925ab301aeda0d0726831151fb2722d3994d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "76dd50e0b5186dc1d26b8d259de0e5c7470a4fce09e1db73416ceff5f22f9d9d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-021/window-windows.txt",
+      "bytes": 28613,
+      "sha256": "c166e42d519a7ac3eeb18aec3c84b48dce02f0334aae8aac5fb7db0479483681"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/activity-activities.txt",
+      "bytes": 22868,
+      "sha256": "2dc0f0cc331dc0e45525222d8569fb53f5fcae40871dd2cd054913f94cca8b55"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/case.json",
+      "bytes": 7433,
+      "sha256": "16add02f6dda35a40035c43028f6f4c49c9a178a8e9204bcdc573972bbb70c42"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "9e5e48e8de2533ac65778bef4522b4a9c1b92db65f3db188ebfa836e48f2948d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/logcat.txt",
+      "bytes": 309683,
+      "sha256": "87c53297c93e1a5d75d7f85b6073d9bd92029e087a9d16ab4a6ef437a414f7a4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/screenshot-first-observation.png",
+      "bytes": 274444,
+      "sha256": "6004167f9e5785007294d7a26f1d6dffcd08fab5d5ea9d2627dfeca6102b7ab8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/screenshot.png",
+      "bytes": 274444,
+      "sha256": "6004167f9e5785007294d7a26f1d6dffcd08fab5d5ea9d2627dfeca6102b7ab8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e23b9e5608bfedfa248cf079b0619a131254b899678f0d94817f1b7f67210e37"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-022/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "49a0ea38f86891e556886c8feca1b38c7053eb6e3628decff344ae2d196c1d54"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "0ee0f69190c1e0b453257383d86c63c8b8f4d733b2e6895bdc192483a952e7f9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/case.json",
+      "bytes": 7433,
+      "sha256": "9309e4a3a4ae56aaf03d461446b8012dbb1a73a5b6f11e0ba89c7fd4805eb4ec"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "84295b289dfe7fc22af74fc6fd9972f3f4a17db1456e6321cb39bebd56ce2e0f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/logcat.txt",
+      "bytes": 305239,
+      "sha256": "706fa2d43506e65f34f1607a0a7e78bec498ffb9420521a976499758eef57333"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/screenshot-first-observation.png",
+      "bytes": 275440,
+      "sha256": "2ef7a7dc8953675e52c1141f2b729ff01865a3db6d0849f655a27d5603609816"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/screenshot.png",
+      "bytes": 275440,
+      "sha256": "2ef7a7dc8953675e52c1141f2b729ff01865a3db6d0849f655a27d5603609816"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "96ae8b4355a32210531fc2486c19cd80bafe4988838be2d5a6d50eaf6c33289b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-023/window-windows.txt",
+      "bytes": 28613,
+      "sha256": "ef9e901a31b81bab650bf9b068be63e3a6cafb12a3416896a4611d051b7debe4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "7cf4df585a678d2449be5549c6cf9a25e44f8da49f45fab9cfc803725f1dcd5c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/case.json",
+      "bytes": 7433,
+      "sha256": "f8e92d03189e3e4157f86b362e67b283463abc23809467b7debe3c1d27e0b3e5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "add21dd65c1854134961aa4ac3c3d6ec66e0ca775c1385244d7e7d0de26b53ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/logcat.txt",
+      "bytes": 304548,
+      "sha256": "11b9926c889cb0acf98c0077b44bbc5f3094a6b31f27fe50ccc5c2cdddc48f39"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/screenshot-first-observation.png",
+      "bytes": 274528,
+      "sha256": "59adfa56ba6aa6645099086db532712f0514b2391e46a5f7c6d3102200251130"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/screenshot.png",
+      "bytes": 274528,
+      "sha256": "59adfa56ba6aa6645099086db532712f0514b2391e46a5f7c6d3102200251130"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "c009e1eb741fa6207c0ab656e4d4d7fdad7d70c5765af977949b239c9c487e4d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-024/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "1585d09ea1b8ee8ddab46ce6109b352531e1d4e39bbf1abe987ff9ea62c08a9f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "06810b27cf78c61a3ce4bb2270f3cc449f0d74db9ba2aea9e86ad86135f519ea"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/case.json",
+      "bytes": 7433,
+      "sha256": "caa402669d76501656e77f4d0b1912c495b391e35bd5c8807eda0a969bc8ba8d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/cold-stop.json",
+      "bytes": 1403,
+      "sha256": "38e89f40c2a12cf548d0fc09a11bf7d27f2edbcee6037967d7886872ec87b69b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/logcat.txt",
+      "bytes": 308854,
+      "sha256": "721ab25cfcec66602b2582711905763f1f1cd92a9c90cfc506f258342994e470"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/screenshot-first-observation.png",
+      "bytes": 275435,
+      "sha256": "50f2145160f5e4dbf4bf4f6f6b45cb9d2287da3ce62744860f421406c21ef59e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/screenshot.png",
+      "bytes": 275435,
+      "sha256": "50f2145160f5e4dbf4bf4f6f6b45cb9d2287da3ce62744860f421406c21ef59e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e8655fca9aa1439ca41c03e642414af7f4db8c8041aa9fc4e507c47a1911f1d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/cold-025/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "62f09a2f2c9e1e7db331baf81af31a76acc04aeace98c86ec6bcfea85c03a05d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/activity-activities.txt",
+      "bytes": 22867,
+      "sha256": "c653b2ca39147f32c9cb4f91034030bc5b61c100d880f9c3e50b9342d2edf218"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/case.json",
+      "bytes": 5622,
+      "sha256": "c5f950ede2b1978e86af7ca431e6c0f77f75662268cdd45de6e083cd0d02cf7a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/logcat.txt",
+      "bytes": 144834,
+      "sha256": "f1d6ce6d3ff36b88a4937d631fac23bc9149a8e270b66b7b6d17071397109f99"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/screenshot-first-observation.png",
+      "bytes": 276017,
+      "sha256": "a7266201c7d89249687ecf4fc903f3ad645e07502d76b7d008d95dd83c7e99e6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/screenshot.png",
+      "bytes": 276017,
+      "sha256": "a7266201c7d89249687ecf4fc903f3ad645e07502d76b7d008d95dd83c7e99e6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "6569c8b755f3ae5be85f97b8da118109506a834d37af09e552ea7146774a6716"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-001/window-windows.txt",
+      "bytes": 28607,
+      "sha256": "3665cf11de1dffe4b7df14389e70d1b50e5db9d9d73acbf02316d9f5af9400bb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/activity-activities.txt",
+      "bytes": 22869,
+      "sha256": "59a3b069db9d1e49e9f02f7302c4b99cbebb08458b5058de1fcd544c16a56124"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/case.json",
+      "bytes": 5620,
+      "sha256": "3c6cb7d1657ae25727f33805e6badd8ef1551c5461ff57ded2884c7ea907e483"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/logcat.txt",
+      "bytes": 135917,
+      "sha256": "288555a7d682b1c16a05548127694f80ae5d2441b6d415aa9863c6b82bffcab1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/screenshot-first-observation.png",
+      "bytes": 275366,
+      "sha256": "645256a7609a8c621a81a54e7e66044d1f6454f4bf960a54cdea69f47d3b7bd1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/screenshot.png",
+      "bytes": 275366,
+      "sha256": "645256a7609a8c621a81a54e7e66044d1f6454f4bf960a54cdea69f47d3b7bd1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e8bcb691bb09861aa737ca7790c0abe86d3d3cfa4db1eca8be43b51a490c2c05"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-002/window-windows.txt",
+      "bytes": 28608,
+      "sha256": "54e51f7b8519367a892ceaf9b1cb553deaa28c5f35650ba0b90149dca1324d7d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/activity-activities.txt",
+      "bytes": 22873,
+      "sha256": "6ca454d667b8fdb1820db08fd18f2500a5db5abb844430c05327761ef962d37c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/case.json",
+      "bytes": 5642,
+      "sha256": "aeb2a73a91ed4270bed6d5069c061b4fe37c45f82e405c225831261880d56c8b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/logcat.txt",
+      "bytes": 142470,
+      "sha256": "b8c999e2a22f78c078db2ceb08e55920beca93a2bccb072dcf3698d7a64b1032"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/screenshot-first-observation.png",
+      "bytes": 275312,
+      "sha256": "1cfbd3f8ff142ceb6f71b9155c16602eab1778e1523dde95ea67c8f411a44bd7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/screenshot.png",
+      "bytes": 275312,
+      "sha256": "1cfbd3f8ff142ceb6f71b9155c16602eab1778e1523dde95ea67c8f411a44bd7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "ead651ad562102281fa9702b0ecae5587574ec93e212041583f654bf124b04ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-003/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "17b1498a64d994733057f27692dea963f078f647daf1d1a308367137cb7d1507"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/activity-activities.txt",
+      "bytes": 22862,
+      "sha256": "d085964995a65149ea4cc8c3b8a1c27b7fb89ccc551134ba134673d3ac758429"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/case.json",
+      "bytes": 5641,
+      "sha256": "e43216b551c7f481d1cf0c07c1ea1feff40be36e4fb05ce363ca802632c867f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/logcat.txt",
+      "bytes": 139655,
+      "sha256": "ca30d6297212f089f0be90e33a17ff88dcd30920158dcce45d349448c9391fb5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/screenshot-first-observation.png",
+      "bytes": 275234,
+      "sha256": "2bd5ea0654da4cd3c19245f9f93098ade79300aedc677c3f2ffdef100f6404ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/screenshot.png",
+      "bytes": 275234,
+      "sha256": "2bd5ea0654da4cd3c19245f9f93098ade79300aedc677c3f2ffdef100f6404ae"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "e36b295f7242e049120d5e7e4c610ceb1c2e29e21ba17c3d0cbe43d2a9e3cad7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-004/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "71b7ff454f15b5bd01f62fc41b531e9df8398dd6d071d7f8dabe01167bbba145"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "08e22753cf1ae56b88fe0773a1a25f6a5dc19630502d18fa9cf882a67e7ba34b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/case.json",
+      "bytes": 5642,
+      "sha256": "e5f7c4814f4827ad5466f06257659a5f3aa69e8815cd23715c6be8b15ee2409f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/logcat.txt",
+      "bytes": 140924,
+      "sha256": "2f29096ca5a3366125f5681b71f2b254c81c49facaf039967a3cb25da04447f2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/screenshot-first-observation.png",
+      "bytes": 276202,
+      "sha256": "2a6e7c97b7dadd0b6ade513a544c19e869abd8dc989ae206172f90ddbfef013b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/screenshot.png",
+      "bytes": 276202,
+      "sha256": "2a6e7c97b7dadd0b6ade513a544c19e869abd8dc989ae206172f90ddbfef013b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "5222c800c8e0fdb4ce13afc82cf52e45ca254099010ce414dff896b3a8bdfc3a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-005/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "69c75c14231d2b1c967377a9ba940c8fdaf3658843002163cd6957895f929d74"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "b9d4690a308f05c169ddfd63e438297bda90a97046fe396e6b62f1dd89dae6f4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/case.json",
+      "bytes": 5640,
+      "sha256": "b10661902c848db37d17484abe834ca8da45b71e844ceb1c147cbc8b11f8a8e1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/logcat.txt",
+      "bytes": 135953,
+      "sha256": "ae6c0d7887f5eee294a2e1cc869e0ec7d035b91e7b8cbce298e3661351824d20"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/screenshot-first-observation.png",
+      "bytes": 275724,
+      "sha256": "d8e758f89aeffe96af78e6eb1fe9d98d70166d57b3a02c6907d2cadd8c467999"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/screenshot.png",
+      "bytes": 275724,
+      "sha256": "d8e758f89aeffe96af78e6eb1fe9d98d70166d57b3a02c6907d2cadd8c467999"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "7c5ad0af5638a2748bc4fe55eb76f569c96ed335804f1c3f552e3764ff7c9746"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-006/window-windows.txt",
+      "bytes": 28614,
+      "sha256": "3749342417b72361da2961bcd682bb768813a30c2d6afb6e2fd11cf4fff44eee"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/activity-activities.txt",
+      "bytes": 22871,
+      "sha256": "f25e5dee8802a29f76f89095188e3434522a13f3b04c79a04902ffddebc042b2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/case.json",
+      "bytes": 5642,
+      "sha256": "31958e4da9d8dfdb28d7827ebe4d31715a09a874d0715a79c845b40e143bcc4a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/logcat.txt",
+      "bytes": 141538,
+      "sha256": "69f1afa5dc79aa19ae1b185645d6c76479b1aa1f5dbf353062d8bb3470a80951"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/screenshot-first-observation.png",
+      "bytes": 276159,
+      "sha256": "c245c1eb04cde3836c8cf6dd883dd086c2d041c731ca000a532207028df96614"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/screenshot.png",
+      "bytes": 276159,
+      "sha256": "c245c1eb04cde3836c8cf6dd883dd086c2d041c731ca000a532207028df96614"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "2aecb7b0877a93347772351807b09554deca78f98b0532e0fb3ce89b97949c4f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-007/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "e4a3ef53b35a49b2c3e5bc9dbf63daabcb5006a65c94a70bfff8f8d182f60e0c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "c6cd632cc120b25ae398fcd3a96a94f40d5b250cc3e9203921214c29ed5d6168"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/case.json",
+      "bytes": 5640,
+      "sha256": "d99fb1240f8baa1886a4954b8190d11bbfb7d35c8a3034a88d732cb6f9f5cc74"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/logcat.txt",
+      "bytes": 135402,
+      "sha256": "3f6a768bedd27cfce8115b32f65754ecb92601dec74c1565e0a0386785542b4f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/screenshot-first-observation.png",
+      "bytes": 276327,
+      "sha256": "f7740622f54643e9b1c67ec49a7330809206189d333cc2f34da2688762ca502c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/screenshot.png",
+      "bytes": 276327,
+      "sha256": "f7740622f54643e9b1c67ec49a7330809206189d333cc2f34da2688762ca502c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "dfe8dab4c8110f8e2604907a82ddf76e1c7fb8c4d5f4ce7e84bb1ebd42ada047"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-008/window-windows.txt",
+      "bytes": 28612,
+      "sha256": "f9fb6f0d1129e0bc1fd8d6f8bcf95759da119088954afb19c0b8d923e1c96240"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "4b03fdbd415e9ca1dc6fb00d19fef4fff245c424d907ce7a4280e7c27289181d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/case.json",
+      "bytes": 5640,
+      "sha256": "e105151a203abf272b059aeb3ad5e6995932036724ec1a415e738b8470ed6f8c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/logcat.txt",
+      "bytes": 139814,
+      "sha256": "d5c9009415ab9c8e8be58b6144f736347bc6a9c96e04ee10bc578633dd2099d4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/screenshot-first-observation.png",
+      "bytes": 276281,
+      "sha256": "68f7c82a3711634613153ae527b484b2fc537138baeae4fedbdb1c665f822ed3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/screenshot.png",
+      "bytes": 276281,
+      "sha256": "68f7c82a3711634613153ae527b484b2fc537138baeae4fedbdb1c665f822ed3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "ed73800ec0dc8f62230c45bd575271d288c879b797a328f6dd5fb41f23fc9066"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-009/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "2c4cd4e861340df01c58b66491720cb80bf25a3a036eef8be1eb452837ccb865"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "aef8d779200ae007dfc8e91abd56ba030b14f1a775dbacc43e704cf7d72b076e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/case.json",
+      "bytes": 5642,
+      "sha256": "f4e3e3fff5e5c675aa205c6f3fb03737bab67f52f77a1a874f5e5bd9250003d5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/logcat.txt",
+      "bytes": 139637,
+      "sha256": "0fb58f01fb7985d50fade154b57d1e55a20770a19333f1031542adf866663808"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/screenshot-first-observation.png",
+      "bytes": 275660,
+      "sha256": "a2d5d90f9d8605b7f7f2b2faa17f7050ba16f5b2034858a60eea7124e95b215a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/screenshot.png",
+      "bytes": 275660,
+      "sha256": "a2d5d90f9d8605b7f7f2b2faa17f7050ba16f5b2034858a60eea7124e95b215a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "2d61a3dfdb1a896049696aecbcf14530b653307fb184e4e4a77804bd918e8529"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-010/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "81a5793e6b9676c8949c5509813a8b4c916134b779e322ed44aeacdb3384c846"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "b4f44f24d7146477a35612230f983959b58602c8e8e9fc5e200fa32bbe856e77"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/case.json",
+      "bytes": 5644,
+      "sha256": "cf30beab309969520c0f96c9cdf15c3b35f916bef1dc462332dc74f74092d021"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/logcat.txt",
+      "bytes": 140851,
+      "sha256": "43ab09011fa4a85be5cf5111be5e1da56f64a45933d973f9b31a6060a9de0681"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/screenshot-first-observation.png",
+      "bytes": 275607,
+      "sha256": "146b3bf5407cd3921fec26c1ff1e441c237a5c6e8809b3c7621d60d14d08f186"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/screenshot.png",
+      "bytes": 275607,
+      "sha256": "146b3bf5407cd3921fec26c1ff1e441c237a5c6e8809b3c7621d60d14d08f186"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "aa64421d2f526c5977e7128a7b14c48504ee48aea51b6eece910bed3187218b1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-011/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "490eabe583e76752d5b7789008e031995cdc50eab11dd811786a6c240855d990"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "0257b2069815913af2a516f07839835ec3193b00416a9d46e1340e93296cbdf6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/case.json",
+      "bytes": 5644,
+      "sha256": "39700fda47ccb74007cd16a1cb76c3b4d7028714cd0d198f3a07df5bc43f0100"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/logcat.txt",
+      "bytes": 141322,
+      "sha256": "fc1f201f0fb395488db67f2ea43805cc7062363d1218771fbcee86a0978fbc6a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/screenshot-first-observation.png",
+      "bytes": 276474,
+      "sha256": "1e65ca7c338158e2d083dcd4aec0f9ceba535b94a69ae52683fbad0a7fccd5f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/screenshot.png",
+      "bytes": 276474,
+      "sha256": "1e65ca7c338158e2d083dcd4aec0f9ceba535b94a69ae52683fbad0a7fccd5f8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "a5ea9ee67040de77ee1a225e140e905d1f1a36901144a92ea4e8e73a0260a394"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-012/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "58d634639a5345bf6d120fbd4bdc98cac91ca8982e6cf0ab2e0ad5ccc5e6c658"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/activity-activities.txt",
+      "bytes": 22860,
+      "sha256": "e51c84a1afaddb88d5dcafec1546944f3ff07ec41a4313f2ee0713f5d5dc7c6c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/case.json",
+      "bytes": 5644,
+      "sha256": "88520ac76921998c81b9b2584508174215f822a5a8fd033e66bbb96413c3a07c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/logcat.txt",
+      "bytes": 143447,
+      "sha256": "f7a67b497247c3f0b44e799c059e56bbecd69731d7b3ec135c54748470db42f9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/screenshot-first-observation.png",
+      "bytes": 276621,
+      "sha256": "b7763978ecf78a88e978feadbece82e29ec07e16c2841dfe294b0a9bd2ceab70"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/screenshot.png",
+      "bytes": 276621,
+      "sha256": "b7763978ecf78a88e978feadbece82e29ec07e16c2841dfe294b0a9bd2ceab70"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/surface-list.txt",
+      "bytes": 2629,
+      "sha256": "001084ba27f492a76a1fb37abd0b23cee5406a76a3de3dd38665214ba07fad31"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-013/window-windows.txt",
+      "bytes": 28613,
+      "sha256": "1df587523e512343d7a1251e793d1d424beb1fc395409f99101d3221c0a274e1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "3c3b2f298868c61dea43a379cd4e20b4d43d6f136eefef67688c87a1606b68c3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/case.json",
+      "bytes": 5644,
+      "sha256": "c6462aa3518093c9128b909209403f2beb7ce59a9235b07f89860a79b8ab0044"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/logcat.txt",
+      "bytes": 138263,
+      "sha256": "eb2a76df902aa223e83db8c731d25b2c89f5bef19510b438d62e085d408f26b2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/screenshot-first-observation.png",
+      "bytes": 276513,
+      "sha256": "7c62e83ee324d938e212b5d51568e5b124469dcd83f89a684986ac7a849c7758"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/screenshot.png",
+      "bytes": 276513,
+      "sha256": "7c62e83ee324d938e212b5d51568e5b124469dcd83f89a684986ac7a849c7758"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "970d67642966a68dc384cdb5b7ad6e7aabcf695566782c5e0215124c1dfc6b1e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-014/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "058aad8e812ad75888b2b3bb2c72f9ae00bc3dac8bb0711afba4b7833d2ae9be"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/activity-activities.txt",
+      "bytes": 22865,
+      "sha256": "04283456cdba42af10805fa752ffc9df2f139f49725f74ca21748d5c9c3db0e5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/case.json",
+      "bytes": 5642,
+      "sha256": "17c2b81df12d8fb98a0f382f9647861fd338ff0f519b10c4d5b37d05edb5ccaa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/logcat.txt",
+      "bytes": 142511,
+      "sha256": "365b5028082110720bdbb24865c16af83f073cdac5017def4aac8adbb41248d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/screenshot-first-observation.png",
+      "bytes": 275280,
+      "sha256": "ea19871f92f7b7549961c71e072fedad32b5efcd8f9ff0085205fcdfdc22cccd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/screenshot.png",
+      "bytes": 275280,
+      "sha256": "ea19871f92f7b7549961c71e072fedad32b5efcd8f9ff0085205fcdfdc22cccd"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "a3a9bd1101aa55300eb718680c99953854e178eb82a0c9d2976fd9443b63876e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-015/window-windows.txt",
+      "bytes": 28615,
+      "sha256": "33067be64867cc86d37ab0828be0f14cac9ee9cdaea687728ac81d43a2dec9f7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "d2c5da08500d8f8afdbde52c234c4c5ae613e04416f7a1a9fc721d461bb8a890"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/case.json",
+      "bytes": 5642,
+      "sha256": "35aa27c1908ace1e27966d8b1ce902514dfcdec07b232da082d86167cf3f0894"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/logcat.txt",
+      "bytes": 141305,
+      "sha256": "1f4e892315da8cdf56922eaf7c17509583ec1a5c14c90953f918f010b9f6ea63"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/screenshot-first-observation.png",
+      "bytes": 276054,
+      "sha256": "cb3994d41f4a450f3f3aa88a435b6326eeb71ab9a0439536951fd50fce72d94e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/screenshot.png",
+      "bytes": 276054,
+      "sha256": "cb3994d41f4a450f3f3aa88a435b6326eeb71ab9a0439536951fd50fce72d94e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "248ecd94f13e3b87c33c9e7019948ae2abc3767d838aa903b0940693b9b17f8e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-016/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "4d1513ba62c359d71616b05f5230c7dfdcdaa0e66c3da0bbc9575ef6f42c44b2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "3e39fc9f15fb87b71cc7a70280626f2bd56fd106dd8dd450dcebb8e7a70d10c5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/case.json",
+      "bytes": 5644,
+      "sha256": "1aee295cc274f91430c85b2ac1ff43756fd536dda164f629d50cbd6230705db4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/logcat.txt",
+      "bytes": 138893,
+      "sha256": "58afdb1b0b9a8723a0f60687ee1bb58e26953da94698602f676afb08a80b2fc0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/screenshot-first-observation.png",
+      "bytes": 275192,
+      "sha256": "6470fc9b90323bd3ffd41f90e1987fec64bd22caad149aa0c316d5cbcf9441f5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/screenshot.png",
+      "bytes": 275192,
+      "sha256": "6470fc9b90323bd3ffd41f90e1987fec64bd22caad149aa0c316d5cbcf9441f5"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "b078ddc74ff7ed060fdbfc28d96f44e50bdff1af2a9eb50d5f80c4b6a0fff126"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-017/window-windows.txt",
+      "bytes": 28616,
+      "sha256": "b277a5fac283ba89ff9dbac7823b9080b78629c9c737f003f57f7196c2d6f2a9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/activity-activities.txt",
+      "bytes": 22873,
+      "sha256": "cb4be9581a30da5356a22f169b07e4a4cc6799b1d9659d12fb5b39f42aa99ba8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/case.json",
+      "bytes": 5642,
+      "sha256": "a16db97310029cf2700d34d59e5d4c570264446b3bf431e43a144f763f02a815"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/logcat.txt",
+      "bytes": 141828,
+      "sha256": "cec49f37190a1b914f8629c316cd5e60e41df4c8b1e0013a71c582c251a73c5a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/screenshot-first-observation.png",
+      "bytes": 275976,
+      "sha256": "3d3565c50c18a734f01c11bd55a01087ab223e683cce06aa562280702d2b19f1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/screenshot.png",
+      "bytes": 275976,
+      "sha256": "3d3565c50c18a734f01c11bd55a01087ab223e683cce06aa562280702d2b19f1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "e0990fe962c08b9b1fa91ce3a3a47c6d25ab4228a25c238f23e48f4fd8b99f7b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-018/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "d99c636328d60a4ee2f28f945571c0a6581b1ee9323ac02f5ac22b5c5cd5f756"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/activity-activities.txt",
+      "bytes": 22870,
+      "sha256": "d57f992ba9d0e8c264aaa76e0e41ee855829db2ded530905eada0ffc1f7ff610"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/case.json",
+      "bytes": 5644,
+      "sha256": "d77172a2af1af48d8cc1f23abbe6e0a5371e039ee20286c9ca1c955027541a1b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/logcat.txt",
+      "bytes": 144565,
+      "sha256": "7c2d979ea75b254ef302d35550a070adb62e1e5e9ebdb0a16d393635aef7b917"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/screenshot-first-observation.png",
+      "bytes": 275572,
+      "sha256": "fa69bb3f22c2fecbf642b79c389ddb53a302a0c7e45a1ac9e67c340f58838cee"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/screenshot.png",
+      "bytes": 275572,
+      "sha256": "fa69bb3f22c2fecbf642b79c389ddb53a302a0c7e45a1ac9e67c340f58838cee"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "32efbfb6e69d4ff3f62d20f899c3447845997c77a35f9cce31975441207520c1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-019/window-windows.txt",
+      "bytes": 28614,
+      "sha256": "a7724d4648d3e9958a4962ff90520fe6b940a3c41f4761769e3119e6771c501e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/activity-activities.txt",
+      "bytes": 22864,
+      "sha256": "08f6b4750bea4b5bc25721b61b64d1e6d907e9dccc45dccacc0c73c99c742bb6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/case.json",
+      "bytes": 5642,
+      "sha256": "785c97f99497f66550c80dbe6bf2e5ddf5085f1d57b44bc146eec2dc23e5ec3c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/logcat.txt",
+      "bytes": 141625,
+      "sha256": "ec6b96f3d3a3a8d9501b534fc332fa136f9246ab1b15ec9de5de9a3b272ab5e9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/screenshot-first-observation.png",
+      "bytes": 276058,
+      "sha256": "87d86cf6eebca6b9c28edd7b1a915e72b430e24514cfc14b46c15acf10befa1f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/screenshot.png",
+      "bytes": 276058,
+      "sha256": "87d86cf6eebca6b9c28edd7b1a915e72b430e24514cfc14b46c15acf10befa1f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "0db85cd51e9178f63626dfadd638c0a2406634f8b70f946d55db20424a128d76"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-020/window-windows.txt",
+      "bytes": 28613,
+      "sha256": "48f988f25cb65753e288ce6ac2e80331398c4b7423894d66cabd9845ef4d6c4d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/activity-activities.txt",
+      "bytes": 22871,
+      "sha256": "04cd6759fa942276ac2dc2c0e1a1f4b8e42f0702162665fadfaac1312ce9cfa8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/case.json",
+      "bytes": 5642,
+      "sha256": "4bbbe27b4ed44d84e3425baf89c0b99d392a07e98ca055ec9f7ea52f68f5cee4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/logcat.txt",
+      "bytes": 146797,
+      "sha256": "7472f7c4c8e284b716dad33a349e3770bd2c3feda9657606492905872da55b26"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/screenshot-first-observation.png",
+      "bytes": 275299,
+      "sha256": "380e4157dee5700446e176ec161925ab301aeda0d0726831151fb2722d3994d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/screenshot.png",
+      "bytes": 275299,
+      "sha256": "380e4157dee5700446e176ec161925ab301aeda0d0726831151fb2722d3994d8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "95df388ba4788895a68bd490eaab16ec3c495f9cbcb61e50bbc93f120e0d6b20"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-021/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "101ee5650235f87b08ecb52cd0c17e45b723323fe13be3973f0f1d3665e3e33b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/activity-activities.txt",
+      "bytes": 22871,
+      "sha256": "bc77243d7da918743559e65cdd821023fa04f9b9ffc2b6ddd6d3315d68d6d263"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/case.json",
+      "bytes": 5642,
+      "sha256": "9cb7684ce6959e6f781ae87d20a90590b64e0f3dbd48f718b3c60aef1dc2d30e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/logcat.txt",
+      "bytes": 143420,
+      "sha256": "4f94e18635822bb90f896825d752851cc34108d801c4e3eb37b7eb9e957dc1d7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/screenshot-first-observation.png",
+      "bytes": 275227,
+      "sha256": "6ec9e769ebf943bcb913e0d765cee868a6311537740b2f8c7dc71aaeff9b8e8a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/screenshot.png",
+      "bytes": 275227,
+      "sha256": "6ec9e769ebf943bcb913e0d765cee868a6311537740b2f8c7dc71aaeff9b8e8a"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "46d6584defefaec95e26c89f7b7382c469a4ed6b23d4d3d5fe436cf64afbc61f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-022/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "4d57e6e734551b1ec0df35c556a70d93a7e58e7dbbd93a98398c310161458f2e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/activity-activities.txt",
+      "bytes": 22865,
+      "sha256": "99016f29bb99c170cb32dedb409c5d95c5000156bb4adf13b6ace0e0d25d73f9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/case.json",
+      "bytes": 5642,
+      "sha256": "d8a19b94cd09e4812e097a85d4599fef2b36a1deaa13a18feffd7f4560fd812f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/logcat.txt",
+      "bytes": 137536,
+      "sha256": "6ce4252a9d6651f554c647c015f29d9c7e9fdf815b4e34e9f4080cfa6249fb91"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/screenshot-first-observation.png",
+      "bytes": 275440,
+      "sha256": "2ef7a7dc8953675e52c1141f2b729ff01865a3db6d0849f655a27d5603609816"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/screenshot.png",
+      "bytes": 275440,
+      "sha256": "2ef7a7dc8953675e52c1141f2b729ff01865a3db6d0849f655a27d5603609816"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "b69288e64aca21eab9a6a94977ff11054bcd795c3c5485518bb1cc53c7d95075"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-023/window-windows.txt",
+      "bytes": 28613,
+      "sha256": "8a6ee4e0b61fdc3574bd59fc3d9706a4bc6f9b9273e9978edf17b8ed17079f71"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/activity-activities.txt",
+      "bytes": 22866,
+      "sha256": "96cb153d2107e274c28b25d7f8eea57ebc0e7975770e92eb226e9c745da48f8e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/case.json",
+      "bytes": 5644,
+      "sha256": "af381b602fee790940c3ae644e431aa9534b16480dd8315fa98168a33cc3cf2d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/logcat.txt",
+      "bytes": 147623,
+      "sha256": "03e24b492a3372f1a2b024fc6663892b1032dbbb8d148973da41f8b0504f50eb"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/screenshot-first-observation.png",
+      "bytes": 275293,
+      "sha256": "a06cdfaa41a8cca0bf79876268d6c409a11906386e687f0109470c2a174abecc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/screenshot.png",
+      "bytes": 275293,
+      "sha256": "a06cdfaa41a8cca0bf79876268d6c409a11906386e687f0109470c2a174abecc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/surface-list.txt",
+      "bytes": 2630,
+      "sha256": "392ff5ebdb7035b18805f49b179fe97b877f0767a764ccb2c54022d19393b8e0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-024/window-windows.txt",
+      "bytes": 28614,
+      "sha256": "934b8b487f411afef18686650878d495594ed3f06b83e2cf16b6de28bad68fe7"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/activity-activities.txt",
+      "bytes": 22872,
+      "sha256": "bd02307cf87190377cb81bad631eac51f5555d868150a1e383b9f6c97562f6b2"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/case.json",
+      "bytes": 5644,
+      "sha256": "db4aabde4a068903406b5b4e993f0a2ac19a623ce7d3e2568fa974afed0be37e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/logcat.txt",
+      "bytes": 140116,
+      "sha256": "70c854ebb4d6a060e572bcf1e9b4938be1f5a5b7b4e0627969a0b38cc97d84c8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/screenshot-first-observation.png",
+      "bytes": 275435,
+      "sha256": "50f2145160f5e4dbf4bf4f6f6b45cb9d2287da3ce62744860f421406c21ef59e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/screenshot.png",
+      "bytes": 275435,
+      "sha256": "50f2145160f5e4dbf4bf4f6f6b45cb9d2287da3ce62744860f421406c21ef59e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/surface-list.txt",
+      "bytes": 2631,
+      "sha256": "16602c0997e2394c330b3d2776e1fb72bca1cd9efa9ee18c9f4e2c0e54fbc78d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/dingtalk/user-1/hot-025/window-windows.txt",
+      "bytes": 28617,
+      "sha256": "86a5604bb652425fd97c2066a0454d393e43b1acca3cd9536b0a62ee3542abf0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/activity-activities.txt",
+      "bytes": 26726,
+      "sha256": "2ce83fbd9c87b00ec12c52d584a95c0a265230e0be6fc5801cd3925e1d8629f0"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/case.json",
+      "bytes": 8885,
+      "sha256": "4365fc590880d6e703dfa85d3e466e4a4d4a949aed26dee36227ba714b6a3c37"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/cold-stop.json",
+      "bytes": 1395,
+      "sha256": "11f367b0ab06278a44f0ac617cc4a92e925b7c8e204f414c59f1e05a4818df2e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/activity-activities.txt",
+      "bytes": 26344,
+      "sha256": "9cd64210b32a83fb74d18338288424dd948a9a967b13e4ef11de74bcb95757c9"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/activity-processes.txt",
+      "bytes": 147096,
+      "sha256": "568acc47da1236a960d885dc1836379d9e923e31a393d3187a866bdf2dc909b1"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/adb-devices.txt",
+      "bytes": 118,
+      "sha256": "5dcaefbb1122d4ed12318c1e2881957092b64a671efb9c52b780823ba58ed96e"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/application-exit-info.txt",
+      "bytes": 9205,
+      "sha256": "08443571a27d94f21c0aa2f2ba5e7051cb3d2a30d61e204ed4f37a01b9189b98"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/device-getprop.txt",
+      "bytes": 21042,
+      "sha256": "0bbdd748b7e97751cae56e4736bef5951923b7789e9f61a86e245dec7ec90fd8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/host-files.txt",
+      "bytes": 73247,
+      "sha256": "bc52acefd76a40c469f5f9098f0f169ae4d4dda18ead84c5c7f282927c8c2eb8"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/host-package.txt",
+      "bytes": 12212,
+      "sha256": "c1f21dbca7df0b29171614ba37bd93fcce66087faed18138b649362f4c977f86"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/logcat-critical.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/logcat.txt",
+      "bytes": 1319713,
+      "sha256": "bc03c2a43c389a310be5b924e2fb4f2562d00e3fdeb0edfd09e39f60c9911723"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/processes.txt",
+      "bytes": 11457,
+      "sha256": "fec342ace86ee792f6f31279b08685131918587e843e422477821127233d6a0b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/screenshot.png",
+      "bytes": 177441,
+      "sha256": "bb3137ce0d402fbb19813660d8822dbe779d04292ef962e15286a1b9e544c3ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/surface-dump.txt",
+      "bytes": 87060,
+      "sha256": "f3172bf53c405054839b7a2795e99e3328d5d504943608628f8b270a5c89fb82"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/surface-list.txt",
+      "bytes": 2437,
+      "sha256": "2c7c50335183942054684640b97ea5713890a408aa905af5d95f525eca39df6c"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/target-package.txt",
+      "bytes": 945209,
+      "sha256": "8c6697c7e6d84a66e3cfefb02cd136153ac7ad617cb26250f0f92d094c5e9d61"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/transactions/sandbox-catalog.json",
+      "bytes": 43048,
+      "sha256": "c738e429af7d20ef8881a417e79f38605d5c7d83463ae2ea3a606e927bcbccc6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/first-failure-full/window-windows.txt",
+      "bytes": 25506,
+      "sha256": "8eeb0baecccdb603a7aecdffaad2bda94e56bf22d6e1f481ae7e5ee357569848"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/logcat.txt",
+      "bytes": 1342261,
+      "sha256": "8c2d24db12b6ff52481d55e4c3d1f37240baac2dc1c79d6b22cd6cbab9605057"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/screenshot-first-observation.png",
+      "bytes": 12504,
+      "sha256": "4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/screenshot.png",
+      "bytes": 177441,
+      "sha256": "bb3137ce0d402fbb19813660d8822dbe779d04292ef962e15286a1b9e544c3ac"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/surface-list.txt",
+      "bytes": 2517,
+      "sha256": "c0e84a3ce6a58da14f8bfd002813b03a63cc8a064914c3859a8ef0047c8eb692"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/089b0c2232-package-lifecycle-transactions.json",
+      "bytes": 1942,
+      "sha256": "6bc5e15eb8fd0e32bc5fac1ad5e8cb1b3b83a90295d0cc63d1f49110ee49f98b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/1990720c9a-debug-command-result.json",
+      "bytes": 517,
+      "sha256": "45c7eb484ea46cfd63c15a4b00e15c65525c3eef4fa85d7859e832734965b35f"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/4fbde4f036-runtime__virtual-uids.registry",
+      "bytes": 179,
+      "sha256": "990f87544f4ce583c2cc4e6668b5147320f560f8d645aedc6f44ab0c7330a8a6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/5feeae5d8b-runtime__activity-tasks.checkpoint",
+      "bytes": 4230,
+      "sha256": "ca891c248008a3234f69bf3fa52b178dbef11890b57c53abef45143d09e821d3"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/dd8e4ee3cc-sandbox-catalog.json.lastgood",
+      "bytes": 43048,
+      "sha256": "c738e429af7d20ef8881a417e79f38605d5c7d83463ae2ea3a606e927bcbccc6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/tx/f645766360-package-lifecycle-transactions.json.lastgood",
+      "bytes": 1942,
+      "sha256": "6bc5e15eb8fd0e32bc5fac1ad5e8cb1b3b83a90295d0cc63d1f49110ee49f98b"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/attempts/quark/user-0/cold-001/window-windows.txt",
+      "bytes": 25798,
+      "sha256": "6e0b316abb7583638eb21a80c128bcb4f309dd6ddbd2f7b8d5e0ccf19281fa77"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/c4-r03-summary.json",
+      "bytes": 457645,
+      "sha256": "7fd80e55685b9fca2450d5005eacc16416c73b9667ced34e2a4fcccf4b4c3f8d"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/commercial-sample-discovery.json",
+      "bytes": 2078,
+      "sha256": "d313da84f8df0ade1397c46a5a426f962f288d7d0eae53daa9bea7e7e9dc3be4"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/dingtalk-discovery.json",
+      "bytes": 581,
+      "sha256": "5b9dbd8212072877fe86fbbb557ecd176ee3c09f70e79e8d85f69116156285ca"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/environment.json",
+      "bytes": 2067,
+      "sha256": "9a639667375d274c8869392b3d5cfc02551476ec77f4ec22f0920136f16e1587"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/install.json",
+      "bytes": 1096,
+      "sha256": "993a9b999a09198684ca74644a6f4435b9cc8e94175be41f06b03d8de9fc2caa"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/resume.json",
+      "bytes": 538,
+      "sha256": "f018f809d3b8fdac2949383477e1f1b3655a3d22683a51cc519907407c961b24"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/dingtalk/user-0-logcat-boundary.json",
+      "bytes": 95,
+      "sha256": "f4610af92da32ded963fb728c58421e58c4bd38c7f1c83aeecd6c6147c6412fc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/dingtalk/user-0.json",
+      "bytes": 2968,
+      "sha256": "4e0c4ec15e35fa88c8d157a3737119817a8387ff3ad56c85d1d244ad9704a2bc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/dingtalk/user-1-logcat-boundary.json",
+      "bytes": 95,
+      "sha256": "f4610af92da32ded963fb728c58421e58c4bd38c7f1c83aeecd6c6147c6412fc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/dingtalk/user-1.json",
+      "bytes": 2968,
+      "sha256": "af4eea5b89008883e619ba97a3391957bb3740b07d9932b6a7210908f1d0fe16"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/quark/user-0-logcat-boundary.json",
+      "bytes": 95,
+      "sha256": "f4610af92da32ded963fb728c58421e58c4bd38c7f1c83aeecd6c6147c6412fc"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/setup/quark/user-0.json",
+      "bytes": 2940,
+      "sha256": "62cc18916fc54dd22f821231648a3563ac47983fc77afb8f787031a318256210"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/targets.json",
+      "bytes": 3159,
+      "sha256": "42c59d3f9cf28ae9ba07e9a563bebfa8fab54b0ac7daa44a9005fa3cea1dd127"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/wrapper-record.json",
+      "bytes": 469519,
+      "sha256": "6eac2e6fa8c7a0ac0aa127dace5e1eb6551078c15d7f0dbdbcde6ebb317cf312"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/wrapper-stderr.txt",
+      "bytes": 242,
+      "sha256": "4a519f12ccfadf7e306d8ca86ab210aef8a11e15672dd0c78df2b3cc79648ed6"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/attempt-005/wrapper-stdout.txt",
+      "bytes": 360,
+      "sha256": "466aa17399ef4b3031443fca44ee8ae2799b522e7672f7aa07eb3f93b768d932"
+    },
+    {
       "path": "round-1-clean-install-cold/launch-matrix/c4-r03-summary.json",
       "bytes": 1133999,
       "sha256": "5ee6638cc1b912c534f0f2a1a5264af66cc435f00c6fc86576ef01e73b94d372"
     },
     {
       "path": "round-1-clean-install-cold/launch-matrix/children.json",
-      "bytes": 396760,
-      "sha256": "9162e35da5703c5b3e0fd57e5b2633ee1a9e90611fb5114e77c9755a45246fa5"
+      "bytes": 656420,
+      "sha256": "fa3fdf3c1a5e58243610ddf3988e525b3070faa3b1567e8337dadca3cd3ac913"
+    },
+    {
+      "path": "round-1-clean-install-cold/launch-matrix/low-memory-recovery/event-001/restart.json",
+      "bytes": 3441,
+      "sha256": "dfb62592bc53a8f12c0ee22dfc65b139d9eff6d2a8aace0a524bd84214f160d2"
     },
     {
       "path": "round-1-clean-install-cold/launch-matrix/seed-existing-child.json",
-      "bytes": 378045,
-      "sha256": "e85f199dc3b983c2ba9e34f520d1ae6639e8de0005193a1b3e6ae8a3298ac3c6"
+      "bytes": 419120,
+      "sha256": "93606ea3d031c3a17c9f33ed3c9edb1ff062d59c8a155f5a04bcff65acc4da4e"
     },
     {
       "path": "round-1-clean-install-cold/prepare.json",
@@ -4699,8 +8494,8 @@
     },
     {
       "path": "summary.json",
-      "bytes": 37143,
-      "sha256": "1d09d6e0e03e3a8326ea939e82fb486238cabdf164c3adc6e3dbfc6ed4df50f5"
+      "bytes": 1369632,
+      "sha256": "52f24fda130c0df3ae5d80ea80f92f3a3b104d9c13d116ff858cc5beeabaf38b"
     }
   ]
 }

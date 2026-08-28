@@ -1,0 +1,84 @@
+{
+  "target": "quark",
+  "package": "com.quark.browser",
+  "user": 0,
+  "requestId": "7a8f08ed8a69414e9ab38d146f9ad410",
+  "attempt": 5,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "7a8f08ed8a69414e9ab38d146f9ad410",
+      "operationId": "7a8f08ed8a69414e9ab38d146f9ad410-launch",
+      "startedAt": 1787905004774,
+      "packageOperationTrace": {
+        "requestId": "7a8f08ed8a69414e9ab38d146f9ad410",
+        "operationId": "3e4c5dc3-19ad-4d11-b79e-66ffa447a7a4",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.quark.browser",
+        "virtualUserId": 0,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1787905008079,
+        "elapsedMs": 17113,
+        "stageTimingsMs": {
+          "HASH": 651,
+          "COPY": 1070,
+          "PARSE": 2022,
+          "NATIVE_EXTRACT": 2214,
+          "PUBLISH": 3502,
+          "ENSURE_INSTANCE": 0,
+          "CATALOG": 3049
+        },
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": []
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 524\nWaitTime: 526\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  },
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "dingtalk",
+    "resumeUser": 0,
+    "resumeIteration": 20,
+    "resumeMode": "cold",
+    "attempt": 5,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\launch-matrix\\attempt-004",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+  }
+}

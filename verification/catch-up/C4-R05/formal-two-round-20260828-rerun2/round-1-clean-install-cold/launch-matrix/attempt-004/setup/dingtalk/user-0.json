@@ -1,0 +1,29 @@
+{
+  "target": "dingtalk",
+  "package": "com.alibaba.android.rimet",
+  "user": 0,
+  "requestId": null,
+  "attempt": 4,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "command": "import-only",
+  "result": {
+    "status": "SKIPPED",
+    "returncode": 0,
+    "reason": "HOT_RESUME_PRESERVES_PREVIOUS_LANE_RUNTIME_STATE"
+  },
+  "status": "SKIPPED",
+  "skipReason": "HOT_RESUME_PRESERVES_PREVIOUS_LANE_RUNTIME_STATE",
+  "resume": {
+    "kind": "MANUAL_RESUME_AFTER_RESTART",
+    "resumeTarget": "dingtalk",
+    "resumeUser": 0,
+    "resumeIteration": 6,
+    "resumeMode": "hot",
+    "attempt": 4,
+    "retryBudget": 0,
+    "automaticRetryPerformed": false,
+    "previousLane": "D:\\github\\controlled-android-sandbox\\verification\\catch-up\\C4-R05\\formal-two-round-20260828-rerun2\\round-1-clean-install-cold\\launch-matrix\\attempt-003",
+    "note": "The prior first-failure evidence remains authoritative; this lane is a separately recorded post-restart observation."
+  }
+}
