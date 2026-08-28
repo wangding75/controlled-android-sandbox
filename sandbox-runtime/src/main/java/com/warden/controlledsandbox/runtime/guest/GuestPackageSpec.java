@@ -20,6 +20,9 @@ import java.util.Set;
 public final class GuestPackageSpec {
     final int protocol;
     public final String sessionId;
+    /** Caller correlation identifiers propagated through the Guest process boundary. */
+    public final String requestId;
+    public final String operationId;
     public final long generation;
     public final String packageName;
     final int virtualUserId;
@@ -73,6 +76,8 @@ public final class GuestPackageSpec {
         protocol = bundle.getInt(RuntimeKeys.PROTOCOL, 0);
         if (!RuntimeProtocol.isCompatible(protocol)) throw new IllegalArgumentException("UNSUPPORTED_PROTOCOL:" + protocol);
         sessionId = required(bundle, RuntimeKeys.SESSION_ID);
+        requestId = bundle.getString(RuntimeKeys.REQUEST_ID, "");
+        operationId = bundle.getString(RuntimeKeys.OPERATION_ID, "");
         generation = bundle.getLong(RuntimeKeys.GENERATION, 0);
         if (generation < 1) throw new IllegalArgumentException("generation must be positive");
         packageName = required(bundle, RuntimeKeys.PACKAGE_NAME);

@@ -96,8 +96,10 @@ final class ApkImportManager {
         File transactionDir = new File(packagesRoot, ".install-" + System.nanoTime());
         if (!transactionDir.mkdirs()) throw new IllegalStateException("Cannot create install transaction");
         try {
-            List<InspectedArtifact> artifacts = stageAndInspect(sources, transactionDir);
-            return finishImport(transactionDir, artifacts, trustedRecords, nativeGuestTrust);
+            return traced(PackageMutationTrace.IMPORT, () -> {
+                List<InspectedArtifact> artifacts = stageAndInspect(sources, transactionDir);
+                return finishImport(transactionDir, artifacts, trustedRecords, nativeGuestTrust);
+            });
         } catch (Exception error) {
             try { deleteTreeOrThrow(transactionDir); }
             catch (Exception cleanupFailure) { error.addSuppressed(cleanupFailure); }
@@ -114,14 +116,22 @@ final class ApkImportManager {
         File incoming = new File(transactionDir, "incoming");
         if (!incoming.mkdirs()) throw new IllegalStateException("Cannot create incoming artifact directory");
         File baseFile = null;
+        PackageMutationTrace trace = PackageMutationTrace.current();
+        if (trace != null) trace.addCounter(PackageMutationTrace.SPLIT_COUNT,
+                Math.max(0, sources.size() - 1));
         for (int index = 0; index < sources.size(); index++) {
             File source = sources.get(index);
-            if (source == null || !source.isFile()) throw new IllegalArgumentException("Source APK does not exist");
+            traced(PackageMutationTrace.SOURCE_DISCOVERY, () -> {
+                if (source == null || !source.isFile()) {
+                    throw new IllegalArgumentException("Source APK does not exist");
+                }
+                return null;
+            });
             File staged = new File(incoming, String.format(Locale.ROOT, "%03d.apk", index));
             CopyResult copied = copyFileAndHash(source, staged, MAX_APK_BYTES);
             totalBytes += copied.bytes;
             if (totalBytes > MAX_INSTALL_BYTES) throw new IllegalArgumentException("Install set exceeds 3 GiB limit");
-            ManifestModel manifest = traced(PackageMutationTrace.PARSE,
+            ManifestModel manifest = traced(PackageMutationTrace.MANIFEST_PARSE,
                     () -> parseManifest(staged));
             if (manifest.splitName().isEmpty()) {
                 if (baseFile != null) throw new IllegalArgumentException("Install set contains more than one base APK");
@@ -132,12 +142,12 @@ final class ApkImportManager {
         }
         if (baseFile == null) throw new IllegalArgumentException("Install set does not contain a base APK");
         File resolvedBaseFile = baseFile;
-        PackageInfo baseInfo = traced(PackageMutationTrace.PARSE,
+        PackageInfo baseInfo = traced(PackageMutationTrace.PACKAGE_INFO,
                 () -> packageInfoForArchive(resolvedBaseFile));
         if (baseInfo == null) throw new IllegalArgumentException("PackageManager rejected the base APK artifact");
         for (int index = 0; index < stagedFiles.size(); index++) {
             int artifactIndex = index;
-            artifacts.add(traced(PackageMutationTrace.PARSE,
+            artifacts.add(traced(PackageMutationTrace.PACKAGE_INFO,
                     () -> inspect(stagedFiles.get(artifactIndex),
                             stagedDigests.get(artifactIndex), baseInfo,
                             sources.get(artifactIndex))));
@@ -158,7 +168,8 @@ final class ApkImportManager {
                 base.versionCode, base.signatureSha256);
         verifyExistingPackageState(previousRecord);
 
-        String revisionSha256 = revisionDigest(artifacts);
+        String revisionSha256 = traced(PackageMutationTrace.STAGED_REVISION_VERIFY,
+                () -> revisionDigest(artifacts));
         File incoming = new File(transactionDir, "incoming");
         File stagedBase = new File(transactionDir, "base.apk");
         moveFile(base.file, stagedBase);
@@ -181,7 +192,8 @@ final class ApkImportManager {
         }
         deleteTreeOrThrow(incoming);
 
-        boolean containsNativeCode = containsNativeCode(stagedRecords);
+        boolean containsNativeCode = traced(PackageMutationTrace.NATIVE_DETECT,
+                () -> containsNativeCode(stagedRecords));
         NativeGuestExecutionPolicy.requireInstallAllowed(containsNativeCode, nativeGuestTrust);
         File stagedNativeDir = new File(transactionDir, "lib");
         String selectedAbi = traced(PackageMutationTrace.NATIVE_EXTRACT,
@@ -199,7 +211,8 @@ final class ApkImportManager {
         traced(PackageMutationTrace.PUBLISH, () -> {
             if (revisionDir.exists()) {
                 removeKnownRuntimeProfileSidecars(revisionDir);
-                requireMatchingPublishedRevision(transactionDir, revisionDir, selectedAbi);
+                traced(PackageMutationTrace.PUBLISHED_REVISION_VERIFY,
+                        () -> { requireMatchingPublishedRevision(transactionDir, revisionDir, selectedAbi); return null; });
                 sealPublishedRevision(revisionDir);
                 deleteTreeOrThrow(transactionDir);
             } else {
@@ -254,8 +267,10 @@ final class ApkImportManager {
 
     private InspectedArtifact inspect(File file, String sha256, PackageInfo baseInfo,
                                       File originalSource) throws Exception {
-        ManifestModel manifest = parseManifest(file);
-        PackageInfo info = packageInfoForArchive(file);
+        ManifestModel manifest = traced(PackageMutationTrace.MANIFEST_PARSE,
+                () -> parseManifest(file));
+        PackageInfo info = traced(PackageMutationTrace.PACKAGE_INFO,
+                () -> packageInfoForArchive(file));
         if (!manifest.packageName().matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
             throw new IllegalArgumentException("Invalid package name");
         }
@@ -341,6 +356,8 @@ final class ApkImportManager {
     static boolean containsNativeCode(List<PackageArtifactRecord> artifacts) throws Exception {
         if (artifacts == null) throw new IllegalArgumentException("artifacts are required");
         for (PackageArtifactRecord artifact : artifacts) {
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT, 1);
             try (ZipFile zip = new ZipFile(artifact.path)) {
                 int entries = 0;
                 var enumeration = zip.entries();
@@ -349,6 +366,7 @@ final class ApkImportManager {
                     if (++entries > MAX_ZIP_ENTRIES) {
                         throw new IllegalArgumentException("APK has too many ZIP entries");
                     }
+                    if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_ENTRY_COUNT, 1);
                     String name = entry.getName();
                     if (entry.isDirectory()) continue;
                     if (name.startsWith("lib/") && name.endsWith(".so")) {
@@ -356,6 +374,7 @@ final class ApkImportManager {
                         if (parts.length == 3 && !parts[1].isEmpty() && !parts[2].isEmpty()) return true;
                     }
                     try (InputStream input = zip.getInputStream(entry)) {
+                        if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT, 1);
                         if (hasElfMagic(input)) return true;
                     }
                 }
@@ -423,12 +442,15 @@ final class ApkImportManager {
             throws Exception {
         Set<String> available = new HashSet<>();
         for (PackageArtifactRecord artifact : artifacts) {
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT, 1);
             try (ZipFile zip = new ZipFile(artifact.path)) {
                 int entries = 0;
                 var enumeration = zip.entries();
                 while (enumeration.hasMoreElements()) {
                     ZipEntry entry = enumeration.nextElement();
                     if (++entries > MAX_ZIP_ENTRIES) throw new IllegalArgumentException("APK has too many ZIP entries");
+                    if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_ENTRY_COUNT, 1);
                     String name = entry.getName();
                     if (name.startsWith("lib/") && name.endsWith(".so")) {
                         String[] parts = name.split("/");
@@ -451,6 +473,8 @@ final class ApkImportManager {
         long total = 0;
         Map<String, String> extractedDigests = new HashMap<>();
         for (PackageArtifactRecord artifact : artifacts) {
+            PackageMutationTrace trace = PackageMutationTrace.current();
+            if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT, 1);
             try (ZipFile zip = new ZipFile(artifact.path)) {
                 var enumeration = zip.entries();
                 while (enumeration.hasMoreElements()) {
@@ -467,7 +491,12 @@ final class ApkImportManager {
                     try (InputStream input = zip.getInputStream(entry);
                          FileOutputStream file = new FileOutputStream(temporary);
                          BufferedOutputStream out = new BufferedOutputStream(file)) {
-                        total += copyLimited(input, out, remaining);
+                        long extracted = copyLimited(input, out, remaining);
+                        total += extracted;
+                        if (trace != null) {
+                            trace.addCounter(PackageMutationTrace.NATIVE_BYTES_EXTRACTED, extracted);
+                            trace.addCounter(PackageMutationTrace.NATIVE_LIB_COUNT, 1);
+                        }
                         out.flush(); file.getFD().sync();
                     }
                     requireCompatibleElf(temporary, selected);
@@ -495,6 +524,16 @@ final class ApkImportManager {
 
     private void verifyExistingPackageState(SandboxRecord previousRecord) throws Exception {
         if (previousRecord == null) return;
+        PackageMutationTrace trace = PackageMutationTrace.current();
+        if (trace != null) {
+            traced(PackageMutationTrace.EXISTING_REVISION_VERIFY,
+                    () -> { verifyExistingPackageStateInternal(previousRecord); return null; });
+            return;
+        }
+        verifyExistingPackageStateInternal(previousRecord);
+    }
+
+    private void verifyExistingPackageStateInternal(SandboxRecord previousRecord) throws Exception {
         storageLayout.requireRecordLayout(previousRecord);
         File existingApk = new File(previousRecord.apkPath).getCanonicalFile();
         int flags = PackageManager.GET_META_DATA | (Build.VERSION.SDK_INT >= 28
@@ -627,7 +666,11 @@ final class ApkImportManager {
         try (BufferedInputStream input = new BufferedInputStream(new FileInputStream(file))) {
             byte[] buffer = new byte[64 * 1024];
             int count;
-            while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count);
+            while ((count = input.read(buffer)) != -1) {
+                digest.update(buffer, 0, count);
+                PackageMutationTrace trace = PackageMutationTrace.current();
+                if (trace != null) trace.addCounter(PackageMutationTrace.SHA_BYTES_READ, count);
+            }
         }
         return toHex(digest.digest());
     }
@@ -663,6 +706,11 @@ final class ApkImportManager {
                 int count;
                 while ((count = input.read(buffer)) != -1) {
                     total += count;
+                    PackageMutationTrace telemetry = PackageMutationTrace.current();
+                    if (telemetry != null) {
+                        telemetry.addCounter(PackageMutationTrace.APK_BYTES_READ, count);
+                        telemetry.addCounter(PackageMutationTrace.APK_BYTES_WRITTEN, count);
+                    }
                     if (total > limit) throw new IllegalArgumentException("APK exceeds size limit");
                     long hashStarted = System.nanoTime();
                     digest.update(buffer, 0, count);

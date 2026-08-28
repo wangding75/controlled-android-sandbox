@@ -10,6 +10,7 @@ import com.warden.controlledsandbox.domain.session.PackageRevision;
 import com.warden.controlledsandbox.domain.protocol.RuntimeProtocol;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -92,8 +93,14 @@ final class RuntimeGuestRequestValidator {
                     splitName, splitTypes.get(index), splitConfigFor.get(index), splitUses.get(index),
                     splitFile, splitSha256s.get(index)));
         }
-        PackageRevision revision = PackageRevisionSetVerifier.verify(
-                apk, baseApkSha256, splitArtifacts, apkVersionCode, apkSha256);
+        emitPerf(input, "REVISION_VERIFY_BEGIN");
+        PackageRevision revision;
+        try {
+            revision = PackageRevisionSetVerifier.verify(
+                    apk, baseApkSha256, splitArtifacts, apkVersionCode, apkSha256);
+        } finally {
+            emitPerf(input, "REVISION_VERIFY_END");
+        }
         input.putString(RuntimeKeys.APK_PATH, apk.getCanonicalPath());
         input.putString(RuntimeKeys.BASE_APK_SHA256,
                 baseApkSha256.toLowerCase(java.util.Locale.ROOT));
@@ -153,5 +160,21 @@ final class RuntimeGuestRequestValidator {
     private static ArrayList<String> optionalStringList(Bundle input, String key) {
         ArrayList<String> values = input.getStringArrayList(key);
         return values == null ? new ArrayList<>() : new ArrayList<>(values);
+    }
+
+    private static void emitPerf(Bundle input, String event) {
+        try {
+            Bundle details = new Bundle();
+            details.putString(RuntimeKeys.REQUEST_ID,
+                    input.getString(RuntimeKeys.REQUEST_ID, ""));
+            details.putString(RuntimeKeys.OPERATION_ID,
+                    input.getString(RuntimeKeys.OPERATION_ID, ""));
+            details.putString(RuntimeKeys.PACKAGE_NAME,
+                    input.getString(RuntimeKeys.PACKAGE_NAME, ""));
+            details.putString("perfEvent", event);
+            details.putString("perfPhase", event.endsWith("_BEGIN") ? "BEGIN" : "END");
+            details.putString("perfStage", "REVISION_VERIFY");
+            RuntimeEventLog.event("PERF_TRACE_STAGE", details);
+        } catch (Throwable ignored) { }
     }
 }

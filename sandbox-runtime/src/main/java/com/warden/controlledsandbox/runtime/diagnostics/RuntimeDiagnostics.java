@@ -330,6 +330,13 @@ public final class RuntimeDiagnostics {
             field(out, "requestId", data.getString(RuntimeKeys.REQUEST_ID, ""), true);
             field(out, "operationId", data.getString(RuntimeKeys.OPERATION_ID, ""), true);
             field(out, "launchStage", data.getString(RuntimeKeys.LAUNCH_STAGE, ""), true);
+            field(out, "perfPhase", data.getString("perfPhase", ""), true);
+            field(out, "perfStage", data.getString("perfStage", ""), true);
+            field(out, "perfEvent", data.getString("perfEvent", ""), true);
+            field(out, "perfElapsedMs", String.valueOf(data.getLong("perfElapsedMs", 0L)), false);
+            field(out, "perfDurationMs", String.valueOf(data.getLong("perfDurationMs", 0L)), false);
+            field(out, "perfStageTimingsMs", data.getString("perfStageTimingsMs", ""), true);
+            field(out, "perfCounters", data.getString("perfCounters", ""), true);
             field(out, "launchStageAtElapsedMs",
                     String.valueOf(data.getLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, 0L)), false);
             field(out, "launchId", data.getString("launchId", ""), true);

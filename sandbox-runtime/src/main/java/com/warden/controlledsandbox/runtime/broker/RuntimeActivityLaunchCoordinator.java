@@ -6,6 +6,7 @@ import android.os.Bundle;
 import com.warden.controlledsandbox.framework.activity.LaunchFlags;
 import com.warden.controlledsandbox.framework.identity.VirtualPackageMetadata;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
 import com.warden.controlledsandbox.runtime.guest.GuestLaunchEvidence;
 import com.warden.controlledsandbox.runtime.guest.GuestLaunchGate;
 import com.warden.controlledsandbox.runtime.guest.GuestLaunchObservation;
@@ -50,6 +51,11 @@ final class RuntimeActivityLaunchCoordinator {
         routedRequest.putInt(RuntimeKeys.ATTEMPT, 1);
         routedRequest.putInt(RuntimeKeys.RETRY_BUDGET, 0);
         routedRequest.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+        RuntimePerformanceTrace perf = new RuntimePerformanceTrace(requestId, operationId,
+                routedRequest.getString(RuntimeKeys.PACKAGE_NAME, ""));
+        try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.CLIENT_LAUNCH_BEGIN)) {
+            // The caller-side trace is correlated with this Broker trace by requestId/operationId.
+        }
         long acceptedAtElapsedMs = android.os.SystemClock.elapsedRealtime();
         routedRequest.putLong(RuntimeKeys.LAUNCH_ACCEPTED_AT_ELAPSED_MS, acceptedAtElapsedMs);
         launchStage(requestId, operationId, "REQUEST_ACCEPTED", 0L, routedRequest);
@@ -90,7 +96,10 @@ final class RuntimeActivityLaunchCoordinator {
                         elapsedSince(acceptedAtElapsedMs), reuseDetails);
                 RuntimeEventLog.event("GUEST_LAUNCH_TASK_REUSE", reuseDetails);
             }
-            Bundle prepared = owner.prepareGuestInternal(routedRequest);
+            Bundle prepared;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.GUEST_PREPARE)) {
+                prepared = owner.prepareGuestInternal(routedRequest);
+            }
             launchStage(requestId, operationId, "PREPARE_RETURN",
                     elapsedSince(acceptedAtElapsedMs), prepared);
             if (!RuntimeBrokerService.isPrepared(prepared)) return prepared;
@@ -234,7 +243,9 @@ final class RuntimeActivityLaunchCoordinator {
             try {
                 launchStage(requestId, operationId, "HOST_START_BEGIN",
                         elapsedSince(acceptedAtElapsedMs), transaction);
-                owner.startActivity(launch);
+                try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.HOST_START_ACTIVITY)) {
+                    owner.startActivity(launch);
+                }
                 launchStage(requestId, operationId, "HOST_START_RETURN",
                         elapsedSince(acceptedAtElapsedMs), transaction);
             } catch (Throwable error) {
@@ -293,6 +304,7 @@ final class RuntimeActivityLaunchCoordinator {
                 out.putString(RuntimeKeys.ERROR_MESSAGE, evidence.failure.isEmpty()
                         ? "guest Activity create/resume/window not confirmed" : evidence.failure);
             }
+            perf.close();
             return out;
         } catch (Throwable error) {
             try {
@@ -300,6 +312,7 @@ final class RuntimeActivityLaunchCoordinator {
             } finally {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }
+            perf.close();
             return RuntimeBrokerService.failure(error);
         }
     }

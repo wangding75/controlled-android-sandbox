@@ -2,6 +2,7 @@ package com.warden.controlledsandbox.runtime.guest;
 
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeDiagnostics;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
@@ -139,6 +140,8 @@ public final class GuestRuntimeEnvironment {
             preparing = true;
         }
         long started = android.os.SystemClock.elapsedRealtime();
+        RuntimePerformanceTrace perf = new RuntimePerformanceTrace(
+                spec.requestId, spec.operationId, spec.packageName);
         Bundle result = new Bundle();
         FrameworkHooks stagedHooks = null;
         GuestFrameworkCallRouter stagedFrameworkCallRouter = null;
@@ -152,6 +155,7 @@ public final class GuestRuntimeEnvironment {
                         && current.spec.generation == spec.generation
                         && current.spec.packageRevision.equals(spec.packageRevision)) {
                     Bundle alreadyReady = current.status("ALREADY_READY", started);
+                    perf.close();
                     synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
                     return alreadyReady;
                 }
@@ -164,8 +168,14 @@ public final class GuestRuntimeEnvironment {
                 current = null;
                 previous.shutdown();
             }
-            IVirtualSystemServiceSession systemServiceSession = requireSystemServiceSession(spec);
-            NativeBootstrap nativeBootstrap = prepareNativeBootstrap(host, spec, systemServiceSession);
+            IVirtualSystemServiceSession systemServiceSession;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.SYSTEM_SERVICE)) {
+                systemServiceSession = requireSystemServiceSession(spec);
+            }
+            NativeBootstrap nativeBootstrap;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.NATIVE_BOOTSTRAP)) {
+                nativeBootstrap = prepareNativeBootstrap(host, spec, systemServiceSession);
+            }
             String nativeAbi = nativeBootstrap.nativeAbi;
             String packagedNativeLibraryDir = nativeBootstrap.packagedNativeLibraryDir;
             File guestDataRoot = nativeBootstrap.guestDataRoot;
@@ -221,6 +231,7 @@ public final class GuestRuntimeEnvironment {
                     + " guestAbi=" + safe(spec.nativeAbi)
                     + " hostAbi=" + safe(hostAbi()));
             GuestClassLoader loader;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.CLASSLOADER)) {
             if (spec.isolatedProcess) {
                 java.util.List<java.nio.ByteBuffer> isolatedDexBuffers =
                         loadIsolatedGuestDexBuffers(spec);
@@ -250,13 +261,17 @@ public final class GuestRuntimeEnvironment {
                         emptyToNull(nativeLibrarySearchPath), GuestRuntimeEnvironment.class.getClassLoader(),
                         spec.packageName, declaredGuestClasses(spec));
             }
+            }
             loader.configureNativeCompatibility(translatedGuestAbi);
             GuestNativeBindingDiagnostic.installProcessProbes();
             GuestNativeBindingDiagnostic.recordLoader("guest.base", loader);
             GuestNativeBindingDiagnostic.recordLoader("guest.dex", loader.definingLoader());
-            GuestResourceLoader.LoadedResources loadedResources = spec.isolatedProcess
-                    ? GuestResourceLoader.load(host, spec.apkDescriptor, spec.splitDescriptors)
-                    : GuestResourceLoader.load(host, spec.apkPath, spec.splitPathArray());
+            GuestResourceLoader.LoadedResources loadedResources;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.RESOURCES)) {
+                loadedResources = spec.isolatedProcess
+                        ? GuestResourceLoader.load(host, spec.apkDescriptor, spec.splitDescriptors)
+                        : GuestResourceLoader.load(host, spec.apkPath, spec.splitPathArray());
+            }
             PackageManager processPackageManager = host.getPackageManager();
             // VirtualPackageStateBuilder already parsed the manifest at import time and carries
             // the authoritative ApplicationInfo (including split paths and appComponentFactory).
@@ -389,10 +404,11 @@ public final class GuestRuntimeEnvironment {
                     packageUniverse);
             guestIdentity.installContentObserverBridge(
                     new GuestContentObserverBridge(spec, guestContext.mainThread));
-            FrameworkHooks frameworkHooks = FrameworkHooks.install(guestContext, host,
-                    processPackageManager,
-                    guestIdentity,
-                    frameworkCallRouter, nativeBoundaryAvailable);
+            FrameworkHooks frameworkHooks;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.FRAMEWORK_HOOK)) {
+                frameworkHooks = FrameworkHooks.install(guestContext, host, processPackageManager,
+                        guestIdentity, frameworkCallRouter, nativeBoundaryAvailable);
+            }
             stagedHooks = frameworkHooks;
             guestContext.sealSystemServices(frameworkHooks.report().installedServices());
             frameworkHooks.report().requireMandatoryReady();
@@ -481,10 +497,13 @@ public final class GuestRuntimeEnvironment {
             loaderApkDescriptor = null;
             loaderNativeArchiveDescriptor = null;
             session.loadedApkBridge = GuestLoadedApkBridge.install(session);
-            Application application = guestContext.mainThread.call(
-                    () -> instantiateApplication(spec, processLoader,
-                            GuestApplicationInfoFactory.readComponentFactory(
-                                    guestContext.getApplicationInfo())));
+            Application application;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ATTACH)) {
+                application = guestContext.mainThread.call(
+                        () -> instantiateApplication(spec, processLoader,
+                                GuestApplicationInfoFactory.readComponentFactory(
+                                        guestContext.getApplicationInfo())));
+            }
             guestContext.application(application);
             // LoadedApk.makeApplication() is still called by the real ActivityThread when the
             // first framework-owned Activity transaction arrives. Publish the already-created
@@ -537,8 +556,12 @@ public final class GuestRuntimeEnvironment {
             session.activityThreadInstrumentation = GuestActivityThreadInstrumentation.install(session);
             stagedHooks = null;
             stagedFrameworkCallRouter = null;
-            session.components.prepareDeclaredProviders();
-            session.mainThread.run(application::onCreate);
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PROVIDER_PREPARE)) {
+                session.components.prepareDeclaredProviders();
+            }
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ONCREATE)) {
+                session.mainThread.run(application::onCreate);
+            }
             if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
                 camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
                 session.camera1AdapterInstalled = camera1AdapterInstalled;
@@ -556,6 +579,7 @@ public final class GuestRuntimeEnvironment {
             }
             Bundle ready = session.status("READY", started);
             RuntimeEventLog.event("GUEST_PREPARED", ready);
+            perf.close();
             stagedSession = null;
             synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
             return ready;
@@ -593,6 +617,7 @@ public final class GuestRuntimeEnvironment {
             android.util.Log.e("CS_RUNTIME", "GUEST_PREPARE_FAILED_STACK\n"
                     + result.getString("stack", ""));
             RuntimeEventLog.event("GUEST_PREPARE_FAILED", result);
+            perf.close();
             return result;
         }
     }

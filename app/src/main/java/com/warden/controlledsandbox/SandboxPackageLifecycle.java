@@ -59,48 +59,48 @@ final class SandboxPackageLifecycle {
     }
 
     synchronized SandboxRecord importApk(Uri uri) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current, importer.importApk(uri, current.records()));
     }
 
     synchronized SandboxRecord importApk(Uri uri, RevisionCommitBarrier barrier) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current, importer.importApk(uri, current.records()), barrier);
     }
 
     synchronized SandboxRecord importApk(Uri uri, String nativeGuestTrust) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current,
                 importer.importApk(uri, current.records(), nativeGuestTrust));
     }
 
     synchronized SandboxRecord importApk(Uri uri, String nativeGuestTrust,
                                          RevisionCommitBarrier barrier) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current,
                 importer.importApk(uri, current.records(), nativeGuestTrust), barrier);
     }
 
     synchronized SandboxRecord importApkFile(File source) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current, importer.importApkFile(source, current.records()));
     }
 
     synchronized SandboxRecord importApkFile(File source, RevisionCommitBarrier barrier)
             throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current, importer.importApkFile(source, current.records()), barrier);
     }
 
     synchronized SandboxRecord importApkFile(File source, String nativeGuestTrust) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current,
                 importer.importApkFile(source, current.records(), nativeGuestTrust));
     }
 
     synchronized SandboxRecord importApkFile(File source, String nativeGuestTrust,
                                              RevisionCommitBarrier barrier) throws Exception {
-        SandboxCatalogState current = catalogRepository.load();
+        SandboxCatalogState current = loadCatalogForTrace();
         return commitImported(current,
                 importer.importApkFile(source, current.records(), nativeGuestTrust), barrier);
     }
@@ -165,6 +165,16 @@ final class SandboxPackageLifecycle {
         return commitImported(current, imported, barrier, virtualUserId);
     }
 
+    private SandboxCatalogState loadCatalogForTrace() throws Exception {
+        PackageMutationTrace trace = PackageMutationTrace.current();
+        if (trace == null) return catalogRepository.load();
+        try (PackageMutationTrace.StageScope ignored = trace.stage(PackageMutationTrace.CATALOG_LOAD)) {
+            SandboxCatalogState state = catalogRepository.load();
+            trace.addCounter(PackageMutationTrace.CATALOG_PACKAGE_COUNT, state.records().size());
+            return state;
+        }
+    }
+
     synchronized int createInstallSession(String expectedPackageName) throws Exception {
         return installSessions.create(expectedPackageName);
     }
@@ -209,7 +219,7 @@ final class SandboxPackageLifecycle {
         try {
             requireSupportedCommitParams(prepared.params);
             installSessions.markCommitting(sessionId);
-            SandboxCatalogState current = catalogRepository.load();
+            SandboxCatalogState current = loadCatalogForTrace();
             SandboxRecord imported = importer.importApkFiles(prepared.artifacts, current.records(),
                     prepared.params.nativeGuestTrust());
             if (!prepared.expectedPackageName.isEmpty()
@@ -445,7 +455,10 @@ final class SandboxPackageLifecycle {
             } else {
                 try (PackageMutationTrace.StageScope ignored =
                              trace.stage(PackageMutationTrace.CATALOG)) {
-                    catalogRepository.save(next);
+                    try (PackageMutationTrace.StageScope ignoredWrite =
+                                 trace.stage(PackageMutationTrace.CATALOG_WRITE)) {
+                        catalogRepository.save(next);
+                    }
                 }
             }
         } catch (Exception error) {
@@ -457,7 +470,15 @@ final class SandboxPackageLifecycle {
         } else if (previous == null) {
             lifecycleTransactions.put(PackageLifecycleTransaction.installed(imported, now));
         }
-        sweepUnreferencedFiles(next);
+        PackageMutationTrace trace = PackageMutationTrace.current();
+        if (trace == null) {
+            sweepUnreferencedFiles(next);
+        } else {
+            try (PackageMutationTrace.StageScope ignored =
+                         trace.stage(PackageMutationTrace.CATALOG_SWEEP)) {
+                sweepUnreferencedFiles(next);
+            }
+        }
         return imported;
     }
 

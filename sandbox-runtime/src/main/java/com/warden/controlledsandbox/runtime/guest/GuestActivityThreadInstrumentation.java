@@ -1044,6 +1044,26 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         request.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
         request.putBoolean("frameworkOwnedActivity", true);
         RuntimeEventLog.event("GUEST_ACTIVITY_" + event, request);
+        // PERF-T00 lifecycle points are emitted independently from the launch result gate. This
+        // keeps first-frame evidence available to tests without making product launch wait for it.
+        String perfEvent = "CREATED".equals(event) ? "ACTIVITY_CREATED"
+                : "RESUMED".equals(event) ? "ACTIVITY_RESUMED"
+                : "FIRST_FRAME_DRAWN".equals(event) ? "FIRST_FRAME_DRAWN" : "";
+        if (!perfEvent.isEmpty()) {
+            Bundle perf = new Bundle(request);
+            perf.putString("perfEvent", perfEvent);
+            perf.putString("perfPhase", "POINT");
+            perf.putString("perfStage", perfEvent);
+            perf.putLong("perfElapsedMs", 0L);
+            RuntimeEventLog.event("PERF_TRACE_STAGE", perf);
+            if ("ACTIVITY_RESUMED".equals(perfEvent)
+                    && request.getBoolean("windowAttached", false)) {
+                Bundle windowEvidence = new Bundle(perf);
+                windowEvidence.putString("perfEvent", "WINDOW_VISIBLE");
+                windowEvidence.putString("perfStage", "WINDOW_VISIBLE");
+                RuntimeEventLog.event("PERF_TRACE_STAGE", windowEvidence);
+            }
+        }
         if (closed) return;
         events.execute(() -> {
             try {

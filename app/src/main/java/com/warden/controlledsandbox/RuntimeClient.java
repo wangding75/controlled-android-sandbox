@@ -18,6 +18,7 @@ import com.warden.controlledsandbox.runtime.broker.RuntimeBrokerService;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeOperationTransport;
 import com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnector;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.UUID;
@@ -27,6 +28,7 @@ final class RuntimeClient implements AutoCloseable {
     private final RebindableServiceConnector<IRuntimeBroker> brokerConnection;
     private final PackageServiceClient packageService;
     private final NativeCompanionClient nativeCompanion;
+    private static final ThreadLocal<RuntimePerformanceTrace> ACTIVE_PERF_TRACE = new ThreadLocal<>();
 
     RuntimeClient(Context context) {
         this.context = context.getApplicationContext();
@@ -84,11 +86,26 @@ final class RuntimeClient implements AutoCloseable {
     }
     Bundle launch(SandboxRecord record, int virtualUserId, String requestId,
                   String operationId) throws Exception {
-        Bundle request = request(record, virtualUserId, record.launchProcess,
-                requestId, operationId);
-        return companionRoute(record)
-                ? nativeCompanion.launchActivity(record, virtualUserId, request)
-                : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+        RuntimePerformanceTrace perf = new RuntimePerformanceTrace(requestId, operationId,
+                record == null ? "" : record.packageName);
+        ACTIVE_PERF_TRACE.set(perf);
+        try {
+            Bundle request;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PACKAGE_STATE)) {
+                request = request(record, virtualUserId, record.launchProcess, requestId, operationId);
+            }
+            Bundle result;
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.BROKER_CONNECT)) {
+                result = companionRoute(record)
+                        ? nativeCompanion.launchActivity(record, virtualUserId, request)
+                        : execute(RuntimeOperationRequest.LAUNCH_ACTIVITY, request);
+            }
+            perf.close();
+            return result;
+        } finally {
+            perf.close();
+            ACTIVE_PERF_TRACE.remove();
+        }
     }
     Bundle launchComponent(SandboxRecord record, int virtualUserId, String component)
             throws Exception {
@@ -311,8 +328,15 @@ final class RuntimeClient implements AutoCloseable {
     private Bundle request(SandboxRecord record, int virtualUserId, String processName,
                            String requestId, String operationId) throws Exception {
         NativeGuestExecutionPolicy.requireRuntimeAllowed(record);
-        VirtualPackageStateSnapshot packageState = packageService.virtualPackageState(
-                record.packageName, virtualUserId);
+        RuntimePerformanceTrace perf = ACTIVE_PERF_TRACE.get();
+        VirtualPackageStateSnapshot packageState;
+        if (perf == null) {
+            packageState = packageService.virtualPackageState(record.packageName, virtualUserId);
+        } else {
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PACKAGE_STATE)) {
+                packageState = packageService.virtualPackageState(record.packageName, virtualUserId);
+            }
+        }
         if (!record.sha256.equals(packageState.apkSha256())) {
             throw new SecurityException("PACKAGE_STATE_REVISION_MISMATCH");
         }
@@ -367,19 +391,29 @@ final class RuntimeClient implements AutoCloseable {
         if (record.permissions != null && !record.permissions.trim().isEmpty()) permissions.addAll(Arrays.asList(record.permissions.split(",")));
         request.putStringArrayList(RuntimeKeys.PERMISSIONS, permissions);
         request.putParcelable(RuntimeKeys.PACKAGE_STATE, packageState);
-        request.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
-                packageUniverse(record, virtualUserId));
+        if (perf == null) {
+            request.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                    packageUniverse(record, virtualUserId));
+        } else {
+            try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.PACKAGE_UNIVERSE)) {
+                request.putParcelableArrayList(RuntimeKeys.PACKAGE_UNIVERSE,
+                        packageUniverse(record, virtualUserId));
+            }
+        }
         return request;
     }
 
     private ArrayList<VirtualPackageProjectionSnapshot> packageUniverse(
             SandboxRecord current, int virtualUserId) throws Exception {
         ArrayList<VirtualPackageProjectionSnapshot> result = new ArrayList<>();
+        RuntimePerformanceTrace perf = ACTIVE_PERF_TRACE.get();
+        if (perf != null) perf.addCounter("packageUniverseCount", 1);
         for (SandboxRecord record : packageService.load().records()) {
             if (current.packageName.equals(record.packageName)) continue;
             VirtualPackageStateSnapshot state;
             try {
                 state = packageService.virtualPackageState(record.packageName, virtualUserId);
+                if (perf != null) perf.addCounter("binderCallCount", 1);
             } catch (Exception unavailableForUser) {
                 // A package without an instance for this virtual user is not installed in that
                 // user's virtual PMS view. Do not fall back to Host PMS metadata.
@@ -393,6 +427,7 @@ final class RuntimeClient implements AutoCloseable {
             // by the target process, Binder identity and virtual system-service state whenever
             // package enumeration order changes or a package was assigned an ID earlier.
             int virtualUid = requireBroker().virtualUidFor(record.packageName, virtualUserId);
+            if (perf != null) perf.addCounter("binderCallCount", 1);
             // The authority snapshot already contains the manifest-derived ApplicationInfo and
             // split paths.  Parsing every peer APK through Host PackageManager on every request
             // duplicated import work and made cold starts scale with unrelated APK size.

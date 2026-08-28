@@ -29,6 +29,15 @@ public final class RuntimeEventLog {
             append(line, "requestId", normalized.getString(RuntimeKeys.REQUEST_ID, ""));
             append(line, "operationId", normalized.getString(RuntimeKeys.OPERATION_ID, ""));
             append(line, "launchStage", normalized.getString(RuntimeKeys.LAUNCH_STAGE, ""));
+            append(line, "perfPhase", normalized.getString("perfPhase", ""));
+            append(line, "perfStage", normalized.getString("perfStage", ""));
+            append(line, "perfEvent", normalized.getString("perfEvent", ""));
+            if (normalized.containsKey("perfElapsedMs")) {
+                line.append(" perfElapsedMs=").append(normalized.getLong("perfElapsedMs", 0L));
+            }
+            if (normalized.containsKey("perfDurationMs")) {
+                line.append(" perfDurationMs=").append(normalized.getLong("perfDurationMs", 0L));
+            }
             if (normalized.containsKey(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS)) {
                 line.append(" launchStageAtElapsedMs=")
                         .append(normalized.getLong(RuntimeKeys.LAUNCH_STAGE_AT_ELAPSED_MS, 0L));
