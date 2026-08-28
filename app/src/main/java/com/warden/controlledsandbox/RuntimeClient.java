@@ -388,24 +388,16 @@ final class RuntimeClient implements AutoCloseable {
                         + unavailableForUser.getClass().getSimpleName());
                 continue;
             }
-            android.content.pm.ApplicationInfo parsedApplicationInfo = null;
-            try {
-                android.content.pm.PackageInfo packageInfo = context.getPackageManager()
-                        .getPackageArchiveInfo(record.apkPath, android.content.pm.PackageManager.GET_META_DATA);
-                if (packageInfo != null && packageInfo.applicationInfo != null) {
-                    parsedApplicationInfo = new android.content.pm.ApplicationInfo(packageInfo.applicationInfo);
-                }
-            } catch (RuntimeException ignored) {
-                // The package authority state remains authoritative if the platform parser
-                // cannot read an optional projection APK on this device image.
-            }
             // Runtime Broker is the single owner of the persistent package/user -> UID mapping.
             // Do not synthesize sequential UIDs here: that silently diverges from the UID used
             // by the target process, Binder identity and virtual system-service state whenever
             // package enumeration order changes or a package was assigned an ID earlier.
             int virtualUid = requireBroker().virtualUidFor(record.packageName, virtualUserId);
+            // The authority snapshot already contains the manifest-derived ApplicationInfo and
+            // split paths.  Parsing every peer APK through Host PackageManager on every request
+            // duplicated import work and made cold starts scale with unrelated APK size.
             result.add(new VirtualPackageProjectionSnapshot(state, record.apkPath,
-                    record.nativeLibraryDir, virtualUid, parsedApplicationInfo));
+                    record.nativeLibraryDir, virtualUid));
         }
         return result;
     }

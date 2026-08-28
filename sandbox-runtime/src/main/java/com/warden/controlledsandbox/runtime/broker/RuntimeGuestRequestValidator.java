@@ -25,6 +25,9 @@ final class RuntimeGuestRequestValidator {
     }
 
     void validate(Bundle input) throws Exception {
+        // Never trust a caller-supplied optimization bit.  Only this validator may mint the
+        // Broker-issued proof after hashing the complete immutable base/split set below.
+        input.putBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER, false);
         int protocol = input.getInt(RuntimeKeys.PROTOCOL, RuntimeProtocol.CURRENT);
         if (!RuntimeProtocol.isCompatible(protocol)) {
             throw new IllegalArgumentException("UNSUPPORTED_PROTOCOL:" + protocol);
@@ -98,6 +101,7 @@ final class RuntimeGuestRequestValidator {
         input.putString(RuntimeKeys.APK_SHA256, revision.apkSha256());
         input.putLong(RuntimeKeys.APK_VERSION_CODE, revision.versionCode());
         input.putString(RuntimeKeys.PACKAGE_REVISION, revision.canonical());
+        input.putBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER, true);
         String nativeDir = input.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
         if (!nativeDir.trim().isEmpty()) {
             File nativeFile = new File(nativeDir).getCanonicalFile();

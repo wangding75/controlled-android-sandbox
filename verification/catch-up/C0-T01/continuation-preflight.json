@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "task_id": "C4-R05",
+  "task_id": "C4-TEMP-01",
   "status": "PASS",
-  "captured_at": "2026-08-28T08:26:49.697976+00:00",
+  "captured_at": "2026-08-28T10:14:09.014873+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-R05",
-    "active_task": "C4-R05",
+    "next_task": "C4-TEMP-01",
+    "active_task": "C4-TEMP-01",
     "last_completed": "C4-R04",
     "first_ready_pending": null,
-    "dependencies": "C4-R04"
+    "dependencies": "C4-R04；C4-R05 BLOCKED（临时前置）"
   },
   "last_receipt": {
     "task_id": "C4-R04",
@@ -29,9 +29,9 @@
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "5ee894f3e32339b951ba7c81f19010f1d13bf392",
+    "head": "3d2783fde0a060f3902083b7f042305343542927",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "5ee894f3e32339b951ba7c81f19010f1d13bf392",
+    "remote_head": "3d2783fde0a060f3902083b7f042305343542927",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
@@ -43,7 +43,7 @@
     "resolved_serial": "127.0.0.1:16416",
     "api": "32",
     "abi": "x86_64,arm64-v8a,x86,armeabi-v7a,armeabi",
-    "boot_id": "818b4e5f-bbe0-4f2f-9503-971c16cc53ee",
+    "boot_id": "bd6fc459-0d52-4689-868a-420364ea407c",
     "android_id": "398eea33120cd887",
     "model": "22041211A"
   },
@@ -303,5 +303,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-R05"
+  "evidence_directory": "verification/catch-up/C4-TEMP-01"
 }

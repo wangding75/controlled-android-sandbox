@@ -34,6 +34,8 @@ public final class GuestPackageSpec {
     final String baseApkSha256;
     final long apkVersionCode;
     final String packageRevision;
+    /** Proof minted by the Broker validator for this exact immutable revision. */
+    final boolean packageRevisionVerifiedByBroker;
     final String nativeLibraryDir;
     final String nativeAbi;
     final boolean containsNativeCode;
@@ -100,6 +102,8 @@ public final class GuestPackageSpec {
         apkVersionCode = bundle.getLong(RuntimeKeys.APK_VERSION_CODE, -1L);
         if (apkVersionCode < 0) throw new IllegalArgumentException("apkVersionCode must be non-negative");
         packageRevision = required(bundle, RuntimeKeys.PACKAGE_REVISION);
+        packageRevisionVerifiedByBroker = bundle.getBoolean(
+                RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER, false);
         String declaredNativeLibraryDir = bundle.getString(RuntimeKeys.NATIVE_LIBRARY_DIR, "");
         nativeLibraryDescriptor = parcelDescriptor(bundle, RuntimeKeys.ISOLATED_NATIVE_LIBRARY_FD);
         nativeLibraryDescriptors = parcelDescriptors(bundle,
@@ -195,6 +199,8 @@ public final class GuestPackageSpec {
         }
         out.putString(RuntimeKeys.BASE_APK_SHA256, baseApkSha256);
         out.putLong(RuntimeKeys.APK_VERSION_CODE, apkVersionCode); out.putString(RuntimeKeys.PACKAGE_REVISION, packageRevision);
+        out.putBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER,
+                packageRevisionVerifiedByBroker);
         out.putString(RuntimeKeys.NATIVE_LIBRARY_DIR, nativeLibraryDir); out.putString(RuntimeKeys.NATIVE_ABI, nativeAbi);
         if (dataRootDescriptor != null) out.putParcelable(RuntimeKeys.ISOLATED_DATA_ROOT_FD, dataRootDescriptor);
         if (nativeLibraryDescriptor != null) {

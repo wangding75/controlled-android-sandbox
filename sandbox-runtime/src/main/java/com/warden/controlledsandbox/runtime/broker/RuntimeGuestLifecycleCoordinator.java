@@ -495,6 +495,10 @@ final class RuntimeGuestLifecycleCoordinator {
         out.putInt(RuntimeKeys.VIRTUAL_USER_ID, input.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1));
         out.putLong(RuntimeKeys.APK_VERSION_CODE,
                 input.getLong(RuntimeKeys.APK_VERSION_CODE, -1L));
+        // Carry only the proof minted by RuntimeGuestRequestValidator.  The validator resets
+        // caller input before hashing, so a replayed or forged request cannot enable this path.
+        out.putBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER,
+                input.getBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER, false));
         for (String key : VALIDATED_STRING_KEYS) copyString(input, out, key);
         for (String key : VALIDATED_LIST_KEYS) copyStringList(input, out, key);
         if (input.containsKey(RuntimeKeys.NATIVE_CODE_PRESENT)) {
@@ -519,6 +523,8 @@ final class RuntimeGuestLifecycleCoordinator {
                 cached.getInt(RuntimeKeys.VIRTUAL_USER_ID, input.getInt(RuntimeKeys.VIRTUAL_USER_ID)));
         input.putLong(RuntimeKeys.APK_VERSION_CODE,
                 cached.getLong(RuntimeKeys.APK_VERSION_CODE, -1L));
+        input.putBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER,
+                cached.getBoolean(RuntimeKeys.PACKAGE_REVISION_VERIFIED_BY_BROKER, false));
         input.putBoolean(RuntimeKeys.NATIVE_CODE_PRESENT,
                 cached.getBoolean(RuntimeKeys.NATIVE_CODE_PRESENT, false));
         if (cached.containsKey(RuntimeKeys.PACKAGE_STATE)) {

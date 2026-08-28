@@ -258,30 +258,18 @@ public final class GuestRuntimeEnvironment {
                     ? GuestResourceLoader.load(host, spec.apkDescriptor, spec.splitDescriptors)
                     : GuestResourceLoader.load(host, spec.apkPath, spec.splitPathArray());
             PackageManager processPackageManager = host.getPackageManager();
-            ApplicationInfo parsedApplicationInfo = null;
-            try {
-                if (spec.isolatedProcess) {
-                    parsedApplicationInfo = spec.packageState.applicationInfo();
-                } else {
-                android.content.pm.PackageInfo parsed = processPackageManager.getPackageArchiveInfo(
-                        spec.apkPath, PackageManager.GET_META_DATA);
-                if (parsed != null && parsed.applicationInfo != null) {
-                    parsedApplicationInfo = new ApplicationInfo(parsed.applicationInfo);
-                }
-                }
-            } catch (Throwable error) {
-                // The custom binary manifest parser remains authoritative for the virtual PMS.
-                // This optional platform projection only supplies framework ApplicationInfo
-                // fields (targetSdk/flags/largeHeap/etc.) when the device parser accepts the APK.
-                android.util.Log.w("CS_GUEST_METADATA", "applicationInfo projection unavailable", error);
+            // VirtualPackageStateBuilder already parsed the manifest at import time and carries
+            // the authoritative ApplicationInfo (including split paths and appComponentFactory).
+            // Re-parsing a large commercial archive through Host PackageManager here duplicated
+            // cold-start work and could disagree with the virtual package identity.  Isolated
+            // descriptor requests use the same authority projection; their bytes remain verified
+            // separately in verifyPackageRevision().
+            ApplicationInfo parsedApplicationInfo = spec.packageState.applicationInfo();
+            if (parsedApplicationInfo != null) {
+                parsedApplicationInfo = new ApplicationInfo(parsedApplicationInfo);
             }
-            if (parsedApplicationInfo == null) {
-                parsedApplicationInfo = spec.packageState.applicationInfo();
-            }
-            String appComponentFactory = spec.isolatedProcess
-                    ? (parsedApplicationInfo == null ? "" :
-                    GuestApplicationInfoFactory.readComponentFactory(parsedApplicationInfo))
-                    : archiveAppComponentFactory(processPackageManager, spec.apkPath);
+            String appComponentFactory = parsedApplicationInfo == null ? ""
+                    : GuestApplicationInfoFactory.readComponentFactory(parsedApplicationInfo);
             GuestContext guestContext = new GuestContext(host, spec, loader,
                     loadedResources.resources, loadedResources.assets, processPackageManager,
                     loadedResources.manifestMetadata.application(), appComponentFactory,
@@ -728,6 +716,15 @@ public final class GuestRuntimeEnvironment {
         if (spec.isolatedProcess && spec.apkDescriptor == null) {
             throw new IllegalStateException("ISOLATED_APK_CAPABILITY_MISSING");
         }
+        if (!spec.isolatedProcess && spec.packageRevisionVerifiedByBroker) {
+            // RuntimeGuestRequestValidator has already hashed the complete immutable base/split
+            // set and bound the resulting revision to this request.  Re-hashing the same sealed
+            // content on the Guest main thread was a duplicate cold-start cost.  Isolated APKs
+            // arrive through transferred descriptors and intentionally never use this shortcut.
+            android.util.Log.i("CS_REVISION_VERIFY", "skipped broker-verified revision="
+                    + spec.packageRevision);
+            return;
+        }
         com.warden.controlledsandbox.domain.session.PackageRevision verifiedRevision =
                 spec.isolatedProcess
                         ? PackageRevisionSetVerifier.verify(spec.apkDescriptor,
@@ -883,19 +880,6 @@ public final class GuestRuntimeEnvironment {
         android.util.Log.i("CS_GUEST_FACTORY", "application factory="
                 + String.valueOf(appComponentFactory) + " class=" + className);
         return application;
-    }
-
-    private static String archiveAppComponentFactory(PackageManager packageManager, String apkPath) {
-        try {
-            android.content.pm.PackageInfo info = packageManager.getPackageArchiveInfo(
-                    apkPath, PackageManager.GET_META_DATA);
-            String value = info == null || info.applicationInfo == null
-                    ? "" : GuestApplicationInfoFactory.readComponentFactory(info.applicationInfo);
-            return value;
-        } catch (Throwable error) {
-            android.util.Log.w("CS_GUEST_FACTORY", "archive factory unavailable", error);
-            return "";
-        }
     }
 
     /**

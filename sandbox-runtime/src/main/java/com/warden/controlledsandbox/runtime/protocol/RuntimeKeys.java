@@ -57,6 +57,9 @@ public final class RuntimeKeys {
     public static final String SHARED_LIBRARIES = "sharedLibraries";
     public static final String APK_VERSION_CODE = "apkVersionCode";
     public static final String PACKAGE_REVISION = "packageRevision";
+    /** True only after the current Broker validator verified the immutable base/split revision. */
+    public static final String PACKAGE_REVISION_VERIFIED_BY_BROKER =
+            "packageRevisionVerifiedByBroker";
     public static final String NATIVE_LIBRARY_DIR = "nativeLibraryDir";
     public static final String NATIVE_ABI = "nativeAbi";
     public static final String NATIVE_CODE_PRESENT = "nativeCodePresent";
