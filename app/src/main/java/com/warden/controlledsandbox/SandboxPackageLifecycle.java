@@ -2,6 +2,7 @@ package com.warden.controlledsandbox;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import com.warden.controlledsandbox.contract.InstallSessionInfoSnapshot;
@@ -35,6 +36,7 @@ final class SandboxPackageLifecycle {
     private final ApkImportManager importer;
     private final PackageInstallSessionStore installSessions;
     private final PackageLifecycleTransactionStore lifecycleTransactions;
+    private final InstalledApplicationImportProofStore importProofs;
     private String maintenanceWarning = "";
 
     SandboxPackageLifecycle(Context context) {
@@ -43,6 +45,7 @@ final class SandboxPackageLifecycle {
         importer = new ApkImportManager(this.context);
         installSessions = new PackageInstallSessionStore(this.context.getFilesDir());
         lifecycleTransactions = new PackageLifecycleTransactionStore(this.context.getFilesDir());
+        importProofs = new InstalledApplicationImportProofStore(this.context.getFilesDir());
     }
 
     synchronized SandboxCatalogState load() throws Exception {
@@ -112,16 +115,24 @@ final class SandboxPackageLifecycle {
         if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
         ApplicationInfo application = context.getPackageManager().getApplicationInfo(
                 normalized, PackageManager.GET_META_DATA);
-        List<File> artifacts = new ArrayList<>();
-        artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
-        if (application.splitSourceDirs != null) {
-            for (String split : application.splitSourceDirs) {
-                artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
+        List<File> artifacts = installedArtifacts(application);
+        PackageInfo packageInfo = installedPackageInfo(normalized);
+        try {
+            SandboxCatalogState fastCurrent = catalogRepository.loadForFastPath();
+            SandboxRecord existing = fastCurrent.findRecord(normalized);
+            if (existing != null && sameRevisionFastPath(fastCurrent, existing, application,
+                    packageInfo, nativeGuestTrust, artifacts, null)) {
+                return existing;
             }
+        } catch (Exception fastPathMiss) {
+            // Fall through to the normal importer; it remains the authority on a miss.
         }
         SandboxCatalogState current = catalogRepository.load();
-        return commitImported(current,
+        SandboxRecord committed = commitImported(current,
                 importer.importApkFiles(artifacts, current.records(), nativeGuestTrust));
+        rememberImportProof(normalized, application, packageInfo, nativeGuestTrust,
+                committed, artifacts);
+        return committed;
     }
 
     synchronized SandboxRecord importInstalledApplication(String packageName,
@@ -132,16 +143,24 @@ final class SandboxPackageLifecycle {
         if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
         ApplicationInfo application = context.getPackageManager().getApplicationInfo(
                 normalized, PackageManager.GET_META_DATA);
-        List<File> artifacts = new ArrayList<>();
-        artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
-        if (application.splitSourceDirs != null) {
-            for (String split : application.splitSourceDirs) {
-                artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
+        List<File> artifacts = installedArtifacts(application);
+        PackageInfo packageInfo = installedPackageInfo(normalized);
+        try {
+            SandboxCatalogState fastCurrent = catalogRepository.loadForFastPath();
+            SandboxRecord existing = fastCurrent.findRecord(normalized);
+            if (existing != null && sameRevisionFastPath(fastCurrent, existing, application,
+                    packageInfo, nativeGuestTrust, artifacts, null)) {
+                return existing;
             }
+        } catch (Exception fastPathMiss) {
+            // Fall through to the normal importer; it remains the authority on a miss.
         }
         SandboxCatalogState current = catalogRepository.load();
-        return commitImported(current,
+        SandboxRecord committed = commitImported(current,
                 importer.importApkFiles(artifacts, current.records(), nativeGuestTrust), barrier);
+        rememberImportProof(normalized, application, packageInfo, nativeGuestTrust,
+                committed, artifacts);
+        return committed;
     }
 
     /** Imports the physical artifact set and publishes the initial instance in one catalog save. */
@@ -152,6 +171,35 @@ final class SandboxPackageLifecycle {
         if (normalized.isEmpty()) throw new IllegalArgumentException("packageName is required");
         ApplicationInfo application = context.getPackageManager().getApplicationInfo(
                 normalized, PackageManager.GET_META_DATA);
+        List<File> artifacts = installedArtifacts(application);
+        PackageInfo packageInfo = installedPackageInfo(normalized);
+
+        // A fast-path catalog read checks only canonical paths, file shape and metadata.  It is
+        // deliberately separate from the normal load, whose full artifact hashes remain the
+        // authority for a new or changed revision.
+        try {
+            SandboxCatalogState fastCurrent = catalogRepository.loadForFastPath();
+            SandboxRecord existing = fastCurrent.findRecord(normalized);
+            if (existing != null && sameRevisionFastPath(fastCurrent, existing, application,
+                    packageInfo, nativeGuestTrust, artifacts, virtualUserId)) {
+                return existing;
+            }
+        } catch (Exception fastPathMiss) {
+            // A missing/corrupt proof or a failed cheap health check is not an import failure;
+            // the ordinary catalog validator below will either recover or report the real error.
+        }
+
+        SandboxCatalogState current = catalogRepository.load();
+        SandboxRecord imported = importer.importApkFiles(artifacts, current.records(),
+                nativeGuestTrust);
+        SandboxRecord committed = commitImported(current, imported, barrier, virtualUserId);
+        rememberImportProof(normalized, application, packageInfo, nativeGuestTrust,
+                committed, artifacts);
+        return committed;
+    }
+
+    private List<File> installedArtifacts(ApplicationInfo application) throws Exception {
+        if (application == null) throw new IllegalArgumentException("installed application is required");
         List<File> artifacts = new ArrayList<>();
         artifacts.add(requireInstalledArtifact(application.sourceDir, "sourceDir"));
         if (application.splitSourceDirs != null) {
@@ -159,10 +207,53 @@ final class SandboxPackageLifecycle {
                 artifacts.add(requireInstalledArtifact(split, "splitSourceDirs"));
             }
         }
-        SandboxCatalogState current = catalogRepository.load();
-        SandboxRecord imported = importer.importApkFiles(artifacts, current.records(),
-                nativeGuestTrust);
-        return commitImported(current, imported, barrier, virtualUserId);
+        return artifacts;
+    }
+
+    private PackageInfo installedPackageInfo(String packageName) throws Exception {
+        int flags = android.os.Build.VERSION.SDK_INT >= 28
+                ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        return context.getPackageManager().getPackageInfo(packageName, flags);
+    }
+
+    private boolean sameRevisionFastPath(SandboxCatalogState current, SandboxRecord existing,
+                                         ApplicationInfo application, PackageInfo packageInfo,
+                                         String nativeGuestTrust, List<File> artifacts,
+                                         Integer virtualUserId) {
+        InstalledApplicationImportProof proof = importProofs.find(existing.packageName);
+        if (proof == null || !proof.matches(existing.packageName, application, packageInfo,
+                nativeGuestTrust, existing, artifacts)) return false;
+        try {
+            PackageLifecycleTransaction transaction = lifecycleTransactions.get(existing.packageName);
+            if (transaction != null) transaction.requireNotInFlight("same-revision-fast-path");
+            long now = System.currentTimeMillis();
+            SandboxCatalogState next = current;
+            if (virtualUserId != null) {
+                next = current.withEnsuredInstance(existing.packageName, virtualUserId, now);
+            }
+            if (next != current) catalogRepository.saveForFastPath(next);
+            android.util.Log.i("CS_PACKAGE_IMPORT", "SAME_REVISION_FAST_PATH package="
+                    + existing.packageName + " revision=" + existing.sha256
+                    + " user=" + virtualUserId);
+            return true;
+        } catch (Exception rejected) {
+            return false;
+        }
+    }
+
+    private void rememberImportProof(String packageName, ApplicationInfo application,
+                                     PackageInfo packageInfo, String nativeGuestTrust,
+                                     SandboxRecord committed, List<File> artifacts) {
+        try {
+            importProofs.put(InstalledApplicationImportProof.capture(packageName, application,
+                    packageInfo, nativeGuestTrust, committed, artifacts));
+        } catch (Exception proofFailure) {
+            // The proof is an optimization index.  A failure must not roll back a committed
+            // revision; the next Add simply uses the fully verified import path again.
+            maintenanceWarning = "Same-revision proof update failed: " + proofFailure.getMessage();
+            android.util.Log.w("CS_PACKAGE_IMPORT", "SAME_REVISION_PROOF_SKIPPED package="
+                    + packageName + " reason=" + proofFailure.getMessage());
+        }
     }
 
     private SandboxCatalogState loadCatalogForTrace() throws Exception {
@@ -560,6 +651,14 @@ final class SandboxPackageLifecycle {
         SandboxCatalogState current = catalogRepository.load();
         SandboxCatalogState next = current.withoutInstance(packageName, virtualUserId);
         catalogRepository.save(next);
+        if (next.findRecord(packageName) == null) {
+            try {
+                importProofs.remove(packageName);
+            } catch (Exception proofCleanupFailure) {
+                maintenanceWarning = "Same-revision proof cleanup failed: "
+                        + proofCleanupFailure.getMessage();
+            }
+        }
         List<String> cleanupFailures = new ArrayList<>();
         deleteForMaintenance(instanceDirectory(packageName, virtualUserId), cleanupFailures);
         sweepUnreferencedFiles(next, cleanupFailures);

@@ -657,6 +657,7 @@ run_java('com.warden.controlledsandbox.PackageInstallSessionStoreSelfTest', asse
 run_java('com.warden.controlledsandbox.PackageMutationCoordinatorSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.InstallSessionPagingSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.PackageArtifactOrderSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.InstalledApplicationImportProofSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.SandboxSharedPreferencesSelfTest', assertions=False)
 run_java('com.warden.controlledsandbox.runtime.provider.ProviderTransportSelfTest', assertions=False)
 run_java('com.warden.controlledsandbox.runtime.provider.BrokerCursorRuntimeSelfTest', assertions=True)

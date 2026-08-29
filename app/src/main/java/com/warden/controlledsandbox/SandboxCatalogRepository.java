@@ -43,9 +43,40 @@ final class SandboxCatalogRepository {
         return migrated;
     }
 
+    /**
+     * Reads the catalog with only the cheap published-layout checks needed by a same-revision
+     * import probe.  Callers must use {@link #load()} before any operation that mutates or
+     * publishes a revision; a failed fast-path probe therefore remains fail-closed.
+     */
+    synchronized SandboxCatalogState loadForFastPath() throws Exception {
+        boolean catalogExists = Files.isRegularFile(store.primary()) || Files.isRegularFile(store.backup());
+        if (!catalogExists) return SandboxCatalogState.empty();
+        SandboxCatalogState state = store.read(SandboxCatalogRepository::decode,
+                SandboxCatalogState.empty());
+        storageLayout.requireCatalogLayoutFast(state);
+        return state;
+    }
+
     synchronized void save(SandboxCatalogState state) throws Exception {
         if (state == null) throw new IllegalArgumentException("catalog state is required");
         storageLayout.requireCatalogLayout(state);
+        write(state);
+    }
+
+    /**
+     * Persists only after the cheap layout validation used by a same-revision probe.
+     *
+     * <p>This is intentionally limited to adding an instance/user binding for an already
+     * proven revision.  Any revision import or replacement must continue to use {@link #save},
+     * which recomputes every published artifact digest.</p>
+     */
+    synchronized void saveForFastPath(SandboxCatalogState state) throws Exception {
+        if (state == null) throw new IllegalArgumentException("catalog state is required");
+        storageLayout.requireCatalogLayoutFast(state);
+        write(state);
+    }
+
+    private void write(SandboxCatalogState state) throws Exception {
         JSONObject root = new JSONObject();
         root.put("schemaVersion", SCHEMA_VERSION);
         JSONArray packages = new JSONArray();

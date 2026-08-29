@@ -47,6 +47,84 @@ final class PackageStorageLayout {
         for (SandboxRecord record : state.records()) requireRecordLayout(record);
     }
 
+    /**
+     * Cheap published-revision health check used only by the same-source import fast path.
+     *
+     * <p>The normal catalog load intentionally hashes every published artifact.  Repeating that
+     * work before every Add defeats the fast path, so this check keeps the path/symlink/shape
+     * invariants and file metadata checks while relying on the source proof and immutable
+     * revision key recorded by the previous successful import.  Any uncertainty falls back to
+     * the full catalog validator.</p>
+     */
+    void requireCatalogLayoutFast(SandboxCatalogState state) throws Exception {
+        for (SandboxRecord record : state.records()) requireRecordLayoutFast(record);
+    }
+
+    void requireRecordLayoutFast(SandboxRecord record) throws Exception {
+        if (record == null || record.sha256 == null
+                || !record.sha256.matches("[0-9a-fA-F]{64}")) {
+            throw new SecurityException("PACKAGE_REVISION_DIGEST_INVALID");
+        }
+        File expectedApk = apkFile(record.packageName, record.sha256).getCanonicalFile();
+        requireNoManagedSymlinks(expectedApk);
+        File configuredApk = new File(record.apkPath);
+        requireNoManagedSymlinks(configuredApk);
+        if (Files.isSymbolicLink(configuredApk.toPath())
+                || !expectedApk.equals(configuredApk.getCanonicalFile())
+                || !configuredApk.isFile() || Files.size(configuredApk.toPath()) <= 0L) {
+            throw new SecurityException("PACKAGE_REVISION_PUBLISHED_UNHEALTHY: "
+                    + record.packageName);
+        }
+
+        int baseCount = 0;
+        Set<String> splitNames = new HashSet<>();
+        for (PackageArtifactRecord artifact : record.artifacts) {
+            if (artifact == null || artifact.sha256 == null
+                    || !artifact.sha256.matches("[0-9a-fA-F]{64}")) {
+                throw new SecurityException("PACKAGE_ARTIFACT_DIGEST_INVALID: "
+                        + record.packageName);
+            }
+            File expected = artifact.base()
+                    ? expectedApk
+                    : splitApkFile(record.packageName, record.sha256, artifact.splitName)
+                            .getCanonicalFile();
+            requireInsidePackagesRoot(expected);
+            File configured = new File(artifact.path);
+            requireNoManagedSymlinks(configured);
+            if (Files.isSymbolicLink(configured.toPath()) || !configured.isFile()
+                    || Files.size(configured.toPath()) <= 0L
+                    || !expected.equals(configured.getCanonicalFile())) {
+                throw new SecurityException("PACKAGE_ARTIFACT_PUBLISHED_UNHEALTHY: "
+                        + record.packageName + ":" + artifact.splitName);
+            }
+            if (artifact.base()) {
+                baseCount++;
+                if (record.baseApkSha256 == null
+                        || !artifact.sha256.equalsIgnoreCase(record.baseApkSha256)) {
+                    throw new SecurityException("PACKAGE_BASE_DIGEST_MISMATCH: "
+                            + record.packageName);
+                }
+            } else if (!splitNames.add(artifact.splitName)) {
+                throw new SecurityException("PACKAGE_DUPLICATE_SPLIT: " + record.packageName);
+            }
+        }
+        if (baseCount != 1) throw new SecurityException("PACKAGE_BASE_ARTIFACT_COUNT_INVALID");
+
+        if (!record.nativeLibraryDir.trim().isEmpty()) {
+            File expectedNative = nativeLibraryDirectory(record.packageName, record.sha256)
+                    .getCanonicalFile();
+            requireNoManagedSymlinks(expectedNative);
+            File configuredNative = new File(record.nativeLibraryDir);
+            requireNoManagedSymlinks(configuredNative);
+            if (Files.isSymbolicLink(configuredNative.toPath())
+                    || !expectedNative.equals(configuredNative.getCanonicalFile())
+                    || !configuredNative.isDirectory()) {
+                throw new SecurityException("PACKAGE_NATIVE_PUBLISHED_UNHEALTHY: "
+                        + record.packageName);
+            }
+        }
+    }
+
     void requireRecordLayout(SandboxRecord record) throws Exception {
         File configuredExpectedApk = apkFile(record.packageName, record.sha256);
         requireNoManagedSymlinks(configuredExpectedApk);
