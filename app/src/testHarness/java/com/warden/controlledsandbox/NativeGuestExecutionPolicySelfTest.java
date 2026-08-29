@@ -4,6 +4,7 @@ import com.warden.controlledsandbox.contract.InstallSessionParamsSnapshot;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -48,9 +49,34 @@ public final class NativeGuestExecutionPolicySelfTest {
             require(ApkImportManager.containsNativeCode(List.of(
                     PackageArtifactRecord.legacyBase(nativeApk.getAbsolutePath(), SHA))),
                     "lib/<abi>/*.so is detected");
-            require(ApkImportManager.containsNativeCode(List.of(
+            require(!ApkImportManager.containsNativeCode(List.of(
                     PackageArtifactRecord.legacyBase(disguisedNativeApk.getAbsolutePath(), SHA))),
-                    "ELF payload outside lib/ is detected");
+                    "ELF-looking non-library assets are ignored");
+
+            int[] centralDirectorySizes = {100, 5_000};
+            // The static harness gives each self-test a 30-second watchdog.  Keep the normal
+            // regression run quick, while retaining the full PERF-T08 scale matrix for an
+            // explicit benchmark invocation: -DnativeDetectionLarge=true.
+            if (Boolean.getBoolean("nativeDetectionLarge")) {
+                centralDirectorySizes = new int[] {100, 5_000, 20_000, 50_000};
+            }
+            for (int size : centralDirectorySizes) {
+                File largeApk = new File(root, "native-" + size + ".apk");
+                writeArchive(largeApk, size, true);
+                PackageMutationTrace trace = new PackageMutationTrace(
+                        "native-detect-" + size, "nativeDetect", "com.example.guest", 0);
+                boolean detected;
+                try (PackageMutationTrace.Scope ignored = trace.attach()) {
+                    detected = ApkImportManager.containsNativeCode(List.of(
+                            PackageArtifactRecord.legacyBase(largeApk.getAbsolutePath(), SHA)));
+                }
+                require(detected, "native library remains detectable at " + size + " entries");
+                require(trace.counter(PackageMutationTrace.ZIP_ENTRY_COUNT) == size + 1,
+                        "central directory scan visits every entry at " + size + " entries");
+                require(trace.counter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT) == 1,
+                        "native detection opens no individual ZIP entry streams at " + size
+                                + " entries");
+            }
 
             SandboxRecord javaRecord = record(false,
                     InstallSessionParamsSnapshot.NATIVE_GUEST_TRUST_UNTRUSTED, "", "");
@@ -99,6 +125,35 @@ public final class NativeGuestExecutionPolicySelfTest {
             output.write(payload);
             output.closeEntry();
         }
+    }
+
+    private static void writeArchive(File file, int resourceCount, boolean nativeLibrary)
+            throws Exception {
+        try (ZipOutputStream output = new ZipOutputStream(Files.newOutputStream(file.toPath()))) {
+            for (int index = 0; index < resourceCount; index++) {
+                byte[] payload = {(byte) (index & 0xff)};
+                output.putNextEntry(storedEntry("res/raw/entry-" + index + ".bin", payload));
+                output.write(payload);
+                output.closeEntry();
+            }
+            if (nativeLibrary) {
+                byte[] payload = {1, 2, 3};
+                output.putNextEntry(storedEntry("lib/x86_64/libfixed.so", payload));
+                output.write(payload);
+                output.closeEntry();
+            }
+        }
+    }
+
+    private static ZipEntry storedEntry(String name, byte[] payload) {
+        CRC32 crc = new CRC32();
+        crc.update(payload);
+        ZipEntry entry = new ZipEntry(name);
+        entry.setMethod(ZipEntry.STORED);
+        entry.setSize(payload.length);
+        entry.setCompressedSize(payload.length);
+        entry.setCrc(crc.getValue());
+        return entry;
     }
 
     private static NativeGuestPolicyException expectDenied(ThrowingRunnable action) throws Exception {

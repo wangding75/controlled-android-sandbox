@@ -369,23 +369,23 @@ final class ApkImportManager {
                     if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_ENTRY_COUNT, 1);
                     String name = entry.getName();
                     if (entry.isDirectory()) continue;
-                    if (name.startsWith("lib/") && name.endsWith(".so")) {
-                        String[] parts = name.split("/");
-                        if (parts.length == 3 && !parts[1].isEmpty() && !parts[2].isEmpty()) return true;
-                    }
-                    try (InputStream input = zip.getInputStream(entry)) {
-                        if (trace != null) trace.addCounter(PackageMutationTrace.ZIP_STREAM_OPEN_COUNT, 1);
-                        if (hasElfMagic(input)) return true;
-                    }
+                    // Native detection is a central-directory name scan only.  Do not open an
+                    // arbitrary entry to inspect its first bytes: large APKs commonly contain
+                    // tens of thousands of resources, and an ELF-looking asset is not an
+                    // Android native-library payload.  A future special native artifact must be
+                    // added as an explicit, typed allowlist here rather than broadening this
+                    // probe to arbitrary ZIP contents.
+                    if (isNativeLibraryEntry(name)) return true;
                 }
             }
         }
         return false;
     }
 
-    private static boolean hasElfMagic(InputStream input) throws java.io.IOException {
-        return input.read() == 0x7f && input.read() == 'E'
-                && input.read() == 'L' && input.read() == 'F';
+    private static boolean isNativeLibraryEntry(String name) {
+        if (name == null || !name.startsWith("lib/") || !name.endsWith(".so")) return false;
+        String[] parts = name.split("/");
+        return parts.length == 3 && !parts[1].isEmpty() && !parts[2].isEmpty();
     }
 
     private static void requireCompatibleElf(File file, String abi) throws Exception {
