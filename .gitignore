@@ -54,4 +54,9 @@ verification/catch-up/C4-R05/formal-dual-user-retest-*/
 verification/catch-up/C4-R05/formal-preflight-device-unavailable-*.json
 verification/catch-up/C4-R05/repro-*/
 
+# C4-TEMP-01 dynamic latency runs retain raw device logs, dumpsys, screenshots and
+# copied package state locally; the curated classification and artifact index at the
+# TEMP-01 root are the durable review evidence.
+/verification/catch-up/C4-TEMP-01/quark-latency/20*/
+
 _delivery/

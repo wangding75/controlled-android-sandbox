@@ -11,7 +11,6 @@ import argparse
 import datetime as dt
 import json
 import re
-import subprocess
 import sys
 import time
 import uuid
@@ -23,7 +22,14 @@ TOOLS = ROOT / "tools" / "capability"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
-from run_c4_r01_rd import badging, capture_snapshot, value  # noqa: E402
+from run_c4_r01_rd import (  # noqa: E402
+    HOST_ACTIVITY_PREFIX,
+    adb_binary,
+    badging,
+    capture_snapshot,
+    guest_window_state,
+    value,
+)
 from run_p1_00_rd import debug_command  # noqa: E402
 from run_rd_campaign import (  # noqa: E402
     HOST_PACKAGE,
@@ -99,8 +105,7 @@ def discover_quark(serial: str, output: Path) -> dict[str, Any]:
 
 def screenshot(serial: str, path: Path) -> dict[str, Any]:
     path.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(["adb", "-s", serial, "exec-out", "screencap", "-p"],
-                            capture_output=True, timeout=30, check=False)
+    result = adb_binary(serial, ["exec-out", "screencap", "-p"], timeout=30)
     path.write_bytes(result.stdout)
     quality: dict[str, Any] = {"returncode": result.returncode, "bytes": len(result.stdout)}
     try:
@@ -120,14 +125,78 @@ def screenshot(serial: str, path: Path) -> dict[str, Any]:
     return quality
 
 
-def visible_snapshot(serial: str, case_dir: Path, package: str, deadline_sec: float = 30.0) -> dict[str, Any]:
+def _target_window_state(window_dump: str, surface_dump: str, package: str,
+                         component: str = "", sandbox: bool = False) -> dict[str, Any]:
+    blocks = re.split(r"(?=\s+Window #\d+ Window\{)", window_dump)
+    package_blocks = ([block for block in blocks if HOST_PACKAGE in block]
+                      if sandbox else [block for block in blocks if package in block])
+    component_blocks = [block for block in package_blocks if component and component in block]
+    target_blocks = component_blocks or package_blocks
+    target = "\n".join(target_blocks)
+    surface_rows = [line.strip() for line in surface_dump.splitlines()
+                    if ((HOST_ACTIVITY_PREFIX in line or package in line)
+                        if sandbox else package in line)]
+    return {
+        "windowCount": len(target_blocks),
+        "hasSurface": "mHasSurface=true" in target,
+        "readyForDisplay": "isReadyForDisplay()=true" in target,
+        "drawStateHasDrawn": "mDrawState=HAS_DRAWN" in target,
+        "visible": "isVisible=true" in target and "isOnScreen=true" in target,
+        "surfaceShown": "Surface: shown=true" in target,
+        "surfaceCount": len(surface_rows),
+        "surfaceNonEmpty": bool(surface_rows),
+        "matchedComponent": bool(component_blocks),
+    }
+
+
+def _activity_state(activity_dump: str, package: str, component: str = "") -> dict[str, Any]:
+    blocks = re.split(r"(?=TASK\s+\d+:)", activity_dump)
+    target_blocks = [block for block in blocks if package in block]
+    target = "\n".join(target_blocks)
+    component_match = not component or component in target
+    return {
+        "packagePresent": bool(target_blocks),
+        "componentPresent": component_match,
+        "resumed": bool(target_blocks) and "mResumed=true" in target,
+        "targetActivityLines": target[-4000:],
+    }
+
+
+def visible_snapshot(serial: str, case_dir: Path, package: str, component: str = "",
+                     deadline_sec: float = 30.0, *, sandbox: bool = False) -> dict[str, Any]:
     deadline = time.monotonic() + deadline_sec
     last: dict[str, Any] = {}
-    while time.monotonic() < deadline:
-        activity = run_adb(serial, ["shell", "dumpsys", "activity", "top"], check=False).stdout
+    first = True
+    while first or time.monotonic() < deadline:
+        first = False
+        activity_command = "activities" if sandbox else "top"
+        activity = run_adb(serial, ["shell", "dumpsys", "activity", activity_command],
+                           check=False).stdout
+        windows = run_adb(serial, ["shell", "dumpsys", "window", "windows"], check=False).stdout
+        surfaces = run_adb(serial, ["shell", "dumpsys", "SurfaceFlinger", "--list"],
+                            check=False).stdout
         shot = screenshot(serial, case_dir / "screenshot.png")
-        last = {"activity": activity, "screenshot": shot}
-        if package in activity and shot.get("nonBlack") and shot.get("nonTransparent"):
+        if sandbox:
+            guest_state = guest_window_state(activity)
+            activity_state = {
+                "packagePresent": package in activity,
+                "componentPresent": package in activity,
+                "resumed": guest_state["resumed_guest_stub_count"] > 0
+                and not guest_state["windows_empty"]
+                and not guest_state["reported_drawn_false"]
+                and guest_state["drawn"],
+                "guestWindowState": guest_state,
+            }
+        else:
+            activity_state = _activity_state(activity, package, component)
+        window_state = _target_window_state(windows, surfaces, package, component, sandbox)
+        last = {"activity": activity, "screenshot": shot,
+                "activityState": activity_state, "windowState": window_state}
+        if (activity_state["resumed"] and window_state["hasSurface"]
+                and window_state["readyForDisplay"] and window_state["drawStateHasDrawn"]
+                and window_state["visible"] and window_state["surfaceShown"]
+                and window_state["surfaceNonEmpty"] and shot.get("nonBlack")
+                and shot.get("nonTransparent")):
             return last
         # Bounded polling is a readiness check; it is not a fixed readiness sleep or a retry of
         # the launch operation.  The operation itself is never issued again.
@@ -150,19 +219,30 @@ def dump_case(serial: str, case_dir: Path, package: str) -> dict[str, Any]:
 
 def direct_once(serial: str, package: str, component: str, case_dir: Path) -> dict[str, Any]:
     request_id = uuid.uuid4().hex
+    operation_id = request_id + "-direct"
     started = time.monotonic()
     stopped = run_adb(serial, ["shell", "am", "force-stop", package], check=False)
     launched = run_adb(serial, ["shell", "am", "start", "-W", "-n", component], check=False)
-    visible = visible_snapshot(serial, case_dir, package)
+    visible = visible_snapshot(serial, case_dir, package, component)
+    cleaned = run_adb(serial, ["shell", "am", "force-stop", package], check=False)
     elapsed_ms = round((time.monotonic() - started) * 1000)
-    row = {"kind": "direct", "requestId": request_id, "package": package, "component": component,
+    row = {"kind": "direct", "requestId": request_id, "operationId": operation_id,
+           "package": package, "component": component,
            "startedAt": now_iso(), "elapsedMs": elapsed_ms,
            "forceStop": {"returncode": stopped.returncode, "stdout": stopped.stdout, "stderr": stopped.stderr},
            "amStart": {"returncode": launched.returncode, "stdout": launched.stdout, "stderr": launched.stderr},
-           "visible": visible, "attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False}
-    if launched.returncode != 0 or package not in visible.get("activity", "") \
-            or not visible.get("screenshot", {}).get("nonBlack"):
-        row["failure"] = "DIRECT_FIRST_VISIBLE_NOT_CONFIRMED"
+           "postObservationForceStop": {"returncode": cleaned.returncode,
+                                         "stdout": cleaned.stdout, "stderr": cleaned.stderr},
+           "visible": visible, "attempt": 1, "retryBudget": 0,
+           "automaticRetryPerformed": False, "retryDecision": "NO_RETRY_FIRST_OBSERVATION"}
+    if (launched.returncode != 0
+            or not visible.get("activityState", {}).get("resumed")
+            or not visible.get("windowState", {}).get("drawStateHasDrawn")
+            or not visible.get("windowState", {}).get("surfaceNonEmpty")
+            or not visible.get("screenshot", {}).get("nonBlack")
+            or cleaned.returncode != 0):
+        row["failure"] = "DIRECT_FIRST_FRAME_NOT_CONFIRMED"
+        row["errorClassification"] = "DIRECT_FIRST_FRAME_NOT_CONFIRMED"
     write_json(case_dir / "case.json", row)
     if row.get("failure"):
         row["firstFailureFullSnapshot"] = dump_case(serial, case_dir / "first-failure-full", package)
@@ -174,6 +254,7 @@ def sandbox_once(serial: str, package: str, case_dir: Path, *, import_first: boo
     request_id = uuid.uuid4().hex
     started = time.monotonic()
     setup: dict[str, Any] | None = None
+    target_stop = run_adb(serial, ["shell", "am", "force-stop", package], check=False)
     if import_first:
         setup_id = uuid.uuid4().hex
         setup = debug_command(serial, ["--es", "command", "import-only", "--es", "package", package,
@@ -185,6 +266,9 @@ def sandbox_once(serial: str, package: str, case_dir: Path, *, import_first: boo
             row = {"kind": "sandbox", "requestId": request_id, "package": package,
                    "attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False,
                    "failure": "IMPORT_ONLY_FAILED", "setup": setup,
+                   "targetStopBeforeSandbox": {"returncode": target_stop.returncode,
+                                                "stdout": target_stop.stdout,
+                                                "stderr": target_stop.stderr},
                    "elapsedMs": round((time.monotonic() - started) * 1000)}
             write_json(case_dir / "case.json", row)
             row["firstFailureFullSnapshot"] = dump_case(serial, case_dir / "first-failure-full", package)
@@ -202,20 +286,31 @@ def sandbox_once(serial: str, package: str, case_dir: Path, *, import_first: boo
     elapsed_ms = round((time.monotonic() - started) * 1000)
     result = (launched.get("result") or {})
     operation = result.get("operation") or {}
-    visible = visible_snapshot(serial, case_dir, package)
+    visible = visible_snapshot(serial, case_dir, package, deadline_sec=0.0,
+                               sandbox=True) if launched.get("status") != "PASS" \
+        else visible_snapshot(serial, case_dir, package, deadline_sec=30.0, sandbox=True)
     timeline = str(operation.get("launchTimeline", ""))
     stages = [item.split("@", 1)[0] for item in timeline.strip("[]").split(", ") if item]
     row = {"kind": "sandbox", "requestId": request_id, "operationId": request_id + "-launch",
            "package": package, "startedAt": now_iso(), "elapsedMs": elapsed_ms,
-           "setup": setup, "stop": stopped, "launch": launched, "operation": operation,
+           "setup": setup, "targetStopBeforeSandbox": {
+               "returncode": target_stop.returncode, "stdout": target_stop.stdout,
+               "stderr": target_stop.stderr}, "stop": stopped, "launch": launched,
+           "operation": operation,
            "readinessElapsedMs": operation.get("launchReadinessElapsedMs"),
            "requiredStagesPresent": all(stage in stages for stage in REQUIRED_STAGES),
            "visible": visible, "attempt": 1, "retryBudget": 0, "automaticRetryPerformed": False}
     if (launched.get("status") != "PASS" or operation.get("status") != "LAUNCH_PASS"
             or operation.get("firstFrameDrawn") is not True
             or not row["requiredStagesPresent"]
-            or not visible.get("screenshot", {}).get("nonBlack")):
+            or not visible.get("activityState", {}).get("resumed")
+            or not visible.get("windowState", {}).get("drawStateHasDrawn")
+            or not visible.get("windowState", {}).get("surfaceNonEmpty")
+            or not visible.get("screenshot", {}).get("nonBlack")
+            or target_stop.returncode != 0):
         row["failure"] = "SANDBOX_FIRST_FRAME_NOT_CONFIRMED"
+        row["errorClassification"] = ((launched.get("result") or {}).get("errorType")
+                                       or "SANDBOX_FIRST_FRAME_NOT_CONFIRMED")
     write_json(case_dir / "case.json", row)
     if row.get("failure"):
         row["firstFailureFullSnapshot"] = dump_case(serial, case_dir / "first-failure-full", package)

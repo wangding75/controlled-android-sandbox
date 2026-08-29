@@ -16,6 +16,8 @@ files = {
     'registry': ROOT / 'sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRegistry.java',
     'policy': ROOT / 'sandbox-domain/src/main/java/com/warden/controlledsandbox/domain/session/SessionRevisionPolicy.java',
     'broker': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeBrokerService.java',
+    'validator': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestRequestValidator.java',
+    'lifecycle': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/broker/RuntimeGuestLifecycleCoordinator.java',
     'spec': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageSpec.java',
     'guest': ROOT / 'sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java',
     'single_test': ROOT / 'sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/protocol/ApkRevisionVerifierSelfTest.java',
@@ -37,8 +39,8 @@ if not errors:
             errors.append(f'GuestPackageSpec does not retain {key}')
         if f'RuntimeKeys.{key}' not in text['client']:
             errors.append(f'RuntimeClient does not send {key}')
-    if 'input.putString(RuntimeKeys.PACKAGE_REVISION, revision.canonical())' not in text['broker']:
-        errors.append('Broker does not derive authoritative PACKAGE_REVISION')
+    if 'input.putString(RuntimeKeys.PACKAGE_REVISION, revision.canonical())' not in text['validator']:
+        errors.append('Broker validator does not derive authoritative PACKAGE_REVISION')
 
     for fragment in ['MessageDigest.getInstance("SHA-256")', 'MessageDigest.isEqual(',
                      'throw new SecurityException("APK_SHA256_MISMATCH']:
@@ -58,17 +60,21 @@ if not errors:
     if 'mismatchedLiveSessions' not in text['policy']:
         errors.append('Session revision replacement policy is missing')
 
+    # The broker lifecycle was split after this gate was first introduced.  Keep the
+    # assertions tied to the owning classes instead of requiring the implementation to
+    # collapse validation, session allocation, and recovery into RuntimeBrokerService.
+    broker_control = '\n'.join((text['validator'], text['lifecycle']))
     required_broker = [
         'PackageRevisionSetVerifier.verify(',
         'Split metadata arrays must have identical sizes',
         'Split APK path is outside app-private storage',
         'stopMismatchedRevisionSessions(packageName, userId, packageRevision)',
-        'sessions.allocate(\n                    packageName, userId, processName, packageRevision, now())',
+        'owner.sessions.allocate(\n                    packageName, userId, processName, packageRevision, owner.now())',
         'PREPARED_SPEC_REVISION_MISMATCH',
     ]
     for fragment in required_broker:
-        if fragment not in text['broker']:
-            errors.append(f'Broker revision control missing: {fragment}')
+        if fragment not in broker_control:
+            errors.append(f'Broker revision control missing from validator/lifecycle: {fragment}')
 
     required_guest = [
         'PackageRevisionSetVerifier.verify(spec.apkFile(), spec.baseApkSha256',

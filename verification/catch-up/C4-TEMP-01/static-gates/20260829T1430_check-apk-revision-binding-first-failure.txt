@@ -1,0 +1,18 @@
+command: python scripts/check-apk-revision-binding.py
+captured_at: 2026-08-29T14:30:44+08:00
+baseline_commit: 54d48c5cfa85602299531b5215cfa0c9c352fdc3
+exit_code: 1
+classification: static-gate-contract-drift-or-implementation-regression; runtime not exercised
+request_id: not-applicable (static check)
+attempt: 1
+retry_decision: no retry; preserve first failure before diagnosis
+raw_output:
+FAIL immutable APK revision binding checks
+ - Broker does not derive authoritative PACKAGE_REVISION
+ - Broker revision control missing: PackageRevisionSetVerifier.verify(
+ - Broker revision control missing: Split metadata arrays must have identical sizes
+ - Broker revision control missing: Split APK path is outside app-private storage
+ - Broker revision control missing: stopMismatchedRevisionSessions(packageName, userId, packageRevision)
+ - Broker revision control missing: sessions.allocate(
+                    packageName, userId, processName, packageRevision, now())
+ - Broker revision control missing: PREPARED_SPEC_REVISION_MISMATCH
