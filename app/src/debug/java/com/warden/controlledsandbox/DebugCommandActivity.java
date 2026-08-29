@@ -418,6 +418,13 @@ public final class DebugCommandActivity extends Activity {
                         "PROVIDER_CAMPAIGN_PASS");
             } else if ("import-launch".equals(command) || "launch".equals(command)) {
                 operation = runtime.launch(record, virtualUserId, requestId, operationId);
+                // Product launch() deliberately returns once the runtime and Host ActivityStarter
+                // have accepted the request.  The debug command is an evidence collector, so it
+                // explicitly follows the independent readiness observation until the terminal
+                // LAUNCH_PASS/LAUNCH_FAILED result is published.
+                if ("LAUNCH_ACCEPTED".equals(operation.getString(RuntimeKeys.STATUS, ""))) {
+                    operation = awaitLaunchReadiness(runtime, operation);
+                }
                 requireStatus("launch", operation, "LAUNCH_PASS");
             } else if ("package-state-campaign".equals(command)) {
                 operation = packageStateCampaign(packages, record, packageName, virtualUserId);
@@ -1318,6 +1325,26 @@ public final class DebugCommandActivity extends Activity {
         String errorMessage = bundle == null ? "No result Bundle" : bundle.getString(RuntimeKeys.ERROR_MESSAGE, "");
         throw new IllegalStateException(operation + " failed: status=" + status
                 + ", errorType=" + errorType + ", errorMessage=" + errorMessage);
+    }
+
+    /**
+     * Debug-only bridge from product launch acceptance to the independent first-frame observer.
+     * This wait is intentionally outside RuntimeClient.launch()'s product critical path.
+     */
+    private static Bundle awaitLaunchReadiness(RuntimeClient runtime, Bundle accepted)
+            throws Exception {
+        if (runtime == null || accepted == null) {
+            throw new IllegalArgumentException("runtime and accepted launch result are required");
+        }
+        final long deadline = android.os.SystemClock.elapsedRealtime() + 35_000L;
+        Bundle observed = accepted;
+        while (android.os.SystemClock.elapsedRealtime() < deadline) {
+            observed = runtime.observeLaunch(accepted);
+            String status = observed.getString(RuntimeKeys.STATUS, "");
+            if (!"LAUNCH_PENDING".equals(status)) return observed;
+            Thread.sleep(100L);
+        }
+        throw new IllegalStateException("LAUNCH_OBSERVATION_TIMEOUT");
     }
 
     private static Bundle packageStateCampaign(PackageServiceClient packages, SandboxRecord record,
