@@ -1809,4 +1809,24 @@ issues:
       This repeats the hard readiness failure after the pulled performance baseline but still does
       not establish whether the residual delay is generic CAS readiness or Quark/app-SDK startup;
       status remains RECORDED and blocks the campaign. No deadline extension, hidden retry, or
-      package-specific production change was used.
+      package-specific production change was used. On 2026-08-30, two independent dynamic
+      C4-TEMP-01 lanes were executed on the dynamically resolved MuMu `RD测试` instance. Lane
+      `20260830T034123` passed Quark direct cold launch 3/3 at 6430/6603/6044 ms; its first
+      sandbox failure used request `f54f6ec3009d489ca33769e14df29ec4` and operation
+      `f54f6ec3009d489ca33769e14df29ec4-launch`, attempt 1, retry budget 0, automatic retry
+      false. The child reached a valid FIRST_FRAME_DRAWN at 03:43:21.608 only after the
+      30-second gate had failed at 03:43:17.955, so the late frame was not accepted. Lane
+      `20260830T035048` independently passed direct cold launch 3/3 at 8737/8405/7803 ms;
+      its first sandbox failure used request `7bc5f68e932b413ea03c3f300df92526` and operation
+      `7bc5f68e932b413ea03c3f300df92526-launch`, also attempt 1 with retry budget 0 and no
+      automatic retry. The target Activity callback spent 16337 ms in the delegate before
+      CREATED/RESUMED, and no FIRST_FRAME_DRAWN was observed before the fail-fast runner stopped.
+      The candidate ApplicationInfo native-library-root separation removed the previously seen
+      `libsgmainso-6.6.230703.so` missing-library error, but did not close the readiness gate;
+      ART profile-directory messages are nonfatal and are not promoted to the root cause. Full
+      first-failure evidence, callback timing, snapshots, screenshots, logs, revision, APK and
+      device hashes are indexed under
+      `verification/catch-up/C4-TEMP-01/20260830T035048-first-failure-classification.md` and
+      the two run directories. The issue remains `RECORDED`, `blocks_current_campaign: true`,
+      and `acceptance: NOT_FIXED`; recovery requires a bounded CAS-versus-App/SDK/Guest
+      classification and a fresh clean-commit regression before C4-R05 can resume.

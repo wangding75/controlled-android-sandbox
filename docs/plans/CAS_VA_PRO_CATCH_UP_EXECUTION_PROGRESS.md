@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.7
-更新时间：2026-08-29 22:37（Asia/Shanghai）
+更新时间：2026-08-30 04:00（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `cdd69a2d7b31e15cc205c4328ddccd4b42dac103` | §5 C4-TEMP-01 block receipt |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 8 小时窗口最终阻断回执 |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2982,3 +2982,156 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `docs(progress): record [C4-TEMP-01] blocked receipt` 提交；完成推送后以 Git SHA 核验。
   本地与远端 HEAD 必须一致、工作区保持干净；下一任务仍记录为
   `C4-TEMP-01 (BLOCKED)`，不得进入 `C4-R05` 或 `C6-T01`。
+
+### C4-TEMP-01：8 小时窗口续作（2026-08-30）
+
+- **任务 ID / 当前状态**：`C4-TEMP-01 / IN_PROGRESS`。本段是对 2026-08-29 首失败阻断的
+  明确人工续作，不覆盖历史 `BLOCKED` 回执，也不把首失败改写为 PASS。当前仍只有本任务
+  一个 `IN_PROGRESS`，在本任务关闭前不得进入 `C4-R05`。
+- **窗口与开始记录**：开始时间 `2026-08-30 02:30:22 +08:00`；窗口截止
+  `2026-08-30 10:30:22 +08:00`；开始 commit、分支与远端 HEAD 均为
+  `691ebac73bc1a69eca3b4e8733bc5dc4160b59d6` /
+  `feature/t57-r03-va-pro-capability-campaign` /
+  `origin/feature/t57-r03-va-pro-capability-campaign`。上一任务回执为 C4-R04
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`；上一轮 C4-TEMP-01 阻断回执为
+  `691ebac73bc1a69eca3b4e8733bc5dc4160b59d6`。
+- **续接预检**：状态恢复前运行 `python scripts/verify-catch-up-continuation.py`，按
+  历史 BLOCKED 状态 fail-closed，原始输出为 `ledger next task C4-TEMP-01 is not first
+  dependency-ready PENDING task`；这是预期阻断，不是任务跳过。写入本段后必须重新运行并
+  识别 `C4-TEMP-01` 为当前唯一活动任务。
+- **RD 测试设备快照**：通过 `python scripts/mumu_instance.py --instance-name 'RD测试'`
+  动态解析；MuMu `RD测试`（实例索引 1，`MuMuPlayer-12.0-1`），API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，型号 `22041211A`，Android ID
+  `398eea33120cd887`，boot ID `bd6fc459-0d52-4689-868a-420364ea407c`；resolved serial
+  仅存在于本次运行快照，未进入代码常量、任务分支或验收逻辑。
+- **当前 Known Issues**：`KI-R03-053`、`KI-R03-054`、`KI-R03-057`、`KI-R03-058`、
+  `KI-R03-059`、`KI-R03-061`、`KI-R03-062` 仍为当前 C4 阻断；`KI-R03-060` 为已接受但
+  必须回归的开放项。本次恢复开始时不关闭任何 Issue。
+- **恢复边界**：先完成首次 Quark 沙箱失败的 CAS readiness 与 Quark/app-SDK 延迟的
+  有界分类；只有存在可归因、最小且有 VA/NBB 对照的 CAS 修复并通过静态/构建/动态门禁，
+  才能将本任务改为 DONE 并续接 C4-R05。若设备、样本、权限或真实首帧仍不可用，保留
+  首次失败证据，按任务书重新形成 BLOCKED 回执并停止后续任务。
+
+### C4-TEMP-01：8 小时窗口最终阻断回执（2026-08-30）
+
+- **任务 ID / 最终状态**：`C4-TEMP-01 / BLOCKED`。本窗口未达到任务书的动态沙箱首帧
+  门禁，未标记 DONE，未启动 C4-R05；当前任务保持 BLOCKED，不能继续后续 C4 任务或
+  关闭 C4 阶段。
+- **开始/结束时间与基线**：本次 8 小时续作从 `2026-08-30 02:30:22 +08:00` 开始，
+  截止时间为 `2026-08-30 10:30:22 +08:00`，但因真实阻断于
+  `2026-08-30 03:58:10 +08:00` 停止。开始 commit 为
+  `691ebac73bc1a69eca3b4e8733bc5dc4160b59d6`；分支为
+  `feature/t57-r03-va-pro-capability-campaign`；远端为
+  `origin/feature/t57-r03-va-pro-capability-campaign`。上一任务 C4-R04 回执为
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`；上一轮 C4-TEMP-01 阻断回执为
+  `691ebac73bc1a69eca3b4e8733bc5dc4160b59d6`。窗口开始前已执行
+  `git fetch origin --prune`、`git pull --ff-only`，本地与远端均为上述基线。
+- **事实源与续接预检**：任务开始前重新完整读取任务书、进度账本、C4 RD 重测根因与验收
+  计划、`KNOWN_ISSUES.yaml`、能力活动工作流、提交身份规范，以及 C4-TEMP-01 专项设计
+  和 VA/NBB 参考实现映射。恢复状态写入后，`python scripts/verify-catch-up-continuation.py`
+  通过并识别 `C4-TEMP-01`；最终将任务置为 BLOCKED 后再次运行，原始结果为
+  `FAIL C0-T01 continuation preflight: ledger next task C4-TEMP-01 is not first
+  dependency-ready PENDING task None`，进程退出码 `1`。该 fail-closed 结果确认未误入
+  C4-R05。
+- **执行环境 / RD 测试快照**：动态解析 MuMu `RD测试`（实例索引 1，
+  `MuMuPlayer-12.0-1`），API 32，型号 `22041211A`，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID
+  `398eea33120cd887`，boot ID `bd6fc459-0d52-4689-868a-420364ea407c`。运行时 serial
+  只存在于环境快照，未进入代码常量、验收分支或固定设备逻辑。动态发现的商业样本为
+  夸克 `com.quark.browser`，组件 `com.ucpro.MainActivity`，版本
+  `10.10.5.1080/code1080`，base 1、split 0，primary ABI `arm64-v8a`。
+- **第一次失败原始证据（lane A）**：目录
+  `verification/catch-up/C4-TEMP-01/quark-latency/20260830T034123/`，完整日志为
+  `live-logcat-20260830T034123-native-dir-fix.txt`。import-only 通过，导入 revision
+  为 `v1080:sha256:2cb38172da5da4aee03826da0feccb77ff0391ee7356f1562052ddc1fae9ecb3`。
+  夸克直启 3/3 通过，耗时 `6430/6603/6044 ms`。首个沙箱失败 request 为
+  `f54f6ec3009d489ca33769e14df29ec4`，operation 为
+  `f54f6ec3009d489ca33769e14df29ec4-launch`，session
+  `ef529806-f368-482a-bc8f-9fe48658345c`，root task `167`，child token
+  `c5efc5bd-4c37-4a17-9cc2-07f8783906fc`；attempt `1`、retry budget `0`、
+  `automaticRetryPerformed=false`，没有自动重试。gate 在 `03:43:17.955` 以
+  `LAUNCH_FAILED/LAUNCH_GATE_FAILED` 失败；child 随后于 `03:43:21.608` 才达到真实
+  `FIRST_FRAME_DRAWN`，晚到首帧不能覆盖首失败。首次失败快照位于
+  `sandbox/sample-01/first-failure-full/`，截图为 12504 bytes，SHA-256
+  `4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930`，快照时
+  `surfaceNonEmpty=false`，Activity/Window/Surface 探针为空；request、operation、
+  Host/Guest 日志、dumpsys、安装事务、staging、revision、catalog、进程和设备信息均保留。
+- **独立复测与第一次失败原始证据（lane B）**：目录
+  `verification/catch-up/C4-TEMP-01/quark-latency/20260830T035048/`，完整日志为
+  `live-logcat-20260830T035047-callback-timing.txt`。import-only 通过，package
+  operation `11c4c43a-09a8-40bc-bb5c-fc3282dea1c4` 为 `SUCCEEDED/DONE`，耗时
+  `18716 ms`；夸克直启 3/3 通过，耗时 `8737/8405/7803 ms`。首个沙箱失败 request 为
+  `7bc5f68e932b413ea03c3f300df92526`，operation 为
+  `7bc5f68e932b413ea03c3f300df92526-launch`，session
+  `3f0dd041-3ac6-4494-b711-28d72e8fc715`，root task `168`，child token
+  `ee220fd9-e528-4d02-a48f-51a324405f63`；attempt `1`、retry budget `0`、
+  `automaticRetryPerformed=false`。gate 在 `03:52:58.800` 失败，失败快照于
+  `03:53:33.317617+08:00` 保存，截图仍为 12504 bytes、同一黑屏 SHA-256
+  `4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930`，runner 在首失败
+  后停止，因此没有使用未观测的后续首帧替代失败。
+- **阶段时序与分类**：lane B child `GUEST_READY` 为 `03:52:30.094`，
+  `CALLBACK_CREATE_BEGIN` 为 `03:52:30.099`，delegate begin 为 `03:52:30.108`，
+  delegate return 为 `03:52:46.444`，delegate elapsed `16337 ms`，随后
+  `CREATED/STARTED/POST_CREATED/RESUMED` 为 `03:52:46.445/03:52:46.528/
+  03:52:46.533/03:52:46.620`，且 `windowAttached=false`。Host gate 在
+  `03:52:58.800` 截止；因此已把残余延迟收敛到目标 Activity delegate/Guest 环境边界的
+  可观测阶段，但现有证据不足以把全部延迟归因于 CAS 通用层、Quark 应用或 SDK。最终
+  分类为 `CAS_READINESS_GATE_FAILURE_WITH_NESTED_QUARK_HANDOFF_UNRESOLVED`，责任边界
+  保持“待验证”，不是猜测出的根因。未发现本次 request 关联的 FATAL、未界定 ANR、设备
+  丢失或 LOW_MEMORY 退出。
+- **VA/NBB 对照与采纳边界**：复核 VA `HCallbackStub`、`AppInstrumentation`、
+  `VirtualRuntime` 与 NBB `HCallbackProxy`、`BaseInstrumentationDelegate`、
+  `IActivityClientProxy` 的生命周期、Binder、token、task、window identity 以及安装/进程
+  复用边界。采纳 broker-issued revision proof、权威 package-state projection、peer
+  universe 状态复用和真实 request-scoped FIRST_FRAME_DRAWN gate；不采纳固定 sleep、
+  扩大 deadline、post-resume 多次 addView、吞异常循环重试或 package-specific 特判。对应
+  回归覆盖 import revision、nested root→child handoff、Window/Surface/首帧及首失败保留。
+- **实现摘要 / 修改文件**：保留并验证本轮最小 CAS 边界改动：
+  `GuestApplicationInfoFactory` 将 `ApplicationInfo.nativeLibraryDir` 与 U4 runtime
+  native 目录分离，避免把打包应用的 native identity 指向错误运行时根；
+  `GuestNativeRuntimeProjection`、`GuestRuntimeEnvironment`、`BaseGuestProcessService`、
+  `GuestContextComponentRouter`、`GuestActivityController`、
+  `RuntimeActivityLaunchCoordinator` 和 `GuestActivityThreadInstrumentation` 补充
+  native/生命周期/回调阶段诊断。该候选修复后两条运行链均未再出现
+  `libsgmainso-6.6.230703.so not found`；ART profile-directory 信息被确认是非致命现象，
+  但 30 秒真实首帧门禁仍失败，故不扩大修改范围、不改变门槛。
+- **验收命令与结果**：续接预检在恢复后 `PASS`；最终 fail-closed 预检如上为预期
+  `FAIL/exit 1`。`python scripts/check-c4-temp-01-latency.py`、
+  `python scripts/check-c4-r05-orchestrator.py`、`python scripts/check-apk-revision-binding.py`
+  和 `python -m py_compile ...` 均通过；Gradle
+  `:sandbox-runtime:compileDebugJavaWithJavac --no-daemon` 及
+  `:app:assembleDebug :fixture-basic:assembleDebug :sandbox-companion32:assembleDebug
+  :fixture-compat32:assembleDebug --no-daemon` 均通过。动态命令
+  `python tools/capability/run_c4_temp_01_quark_latency.py --samples 3` 在 lane A/B
+  均于沙箱 sample-01 首失败返回 `exit 1`；没有为追求偶然通过而重试或扩大门禁。
+- **商业样本矩阵**：夸克直启两条独立 lane 各 3/3 PASS；每条 lane 的 CAS 沙箱 sample-01
+  均 FAIL，故没有伪造 ratio、继续余下沙箱样本或宣称商业矩阵通过。DingTalk、红果、番茄
+  小说以及 C4-R05 两轮正式矩阵、C1/C2/C4/SX 回归、30 分钟双用户短测均未执行，按首个
+  真实非环境失败 fail-fast 停止；夸克直启和历史 fixture/DingTalk 结果不能替代它们。
+- **APK / revision / device hash**：本轮构建 APK SHA-256 为 host
+  `B176F18AEA3997CBED829580D21DB255D561421A62870B5C5E98E04DB79C5D07`，fixture-basic
+  `8D8F4D776B287EA947358690882A33763C3967578952CC88E57D5188CA8275A5`，companion32
+  `AF576D1D53C98E9F408B1691B3AFC8042AF9BC20628F024132DCFC6039528BB3`，fixture-compat32
+  `9193694EE36848992E98D7E1FF7197A833182807784EB5A375F0D32BFF5C96E1`；revision、设备
+  boot ID 与截图 hash 已在两条动态证据的环境/summary/case/snapshot 文件中保存。
+- **Known Issues 变化**：`KI-R03-062` 保持
+  `RECORDED / NEEDS_REPRODUCTION_AND_CLASSIFICATION / acceptance: NOT_FIXED /
+  blocks_current_campaign: true`，追加两条 2026-08-30 动态 lane、首次失败 request、
+  callback timing 和候选 native 边界结果；`KI-R03-053/054/057/058/059/061` 保持
+  `RECORDED` 阻断，`KI-R03-060` 保持已接受但开放的强制回归项，未错误关闭任何 Issue。
+- **重试记录**：两条生产 launch request 都是 attempt `1`、retry budget `0`、
+  `automaticRetryPerformed=false`，retry decision 为首次观察不重试；lane B 是保留 lane A
+  首失败后重新建立的独立 request/operation，不能解释成同一请求重试。没有捕获所有异常后
+  循环、固定 sleep、静默 launch retry 或扩大总 timeout。
+- **偏离任务书 / 遗留风险 / 恢复条件**：因首个真实沙箱失败，未完成沙箱余项、全商业
+  样本、C4-R05 两轮、C1/C2/C4/SX 回归和 30 分钟双用户短测，这是任务书 fail-fast 阻断路径，
+  不是降低门槛。恢复前须完成 CAS readiness 与 Quark/app-SDK/Guest 环境责任的有界分类；
+  若需生产改动，先提交独立 VA/NBB 设计和回归用例，再用新的 clean commit、动态 RD 快照、
+  独立 request/operation 和完整首失败证据重跑 C4-TEMP-01。只有该任务达到 30 秒 cold /
+  10 秒 hot 首帧门禁并完成规定回归，才可恢复 C4-R05。
+- **提交、推送与下一任务**：实现/证据提交和本回执提交分离；本次实现/证据提交为
+  `a9add66722cb3ab6da996059bcc4ad32c502778d`（`fix(c4): [C4-TEMP-01] classify Quark
+  readiness latency`），回执提交 SHA 在第二次提交后回填。两次提交均须推送到
+  `origin/feature/t57-r03-va-pro-capability-campaign`，并验证本地与远端 HEAD 一致、
+  工作区干净。下一任务仍为 `C4-TEMP-01 (BLOCKED)`，C4-R05 保持 `BLOCKED`；不得进入
+  C6-T01，C4 阶段不得标记 DONE。
