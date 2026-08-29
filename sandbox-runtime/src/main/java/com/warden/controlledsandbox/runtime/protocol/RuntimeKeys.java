@@ -212,6 +212,13 @@ public final class RuntimeKeys {
     public static final String LAUNCH_TIMEOUT_OWNER = "timeoutOwner";
     public static final String LAUNCH_STAGE_START_REMAINING_MS = "stageStartRemaining";
     public static final String LAUNCH_STAGE_END_REMAINING_MS = "stageEndRemaining";
+    /** Versioned Guest Prepare classification emitted with the readiness projection. */
+    public static final String GUEST_PREPARE_PLAN_VERSION = "guestPreparePlanVersion";
+    public static final String GUEST_PREPARE_TIER_A = "guestPrepareTierA";
+    public static final String GUEST_PREPARE_TIER_B = "guestPrepareTierB";
+    public static final String GUEST_PREPARE_TIER_C = "guestPrepareTierC";
+    public static final String GUEST_PREPARE_DEFERRED = "guestPrepareDeferred";
+    public static final String GUEST_PREPARE_LAZY_POLICY = "guestPrepareLazyPolicy";
 
     public static final String CONNECTION_ID = "connectionId";
     public static final String SERVICE_BIND_FLAGS = "serviceBindFlags";

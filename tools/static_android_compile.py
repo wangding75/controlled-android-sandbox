@@ -676,6 +676,7 @@ run_java('com.warden.controlledsandbox.runtime.guest.GuestContextBoundarySelfTes
 run_java('com.warden.controlledsandbox.runtime.guest.GuestContextCacheKeySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestIntentResolverSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestContextStorageTransferSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.guest.GuestPreparePlanSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestStorageNameCodecSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestJobServiceBridgeSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.guest.GuestServiceConnectionRelaySelfTest', assertions=True)

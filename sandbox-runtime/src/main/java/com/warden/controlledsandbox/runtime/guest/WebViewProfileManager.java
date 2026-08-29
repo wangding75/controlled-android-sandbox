@@ -30,18 +30,10 @@ public final class WebViewProfileManager {
             return configuredProfile;
         }
         // Platform isolated UIDs cannot traverse the host package data label.  The isolated
-        // WebView profile is therefore provisioned by the capability-backed storage bridge when
-        // WebView is actually requested; eagerly mkdir'ing the logical Guest path here makes the
-        // whole process fail before Application.onCreate.
-        if (!spec.isolatedProcess) {
-            createDirectory(profile.root);
-            createDirectory(profile.cache);
-            createDirectory(profile.databases);
-            createDirectory(profile.serviceWorker);
-            createDirectory(profile.cookies);
-            createDirectory(profile.webStorage);
-            createDirectory(profile.fileChooser);
-        }
+        // WebView profile is provisioned by the capability-backed storage bridge when WebView is
+        // actually requested.  The regular path follows the same rule: profile paths are
+        // validated now, while directory creation remains a first-use concern.  This avoids
+        // seven mkdir/stat operations on every Activity launch that never touches WebView.
         if (Build.VERSION.SDK_INT >= 28) {
             try {
                 WebView.setDataDirectorySuffix(profile.suffix);
@@ -96,12 +88,6 @@ public final class WebViewProfileManager {
                 new File(root, "file-chooser"), Build.VERSION.SDK_INT >= 28,
                 new WebViewRendererRegistry(effective), effective.rendererProcessPrefix(),
                 effective.maximumRendererProcesses());
-    }
-
-    private static void createDirectory(File directory) {
-        if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
-            throw new IllegalStateException("Cannot create WebView profile directory " + directory);
-        }
     }
 
     private static void requireName(String value, String name) {

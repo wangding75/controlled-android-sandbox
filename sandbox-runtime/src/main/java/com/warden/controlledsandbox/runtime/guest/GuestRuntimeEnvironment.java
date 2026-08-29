@@ -455,13 +455,15 @@ public final class GuestRuntimeEnvironment {
                     + " available=" + cameraProfile.cameraAvailable()
                     + " ids=" + cameraProfile.cameraIds().size()
                     + " frontIds=" + cameraProfile.frontCameraIds().size());
-            boolean camera1AdapterInstalled = nativePolicyConfigured && !translatedGuestAbi
-                    && NativePolicy.installCamera1Adapter();
+            // Camera1 is a first-use capability.  GuestClassLoader installs the adapter when the
+            // Guest actually loads android.hardware.Camera; doing it here made every launch pay
+            // the native symbol lookup/patch cost even for camera-free applications.
+            boolean camera1AdapterInstalled = false;
             if (nativePolicyConfigured) {
                 configureCamera1NativeProfile(guestContext.getFilesDir(), spec, host,
                         cameraProfile);
-                android.util.Log.i("CS_CAMERA1_NATIVE", (camera1AdapterInstalled
-                        ? "ADAPTER_READY" : "ADAPTER_DEFERRED_SYSTEM_LIBRARY_LOAD") + " status="
+                android.util.Log.i("CS_CAMERA1_NATIVE", (!translatedGuestAbi
+                        ? "ADAPTER_DEFERRED_CAMERA_CLASS_LOAD" : "ADAPTER_DEFERRED_TRANSLATED_ABI") + " status="
                         + NativePolicy.camera1Status());
             }
             PrivilegedServicesProxyReadiness.require(frameworkHooks.report().installedServices(),
@@ -515,11 +517,6 @@ public final class GuestRuntimeEnvironment {
             GuestNativeBindingDiagnostic.recordClass("application", application.getClass());
             stagedProcessIdentity.attachApplication(application);
             guestContext.mainThread.run(() -> invokeNearestAttachBaseContext(application, guestContext));
-            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
-                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
-                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_ATTACH installed="
-                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
-            }
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_CREATE:"
                         + NativePolicy.hookStatus());
@@ -561,12 +558,6 @@ public final class GuestRuntimeEnvironment {
             }
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ONCREATE)) {
                 session.mainThread.run(application::onCreate);
-            }
-            if (nativePolicyConfigured && !translatedGuestAbi && !camera1AdapterInstalled) {
-                camera1AdapterInstalled = NativePolicy.installCamera1Adapter();
-                session.camera1AdapterInstalled = camera1AdapterInstalled;
-                android.util.Log.i("CS_CAMERA1_NATIVE", "ADAPTER_RETRY_AFTER_APPLICATION installed="
-                        + camera1AdapterInstalled + " status=" + NativePolicy.camera1Status());
             }
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
@@ -1343,6 +1334,8 @@ public final class GuestRuntimeEnvironment {
         final GuestCapabilityAuditLog capabilityAudit;
         final CapabilityLeaseRegistry capabilityLeases;
         final VirtualSystemServiceState virtualServices;
+        /** Immutable audit of which prepare operations are launch-critical versus first-use. */
+        final GuestPreparePlan preparePlan;
         volatile VirtualPackageStateSnapshot packageState;
         final boolean nativePolicyConfigured;
         final boolean nativeHooksInstalled;
@@ -1391,6 +1384,7 @@ public final class GuestRuntimeEnvironment {
             this.capabilityAudit = java.util.Objects.requireNonNull(capabilityAudit, "capabilityAudit");
             this.capabilityLeases = java.util.Objects.requireNonNull(capabilityLeases, "capabilityLeases");
             this.virtualServices = java.util.Objects.requireNonNull(virtualServices, "virtualServices");
+            this.preparePlan = GuestPreparePlan.forSpec(spec, nativePolicyConfigured);
             this.packageState = spec.packageState;
             this.nativePolicyConfigured = nativePolicyConfigured;
             this.nativeHooksInstalled = nativeHooksInstalled;
@@ -1453,6 +1447,7 @@ public final class GuestRuntimeEnvironment {
                     && spec.packageName.equals(context.getApplicationInfo().packageName));
             out.putBoolean("frameworkComponentLifecycleReady", activityThreadInstrumentation != null
                     && serviceFrameworkBridge != null && loadedApkBridge != null);
+            out.putAll(preparePlan.toBundle());
             out.putLong("durationMs", Math.max(0,
                     android.os.SystemClock.elapsedRealtime() - started));
             return out;
@@ -1556,6 +1551,7 @@ public final class GuestRuntimeEnvironment {
                     && spec.packageName.equals(context.getApplicationInfo().packageName));
             out.putBoolean("frameworkComponentLifecycleReady", activityThreadInstrumentation != null
                     && serviceFrameworkBridge != null && loadedApkBridge != null);
+            out.putAll(preparePlan.toBundle());
             out.putInt("virtualComponentCount", packageMetadata.components().size());
             java.util.ArrayList<String> deviceServiceBindings = new java.util.ArrayList<>();
             for (java.util.Map.Entry<String, String> item : frameworkHooks.report().bindingDetails().entrySet()) {
