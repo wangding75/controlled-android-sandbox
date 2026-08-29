@@ -4,6 +4,9 @@ import android.content.Context;
 import com.warden.controlledsandbox.domain.persistence.RecoverableFileStore;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
 import org.json.JSONArray;
@@ -18,6 +21,10 @@ final class SandboxCatalogRepository {
     private final PackageStorageLayout storageLayout;
     private final LegacyPackageLayoutMigrator legacyLayoutMigrator;
     private long generation;
+    private SandboxCatalogState cachedState;
+    private CatalogStamp cachedPrimary;
+    private CatalogStamp cachedBackup;
+    private boolean cachedFullyValidated;
 
     SandboxCatalogRepository(Context context) {
         File filesDir = context.getFilesDir();
@@ -30,17 +37,38 @@ final class SandboxCatalogRepository {
     }
 
     synchronized SandboxCatalogState load() throws Exception {
+        if (cachedState != null && cacheMatchesDisk()) {
+            try {
+                if (cachedFullyValidated) {
+                    // A fully validated cache hit still performs the cheap published-layout check
+                    // so a missing, replaced or symlinked revision fails closed without reparsing
+                    // the catalog or hashing every APK on every launch/import.
+                    storageLayout.requireCatalogLayoutFast(cachedState);
+                } else {
+                    // A fast-path probe may have populated this cache without cryptographic
+                    // artifact validation.  The ordinary load is the authority and upgrades it
+                    // only after the full digest check succeeds.
+                    storageLayout.requireCatalogLayout(cachedState);
+                    cachedFullyValidated = true;
+                }
+                return cachedState;
+            } catch (Exception staleCache) {
+                clearCache();
+            }
+        }
         boolean catalogExists = Files.isRegularFile(store.primary()) || Files.isRegularFile(store.backup());
         if (catalogExists) {
             SandboxCatalogState state = store.read(
                     SandboxCatalogRepository::decode, SandboxCatalogState.empty());
             storageLayout.requireCatalogLayout(state);
+            cacheState(state, true);
             return state;
         }
         SandboxCatalogState legacy = SandboxCatalogState.normalizeLegacy(
                 legacyPackages.load(), legacyInstances.load(), System.currentTimeMillis());
         SandboxCatalogState migrated = legacyLayoutMigrator.migrate(legacy);
         if (!migrated.records().isEmpty() || !migrated.instances().isEmpty()) save(migrated);
+        else clearCache();
         return migrated;
     }
 
@@ -50,11 +78,20 @@ final class SandboxCatalogRepository {
      * publishes a revision; a failed fast-path probe therefore remains fail-closed.
      */
     synchronized SandboxCatalogState loadForFastPath() throws Exception {
+        if (cachedState != null && cacheMatchesDisk()) {
+            try {
+                storageLayout.requireCatalogLayoutFast(cachedState);
+                return cachedState;
+            } catch (Exception staleCache) {
+                clearCache();
+            }
+        }
         boolean catalogExists = Files.isRegularFile(store.primary()) || Files.isRegularFile(store.backup());
         if (!catalogExists) return SandboxCatalogState.empty();
         SandboxCatalogState state = store.read(SandboxCatalogRepository::decode,
                 SandboxCatalogState.empty());
         storageLayout.requireCatalogLayoutFast(state);
+        cacheState(state, false);
         return state;
     }
 
@@ -63,6 +100,7 @@ final class SandboxCatalogRepository {
         storageLayout.requireCatalogLayout(state);
         write(state);
         generation++;
+        cacheState(state, true);
     }
 
     /**
@@ -77,9 +115,38 @@ final class SandboxCatalogRepository {
         storageLayout.requireCatalogLayoutFast(state);
         write(state);
         generation++;
+        cacheState(state, false);
     }
 
     synchronized long generation() { return generation; }
+
+    private boolean cacheMatchesDisk() {
+        if (cachedPrimary == null || cachedBackup == null) return false;
+        CatalogStamp currentPrimary = CatalogStamp.capture(store.primary());
+        CatalogStamp currentBackup = CatalogStamp.capture(store.backup());
+        return currentPrimary != null && currentBackup != null
+                && cachedPrimary.equals(currentPrimary) && cachedBackup.equals(currentBackup);
+    }
+
+    private void cacheState(SandboxCatalogState state, boolean fullyValidated) {
+        CatalogStamp primary = CatalogStamp.capture(store.primary());
+        CatalogStamp backup = CatalogStamp.capture(store.backup());
+        if (primary == null || backup == null) {
+            clearCache();
+            return;
+        }
+        cachedState = state;
+        cachedPrimary = primary;
+        cachedBackup = backup;
+        cachedFullyValidated = fullyValidated;
+    }
+
+    private void clearCache() {
+        cachedState = null;
+        cachedPrimary = null;
+        cachedBackup = null;
+        cachedFullyValidated = false;
+    }
 
     private void write(SandboxCatalogState state) throws Exception {
         JSONObject root = new JSONObject();
@@ -144,5 +211,47 @@ final class SandboxCatalogRepository {
         }
         return new SandboxCatalogState(packages, instances, policies,
                 permissionRequests, permissionAudit);
+    }
+
+    private static final class CatalogStamp {
+        final boolean exists;
+        final long size;
+        final long modified;
+        final String identity;
+
+        CatalogStamp(boolean exists, long size, long modified, String identity) {
+            this.exists = exists;
+            this.size = size;
+            this.modified = modified;
+            this.identity = identity == null ? "" : identity;
+        }
+
+        static CatalogStamp capture(Path path) {
+            try {
+                if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+                    return new CatalogStamp(false, 0L, 0L, "");
+                }
+                BasicFileAttributes attributes = Files.readAttributes(path,
+                        BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+                Object key = attributes.fileKey();
+                String identity = key == null
+                        ? "creation:" + attributes.creationTime().toMillis()
+                        : String.valueOf(key);
+                return new CatalogStamp(true, attributes.size(),
+                        attributes.lastModifiedTime().toMillis(), identity);
+            } catch (Exception error) {
+                return null;
+            }
+        }
+
+        @Override public boolean equals(Object other) {
+            if (!(other instanceof CatalogStamp stamp)) return false;
+            return exists == stamp.exists && size == stamp.size && modified == stamp.modified
+                    && identity.equals(stamp.identity);
+        }
+
+        @Override public int hashCode() {
+            return java.util.Objects.hash(exists, size, modified, identity);
+        }
     }
 }
