@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.7
-更新时间：2026-08-30 04:00（Asia/Shanghai）
+更新时间：2026-08-30 04:02（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -3031,8 +3031,9 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   和 VA/NBB 参考实现映射。恢复状态写入后，`python scripts/verify-catch-up-continuation.py`
   通过并识别 `C4-TEMP-01`；最终将任务置为 BLOCKED 后再次运行，原始结果为
   `FAIL C0-T01 continuation preflight: ledger next task C4-TEMP-01 is not first
-  dependency-ready PENDING task None`，进程退出码 `1`。该 fail-closed 结果确认未误入
-  C4-R05。
+  dependency-ready PENDING task None`，进程退出码 `1`。原始输出另存于
+  `verification/catch-up/C4-TEMP-01/20260830T0357-final-continuation-preflight-failure.md`；
+  该 fail-closed 结果确认未误入 C4-R05。
 - **执行环境 / RD 测试快照**：动态解析 MuMu `RD测试`（实例索引 1，
   `MuMuPlayer-12.0-1`），API 32，型号 `22041211A`，ABI
   `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID
