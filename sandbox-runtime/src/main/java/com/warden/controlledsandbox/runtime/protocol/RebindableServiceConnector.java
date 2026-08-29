@@ -214,7 +214,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
                 continue;
             }
             if (delayNanos > 0L) {
-                sleepNanos(Math.min(delayNanos, remaining));
+                awaitRetryDelay(Math.min(delayNanos, remaining));
                 continue;
             }
 
@@ -272,6 +272,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
             staleBinder = binder;
             binder = null;
             if (staleAttempt != null) staleAttempt.latch.countDown();
+            lock.notifyAll();
         }
         unlink(staleBinder, staleAttempt == null ? null : staleAttempt.deathRecipient);
         closeService(staleService);
@@ -478,6 +479,7 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         nextBindAtNanos = safeAdd(System.nanoTime(), TimeUnit.MILLISECONDS.toNanos(delayMs));
         lastFailure = cause == null ? new IllegalStateException(reason)
                 : new IllegalStateException(reason, cause);
+        lock.notifyAll();
     }
 
     private long retryDelayMs(int failures) {
@@ -523,11 +525,24 @@ public final class RebindableServiceConnector<T> implements AutoCloseable {
         catch (RuntimeException ignored) { }
     }
 
-    private static void sleepNanos(long nanos) throws InterruptedException {
-        if (nanos <= 0L) return;
-        long millis = TimeUnit.NANOSECONDS.toMillis(nanos);
-        int extraNanos = (int) (nanos - TimeUnit.MILLISECONDS.toNanos(millis));
-        Thread.sleep(millis, extraNanos);
+    /**
+     * Waits for the retry deadline without an uninterruptible fixed sleep.  Lifecycle changes
+     * (close, invalidation, or a new failure policy) wake the condition immediately, so a caller
+     * never remains parked for the entire backoff after the capability is no longer wanted.
+     */
+    private void awaitRetryDelay(long maxNanos) throws InterruptedException {
+        if (maxNanos <= 0L) return;
+        long deadline = safeAdd(System.nanoTime(), maxNanos);
+        synchronized (lock) {
+            while (!closed) {
+                long remaining = Math.min(nextBindAtNanos - System.nanoTime(),
+                        deadline - System.nanoTime());
+                if (remaining <= 0L) return;
+                long millis = TimeUnit.NANOSECONDS.toMillis(remaining);
+                int extraNanos = (int) (remaining - TimeUnit.MILLISECONDS.toNanos(millis));
+                lock.wait(millis, extraNanos);
+            }
+        }
     }
 
     private static long safeAdd(long left, long right) {

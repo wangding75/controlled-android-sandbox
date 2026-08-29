@@ -23,6 +23,7 @@ public final class RebindableServiceConnectorSelfTest {
         reconnectsAfterBinderDeath();
         retiresSilentlyDeadBindingBeforeRebind();
         usesBoundedExponentialBackoff();
+        closeWakesRetryBackoff();
         singleAttemptDoesNotHideRejectedBind();
         timesOutMissingCallbackAndRebinds();
         timeoutAfterBackoffCancelsAttempt();
@@ -95,6 +96,30 @@ public final class RebindableServiceConnectorSelfTest {
         require(connector.snapshot().consecutiveFailures() == 0,
                 "successful reconnect must clear failure count");
         connector.close();
+    }
+
+    private static void closeWakesRetryBackoff() throws Exception {
+        FakeContext context = new FakeContext();
+        context.enqueue(BindBehavior.REJECT, BindBehavior.CONNECT);
+        RebindableServiceConnector<String> connector = new RebindableServiceConnector<>(
+                context, new Intent(), ignored -> "ready", ignored -> { },
+                "close retry service", 5_000L, 5_000L, 5_000L);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<Throwable> waiting = executor.submit(() -> captureFailure(connector::require));
+            require(context.awaitBind(1, TimeUnit.SECONDS),
+                    "retry backoff test must enter the first bind");
+            long started = System.nanoTime();
+            connector.close();
+            Throwable failure = waiting.get(1, TimeUnit.SECONDS);
+            require(hasMessage(failure, "connector is closed"),
+                    "close must release a retry-backoff waiter");
+            require(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 1_000L,
+                    "close must wake retry wait without waiting for the full backoff");
+        } finally {
+            connector.close();
+            executor.shutdownNow();
+        }
     }
 
     private static void singleAttemptDoesNotHideRejectedBind() throws Exception {
