@@ -3132,7 +3132,10 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   10 秒 hot 首帧门禁并完成规定回归，才可恢复 C4-R05。
 - **提交、推送与下一任务**：实现/证据提交和本回执提交分离；本次实现/证据提交为
   `a9add66722cb3ab6da996059bcc4ad32c502778d`（`fix(c4): [C4-TEMP-01] classify Quark
-  readiness latency`），回执提交 SHA 在第二次提交后回填。两次提交均须推送到
+  readiness latency`）；独立任务回执提交为
+  `c5c7348b0d6f798bdf2325984b7a16bfaaba80e3`（`docs(progress): record [C4-TEMP-01]
+  blocked 8h receipt`）；最终 fail-closed 原始输出补充提交为
+  `b6604419d90c9b2b9b96aa06e599b74021df62a3`。上述提交均已推送到
   `origin/feature/t57-r03-va-pro-capability-campaign`，并验证本地与远端 HEAD 一致、
   工作区干净。下一任务仍为 `C4-TEMP-01 (BLOCKED)`，C4-R05 保持 `BLOCKED`；不得进入
   C6-T01，C4 阶段不得标记 DONE。
