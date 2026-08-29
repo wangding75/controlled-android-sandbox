@@ -488,19 +488,22 @@ final class ApkImportManager {
                     }
                     File temporary = new File(abiOutputDir, fileName + ".incoming");
                     long remaining = MAX_NATIVE_BYTES - total;
+                    ExtractionResult extraction;
                     try (InputStream input = zip.getInputStream(entry);
                          FileOutputStream file = new FileOutputStream(temporary);
                          BufferedOutputStream out = new BufferedOutputStream(file)) {
-                        long extracted = copyLimited(input, out, remaining);
+                        extraction = copyLimitedAndHash(input, out, remaining);
+                        long extracted = extraction.bytes;
                         total += extracted;
                         if (trace != null) {
+                            trace.addCounter(PackageMutationTrace.SHA_BYTES_READ, extracted);
                             trace.addCounter(PackageMutationTrace.NATIVE_BYTES_EXTRACTED, extracted);
                             trace.addCounter(PackageMutationTrace.NATIVE_LIB_COUNT, 1);
                         }
                         out.flush(); file.getFD().sync();
                     }
+                    String digest = extraction.sha256;
                     requireCompatibleElf(temporary, selected);
-                    String digest = sha256(temporary);
                     String existing = extractedDigests.get(fileName);
                     if (existing != null && !existing.equals(digest)) {
                         throw new SecurityException("Conflicting native library across splits: " + fileName);
@@ -903,15 +906,21 @@ final class ApkImportManager {
         return component == null || component.actions().isEmpty() ? "" : component.actions().get(0);
     }
 
-    private static long copyLimited(InputStream input, java.io.OutputStream output, long limit)
-            throws java.io.IOException {
-        byte[] buffer = new byte[64 * 1024]; long total = 0; int count;
-        while ((count = input.read(buffer)) != -1) {
+    private static ExtractionResult copyLimitedAndHash(InputStream input,
+                                                        java.io.OutputStream output,
+                                                        long limit) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        java.security.DigestInputStream hashedInput =
+                new java.security.DigestInputStream(input, digest);
+        byte[] buffer = new byte[64 * 1024];
+        long total = 0;
+        int count;
+        while ((count = hashedInput.read(buffer)) != -1) {
             total += count;
             if (total > limit) throw new java.io.IOException("Native libraries exceed 1 GiB limit");
             output.write(buffer, 0, count);
         }
-        return total;
+        return new ExtractionResult(total, toHex(digest.digest()));
     }
 
     private static String toHex(byte[] bytes) {
@@ -1092,6 +1101,11 @@ final class ApkImportManager {
     private static final class CopyResult {
         final long bytes; final String sha256;
         CopyResult(long bytes, String sha256) { this.bytes = bytes; this.sha256 = sha256; }
+    }
+
+    private static final class ExtractionResult {
+        final long bytes; final String sha256;
+        ExtractionResult(long bytes, String sha256) { this.bytes = bytes; this.sha256 = sha256; }
     }
 
     private static final class ManifestSet {
