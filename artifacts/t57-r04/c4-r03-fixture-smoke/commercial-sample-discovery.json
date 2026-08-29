@@ -1,0 +1,48 @@
+[
+  {
+    "target": "hongguo",
+    "label": "红果免费短剧",
+    "package": "com.phoenix.read",
+    "versionName": "7.0.5.33",
+    "versionCode": "70533",
+    "launchableActivity": "com.dragon.read.pages.splash.SplashActivity",
+    "baseAndSplits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~7DcuDo1hLralzWk_j7GndQ==/com.phoenix.read-qxcQzU44R_TND8OtsKeWEQ==/base.apk",
+        "bytes": 116439278
+      }
+    ],
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a",
+    "secondaryCpuAbi": "null",
+    "apkNativeCode": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -> pm path -> aapt2 label -> dumpsys package"
+  },
+  {
+    "target": "quark",
+    "label": "夸克",
+    "package": "com.quark.browser",
+    "versionName": "10.10.5.1080",
+    "versionCode": "1080",
+    "launchableActivity": "com.ucpro.MainActivity",
+    "baseAndSplits": [
+      {
+        "kind": "base",
+        "path": "/data/app/~~RUHp0o0cRBQleIiE1NLAnQ==/com.quark.browser-lh99NGFqzZjsvaLRLFJFwA==/base.apk",
+        "bytes": 169654003
+      }
+    ],
+    "baseCount": 1,
+    "splitCount": 0,
+    "primaryCpuAbi": "arm64-v8a",
+    "secondaryCpuAbi": "null",
+    "apkNativeCode": [
+      "'arm64-v8a'\r"
+    ],
+    "discovery": "pm list packages -> pm path -> aapt2 label -> dumpsys package"
+  }
+]
