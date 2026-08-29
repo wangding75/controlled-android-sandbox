@@ -112,10 +112,12 @@ final class ApkImportManager {
         List<InspectedArtifact> artifacts = new ArrayList<>();
         List<File> stagedFiles = new ArrayList<>();
         List<String> stagedDigests = new ArrayList<>();
+        List<ManifestModel> manifests = new ArrayList<>();
+        List<PackageInfo> packageInfos = new ArrayList<>();
         long totalBytes = 0;
         File incoming = new File(transactionDir, "incoming");
         if (!incoming.mkdirs()) throw new IllegalStateException("Cannot create incoming artifact directory");
-        File baseFile = null;
+        int baseIndex = -1;
         PackageMutationTrace trace = PackageMutationTrace.current();
         if (trace != null) trace.addCounter(PackageMutationTrace.SPLIT_COUNT,
                 Math.max(0, sources.size() - 1));
@@ -134,23 +136,24 @@ final class ApkImportManager {
             ManifestModel manifest = traced(PackageMutationTrace.MANIFEST_PARSE,
                     () -> parseManifest(staged));
             if (manifest.splitName().isEmpty()) {
-                if (baseFile != null) throw new IllegalArgumentException("Install set contains more than one base APK");
-                baseFile = staged;
+                if (baseIndex >= 0) throw new IllegalArgumentException("Install set contains more than one base APK");
+                baseIndex = index;
             }
+            PackageInfo packageInfo = traced(PackageMutationTrace.PACKAGE_INFO,
+                    () -> packageInfoForArchive(staged));
             stagedFiles.add(staged);
             stagedDigests.add(copied.sha256);
+            manifests.add(manifest);
+            packageInfos.add(packageInfo);
         }
-        if (baseFile == null) throw new IllegalArgumentException("Install set does not contain a base APK");
-        File resolvedBaseFile = baseFile;
-        PackageInfo baseInfo = traced(PackageMutationTrace.PACKAGE_INFO,
-                () -> packageInfoForArchive(resolvedBaseFile));
+        if (baseIndex < 0) throw new IllegalArgumentException("Install set does not contain a base APK");
+        PackageInfo baseInfo = packageInfos.get(baseIndex);
         if (baseInfo == null) throw new IllegalArgumentException("PackageManager rejected the base APK artifact");
         for (int index = 0; index < stagedFiles.size(); index++) {
             int artifactIndex = index;
-            artifacts.add(traced(PackageMutationTrace.PACKAGE_INFO,
-                    () -> inspect(stagedFiles.get(artifactIndex),
-                            stagedDigests.get(artifactIndex), baseInfo,
-                            sources.get(artifactIndex))));
+            artifacts.add(inspect(stagedFiles.get(artifactIndex),
+                    stagedDigests.get(artifactIndex), manifests.get(artifactIndex),
+                    packageInfos.get(artifactIndex), baseInfo, sources.get(artifactIndex)));
         }
         validateArtifactSet(artifacts);
         Collections.sort(artifacts);
@@ -265,12 +268,9 @@ final class ApkImportManager {
                 importedAt, importedAt, "NOT_TESTED", 0);
     }
 
-    private InspectedArtifact inspect(File file, String sha256, PackageInfo baseInfo,
+    private InspectedArtifact inspect(File file, String sha256, ManifestModel manifest,
+                                      PackageInfo info, PackageInfo baseInfo,
                                       File originalSource) throws Exception {
-        ManifestModel manifest = traced(PackageMutationTrace.MANIFEST_PARSE,
-                () -> parseManifest(file));
-        PackageInfo info = traced(PackageMutationTrace.PACKAGE_INFO,
-                () -> packageInfoForArchive(file));
         if (!manifest.packageName().matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+")) {
             throw new IllegalArgumentException("Invalid package name");
         }
