@@ -12,6 +12,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Transaction coordinator for package metadata and immutable APK revisions.
@@ -37,6 +40,10 @@ final class SandboxPackageLifecycle {
     private final PackageInstallSessionStore installSessions;
     private final PackageLifecycleTransactionStore lifecycleTransactions;
     private final InstalledApplicationImportProofStore importProofs;
+    private final ExecutorService maintenanceExecutor;
+    private SandboxCatalogState pendingMaintenanceState;
+    private long pendingMaintenanceGeneration;
+    private boolean maintenanceQueued;
     private String maintenanceWarning = "";
 
     SandboxPackageLifecycle(Context context) {
@@ -46,6 +53,11 @@ final class SandboxPackageLifecycle {
         installSessions = new PackageInstallSessionStore(this.context.getFilesDir());
         lifecycleTransactions = new PackageLifecycleTransactionStore(this.context.getFilesDir());
         importProofs = new InstalledApplicationImportProofStore(this.context.getFilesDir());
+        maintenanceExecutor = Executors.newSingleThreadExecutor(task -> {
+            Thread thread = new Thread(task, "sandbox-package-maintenance");
+            thread.setDaemon(true);
+            return thread;
+        });
     }
 
     synchronized SandboxCatalogState load() throws Exception {
@@ -561,15 +573,7 @@ final class SandboxPackageLifecycle {
         } else if (previous == null) {
             lifecycleTransactions.put(PackageLifecycleTransaction.installed(imported, now));
         }
-        PackageMutationTrace trace = PackageMutationTrace.current();
-        if (trace == null) {
-            sweepUnreferencedFiles(next);
-        } else {
-            try (PackageMutationTrace.StageScope ignored =
-                         trace.stage(PackageMutationTrace.CATALOG_SWEEP)) {
-                sweepUnreferencedFiles(next);
-            }
-        }
+        scheduleMaintenanceSweep(next);
         return imported;
     }
 
@@ -723,6 +727,49 @@ final class SandboxPackageLifecycle {
         List<String> failures = new ArrayList<>();
         sweepUnreferencedFiles(state, failures);
         maintenanceWarning = formatMaintenanceWarning(failures);
+    }
+
+    /**
+     * Queues global package/instance garbage collection after a successful catalog commit.
+     *
+     * <p>The worker serializes with lifecycle mutations and only sweeps the snapshot when the
+     * repository generation still matches.  A newer mutation either replaces the pending
+     * snapshot or causes this pass to be skipped, so a stale import can never delete a newly
+     * published or rollback-retained revision.  If the process dies, the next normal catalog
+     * load performs the existing synchronous recovery sweep.</p>
+     */
+    private void scheduleMaintenanceSweep(SandboxCatalogState state) {
+        pendingMaintenanceState = state;
+        pendingMaintenanceGeneration = catalogRepository.generation();
+        if (maintenanceQueued) return;
+        maintenanceQueued = true;
+        try {
+            maintenanceExecutor.execute(this::runPendingMaintenance);
+        } catch (RejectedExecutionException rejected) {
+            maintenanceQueued = false;
+            pendingMaintenanceState = null;
+            maintenanceWarning = "Package maintenance scheduling failed: "
+                    + rejected.getMessage();
+        }
+    }
+
+    private void runPendingMaintenance() {
+        synchronized (this) {
+            try {
+                SandboxCatalogState snapshot = pendingMaintenanceState;
+                long expectedGeneration = pendingMaintenanceGeneration;
+                pendingMaintenanceState = null;
+                if (snapshot == null || catalogRepository.generation() != expectedGeneration) return;
+                List<String> failures = new ArrayList<>();
+                sweepUnreferencedFiles(snapshot, failures);
+                if (!failures.isEmpty()) maintenanceWarning = formatMaintenanceWarning(failures);
+            } catch (Throwable failure) {
+                FatalErrorPolicy.rethrowIfFatal(failure);
+                maintenanceWarning = "Package maintenance failed: " + failure.getMessage();
+            } finally {
+                maintenanceQueued = false;
+            }
+        }
     }
 
     private void sweepUnreferencedFiles(SandboxCatalogState state, List<String> failures) {

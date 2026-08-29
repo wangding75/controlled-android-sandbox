@@ -17,6 +17,7 @@ final class SandboxCatalogRepository {
     private final SandboxInstanceRepository legacyInstances;
     private final PackageStorageLayout storageLayout;
     private final LegacyPackageLayoutMigrator legacyLayoutMigrator;
+    private long generation;
 
     SandboxCatalogRepository(Context context) {
         File filesDir = context.getFilesDir();
@@ -61,6 +62,7 @@ final class SandboxCatalogRepository {
         if (state == null) throw new IllegalArgumentException("catalog state is required");
         storageLayout.requireCatalogLayout(state);
         write(state);
+        generation++;
     }
 
     /**
@@ -74,7 +76,10 @@ final class SandboxCatalogRepository {
         if (state == null) throw new IllegalArgumentException("catalog state is required");
         storageLayout.requireCatalogLayoutFast(state);
         write(state);
+        generation++;
     }
+
+    synchronized long generation() { return generation; }
 
     private void write(SandboxCatalogState state) throws Exception {
         JSONObject root = new JSONObject();
