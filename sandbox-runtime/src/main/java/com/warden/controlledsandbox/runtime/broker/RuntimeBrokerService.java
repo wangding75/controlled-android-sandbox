@@ -1276,6 +1276,7 @@ public final class RuntimeBrokerService extends Service implements RuntimeBroker
         launchObservationExecutor.shutdownNow();
         launchReadinessResults.clear();
         guestRecoveryPrewarm.close();
+        if (componentRecoveryCoordinator != null) componentRecoveryCoordinator.close();
         for (GuestSession session : sessions.snapshot()) {
             if (ownershipSweep != null) {
                 ownershipSweep.stop(session, "ORDERED_RECEIVER_BROKER_DESTROYED");

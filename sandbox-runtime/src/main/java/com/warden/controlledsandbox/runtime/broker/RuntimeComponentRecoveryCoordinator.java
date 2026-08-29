@@ -7,7 +7,13 @@ import com.warden.controlledsandbox.domain.session.GuestSession;
 import com.warden.controlledsandbox.domain.session.SessionRegistry;
 import com.warden.controlledsandbox.domain.session.SessionState;
 import com.warden.controlledsandbox.runtime.component.activity.BrokerActivityRuntime;
+import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
+import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
 import com.warden.controlledsandbox.runtime.provider.RuntimeProviderResourceCoordinator;
+
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Coordinates cross-component recovery and fail-closed cleanup for a replacing Guest generation. */
 final class RuntimeComponentRecoveryCoordinator {
@@ -18,6 +24,14 @@ final class RuntimeComponentRecoveryCoordinator {
     private final RuntimeReceiverCoordinator receivers;
     private final RuntimeProviderResourceCoordinator providers;
     private final RuntimeSystemServiceCoordinator systemServices;
+    private final ExecutorService recoveryExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "sandbox-component-recovery");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private final Set<String> pendingServiceRecoveries =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private volatile boolean closed;
 
     RuntimeComponentRecoveryCoordinator(SessionRegistry sessions, Clock clock,
                                         BrokerActivityRuntime activities,
@@ -41,10 +55,10 @@ final class RuntimeComponentRecoveryCoordinator {
     void recover(GuestSession stale, GuestSession current, Bundle currentSpec) throws Exception {
         try {
             activities.recreate(stale, current);
-            services.recoverSession(stale, current, currentSpec);
             receivers.recoverSession(stale, current);
             providers.recoverSession(stale, current);
             systemServices.stop(stale);
+            scheduleServiceRecovery(stale, current, currentSpec);
         } catch (Throwable error) {
             try {
                 cleanup(stale, current);
@@ -54,6 +68,87 @@ final class RuntimeComponentRecoveryCoordinator {
             if (error instanceof Exception exception) throw exception;
             throw new IllegalStateException("COMPONENT_RECOVERY_FAILED", error);
         }
+    }
+
+    /**
+     * Service restart invokes Guest component callbacks and can run arbitrary application code.
+     * Keep Activity/task recovery on the launch edge, but move sticky/redelivery Service work to
+     * a generation-fenced daemon so a dead daemon cannot add its recovery latency to a new launch.
+     */
+    private void scheduleServiceRecovery(GuestSession stale, GuestSession current,
+                                         Bundle currentSpec) {
+        if (closed) return;
+        String key = recoveryKey(current);
+        if (!pendingServiceRecoveries.add(key)) return;
+        Bundle spec = currentSpec == null ? new Bundle() : new Bundle(currentSpec);
+        try {
+            recoveryExecutor.execute(() -> recoverServicesAsync(stale, current, spec, key));
+        } catch (RuntimeException rejected) {
+            pendingServiceRecoveries.remove(key);
+            RuntimeEventLog.event("GUEST_COMPONENT_RECOVERY_ASYNC_REJECTED",
+                    event(current, "REJECTED", 0, rejected));
+        }
+    }
+
+    private void recoverServicesAsync(GuestSession stale, GuestSession current,
+                                      Bundle currentSpec, String key) {
+        try {
+            if (!ownsGeneration(current)) return;
+            int recovered = services.recoverSession(stale, current, currentSpec).size();
+            if (ownsGeneration(current)) {
+                RuntimeEventLog.event("GUEST_COMPONENT_RECOVERY_ASYNC_COMPLETED",
+                        event(current, "COMPLETED", recovered, null));
+            } else {
+                services.invalidate(stale);
+            }
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            // Remove only stale-generation records. A user may have started a new Service while
+            // this best-effort recovery was running; invalidating the current generation would
+            // incorrectly erase that live state and turn a recovery race into data loss.
+            services.invalidate(stale);
+            RuntimeEventLog.event("GUEST_COMPONENT_RECOVERY_ASYNC_FAILED",
+                    event(current, "FAILED", 0, error));
+        } finally {
+            pendingServiceRecoveries.remove(key);
+        }
+    }
+
+    private boolean ownsGeneration(GuestSession current) {
+        GuestSession observed = sessions.get(current.packageName(), current.virtualUserId(),
+                current.processName());
+        return observed != null && observed.generation() == current.generation()
+                && observed.state() != SessionState.STOPPED
+                && observed.state() != SessionState.FAILED;
+    }
+
+    private static String recoveryKey(GuestSession current) {
+        return current.packageName() + ":" + current.virtualUserId() + ":"
+                + current.processName() + ":g" + current.generation();
+    }
+
+    private static Bundle event(GuestSession session, String status, int recovered,
+                                Throwable error) {
+        Bundle out = new Bundle();
+        out.putString(RuntimeKeys.STATUS, status);
+        out.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+        out.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        out.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+        out.putString(RuntimeKeys.PROCESS_NAME, session.processName());
+        out.putLong(RuntimeKeys.GENERATION, session.generation());
+        out.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        out.putInt("recoveredServices", recovered);
+        if (error != null) {
+            out.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
+            out.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
+        }
+        return out;
+    }
+
+    void close() {
+        closed = true;
+        recoveryExecutor.shutdownNow();
+        pendingServiceRecoveries.clear();
     }
 
     private void cleanup(GuestSession stale, GuestSession current) {
