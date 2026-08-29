@@ -31,6 +31,12 @@ public abstract class BaseGuestProcessService extends Service {
         @Override public RuntimeOperationResult executeV2(RuntimeOperationRequest request) {
             CallerGuard.requireSameApplication();
             if (request == null) throw new IllegalArgumentException("request is required");
+            android.util.Log.i("CS_GUEST_OPERATION", "ENTRY operation=" + request.operation()
+                    + " request=" + request.requestId()
+                    + " package=" + request.packageName()
+                    + " session=" + request.sessionId()
+                    + " generation=" + request.generation()
+                    + " pid=" + Process.myPid());
             try {
                 Bundle result = switch (request.operation()) {
                     case RuntimeOperationRequest.PREPARE_GUEST -> prepareGuestInternal(request.payload());
@@ -42,9 +48,19 @@ public abstract class BaseGuestProcessService extends Service {
                     default -> throw new IllegalArgumentException(
                             "unsupported guest operation: " + request.operation());
                 };
+                android.util.Log.i("CS_GUEST_OPERATION", "RETURN operation=" + request.operation()
+                        + " request=" + request.requestId()
+                        + " status=" + (result == null ? "<null>"
+                                : result.getString(com.warden.controlledsandbox.runtime.protocol.RuntimeKeys.STATUS, ""))
+                        + " pid=" + Process.myPid());
                 return RuntimeOperationTransport.fromLegacy(request, result);
             } catch (Throwable error) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+                android.util.Log.e("CS_GUEST_OPERATION", "FAIL operation=" + request.operation()
+                        + " request=" + request.requestId()
+                        + " type=" + error.getClass().getName()
+                        + " message=" + String.valueOf(error.getMessage())
+                        + " pid=" + Process.myPid(), error);
                 return RuntimeOperationTransport.failure(request, error);
             }
         }

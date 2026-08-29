@@ -122,6 +122,8 @@ public final class GuestRuntimeEnvironment {
     }
 
     static Bundle prepare(Context host, GuestPackageSpec spec) {
+        long prepareStarted = android.os.SystemClock.elapsedRealtime();
+        prepareTrace("ENTRY", spec, "", prepareStarted, null);
         PreparationKey key = PreparationKey.from(spec);
         ProcessInitializationGate<PreparationKey, Bundle>.Start start;
         synchronized (GuestRuntimeEnvironment.class) {
@@ -130,12 +132,15 @@ public final class GuestRuntimeEnvironment {
             // concurrent callers instead of handing them the old session while it is shutting down.
             if (!INITIALIZATION_GATE.initializing() && current != null
                     && key.matches(current.spec)) {
+                prepareTrace("RETURN", spec, "ALREADY_READY", prepareStarted, null);
                 return current.status("ALREADY_READY",
                         android.os.SystemClock.elapsedRealtime());
             }
             start = INITIALIZATION_GATE.start(key);
         }
         if (start.rejected()) {
+            prepareTrace("REJECTED", spec, "GUEST_PREPARATION_IN_PROGRESS", prepareStarted,
+                    null);
             throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
         }
         if (start.waiter()) {
@@ -143,9 +148,15 @@ public final class GuestRuntimeEnvironment {
             // call protection the old preparing flag provided.  Binder/background callers join
             // the future and receive the exact result of the single owner attempt.
             if (Looper.myLooper() == Looper.getMainLooper()) {
+                prepareTrace("REJECTED", spec, "GUEST_PREPARATION_IN_PROGRESS_MAIN_THREAD",
+                        prepareStarted, null);
                 throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
             }
-            return awaitPreparation(start.future());
+            Bundle result = awaitPreparation(start.future());
+            prepareTrace("RETURN_WAITER", spec,
+                    result == null ? "<null>" : result.getString(RuntimeKeys.STATUS, ""),
+                    prepareStarted, null);
+            return result;
         }
 
         Runnable initialize = () -> completePreparation(start, host, spec);
@@ -160,14 +171,24 @@ public final class GuestRuntimeEnvironment {
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
             // The main-thread owner has already completed the future synchronously.
-            return awaitPreparation(start.future());
+            Bundle result = awaitPreparation(start.future());
+            prepareTrace("RETURN_OWNER", spec,
+                    result == null ? "<null>" : result.getString(RuntimeKeys.STATUS, ""),
+                    prepareStarted, null);
+            return result;
         }
-        return awaitPreparation(start.future());
+        Bundle result = awaitPreparation(start.future());
+        prepareTrace("RETURN_OWNER", spec,
+                result == null ? "<null>" : result.getString(RuntimeKeys.STATUS, ""),
+                prepareStarted, null);
+        return result;
     }
 
     private static void completePreparation(
             ProcessInitializationGate<PreparationKey, Bundle>.Start start,
         Context host, GuestPackageSpec spec) {
+        long preparationStarted = android.os.SystemClock.elapsedRealtime();
+        prepareTrace("OWNER_BEGIN", spec, "", preparationStarted, null);
         try {
             Bundle result = prepareOnCurrentThread(host, spec);
             synchronized (GuestRuntimeEnvironment.class) {
@@ -184,7 +205,12 @@ public final class GuestRuntimeEnvironment {
                     INITIALIZATION_GATE.completeSuccess(start, result);
                 }
             }
+            prepareTrace("OWNER_RETURN", spec,
+                    result == null ? "<null>" : result.getString(RuntimeKeys.STATUS, ""),
+                    preparationStarted, null);
         } catch (Throwable error) {
+            prepareTrace("OWNER_FAIL", spec, error.getClass().getName(), preparationStarted,
+                    error);
             completePreparationFailure(start, error);
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
         }
@@ -194,6 +220,29 @@ public final class GuestRuntimeEnvironment {
             ProcessInitializationGate<PreparationKey, Bundle>.Start start, Throwable error) {
         synchronized (GuestRuntimeEnvironment.class) {
             INITIALIZATION_GATE.completeFailure(start, error);
+        }
+    }
+
+    private static void prepareTrace(String phase, GuestPackageSpec spec, String status,
+                                     long started, Throwable error) {
+        String message = "phase=" + phase
+                + " request=" + (spec == null ? "" : spec.requestId)
+                + " operation=" + (spec == null ? "" : spec.operationId)
+                + " package=" + (spec == null ? "" : spec.packageName)
+                + " process=" + (spec == null ? "" : spec.processName)
+                + " session=" + (spec == null ? "" : spec.sessionId)
+                + " generation=" + (spec == null ? 0L : spec.generation)
+                + " slot=" + (spec == null ? -1 : spec.processSlot)
+                + " status=" + (status == null ? "" : status)
+                + " elapsedMs=" + Math.max(0L,
+                        android.os.SystemClock.elapsedRealtime() - started)
+                + " pid=" + Process.myPid();
+        if (error == null) {
+            android.util.Log.i("CS_GUEST_PREPARE", message);
+        } else {
+            android.util.Log.e("CS_GUEST_PREPARE", message
+                    + " error=" + error.getClass().getName()
+                    + " message=" + String.valueOf(error.getMessage()), error);
         }
     }
 
@@ -215,6 +264,7 @@ public final class GuestRuntimeEnvironment {
 
     private static Bundle prepareOnCurrentThread(Context host, GuestPackageSpec spec) {
         long started = android.os.SystemClock.elapsedRealtime();
+        prepareTrace("CURRENT_THREAD_BEGIN", spec, "", started, null);
         RuntimePerformanceTrace perf = new RuntimePerformanceTrace(
                 spec.requestId, spec.operationId, spec.packageName);
         Bundle result = new Bundle();
@@ -633,6 +683,12 @@ public final class GuestRuntimeEnvironment {
             try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.APPLICATION_ONCREATE)) {
                 session.mainThread.run(application::onCreate);
             }
+            // Application/Provider bootstrap is allowed to install process-local SDK hooks,
+            // but it must not replace the ActivityThread transport used by the Guest lifecycle.
+            // Reassert the bridge before publishing READY so the first physical Stub transaction
+            // is still delivered through framework Instrumentation.
+            session.activityThreadInstrumentation =
+                    GuestActivityThreadInstrumentation.ensureInstalled(session);
             if (nativeHooksInstalled && !NativePolicy.refreshHooks()) {
                 throw new IllegalStateException("NATIVE_FILE_HOOK_REFRESH_FAILED_AFTER_APPLICATION_ONCREATE:"
                         + NativePolicy.hookStatus());
@@ -644,6 +700,8 @@ public final class GuestRuntimeEnvironment {
             }
             Bundle ready = session.status("READY", started);
             RuntimeEventLog.event("GUEST_PREPARED", ready);
+            prepareTrace("CURRENT_THREAD_RETURN", spec,
+                    ready.getString(RuntimeKeys.STATUS, ""), started, null);
             perf.close();
             stagedSession = null;
             return ready;
@@ -680,6 +738,9 @@ public final class GuestRuntimeEnvironment {
             android.util.Log.e("CS_RUNTIME", "GUEST_PREPARE_FAILED_STACK\n"
                     + result.getString("stack", ""));
             RuntimeEventLog.event("GUEST_PREPARE_FAILED", result);
+            prepareTrace("CURRENT_THREAD_FAIL", spec,
+                    result.getString(RuntimeKeys.ERROR_TYPE, "GUEST_PREPARE_FAILED"), started,
+                    error);
             perf.close();
             return result;
         }
@@ -742,12 +803,11 @@ public final class GuestRuntimeEnvironment {
         String guestDexPath = spec.dexPath();
         String coreDexMode = "apk";
         int virtualPid = 20000 + (spec.virtualUserId * 100) + spec.processSlot;
-        // The selected runtime directory is the authoritative native root.  This matters
-        // for U4/WebView-style deployments: ApplicationInfo and the class-loader search path
-        // may be projected to an immutable data-side revision while the APK's packaged lib
-        // directory remains only a fallback.  Keeping NativePolicy on spec.nativeLibraryDir
-        // would leave native open/dlopen and /data/app/.../lib aliases enforcing the wrong
-        // revision, even though Java already observes runtimeNativeLibraryDir.
+        // The selected runtime directory is the authoritative CAS native root for the defining
+        // ClassLoader and NativePolicy.  ApplicationInfo.nativeLibraryDir is intentionally kept
+        // on the APK-owned root by GuestApplicationInfoFactory: application SDKs use that public
+        // contract to resolve their own packaged libraries, while U4/WebView code resolves its
+        // core through the separate runtime search path.
         String nativePolicyLibraryRoot = runtimeNativeLibraryDir.isEmpty()
                 ? spec.nativeLibraryDir : runtimeNativeLibraryDir;
         if (nativePolicyLibraryRoot == null || nativePolicyLibraryRoot.trim().isEmpty()) {

@@ -96,6 +96,17 @@ final class GuestContextComponentRouter {
             request.putInt(RuntimeKeys.REQUEST_CODE, requestCode);
         }
         if (options != null) request.putBundle("activityOptions", new Bundle(options));
+        android.util.Log.i("CS_GUEST_ACTIVITY", "REQUEST frameworkHost=" + frameworkHost
+                + " package=" + spec.packageName
+                + " session=" + spec.sessionId
+                + " generation=" + spec.generation
+                + " callerTaskId=" + callerTaskId
+                + " requestCode=" + requestCode
+                + " targetPackage=" + target.packageName()
+                + " targetComponent=" + target.className()
+                + " requestId=" + request.getString(RuntimeKeys.REQUEST_ID, "")
+                + " operationId=" + request.getString(RuntimeKeys.OPERATION_ID, "")
+                + " pid=" + android.os.Process.myPid());
         Bundle result = frameworkHost
                 ? bridge.launchActivityFromFrameworkHost(request)
                 : bridge.launchActivity(request);

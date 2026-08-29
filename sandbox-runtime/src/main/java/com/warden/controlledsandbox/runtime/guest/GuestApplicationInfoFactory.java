@@ -41,8 +41,13 @@ public final class GuestApplicationInfoFactory {
         setOptionalField(info, "splitNames", spec.splitNames.toArray(new String[0]));
         info.splitSourceDirs = spec.splitPathArray();
         info.splitPublicSourceDirs = spec.splitPathArray();
-        info.nativeLibraryDir = GuestNativeRuntimeProjection.select(spec, new File(dataDir),
-                spec.effectiveNativeLibraryDir());
+        // ApplicationInfo.nativeLibraryDir is the Guest APK's package-owned library root.  A
+        // U4/WebView core may be selected separately for the defining ClassLoader, but exposing
+        // that runtime-only directory here breaks SDKs which resolve their own APK libraries
+        // through ApplicationInfo (for example SecurityGuard's libsgmainso).  Keep the platform
+        // ApplicationInfo contract aligned with the immutable APK revision; the CAS runtime
+        // projection remains available through the ClassLoader search path and NativePolicy.
+        info.nativeLibraryDir = spec.effectiveNativeLibraryDir();
         setOptionalField(info, "primaryCpuAbi", emptyToNull(spec.nativeAbi));
         setOptionalField(info, "secondaryCpuAbi", null);
         setOptionalField(info, "sharedLibraryFiles", null);

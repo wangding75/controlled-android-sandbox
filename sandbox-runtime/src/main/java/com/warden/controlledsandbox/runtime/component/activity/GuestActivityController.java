@@ -205,6 +205,14 @@ public final class GuestActivityController {
     }
 
     private void emit(String event, Bundle details) {
+        android.util.Log.i("CS_GUEST_ACTIVITY", "LEGACY_LIFECYCLE event=" + event
+                + " request=" + session.spec().requestId
+                + " operation=" + session.spec().operationId
+                + " session=" + session.sessionId()
+                + " activityToken=" + activityToken
+                + " component=" + (guest == null ? "" : guest.getClass().getName())
+                + " taskId=" + taskId
+                + " pid=" + android.os.Process.myPid());
         eventSink.emit(event, details);
     }
 

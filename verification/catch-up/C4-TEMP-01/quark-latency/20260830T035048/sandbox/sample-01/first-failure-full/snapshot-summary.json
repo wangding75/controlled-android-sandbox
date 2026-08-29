@@ -1,0 +1,12 @@
+{
+  "activity": "",
+  "windows": "",
+  "surfaces": "",
+  "screenshot": {
+    "returncode": 0,
+    "bytes": 12504,
+    "sha256": "4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930"
+  },
+  "guestWindowState": {},
+  "surfaceNonEmpty": false
+}

@@ -19,10 +19,10 @@ import java.io.FileOutputStream;
 /**
  * Selects an app-owned runtime native payload without widening the Guest native boundary.
  *
- * <p>Some applications deploy a newer WebView/U4 core below their private data directory and
- * expose that directory through {@code ApplicationInfo.nativeLibraryDir}.  The platform loader
- * and the application therefore agree on the same core only when this projection is made before
- * {@code LoadedApk} and {@code Application} bootstrap.  Native libraries are selected read-only;
+ * <p>Some applications deploy a newer WebView/U4 core below their private data directory.  The
+ * CAS defining ClassLoader and NativePolicy use this runtime directory, while
+ * {@code ApplicationInfo.nativeLibraryDir} remains the APK-owned library root so application
+ * SDKs can resolve their own native payload.  Native libraries are selected read-only;
  * when the matching core is a raw DEX file, CAS atomically creates a validated ZIP overlay in a
  * separate CAS-owned directory because U4 may retire the source after loading it.  Every selected
  * or generated path remains canonically contained by the current Guest data root.  Invalid or

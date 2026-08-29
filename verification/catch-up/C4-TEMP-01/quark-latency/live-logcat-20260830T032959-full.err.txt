@@ -1,0 +1,1 @@
+adb.exe: unknown command -v

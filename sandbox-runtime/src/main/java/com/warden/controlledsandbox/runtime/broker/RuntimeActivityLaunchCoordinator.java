@@ -54,6 +54,13 @@ final class RuntimeActivityLaunchCoordinator {
         routedRequest.putInt(RuntimeKeys.ATTEMPT, 1);
         routedRequest.putInt(RuntimeKeys.RETRY_BUDGET, 0);
         routedRequest.putBoolean(RuntimeKeys.AUTOMATIC_RETRY_PERFORMED, false);
+        android.util.Log.i("CS_BROKER_LAUNCH", "ENTRY request=" + requestId
+                + " operation=" + operationId
+                + " package=" + routedRequest.getString(RuntimeKeys.PACKAGE_NAME, "")
+                + " user=" + routedRequest.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1)
+                + " process=" + routedRequest.getString(RuntimeKeys.PROCESS_NAME, "")
+                + " awaitReadiness=" + awaitReadiness
+                + " pid=" + android.os.Process.myPid());
         RuntimePerformanceTrace perf = new RuntimePerformanceTrace(requestId, operationId,
                 routedRequest.getString(RuntimeKeys.PACKAGE_NAME, ""));
         try (RuntimePerformanceTrace.Stage ignored = perf.stage(RuntimePerformanceTrace.CLIENT_LAUNCH_BEGIN)) {
@@ -110,6 +117,15 @@ final class RuntimeActivityLaunchCoordinator {
             }
             launchStage(requestId, operationId, "PREPARE_RETURN",
                     elapsedSince(acceptedAtElapsedMs), prepared);
+            android.util.Log.i("CS_BROKER_LAUNCH", "PREPARE_RETURN request=" + requestId
+                    + " operation=" + operationId
+                    + " status=" + (prepared == null ? "<null>"
+                            : prepared.getString(RuntimeKeys.STATUS, ""))
+                    + " session=" + (prepared == null ? ""
+                            : prepared.getString(RuntimeKeys.SESSION_ID, ""))
+                    + " generation=" + (prepared == null ? 0L
+                            : prepared.getLong(RuntimeKeys.GENERATION, 0L))
+                    + " pid=" + android.os.Process.myPid());
             if (!RuntimeBrokerService.isPrepared(prepared)) return prepared;
             String packageName = prepared.getString(RuntimeKeys.PACKAGE_NAME, "");
             int userId = prepared.getInt(RuntimeKeys.VIRTUAL_USER_ID, -1);
@@ -148,6 +164,20 @@ final class RuntimeActivityLaunchCoordinator {
             String callerTaskKey = taskObservationKey(session, callerTaskId);
             issuedRouteToken = transaction.getString(RuntimeKeys.ROUTE_TOKEN, "");
             boolean frameworkHost = routedRequest.getBoolean(RuntimeKeys.ACTIVITY_FRAMEWORK_HOST, false);
+            android.util.Log.i("CS_BROKER_LAUNCH", "OBSERVATION_SHAPE request=" + requestId
+                    + " operation=" + operationId
+                    + " session=" + sessionId
+                    + " activityToken=" + activityToken
+                    + " component=" + component
+                    + " taskId=" + taskId
+                    + " callerTaskId=" + callerTaskId
+                    + " nested=" + nestedLaunch
+                    + " frameworkHost=" + frameworkHost
+                    + " existingBySession=" + (sessionId.isEmpty()
+                            ? false : owner.launchObservations.containsKey(sessionId))
+                    + " existingByCallerTask=" + (callerTaskKey.isEmpty()
+                            ? false : owner.launchObservations.containsKey(callerTaskKey))
+                    + " pid=" + android.os.Process.myPid());
             Intent launch = new Intent();
             launch.setComponent(new ComponentName(owner.getPackageName(),
                     RuntimeStubComponents.activityComponentFor(session.processSlot(), component,
@@ -196,6 +226,13 @@ final class RuntimeActivityLaunchCoordinator {
                 if (parent == null && !callerTaskKey.isEmpty()) {
                     parent = owner.launchObservations.get(callerTaskKey);
                 }
+                android.util.Log.i("CS_BROKER_LAUNCH", "FRAMEWORK_PARENT_LOOKUP request="
+                        + requestId + " operation=" + operationId
+                        + " session=" + sessionId
+                        + " childActivityToken=" + activityToken
+                        + " callerTaskId=" + callerTaskId
+                        + " found=" + (parent != null)
+                        + " pid=" + android.os.Process.myPid());
                 if (parent != null) {
                     parent.linkActivity(activityToken, requestId, operationId, component);
                     if (!activityToken.isEmpty()) owner.launchObservations.put(activityToken, parent);
@@ -222,6 +259,13 @@ final class RuntimeActivityLaunchCoordinator {
                 // evidence for a same-task handoff.
                 existing = owner.launchObservations.get(callerTaskKey);
             }
+            android.util.Log.i("CS_BROKER_LAUNCH", "OBSERVATION_LOOKUP request=" + requestId
+                    + " operation=" + operationId
+                    + " session=" + sessionId
+                    + " activityToken=" + activityToken
+                    + " nested=" + nestedLaunch
+                    + " found=" + (existing != null)
+                    + " pid=" + android.os.Process.myPid());
             if (!nestedLaunch) {
                 if (existing == null) {
                     observation = new GuestLaunchObservation(activityToken, component,
@@ -352,6 +396,11 @@ final class RuntimeActivityLaunchCoordinator {
             perf.close();
             return out;
         } catch (Throwable error) {
+            android.util.Log.e("CS_BROKER_LAUNCH", "FAIL request=" + requestId
+                    + " operation=" + operationId
+                    + " type=" + error.getClass().getName()
+                    + " message=" + String.valueOf(error.getMessage())
+                    + " pid=" + android.os.Process.myPid(), error);
             try {
                 if (!issuedRouteToken.isEmpty()) owner.activityRuntime.launchFailed(issuedRouteToken);
             } finally {

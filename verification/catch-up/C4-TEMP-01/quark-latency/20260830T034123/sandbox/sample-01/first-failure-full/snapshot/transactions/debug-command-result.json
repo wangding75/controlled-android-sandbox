@@ -1,0 +1,13 @@
+{
+  "command": "launch",
+  "package": "com.quark.browser",
+  "virtualUserId": 0,
+  "trustNativeGuest": true,
+  "requestId": "f54f6ec3009d489ca33769e14df29ec4",
+  "operationId": "f54f6ec3009d489ca33769e14df29ec4-launch",
+  "startedAt": 1788032539664,
+  "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+  "status": "FAIL",
+  "errorType": "java.lang.IllegalStateException",
+  "errorMessage": "launch failed: status=LAUNCH_FAILED, errorType=LAUNCH_GATE_FAILED, errorMessage=guest Activity create\/resume\/window not confirmed"
+}

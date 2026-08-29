@@ -58,6 +58,23 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
 
     static GuestActivityThreadInstrumentation install(GuestRuntimeEnvironment.Session session)
             throws Exception {
+        return install(session, false);
+    }
+
+    /**
+     * Reassert the framework bridge after Guest Application bootstrap.  Some SDKs replace
+     * ActivityThread.mInstrumentation while installing their process hooks.  That replacement
+     * must not silently divert the next framework Activity transaction into the legacy Stub
+     * lifecycle; wrap the SDK delegate once more and keep the same session-owned contract.
+     */
+    static GuestActivityThreadInstrumentation ensureInstalled(GuestRuntimeEnvironment.Session session)
+            throws Exception {
+        return install(session, true);
+    }
+
+    private static GuestActivityThreadInstrumentation install(
+            GuestRuntimeEnvironment.Session session, boolean allowExistingBridge)
+            throws Exception {
         Class<?> type = Class.forName("android.app.ActivityThread");
         Field currentField = findField(type, "sCurrentActivityThread");
         currentField.setAccessible(true);
@@ -70,13 +87,55 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             throw new IllegalStateException("GUEST_INSTRUMENTATION_UNAVAILABLE");
         }
         if (value instanceof GuestActivityThreadInstrumentation) {
-            throw new IllegalStateException("GUEST_INSTRUMENTATION_ALREADY_INSTALLED");
+            GuestActivityThreadInstrumentation existing = (GuestActivityThreadInstrumentation) value;
+            if (allowExistingBridge && existing.session == session && !existing.closed) {
+                recordInstrumentationState(session, "already_installed",
+                        value.getClass().getName(), value.getClass().getName());
+                return existing;
+            }
+            if (!allowExistingBridge) {
+                throw new IllegalStateException("GUEST_INSTRUMENTATION_ALREADY_INSTALLED");
+            }
+            // Retire an old generation before replacing it. close() only restores the delegate
+            // when the old bridge still owns the field, so it cannot clobber the new bridge.
+            existing.close();
+            value = instrumentation.get(thread);
+            if (!(value instanceof Instrumentation)) {
+                throw new IllegalStateException("GUEST_INSTRUMENTATION_UNAVAILABLE_AFTER_REPLACE");
+            }
+            delegate = (Instrumentation) value;
         }
         GuestActivityThreadInstrumentation bridge = new GuestActivityThreadInstrumentation(
                 thread, instrumentation, delegate, session);
         instrumentation.set(thread, bridge);
         android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "INSTRUMENTATION_READY mode=ACTIVITY_THREAD");
+        recordInstrumentationState(session, "installed", delegate.getClass().getName(),
+                bridge.getClass().getName());
         return bridge;
+    }
+
+    private static void recordInstrumentationState(GuestRuntimeEnvironment.Session session,
+                                                    String mode, String previousClass,
+                                                    String currentClass) {
+        Bundle evidence = new Bundle();
+        evidence.putString(RuntimeKeys.STATUS, mode);
+        evidence.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+        evidence.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+        evidence.putLong(RuntimeKeys.GENERATION, session.generation());
+        evidence.putInt(RuntimeKeys.VIRTUAL_USER_ID, session.virtualUserId());
+        evidence.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+        evidence.putString("previousInstrumentationClass", previousClass);
+        evidence.putString("currentInstrumentationClass", currentClass);
+        evidence.putInt("pid", android.os.Process.myPid());
+        RuntimeEventLog.event("GUEST_INSTRUMENTATION_STATE", evidence);
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                "INSTRUMENTATION_STATE mode=" + mode
+                        + " previous=" + previousClass
+                        + " current=" + currentClass
+                        + " package=" + session.packageName()
+                        + " session=" + session.sessionId()
+                        + " generation=" + session.generation()
+                        + " pid=" + android.os.Process.myPid());
     }
 
     @Override public Activity newActivity(ClassLoader classLoader, String className, Intent intent)
@@ -232,6 +291,15 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                     requestCode, options);
         }
         try (FrameworkClassLoaderScope ignored = enterFrameworkClassLoader()) {
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "EXEC_START request=" + route.requestId
+                    + " operation=" + route.operationId
+                    + " session=" + route.sessionId
+                    + " parentActivityToken=" + route.activityToken
+                    + " parentTaskId=" + route.taskId
+                    + " target=" + (intent == null || intent.getComponent() == null
+                            ? "" : intent.getComponent().flattenToShortString())
+                    + " requestCode=" + requestCode
+                    + " pid=" + android.os.Process.myPid());
             Bundle result = session.context().startActivityFromFrameworkActivity(
                     intent, options, route.taskId, requestCode);
             // The Broker returns a Host Intent carrying the selected physical component and
@@ -241,6 +309,14 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             if (hostIntent == null) {
                 throw new IllegalStateException("FRAMEWORK_HOST_ACTIVITY_INTENT_MISSING");
             }
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "EXEC_START_RETURN request="
+                    + route.requestId + " operation=" + route.operationId
+                    + " resultStatus=" + result.getString(RuntimeKeys.STATUS, "")
+                    + " hostComponent=" + (hostIntent.getComponent() == null
+                            ? "" : hostIntent.getComponent().flattenToShortString())
+                    + " childActivityToken=" + hostIntent.getStringExtra(RuntimeKeys.ACTIVITY_TOKEN)
+                    + " childSession=" + hostIntent.getStringExtra(RuntimeKeys.SESSION_ID)
+                    + " pid=" + android.os.Process.myPid());
             return invokeDelegateExecStartActivity(who, contextThread, token, target, hostIntent,
                     requestCode, options);
         } catch (Throwable error) {
@@ -306,6 +382,11 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             if (staleRouteActivities.remove(activity) != null) finishStaleRouteActivity(activity);
             return;
         }
+        long callbackStarted = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_BEGIN component="
+                + route.component + " request=" + route.requestId
+                + " operation=" + route.operationId + " session=" + route.sessionId
+                + " pid=" + android.os.Process.myPid());
         android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_TWO_ARG component="
                 + route.component + " persistableMode="
                 + ActivityFieldBridge.frameworkPersistableMode(activity)
@@ -320,10 +401,28 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             emitActivityRecordMapping(activity, route, route.token, route.activityToken,
                     frameworkEvidence);
             Bundle effectiveState = effectiveState(route, state);
+            long delegateStarted = android.os.SystemClock.elapsedRealtime();
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_BEGIN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " elapsedMs="
+                    + Math.max(0L, delegateStarted - callbackStarted)
+                    + " pid=" + android.os.Process.myPid());
             delegate.callActivityOnCreate(activity, effectiveState);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " delegateElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - delegateStarted)
+                    + " totalElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - callbackStarted)
+                    + " pid=" + android.os.Process.myPid());
             dispatchMissingRestoreCallbacks(activity, route, state, null, effectiveState, null);
             Bundle details = callbackStateDetails(effectiveState, null);
             emit(activity, route, "CREATED", details);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_RETURN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " totalElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - callbackStarted)
+                    + " pid=" + android.os.Process.myPid());
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             emitFailure(activity, route, error);
@@ -340,6 +439,11 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             if (staleRouteActivities.remove(activity) != null) finishStaleRouteActivity(activity);
             return;
         }
+        long callbackStarted = android.os.SystemClock.elapsedRealtime();
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_BEGIN component="
+                + route.component + " request=" + route.requestId
+                + " operation=" + route.operationId + " session=" + route.sessionId
+                + " persistable=true pid=" + android.os.Process.myPid());
         android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_THREE_ARG component="
                 + route.component + " persistableMode="
                 + ActivityFieldBridge.frameworkPersistableMode(activity)
@@ -357,7 +461,20 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
             Bundle effectiveState = effectiveState(route, state);
             PersistableBundle effectivePersistentState = effectivePersistentState(
                     route, persistentState);
+            long delegateStarted = android.os.SystemClock.elapsedRealtime();
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_BEGIN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " elapsedMs="
+                    + Math.max(0L, delegateStarted - callbackStarted)
+                    + " persistable=true pid=" + android.os.Process.myPid());
             delegate.callActivityOnCreate(activity, effectiveState, effectivePersistentState);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_DELEGATE_RETURN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " delegateElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - delegateStarted)
+                    + " totalElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - callbackStarted)
+                    + " persistable=true pid=" + android.os.Process.myPid());
             dispatchMissingRestoreCallbacks(activity, route, state, persistentState,
                     effectiveState, effectivePersistentState);
             Bundle details = callbackStateDetails(effectiveState, effectivePersistentState);
@@ -366,6 +483,11 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
                 details.putInt("persistableStateKeyCount", effectivePersistentState.keySet().size());
             }
             emit(activity, route, "CREATED", details);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "CALLBACK_CREATE_RETURN component="
+                    + route.component + " request=" + route.requestId
+                    + " operation=" + route.operationId + " totalElapsedMs="
+                    + Math.max(0L, android.os.SystemClock.elapsedRealtime() - callbackStarted)
+                    + " persistable=true pid=" + android.os.Process.myPid());
             // The callback overload is the framework contract under test. Android is allowed
             // to select the three-argument path with a null/empty restored state on a first
             // launch; tying the evidence marker to non-null state would report a false two-arg
@@ -1043,6 +1165,16 @@ final class GuestActivityThreadInstrumentation extends Instrumentation implement
         android.view.View decor = window == null ? null : window.getDecorView();
         request.putBoolean("windowAttached", decor != null && decor.isAttachedToWindow());
         request.putBoolean("frameworkOwnedActivity", true);
+        android.util.Log.i("CS_FRAMEWORK_ACTIVITY", "LIFECYCLE event=" + event
+                + " request=" + route.requestId
+                + " operation=" + route.operationId
+                + " session=" + route.sessionId
+                + " activityToken=" + route.activityToken
+                + " component=" + route.component
+                + " windowAttached=" + request.getBoolean("windowAttached", false)
+                + " windowCreated=" + request.getBoolean("windowCreated", false)
+                + " windowRegistered=" + request.getBoolean("windowRegistered", false)
+                + " pid=" + android.os.Process.myPid());
         RuntimeEventLog.event("GUEST_ACTIVITY_" + event, request);
         // PERF-T00 lifecycle points are emitted independently from the launch result gate. This
         // keeps first-frame evidence available to tests without making product launch wait for it.

@@ -1,0 +1,146 @@
+USER           PID  PPID NAME                        ARGS                       
+root             1     0 init                        init second_stage
+root             2     0 [kthreadd]                  [kthreadd]
+root             3     2 [rcu_gp]                    [rcu_gp]
+root             4     2 [rcu_par_gp]                [rcu_par_gp]
+root             6     2 [kworker/0:0H-kblockd]      [kworker/0:0H-kblockd]
+root             8     2 [mm_percpu_wq]              [mm_percpu_wq]
+root             9     2 [ksoftirqd/0]               [ksoftirqd/0]
+root            10     2 [rcu_preempt]               [rcu_preempt]
+root            11     2 [migration/0]               [migration/0]
+root            13     2 [cpuhp/0]                   [cpuhp/0]
+root            14     2 [cpuhp/1]                   [cpuhp/1]
+root            15     2 [migration/1]               [migration/1]
+root            16     2 [ksoftirqd/1]               [ksoftirqd/1]
+root            18     2 [kworker/1:0H-kblockd]      [kworker/1:0H-kblockd]
+root            19     2 [cpuhp/2]                   [cpuhp/2]
+root            20     2 [migration/2]               [migration/2]
+root            21     2 [ksoftirqd/2]               [ksoftirqd/2]
+root            22     2 [kworker/2:0-events]        [kworker/2:0-events]
+root            23     2 [kworker/2:0H-kblockd]      [kworker/2:0H-kblockd]
+root            24     2 [cpuhp/3]                   [cpuhp/3]
+root            25     2 [migration/3]               [migration/3]
+root            26     2 [ksoftirqd/3]               [ksoftirqd/3]
+root            28     2 [kworker/3:0H-kblockd]      [kworker/3:0H-kblockd]
+root            30     2 [rcu_tasks_kthre]           [rcu_tasks_kthre]
+root            42     2 [kauditd]                   [kauditd]
+root            61     2 [kworker/2:2]               [kworker/2:2]
+root           207     2 [oom_reaper]                [oom_reaper]
+root           212     2 [kworker/1:1-events]        [kworker/1:1-events]
+root           214     2 [writeback]                 [writeback]
+root           357     2 [kcompactd0]                [kcompactd0]
+root           358     2 [ksmd]                      [ksmd]
+root           381     2 [cryptd]                    [cryptd]
+root           452     2 [kblockd]                   [kblockd]
+root           523     2 [ata_sff]                   [ata_sff]
+root           541     2 [devfreq_wq]                [devfreq_wq]
+root           548     2 [watchdogd]                 [watchdogd]
+root           673     2 [kswapd0]                   [kswapd0]
+root           674     2 [kpclimitd]                 [kpclimitd]
+root           675     2 [kpclimitd_ela]             [kpclimitd_ela]
+root           712     2 [acpi_thermal_pm]           [acpi_thermal_pm]
+root           808     2 [scsi_eh_0]                 [scsi_eh_0]
+root           809     2 [scsi_tmf_0]                [scsi_tmf_0]
+root           826     2 [kworker/2:1H-kblockd]      [kworker/2:1H-kblockd]
+root           827     2 [kworker/0:1H-kblockd]      [kworker/0:1H-kblockd]
+root           857     2 [nvme-wq]                   [nvme-wq]
+root           859     2 [nvme-reset-wq]             [nvme-reset-wq]
+root           861     2 [nvme-delete-wq]            [nvme-delete-wq]
+root           926     2 [ion_system_heap]           [ion_system_heap]
+root           936     2 [ipv6_addrconf]             [ipv6_addrconf]
+root           975     2 [kworker/u9:0]              [kworker/u9:0]
+root           996     2 [ext4-rsv-conver]           [ext4-rsv-conver]
+root          1005     2 [ext4-rsv-conver]           [ext4-rsv-conver]
+root          1007     2 [kworker/1:1H-kblockd]      [kworker/1:1H-kblockd]
+root          1017     2 [jbd2/sdc3-8]               [jbd2/sdc3-8]
+root          1018     2 [ext4-rsv-conver]           [ext4-rsv-conver]
+root          1027     2 [jbd2/sdc1-8]               [jbd2/sdc1-8]
+root          1028     2 [ext4-rsv-conver]           [ext4-rsv-conver]
+root          1031     1 init                        init subcontext u:r:vendor_init:s0 15
+root          1036     1 ueventd                     ueventd
+logd          1043     1 logd                        logd
+lmkd          1044     1 lmkd                        lmkd
+system        1045     1 servicemanager              servicemanager
+root          1046     2 [psimon]                    [psimon]
+system        1047     1 hwservicemanager            hwservicemanager
+root          1051     2 [iprt-VBoxWQueue]           [iprt-VBoxWQueue]
+root          1054     1 vold                        vold --blkid_context=u:r:blkid:s0 --blkid_untrusted_context=u:r:blkid_untrusted:s0 --fsck_context=u:r:fsck:s0 --fsck_untrusted_context=u:r:fsck_untrusted:s0
+root          1060     1 nemuinit                    nemuinit
+root          1061     1 powerbtnd                   powerbtnd
+root          1062     1 nemu_sys_opt                nemu_sys_opt --daemon
+system        1063     1 android.system.suspend@1.0-service android.system.suspend@1.0-service
+keystore      1067     1 keystore2                   keystore2 /data/misc/keystore
+system        1068     1 android.hardware.keymaster@4.0-service android.hardware.keymaster@4.0-service
+tombstoned    1073     1 tombstoned                  tombstoned
+root          1093     2 [kworker/3:1H-kblockd]      [kworker/3:1H-kblockd]
+root          1126     1 netd                        netd
+root          1127     1 zygote64                    zygote64
+root          1128     1 zygote                      zygote
+system        1129     1 android.hidl.allocator@1.0-service android.hidl.allocator@1.0-service
+audioserver   1130     1 android.hardware.audio.service android.hardware.audio.service
+bluetooth     1131     1 android.hardware.bluetooth@1.1-service.sim android.hardware.bluetooth@1.1-service.sim
+cameraserver  1132     1 android.hardware.camera.provider@2.4-service android.hardware.camera.provider@2.4-service
+system        1133     1 android.hardware.configstore@1.1-service android.hardware.configstore@1.1-service
+media         1134     1 android.hardware.drm@1.4-service.widevine android.hardware.drm@1.4-service.widevine
+system        1135     1 android.hardware.gatekeeper@1.0-service.software android.hardware.gatekeeper@1.0-service.software
+gps           1136     1 android.hardware.gnss@2.0-service.x86 android.hardware.gnss@2.0-service.x86
+system        1137     1 android.hardware.graphics.allocator@2.0-service android.hardware.graphics.allocator@2.0-service
+system        1138     1 android.hardware.health@2.0-service android.hardware.health@2.0-service
+system        1139     1 android.hardware.power.stats@1.0-service.mock android.hardware.power.stats@1.0-service.mock
+system        1140     1 android.hardware.sensors@2.1-service.multihal android.hardware.sensors@2.1-service.multihal
+system        1141     1 android.hardware.vibrator@1.3-service android.hardware.vibrator@1.3-service
+wifi          1142     1 android.hardware.wifi@1.0-service android.hardware.wifi@1.0-service
+audioserver   1143     1 audioserver                 audioserver
+credstore     1144     1 credstore                   credstore /data/misc/credstore
+system        1145     1 surfaceflinger              surfaceflinger
+shell         1146     1 adbd                        adbd --root_seclabel=u:r:su:s0
+nobody        1147     1 traced_probes               traced_probes
+nobody        1148     1 traced                      traced
+cameraserver  1149     1 cameraserver                cameraserver
+root          1153     1 installd                    installd
+mediaex       1154     1 media.extractor             media.extractor aextractor
+media         1155     1 media.metrics               media.metrics diametrics
+media         1156     1 mediaserver                 mediaserver
+root          1157     1 storaged                    storaged
+wifi          1158     1 wificond                    wificond
+mediacodec    1159     1 media.codec                 media.codec hw/android.hardware.media.omx@1.0-service
+radio         1160     1 rild                        rild
+mediacodec    1161     1 media.swcodec               media.swcodec oid.media.swcodec/bin/mediaswcodec
+statsd        1162     1 statsd                      statsd
+root          1165     1 mu_bak                      mu_bak --daemon
+root          1166     1 nemuinput                   nemuinput
+root          1167     1 opengl-gc                   opengl-gc
+root          1212  1126 iptables-restore            iptables-restore --noflush -w -v
+root          1223  1126 ip6tables-restore           ip6tables-restore --noflush -w -v
+system        1296  1127 system_server               system_server
+system        1450  1127 com.netease.nemu_vapi_android.nemu com.netease.nemu_vapi_android.nemu
+u0_a29        1483  1127 com.android.systemui        com.android.systemui
+network_stack 1564  1127 com.android.networkstack.process com.android.networkstack.process
+u0_a42        1616  1127 app.lawnchair               app.lawnchair
+webview_zygote 1709 1127 webview_zygote              webview_zygote
+u0_a35        1742  1127 android.ext.services        android.ext.services
+u0_a19        2019  1127 com.mumu.acc                com.mumu.acc
+u0_a34        2124  1127 com.android.providers.media.module com.android.providers.media.module
+u0_a14        2144  1127 com.nemu.nlp                com.nemu.nlp
+system        2180  1127 com.sohu.inputmethod.sogou.chuizi com.sohu.inputmethod.sogou.chuizi
+shell         2826  1146 abb                         abb
+root          3774     2 [kworker/1:2]               [kworker/1:2]
+root          4316     2 [kworker/0:1-events]        [kworker/0:1-events]
+root         12458     2 [kworker/3:2-events_power_efficient] [kworker/3:2-events_power_efficient]
+root         13507     2 [kworker/u8:0-events_unbound] [kworker/u8:0-events_unbound]
+root         17467     2 [kworker/u8:2-events_unbound] [kworker/u8:2-events_unbound]
+root         22927     2 [kworker/0:2]               [kworker/0:2]
+shell        25052  1146 logcat                      logcat -v threadtime
+root         25095     2 [kworker/1:0-events]        [kworker/1:0-events]
+root         25097     2 [kworker/u8:1-events_unbound] [kworker/u8:1-events_unbound]
+u0_a187      25337  1128 com.warden.controlledsandbox.companion32.debug:sandbox_server32 com.warden.controlledsandbox.companion32.debug:sandbox_server32
+u0_a196      26999  1127 com.warden.controlledsandbox.debug com.warden.controlledsandbox.debug
+u0_a196      27023  1127 com.warden.controlledsandbox.debug:sandbox_server com.warden.controlledsandbox.debug:sandbox_server
+u0_a196      27050  1127 com.warden.controlledsandbox.debug:sandbox_package com.warden.controlledsandbox.debug:sandbox_package
+u0_a196      27176  1127 com.quark.browser           com.quark.browser
+u0_a196      27460  1127 com.quark.browser:channel   com.quark.browser:channel
+u0_a196      27741  1127 com.quark.browser:filedownloader com.quark.browser:filedownloader
+u0_a196      27860  1127 com.quark.browser:push      com.quark.browser:push
+shell        28059  1146 ps                          ps -A -o USER,PID,PPID,NAME,ARGS
+system       29052  1127 com.mumu.store              com.mumu.store
+root         29796     2 [kworker/3:0-events_power_efficient] [kworker/3:0-events_power_efficient]

@@ -1,0 +1,461 @@
+{
+  "kind": "sandbox",
+  "requestId": "7bc5f68e932b413ea03c3f300df92526",
+  "operationId": "7bc5f68e932b413ea03c3f300df92526-launch",
+  "package": "com.quark.browser",
+  "startedAt": "2026-08-29T19:53:33.316266+00:00",
+  "elapsedMs": 95340,
+  "setup": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "import-only",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "033aeb3fb7a54178b9cfc8e997549942",
+      "operationId": "033aeb3fb7a54178b9cfc8e997549942-launch",
+      "startedAt": 1788033084773,
+      "packageOperationTrace": {
+        "requestId": "033aeb3fb7a54178b9cfc8e997549942",
+        "operationId": "11c4c43a-09a8-40bc-bb5c-fc3282dea1c4",
+        "operation": "importInstalledApplicationAndEnsure",
+        "packageName": "com.quark.browser",
+        "virtualUserId": 0,
+        "stage": "DONE",
+        "status": "SUCCEEDED",
+        "errorCode": "",
+        "retryable": false,
+        "attempt": 1,
+        "retryBudget": 0,
+        "startedAtMs": 1788033090102,
+        "elapsedMs": 18716,
+        "stageTimingsMs": {
+          "SOURCE_DISCOVERY": 1,
+          "HASH": 777,
+          "COPY": 1407,
+          "MANIFEST_PARSE": 56,
+          "PACKAGE_INFO": 1281,
+          "EXISTING_REVISION_VERIFY": 2466,
+          "STAGED_REVISION_VERIFY": 1,
+          "NATIVE_DETECT": 67,
+          "NATIVE_EXTRACT": 2597,
+          "PUBLISHED_REVISION_VERIFY": 3787,
+          "PUBLISH": 3838,
+          "IMPORT": 11768,
+          "ENSURE_INSTANCE": 3,
+          "CATALOG_WRITE": 3568,
+          "CATALOG": 3572
+        },
+        "apkBytesRead": 169654003,
+        "apkBytesWritten": 169654003,
+        "shaBytesRead": 2595826263,
+        "zipEntryCount": 21883,
+        "zipStreamOpenCount": 3,
+        "binderCallCount": 0,
+        "binderRetryCount": 0,
+        "fsyncCount": 0,
+        "splitCount": 0,
+        "nativeLibCount": 71,
+        "nativeBytesExtracted": 188833259,
+        "catalogPackageCount": 0,
+        "packageUniverseCount": 0,
+        "counters": {
+          "apkBytesRead": 169654003,
+          "apkBytesWritten": 169654003,
+          "shaBytesRead": 2595826263,
+          "zipEntryCount": 21883,
+          "zipStreamOpenCount": 3,
+          "binderCallCount": 0,
+          "binderRetryCount": 0,
+          "fsyncCount": 0,
+          "splitCount": 0,
+          "nativeLibCount": 71,
+          "nativeBytesExtracted": 188833259,
+          "catalogPackageCount": 0,
+          "packageUniverseCount": 0
+        },
+        "stageEvents": [
+          {
+            "phase": "BEGIN",
+            "stage": "IMPORT",
+            "elapsedMs": 3146
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "SOURCE_DISCOVERY",
+            "elapsedMs": 3149
+          },
+          {
+            "phase": "END",
+            "stage": "SOURCE_DISCOVERY",
+            "elapsedMs": 3151,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "COPY",
+            "elapsedMs": 3152
+          },
+          {
+            "phase": "END",
+            "stage": "COPY",
+            "elapsedMs": 4560,
+            "durationMs": 1407
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "MANIFEST_PARSE",
+            "elapsedMs": 4564
+          },
+          {
+            "phase": "END",
+            "stage": "MANIFEST_PARSE",
+            "elapsedMs": 4621,
+            "durationMs": 56
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PACKAGE_INFO",
+            "elapsedMs": 4623
+          },
+          {
+            "phase": "END",
+            "stage": "PACKAGE_INFO",
+            "elapsedMs": 5904,
+            "durationMs": 1281
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "EXISTING_REVISION_VERIFY",
+            "elapsedMs": 5907
+          },
+          {
+            "phase": "END",
+            "stage": "EXISTING_REVISION_VERIFY",
+            "elapsedMs": 8373,
+            "durationMs": 2466
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "STAGED_REVISION_VERIFY",
+            "elapsedMs": 8376
+          },
+          {
+            "phase": "END",
+            "stage": "STAGED_REVISION_VERIFY",
+            "elapsedMs": 8378,
+            "durationMs": 1
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "NATIVE_DETECT",
+            "elapsedMs": 8389
+          },
+          {
+            "phase": "END",
+            "stage": "NATIVE_DETECT",
+            "elapsedMs": 8457,
+            "durationMs": 67
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "NATIVE_EXTRACT",
+            "elapsedMs": 8459
+          },
+          {
+            "phase": "END",
+            "stage": "NATIVE_EXTRACT",
+            "elapsedMs": 11057,
+            "durationMs": 2597
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PUBLISH",
+            "elapsedMs": 11060
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "PUBLISHED_REVISION_VERIFY",
+            "elapsedMs": 11062
+          },
+          {
+            "phase": "END",
+            "stage": "PUBLISHED_REVISION_VERIFY",
+            "elapsedMs": 14849,
+            "durationMs": 3787
+          },
+          {
+            "phase": "END",
+            "stage": "PUBLISH",
+            "elapsedMs": 14898,
+            "durationMs": 3838
+          },
+          {
+            "phase": "END",
+            "stage": "IMPORT",
+            "elapsedMs": 14915,
+            "durationMs": 11768
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "ENSURE_INSTANCE",
+            "elapsedMs": 15127
+          },
+          {
+            "phase": "END",
+            "stage": "ENSURE_INSTANCE",
+            "elapsedMs": 15131,
+            "durationMs": 3
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "CATALOG",
+            "elapsedMs": 15133
+          },
+          {
+            "phase": "BEGIN",
+            "stage": "CATALOG_WRITE",
+            "elapsedMs": 15136
+          },
+          {
+            "phase": "END",
+            "stage": "CATALOG_WRITE",
+            "elapsedMs": 18704,
+            "durationMs": 3568
+          },
+          {
+            "phase": "END",
+            "stage": "CATALOG",
+            "elapsedMs": 18705,
+            "durationMs": 3572
+          }
+        ],
+        "stageDeadlinesMs": {
+          "CATALOG": 30000,
+          "PARSE": 60000,
+          "COPY": 120000,
+          "ENSURE_INSTANCE": 10000,
+          "PUBLISH": 30000,
+          "NATIVE_EXTRACT": 180000,
+          "HASH": 30000
+        },
+        "anomalies": []
+      },
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "IMPORTED"
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 640\nWaitTime: 642\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  },
+  "targetStopBeforeSandbox": {
+    "returncode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "stop": {
+    "status": "PASS",
+    "returncode": 0,
+    "result": {
+      "command": "stop",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "b88da2742fb8468694850fb830d75f7d",
+      "operationId": "b88da2742fb8468694850fb830d75f7d-launch",
+      "startedAt": 1788033110041,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "operation": {
+        "status": "STOPPED",
+        "errorType": "",
+        "errorMessage": "",
+        "sessionId": "",
+        "generation": 0,
+        "processSlot": -1,
+        "platformPid": 0
+      },
+      "status": "PASS"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 613\nWaitTime: 614\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  },
+  "launch": {
+    "status": "FAIL",
+    "returncode": 1,
+    "result": {
+      "command": "launch",
+      "package": "com.quark.browser",
+      "virtualUserId": 0,
+      "trustNativeGuest": true,
+      "requestId": "7bc5f68e932b413ea03c3f300df92526",
+      "operationId": "7bc5f68e932b413ea03c3f300df92526-launch",
+      "startedAt": 1788033118011,
+      "nativeGuestTrust": "EXPLICITLY_TRUSTED",
+      "status": "FAIL",
+      "errorType": "java.lang.IllegalStateException",
+      "errorMessage": "launch failed: status=LAUNCH_FAILED, errorType=LAUNCH_GATE_FAILED, errorMessage=guest Activity create/resume/window not confirmed"
+    },
+    "start_stdout": "Starting: Intent { flg=0x10008000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity (has extras) }\nStatus: ok\nLaunchState: COLD\nActivity: com.warden.controlledsandbox.debug/com.warden.controlledsandbox.DebugCommandActivity\nTotalTime: 557\nWaitTime: 558\nComplete\n",
+    "start_stderr": "",
+    "host_teardown": {
+      "activity_present": false,
+      "window_present": false,
+      "activity_rows": [],
+      "window_rows": [],
+      "activity_returncode": 0,
+      "window_returncode": 0
+    }
+  },
+  "operation": {},
+  "readinessElapsedMs": null,
+  "requiredStagesPresent": false,
+  "visible": {
+    "activity": "ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)\nDisplay #0 (activities from top to bottom):\n  * Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n    mLastPausedActivity: ActivityRecord{d76050b u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60 t827 f}}\n    isSleeping=false\n    topResumedActivity=ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n    * Hist  #1: ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n      packageName=com.warden.controlledsandbox.debug processName=com.warden.controlledsandbox.debug:guest60\n      launchedFromUid=10196 launchedFromPackage=com.warden.controlledsandbox.debug launchedFromFeature=null userId=0\n      app=ProcessRecord{29061ff 31050:com.warden.controlledsandbox.debug:guest60/u0a196}\n      Intent { flg=0x10000000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 (has extras) }\n      rootOfTask=true task=Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n      taskAffinity=10196:com.warden.controlledsandbox.debug\n      mActivityComponent=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1\n      baseDir=/data/app/~~A0kvKbgUgq4LnV_uTcivdw==/com.warden.controlledsandbox.debug-ZCxjbu-sF9I2fBed7e1qsA==/base.apk\n      dataDir=/data/user/0/com.warden.controlledsandbox.debug\n      stateNotNeeded=false componentSpecified=false mActivityType=standard\n      compat={480dpi} labelRes=0x7f050012 icon=0x0 theme=0x7f060001\n      mLastReportedConfigurations:\n        mGlobalConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.19 fontWeightAdjustment=0}\n        mOverrideConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.1 fontWeightAdjustment=0}\n      CurrentConfiguration={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.1 fontWeightAdjustment=0}\n      taskDescription: label=\"夸克\" icon=null iconResource=/0 iconFilename=null primaryColor=0\n        backgroundColor=fffafafa statusBarColor=0 navigationBarColor=ffffffff\n       backgroundColorFloating=ffffffff\n      launchFailed=false launchCount=1 lastLaunchTime=-29s153ms\n      mHaveState=false mIcicle=null\n      state=RESUMED stopped=false delayedResume=false finishing=false\n      keysPaused=false inHistory=true idle=false\n      occludesParent=true noDisplay=false immersive=false launchMode=0\n      frozenBeforeDestroy=false forceNewConfig=false\n      mActivityType=standard\n      mImeInsetsFrozenUntilStartInput=false\n      windows=[Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}]\n      windowType=2 hasVisible=false\n      mOccludesParent=true\n      mOrientation=SCREEN_ORIENTATION_PORTRAIT\n      mVisibleRequested=true mVisible=true mClientVisible=true reportedDrawn=false reportedVisible=false\n      mNumInterestingWindows=1 mNumDrawnWindows=0 allDrawn=false lastAllDrawn=false)\n      resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION\n      mLastReportedMultiWindowMode=false mLastReportedPictureInPictureMode=false\n      supportsSizeChanges=SIZE_CHANGES_UNSUPPORTED_METADATA\n      configChanges=0x3\n      neverSandboxDisplayApis=false\n      alwaysSandboxDisplayApis=false\n      areBoundsLetterboxed=false\n    * Hist  #0: ActivityRecord{d76050b u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60 t827 f}}\n      packageName=com.warden.controlledsandbox.debug processName=com.warden.controlledsandbox.debug:guest60\n      launchedFromUid=10196 launchedFromPackage=com.warden.controlledsandbox.debug launchedFromFeature=null userId=0\n      app=ProcessRecord{29061ff 31050:com.warden.controlledsandbox.debug:guest60/u0a196}\n      Intent { flg=0x18200000 cmp=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60 (has extras) }\n      rootOfTask=false task=Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n      taskAffinity=10196:com.warden.controlledsandbox.debug\n      mActivityComponent=com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60\n      baseDir=/data/app/~~A0kvKbgUgq4LnV_uTcivdw==/com.warden.controlledsandbox.debug-ZCxjbu-sF9I2fBed7e1qsA==/base.apk\n      dataDir=/data/user/0/com.warden.controlledsandbox.debug\n      stateNotNeeded=false componentSpecified=false mActivityType=standard\n      compat={480dpi} labelRes=0x7f050012 icon=0x0 theme=0x7f060001\n      mLastReportedConfigurations:\n        mGlobalConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.19 fontWeightAdjustment=0}\n        mOverrideConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.1 fontWeightAdjustment=0}\n      CurrentConfiguration={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=standard mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.1 fontWeightAdjustment=0}\n      taskDescription: label=\"null\" icon=null iconResource=/0 iconFilename=null primaryColor=fff5f5f5\n        backgroundColor=fffafafa statusBarColor=ffffffff navigationBarColor=ff000000\n       backgroundColorFloating=ffffffff\n      launchFailed=false launchCount=1 lastLaunchTime=-30s276ms\n      mHaveState=false mIcicle=null\n      state=DESTROYING stopped=false delayedResume=false finishing=true\n      keysPaused=false inHistory=true idle=false\n      occludesParent=false noDisplay=false immersive=false launchMode=0\n      frozenBeforeDestroy=false forceNewConfig=false\n      mActivityType=standard\n      mImeInsetsFrozenUntilStartInput=false\n      windows=[]\n      windowType=2 hasVisible=false\n      mOccludesParent=true\n      mOrientation=SCREEN_ORIENTATION_UNSPECIFIED\n      mVisibleRequested=false mVisible=false mClientVisible=true reportedDrawn=false reportedVisible=false\n      resizeMode=RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION\n      mLastReportedMultiWindowMode=false mLastReportedPictureInPictureMode=false\n      supportsSizeChanges=SIZE_CHANGES_UNSUPPORTED_METADATA\n      configChanges=0x3\n      neverSandboxDisplayApis=false\n      alwaysSandboxDisplayApis=false\n\n  * Task{f664fab #1 type=home ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n    * Task{a8734d #2 type=home I=app.lawnchair/.LawnchairLauncher U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n      mLastPausedActivity: ActivityRecord{e1144ff u0 app.lawnchair/.LawnchairLauncher t2}\n      isSleeping=false\n      * Hist  #0: ActivityRecord{e1144ff u0 app.lawnchair/.LawnchairLauncher t2}\n        packageName=app.lawnchair processName=app.lawnchair\n        launchedFromUid=0 launchedFromPackage=null launchedFromFeature=null userId=0\n        app=ProcessRecord{eb7c993 1616:app.lawnchair/u0a42}\n        Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=app.lawnchair/.LawnchairLauncher (has extras) }\n        rootOfTask=true task=Task{a8734d #2 type=home I=app.lawnchair/.LawnchairLauncher U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n        taskAffinity=null\n        mActivityComponent=app.lawnchair/.LawnchairLauncher\n        baseDir=/system/priv-app/app.lawnchair/app.lawnchair.apk\n        dataDir=/data/user/0/app.lawnchair\n        stateNotNeeded=true componentSpecified=false mActivityType=home\n        compat={480dpi} labelRes=0x7f12011e icon=0x7f0802a9 theme=0x7f130012\n        mLastReportedConfigurations:\n          mGlobalConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.19 fontWeightAdjustment=0}\n          mOverrideConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.5 fontWeightAdjustment=0}\n        CurrentConfiguration={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=home mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.5 fontWeightAdjustment=0}\n        RequestedOverrideConfiguration={0.0 ?mcc?mnc ?localeList ?layoutDir ?swdp ?wdp ?hdp ?density ?lsize ?long ?ldr ?wideColorGamut ?orien ?uimode ?night ?touch ?keyb/?/? ?nav/? winConfig={ mBounds=Rect(0, 0 - 0, 0) mAppBounds=null mMaxBounds=Rect(0, 0 - 0, 0) mWindowingMode=undefined mDisplayWindowingMode=undefined mActivityType=home mAlwaysOnTop=undefined mRotation=undefined} as.2 ?fontWeightAdjustment}\n        taskDescription: label=\"null\" icon=null iconResource=/0 iconFilename=null primaryColor=fff5f5f5\n          backgroundColor=ff1c1b1b statusBarColor=0 navigationBarColor=0\n         backgroundColorFloating=ff1c1b1b\n        launchFailed=false launchCount=0 lastLaunchTime=-1d9h39m3s367ms\n        mHaveState=true mIcicle=Bundle[mParcelledData.dataSize=11200]\n        state=STOPPED stopped=true delayedResume=false finishing=false\n        keysPaused=false inHistory=true idle=true\n        occludesParent=true noDisplay=false immersive=false launchMode=2\n        frozenBeforeDestroy=false forceNewConfig=false\n        mActivityType=home\n        mImeInsetsFrozenUntilStartInput=true\n        windows=[Window{79eea9a u0 app.lawnchair/app.lawnchair.LawnchairLauncher}]\n        windowType=2 hasVisible=true\n        mOccludesParent=true\n        mOrientation=SCREEN_ORIENTATION_PORTRAIT\n        mVisibleRequested=false mVisible=false mClientVisible=false reportedDrawn=false reportedVisible=false\n        mAppStopped=true\n        mNumInterestingWindows=1 mNumDrawnWindows=1 allDrawn=true lastAllDrawn=true)\n        nowVisible=false lastVisibleTime=-1m2s169ms\n        connections={ConnectionRecord{121a3d7 u0 DEAD app.lawnchair/com.android.quickstep.TouchInteractionService:@882a756}, ConnectionRecord{67005f8 u0 app.lawnchair/com.android.quickstep.TouchInteractionService:@882a756}}\n        resizeMode=RESIZE_MODE_RESIZEABLE\n        mLastReportedMultiWindowMode=false mLastReportedPictureInPictureMode=false\n        supportsSizeChanges=SIZE_CHANGES_UNSUPPORTED_METADATA\n        configChanges=0xdf3\n        neverSandboxDisplayApis=false\n        alwaysSandboxDisplayApis=false\n        areBoundsLetterboxed=false\n\n  * Task{568be02 #3 type=undefined ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=0}\n    mCreatedByOrganizer=true\n    isSleeping=false\n\n  * Task{f09b313 #4 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n    mCreatedByOrganizer=true\n    isSleeping=false\n\n  * Task{f633950 #5 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n    mCreatedByOrganizer=true\n    isSleeping=false\n\n  Resumed activities in task display areas (from top to bottom):\n    Resumed: ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n\n  ResumedActivity: ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n\nActivityTaskSupervisor state:\n  topDisplayFocusedRootTask=Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n  mLastOrientationSource=WindowedMagnification:0:31@178106049\n  deepestLastOrientationSource=ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n  overrideConfig={1.0 460mcc65535mnc [zh_CN_#Hans] ldltr sw360dp w360dp h616dp 480dpi nrml long port night finger -keyb/v/v dpad/v winConfig={ mBounds=Rect(0, 0 - 1080, 1920) mAppBounds=Rect(0, 0 - 1080, 1920) mMaxBounds=Rect(0, 0 - 1080, 1920) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} as.2 s.19 fontWeightAdjustment=0}\n  Display: mDisplayId=0 rootTasks=5\n    init=1080x1920 480dpi cur=1080x1920 app=1080x1920 rng=1080x1008-1920x1848\n    deferred=false mLayoutNeeded=false mTouchExcludeRegion=SkRegion((0,0,1080,1920))\n\n  mLayoutSeq=2178\n  mCurrentFocus=null\n  mFocusedApp=ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n\n  displayId=0\n  mWallpaperTarget=null\n  mLastWallpaperX=-1.0 mLastWallpaperY=-1.0\n\n  Display areas in top down Z order:\n    * Leaf:36:36\n    * HideDisplayCutout:32:35\n      * OneHanded:32:35\n        * FullscreenMagnification:33:35\n          * Leaf:33:35\n        * Leaf:32:32\n    * WindowedMagnification:0:31\n      * HideDisplayCutout:26:31\n        * OneHanded:26:31\n          * FullscreenMagnification:29:31\n            * Leaf:29:31\n          * Leaf:28:28\n          * FullscreenMagnification:26:27\n            * Leaf:26:27\n      * Leaf:24:25\n      * HideDisplayCutout:20:23\n        * OneHanded:20:23\n          * FullscreenMagnification:20:23\n            * Leaf:20:23\n      * OneHanded:19:19\n        * FullscreenMagnification:19:19\n          * Leaf:19:19\n      * HideDisplayCutout:18:18\n        * OneHanded:18:18\n          * FullscreenMagnification:18:18\n            * Leaf:18:18\n      * OneHanded:17:17\n        * FullscreenMagnification:17:17\n          * Leaf:17:17\n      * HideDisplayCutout:0:16\n        * OneHanded:2:16\n          * ImePlaceholder:15:16\n            * ImeContainer\n          * FullscreenMagnification:2:14\n            * Leaf:3:14\n            * DefaultTaskDisplayArea\n        * OneHandedBackgroundPanel:0:1\n          * OneHanded:0:1\n            * FullscreenMagnification:0:1\n              * Leaf:0:1\n\n  Task display areas in top down Z order:\n    TaskDisplayArea DefaultTaskDisplayArea\n      mPreferredTopFocusableRootTask=Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n      mLastFocusedRootTask=Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n      Application tokens in top down Z order:\n      * Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n        bounds=[0,0][1080,1920]\n        * ActivityRecord{5083171 u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60W1 t827}\n        * ActivityRecord{d76050b u0 com.warden.controlledsandbox.debug/com.warden.controlledsandbox.runtime.component.activity.StubActivity60 t827 f}}\n      * Task{f664fab #1 type=home ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n        bounds=[0,0][1080,1920]\n        * Task{a8734d #2 type=home I=app.lawnchair/.LawnchairLauncher U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n          bounds=[0,0][1080,1920]\n          * ActivityRecord{e1144ff u0 app.lawnchair/.LawnchairLauncher t2}\n      * Task{568be02 #3 type=undefined ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=0}\n        bounds=[0,0][1080,1920]\n      * Task{f09b313 #4 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n        bounds=[0,0][1080,1920]\n      * Task{f633950 #5 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n        bounds=[0,0][1080,1920]\n\n  no ScreenRotationAnimation \n\n  rootHomeTask=Task=1\n\n  PinnedTaskController\n    mIsImeShowing=false\n    mImeHeight=0\n    mAspectRatio=-1.0\n    mMinAspectRatio=0.41841003\n    mMaxAspectRatio=2.39\n    mActions=[]\n\n  DisplayFrames w=1080 h=1920 r=0\n\n  DisplayPolicy\n    mCarDockEnablesAccelerometer=true mDeskDockEnablesAccelerometer=true\n    mDockMode=EXTRA_DOCK_STATE_UNDOCKED mLidState=LID_ABSENT\n    mAwake=true mScreenOnEarly=true mScreenOnFully=true\n    mKeyguardDrawComplete=true mWindowManagerDrawComplete=true\n    mHdmiPlugged=false\n    mLastAppearance=LIGHT_STATUS_BARS\n    mLastBehavior=DEFAULT\n    mShowingDream=false mDreamingLockscreen=false\n    mStatusBar=Window{837778e u0 StatusBar}\n    mExpandedPanel=Window{ef2e38d u0 NotificationShade}\n    isKeyguardShowing=false\n    mTopFullscreenOpaqueWindowState=Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}\n    mStatusBarColorWindows=\n      Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}\n    mStatusBarBackgroundWindows=\n      Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}\n    mTopIsFullscreen=false\n    mForceStatusBar=true mAllowLockscreenWhenOn=false\n    mRemoteInsetsControllerControlsSystemBars=false\n    SystemGestures:\n      mDisplayCutoutTouchableRegionSize=0\n      mSwipeStartThreshold=Rect(72, 72 - 72, 72)\n      mSwipeDistanceThreshold=72\n    Looper state:\n      Looper (android.ui, tid 19) {8f16f96}\n        (Total messages: 0, polling=true, quitting=false)\n\n  DisplayRotation\n    mCurrentAppOrientation=SCREEN_ORIENTATION_PORTRAIT\n    mLastOrientation=1\n    mRotation=0 mDeferredRotationPauseCount=0\n    mLandscapeRotation=ROTATION_90 mSeascapeRotation=ROTATION_270\n    mPortraitRotation=ROTATION_0 mUpsideDownRotation=ROTATION_180\n    mSupportAutoRotation=false\n    WindowOrientationListener\n      mEnabled=false\n      mCurrentRotation=ROTATION_0\n      mSensorType=null\n      mSensor={Sensor name=\"3-axis Accelerometer\", vendor=\"STMicro\", version=1, type=1, maxRange=39.300102, resolution=2.480159E-4, power=3.0, minDelay=10000}\n      mRate=2\n      AccelSensorJudge\n        mProposedRotation=0\n        mPredictedRotation=0\n        mLastFilteredX=0.0\n        mLastFilteredY=0.0\n        mLastFilteredZ=0.0\n        mLastFilteredTimestampNanos=0 (1.21150448E8ms ago)\n        mTiltHistory={last: 0.0}\n        mFlat=false\n        mSwinging=false\n        mAccelerating=false\n        mOverhead=false\n        mTouched=false\n        mTiltToleranceConfig=[[-25, 70], [-25, 65], [-25, 60], [-25, 65]]\n\n    mCarDockRotation=-1 mDeskDockRotation=-1\n    mUserRotationMode=USER_ROTATION_FREE mUserRotation=ROTATION_0 mCameraRotationMode=0 mAllowAllRotations=unknown\n    mDemoHdmiRotation=ROTATION_90 mDemoHdmiRotationLock=false mUndockedHdmiRotation=-1\n    mLidOpenRotation=-1\n    mFixedToUserRotation=false\n\n  InputConsumers:\n    name=recents_animation_input_consumer pid=1616 user=UserHandle{0}\n\n  WindowInsetsStateController\n    InsetsState\n      mDisplayFrame=Rect(0, 0 - 1080, 1920)\n      mDisplayCutout=DisplayCutout{insets=Rect(0, 0 - 0, 0) waterfall=Insets{left=0, top=0, right=0, bottom=0} boundingRect={Bounds=[Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0), Rect(0, 0 - 0, 0)]} cutoutPathParserInfo={CutoutPathParserInfo{displayWidth=0 displayHeight=0 density={0.0} cutoutSpec={} rotation={0} scale={0.0}}}}\n      mRoundedCorners=RoundedCorners{[RoundedCorner{position=TopLeft, radius=0, center=Point(0, 0)}, RoundedCorner{position=TopRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomRight, radius=0, center=Point(0, 0)}, RoundedCorner{position=BottomLeft, radius=0, center=Point(0, 0)}]}\n      mPrivacyIndicatorBounds=PrivacyIndicatorBounds {static bounds=Rect(792, 0 - 1038, 72) rotation=0}\n        InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,72] visible=true\n        InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,72] visible=true\n        InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,72] visible=true\n        InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false\n    Control map:\n      ITYPE_IME -> com.android.server.wm.DisplayContent$RemoteInsetsControlTarget@ea35517\n      ITYPE_STATUS_BAR -> Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}\n    InsetsSourceProviders:\n      ImeInsetsSourceProvider\n        mSource=InsetsSource type=ITYPE_IME frame=[0,0][0,0] visible=false\n        mControl=InsetsSourceControl type=ITYPE_IME mLeash=Surface(name=Surface(name=3bd7358 InputMethod)/@0x1a35596 - animation-leash of insets_animation)/@0x425dba mSurfacePosition=Point(0, 1920) mInsetsHint=Insets{left=0, top=0, right=0, bottom=0} mSkipAnimationOnce=false\n        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]\n        mWin=Window{3bd7358 u0 InputMethod}\n        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=3bd7358 InputMethod)/@0x1a35596 - animation-leash of insets_animation)/@0x425dba\n        mControlTarget=null\n        mImeShowing=false\n      InsetsSourceProvider\n        mSource=InsetsSource type=ITYPE_TOP_TAPPABLE_ELEMENT frame=[0,0][1080,72] visible=true\n        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]\n        mWin=Window{837778e u0 StatusBar}\n      InsetsSourceProvider\n        mSource=InsetsSource type=ITYPE_TOP_MANDATORY_GESTURES frame=[0,0][1080,72] visible=true\n        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]\n        mWin=Window{837778e u0 StatusBar}\n      InsetsSourceProvider\n        mSource=InsetsSource type=ITYPE_STATUS_BAR frame=[0,0][1080,72] visible=true\n        mControl=InsetsSourceControl type=ITYPE_STATUS_BAR mLeash=Surface(name=Surface(name=837778e StatusBar)/@0x759e5fe - animation-leash of insets_animation)/@0xcacc46b mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=72, right=0, bottom=0} mSkipAnimationOnce=false\n        mIsLeashReadyForDispatching=true mImeOverrideFrame=[0,0][0,0]\n        mWin=Window{837778e u0 StatusBar}\n        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=837778e StatusBar)/@0x759e5fe - animation-leash of insets_animation)/@0xcacc46b\n        mControlTarget=Window{93459ee u0 com.quark.browser/com.ucpro.BrowserActivity}\n\n  KeyguardController:\n    mKeyguardShowing=false\n    mAodShowing=false\n    mKeyguardGoingAway=false\n    Occluded=true DismissingKeyguardActivity=null TurnScreenOnActivity=null at display=0\n    mDismissalRequested=false\n\n  LockTaskController:\n    mLockTaskModeState=NONE\n    mLockTaskModeTasks=\n    mLockTaskPackages (userId:packages)=\n      u0:[]\n\n  mCurTaskIdForUser={0=827}\n  mUserRootTaskInFront={}\n  mVisibilityTransactionDepth=0\n  isHomeRecentsComponent=true\n  mNoHistoryActivities=[]\n\n  TaskOrganizerController:\n      android.window.ITaskOrganizer$Stub$Proxy@3e834ed uid=10029:\n        (fullscreen) Task{a8734d #2 type=home I=app.lawnchair/.LawnchairLauncher U=0 rootTaskId=1 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n        (fullscreen) Task{f664fab #1 type=home ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=1}\n        (fullscreen) Task{568be02 #3 type=undefined ?? U=0 visible=false visibleRequested=false mode=fullscreen translucent=true sz=0}\n        (multi-window) Task{f09b313 #4 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n        (multi-window) Task{f633950 #5 type=undefined ?? U=0 visible=false visibleRequested=false mode=multi-window translucent=true sz=0}\n        (fullscreen) Task{d7857d7 #827 type=standard A=10196:com.warden.controlledsandbox.debug U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=2}\n\n  VisibleActivityProcess:[ ProcessRecord{29061ff 31050:com.warden.controlledsandbox.debug:guest60/u0a196}]\n  NumNonAppVisibleWindowByUid:[ 10029:3]\n",
+    "screenshot": {
+      "returncode": 0,
+      "bytes": 12504,
+      "width": 1080,
+      "height": 1920,
+      "nonTransparent": true,
+      "nonBlack": false,
+      "nonBlackFraction": 0.0,
+      "uniform": true
+    },
+    "activityState": {
+      "packagePresent": true,
+      "componentPresent": true,
+      "resumed": false,
+      "guestWindowState": {
+        "resumed_guest_stub_count": 1,
+        "windows_empty": false,
+        "reported_drawn_false": true,
+        "has_visible_false": true,
+        "drawn": false
+      }
+    },
+    "windowState": {
+      "windowCount": 1,
+      "hasSurface": false,
+      "readyForDisplay": false,
+      "drawStateHasDrawn": false,
+      "visible": false,
+      "surfaceShown": false,
+      "surfaceCount": 3,
+      "surfaceNonEmpty": true,
+      "matchedComponent": false
+    }
+  },
+  "attempt": 1,
+  "retryBudget": 0,
+  "automaticRetryPerformed": false,
+  "failure": "SANDBOX_FIRST_FRAME_NOT_CONFIRMED",
+  "errorClassification": "java.lang.IllegalStateException",
+  "firstFailureFullSnapshot": {
+    "captured_at": "2026-08-29T19:53:33.317617+00:00",
+    "screenshot": {
+      "returncode": 0,
+      "bytes": 12504,
+      "sha256": "4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930"
+    },
+    "probes": {
+      "logcat.txt": {
+        "returncode": 0
+      },
+      "logcat-critical.txt": {
+        "returncode": 0
+      },
+      "activity-activities.txt": {
+        "returncode": 0
+      },
+      "activity-processes.txt": {
+        "returncode": 0
+      },
+      "application-exit-info.txt": {
+        "returncode": 0
+      },
+      "window-windows.txt": {
+        "returncode": 0
+      },
+      "surface-list.txt": {
+        "returncode": 0
+      },
+      "surface-dump.txt": {
+        "returncode": 0
+      },
+      "processes.txt": {
+        "returncode": 0
+      },
+      "host-package.txt": {
+        "returncode": 0
+      },
+      "target-package.txt": {
+        "returncode": 0
+      },
+      "device-getprop.txt": {
+        "returncode": 0
+      },
+      "adb-devices.txt": {
+        "returncode": 0
+      },
+      "host-files.txt": {
+        "returncode": 0
+      }
+    },
+    "transactions": {
+      "files/debug-command-result.json": {
+        "returncode": 0,
+        "bytes": 517,
+        "storedPath": "snapshot\\transactions\\debug-command-result.json"
+      },
+      "files/sandbox-catalog.json": {
+        "returncode": 0,
+        "bytes": 44965,
+        "storedPath": "snapshot\\transactions\\sandbox-catalog.json"
+      },
+      "files/sandbox-catalog.json.lastgood": {
+        "returncode": 0,
+        "bytes": 44965,
+        "storedPath": "snapshot\\transactions\\sandbox-catalog.json.lastgood"
+      },
+      "files/package-lifecycle-transactions.json": {
+        "returncode": 0,
+        "bytes": 1942,
+        "storedPath": "snapshot\\transactions\\package-lifecycle-transactions.json"
+      },
+      "files/package-lifecycle-transactions.json.lastgood": {
+        "returncode": 0,
+        "bytes": 1942,
+        "storedPath": "snapshot\\transactions\\package-lifecycle-transactions.json.lastgood"
+      },
+      "files/runtime/activity-tasks.checkpoint": {
+        "returncode": 0,
+        "bytes": 4722,
+        "storedPath": "snapshot\\transactions\\runtime__activity-tasks.checkpoint"
+      },
+      "files/runtime/virtual-uids.registry": {
+        "returncode": 0,
+        "bytes": 179,
+        "storedPath": "snapshot\\transactions\\runtime__virtual-uids.registry"
+      }
+    }
+  }
+}
