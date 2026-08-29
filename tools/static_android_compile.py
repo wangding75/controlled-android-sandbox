@@ -760,6 +760,7 @@ run_java('com.warden.controlledsandbox.framework.core.InputManagerServiceContrac
 run_java('com.warden.controlledsandbox.framework.core.VirtualSystemServiceSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.framework.core.SystemServiceSemanticSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.protocol.RebindableServiceConnectorSelfTest', assertions=True)
+run_java('com.warden.controlledsandbox.runtime.protocol.ProcessInitializationGateSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.broker.RuntimeCrossAbiProviderRelaySelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.capability.GuestCapabilityAuditLogSelfTest', assertions=True)
 run_java('com.warden.controlledsandbox.runtime.capability.CapabilityProxyReadinessSelfTest', assertions=True)

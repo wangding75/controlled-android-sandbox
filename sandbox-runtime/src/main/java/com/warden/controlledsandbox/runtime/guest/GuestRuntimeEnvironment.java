@@ -5,6 +5,7 @@ import com.warden.controlledsandbox.runtime.diagnostics.RuntimeEventLog;
 import com.warden.controlledsandbox.runtime.diagnostics.RuntimePerformanceTrace;
 import com.warden.controlledsandbox.runtime.protocol.PackageRevisionSetVerifier;
 import com.warden.controlledsandbox.runtime.protocol.RuntimeKeys;
+import com.warden.controlledsandbox.runtime.protocol.ProcessInitializationGate;
 import com.warden.controlledsandbox.contract.IRuntimeBroker;
 import com.warden.controlledsandbox.contract.ProcessSlotContract;
 import com.warden.controlledsandbox.contract.RuntimeOperationRequest;
@@ -66,14 +67,17 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 /** Process-local runtime. One Android guest process hosts exactly one generation at a time. */
 public final class GuestRuntimeEnvironment {
     private static Session current;
-    private static boolean preparing;
+    private static final ProcessInitializationGate<PreparationKey, Bundle> INITIALIZATION_GATE =
+            new ProcessInitializationGate<>();
+    private static final long PREPARATION_WAIT_TIMEOUT_SECONDS = 60L;
 
     private GuestRuntimeEnvironment() { }
 
@@ -100,45 +104,116 @@ public final class GuestRuntimeEnvironment {
                 broker, RuntimeOperationRequest.ACTIVITY_EVENT, request));
     }
 
-    static Bundle prepare(Context host, GuestPackageSpec spec) {
-        if (Looper.myLooper() == Looper.getMainLooper()) return prepareOnCurrentThread(host, spec);
-        Handler mainHandler = new Handler(Looper.getMainLooper());
-        CountDownLatch complete = new CountDownLatch(1);
-        AtomicReference<Bundle> result = new AtomicReference<>();
-        AtomicReference<Throwable> failure = new AtomicReference<>();
-        if (!mainHandler.post(() -> {
-            try {
-                result.set(prepareOnCurrentThread(host, spec));
-            } catch (Throwable error) {
-                failure.set(error);
-            } finally {
-                complete.countDown();
-            }
-        })) {
-            throw new IllegalStateException("GUEST_PREPARE_MAIN_HANDLER_REJECTED");
+    private record PreparationKey(String packageName, String sessionId, long generation,
+                                  String packageRevision, String processName) {
+        static PreparationKey from(GuestPackageSpec spec) {
+            if (spec == null) throw new IllegalArgumentException("spec is required");
+            return new PreparationKey(spec.packageName, spec.sessionId, spec.generation,
+                    spec.packageRevision, spec.processName);
         }
-        try {
-            if (!complete.await(60L, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("GUEST_PREPARE_MAIN_THREAD_TIMEOUT");
+
+        boolean matches(GuestPackageSpec spec) {
+            return spec != null && generation == spec.generation
+                    && java.util.Objects.equals(packageName, spec.packageName)
+                    && java.util.Objects.equals(sessionId, spec.sessionId)
+                    && java.util.Objects.equals(packageRevision, spec.packageRevision)
+                    && java.util.Objects.equals(processName, spec.processName);
+        }
+    }
+
+    static Bundle prepare(Context host, GuestPackageSpec spec) {
+        PreparationKey key = PreparationKey.from(spec);
+        ProcessInitializationGate<PreparationKey, Bundle>.Start start;
+        synchronized (GuestRuntimeEnvironment.class) {
+            // A live same-revision session is already the authoritative process initialization.
+            // Check this only when no other generation is being prepared; an upgrade must fence
+            // concurrent callers instead of handing them the old session while it is shutting down.
+            if (!INITIALIZATION_GATE.initializing() && current != null
+                    && key.matches(current.spec)) {
+                return current.status("ALREADY_READY",
+                        android.os.SystemClock.elapsedRealtime());
             }
+            start = INITIALIZATION_GATE.start(key);
+        }
+        if (start.rejected()) {
+            throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+        }
+        if (start.waiter()) {
+            // Waiting on the main thread would deadlock the owner, which is the same recursive
+            // call protection the old preparing flag provided.  Binder/background callers join
+            // the future and receive the exact result of the single owner attempt.
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+            }
+            return awaitPreparation(start.future());
+        }
+
+        Runnable initialize = () -> completePreparation(start, host, spec);
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            initialize.run();
+        } else {
+            Handler mainHandler = new Handler(Looper.getMainLooper());
+            if (!mainHandler.post(initialize)) {
+                completePreparationFailure(start,
+                        new IllegalStateException("GUEST_PREPARE_MAIN_HANDLER_REJECTED"));
+            }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            // The main-thread owner has already completed the future synchronously.
+            return awaitPreparation(start.future());
+        }
+        return awaitPreparation(start.future());
+    }
+
+    private static void completePreparation(
+            ProcessInitializationGate<PreparationKey, Bundle>.Start start,
+        Context host, GuestPackageSpec spec) {
+        try {
+            Bundle result = prepareOnCurrentThread(host, spec);
+            synchronized (GuestRuntimeEnvironment.class) {
+                if (result == null) {
+                    INITIALIZATION_GATE.completeFailure(start,
+                            new IllegalStateException("GUEST_PREPARE_EMPTY_RESULT"));
+                } else if ("FAILED".equals(result.getString(RuntimeKeys.STATUS, ""))) {
+                    String type = result.getString(RuntimeKeys.ERROR_TYPE,
+                            "GUEST_PREPARE_FAILED");
+                    String message = result.getString(RuntimeKeys.ERROR_MESSAGE, "");
+                    INITIALIZATION_GATE.completeFailureResult(start, result,
+                            new IllegalStateException(type + ":" + message));
+                } else {
+                    INITIALIZATION_GATE.completeSuccess(start, result);
+                }
+            }
+        } catch (Throwable error) {
+            completePreparationFailure(start, error);
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+        }
+    }
+
+    private static void completePreparationFailure(
+            ProcessInitializationGate<PreparationKey, Bundle>.Start start, Throwable error) {
+        synchronized (GuestRuntimeEnvironment.class) {
+            INITIALIZATION_GATE.completeFailure(start, error);
+        }
+    }
+
+    private static Bundle awaitPreparation(CompletableFuture<Bundle> future) {
+        try {
+            return future.get(PREPARATION_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("GUEST_PREPARE_MAIN_THREAD_INTERRUPTED", error);
+        } catch (java.util.concurrent.TimeoutException error) {
+            throw new IllegalStateException("GUEST_PREPARE_MAIN_THREAD_TIMEOUT", error);
+        } catch (ExecutionException error) {
+            Throwable cause = error.getCause() == null ? error : error.getCause();
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(cause);
+            if (cause instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException(cause);
         }
-        Throwable error = failure.get();
-        if (error != null) {
-            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
-            if (error instanceof RuntimeException runtime) throw runtime;
-            throw new IllegalStateException(error);
-        }
-        return result.get();
     }
 
     private static Bundle prepareOnCurrentThread(Context host, GuestPackageSpec spec) {
-        synchronized (GuestRuntimeEnvironment.class) {
-            if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
-            preparing = true;
-        }
         long started = android.os.SystemClock.elapsedRealtime();
         RuntimePerformanceTrace perf = new RuntimePerformanceTrace(
                 spec.requestId, spec.operationId, spec.packageName);
@@ -156,7 +231,6 @@ public final class GuestRuntimeEnvironment {
                         && current.spec.packageRevision.equals(spec.packageRevision)) {
                     Bundle alreadyReady = current.status("ALREADY_READY", started);
                     perf.close();
-                    synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
                     return alreadyReady;
                 }
                 if (spec.generation <= current.spec.generation) throw new IllegalStateException("STALE_GUEST_GENERATION");
@@ -572,7 +646,6 @@ public final class GuestRuntimeEnvironment {
             RuntimeEventLog.event("GUEST_PREPARED", ready);
             perf.close();
             stagedSession = null;
-            synchronized (GuestRuntimeEnvironment.class) { preparing = false; }
             return ready;
         } catch (Throwable error) {
             try {
@@ -594,7 +667,6 @@ public final class GuestRuntimeEnvironment {
                 }
                 synchronized (GuestRuntimeEnvironment.class) {
                     current = null;
-                    preparing = false;
                 }
             } finally {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
@@ -804,6 +876,7 @@ public final class GuestRuntimeEnvironment {
             Bundle out = new Bundle();
             out.putString(RuntimeKeys.STATUS, "IDLE");
             out.putInt("pid", Process.myPid());
+            addInitializationStatus(out);
             return out;
         }
         // VA/NBB keep the process-reuse decision on the bindApplication/process record state
@@ -811,8 +884,11 @@ public final class GuestRuntimeEnvironment {
         // live bound process from a stale lease; it must not synchronously rebuild diagnostics,
         // query every isolated service declaration, or marshal the package projection on every
         // hot Activity launch.
-        return current.readinessStatus(preparing ? "PREPARING" : "READY",
+        Bundle out = current.readinessStatus(
+                INITIALIZATION_GATE.initializing() ? "PREPARING" : "READY",
                 android.os.SystemClock.elapsedRealtime());
+        addInitializationStatus(out);
+        return out;
     }
 
     static synchronized Bundle diagnosticStatus() {
@@ -820,21 +896,36 @@ public final class GuestRuntimeEnvironment {
             Bundle out = new Bundle();
             out.putString(RuntimeKeys.STATUS, "IDLE");
             out.putInt("pid", Process.myPid());
+            addInitializationStatus(out);
             return out;
         }
-        return current.status(preparing ? "PREPARING" : "READY",
+        Bundle out = current.status(INITIALIZATION_GATE.initializing() ? "PREPARING" : "READY",
                 android.os.SystemClock.elapsedRealtime());
+        addInitializationStatus(out);
+        return out;
+    }
+
+    private static void addInitializationStatus(Bundle out) {
+        out.putString("runtimeInitializationState", INITIALIZATION_GATE.state().name());
+        Throwable failure = INITIALIZATION_GATE.lastFailure();
+        if (failure != null) {
+            out.putString("runtimeInitializationFailure",
+                    failure.getClass().getName() + ":" + String.valueOf(failure.getMessage()));
+        }
     }
 
     static void shutdown(String sessionId, long generation) {
         Session session;
         synchronized (GuestRuntimeEnvironment.class) {
-            if (preparing) throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+            if (INITIALIZATION_GATE.initializing()) {
+                throw new IllegalStateException("GUEST_PREPARATION_IN_PROGRESS");
+            }
             session = require(sessionId, generation);
             // Invalidate the lease before cleanup.  Cleanup can synchronously call a framework
             // or Broker route which re-enters this class; never hold the class monitor while
             // waiting for Guest main-thread lifecycle work to finish.
             current = null;
+            INITIALIZATION_GATE.reset();
         }
         session.shutdown();
     }
@@ -850,10 +941,11 @@ public final class GuestRuntimeEnvironment {
             // A concurrent prepare owns the staged cleanup path in prepare().  Android is
             // already tearing down this process; do not publish a new current Session from
             // that path.
-            if (preparing) return;
+            if (INITIALIZATION_GATE.initializing()) return;
             session = current;
             if (session == null) return;
             current = null;
+            INITIALIZATION_GATE.reset();
         }
         session.shutdown();
     }
