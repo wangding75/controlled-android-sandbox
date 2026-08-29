@@ -1,12 +1,12 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.7
-更新时间：2026-08-28 18:11（Asia/Shanghai）
+更新时间：2026-08-29 22:37（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
 当前阶段：`C4`（BLOCKED，REOPENED，原 C4-T05 证据不足）
-当前任务：`C4-TEMP-01`（IN_PROGRESS）
+当前任务：`C4-TEMP-01`
 下一任务：`C4-TEMP-01`
 最后完成任务：`C4-R04`
 
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | - | §5 C4-TEMP-01 |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `cdd69a2d7b31e15cc205c4328ddccd4b42dac103` | §5 C4-TEMP-01 block receipt |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -2857,11 +2857,27 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
 
 ### C4-TEMP-01：CAS 导入/克隆/添加/启动耗时根因与修复（2026-08-28 起）
 
-- **状态**：`IN_PROGRESS`。按用户明确要求插入 C4-R05 之前，作为临时通用性能根因与修复前置；
-  C4-R05 原有 BLOCKED 状态、首帧门禁和历史证据均保留，不因本任务开始而自动恢复或关闭。
+- **状态**：`BLOCKED`（2026-08-29 22:46，Asia/Shanghai）。按用户明确要求插入 C4-R05 之前，
+  作为临时通用性能根因与修复前置；C4-R05 原有 BLOCKED 状态、首帧门禁和历史证据均保留，
+  不因本任务开始或本轮性能改动而自动恢复或关闭。
 - **开始时间 / 开始基线**：2026-08-28 18:11（Asia/Shanghai）；分支
   `feature/t57-r03-va-pro-capability-campaign`；开始前工作区干净；任务书变更前置设计提交
-  `d6175da2`，账本插入后的实现基线待本回执提交时写入。
+  `d6175da2`；本次拉取后实际执行基线为 `54d48c5cfa85602299531b5215cfa0c9c352fdc3`，
+  证据/验证实现提交为 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`。
+- **拉取后续接开始**：2026-08-29 22:37（Asia/Shanghai）；按用户指令先执行
+  `git pull --ff-only origin feature/t57-r03-va-pro-capability-campaign`，从
+  `6c7c41aa` fast-forward 到 `54d48c5cfa85602299531b5215cfa0c9c352fdc3`；本地 HEAD、
+  远端 HEAD 和任务分支一致，未覆盖已有 `C0-T01` 预检 JSON 或本任务历史证据。续接预检
+  通过并继续识别 `C4-TEMP-01`；提交身份为 `OpenAI <openai@users.noreply.github.com>`。
+- **拉取后 RD 快照**：动态解析 MuMu `RD测试`，serial `127.0.0.1:16416`、API 32、ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`、型号 `22041211A`、boot ID
+  `bd6fc459-0d52-4689-868a-420364ea407c`、Android ID `398eea33120cd887`；serial 仅写入
+  运行时环境快照，未进入脚本常量或验收分支。
+- **拉取后本地门禁**：`py_compile`、C4-TEMP-01 latency contract、C4-R05 orchestrator
+  contract、修订绑定 gate（更新为扫描拆分后的 validator/lifecycle owner）和静态 Android
+  编译/self-test 通过；首次旧门禁失败原文保留于
+  `verification/catch-up/C4-TEMP-01/static-gates/20260829T1430_check-apk-revision-binding-first-failure.txt`，
+  归类为检查器与最新职责拆分的断言漂移，未进行运行时重试。
 - **上一任务回执**：C4-R04 已于 2026-08-25 20:18 以
   `1d9b83d54c13d2a758752281dbc492859d8bd05d` 完成并推送；C4-R05 于 2026-08-28 因 Quark
   cold 首帧 gate 超时以 `5ee894f3e32339b951ba7c81f19010f1d13bf392` 形成首失败阻断回执，账本/KI
@@ -2883,5 +2899,86 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   request/operation、stage timing、日志、dumpsys、Window/Surface、截图/帧和 hash，不自动重试。
 - **Known Issues**：本任务开始时不关闭 `KI-R03-053/054/057/058/059/061/062` 或开放的
   `KI-R03-060`；只有证据闭环后才追加变化。
-- **下一任务**：临时任务完成且恢复条件满足后为 `C4-R05`；若设备、样本、构建或性能门禁真实
-  阻断，则本任务标记 `BLOCKED`，停止后续任务并提交阻断证据。
+- **下一任务**：临时任务完成且恢复条件满足后为 `C4-R05`；本轮性能硬门禁真实阻断，已按任务书
+  标记本任务 `BLOCKED`，停止后续任务并提交以下阻断回执。
+
+### C4-TEMP-01：阻断回执（2026-08-29）
+
+- **任务 ID / 最终状态**：`C4-TEMP-01 / BLOCKED`。本轮没有标记 DONE，也没有进入 C4-R05。
+- **开始/结束时间与基线**：续接开始 2026-08-29 22:37（Asia/Shanghai），首个动态 benchmark
+  运行目录 `20260829T223756`；修正观测边界后独立验证目录 `20260829T224349`，于约
+  22:46 因沙箱首帧硬门禁失败结束。代码基线为拉取后的
+  `54d48c5cfa85602299531b5215cfa0c9c352fdc3`，实现/证据提交为
+  `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`
+  （`fix(c4): [C4-TEMP-01] preserve latency block evidence`）。
+- **执行环境 / RD 快照**：动态解析 MuMu `RD测试`，API 32，ABI
+  `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，型号 `22041211A`，boot ID
+  `bd6fc459-0d52-4689-868a-420364ea407c`，Android ID `398eea33120cd887`；完整环境和
+  动态 discovery 见 `verification/catch-up/C4-TEMP-01/20260829T224349-artifact-index.md`
+  及同目录 raw `environment.json`/`quark-discovery.json`。运行时 serial 未进入脚本常量或分支。
+- **首次失败证据**：第二条独立链的第一失败为 Quark 沙箱 sample-01，request
+  `bdb03fe6b78d4323ab3b1adcf170be36`，operation
+  `bdb03fe6b78d4323ab3b1adcf170be36-launch`，session
+  `eb8a4856-f830-4b3a-ad14-79a82f0496ef`，attempt 1，retry budget 0，automatic retry
+  `false`；`targetStopBeforeSandbox` 返回码 0。import-only PASS，launch 返回码 1，耗时
+  `88953ms`，结构化错误为 `LAUNCH_FAILED / LAUNCH_GATE_FAILED`，
+  `guest Activity create/resume/window not confirmed`，没有完整 launch timeline，
+  `requiredStagesPresent=false`。原始 logcat 关键行是 22:45:46.486 的
+  `GUEST_LAUNCH_READINESS status=LAUNCH_FAILED`，随后 22:45:46.608 的同一命令失败。
+  完整 request/operation、logcat、Host/Guest、dumpsys、Window/Surface、截图、安装事务、
+  staging/catalog/revision、进程、boot 和 APK hash 由 artifact index 索引；第一次
+  `20260829T223756` 证据未覆盖。
+- **真实显示证据**：失败边界快照中 Host `StubActivity60W1` 为 top-resumed，但 Guest
+  `resumed_guest_stub_count=1`、`reported_drawn=false`、`has_visible=false`、`drawn=false`；
+  目标 Host-owned Window 的 `mHasSurface=true` 但 `Surface: shown=false`、
+  `mDrawState=DRAW_PENDING`，`readyForDisplay=false`、`visible=false`；截图为
+  `1080x1920` 全黑均匀，SHA-256
+  `4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930`。因此没有用 Guest
+  进程存在、静态 marker、系统 Surface 数量或后续窗口残留代替 FIRST_FRAME_DRAWN。
+- **对照矩阵**：夸克直接冷启动 3/3 通过动态 Activity/Window/Surface/非黑首帧，耗时
+  `6937/6147/7582ms`；沙箱在 sample-01 的第一项即失败，故不计算 ratio 以绕过硬门禁，
+  也没有继续发起后续样本。商业样本、C1/C2/C4/SX 和 30 分钟双用户短测均未执行，不能
+  以夸克直启或历史 fixture/DingTalk 结果替代。
+- **根因及分类**：当前可证实的分类为
+  `CAS_READINESS_GATE_FAILURE_WITH_NESTED_QUARK_HANDOFF_UNRESOLVED`。CAS fail-closed
+  gate 在该 request 的 deadline 内没有得到 Guest `FIRST_FRAME_DRAWN` 合同，这一失败是真实
+  且可重复的；但现有日志同时包含 Quark/app-SDK native profile/SecurityGuard 相关现象，
+  没有足够因果证据将责任定为 CAS 通用层或 Quark 专属层。历史其他运行的 FATAL 不与本
+  request 关联，未被提升为本次根因。结论保持“待验证”，不授权延长 deadline、固定 sleep、
+  吞异常循环重试或 package-specific production fix。
+- **VA/NBB 对照**：NBB 安装解析/设置缓存后复用 `ProcessRecord`；VA 在安装阶段完成
+  parse/copy/cache，启动复用已建立的身份与进程边界。CAS import-only 已通过并记录
+  `HASH/MANIFEST_PARSE/PACKAGE_INFO/REVISION_VERIFY/CATALOG` 分段；失败位于
+  `RuntimeActivityLaunchCoordinator`、`GuestLaunchObservation`、`GuestLaunchGate` 对
+  Guest create/resume/window identity 的 readiness 合同。采纳真实 request-scoped gate 和
+  fail-closed 语义，不采纳固定 sleep、隐藏 retry、延长 SLO 或包名特判；后续回归为
+  KI-R03-062 root→child handoff 与 C4-R05 两轮矩阵。
+- **本轮修改文件**：`tools/capability/run_c4_temp_01_quark_latency.py`（动态目标清理、
+  Host/Guest Window/Surface/Activity 归属、真实首帧 fail-fast、request/operation/retry
+  记录）；`scripts/check-apk-revision-binding.py`（适配 validator/lifecycle 职责拆分）；
+  `.gitignore`（raw device output 保留本地）；`verification/catch-up/C4-TEMP-01/` 下
+  首失败原文、分类和 artifact index；以及最新续接预检快照。生产 CAS 未因证据不足作 R03
+  范围外改动。
+- **验收命令与结果**：`python scripts/verify-catch-up-continuation.py` PASS，识别
+  `C4-TEMP-01`；`python -m py_compile ...` PASS；`python scripts/check-c4-temp-01-latency.py`
+  PASS；`python scripts/check-c4-r05-orchestrator.py` PASS；`python scripts/check-apk-revision-binding.py`
+  PASS；`python tools/static_android_compile.py` PASS（self-tests PASS）；Gradle
+  `:app:assembleDebug :fixture-basic:assembleDebug :sandbox-companion32:assembleDebug
+  :fixture-compat32:assembleDebug --no-daemon` PASS。动态 TEMP-01 硬门禁 FAIL，故任务总体
+  BLOCKED。
+- **Known Issues 变化**：`KI-R03-062` 保持 `RECORDED / NEEDS_REPRODUCTION_AND_CLASSIFICATION /
+  blocks_current_campaign: true / acceptance: NOT_FIXED`，追加本轮 request、快照和索引；
+  `KI-R03-053/054/057/058/059/061` 仍未关闭，`KI-R03-060` 仍为已接受但开放的强制回归项。
+- **重试记录**：生产请求没有重试，`attempt=1`、`retryBudget=0`、`automaticRetryPerformed=false`；
+  第一条链的失败证据保存后只修正了 benchmark 的错误观测边界，再以独立链验证，未重发同一
+  request、未捕获异常循环、未固定 sleep、未延长总 timeout。旧静态 gate 的第一次失败是
+  checker contract drift，原文保留并经职责拆分修正，不是运行时 retry。
+- **偏离任务书 / 遗留风险 / 恢复条件**：因首个真实非环境失败，按 fail-fast 停止，未执行
+  3×沙箱余项、商业样本、R05 两轮、C1/C2/C4/SX 回归和 30 分钟双用户短测；这是任务书
+  第 6 节要求的阻断路径，不是降低门槛。恢复前须先完成 CAS readiness 与 Quark/app-SDK
+  延迟的有界分类；若需生产修改，先提交独立 VA/NBB 设计和回归用例，再在新的 clean commit
+  上重跑 TEMP-01 和完整 C4-R05。
+- **回执提交 / 推送 / 下一任务**：本段由独立提交主题
+  `docs(progress): record [C4-TEMP-01] blocked receipt` 提交；完成推送后以 Git SHA 核验。
+  本地与远端 HEAD 必须一致、工作区保持干净；下一任务仍记录为
+  `C4-TEMP-01 (BLOCKED)`，不得进入 `C4-R05` 或 `C6-T01`。

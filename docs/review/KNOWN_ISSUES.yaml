@@ -1756,6 +1756,11 @@ issues:
       - sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestLaunchGate.java
       - docs/review/C4_R03_LAUNCH_READINESS_WINDOW_DESIGN_20260824.md
       - docs/review/C4_R05_FINAL_TWO_ROUND_EVIDENCE_BOUNDARY_DESIGN_20260827.md
+      - verification/catch-up/C4-TEMP-01/quark-latency/20260829T224349/summary.json
+      - verification/catch-up/C4-TEMP-01/quark-latency/20260829T224349/sandbox/sample-01/case.json
+      - verification/catch-up/C4-TEMP-01/quark-latency/20260829T224349/sandbox/sample-01/first-failure-full
+      - verification/catch-up/C4-TEMP-01/20260829T224349-first-failure-classification.md
+      - verification/catch-up/C4-TEMP-01/20260829T224349-artifact-index.md
     match_patterns:
       - READINESS_SLO_EXCEEDED
       - LAUNCH_GATE_FAILED
@@ -1789,4 +1794,19 @@ issues:
       Quark/app-SDK startup latency. Do not extend the deadline, add a package-specific fix,
       or retry until that boundary is classified and a bounded regression passes. A later
       CONTENT_PROVIDER_AUTHORITY_NOT_VIRTUALIZED:media exception is retained as post-failure
-      app evidence, not promoted to the gate root cause.
+      app evidence, not promoted to the gate root cause. On 2026-08-29, C4-TEMP-01 ran a
+      second independent dynamic Quark lane after correcting the benchmark's direct-process
+      cleanup and Host/Guest Window attribution. Import-only passed, direct cold launch passed
+      3/3 at 6937/6147/7582 ms, but sandbox sample-01 failed on request
+      bdb03fe6b78d4323ab3b1adcf170be36 and operation
+      bdb03fe6b78d4323ab3b1adcf170be36-launch, attempt 1, retry budget 0, automatic retry
+      false. The production result was LAUNCH_FAILED/LAUNCH_GATE_FAILED after 88953 ms;
+      the Host Stub was top-resumed while Guest reported_drawn and has_visible remained false,
+      the target Window was DRAW_PENDING/Surface shown=false, and the 1080x1920 screenshot was
+      uniform black (SHA-256 4afb293f262964138b1d2e2a08733ad4d4216150e508b9f62e4610e47e0cb930).
+      The complete request/operation, stage, logcat, Activity/process, Window/Surface, transaction,
+      catalog, revision, boot and APK evidence is indexed under the C4-TEMP-01 artifact index.
+      This repeats the hard readiness failure after the pulled performance baseline but still does
+      not establish whether the residual delay is generic CAS readiness or Quark/app-SDK startup;
+      status remains RECORDED and blocks the campaign. No deadline extension, hidden retry, or
+      package-specific production change was used.
