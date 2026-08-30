@@ -3182,7 +3182,7 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   没有进入 C4-R05。C4 阶段保持 `BLOCKED/REOPENED`，C4-R05 保持 `BLOCKED`，C6-T01
   仍为 `PENDING`。下一任务仍为 `C4-TEMP-01`，待恢复条件满足后续接。
 - **开始/结束时间与基线**：开始 `2026-08-30 11:09:55 +08:00`，结束
-  `2026-08-30 11:50:27 +08:00`；开始 commit 为
+  `2026-08-30 11:51:29 +08:00`；开始 commit 为
   `b5efd69d000d40f2383cd7290e9d7482cef06522`，结束实现基线为
   `ffef74c31edcb4497a51bf18b9e6a869d6593e53`；分支为
   `feature/t57-r03-va-pro-capability-campaign`，远端为
@@ -3309,7 +3309,8 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   或 Quark direct 成功替代真实 `FIRST_FRAME_DRAWN`。
 - **提交、推送与下一任务**：实现提交 `2bb1f2864bc2b556fa5987bff2c69445be0a0862`、
   `ffef74c31edcb4497a51bf18b9e6a869d6593e53` 已分别推送；本回执/证据提交 SHA 在提交
-  后写回本段。推送后必须再次核验本地与远端 HEAD 一致、工作区干净；最终续接预检因
+  `38440d5f2df62c6e50cb609444353cb7d0aea29c` 已推送。推送后必须再次核验本地与远端
+  HEAD 一致、工作区干净；最终续接预检因
   `C4-TEMP-01` 为 BLOCKED 应 fail-closed；最终原始输出已记录在
   `verification/catch-up/C4-TEMP-01/20260830T1150-final-continuation-preflight-failure.md`，
   不得识别为 C4-R05。
