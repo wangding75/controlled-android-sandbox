@@ -1,7 +1,7 @@
 # CAS 追平 VA PRO 执行进度
 
 账本版本：1.7
-更新时间：2026-08-30 04:02（Asia/Shanghai）
+更新时间：2026-08-30 11:10（Asia/Shanghai）
 任务书：`docs/plans/CAS_VA_PRO_CATCH_UP_EXECUTION_TASK_BOOK_20260821.md`
 任务分支：`feature/t57-r03-va-pro-capability-campaign`
 远端：`origin`
@@ -68,7 +68,7 @@
 | C4-R02 | 添加事务、超时与 UI 状态机 | DONE | C4-R01 | `46eed7be60a83f5b5adfe865a8c4b0d37e0a63a1` | §5 C4-R02 |
 | C4-R03 | 启动 readiness 与窗口合同 | DONE | C4-R01 | `d8797c89` | §5 C4-R03（用户批准残余风险豁免） |
 | C4-R04 | C4 fail-closed 验收编排 | DONE | C4-R02,C4-R03 | `1d9b83d54c13d2a758752281dbc492859d8bd05d` | §5 C4-R04 |
-| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | BLOCKED | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 8 小时窗口最终阻断回执 |
+| C4-TEMP-01 | CAS 导入/克隆/添加/启动耗时根因与修复 | IN_PROGRESS | C4-R04；C4-R05 BLOCKED（临时前置） | `a9add66722cb3ab6da996059bcc4ad32c502778d`（含前置 `cdd69a2d7b31e15cc205c4328ddccd4b42dac103`） | §5 C4-TEMP-01 5 小时窗口续作 |
 | C4-R05 | MuMu RD 正式重验与关门 | BLOCKED | C4-R04 | `5ee894f3e32339b951ba7c81f19010f1d13bf392` | §5 C4-R05 formal Quark block receipt |
 | C5-T01 | 原始 XH 产品能力契约 | NOT_APPLICABLE | C2,C3 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
 | C5-T02 | XH CAS Host/SDK 集成 | NOT_APPLICABLE | C5-T01,C4-T02 | `a8f24e40` | §5 PLAN-20260824-C4-REOPEN |
@@ -3139,3 +3139,38 @@ C4-R04；这不表示 500/500 正式首试门禁已通过，也不表示 C4 阶�
   `origin/feature/t57-r03-va-pro-capability-campaign`，并验证本地与远端 HEAD 一致、
   工作区干净。下一任务仍为 `C4-TEMP-01 (BLOCKED)`，C4-R05 保持 `BLOCKED`；不得进入
   C6-T01，C4 阶段不得标记 DONE。
+
+### C4-TEMP-01：5 小时窗口续作（2026-08-30）
+
+- **任务 ID / 当前状态**：`C4-TEMP-01 / IN_PROGRESS`。本段是用户明确“重新开始 5 小时”
+  后对上一轮阻断的正式续作；不覆盖历史 BLOCKED 回执，也不把旧失败改写为 PASS。当前
+  只允许本任务处于 `IN_PROGRESS`，在任务关闭或再次形成真实阻断前不得进入 C4-R05。
+- **窗口与开始基线**：开始时间 `2026-08-30 11:09:55 +08:00`，窗口截止
+  `2026-08-30 16:09:55 +08:00`；开始 commit、分支和远端 HEAD 均为
+  `b5efd69d000d40f2383cd7290e9d7482cef06522` /
+  `feature/t57-r03-va-pro-capability-campaign` /
+  `origin/feature/t57-r03-va-pro-capability-campaign`。上一任务 C4-R04 回执为
+  `1d9b83d54c13d2a758752281dbc492859d8bd05d`；上一轮 C4-TEMP-01 最终阻断回执为
+  `c5c7348b0d6f798bdf2325984b7a16bfaaba80e3`，最终证据补充为
+  `b6604419d90c9b2b9b96aa06e599b74021df62a3`，账本哈希收尾提交为
+  `b5efd69d000d40f2383cd7290e9d7482cef06522`。
+- **拉取与预检**：窗口开始前执行 `git fetch origin --prune` 和
+  `git pull --ff-only origin feature/t57-r03-va-pro-capability-campaign`，结果为
+  `Already up to date`，本地与远端一致且工作区干净。重开前执行
+  `python scripts/verify-catch-up-continuation.py`，按历史 BLOCKED 状态返回
+  `FAIL C0-T01 continuation preflight: ledger next task C4-TEMP-01 is not first
+  dependency-ready PENDING task None`，退出码 `1`；这是预期 fail-closed 边界，写入本段后
+  将重新执行并确认当前唯一活动任务为 `C4-TEMP-01`。
+- **事实源与专项参考**：已重新完整读取任务书、进度账本、C4 RD 重测根因与验收计划、
+  `KNOWN_ISSUES.yaml`、能力活动工作流、提交身份策略、C4-TEMP-01 专项设计及 C4-R01/R02/R03/R04/R05
+  设计、证据边界、交接和 VA/NBB 参考映射；本轮仍遵守 30 秒 cold/10 秒 hot 首帧门槛，
+  不使用固定 sleep、静默 launch retry、扩大 timeout 或 package-specific 分支。
+- **RD 测试设备快照**：通过 `python scripts/mumu_instance.py --instance-name 'RD测试'`
+  动态解析到 MuMu `RD测试`（实例索引 1，`MuMuPlayer-12.0-1`），API 32，型号
+  `22041211A`，ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`，Android ID
+  `398eea33120cd887`，boot ID `bd6fc459-0d52-4689-868a-420364ea407c`；resolved serial
+  只进入本次快照，不进入生产代码、任务分支或验收逻辑。
+- **当前 Known Issues 与续作边界**：`KI-R03-053/054/057/058/059/061/062` 仍为
+  `RECORDED` 阻断项，`KI-R03-060` 仍为已接受但必须回归的开放项；本轮先针对
+  `KI-R03-062` 的 CAS readiness 与 Quark/app-SDK/Guest 延迟边界做新的独立诊断，只有
+  形成可归因、最小、具 VA/NBB 对照的修复并通过静态、构建、动态门禁，才允许关闭 TEMP-01。
