@@ -1,42 +1,40 @@
 {
   "schema_version": 1,
-  "task_id": "C4-TEMP-01",
+  "task_id": "C4-R05",
   "status": "PASS",
-  "captured_at": "2026-08-30T14:07:32.721994+00:00",
+  "captured_at": "2026-08-30T14:12:24.079318+00:00",
   "ledger": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "next_task": "C4-TEMP-01",
-    "active_task": "C4-TEMP-01",
-    "last_completed": "C4-R04",
+    "next_task": "C4-R05",
+    "active_task": "C4-R05",
+    "last_completed": "C4-TEMP-01",
     "first_ready_pending": null,
-    "dependencies": "C4-R04；C4-R05 BLOCKED（临时前置）"
+    "dependencies": "C4-R04,C4-TEMP-01"
   },
   "last_receipt": {
-    "task_id": "C4-R04",
-    "status": "`DONE`。本回执只关闭 C4-R04 任务，不关闭 C4 阶段；C4-R05 的正式 MuMu",
+    "task_id": "C4-TEMP-01",
+    "status": "`DONE`",
     "implementation_commits": [
-      "57d2c34a04c3c33b0292934373d763c3e4369ea7"
+      "7c0c819a58513f89e91ec0fb44cdc05a151e2c32"
     ],
-    "receipt_commit": "c134ae3735d74cd179b7235b220dd9456c762ce3",
-    "baseline_commit": "46a59f3a9c1f8703213705562f9f48c2bff02691",
+    "receipt_commit": "b2c021c884058491bf8a966eca653906138f84e2",
+    "baseline_commit": "f4d69bb53d6a8f2cc70469902c40ffad77d2d431",
     "evidence_paths": [
-      "verification/catch-up/C0-T01/continuation-preflight.json",
-      "docs/review/C4_R04_FAIL_CLOSED_ACCEPTANCE_ORCHESTRATION_DESIGN_20260825.md",
-      "verification/catch-up/C4-R04/acceptance/failure-injection/failure-injection-summary.json",
-      "verification/catch-up/C4-R04/acceptance/recovery/recovery-summary.json",
-      "verification/catch-up/C4-R04/live-smoke-fixed/live-summary.json"
+      "docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md",
+      "docs/review/KNOWN_ISSUES.yaml",
+      "verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json"
     ]
   },
   "git": {
     "branch": "feature/t57-r03-va-pro-capability-campaign",
-    "head": "d2d2d5b1c37d3cad669d2964129d12fadc3ccdf9",
+    "head": "e05ed0f7b6d405cd268b7a0fcb775c1c306df60b",
     "remote_branch": "origin/feature/t57-r03-va-pro-capability-campaign",
-    "remote_head": "d2d2d5b1c37d3cad669d2964129d12fadc3ccdf9",
+    "remote_head": "e05ed0f7b6d405cd268b7a0fcb775c1c306df60b",
     "identity": {
       "name": "OpenAI",
       "email": "openai@users.noreply.github.com"
     },
-    "status_short": "M .gitignore\n M docs/review/C4_TEMP_01_CAS_IMPORT_LAUNCH_LATENCY_ROOT_CAUSE_AND_FIX_DESIGN_20260828.md\n M docs/review/KNOWN_ISSUES.yaml\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestContext.java\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestDynamicReceiverTransport.java\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestPackageContext.java\n M sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java\n M sandbox-runtime/src/testHarness/java/com/warden/controlledsandbox/runtime/guest/GuestContextBoundarySelfTest.java\n M scripts/check-c4-temp-01-latency.py\n M tools/static_android_compile.py\n M verification/catch-up/C0-T01/continuation-preflight.json\n?? javac.20260830_220551.args\n?? verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json\n?? verification/catch-up/C4-TEMP-01/20260830T181923-first-frame-fix-classification.md"
+    "status_short": "M verification/catch-up/C0-T01/continuation-preflight.json"
   },
   "device": {
     "instance_name": "RD测试",
@@ -303,5 +301,5 @@
       }
     ]
   },
-  "evidence_directory": "verification/catch-up/C4-TEMP-01"
+  "evidence_directory": "verification/catch-up/C4-R05"
 }
