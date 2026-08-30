@@ -104,3 +104,62 @@ CAS 在 Host 启动后 30 秒窗口内未收到目标 `BrowserActivity` 的 `FIR
 - 回滚：两个独立提交可分别回退；不删除历史 R05 evidence/Known Issues。
 - 任务完成后重新写入临时任务回执和 Known Issues 变化；只有动态 ratio 达标且无新增 P0/P1，才把 C4-R05 恢复为下一
   `PENDING` 依赖；否则临时任务本身 `BLOCKED`，后续停止。
+
+## 8. 2026-08-30 续作：动态 Receiver 的 CAS 主线程锁反转
+
+### 8.1 首次失败证据和定位
+
+前序诊断 lane `verification/catch-up/C4-TEMP-01/quark-layout-inflater-20260830/20260830T180827/`
+仍在 CAS sample-01 首次失败，request 为 `c73ef73bc087476789e90baa65b3f6e3`，attempt=1、
+`retryBudget=0`、无自动重试。该 lane 的 Guest 事件显示：child `GUEST_READY` 后，
+`com.uc.base.wa.config.WaIpcHelper$WaBroadcastReceiver` 在后台线程登记
+`GUEST_RECEIVER_REGISTER`，随后约 15,032 ms 才 `GUEST_RECEIVER_UNREGISTER`；child
+`GUEST_ACTIVITY_CREATED` 紧接着发生。该间隔与 `GuestMainThreadDispatcher.DEFAULT_TIMEOUT_MS=15_000`
+一致，说明阻塞发生在 Guest 主线程派发，而不是导入 hash 或窗口绘制本身。
+
+代码链路为 `GuestContextComponentRouter.registerReceiver` → Broker 动态 Receiver lease →
+`GuestDynamicReceiverTransport.register`。旧实现把 Host `Context.registerReceiver` 再次包装为
+`session.mainThread.call(...)`。Quark 的启动 worker 在等待该同步登记完成，而
+`BrowserActivity.onCreate` 同时等待 worker，形成 CAS 才有的 worker↔Guest-main-thread 锁反转。
+直启没有这条 CAS transport hop；package-neutral fixture 也没有触发该依赖关系。该证据将该
+失败从“未界定 Quark 首帧延迟”收敛为 CAS 通用 Guest Receiver transport owner 边界。
+
+### 8.2 采纳的 VA/NBB/Android 合同与实现
+
+- Android `Context.registerReceiver(..., Handler, ...)` 的调用登记属于调用方可执行的
+  Context/ReceiverDispatcher 操作，`Handler` 只决定回调投递线程；因此不需要把登记/注销
+  强制转发到 Activity 主线程。
+- VA/NBB 的参考边界保持 Broker/virtual receiver registry 负责 package、user、permission、
+  receiver lease 和 death cleanup，framework dispatcher 负责 Host receiver 的实际登记与回调；
+  两者不能共享 Guest Activity 的同步生命周期锁。采纳该 owner 分离，不采纳把回调直接放回
+  Host 主线程、绕过 Broker registry 或扩大 readiness deadline。
+- `GuestDynamicReceiverTransport` 现在在发起登记的 SDK 线程直接调用 Host
+  `registerReceiver`，仍使用传入 `Handler` 派发 Guest callback；`unregister` 和 `close` 同样
+  直接清理 Host dispatcher，Broker lease、异常回滚、generation/session 身份检查保持不变。
+- Guest/GuestPackage Context 的 `LayoutInflater` 改为每个 Context 缓存单一实例，保持
+  `ContextImpl` 的服务身份语义；`StubActivityBase` 在物理 Stub 放行 route 前重新确认
+  ActivityThread instrumentation，失败即留证并 fail-closed，不改变正常 framework `addView`
+  或首帧门槛。后两项是边界完整性修复，不被宣称为本次 Quark 延迟的主因。
+
+### 8.3 修复后验证
+
+同一构建提交上的 package-neutral fixture 动态回归为 PASS。Quark lane
+`verification/catch-up/C4-TEMP-01/quark-receiver-thread-20260830/20260830T181923/`
+动态解析到 `com.quark.browser` 10.10.5.1080、入口 `com.ucpro.MainActivity`、实际 child
+`com.ucpro.BrowserActivity`，MuMu `RD测试` API32/ABI `x86_64,arm64-v8a,x86,armeabi-v7a,armeabi`。
+直启 3/3 为 7534/7042/6114 ms；CAS 3/3 为 63013/41235/39081 ms，比值
+8.3638/5.8556/6.3921，最大值 8.3638，低于 10x 硬门槛但仍高于 3x 目标。三次 CAS 的
+readiness 分别为 14387/14368/13668 ms，并且均有 `activityCreated=true`、
+`activityResumed=true`、`windowEvidence=true`、`firstFrameDrawn=true`、非空 Surface、
+`readyForDisplay=true`、`drawStateHasDrawn=true`、`surfaceShown=true` 和非黑截图。每次
+均为 attempt=1、`retryBudget=0`、`automaticRetryPerformed=false`。完整摘要见
+`verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json`，原始 runner
+树和截图路径见对应 lane。
+
+### 8.4 范围结论
+
+该修复关闭了本次可复现的 CAS Receiver 主线程锁反转，并通过 TEMP-01 的 3+3 硬门槛；
+3x 只是性能目标，未把 8.36x 写成目标达成。夸克的残余导入/clone/prepare 成本、低内存
+环境项及商业样本完整矩阵仍按 C4-R05 独立验收，不能用本 TEMP 结果替代 R05 的两轮、
+添加、回归或双用户短测。`KI-R03-062` 的历史首失败保留为审计证据；其具体锁反转签名
+在本 lane 不再复现，待完整 R05 回归后再决定是否正式关闭。

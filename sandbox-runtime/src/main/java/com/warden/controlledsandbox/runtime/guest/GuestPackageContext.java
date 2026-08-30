@@ -28,6 +28,9 @@ final class GuestPackageContext extends GuestHostOperationDenyContext {
     private final Resources resources;
     private final AssetManager assets;
     private final Resources.Theme theme;
+    /** Match ContextImpl's per-context service identity for resource-only Guest views. */
+    private volatile LayoutInflater guestLayoutInflater;
+    private final Object layoutInflaterLock = new Object();
 
     GuestPackageContext(GuestContext owner, String targetPackage,
                         VirtualPackageStateSnapshot targetState,
@@ -75,7 +78,16 @@ final class GuestPackageContext extends GuestHostOperationDenyContext {
     }
     @Override public Object getSystemService(String name) {
         if (Context.LAYOUT_INFLATER_SERVICE.equals(name)) {
-            return LayoutInflater.from(owner.hostServiceContext()).cloneInContext(this);
+            LayoutInflater cached = guestLayoutInflater;
+            if (cached != null) return cached;
+            synchronized (layoutInflaterLock) {
+                cached = guestLayoutInflater;
+                if (cached == null) {
+                    cached = LayoutInflater.from(owner.hostServiceContext()).cloneInContext(this);
+                    guestLayoutInflater = cached;
+                }
+                return cached;
+            }
         }
         return owner.getSystemService(name);
     }

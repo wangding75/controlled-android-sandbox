@@ -48,7 +48,13 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         DynamicReceiverLease lease = new DynamicReceiverLease(receiverId, guestReceiver, filter,
                 permission, scheduler, flags);
         try {
-            Intent sticky = session.mainThread.call(() -> registerHost(lease));
+            // Context.registerReceiver() is explicitly usable from a caller-owned thread; the
+            // Handler argument controls where delivery runs.  Marshaling this registration to
+            // the Guest main thread creates a lock inversion for SDKs that register a Receiver
+            // from a worker while Activity.onCreate() waits for that worker.  The Broker lease
+            // was already committed above, so register the Host dispatcher on this same thread
+            // and keep Guest callback execution on the supplied scheduler.
+            Intent sticky = registerHost(lease);
             synchronized (leasesLock) {
                 requireOpen();
                 if (leases.put(receiverId, lease) != null) {
@@ -77,10 +83,10 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         synchronized (leasesLock) { lease = leases.remove(receiverId); }
         if (lease == null) return;
         try {
-            session.mainThread.call(() -> {
-                unregisterHost(lease);
-                return null;
-            });
+            // unregisterReceiver() has the same thread contract as registration.  Keeping it
+            // direct also makes a register/unregister pair atomic with respect to the caller's
+            // SDK worker instead of queueing behind Activity.onCreate().
+            unregisterHost(lease);
         } catch (Throwable error) {
             com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             android.util.Log.w("CS_RECEIVER_FRAMEWORK",
@@ -247,10 +253,10 @@ final class GuestDynamicReceiverTransport implements AutoCloseable {
         }
         for (DynamicReceiverLease lease : toClose) {
             try {
-                session.mainThread.call(() -> {
-                    unregisterHost(lease);
-                    return null;
-                });
+                // ReceiverDispatcher bookkeeping is synchronized by ContextImpl and is not
+                // thread-affine.  Teardown must not wait for a Guest main thread that can be
+                // blocked in a framework callback or already retired.
+                unregisterHost(lease);
             } catch (Throwable error) {
                 com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
             }

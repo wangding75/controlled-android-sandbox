@@ -59,4 +59,12 @@ verification/catch-up/C4-R05/repro-*/
 # TEMP-01 root are the durable review evidence.
 /verification/catch-up/C4-TEMP-01/quark-latency/20*/
 
+# C4-TEMP-01 raw 2026-08-30 dynamic runs retain copied APKs and device dumps locally;
+# curated benchmark/classification files at the lane root are the durable evidence.
+/verification/catch-up/C4-TEMP-01/fixture-*-20260830*/
+/verification/catch-up/C4-TEMP-01/quark-*-20260830*/
+
 _delivery/
+
+# javac emits transient @arg files in the repository root for long source lists.
+javac.*.args

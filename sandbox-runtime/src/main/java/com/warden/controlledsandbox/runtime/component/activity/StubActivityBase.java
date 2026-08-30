@@ -98,16 +98,57 @@ public abstract class StubActivityBase extends Activity {
 
     private void queueGrantedRoute(Bundle route, Bundle state) {
         if (destroying) return;
-        bindWindowOwner(route);
-        pendingGrantedRoute = new Bundle(route);
-        pendingRouteState = state == null ? null : new Bundle(state);
         // Broker recovery may have advanced the Guest process generation while Android was
         // recreating this Host trampoline.  The returned route is authoritative; retaining the
         // stale Intent extras here would make GuestRuntimeEnvironment.require() reject a valid
         // recovered session.
         sessionId = value(route.getString(RuntimeKeys.SESSION_ID, sessionId));
         generation = route.getLong(RuntimeKeys.GENERATION, generation);
+        if (!reassertFrameworkActivityTransport(route)) return;
+        bindWindowOwner(route);
+        pendingGrantedRoute = new Bundle(route);
+        pendingRouteState = state == null ? null : new Bundle(state);
         postGuestCreationIfResumed();
+    }
+
+    /**
+     * The Broker has already accepted this route, so this is the last point at which the
+     * process-local ActivityThread transport can be repaired before Guest onCreate/onResume.
+     * Do not silently fall back to the legacy manual child-Activity path when the bridge is
+     * unavailable: that path can report a logical RESUMED state without a real window/first
+     * frame, which is explicitly rejected by the C4 readiness gate.
+     */
+    private boolean reassertFrameworkActivityTransport(Bundle route) {
+        String routedSession = value(route.getString(RuntimeKeys.SESSION_ID, sessionId));
+        long routedGeneration = route.getLong(RuntimeKeys.GENERATION, generation);
+        try {
+            GuestRuntimeEnvironment.ensureFrameworkActivityInstrumentation(
+                    routedSession, routedGeneration);
+            return true;
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            Bundle evidence = new Bundle();
+            evidence.putString(RuntimeKeys.STATUS, "FAILED");
+            evidence.putString(RuntimeKeys.ERROR_TYPE, error.getClass().getName());
+            evidence.putString(RuntimeKeys.ERROR_MESSAGE, String.valueOf(error.getMessage()));
+            evidence.putString(RuntimeKeys.SESSION_ID, routedSession);
+            evidence.putLong(RuntimeKeys.GENERATION, routedGeneration);
+            evidence.putString(RuntimeKeys.REQUEST_ID,
+                    value(route.getString(RuntimeKeys.REQUEST_ID, requestId)));
+            evidence.putString(RuntimeKeys.OPERATION_ID,
+                    value(route.getString(RuntimeKeys.OPERATION_ID, operationId)));
+            evidence.putInt("pid", android.os.Process.myPid());
+            RuntimeEventLog.event("GUEST_INSTRUMENTATION_ROUTE_FENCE_FAILED", evidence);
+            android.util.Log.e("CS_FRAMEWORK_ACTIVITY",
+                    "ROUTE_FENCE_REASSERT_FAILED session=" + routedSession
+                            + " generation=" + routedGeneration
+                            + " request=" + value(route.getString(RuntimeKeys.REQUEST_ID, requestId))
+                            + " operation=" + value(route.getString(RuntimeKeys.OPERATION_ID, operationId)),
+                    error);
+            showFailure("GUEST_ACTIVITY_INSTRUMENTATION_REASSERT_FAILED",
+                    String.valueOf(error.getMessage()));
+            return false;
+        }
     }
 
     private void postGuestCreationIfResumed() {

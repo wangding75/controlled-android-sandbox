@@ -92,8 +92,11 @@ public final class GuestContextBoundarySelfTest {
                             }), "NO_GUEST_SERVICE_MATCH", "bindService executor overload");
             require(context.getContentResolver() != null,
                     "ContentResolver is exposed through the framework interception boundary");
-            require(context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) != null,
+            Object firstInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            require(firstInflater != null,
                     "LayoutInflater is cloned into the Guest context");
+            require(firstInflater == context.getSystemService(Context.LAYOUT_INFLATER_SERVICE),
+                    "LayoutInflater identity is cached per Guest context");
             boolean packageManagerNotReady = false;
             try { context.getPackageManager(); }
             catch (SecurityException expected) {

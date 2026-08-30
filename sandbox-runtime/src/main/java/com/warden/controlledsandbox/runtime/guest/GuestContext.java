@@ -21,6 +21,7 @@ import android.os.Bundle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.LayoutInflater;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -62,6 +63,9 @@ public final class GuestContext extends GuestHostOperationDenyContext {
     private final Context unwrapBoundary;
     private final Resources.Theme frameworkTheme;
     private final Map<String, GuestPackageContext> packageContexts = new HashMap<>();
+    /** ContextImpl caches this context-bound service; cloning it for every lookup is observable. */
+    private volatile LayoutInflater guestLayoutInflater;
+    private final Object layoutInflaterLock = new Object();
     private volatile GuestActivityThreadServiceBridge serviceFrameworkBridge;
     final GuestDynamicReceiverRegistry dynamicReceivers;
     final GuestMainThreadDispatcher mainThread;
@@ -308,7 +312,16 @@ public final class GuestContext extends GuestHostOperationDenyContext {
         // LayoutInflater is framework-owned but context-bound. It must be cloned into the
         // Guest context so Activity/Fragment UI code does not receive null or a Host inflater.
         if (Context.LAYOUT_INFLATER_SERVICE.equals(name)) {
-            return android.view.LayoutInflater.from(hostServiceContext).cloneInContext(this);
+            LayoutInflater cached = guestLayoutInflater;
+            if (cached != null) return cached;
+            synchronized (layoutInflaterLock) {
+                cached = guestLayoutInflater;
+                if (cached == null) {
+                    cached = LayoutInflater.from(hostServiceContext).cloneInContext(this);
+                    guestLayoutInflater = cached;
+                }
+                return cached;
+            }
         }
         if (!sharedState.systemServices.isKnownService(name)) return null;
         // Android service lookup is discovery, not permission grant. Camera and

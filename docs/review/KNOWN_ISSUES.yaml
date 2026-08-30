@@ -1857,4 +1857,17 @@ issues:
       Quark evidence and current-window artifact index are under
       `verification/catch-up/C4-TEMP-01/20260830T111850/`,
       `verification/catch-up/C4-TEMP-01/20260830T113744-artifact-index.md`, and
-      `verification/catch-up/C4-TEMP-01/20260830T113744-first-failure-classification.md`.
+      `verification/catch-up/C4-TEMP-01/20260830T113744-first-failure-classification.md`. On
+      2026-08-30, a source-level CAS repair removed the Guest-main-thread hop around Host dynamic
+      Receiver registration/unregistration after raw diagnostics showed a worker↔Guest-main-thread
+      lock inversion lasting approximately the 15,000 ms dispatcher timeout. The repair was
+      verified on the dynamically resolved MuMu `RD测试`: package-neutral fixture PASS, Quark direct
+      cold 3/3 at 7534/7042/6114 ms, and Quark CAS cold 3/3 at 63013/41235/39081 ms. All three
+      CAS requests reached correlated `LAUNCH_PASS`/`FIRST_FRAME_DRAWN` with non-empty Surface,
+      ready-for-display Window and non-black screenshot; each used attempt 1, retry budget 0 and
+      no automatic retry. The maximum sandbox/direct ratio was 8.3638, below the 10x hard limit
+      but above the 3x target. This closes the reproduced Receiver lock-inversion signature for
+      the TEMP-01 lane, but does not close the historical KI or its required full C4-R05 matrix;
+      status remains RECORDED and blocking until R05 completes. Evidence is indexed by
+      `verification/catch-up/C4-TEMP-01/20260830T181923-benchmark-summary.json` and
+      `verification/catch-up/C4-TEMP-01/20260830T181923-first-frame-fix-classification.md`.

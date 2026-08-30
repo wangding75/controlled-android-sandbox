@@ -892,6 +892,44 @@ public final class GuestRuntimeEnvironment {
         return current;
     }
 
+    /**
+     * Reasserts the ActivityThread bridge at the last safe boundary before a physical Stub
+     * Activity is allowed to create the Guest object. Guest SDK bootstrap code is permitted to
+     * install process hooks, and some SDKs replace {@code ActivityThread.mInstrumentation} after
+     * the normal PREPARE return. Waiting until the next Activity launch in that case sends the
+     * framework transaction through {@link com.warden.controlledsandbox.runtime.component.activity.StubActivityBase}
+     * without a Guest ActivityThread route, which can leave a logical Activity RESUMED with no
+     * published Surface. This method is generation-owned and fail-closed: a valid route cannot
+     * proceed when the framework bridge cannot be restored.
+     */
+    public static synchronized void ensureFrameworkActivityInstrumentation(
+            String sessionId, long generation) {
+        Session session = require(sessionId, generation);
+        try {
+            session.activityThreadInstrumentation =
+                    GuestActivityThreadInstrumentation.ensureInstalled(session);
+            Bundle evidence = new Bundle();
+            evidence.putString(RuntimeKeys.STATUS, "REASSERTED");
+            evidence.putString(RuntimeKeys.SESSION_ID, session.sessionId());
+            evidence.putLong(RuntimeKeys.GENERATION, session.generation());
+            evidence.putString(RuntimeKeys.PACKAGE_NAME, session.packageName());
+            evidence.putInt(RuntimeKeys.PROCESS_SLOT, session.processSlot());
+            evidence.putInt("pid", Process.myPid());
+            RuntimeEventLog.event("GUEST_INSTRUMENTATION_ROUTE_FENCE", evidence);
+            android.util.Log.i("CS_FRAMEWORK_ACTIVITY",
+                    "ROUTE_FENCE_REASSERTED session=" + session.sessionId()
+                            + " generation=" + session.generation()
+                            + " package=" + session.packageName()
+                            + " pid=" + Process.myPid());
+        } catch (Throwable error) {
+            com.warden.controlledsandbox.runtime.protocol.FatalErrorPolicy.rethrowIfFatal(error);
+            throw error instanceof RuntimeException
+                    ? (RuntimeException) error
+                    : new IllegalStateException("GUEST_ACTIVITY_INSTRUMENTATION_REASSERT_FAILED",
+                            error);
+        }
+    }
+
     /** Delivers a Broker-owned IIntentSender send through the current Guest generation. */
     static Bundle sendPersistentPendingIntent(String sessionId, long generation,
                                               Bundle request) {

@@ -32,6 +32,11 @@ spec = read("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/
 env = read("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/GuestRuntimeEnvironment.java")
 client = read("app/src/main/java/com/warden/controlledsandbox/RuntimeClient.java")
 benchmark = read("tools/capability/run_c4_temp_01_quark_latency.py")
+stub_activity = read("sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/component/activity/StubActivityBase.java")
+receiver_transport = read(
+    "sandbox-runtime/src/main/java/com/warden/controlledsandbox/runtime/guest/"
+    "GuestDynamicReceiverTransport.java"
+)
 
 if "PACKAGE_REVISION_VERIFIED_BY_BROKER" not in keys:
     fail("missing broker-issued revision key")
@@ -68,5 +73,19 @@ if "127.0.0.1:" in benchmark or "com.ucpro" in benchmark or "com.quark.browser" 
     fail("benchmark contains a hard-coded serial or Quark package")
 if "resolve_rd_environment" not in benchmark or "resolve-activity" not in benchmark:
     fail("benchmark does not dynamically resolve RD or the physical launch component")
+if "ensureFrameworkActivityInstrumentation" not in env:
+    fail("Guest runtime has no last-boundary ActivityThread bridge reassertion")
+if "reassertFrameworkActivityTransport" not in stub_activity:
+    fail("physical Stub route does not enforce the ActivityThread bridge fence")
+if "GUEST_INSTRUMENTATION_ROUTE_FENCE_FAILED" not in stub_activity:
+    fail("ActivityThread bridge fence failure is not captured as evidence")
+if "Intent sticky = registerHost(lease);" not in receiver_transport:
+    fail("dynamic receiver registration is still marshaled through Guest main thread")
+if "unregisterHost(lease);" not in receiver_transport:
+    fail("dynamic receiver teardown does not use the caller-owned thread")
+if "session.mainThread.call(() -> registerHost(lease))" in receiver_transport:
+    fail("dynamic receiver registration retains the Guest-main-thread lock inversion")
+if "session.mainThread.call(() -> unregisterHost(lease))" in receiver_transport:
+    fail("dynamic receiver teardown retains the Guest-main-thread lock inversion")
 
 print("PASS C4-TEMP-01 latency contract")
